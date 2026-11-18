@@ -1,6 +1,6 @@
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
 import type { Editor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { focusFirstMenuItem, menuKeyDown } from "../dialogs/menuKeys";
 import { openMediaPicker } from "../editor/mediaPicker";
 import { useEscapeLayer } from "../shell/escapeLayers";
 import {

@@ -1,6 +1,6 @@
 import { type Board, type SectionColor, sectionColors } from "@suite/graph";
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { focusFirstMenuItem, menuKeyDown } from "../dialogs/menuKeys";
 import { IconPicker } from "../icons/IconPicker";
 import { useEscapeLayer } from "../shell/escapeLayers";
 import { BoardGlyph } from "./BoardGlyph";

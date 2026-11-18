@@ -1,6 +1,6 @@
 import { typePluralName } from "@suite/graph";
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
 import { createPortal } from "react-dom";
-import { focusFirstMenuItem, menuKeyDown } from "../dialogs/menuKeys";
 import { useEscapeLayer } from "../shell/escapeLayers";
 import { useCanvasStore } from "../store/useCanvasStore";
 import { useUiStore } from "../store/useUiStore";

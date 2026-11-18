@@ -1,6 +1,6 @@
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
 import type { ReactNode } from "react";
 import { PORTAL_GLYPH } from "../cards/portal";
-import { focusFirstMenuItem, menuKeyDown } from "../dialogs/menuKeys";
 import type { NewThingMenuModel } from "./newThingMenu";
 
 /** A media card's glyph, next to the sketch's: both are verbs that make a card of a built-in type. */

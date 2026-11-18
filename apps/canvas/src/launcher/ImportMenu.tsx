@@ -1,5 +1,5 @@
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
 import { useEffect } from "react";
-import { focusFirstMenuItem, menuKeyDown } from "../dialogs/menuKeys";
 
 /**
  * The three import doors a row offers, behind one button.

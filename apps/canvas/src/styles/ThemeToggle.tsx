@@ -1,5 +1,5 @@
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
 import { useEffect, useRef, useState } from "react";
-import { focusFirstMenuItem, menuKeyDown } from "../dialogs/menuKeys";
 import { useEscapeLayer } from "../shell/escapeLayers";
 import { type ThemeMode, themeOptions } from "../theme/theme";
 import { useThemeStore } from "../theme/useThemeStore";

@@ -74,7 +74,7 @@ Use the library primitive before writing plumbing: Tiptap `BubbleMenu`, `useEdit
 surfaces, so consult `editingSurface` in the UI store rather than starting a second editor. A reveal
 goes through `focusTarget` (`focusCard`, `focusSection`); a panel never calls `setCenter` or
 `fitBounds`. A modal panel gets `useFocusTrap` from `apps/canvas/src/dialogs/useFocusTrap.ts`, a menu
-gets `menuKeyDown` from `apps/canvas/src/dialogs/menuKeys.ts`, and Escape is registered with
+gets `menuKeyDown` from `@suite/ui`, and Escape is registered with
 `useEscapeLayer` rather than a listener of its own. Format values through `displayTemplate(field)` and
 `ValueTemplate` instead of formatting by hand; that rule and its history are in
 [reference/editing.md](../reference/editing.md).

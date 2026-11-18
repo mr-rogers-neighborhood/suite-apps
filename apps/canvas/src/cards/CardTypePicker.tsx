@@ -1,6 +1,6 @@
 import { type Card, type CardType, isBehaviourType } from "@suite/graph";
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
 import { useEffect, useRef, useState } from "react";
-import { focusFirstMenuItem, menuKeyDown } from "../dialogs/menuKeys";
 
 /**
  * The multi-type picker (ADR-0053).

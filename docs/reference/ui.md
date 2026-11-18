@@ -662,7 +662,7 @@ Escape is a stack. `apps/canvas/src/shell/escapeLayers.ts` keeps one layer per o
 
 A modal panel traps Tab. `useFocusTrap` in `apps/canvas/src/dialogs/useFocusTrap.ts` moves focus in, wraps Tab and Shift-Tab inside the panel, and returns focus to whatever opened it. It exists because `aria-modal="true"` says the page behind is inert, and before it the last Tab walked into the canvas behind the scrim.
 
-Menus answer the arrows. Every `role="menu"` container handles `ArrowUp`, `ArrowDown`, `Home` and `End` through `menuKeyDown` in `apps/canvas/src/dialogs/menuKeys.ts`, moving focus among its own items and skipping a nested submenu's rows. Without it the role announced behaviour the keys did not have.
+Menus answer the arrows. Every `role="menu"` container handles `ArrowUp`, `ArrowDown`, `Home` and `End` through `menuKeyDown`, which moved to `@suite/ui` with the rest of the menu bar so Planner and Budget can have the same keys without copying them; it moves focus among the menu's own items and skips a nested submenu's rows. Without it the role announced behaviour the keys did not have.
 
 A menu also takes focus when it opens. `focusFirstMenuItem` is the menu's `ref`, so the first item holds focus on the frame the menu appears, which is what lets the key handler run at all; before it, focus stayed on the trigger and `ContextMenu`, portalled to `body`, sent Tab to the end of the document. The same ref restores focus to the opener when the menu unmounts, unless something else already took it.
 
@@ -695,7 +695,7 @@ Focus is always visible on interactive elements, and a focusable read-only contr
 | Behaviour | Test |
 | --- | --- |
 | Focus trap and focus restore | `apps/canvas/src/dialogs/useFocusTrap.test.tsx` |
-| Menu arrow keys, and focus entering the menu | `apps/canvas/src/dialogs/menuKeys.test.tsx` |
+| Menu arrow keys, and focus entering the menu | `@suite/ui`'s own `menuKeys.test.tsx`, beside the implementation it covers |
 | Tab strip keyboard | `apps/canvas/src/dialogs/tabKeys.test.tsx` |
 | Each menu takes focus on open | `ContextMenu.test.tsx`, `Dock.test.tsx`, `ViewsBar.test.tsx`, `BoardTabs.test.tsx`, `WorkspaceActions.test.tsx`, `ThemeToggle.test.tsx` and `CardTypePicker.test.tsx` beside each component |
 | A combobox keeps focus in its field | `apps/canvas/src/cards/CardPicker.test.tsx` |

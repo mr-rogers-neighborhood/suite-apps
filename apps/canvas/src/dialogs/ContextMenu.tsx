@@ -1,9 +1,9 @@
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useSurfacePaint } from "../canvas/surfaceContext";
 import { ColourStrip } from "../inspector/ColourStrip";
 import { useEscapeLayer } from "../shell/escapeLayers";
-import { focusFirstMenuItem, menuKeyDown } from "./menuKeys";
 
 export interface ContextMenuItem {
   label: string;

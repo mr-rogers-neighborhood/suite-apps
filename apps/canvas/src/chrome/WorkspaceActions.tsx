@@ -1,7 +1,7 @@
 import type { VaultFile } from "@suite/import-obsidian";
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
 import { useEffect, useRef, useState } from "react";
 import { DeleteWorkspaceDialog } from "../dialogs/DeleteWorkspaceDialog";
-import { focusFirstMenuItem, menuKeyDown } from "../dialogs/menuKeys";
 import { importVaultIntoWorkspace, vaultFilesFromPicker } from "../launcher/vaultImport";
 import { readVaultZip } from "../launcher/vaultZip";
 import { isShareSession } from "../session/session";
