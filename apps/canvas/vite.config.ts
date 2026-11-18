@@ -58,6 +58,9 @@ function excalidrawFontAssets(): Plugin {
 // One profile: the app, as a static bundle that reaches nothing.
 export default defineConfig({
   plugins: [react(), tailwindcss(), wasm(), excalidrawFontAssets()],
+  resolve: {
+    dedupe: ["react", "react-dom"],
+  },
   server: {
     watch: {
       // Test output lives under the canvas root (storybook-static) or one level

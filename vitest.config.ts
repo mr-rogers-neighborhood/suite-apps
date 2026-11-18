@@ -1,12 +1,21 @@
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { defineConfig } from "vitest/config";
 
-/**
- * Coverage is collected across all projects in one run, so the reporter options
- * below live at the root. `coverage.thresholds` accepts path globs, which is how
- * the gate is scoped to `@suite/graph` only — `canvas` is measured and printed
- * but not gated until it has enough real assertions to justify it.
- */
+const require = createRequire(import.meta.url);
+const reactDir = dirname(require.resolve("react/package.json"));
+const reactDomDir = dirname(require.resolve("react-dom/package.json"));
+
 export default defineConfig({
+  resolve: {
+    alias: [
+      { find: /^react$/, replacement: join(reactDir, "index.js") },
+      { find: /^react\/(.*)$/, replacement: join(reactDir, "$1") },
+      { find: /^react-dom$/, replacement: join(reactDomDir, "index.js") },
+      { find: /^react-dom\/(.*)$/, replacement: join(reactDomDir, "$1") },
+    ],
+    dedupe: ["react", "react-dom"],
+  },
   test: {
     // CRDT convergence tests move whole documents between peers and run in
     // parallel with the canvas project; the 5 s default produced a load-induced

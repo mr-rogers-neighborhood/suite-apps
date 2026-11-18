@@ -21,6 +21,7 @@ overrides:
   # Low severity (2.1), reached only through Mermaid's math typesetting inside
   # the Excalidraw converter. Overridden anyway so the scan stays a gate.
   katex: ^0.18.2
+  "@suite/ui": link:../suite-start/packages/ui
 minimumReleaseAgeExclude:
   - "@turbo/darwin-64@2.11.10"
   - "@turbo/darwin-arm64@2.11.10"
