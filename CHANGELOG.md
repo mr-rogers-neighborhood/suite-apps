@@ -4,6 +4,25 @@
 
 No changes yet.
 
+## [0.1.9] - 2026-11-18
+
+A maintenance release with one change that matters and one that will matter later. Nothing looks
+different.
+
+### Changed
+
+- **The same `loro-crdt` as the rest of the suite.** Canvas was on 1.16.4 while Planner, Budget and
+  Suite Go were on 1.17.1, which is invisible until a document written by one is opened by the other,
+  and then it is a data problem rather than an update prompt. The test that guards it runs the version
+  this release replaces against this one, in both directions, for snapshots and incremental updates.
+- **The top bar is drawn by `@suite/ui`'s `MenuBar`.** It composes the same nodes in the same seven
+  zones, so the props and the behaviour are unchanged and the existing tests were not touched. What
+  changed is where the structure lives: a bar four apps can share, rather than one app's chrome. Canvas
+  is the first app on it and, today, the only one.
+- **Menu keyboard handling moved with it.** The arrow, `Home` and `End` behaviour a `role="menu"`
+  announces is now in the package, with its tests beside it, so the next app to use a menu gets it
+  rather than reimplementing it.
+
 ## [0.1.8] - 2026-11-08
 
 ### Changed
