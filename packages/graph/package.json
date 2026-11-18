@@ -21,12 +21,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "loro-crdt": "^1.16.4",
+    "loro-crdt": "^1.17.1",
     "neverthrow": "^8.2.0",
     "remeda": "^2.54.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "loro-crdt-1-16": "npm:loro-crdt@1.16.4",
     "typescript": "~5.9.3",
     "vitest": "^5.0.5"
   }

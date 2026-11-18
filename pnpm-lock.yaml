@@ -269,11 +269,11 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2
       loro-crdt:
-        specifier: ^1.16.4
-        version: 1.16.4
+        specifier: ^1.17.1
+        version: 1.17.1
       loro-prosemirror:
         specifier: 0.4.4
-        version: 0.4.4(patch_hash=ccea0fae37122631a09ed2760cc51773577c22dc8e4e816e56c34ed54039be39)(loro-crdt@1.16.4)
+        version: 0.4.4(patch_hash=ccea0fae37122631a09ed2760cc51773577c22dc8e4e816e56c34ed54039be39)(loro-crdt@1.17.1)
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -400,8 +400,8 @@ importers:
   packages/graph:
     dependencies:
       loro-crdt:
-        specifier: ^1.16.4
-        version: 1.16.4
+        specifier: ^1.17.1
+        version: 1.17.1
       neverthrow:
         specifier: ^8.2.0
         version: 8.2.0
@@ -412,6 +412,9 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
+      loro-crdt-1-16:
+        specifier: npm:loro-crdt@1.16.4
+        version: loro-crdt@1.16.4
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
@@ -4510,6 +4513,9 @@ packages:
 
   loro-crdt@1.16.4:
     resolution: {integrity: sha512-UPufMpHSEMLRVjWfCjhVbOD8nkCDwxdfVk4Uer6xTEFAcNn+X+oGYWGgIIYuAgofc8UiI0ERZUIMnP7ib/kh6w==}
+
+  loro-crdt@1.17.1:
+    resolution: {integrity: sha512-83hWRYG6eMMpPezm+yXWlOqCuUsC0BYY1MVCPW9x2zlikgkHhL7GC7Q6JFH+Hjvauyn287Q1MiwTuRW0lUOUag==}
 
   loro-prosemirror@0.4.4:
     resolution: {integrity: sha512-9Ttd3yHcb6Y+qxsqiS+fNMy9c9bNeimlLd7FShbVwRUBer8iosI9txWZlegzKnNjUUqIRyV15ybM6w3c2zS+Jg==}
@@ -9896,10 +9902,12 @@ snapshots:
 
   loro-crdt@1.16.4: {}
 
-  loro-prosemirror@0.4.4(patch_hash=ccea0fae37122631a09ed2760cc51773577c22dc8e4e816e56c34ed54039be39)(loro-crdt@1.16.4):
+  loro-crdt@1.17.1: {}
+
+  loro-prosemirror@0.4.4(patch_hash=ccea0fae37122631a09ed2760cc51773577c22dc8e4e816e56c34ed54039be39)(loro-crdt@1.17.1):
     dependencies:
       lib0: 0.2.119
-      loro-crdt: 1.16.4
+      loro-crdt: 1.17.1
       prosemirror-model: 1.25.12
       prosemirror-state: 1.4.4
       prosemirror-view: 1.42.6
