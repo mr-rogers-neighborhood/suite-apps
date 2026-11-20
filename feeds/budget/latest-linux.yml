@@ -1,9 +1,9 @@
-version: 0.2.3
+version: 0.2.4
 files:
-  - url: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/budget-v0.2.3/suite-budget-0.2.3-x86_64.AppImage
-    sha512: WZEJ/bChYfyazlF2Jv6RlTzC5XLFZ1n8OZXhEbwD8YArvhvf0j3R8HtuloIcNCCdSRrxnifP4WS5jKGj6K+8WQ==
-    size: 141484971
-    blockMapSize: 148415
-path: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/budget-v0.2.3/suite-budget-0.2.3-x86_64.AppImage
-sha512: WZEJ/bChYfyazlF2Jv6RlTzC5XLFZ1n8OZXhEbwD8YArvhvf0j3R8HtuloIcNCCdSRrxnifP4WS5jKGj6K+8WQ==
-releaseDate: '2026-11-20T10:19:59.974Z'
+  - url: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/budget-v0.2.4/suite-budget-0.2.4-x86_64.AppImage
+    sha512: /5G7Fbhj9k6m7PzSjJdeiByqOAkaP3MJw69qglZtBEltluu5EFEMNWoWVtsjGCaGBTBLXXF1PTvdJzlDRpxtQA==
+    size: 141484988
+    blockMapSize: 148432
+path: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/budget-v0.2.4/suite-budget-0.2.4-x86_64.AppImage
+sha512: /5G7Fbhj9k6m7PzSjJdeiByqOAkaP3MJw69qglZtBEltluu5EFEMNWoWVtsjGCaGBTBLXXF1PTvdJzlDRpxtQA==
+releaseDate: '2026-11-20T11:01:18.893Z'
