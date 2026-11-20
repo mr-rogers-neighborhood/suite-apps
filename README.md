@@ -70,6 +70,26 @@ the `suite://` handler in `~/.config/mimeapps.list`. The AppImage needs
 mount; the unpacked build keeps the sandbox. A Flatpak build uses zypak and
 avoids that tradeoff.
 
+## Flatpak (Canvas first)
+
+Flatpak is a second channel for one app, not yet a replacement for Start's AppImage installs. The
+manifest packages the same `package:dir` build, with zypak from the Electron base app.
+
+```sh
+node scripts/flatpak.mjs              # package, build, publish, install
+node scripts/flatpak.mjs --no-build   # reuse release/linux-unpacked
+flatpak run run.suite.canvas
+```
+
+It exports to `~/suite-flatpak/repo`, adds it as the user remote `suite-local`, and installs from
+that remote, so `flatpak update` is the real update path. The repo is unsigned and the remote is
+added with `--no-gpg-verify`; a published repo needs `flatpak build-update-repo --gpg-sign` and a
+key the client already trusts.
+
+The hub stays an unpacked install until it manages Flatpaks. Packaging it earlier would need
+`--filesystem=home` and `flatpak-spawn --host` to keep writing `~/Applications`, which is sandbox
+theater and a second update channel. See `apps/suite-start/docs/how-to/package.md` and ADR-0001.
+
 ## The gate on the VM
 
 `suite-dev` is the independent machine. `scripts/ci/bootstrap-vm.sh` prepares it

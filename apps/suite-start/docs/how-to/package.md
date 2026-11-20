@@ -87,8 +87,12 @@ for it:
   trust story is a signed yml and a sha512. Two ways to receive bytes is one way too many.
 - **Heavier to build:** `flatpak-builder` plus an `org.freedesktop.Sdk` runtime.
 
-Where Flatpak could earn a place later: as an alternative channel for a _single self-contained app_
-(Canvas) for people who distrust AppImages. Not for the hub, and not for the apps Start manages.
+Where Flatpak fits: each app can ship as a Flatpak beside its AppImage (Canvas first; see
+`packaging/flatpak/`). The hub itself becomes a Flatpak **when it manages Flatpaks** — at that point the
+Flatpak portal is the writer, Start needs no access to `~/Applications`, and its sandbox is real.
+Packaging the hub before then would mean `--filesystem=home` and `flatpak-spawn --host` to keep
+managing AppImages: a sandbox with the door propped open, and a second update channel for the same
+binary. So: apps first, hub last. ADR-0001's one-writer rule is unchanged — only the writer changes.
 
 ## Cutting a release that includes the package
 

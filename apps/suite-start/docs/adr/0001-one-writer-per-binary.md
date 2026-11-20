@@ -1,7 +1,7 @@
 # ADR-0001: One writer per binary
 
 - Status: accepted; amended 2026-11-06 and 2026-11-07; restated 2026-11-07 so the Decision below is
-  the rule the code implements
+  the rule the code implements; amended 2026-11-19 for the Flatpak writer
 - Date: 2026-11-06
 
 ## Context
@@ -67,6 +67,10 @@ As applied:
 - An app installed by a package manager is not Start's to launch, so it keeps its own updater and may
   need root to use it. The suite ships apps as AppImages precisely so that case does not arise — see
   `docs/how-to/package.md`.
+- A Flatpak app is written by Flatpak, not by Start. When an app ships as a Flatpak, Start asks the
+  Flatpak portal (or its CLI) to install and update it and never writes into the install tree: the
+  one-writer rule is unchanged, only the writer changes. The hub itself can be a Flatpak once that is
+  its only path; until then it keeps managing AppImages outside one.
 - Start cannot replace its own running binary. Its own row links to the release page instead of
   offering a button that would fail.
 

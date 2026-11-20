@@ -39,7 +39,11 @@ modules:
       - install -Dm755 run.suite.canvas /app/bin/run.suite.canvas
       - install -Dm644 run.suite.canvas.desktop /app/share/applications/run.suite.canvas.desktop
       - install -Dm644 run.suite.canvas.metainfo.xml /app/share/metainfo/run.suite.canvas.metainfo.xml
-      - install -Dm644 icon.png /app/share/icons/hicolor/1024x1024/apps/run.suite.canvas.png
+      - install -Dm644 icons/run.suite.canvas-48.png /app/share/icons/hicolor/48x48/apps/run.suite.canvas.png
+      - install -Dm644 icons/run.suite.canvas-64.png /app/share/icons/hicolor/64x64/apps/run.suite.canvas.png
+      - install -Dm644 icons/run.suite.canvas-128.png /app/share/icons/hicolor/128x128/apps/run.suite.canvas.png
+      - install -Dm644 icons/run.suite.canvas-256.png /app/share/icons/hicolor/256x256/apps/run.suite.canvas.png
+      - install -Dm644 icons/run.suite.canvas-512.png /app/share/icons/hicolor/512x512/apps/run.suite.canvas.png
     sources:
       - type: dir
         path: ../../apps/suite-canvas/apps/desktop/release/linux-unpacked
@@ -50,5 +54,6 @@ modules:
         path: run.suite.canvas.desktop
       - type: file
         path: run.suite.canvas.metainfo.xml
-      - type: file
-        path: ../../apps/suite-canvas/apps/desktop/build/icon.png
+      - type: dir
+        path: icons
+        dest: icons
