@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Installed as <bare>/hooks/post-receive by scripts/ci/bootstrap-vm.sh.
+#
+# A push to `main` starts one gate run per pushed commit. The run is a transient
+# system unit: it survives this hook's shell, carries a memory cap, and keeps
+# its own log file. The unit runs as `aurora`, not root.
+set -euo pipefail
+
+ROOT=${SUITE_CI_ROOT:-$HOME/ci}
+if [ ! -x "$ROOT/run-gate.sh" ]; then
+  echo "post-receive: $ROOT/run-gate.sh is missing; run scripts/ci/bootstrap-vm.sh" >&2
+  exit 1
+fi
+
+mkdir -p "$ROOT/logs"
+
+while read -r old new ref; do
+  case "$ref" in
+    refs/heads/main) ;;
+    *) continue ;;
+  esac
+  if [ "$new" = "0000000000000000000000000000000000000000" ]; then
+    echo "post-receive: ignoring deleted main" >&2
+    continue
+  fi
+
+  unit="suite-gate-${new:0:12}-$(date -u +%Y%m%dT%H%M%SZ)"
+  log="$ROOT/logs/$new.log"
+
+  # systemd-run --user needs a session bus that a non-interactive SSH session
+  # does not have, so the hook asks the system manager for a transient unit and
+  # hands it back to this user. One run at a time: run-gate.sh takes a lock, so
+  # a second push waits its turn instead of doubling the memory footprint.
+  sudo -n systemd-run --unit="$unit" --collect --quiet \
+    --uid="$(id -u)" --gid="$(id -g)" \
+    --working-directory="$ROOT" \
+    --property=MemoryHigh=5G \
+    --property=MemoryMax=6G \
+    --property=StandardOutput=append:"$log" \
+    --property=StandardError=append:"$log" \
+    --setenv=HOME="$HOME" \
+    --setenv=PATH=/usr/local/bin:/usr/bin:/bin \
+    --setenv=NODE_OPTIONS=--max-old-space-size=3072 \
+    "$ROOT/run-gate.sh" "$new"
+
+  echo "post-receive: queued $unit for $new"
+done
