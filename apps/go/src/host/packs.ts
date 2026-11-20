@@ -34,15 +34,16 @@ const ROOT = "packs";
  * handed over the app. An empty value refuses every pack, which is the correct default for a
  * build with no key: an unverified pack is never better than no pack.
  *
- * **This is a development key.** It exists so the pipeline can be exercised end to end while
- * there is no release process. The release key replaces it in the same commit that adds
- * signing to CI, and the private half is a release secret that never enters this repository.
+ * The private half is a release secret and lives outside this repository, at
+ * `~/.config/suite/keys/pack-key` (or wherever `SUITE_KEYS_DIR` points). `pnpm planner:pack`
+ * reads it from `$SUITE_PACK_KEY` or that file. `pnpm keys status` prints its fingerprint and
+ * says whether the key on this machine is the key this constant trusts — the check that matters,
+ * because a pack signed by anything else is refused on the device as `untrusted`.
  *
- * Rotated when Planner was wired as the first real pack: the previous development key had no
- * private half in any build pipeline, so nothing could be signed with it. `pnpm planner:pack`
- * reads the matching private half from `.dev/suite-pack-key` (ignored) or `SUITE_PACK_KEY`.
+ * Rotation is one change: `pnpm keys generate pack`, put the public half here, rebuild every pack.
+ * [Keys](../../../../docs/how-to/keys.md) states the procedure and what a fingerprint proves.
  */
-export const PACK_PUBLIC_KEY = "IHbF2Q8pBAvXq/DaaxxV50WfuXG1+WqJgGFVpahtewk=";
+export const PACK_PUBLIC_KEY = "x5QN5OKEGya9gsrbNGaKZMfznsAv6+Cux/qrBYHuSfc=";
 
 /** What this build implements. Bumped when the host services a pack may call change. */
 export const HOST_CONTRACT_VERSION = 1;

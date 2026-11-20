@@ -58,9 +58,11 @@ An update feed is one URL, and anything that can answer it can offer a version. 
 protects a download, not the manifest that named it, so the manifest is signed with the publisher's
 ed25519 key. The script does this; `latest-linux.yml.sig` sits beside the manifest.
 
-The private key is at `~/.config/suite/update-key.pem` on the publisher's machine, or wherever
+The private key is at `~/.config/suite/keys/update-key.pem` on the publisher's machine, or wherever
 `SUITE_UPDATE_KEY` points. **It is not in this repository and must not be.** Back it up somewhere you
-control: anyone holding it can push an update to every install.
+control: anyone holding it can push an update to every install. [Manage signing keys](../../../../docs/how-to/keys.md)
+covers the directory and the backup, and the root repository's `keys status` check proves the key in
+hand is the one the apps pin before anything is built.
 
 The public half is `SUITE_UPDATE_PUBLIC_KEY` in `@suite/desktop`, with `updateKeyFingerprint()` to
 check that what you signed with is what the apps pin. A new key is a new trust root: an installed app

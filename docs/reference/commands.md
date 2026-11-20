@@ -55,6 +55,19 @@ pnpm shape          # file length, observe sites, raw Loro writes
 Playwright is not part of any per-change gate. Run it when the owner asks for a run or names a
 milestone.
 
+## Signing keys
+
+```sh
+pnpm keys status            # presence, fingerprint, and whether each pin accepts the key
+pnpm keys status --strict   # also fail when a key is absent
+pnpm keys generate pack     # a new pack signing keypair
+pnpm keys generate update   # a new update signing keypair
+```
+
+The private halves live outside the repository, and each public half is pinned in the source that
+verifies it. [Manage signing keys](../how-to/keys.md) has the directory, the rotation order and what
+a backup has to preserve.
+
 ## Docs
 
 ```sh

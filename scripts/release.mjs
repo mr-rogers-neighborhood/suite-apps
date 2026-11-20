@@ -16,8 +16,9 @@
  *   default, so running the command to see what it would do cannot upload.
  * - **Nothing is bumped.** The version in `package.json` is the release.
  *
- * The private key never enters this repository. It is read from
- * `SUITE_UPDATE_KEY`, or from `~/.config/suite/update-key.pem`.
+ * The private key never enters this repository. It is read from `SUITE_UPDATE_KEY`, or from
+ * `~/.config/suite/keys/update-key.pem` (`pnpm keys status` names it). A key that does not match
+ * the pin the apps trust is refused before the build: such a feed is refused by every install.
  *
  * Usage:
  *   node scripts/release.mjs <app-id> [--publish]
@@ -36,9 +37,16 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  fingerprintOf as secretFingerprint,
+  groupedFingerprint,
+  keyPath as secretKeyPath,
+  pinnedPublic as pinnedSecretPublic,
+  publicOf as publicFromPrivate,
+} from "./lib/keys.mjs";
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 export const FEED_HOST = "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main";
@@ -467,7 +475,36 @@ export function signatureVerifies(bytes, signature, publicKeyPem) {
 
 /** The key path a release reads, from the environment or the publisher's default. */
 export function updateKeyPath(env = process.env) {
-  return env.SUITE_UPDATE_KEY?.trim() || join(homedir(), ".config", "suite", "update-key.pem");
+  return env.SUITE_UPDATE_KEY?.trim() || secretKeyPath("update", env);
+}
+
+/**
+ * Why a private key must not publish, or null when it is the key the apps pin.
+ *
+ * Exported so the refusal can be exercised without a release. An installed app verifies with the
+ * key compiled into it, so a feed signed by anything else downloads nothing and reports no
+ * release; the build should not start, let alone upload, before that is known.
+ */
+export function publisherKeyProblem(privateKey, { pinned = pinnedSecretPublic("update") } = {}) {
+  let derived;
+  try {
+    derived = publicFromPrivate("update", privateKey).publicText;
+  } catch (error) {
+    return `the publisher key is not a usable Ed25519 key: ${error.message}`;
+  }
+
+  if (pinned === null) {
+    return "SUITE_UPDATE_PUBLIC_KEY is missing from packages/desktop/src/updateSignature.ts";
+  }
+  if (derived.trim() === pinned.trim()) return null;
+
+  return (
+    "the publisher key is not the key the apps pin.\n" +
+    `  this key  ${groupedFingerprint(secretFingerprint(derived, "spki-pem"))}\n` +
+    `  pinned    ${groupedFingerprint(secretFingerprint(pinned, "spki-pem"))}\n` +
+    "A feed signed with this key is refused by every installed app. Run `pnpm keys status`; " +
+    "pin this key first, or use the one the tree already trusts."
+  );
 }
 
 export function parseArgs(argv) {
@@ -764,11 +801,19 @@ async function release(app, options) {
   const keyPath = updateKeyPath();
   if (!existsSync(keyPath)) {
     throw new Error(
-      `no publisher key at ${keyPath}. Set SUITE_UPDATE_KEY to its path; ` +
-        "the private key never belongs in this repository.",
+      `no publisher key at ${keyPath}. Run \`pnpm keys generate update\` to make one, ` +
+        "or set SUITE_UPDATE_KEY to its path; the private key never belongs in this repository.",
     );
   }
   const privateKey = await readFile(keyPath, "utf8");
+
+  // The pin is what an installed app trusts. Signing with any other key produces a feed that
+  // every existing install refuses as "not signed by the publisher" — after the artifact has
+  // been uploaded and the feed committed. Refuse before the build instead.
+  const keyProblem = publisherKeyProblem(privateKey);
+  if (keyProblem !== null) {
+    throw new Error(`${keyProblem}\n  at        ${keyPath}`);
+  }
 
   process.stdout.write(`\nreleasing ${app.name} ${version} as ${tag}\n`);
 

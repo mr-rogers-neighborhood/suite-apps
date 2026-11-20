@@ -5,16 +5,18 @@
  *   pnpm planner:pack [--key <base64>] [--out .dev/planner.pack]
  *
  * The private key follows the existing rule: it is never in this repository. `SUITE_PACK_KEY` or
- * `--key` supplies it; `apps/go/.dev/suite-pack-key` is a local convenience for a development key
- * (that directory is ignored). The public half is `PACK_PUBLIC_KEY` in `src/host/packs.ts`.
+ * `--key` supplies it; `~/.config/suite/keys/pack-key` is where `pnpm keys generate pack` puts it
+ * (or wherever `SUITE_KEYS_DIR` points). The public half is `PACK_PUBLIC_KEY` in
+ * `src/host/packs.ts`, and `pnpm keys status` says whether the two on this machine agree.
  *
  * The entry page is written here rather than committed: its script name carries Vite's content
  * hash, and its CSP is the pack's own network seal, which the installer verifies.
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { keyPath, readKey } from "../../../scripts/lib/keys.mjs";
 
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 const DIST = join(APP_DIR, "planner-dist");
@@ -31,10 +33,15 @@ const name = arg("name") ?? "Planner";
 const version = arg("version") ?? "0.1.0";
 const out = arg("out") ?? join(DEV_DIR, `${id}.pack`);
 
+/**
+ * The signing key, from the one home secrets have.
+ *
+ * It used to be `apps/go/.dev/suite-pack-key`, which is the scratch directory the build replaces:
+ * a cleanup took the only copy with it. Nothing durable lives there now. `pnpm keys status`
+ * reports whether this key is the one `PACK_PUBLIC_KEY` trusts.
+ */
 function localKey() {
-  const path = join(DEV_DIR, "suite-pack-key");
-  if (!existsSync(path)) return undefined;
-  return readFileSync(path, "utf8").trim().split(/\r?\n/u)[0];
+  return readKey("pack") ?? undefined;
 }
 
 const key = arg("key") ?? process.env.SUITE_PACK_KEY ?? localKey();
@@ -113,9 +120,9 @@ rewriteEntry();
 
 if (!key) {
   console.error(
-    "No signing key. Pass --key <base64>, set SUITE_PACK_KEY, or put a development key in " +
-      "apps/go/.dev/suite-pack-key.\n" +
-      "Generate one with `pnpm pack:keygen`; the public half goes into PACK_PUBLIC_KEY.",
+    "No signing key. Pass --key <base64>, set SUITE_PACK_KEY, or run `pnpm keys generate pack`.\n" +
+      `That command writes the key to ${keyPath("pack")}.\n` +
+      "A pack that is not signed is not installable, by design.",
   );
   process.exit(1);
 }

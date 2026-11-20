@@ -13,6 +13,7 @@
     "check:all": "node scripts/gate.mjs",
     "gate:fresh": "node scripts/gate.mjs --fresh",
     "docs:check": "node scripts/docs-check.mjs",
+    "keys": "node scripts/keys.mjs",
     "format": "pnpm --filter \"./apps/*\" --filter \"./apps/*/*\" --filter \"./packages/*\" --workspace-concurrency=1 run format",
     "build": "pnpm --filter \"./apps/*\" --filter \"./apps/*/*\" --filter \"./packages/*\" --workspace-concurrency=1 run build",
     "prepare": "husky"

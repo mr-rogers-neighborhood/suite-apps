@@ -51,6 +51,17 @@ where `scripts/store-key.sh` writes and whose name the key carries. `SUITE_GO_KE
 `SUITE_GO_KEY_ALIAS`, `SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_PASSWORD` and `SUITE_GO_JAVA_HOME`
 are used when building and signing an Android pack.
 
+## Signing keys
+
+The private keys live outside the repository. [Manage signing keys](../how-to/keys.md) states what
+each one signs and how to rotate it; this table is only where a script looks.
+
+| Variable | Means |
+| --- | --- |
+| `SUITE_KEYS_DIR` | the directory that holds both keys, instead of `~/.config/suite/keys` |
+| `SUITE_PACK_KEY` | the pack signing key's text, instead of `pack-key` in that directory |
+| `SUITE_UPDATE_KEY` | the update signing key's file, instead of `update-key.pem` in that directory |
+
 ## Development
 
 `SUITE_SKIP_DOCKER_SECURITY=1` skips Canvas's container-based secret scan. It exists for a machine

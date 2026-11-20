@@ -125,7 +125,8 @@ The manifest is signed, and an installed build verifies it with the update key c
 build. Replacing the key at the publisher does not reach an installed copy: the old build keeps
 refusing feeds signed with the new key, and its cards report no release rather than offering a
 download. The order that avoids this is a new Start first, then a feed signed with the new key;
-[the decision record](decisions.md#packaging) states it.
+[the decision record](decisions.md#packaging) states it. The private key's location, the fingerprints
+that identify it, and the backup it needs are on [Manage signing keys](../how-to/keys.md).
 
 Recovery from a rotation that already happened is one manual install of the current Start, which then
 verifies the feeds with the new key.

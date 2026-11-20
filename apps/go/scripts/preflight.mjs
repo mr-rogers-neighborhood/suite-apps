@@ -14,6 +14,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { groupedFingerprint, inspectKey } from "../../../scripts/lib/keys.mjs";
 
 const run = promisify(execFile);
 
@@ -161,6 +162,25 @@ async function main() {
       "jdk (gradle)",
       "no JDK 17 or 21 found",
       "pacman -S jdk21-openjdk. A newer JDK than Gradle supports fails with a message that never names the JDK.",
+    );
+
+  const packKey = inspectKey("pack");
+  if (packKey.state === "absent")
+    warn(
+      "pack signing key",
+      "absent — `pnpm planner:pack` cannot sign",
+      "pnpm keys generate pack, then pin its public half as PACK_PUBLIC_KEY",
+    );
+  else if (packKey.ok)
+    pass(
+      "pack signing key",
+      `${groupedFingerprint(packKey.fingerprint)} — matches PACK_PUBLIC_KEY`,
+    );
+  else
+    fail(
+      "pack signing key",
+      `${packKey.detail} — a pack signed with it is refused as untrusted`,
+      "pnpm keys status names both fingerprints",
     );
 
   const systemImages = sdkRoot ? listDirs(join(sdkRoot, "system-images")) : [];

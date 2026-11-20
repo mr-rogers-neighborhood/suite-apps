@@ -100,10 +100,12 @@ pnpm planner:pack                # renderer + prelude + signed pack in .dev/plan
 pnpm android:install             # the shell; the pack is installed separately until there is an install screen
 ```
 
-`pnpm planner:pack` signs with `SUITE_PACK_KEY`, `--key`, or the local
-`apps/go/.dev/suite-pack-key`. The public half is `PACK_PUBLIC_KEY` in `src/host/packs.ts`. The
-development key was rotated when this pack was wired: the previous one had no private half in any
-build pipeline, so nothing could be signed with it.
+`pnpm planner:pack` signs with `SUITE_PACK_KEY`, `--key`, or the key at
+`~/.config/suite/keys/pack-key`. The public half is `PACK_PUBLIC_KEY` in `src/host/packs.ts`, and
+`pnpm keys status` says whether the two agree — a pack signed by any other key is refused on the
+device as `untrusted`. The key was rotated when this pack was wired, because the earlier one had no
+private half anywhere; [Manage signing keys](../../../../docs/how-to/keys.md) records where the
+replacement lives and how the next rotation works.
 
 ## Reminders
 

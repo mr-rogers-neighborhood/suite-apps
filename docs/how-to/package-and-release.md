@@ -106,6 +106,7 @@ guess one.
 ```sh
 mise exec -- node scripts/gate.mjs --fresh      # writes .dev/gate-status.json for this commit
 mise exec -- node scripts/docs-check.mjs       # if docs changed
+pnpm keys status                               # the publisher key matches the pin the apps trust
 node scripts/release.mjs <app>                # a clean dry run
 node scripts/release.mjs <app> --publish
 node scripts/release.mjs <app> --verify
@@ -213,4 +214,6 @@ its own. Where a version shipped without written notes, the changelog says so in
 than inventing a section.
 
 The manifest's signature is made with the publisher key at `SUITE_UPDATE_KEY`, or
-`~/.config/suite/update-key.pem` by default. The private half never enters this repository.
+`~/.config/suite/keys/update-key.pem` by default. The private half never enters this repository, and
+`scripts/release.mjs` refuses a key that does not match the pin before it builds anything.
+[Manage signing keys](keys.md) covers the directory, the fingerprints and rotation.

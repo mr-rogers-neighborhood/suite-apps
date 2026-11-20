@@ -36,6 +36,11 @@ The rules that shape this repository. Each is current; the code follows it.
   states which file owns it and which prefix the tag uses.
 - An installed app verifies a feed with the update key it was built with. A key rotation therefore
   ships a new Start first; a feed signed with the new key is published only after that build exists.
+- Private signing keys live outside the repository, in `~/.config/suite/keys/` or wherever
+  `SUITE_KEYS_DIR` points. A public half is pinned in the source that verifies it, and
+  `pnpm keys status` proves the two agree. No secret is stored in a generated directory such as
+  `.dev/`: a cleanup deletes it, and the pin is left with no key able to satisfy it.
+  [Manage signing keys](../how-to/keys.md) owns the procedure.
 - Linux is the published platform. macOS and Windows have no signing identity.
 
 ## Product boundary
