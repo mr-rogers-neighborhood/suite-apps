@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
-import { type DeviceGroup, decodeGroup, encodeGroup } from "@suite/sync";
+import { type DeviceGroup, decodeGroup, encodeGroup, genesisRecordSchema } from "@suite/sync";
 import type { StoredIdentityFile } from "./identity.js";
+import type { StoredRootFile } from "./rootStore.js";
 
 /**
  * A way back in, as one file.
@@ -22,6 +23,15 @@ export const KIT_VERSION = 1;
 export interface KitPayload {
   readonly group: string;
   readonly identity: StoredIdentityFile;
+  /**
+   * The workspace's identity root, present only in a kit written by the device that
+   * founded the workspace.
+   *
+   * The root private key is the one secret that must not be copied to every device: a
+   * second owner can invite and revoke, but it cannot re-found the workspace because it
+   * does not hold the root. Its only backup is this file, on the creating device.
+   */
+  readonly root?: StoredRootFile;
 }
 
 export interface KitFile {
@@ -48,6 +58,8 @@ export interface KitOptions {
   readonly deviceName: string;
   readonly group: DeviceGroup;
   readonly identity: StoredIdentityFile;
+  /** The identity root, when this device is the one that founded the workspace. */
+  readonly root?: StoredRootFile;
   readonly now?: Date;
 }
 
@@ -59,6 +71,7 @@ export function exportKit(options: KitOptions, passphrase: string | null): Uint8
   const payload: KitPayload = {
     group: Buffer.from(encodeGroup(options.group)).toString("base64"),
     identity: options.identity,
+    ...(options.root === undefined ? {} : { root: options.root }),
   };
   const common = {
     format: KIT_FORMAT as typeof KIT_FORMAT,
@@ -99,6 +112,8 @@ export interface OpenedKit {
   readonly deviceName: string;
   readonly group: DeviceGroup;
   readonly identity: StoredIdentityFile;
+  /** The identity root, when the kit was written by the founding device. */
+  readonly root: StoredRootFile | null;
 }
 
 /**
@@ -131,6 +146,11 @@ export function importKit(bytes: Uint8Array, passphrase: string | null): OpenedK
     throw new Error("That recovery file is missing the device it belongs to.");
   }
 
+  const root = payload.root === undefined ? null : storedRoot(payload.root);
+  if (payload.root !== undefined && root === null) {
+    throw new Error("That recovery file's workspace root could not be read.");
+  }
+
   let group: DeviceGroup;
   try {
     group = decodeGroup(new Uint8Array(Buffer.from(payload.group, "base64")));
@@ -144,6 +164,22 @@ export function importKit(bytes: Uint8Array, passphrase: string | null): OpenedK
     deviceName: typeof kit.deviceName === "string" ? kit.deviceName : "this device",
     group,
     identity,
+    root,
+  };
+}
+
+/** The identity root a kit carries, when it carries one and it is shaped like one. */
+function storedRoot(value: unknown): StoredRootFile | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.publicKey !== "string" || typeof record.privateKey !== "string") return null;
+  const genesis = genesisRecordSchema.safeParse(record.genesis);
+  if (!genesis.success) return null;
+  return {
+    version: 1,
+    publicKey: record.publicKey,
+    privateKey: record.privateKey,
+    genesis: genesis.data,
   };
 }
 

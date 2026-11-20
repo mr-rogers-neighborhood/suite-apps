@@ -13,8 +13,10 @@ import {
   seal,
 } from "@suite/sync";
 import { describe, expect, it, vi } from "vitest";
+import { loadCursor } from "./cursorStore.js";
 import { loadGroup, saveGroup } from "./groupStore.js";
 import { loadOrCreateIdentity } from "./identity.js";
+import { genesisChecksOut, readGenesis, readRootFile } from "./rootStore.js";
 import { createSyncService, type SyncStatus } from "./service.js";
 
 const workspaceId = "a".repeat(64);
@@ -47,6 +49,68 @@ function fakeHost() {
       listeners.get("open")?.();
     },
     host: (message: unknown) => listeners.get("message")?.({ data: JSON.stringify(message) }),
+  };
+}
+
+/** The last frame of a kind this fake host was sent, as the host would relay it. */
+function sentFrame(fake: ReturnType<typeof fakeHost>, kind: string, epoch?: number) {
+  return [...fake.sent]
+    .reverse()
+    .map((message) => message.frame as { kind?: string; epoch?: number } | undefined)
+    .find((frame) => frame?.kind === kind && (epoch === undefined || frame.epoch === epoch));
+}
+
+/** Answer a commit the way the host does: number it, stamp it, and send it back. */
+async function echoCommit(fake: ReturnType<typeof fakeHost>, index: number): Promise<void> {
+  await vi.waitFor(() => {
+    expect(sentFrame(fake, "commit")).toBeDefined();
+  });
+  fake.host({
+    type: "frame",
+    index,
+    frame: { ...sentFrame(fake, "commit"), receivedAt: "2026-11-06T12:00:00.000Z" },
+  });
+}
+
+/** Two devices in one group, each with its own service, and a socket the test relays by hand. */
+async function twoDevices() {
+  const a = await folder();
+  const b = await folder();
+  const aIdentity = await loadOrCreateIdentity(a);
+  const bIdentity = await loadOrCreateIdentity(b);
+  const owner = await createDeviceIdentity(aIdentity.deviceId);
+  const joiner = await createDeviceIdentity(bIdentity.deviceId);
+  const started = await createWorkspaceGroup(workspaceId, owner);
+  const added = await addDevice(started, joiner.keyPackage);
+  await saveGroup(a, workspaceId, added.group);
+  await saveGroup(b, workspaceId, await joinWorkspaceGroup(added.welcome, joiner));
+
+  const hostA = fakeHost();
+  const hostB = fakeHost();
+  const serviceA = await createSyncService({
+    dataDir: a,
+    workspaceId,
+    webSocket: () => hostA.socket,
+  });
+  const serviceB = await createSyncService({
+    dataDir: b,
+    workspaceId,
+    webSocket: () => hostB.socket,
+  });
+  const connectingA = serviceA.connect("ws://127.0.0.1:8787/sync");
+  const connectingB = serviceB.connect("ws://127.0.0.1:8787/sync");
+  hostA.open();
+  hostB.open();
+  await Promise.all([connectingA, connectingB]);
+  return {
+    serviceA,
+    serviceB,
+    hostA,
+    hostB,
+    owner: aIdentity,
+    joiner: bIdentity,
+    dataDirA: a,
+    dataDirB: b,
   };
 }
 
@@ -289,48 +353,6 @@ describe("sharing a workspace for the first time", () => {
 });
 
 describe("presence and leaving", () => {
-  /** Two devices in one group, each with its own service, and a socket the test relays by hand. */
-  async function twoDevices() {
-    const a = await folder();
-    const b = await folder();
-    const aIdentity = await loadOrCreateIdentity(a);
-    const bIdentity = await loadOrCreateIdentity(b);
-    const owner = await createDeviceIdentity(aIdentity.deviceId);
-    const joiner = await createDeviceIdentity(bIdentity.deviceId);
-    const started = await createWorkspaceGroup(workspaceId, owner);
-    const added = await addDevice(started, joiner.keyPackage);
-    await saveGroup(a, workspaceId, added.group);
-    await saveGroup(b, workspaceId, await joinWorkspaceGroup(added.welcome, joiner));
-
-    const hostA = fakeHost();
-    const hostB = fakeHost();
-    const serviceA = await createSyncService({
-      dataDir: a,
-      workspaceId,
-      webSocket: () => hostA.socket,
-    });
-    const serviceB = await createSyncService({
-      dataDir: b,
-      workspaceId,
-      webSocket: () => hostB.socket,
-    });
-    const connectingA = serviceA.connect("ws://127.0.0.1:8787/sync");
-    const connectingB = serviceB.connect("ws://127.0.0.1:8787/sync");
-    hostA.open();
-    hostB.open();
-    await Promise.all([connectingA, connectingB]);
-    return {
-      serviceA,
-      serviceB,
-      hostA,
-      hostB,
-      owner: aIdentity,
-      joiner: bIdentity,
-      dataDirA: a,
-      dataDirB: b,
-    };
-  }
-
   it("sends presence the other device can open, and receives what it sends", async () => {
     const { serviceA, serviceB, hostA, hostB, owner } = await twoDevices();
     const seen: Uint8Array[] = [];
@@ -386,7 +408,11 @@ describe("presence and leaving", () => {
       ],
     });
 
-    await serviceA.removeDevice(joiner.deviceId);
+    const removal = serviceA.removeDevice(joiner.deviceId);
+    // The commit is not "removed" until the host has numbered it. Answer the way a host does.
+    await echoCommit(hostA, 0);
+    await removal;
+
     const kinds = hostA.sent
       .filter((message) => message.type === "frame")
       .map((message) => (message.frame as { kind?: string }).kind);
@@ -682,5 +708,336 @@ describe("inviting someone in", () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
 
     expect(fake.sent.some((message) => message.type === "role")).toBe(false);
+  });
+});
+
+describe("a revoke waits for the commit's numbered echo", () => {
+  it("does not report a removal until the host has numbered the commit", async () => {
+    const { serviceA, hostA, joiner } = await twoDevices();
+    let settled = false;
+    const removal = serviceA.removeDevice(joiner.deviceId).then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+
+    await vi.waitFor(() => {
+      expect(sentFrame(hostA, "commit")).toBeDefined();
+    });
+    // The frame was sent; the host has not said it stored it. "Removed" now would be a
+    // promise about a key rotation that is still only in flight.
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(settled).toBe(false);
+
+    await echoCommit(hostA, 0);
+    await removal;
+    expect(settled).toBe(true);
+  });
+
+  it("sends the commit again when the host refuses it as stale", async () => {
+    const { serviceA, hostA, joiner } = await twoDevices();
+    const removal = serviceA.removeDevice(joiner.deviceId);
+    await vi.waitFor(() => {
+      expect(sentFrame(hostA, "commit")).toBeDefined();
+    });
+
+    hostA.host({ type: "refused", reason: "stale-epoch" });
+    await vi.waitFor(() => {
+      const commits = hostA.sent.filter(
+        (message) =>
+          message.type === "frame" && (message.frame as { kind?: string }).kind === "commit",
+      );
+      expect(commits).toHaveLength(2);
+    });
+
+    await echoCommit(hostA, 0);
+    await removal;
+  });
+
+  it("says the removal did not complete when the host goes away", async () => {
+    const { serviceA, hostA, joiner } = await twoDevices();
+    const removal = serviceA.removeDevice(joiner.deviceId);
+    await vi.waitFor(() => {
+      expect(sentFrame(hostA, "commit")).toBeDefined();
+    });
+
+    hostA.socket.close();
+    await expect(removal).rejects.toThrow(/did not complete/u);
+  });
+});
+
+describe("a revoked device", () => {
+  it("cannot open a post-revoke frame", async () => {
+    const { serviceA, serviceB, hostA, hostB, joiner } = await twoDevices();
+    const updates: Uint8Array[] = [];
+    serviceB.onUpdate((update) => updates.push(update));
+
+    const removal = serviceA.removeDevice(joiner.deviceId);
+    await echoCommit(hostA, 0);
+    await removal;
+
+    await serviceA.publish(new TextEncoder().encode("after the revoke"));
+    const sealedAfter = sentFrame(hostA, "application");
+    expect(sealedAfter).toBeDefined();
+    expect(sealedAfter?.epoch).toBe(2);
+
+    // The epoch moved, so a device that no longer holds its secrets cannot open what follows.
+    hostB.host({
+      type: "frame",
+      index: 0,
+      frame: { ...sealedAfter, receivedAt: "2026-11-06T12:00:00.000Z" },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(updates).toHaveLength(0);
+
+    // And applying the commit does not give back what the remove took away.
+    hostB.host({
+      type: "frame",
+      index: 1,
+      frame: { ...sentFrame(hostA, "commit"), receivedAt: "2026-11-06T12:00:00.000Z" },
+    });
+    hostB.host({
+      type: "frame",
+      index: 2,
+      frame: { ...sealedAfter, receivedAt: "2026-11-06T12:00:00.000Z" },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(updates).toHaveLength(0);
+  });
+});
+
+describe("a device that is one commit behind", () => {
+  it("catches up and writes again", async () => {
+    const { serviceA, serviceB, hostB, dataDirA } = await twoDevices();
+    const updates: Uint8Array[] = [];
+    serviceB.onUpdate((update) => updates.push(update));
+
+    // B is at epoch 1 and applies one frame, so its cursor is the host's index 0.
+    const atEpochOne = await loadGroup(dataDirA, workspaceId);
+    if (atEpochOne === null) throw new Error("expected a group");
+    const first = await seal(atEpochOne, new TextEncoder().encode("one"));
+    hostB.host({
+      type: "frame",
+      index: 0,
+      frame: {
+        kind: "application",
+        workspaceId,
+        deviceId: (await serviceA.identity()).deviceId,
+        epoch: first.group.epoch,
+        payload: encodeBase64(first.message),
+        signature: "signed",
+        receivedAt: "2026-11-06T12:00:00.000Z",
+      },
+    });
+    await vi.waitFor(() => expect(updates).toHaveLength(1));
+
+    // A membership change makes epoch 2, and A writes there. B receives the update first,
+    // which is what a live socket can do while a catch-up is still in flight.
+    const third = await createDeviceIdentity("third-laptop");
+    const added = await addDevice(atEpochOne, third.keyPackage);
+    const second = await seal(added.group, new TextEncoder().encode("two"));
+    const epochTwo = second.group.epoch;
+    hostB.host({
+      type: "frame",
+      index: 2,
+      frame: {
+        kind: "application",
+        workspaceId,
+        deviceId: (await serviceA.identity()).deviceId,
+        epoch: epochTwo,
+        payload: encodeBase64(second.message),
+        signature: "signed",
+        receivedAt: "2026-11-06T12:00:00.000Z",
+      },
+    });
+
+    // The answer is not "open it anyway": it asks for the frames after its cursor.
+    await vi.waitFor(() => {
+      expect(hostB.sent.filter((message) => message.type === "since").at(-1)).toEqual({
+        type: "since",
+        after: 1,
+      });
+    });
+    expect(updates).toHaveLength(1);
+
+    // The host answers in index order: the commit, then the frame it unlocks.
+    hostB.host({
+      type: "frame",
+      index: 1,
+      frame: {
+        kind: "commit",
+        workspaceId,
+        deviceId: (await serviceA.identity()).deviceId,
+        epoch: epochTwo,
+        payload: encodeBase64(added.commit),
+        signature: "signed",
+        receivedAt: "2026-11-06T12:00:00.000Z",
+      },
+    });
+    hostB.host({
+      type: "frame",
+      index: 2,
+      frame: {
+        kind: "application",
+        workspaceId,
+        deviceId: (await serviceA.identity()).deviceId,
+        epoch: epochTwo,
+        payload: encodeBase64(second.message),
+        signature: "signed",
+        receivedAt: "2026-11-06T12:00:00.000Z",
+      },
+    });
+    await vi.waitFor(() => {
+      expect(new TextDecoder().decode(updates[1] ?? new Uint8Array())).toBe("two");
+    });
+
+    // And the member can write again, at the epoch it caught up to.
+    hostB.sent.length = 0;
+    await serviceB.publish(new TextEncoder().encode("three"));
+    const written = hostB.sent.find(
+      (message) =>
+        message.type === "frame" && (message.frame as { kind?: string }).kind === "application",
+    );
+    expect((written?.frame as { epoch?: number } | undefined)?.epoch).toBe(epochTwo);
+  });
+});
+
+describe("the cursor is the host's index, not a count in this process", () => {
+  it("asks for what follows the last applied index after a restart", async () => {
+    const dataDir = await folder();
+    const owner = await createDeviceIdentity("owner-laptop");
+    const group = await createWorkspaceGroup(workspaceId, owner);
+    await saveGroup(dataDir, workspaceId, group);
+
+    const firstHost = fakeHost();
+    const first = await createSyncService({
+      dataDir,
+      workspaceId,
+      webSocket: () => firstHost.socket,
+    });
+    const updates: Uint8Array[] = [];
+    first.onUpdate((update) => updates.push(update));
+    const connecting = first.connect("ws://127.0.0.1:8787/sync");
+    firstHost.open();
+    await connecting;
+
+    const sealed = await seal(group, new TextEncoder().encode("first"));
+    firstHost.host({
+      type: "frame",
+      index: 0,
+      frame: {
+        kind: "application",
+        workspaceId,
+        deviceId: "b".repeat(64),
+        epoch: sealed.group.epoch,
+        payload: encodeBase64(sealed.message),
+        signature: "signed",
+        receivedAt: "2026-11-06T12:00:00.000Z",
+      },
+    });
+    await vi.waitFor(() => expect(updates).toHaveLength(1));
+    await vi.waitFor(async () => {
+      expect(await loadCursor(dataDir, workspaceId)).toBe(0);
+    });
+    await first.disconnect();
+
+    // The app quits and comes back. A count would start at zero and ask for frame 0 again;
+    // the cursor names what this device already applied.
+    const secondHost = fakeHost();
+    const second = await createSyncService({
+      dataDir,
+      workspaceId,
+      webSocket: () => secondHost.socket,
+    });
+    const reconnecting = second.connect("ws://127.0.0.1:8787/sync");
+    secondHost.open();
+    await reconnecting;
+
+    await vi.waitFor(() => {
+      expect(secondHost.sent.find((message) => message.type === "since")).toEqual({
+        type: "since",
+        after: 1,
+      });
+    });
+  });
+});
+
+describe("the identity root of a new workspace", () => {
+  it("writes a genesis its root signed when the workspace is first shared", async () => {
+    const dataDir = await folder();
+    const fake = fakeHost();
+    const service = await createSyncService({
+      dataDir,
+      workspaceId,
+      deviceName: "this laptop",
+      webSocket: () => fake.socket,
+    });
+
+    const sharing = service.connect("ws://127.0.0.1:8787/sync");
+    fake.open();
+    await sharing;
+
+    const stored = await readRootFile(dataDir, workspaceId);
+    if (stored === null) throw new Error("expected a root for a new workspace");
+    expect(stored.genesis.workspaceId).toBe(workspaceId);
+    expect(stored.genesis.relay).toBe("ws://127.0.0.1:8787/sync");
+    expect(stored.genesis.deviceId).toBe((await service.identity()).deviceId);
+    expect(genesisChecksOut(stored.genesis, workspaceId)).toBe(true);
+
+    // The root private key is not sent to the host, and it is not what signs frames: it signs
+    // exactly one record, and the install key is still what the host pins.
+    const wire = JSON.stringify(fake.sent);
+    expect(wire).not.toContain(stored.privateKey);
+  });
+
+  it("opens a workspace shared before the root existed, with no genesis", async () => {
+    const dataDir = await folder();
+    await saveGroup(
+      dataDir,
+      workspaceId,
+      await createWorkspaceGroup(workspaceId, await createDeviceIdentity("owner-laptop")),
+    );
+
+    const fake = fakeHost();
+    const service = await createSyncService({ dataDir, workspaceId, webSocket: () => fake.socket });
+    const connecting = service.connect("ws://127.0.0.1:8787/sync");
+    fake.open();
+    await connecting;
+
+    expect(await readGenesis(dataDir, workspaceId)).toBeNull();
+    await service.publish(new TextEncoder().encode("still working"));
+    expect(fake.sent.some((message) => message.type === "frame")).toBe(true);
+  });
+
+  it("carries the root in the recovery kit, and restores it", async () => {
+    const original = await folder();
+    const fake = fakeHost();
+    const service = await createSyncService({
+      dataDir: original,
+      workspaceId,
+      webSocket: () => fake.socket,
+    });
+    const sharing = service.connect("ws://127.0.0.1:8787/sync");
+    fake.open();
+    await sharing;
+    const kit = await service.exportKit(null);
+    const genesis = await readGenesis(original, workspaceId);
+    expect(genesis).not.toBeNull();
+
+    const restored = await folder();
+    const second = await createSyncService({
+      dataDir: restored,
+      workspaceId,
+      webSocket: () => fakeHost().socket,
+    });
+    await second.importKit(kit, null);
+
+    const after = await readRootFile(restored, workspaceId);
+    if (after === null) throw new Error("expected the kit to restore the root");
+    expect(after.genesis).toEqual(genesis);
+    expect(genesisChecksOut(after.genesis, workspaceId)).toBe(true);
   });
 });

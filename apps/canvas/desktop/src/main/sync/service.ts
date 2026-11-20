@@ -13,6 +13,7 @@ import {
   exportKey,
   type Frame,
   formatInvite,
+  frameRejection,
   type InviteRecord,
   inviteRecordPayload,
   joinWorkspaceGroup,
@@ -31,6 +32,7 @@ import {
   signFrame,
 } from "@suite/sync";
 import type { SyncState } from "../../shared/ipc.js";
+import { loadCursor, saveCursor } from "./cursorStore.js";
 import { isOwned, loadGroup, markOwned, saveGroup } from "./groupStore.js";
 import {
   type DeviceIdentity,
@@ -42,6 +44,7 @@ import {
 import { exportKit, importKit } from "./kit.js";
 import { recordKit } from "./kitReport.js";
 import { clearPending, loadPending, type PendingJoin, savePending } from "./pendingStore.js";
+import { createGenesis, readRootFile, writeRootFile } from "./rootStore.js";
 
 /**
  * One workspace's sync, owned by the main process.
@@ -68,6 +71,13 @@ export interface SyncServiceOptions {
   readonly webSocket?: RelayWebSocketFactory;
   /** What this device is called on the other person's screen. */
   readonly deviceName?: string;
+  /**
+   * How long a revoke waits for the relay to confirm the commit, before saying it failed.
+   *
+   * A relay that has gone away will never answer, and a person waiting on "removed" needs
+   * an answer. Ten seconds is long enough for a slow socket and short enough to be honest.
+   */
+  readonly revokeEchoTimeoutMs?: number;
 }
 
 export interface SyncService {
@@ -101,7 +111,12 @@ export interface SyncService {
   presence(update: Uint8Array): Promise<void>;
   /** Somebody else's presence, already opened. Live only. */
   onPresence(handler: (update: Uint8Array) => void): void;
-  /** Take a device out of this workspace. Only an owner's record is applied. */
+  /**
+   * Take a device out of this workspace. Only an owner's record is applied.
+   *
+   * Resolves when the host has numbered the commit that rotates the epoch. A rejected
+   * promise means the revoke did not complete, and the app must not say it did.
+   */
   removeDevice(deviceId: string): Promise<void>;
   /** Write this device's way back in, plain or sealed with a passphrase. */
   exportKit(passphrase: string | null): Promise<Uint8Array>;
@@ -131,6 +146,29 @@ export interface SyncService {
   /** Hand out document updates from other devices. */
   onUpdate(handler: (update: Uint8Array) => void): void;
   onStatus(handler: (status: SyncStatus) => void): void;
+}
+
+/** How many times a revoke resends a commit the host refused as stale before giving up. */
+const MAX_COMMIT_ATTEMPTS = 3;
+
+interface EchoWaiter {
+  readonly resolve: () => void;
+  readonly reject: (error: Error) => void;
+  readonly timer: ReturnType<typeof setTimeout>;
+}
+
+/**
+ * The host refused the message a revoke was waiting on.
+ *
+ * `stale-epoch` is the one refusal worth retrying: the commit was written against an
+ * epoch the host has since moved past, and sending it again is what the design asks for.
+ * Every other reason means the revoke cannot land as written.
+ */
+class EchoRefused extends Error {
+  constructor(readonly reason: string) {
+    super(`the host refused the commit: ${reason}`);
+    this.name = "EchoRefused";
+  }
 }
 
 export async function createSyncService(options: SyncServiceOptions): Promise<SyncService> {
@@ -165,15 +203,86 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
   const waitingRoles = new Map<string, MemberRole>();
   /** A join in flight: the identity whose key package is waiting for a welcome. */
   let pending: PendingJoin | null = await loadPending(options.dataDir, options.workspaceId);
-  /** How many frames this device has taken from the host, for a catch-up request. */
-  let received = 0;
+  /**
+   * The last frame this device applied, as the host numbered it.
+   *
+   * Persisted beside the group, because a count held in a variable means nothing after a
+   * restart: it starts at zero, drifts when a frame is replayed, and cannot name a point in
+   * the host's log. `null` means nothing has been applied and the next catch-up starts at 0.
+   */
+  let cursor: number | null = await loadCursor(options.dataDir, options.workspaceId);
   /** The queue that keeps frame handling in order, one at a time. */
   let frames: Promise<void> = Promise.resolve();
+  /** A catch-up already asked for, so a burst of out-of-step frames asks once per gap. */
+  let catchUpFrom: number | null = null;
+  /** Revokes waiting for the numbered echo of a commit, keyed by the commit's signature. */
+  const echoWaiters = new Map<string, EchoWaiter>();
+
+  /** Frames applied, for a status line. The cursor is what a catch-up uses. */
+  const applied = (): number => (cursor === null ? 0 : cursor + 1);
 
   const publishStatus = (next: SyncStatus): void => {
     status = next;
     statusHandler?.(next);
   };
+
+  /**
+   * Ask for the frames after the cursor, when a frame is newer than this device's epoch.
+   *
+   * A newer frame — even an application frame — means a commit is missing; opening it
+   * would either fail or, worse, quietly do nothing while the workspace looks current.
+   * The cursor is the only point in the host's log this device can name.
+   */
+  function requestCatchUp(): void {
+    if (relay === null) return;
+    const from = cursor === null ? 0 : cursor + 1;
+    if (catchUpFrom === from) return;
+    catchUpFrom = from;
+    relay.since(from);
+  }
+
+  /** Move the durable cursor, once, in order. A gap is caught up rather than skipped. */
+  async function advanceCursor(index: number): Promise<void> {
+    if (cursor !== null && index <= cursor) return;
+    cursor = index;
+    catchUpFrom = null;
+    await saveCursor(options.dataDir, options.workspaceId, index);
+  }
+
+  /**
+   * Wait for the host to number and echo the frame that carries a decision.
+   *
+   * A frame that was sent is not a frame that was stored. The numbered echo is the only
+   * thing that says the host has it, and a revoke that reports success before it is a
+   * promise about a key rotation that may still be in flight.
+   */
+  function awaitEcho(signature: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        echoWaiters.delete(signature);
+        reject(new Error("The host did not confirm that the commit was stored."));
+      }, options.revokeEchoTimeoutMs ?? 10_000);
+      echoWaiters.set(signature, { resolve, reject, timer });
+    });
+  }
+
+  function settleEcho(signature: string): void {
+    const waiter = echoWaiters.get(signature);
+    if (waiter === undefined) return;
+    clearTimeout(waiter.timer);
+    echoWaiters.delete(signature);
+    waiter.resolve();
+  }
+
+  function rejectEchoes(error: Error): void {
+    for (const signature of [...echoWaiters.keys()]) {
+      const waiter = echoWaiters.get(signature);
+      if (waiter === undefined) continue;
+      clearTimeout(waiter.timer);
+      echoWaiters.delete(signature);
+      waiter.reject(error);
+    }
+  }
 
   /** This device started this workspace's group, so it may own it if nobody does. */
   let startedHere = await isOwned(options.dataDir, options.workspaceId);
@@ -246,13 +355,28 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
       claimOwnership();
       publishStatus({ state: "syncing", count: info.frames });
     },
-    onFrame: (_index, frame) => {
-      received += 1;
+    onFrame: (index, frame) => {
+      // The numbered echo says the host has stored what this device sent, which is what a
+      // revoke waits for. It is settled before the frame is applied, because the answer is
+      // about the host's log, not about the local group.
+      settleEcho(frame.signature);
       // One at a time, in the order the host sent them. Applying a frame is not a pure read:
       // opening a welcome creates the group, and opening an application message ratchets the
       // secret tree. Run two at once and a snapshot that followed a welcome is evaluated before
       // the group exists — the joiner then sits in a workspace it cannot read.
-      frames = frames.then(() => applyFrame(frame)).catch(() => undefined);
+      frames = frames
+        .then(async () => {
+          // A frame this device already applied is a replay, not a second change.
+          if (cursor !== null && index <= cursor) return;
+          // A gap means a frame before this one is missing. Catch up in index order rather
+          // than opening something whose commit has not arrived.
+          if (cursor !== null && index > cursor + 1) {
+            requestCatchUp();
+            return;
+          }
+          if (await applyFrame(frame)) await advanceCursor(index);
+        })
+        .catch(() => undefined);
     },
     onWaiting: (waiting) => {
       waitingRoles.set(waiting.deviceId, waiting.role);
@@ -269,17 +393,22 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
     onRemoved: () => {
       removedByOwner = true;
       pending = null;
+      rejectEchoes(new Error("This device was removed before the commit was confirmed."));
       void clearPending(options.dataDir, options.workspaceId);
       relay?.close();
       relay = null;
       publishStatus({ state: "removed" });
     },
-    onRefused: (reason) => publishStatus({ state: "refused", reason }),
+    onRefused: (reason) => {
+      rejectEchoes(new EchoRefused(reason));
+      publishStatus({ state: "refused", reason });
+    },
     onError: (code, message) => publishStatus({ state: "asleep", reason: `${code}: ${message}` }),
     onClosed: () => {
       // A socket that closes because somebody removed this device is not a host that went to
       // sleep, and saying so would offer a retry that can never work.
       if (removedByOwner) return;
+      rejectEchoes(new Error("The host went away before it confirmed the commit."));
       publishStatus({ state: "asleep", reason: "the host is not answering" });
     },
   };
@@ -371,44 +500,68 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
       pending = null;
       await clearPending(options.dataDir, options.workspaceId);
       await saveGroup(options.dataDir, options.workspaceId, group);
-      publishStatus({ state: "syncing", count: received });
+      publishStatus({ state: "syncing", count: applied() });
     } catch {
       publishStatus({ state: "refused", reason: "That invitation could not be used." });
     }
   }
 
-  async function applyFrame(frame: Frame): Promise<void> {
+  /**
+   * Apply one frame, and say whether it was consumed.
+   *
+   * `false` means "do not move the cursor": the frame is newer than this device's epoch,
+   * so a commit before it is missing and the answer is to catch up from the cursor rather
+   * than to open something the group cannot read yet.
+   */
+  async function applyFrame(frame: Frame): Promise<boolean> {
     // A welcome is the one frame a device with no group is waiting for, so it is handled
     // before any of the epoch reasoning below — the joiner has no epoch to compare against.
     if (frame.kind === "welcome") {
       await acceptWelcome(frame);
-      return;
+      return true;
     }
 
-    // A frame for an epoch this device has left is not late, it is irrelevant; MLS would
-    // quietly decrypt it as an old application message rather than refuse it.
-    if (group === null || frame.epoch < group.epoch) return;
-
-    if (frame.kind === "commit") {
-      await applyCommitFromPeer(frame);
-      return;
-    }
-
+    // A key package is not group traffic: it carries epoch 0 because the asking device has no
+    // group, and it is the join request, not a message in the ordering. It is handled before
+    // the epoch rule for the same reason the host exempts it from the epoch floor.
     if (frame.kind === "keypackage") {
       // Only a device the host has just announced, and only once. A key package replayed from
       // the log on connect is a device that is already a member, so adding it again would put
       // a second copy in the tree and a second join on everyone's screen.
       const role = waitingRoles.get(frame.deviceId);
-      if (role === undefined) return;
+      if (role === undefined) return true;
       waitingRoles.delete(frame.deviceId);
       await admitDevice(frame, role);
-      return;
+      return true;
     }
 
-    if (frame.kind !== "application") return;
+    if (group === null) return true;
+
+    // One rule for every frame that is group traffic. Exact equality is right for an
+    // application frame; a commit one epoch ahead is how this device moves, and everything
+    // else is either already past (drop) or not reachable yet (catch up in index order).
+    const verdict = frameRejection(frame, {
+      workspaceId: options.workspaceId,
+      epoch: group.epoch,
+    });
+    if (verdict !== null) {
+      // A frame from an epoch this device has left is not late, it is irrelevant; MLS would
+      // quietly decrypt it as an old application message rather than refuse it.
+      if (verdict === "wrong-workspace" || frame.epoch < group.epoch) return true;
+      // Newer, and not the commit that moves us: a commit is missing. Do not open it.
+      requestCatchUp();
+      return false;
+    }
+
+    if (frame.kind === "commit") {
+      await applyCommitFromPeer(frame);
+      return true;
+    }
+
+    if (frame.kind !== "application") return true;
 
     const payload = decodeBase64(frame.payload);
-    if (payload === null) return;
+    if (payload === null) return true;
 
     try {
       const opened = await openMessage(group, payload);
@@ -420,6 +573,7 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
       // A frame this device cannot read is not an error worth surfacing: it is what a device
       // that joined later sees of the past, by design.
     }
+    return true;
   }
 
   /**
@@ -429,6 +583,10 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
    * this device, in the first epoch. Joining somebody else's does not come through here —
    * that group arrives inside the welcome — so this is the only place a group is created, and
    * creating it is also what makes this device the workspace's owner.
+   *
+   * It is also where a brand-new workspace gets its identity root and the genesis that root
+   * signs. A workspace shared before this existed has a group and no root, and nothing here
+   * migrates it: it opens exactly as it did.
    */
   async function share(url: string): Promise<SyncStatus> {
     if (group === null) {
@@ -439,6 +597,15 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
       await saveGroup(options.dataDir, options.workspaceId, group);
       await markOwned(options.dataDir, options.workspaceId);
       startedHere = true;
+      if ((await readRootFile(options.dataDir, options.workspaceId)) === null) {
+        await createGenesis({
+          dataDir: options.dataDir,
+          workspaceId: options.workspaceId,
+          deviceId: identity.deviceId,
+          devicePublicKey: identity.publicKey,
+          relay: url,
+        });
+      }
     }
     return connectTo(url);
   }
@@ -460,11 +627,12 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
         },
         handlers,
       );
-      // Ask for what arrived while this device was closed, once the client exists. 0 means
-      // everything the host still holds, which is the honest answer for a device that has
-      // never synced. Doing it from `onJoined` looked equivalent and was not: the host can
-      // answer before the client is assigned, and the catch-up was dropped on the floor.
-      relay.since(received);
+      // Ask for what arrived while this device was closed, once the client exists. The
+      // cursor is the host's own numbering, written beside the group, so it survives a
+      // restart and a replayed frame; a count in a variable would mean nothing here. A
+      // device that has never applied a frame asks from the start.
+      catchUpFrom = null;
+      requestCatchUp();
     } catch (error) {
       publishStatus({
         state: "asleep",
@@ -605,6 +773,12 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
      * members can read, and the record the host can read so it stops carrying that device's
      * mail. The group moves to a new epoch, so everything sealed afterwards is unreadable to
      * the device that left — which is the whole of what "removed" can honestly mean.
+     *
+     * It resolves only when the host has numbered the commit and echoed it back. A frame
+     * sent is not a frame stored: reporting "removed" before the echo is a promise about a
+     * key rotation that may still be in flight. A removal record that landed without its
+     * commit closes the door but leaves the old epoch readable to the device that left, so
+     * a commit the host refuses as stale is sent again rather than reported as done.
      */
     async removeDevice(deviceId) {
       if (group === null || relay === null) throw new Error("This workspace is not shared yet.");
@@ -619,32 +793,58 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
       group = removed.group;
       presenceKeyCache = null;
       await saveGroup(options.dataDir, options.workspaceId, group);
-      relay.send(
-        signFrame(identity.sign, {
-          kind: "commit",
-          workspaceId: options.workspaceId,
-          deviceId: identity.deviceId,
-          epoch: group.epoch,
-          payload: encodeBase64(removed.commit),
-        }),
-      );
 
+      const commit = signFrame(identity.sign, {
+        kind: "commit",
+        workspaceId: options.workspaceId,
+        deviceId: identity.deviceId,
+        epoch: group.epoch,
+        payload: encodeBase64(removed.commit),
+      });
       const unsigned = {
         workspaceId: options.workspaceId,
         deviceId,
         removedAt: new Date().toISOString(),
         signerId: identity.deviceId,
       };
-      relay.sendRemoval({
-        ...unsigned,
-        signature: identity.sign(removalRecordPayload(unsigned)),
-      });
+      const removal = { ...unsigned, signature: identity.sign(removalRecordPayload(unsigned)) };
+
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= MAX_COMMIT_ATTEMPTS; attempt += 1) {
+        const current = relay;
+        if (current === null) throw new Error("The host went away before the removal finished.");
+        const echo = awaitEcho(commit.signature);
+        current.send(commit);
+        // The record is what closes the door, and it is sent once: a retry is about the
+        // commit the door is waiting for, not about asking the host twice.
+        if (attempt === 1) current.sendRemoval(removal);
+        try {
+          await echo;
+          return;
+        } catch (error) {
+          lastError = error;
+          if (
+            error instanceof EchoRefused &&
+            error.reason === "stale-epoch" &&
+            attempt < MAX_COMMIT_ATTEMPTS
+          ) {
+            continue;
+          }
+          break;
+        }
+      }
+      throw new Error(
+        lastError instanceof Error
+          ? `The removal did not complete: ${lastError.message}`
+          : "The removal did not complete.",
+      );
     },
 
     async exportKit(passphrase) {
       const stored = await readStoredIdentity(options.dataDir);
       if (group === null) throw new Error("This workspace is not shared yet.");
       if (stored === null) throw new Error("This device has no identity to save.");
+      const root = await readRootFile(options.dataDir, options.workspaceId);
 
       return exportKit(
         {
@@ -653,6 +853,7 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
           deviceName,
           group,
           identity: stored,
+          ...(root === null ? {} : { root }),
         },
         passphrase,
       );
@@ -685,6 +886,11 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
       group = opened.group;
       presenceKeyCache = null;
       await saveGroup(options.dataDir, options.workspaceId, group);
+      // The root, when this kit came from the device that founded the workspace. A kit from
+      // any other device carries none, because the root is never copied to one.
+      if (opened.root !== null) {
+        await writeRootFile(options.dataDir, options.workspaceId, opened.root);
+      }
       // The file exists, which is what the hub reports; the device is not connected until
       // somebody connects it, and saying "syncing" before that would be a claim with no basis.
       await recordKit(options.dataDir, {
