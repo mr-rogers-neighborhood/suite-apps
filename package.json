@@ -9,7 +9,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "pnpm -r --workspace-concurrency=1 run check",
+    "check": "node scripts/gate.mjs",
+    "check:all": "node scripts/gate.mjs",
+    "gate:fresh": "node scripts/gate.mjs --fresh",
     "format": "pnpm -r --workspace-concurrency=1 run format",
     "build": "pnpm -r --workspace-concurrency=1 run build"
   }
