@@ -1,10 +1,11 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { type DayTask, formatDuration, type Project, type Tag } from "@suite/planner-core";
 import { IconButton } from "@suite/ui";
-import { Bell, MoreHorizontal, Repeat, Timer } from "lucide-react";
+import { Bell, ChevronRight, MoreHorizontal, Repeat, Timer } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TaskCheckbox } from "../components/TaskCheckbox";
 import { useReplica } from "../store/snapshotStore";
+import { eveningReminder, inMinutes, reminderLabel, tomorrowMorning } from "./reminderPresets";
 
 type TaskRowProps = {
   entry: DayTask;
@@ -46,6 +47,14 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
       return;
     }
     replica.document.updateTask(entry.task.id, { title: next });
+  }
+
+  function setReminderTo(at: Date): void {
+    replica.document.updateTask(entry.task.id, { remindAt: at.toISOString() });
+  }
+
+  function clearReminder(): void {
+    replica.document.updateTask(entry.task.id, { remindAt: null });
   }
 
   const dueTime = entry.task.dueAt
@@ -118,9 +127,12 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
             </span>
           )}
           {entry.task.remindAt && (
-            <span className="inline-flex items-center gap-1">
+            <span
+              className="inline-flex items-center gap-1"
+              title={`Reminder at ${entry.task.remindAt}`}
+            >
               <Bell size={11} />
-              reminder
+              {reminderLabel(entry.task.remindAt)}
             </span>
           )}
         </div>
@@ -141,6 +153,61 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
             sideOffset={4}
             className="z-50 min-w-[180px] rounded-lg border border-line bg-panel p-1 shadow-2xl"
           >
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className="flex cursor-default items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised data-[state=open]:bg-raised">
+                Remind me
+                <ChevronRight size={13} />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.SubContent
+                  sideOffset={4}
+                  className="z-50 min-w-[180px] rounded-lg border border-line bg-panel p-1 shadow-2xl"
+                >
+                  <DropdownMenu.Item
+                    onSelect={() => setReminderTo(inMinutes(30))}
+                    className="cursor-default rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised"
+                  >
+                    In 30 minutes
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    onSelect={() => setReminderTo(inMinutes(60))}
+                    className="cursor-default rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised"
+                  >
+                    In 1 hour
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    onSelect={() => setReminderTo(inMinutes(180))}
+                    className="cursor-default rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised"
+                  >
+                    In 3 hours
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    onSelect={() => setReminderTo(eveningReminder())}
+                    className="cursor-default rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised"
+                  >
+                    This evening
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    onSelect={() => setReminderTo(tomorrowMorning())}
+                    className="cursor-default rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised"
+                  >
+                    Tomorrow at 9:00
+                  </DropdownMenu.Item>
+                  {entry.task.remindAt && (
+                    <>
+                      <DropdownMenu.Separator className="my-1 h-px bg-line" />
+                      <DropdownMenu.Item
+                        onSelect={() => clearReminder()}
+                        className="cursor-default rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised"
+                      >
+                        Clear reminder
+                      </DropdownMenu.Item>
+                    </>
+                  )}
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Sub>
+            <DropdownMenu.Separator className="my-1 h-px bg-line" />
             <DropdownMenu.Item
               onSelect={() => replica.document.scheduleTask(entry.task.id, null)}
               className="cursor-default rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised"
