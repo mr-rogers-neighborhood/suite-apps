@@ -53,11 +53,11 @@ The document stays a file the app owns. Suite Sync provides the wire protocol, t
 and a server a person runs on a device they control. It never defines an app schema.
 
 - Ids are fingerprints: 64 lower-case hex characters.
-- Membership is a signed, append-only log (`create`, `invite`, `accept`, `set-role`, `revoke`).
-- Peers exchange version vectors, then send the updates the other is missing.
-- One active server per workspace in v1; there is no server-to-server federation.
-- The target is a blind relay that stores ciphertext. The current room is plaintext and loopback-only
-  while the transport is proven.
+- Membership is an MLS group plus signed role records; an invitation is a single-use join capability.
+- A device seals one document update into one frame, and the relay numbers, stores and forwards it.
+- One active relay per workspace in v1; there is no server-to-server federation.
+- The relay stores sealed frames it cannot read, plus the signed metadata it needs to admit them. It
+  is loopback by default and has no TLS yet.
 
 ## Shared packages
 

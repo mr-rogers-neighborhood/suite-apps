@@ -22,23 +22,25 @@ deliberately small: the hard parts are identity, membership and key recovery, no
 
 An id is a 32-byte fingerprint encoded as 64 lower-case hex characters.
 
-| Id            | What it names                 | How it is made (Phase 4)            |
-| ------------- | ----------------------------- | ----------------------------------- |
-| `workspaceId` | One Loro document / workspace | SHA-256 of the workspace public key |
-| `deviceId`    | One installation              | SHA-256 of the device public key    |
-| `memberId`    | One member                    | SHA-256 of the member public key    |
-| `inviteId`    | One invite                    | Random 32 bytes                     |
+| Id            | What it names                 | How it is made                                                |
+| ------------- | ----------------------------- | ------------------------------------------------------------- |
+| `workspaceId` | One Loro document / workspace | The id the document already owns; the workspace root signs it |
+| `deviceId`    | One installation              | SHA-256 of the device public key                              |
+| `memberId`    | One member                    | SHA-256 of the member public key                              |
+| `inviteId`    | One invite                    | Random 32 bytes                                               |
 
 In v1, **each device is a member**. A person with a laptop and a desktop has two member records, each
 with its own key and role. This avoids delegated device keys while still giving the user a clean
 revocation story. Per-person members with device sub-keys can come later behind the same log.
 
 A workspace made under the blind relay also has an **identity root**: an Ed25519 key, held only by the
-device that founded the workspace and its recovery kit, that names the workspace
-(`workspaceId = SHA-256(root public key)`) and signs one record, the genesis. The genesis carries the
-workspace id, the creation time, the creating device and the relay address. A workspace shared before
-the root existed has an id that is not a root hash and no genesis; it is a workspace without an
-identity root, and nothing migrates it.
+device that founded the workspace and its recovery kit, that signs one record, the genesis. The
+genesis carries the workspace id, the creation time, the creating device and the relay address. The
+root signs the id the document already owns rather than replacing it, so a Canvas workspace keeps the
+id it had before it was shared; `workspaceIdFromRootKey` is the derivation for a workspace created
+root-first, and `genesisNamesItsRoot` says which kind a record is. The genesis is the creating
+device's record: it is not a frame, and the relay never receives it. A workspace shared before the
+root existed has no genesis and opens unchanged; nothing migrates it.
 
 ## Membership
 
@@ -73,28 +75,51 @@ Rules:
 
 ## Sync messages
 
-All messages are JSON; the update payload is base64.
+All messages are JSON; frame and presence payloads are base64.
 
 ```ts
-type SyncMessage =
-  | { type: "hello"; protocolVersion; workspaceId; memberId; deviceId; epoch; versionVector }
-  | { type: "update"; workspaceId; from; to; epoch; payload }
-  | { type: "ack"; epoch; versionVector }
+type ClientMessage =
+  | { type: "join"; protocolVersion; workspaceId; deviceId; publicKey; name; inviteId? }
+  | { type: "keypackage"; inviteId; deviceId; publicKey; name; frame }
+  | { type: "frame"; frame }
+  | { type: "since"; after }
+  | { type: "invite"; record }
+  | { type: "role"; record }
+  | { type: "removal"; record }
+  | { type: "ephemeral"; workspaceId; deviceId; payload; signature };
+
+type HostMessage =
+  | { type: "joined"; protocolVersion; workspaceId; newestEpoch; frames; oldestIndex; members }
+  | { type: "frame"; index; frame }
+  | { type: "applied"; deviceId; role; seq }
+  | { type: "invited"; inviteId }
+  | { type: "waiting"; deviceId; name; inviteId; role }
+  | { type: "roster"; members }
+  | { type: "ephemeral"; workspaceId; deviceId; payload; signature }
+  | { type: "removed" }
+  | { type: "refused"; reason }
   | { type: "error"; code; message };
 ```
 
+`frame` is a sealed frame: an MLS message with a readable header and a ciphertext payload. The relay
+never opens the payload. `since.after` is inclusive: `since(n)` returns frames whose stored index is
+at least `n`.
+
 ### First sync
 
-1. Both sides send `hello` with their version vector.
-2. Each side computes the updates the other is missing and sends one or more `update` messages.
-3. Each side sends `ack` with its new version vector.
-4. The transport forwards local updates as `update` messages and presence as a separate ephemeral
-   channel.
+1. The client opens the socket, sends `join`, and the relay answers `joined` with the newest epoch,
+   the frame count, the oldest index it still holds and the roster.
+2. The client asks `since(0)`, or `since(cursor + 1)` when it has applied frames before, and the relay
+   sends each held frame with its index.
+3. The client applies the frames in index order: commits first, then the application frames they
+   unlock. A frame newer than the client's epoch is a cue to catch up, not something to open.
+4. Live frames are forwarded as they arrive, with the index the relay assigned.
 
 ### Reconnect
 
-The same exchange, using the version vector the client already has. Loro's `export({mode: "update",
-from})` sends the diff, not the whole history.
+The same exchange with the cursor the client persisted beside its group. The cursor is the relay's
+own numbering, not a count that starts at zero in each process. A cursor below `oldestIndex` is a gap:
+the relay no longer holds the frames after it, so the device needs a snapshot from a peer.
 
 ### Presence
 
@@ -159,28 +184,40 @@ request rather than a message in the ordering.
 Sizes, measured rather than estimated: a commit is 0.5 kB, a welcome 0.8 kB, an application message
 0.3 kB, and a device's group state 1.6 kB.
 
-## Server transport (Phase 2 slice)
+## Relay transport
 
-The current transport is a WebSocket at `/sync` with a `/health` HTTP route.
+The transport is a WebSocket at `/sync` with a `/health` HTTP route.
 
-- `hello` must be the first message. It carries the protocol version, workspace, member, device, epoch
-  and version vector. The server answers `ack` and, when the client is behind, one `update`.
-- `update` is accepted only from the socket's joined member, only for the joined workspace, and only
-  for the current epoch. The server applies it, answers `ack`, and forwards it to the other sockets in
-  the same room.
-- `error` codes: `protocol-version`, `unauthorized`, `forbidden`, `epoch-mismatch`, `malformed`,
-  `busy`, `unknown`.
-- The server binds to `127.0.0.1` by default; `--host` is explicit. There is no TLS yet.
-- A room snapshot is written to a file with a temp-file rename and loaded on the next boot.
-- `serve --workspace <dir>` loads a Phase 2 workspace directory: `membership.json` (the serialized
-  membership state) and an optional `snapshot.loro` (a full Loro snapshot). The membership file is
-  trusted admin input for now; the signed log and the invite/accept path replace it next.
+- `join` must be the first message. It carries the protocol version, workspace, device, public key and
+  name. The relay pins the key the first time it sees a device and refuses the same device id with a
+  different key.
+- `frame` is accepted only for the joined workspace, from a device with a role (a key package is the
+  one exception), at an epoch no older than the newest the relay holds, and only when the device-key
+  signature verifies. The relay numbers it, appends it to the store, echoes it to the sender and
+  forwards it to the other sockets in the room.
+- `since` returns the frames whose stored index is at least `after`. Positions are durable across
+  compaction, so a client that reconnects can tell a gap from an empty catch-up.
+- `keypackage` is how a device with no role asks to join. A live, signed invitation authorises it; the
+  relay spends the invitation, pins the key and sends the waiting device's name and promised role to
+  the other members. The invitation is a single-use bearer token: whoever spends it first is in.
+- `role`, `invite` and `removal` are signed public metadata. The relay applies them without reading a
+  frame: a role gates who may write, an invite is the join capability, and a removal closes the socket
+  and drops the device from the roster.
+- `ephemeral` is presence. It is verified, forwarded and forgotten: never numbered, appended or
+  written down.
+- `error` codes: `protocol-version`, `not-joined`, `malformed`, `unknown`. A refused frame, role,
+  invite or removal is answered with `refused` and its reason.
+- The relay binds to `127.0.0.1` by default; `--host` is explicit. There is no TLS: the URL is `ws://`.
+  The CLI's `serve` also requires `--trust-all` because it has no device-key verifier; Start runs the
+  same server with the Ed25519 verifier.
 
-**The Phase 2 room is plaintext and is a development transport.** The shipped server is a blind relay
-per [Decisions](reference/decisions.md): encrypted updates, client-side version vectors, no
-server-side merge.
+The store is one append-only file per workspace for frames, and one each for roles, invites, pinned
+keys and removals. A frame file holds the sealed frame with the position the relay assigned, plus a
+header recording the next position so a compacted log does not move a client's cursor. There is no
+document, no snapshot and no version vector on disk. The accepted metadata and the retention window
+are in [the blind relay record](reference/blind-relay.md).
 
-## Security invariants (target)
+## Security invariants
 
 1. The server never holds the workspace key in plaintext.
 2. The server never decrypts a document update or an attachment.
@@ -190,7 +227,10 @@ server-side merge.
 6. Presence is never written to the document.
 7. A server operator can deny service or delete ciphertext; the threat model says so.
 
-The Phase 2 plaintext room satisfies 3–6 but not 1–2. It is loopback-only until the blind relay lands.
+The relay satisfies 1–7 for the frames it stores: it holds no group key, opens no payload, and keeps
+only the signed metadata it needs to admit or refuse a frame. The demo path is still loopback-only
+without TLS, so a network attacker sees the header, timing and availability even though the payload
+stays sealed.
 
 ## Open questions
 

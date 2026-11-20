@@ -16,7 +16,7 @@ slogan.
 | **3. The network is optional** | Met. The apps open and edit offline. Budget has no network client at all. |
 | **4. Seamless collaboration** | Partial. Canvas has live presence and collaborative editing. Collaboration is a foreground session; a sleeping device is not woken. |
 | **5. The Long Now** | Met in shape. Files are plain and exportable, the licence is MIT, and the project operates no service that can be shut down. Schema upgrades between app versions are not yet guaranteed. |
-| **6. Security and privacy by default** | Partial. There is no account, no telemetry and no project-operated server. Document files are not encrypted, and the current sync room is plaintext without TLS. |
+| **6. Security and privacy by default** | Partial. There is no account, no telemetry and no project-operated server. Document files are not encrypted, and the sync relay has no TLS, so a network attacker still sees its metadata. |
 | **7. Ownership and control** | Met. A document is a file the user owns and can copy, back up or export. Apps install and uninstall without an account. |
 
 ## What "partial" means in practice
@@ -27,9 +27,9 @@ The limits are deliberate and recorded, not marketing gaps:
   them. Planner and Budget still open one file on one machine. See [Status](../reference/status.md).
 - **No background delivery.** A sleeping device is not woken. See
   `apps/go/docs/reference/decisions.md`.
-- **The sync room is not the shipped security model.** It is plaintext and loopback-only while the
-  transport is being proven. The target is a blind relay that stores ciphertext it cannot read. See
-  `apps/sync/docs/reference/decisions.md`.
+- **The sync relay is not the shipped security model.** It stores sealed frames it cannot read, but
+  it has no TLS, it binds to loopback by default, and it sees the metadata the threat model accepts.
+  See `apps/sync/docs/reference/decisions.md`.
 - **Files rely on disk encryption.** A `.canvas`, `.planner` or `.budget` file is readable by anyone
   who has it. The apps do not add a passphrase.
 - **Longevity is a property of the format, not a promise about migrations.** Each file carries a

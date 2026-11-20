@@ -16,14 +16,14 @@ belong to it; Canvas's is [here](../../apps/canvas/docs/reference/glossary.md).
 | **Capability** | A permission a pack declares in its manifest, which the host enforces. A declaration is not a user authorisation. |
 | **Document** | One Loro CRDT per app workspace, stored in a file the app owns: `.canvas`, `.planner` or `.budget`. |
 | **Workspace** | The unit a document belongs to. In Canvas it is also the collaboration and storage boundary. |
-| **Sync workspace** | The server-side directory for one workspace: `membership.json` and `snapshot.loro`. |
+| **Sync workspace** | The relay's unit for one workspace: sealed frames plus signed roles, invitations, pinned keys and removals. |
 | **Board** | A Canvas view that places cards. It is not the owner of a card. |
 | **Card** | A Canvas object with identity, a type, fields, tags and body content. It exists without a board. |
 | **Projection** | A derived, read-only representation: a view's results, a share's redacted copy, a published bundle. It is never the place the document is authored. |
-| **Member** | A 64-hex identity with a role in a sync workspace. Only an active owner invites or revokes; the signed log is the model, and the Phase 2 membership file is admin input. |
+| **Member** | A 64-hex device identity with a role in a sync workspace. Only an active owner invites or revokes; the signed role record is the model. |
 | **Device** | A 64-hex identity for one installation that holds a document and joins a sync workspace. |
 | **Epoch** | The group-key generation. A revoke bumps it; a client ignores a frame from another epoch. |
-| **Blind relay** | A sync server that stores ciphertext it cannot read and cannot merge. It is the target, not the current Phase 2 room. |
+| **Blind relay** | A sync server that stores sealed frames it cannot read and cannot merge. It is what the tree runs. |
 | **Session** | A period when two or more devices are connected and collaborating. There is no background wake, so collaboration is a session, not a subscription. |
 | **Local-first** | The copy on the device is primary; a server, if any, holds a secondary copy. See [Local-first](../explanation/local-first.md). |
 | **Gate** | The local commands that verify a change. The root gate runs each app's gate; see [Commands](commands.md). |

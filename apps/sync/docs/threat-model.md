@@ -26,7 +26,7 @@
 | Server reads documents                 | E2E encryption with a workspace epoch key; server stores ciphertext only.                                                |
 | Server is operated by a third party    | Same as above; the server is replaceable and sees no plaintext.                                                          |
 | Malicious member writes garbage        | Signed updates and schema validation in the app; server enforces role and membership before forwarding.                  |
-| Impersonation at join                  | Invite names the invitee's public key; both sides confirm the fingerprint.                                               |
+| Impersonation at join                  | An owner mints a single-use signed invitation; the relay spends it on the first key package and pins that device's key.  |
 | Stolen device                          | Owner revokes the member; epoch rotates; live connection is dropped. OS disk encryption protects the local file.         |
 | Replay of an old membership entry      | Strict `seq`, workspace binding, signature check, and an append-only log.                                                |
 | Replay of an old document update       | Loro version vectors and CRDT idempotence; an update already applied is a no-op.                                         |
@@ -35,15 +35,31 @@
 | Server learns metadata                 | Accept that workspace ids, member keys, sizes and timing are visible. Minimize what is sent; document it.                |
 | Ghost cursor after a disconnect        | Presence is ephemeral with a TTL, separate from the document.                                                            |
 
-## Current implementation gap
+## What the relay holds
 
-The Phase 2 server keeps a plaintext Loro replica per room and writes a plaintext snapshot to disk.
-That is a development transport, not the shipped server. It is bound to `127.0.0.1` by default and
-must not be exposed beyond a trusted network.
+For each workspace the relay keeps `<workspaceId>.frames.jsonl` — sealed MLS frames with the position
+it assigned — and `.roles.jsonl`, `.invites.jsonl`, `.keys.jsonl` and `.removed.jsonl`. It reads the
+frame header (kind, workspace, device, epoch, payload length) and the signed records beside it. It
+never opens a payload, and there is no document, snapshot or version vector in the store. Threats
+"server reads documents" and "server is operated by a third party" are mitigated for the frames it
+holds.
 
-[Decisions](reference/decisions.md) is the fix: the server becomes a blind relay of
-encrypted updates, clients keep the only decryptable replica, and the server enforces membership and
-role from signed headers. Until that lands, threats 1 and 2 in the table are **not** mitigated.
+## Accepted limits
+
+- **No transport security.** The URL is `ws://` and both the CLI and Start's relay bind to `127.0.0.1`
+  by default. A network attacker sees the header, timing and connection metadata and can drop or
+  replay traffic. The payload stays sealed.
+- **Metadata.** Workspace and device ids, device names, public keys, epochs, kinds, payload lengths,
+  arrival order and timing, cursors, roles, invitations and removals are visible. The list is in
+  [the blind relay record](reference/blind-relay.md#what-the-relay-may-learn).
+- **A bearer invitation.** An invitation is a signed, single-use token. Whoever spends it first gets
+  the role it named; the relay pins that device's key, but there is no fingerprint confirmation yet.
+- **Availability is the operator's.** The relay can delete or withhold frames. Every device keeps a
+  local copy, but a device away longer than the retention window (30 days by default) needs a
+  snapshot from a peer, because the relay cannot produce one.
+- **The CLI needs `--trust-all`.** It has no device-key verifier yet, so `serve` refuses to start
+  without it; on a non-loopback address that is an open mailbox until `--trust-all-remote` says so.
+  Start runs the same server with the Ed25519 verifier and pins each key on join.
 
 ## Non-goals
 

@@ -13,9 +13,9 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Canvas | Alpha | Cards, boards, editor, library and views; opt-in sync through a host; no account or share link, and still changing shape |
 | Planner | Pre-alpha | Day view, inbox, capture, estimates; no sync transport |
 | Budget | Pre-alpha | Launcher, accounts, register, month grid, rollover, reconcile, backups; no network |
-| Sync | Phase 2 demo | Protocol, membership, room, WebSocket server and CLI work; plaintext, loopback-only |
-| Sync: invite and join | Missing | Adding a device is still a CLI step |
-| Sync: blind relay | Target | The room stores plaintext today; ciphertext is the design |
+| Sync | Phase 4 demo | Protocol, membership, relay, CLI and Canvas client work; the relay stores sealed frames, not a document; loopback by default, no TLS |
+| Sync: invite and join | Working | An invitation link in the Sync dialog; the relay pins the joining device's key and spends the invitation |
+| Sync: blind relay | Working | One append-only file per workspace: sealed frames, roles, invites, pinned keys and removals; no code path reads a document |
 | Go | v0 container | Android debug build installs; Scratch proves capture and documents, Canvas is a placeholder, and an installed pack appears on home; [Planner's state](../../apps/go/docs/reference/planner.md); iOS unbuilt; no sync transport |
 | Shared packages | Working | `@suite/contracts`, `files`, `desktop`, `theme`, `ui` are consumed as workspace packages |
 | Linux packaging | Working | AppImage and Arch package for the hub; app AppImages through Start |

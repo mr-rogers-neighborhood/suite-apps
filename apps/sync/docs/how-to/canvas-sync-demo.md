@@ -1,116 +1,84 @@
 # Run the Canvas sync demo
 
-This is the first end-to-end demo: two Canvas clients, one user-run `suite-sync` server, account-free
-members, real document updates. It is a **development transport**: plaintext, loopback-only, no TLS,
-no attachments, no presence. Do not expose it beyond a trusted machine.
+This is the end-to-end demo: two Canvas clients, one user-run `suite-sync` relay, account-free
+devices, real document updates. The relay stores sealed frames and the signed records beside them; it
+cannot read a document. It is still a development path: loopback by default, no TLS, and no push. Do
+not expose it beyond a trusted machine.
 
-## 1. Create a workspace
+## 1. Start a relay
 
-From `suite-sync`:
+Start supervises a `suite-sync` relay. Open Start's **Sync** pane, turn sync on, and read **This
+machine's address** — normally `ws://127.0.0.1:8787/sync`. The relay binds to loopback unless somebody
+changes the scope, and Start runs it with the Ed25519 verifier, so it pins each device's key when that
+device first joins.
+
+From a checkout, the same server is the CLI:
 
 ```sh
 pnpm --filter @suite/sync-server build
-node dist/cli.js workspace init /tmp/suite-sync-demo
-```
-
-The command prints the workspace id, the owner id and the editor id. Keep them. It writes:
-
-```
-/tmp/suite-sync-demo/membership.json
-/tmp/suite-sync-demo/snapshot.loro
-```
-
-Use fixed ids if you want a copy-paste recipe:
-
-```sh
-WS=$(printf '1%.0s' {1..64})
-OWNER=$(printf '2%.0s' {1..64})
-EDITOR=$(printf '3%.0s' {1..64})
-node dist/cli.js workspace init /tmp/suite-sync-demo \
-  --workspace "$WS" --owner "$OWNER" --editor "$EDITOR" --force
-```
-
-## 2. Serve it
-
-```sh
-node dist/cli.js serve --workspace /tmp/suite-sync-demo --port 8787
+cd apps/sync
+node dist/cli.js serve --host 127.0.0.1 --port 8787 --trust-all
 curl http://127.0.0.1:8787/health
-# {"ok":true,"rooms":1,"clients":0}
+# {"ok":true,"workspaces":0,"clients":0}
 ```
 
-The server writes the room snapshot back to `snapshot.loro`; a restart keeps the document.
+The CLI needs `--trust-all` because it has no device-key verifier yet. On loopback that admits
+processes on this machine; it is not the flag to use on a network address without understanding that
+the relay is then an open mailbox.
 
-## 3. Web standalone: two tabs
+## 2. Share on the first device
 
-In `suite-canvas`:
+Open the document in Canvas desktop. Click the status pill that says **Local only**, then in the Sync
+dialog use **Share this workspace**:
 
-```sh
-pnpm --filter @suite/canvas dev:standalone -- --port 5173
-```
+1. Start's address is already in the field when Start is running. Otherwise type the relay address.
+2. Press **Share**. The pill changes to **Syncing · 1**, and the dialog now offers an invitation.
+3. Save the **way back in** file when it is offered. It is the only thing that can restore this
+   device's copy; the relay cannot.
 
-Open two tabs, using the ids the workspace printed:
+## 3. Give the second device a copy and an invitation
 
-```text
-http://localhost:5173/?workspace=<WS>&fresh=1&syncUrl=ws://127.0.0.1:8787/sync&member=<OWNER>&epoch=1
-http://localhost:5173/?workspace=<WS>&fresh=1&syncUrl=ws://127.0.0.1:8787/sync&member=<EDITOR>&epoch=1
-```
+The joining device needs the same document before it can join, because the workspace id lives in the
+file:
 
-- The first tab seeds the workspace and sends it to the server.
-- The second tab catches up from the server.
-- Create or edit a card in one tab; the other receives it.
-- `GET /health` should report `clients: 2`.
+1. Copy the `.canvas` file to the other machine. On one machine, use a second Electron data directory
+   and a second copy of the file: the writer lock is per path.
+2. On the first device press **Make one** under **Invite someone**, and send the `suite://join?…`
+   string it produces. The invitation is signed, names the role it grants, and expires.
+3. On the second device open its copy of the file, click **Local only**, paste the invitation under
+   **Join one somebody shared**, and press **Join**.
 
-The app rewrites its URL to the active board, so the sync parameters are cached in `sessionStorage`
-for the tab. Reloading the page keeps the same member.
+The second device says **Waiting** until the first device's app admits it. Admission uses the
+invitation, not a second question: the relay spends the invitation, the first device adds the key
+package to the group, and the second device receives a welcome and a snapshot of the document.
 
-## 4. Desktop: two copies of one workspace
+## 4. Look for
 
-This is the same transport in the Electron shell.
-
-1. In Canvas desktop, create a workspace and save it as `Demo.canvas`.
-2. Create a sync workspace from that file:
-
-   ```sh
-   node dist/cli.js workspace init /tmp/suite-demo-desktop \
-     --from-canvas ~/Documents/Suite/Canvas/Demo.canvas
-   ```
-
-   The command prints the 64-hex sync workspace id. A non-hex app id is hashed to one.
-3. Copy `Demo.canvas` to `Demo-b.canvas`. Both files carry the same workspace id, so they are two
-   local copies of one sync unit.
-4. Start the server with the directory it printed.
-5. Launch two desktop instances, each with its own Electron data directory and member:
-
-   ```sh
-   SUITE_SYNC_URL=ws://127.0.0.1:8787/sync \
-   SUITE_SYNC_MEMBER=<OWNER> \
-   SUITE_SYNC_WORKSPACE=<sync-workspace-id> \
-   SUITE_SYNC_EPOCH=1 \
-   pnpm --filter @suite/desktop start -- --user-data-dir=/tmp/suite-desktop-a
-
-   SUITE_SYNC_URL=ws://127.0.0.1:8787/sync \
-   SUITE_SYNC_MEMBER=<EDITOR> \
-   SUITE_SYNC_WORKSPACE=<sync-workspace-id> \
-   SUITE_SYNC_EPOCH=1 \
-   pnpm --filter @suite/desktop start -- --user-data-dir=/tmp/suite-desktop-b
-   ```
-
-   Each instance opens its own copy of the file. The one-writer lock is per path, so two copies are
-   required; the server room is the one sync workspace id.
-
-## What to look for
-
-- `Saved` in the title bar means the local file was written.
-- With sync enabled, the "Local only" label is gone.
-- `/health` shows two clients.
+- Both title bars drop **Local only**; the first device shows **Syncing · 2**.
 - A card created or renamed in one window appears in the other.
-- Stop the server and start it again: the next client catches up from `snapshot.loro`.
+- Presence (a moving cursor) arrives live and is not written into the document.
+- Restart the relay: both devices reconnect, ask for what follows their cursor, and catch up. The
+  relay's store keeps frames and their positions, not the document.
+- In Start's Sync pane, the workspace appears with its frame count and the devices the relay knows.
+  Nothing there is a title, a card or any other document content.
+
+## 5. Remove a device
+
+On the first device open the Sync dialog and press **Remove** beside the device. The app sends the MLS
+commit that rotates the epoch and the signed removal record the relay can read. It reports success
+only after the relay has numbered the commit. The removed device keeps the copy it already has and
+cannot read what is sealed after the commit; a fresh invitation is the only way back in.
 
 ## Known limits
 
-- Plaintext, loopback-only, no TLS. This is not the shipped security model; see
-  [Decisions](../reference/decisions.md).
-- No presence/cursors and no attachment bytes in this phase.
-- The membership file is a Phase 2 admin shape, not the signed invite/accept flow.
-- The web tabs share one browser origin and IndexedDB. Use a fresh workspace id when you want a clean
-  first-sync test.
+- **No TLS.** The relay speaks `ws://` and binds to `127.0.0.1` by default. Frames protect content
+  from the relay and from disk; they do not protect the header, timing or availability from the
+  network. See [the threat model](../threat-model.md).
+- **Metadata is visible.** The relay reads the workspace and device ids, epoch, frame kind, payload
+  length and arrival time, plus the signed roles, invitations, pinned keys and removals. It reads no
+  document content.
+- **No push.** A device with the app closed learns nothing until it is opened and reconnects.
+- **Retention is finite.** Frames older than 30 days are dropped by default. A device away longer
+  needs a snapshot from a peer; the relay never had a document to hand back.
+- **The CLI is not the shipped relay.** Start's server verifies device signatures; `serve` currently
+  needs `--trust-all`.

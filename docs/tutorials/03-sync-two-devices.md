@@ -1,10 +1,11 @@
 # 3. Sync two devices
 
-The sync server is run by a person, not by the project. This tutorial runs one locally and connects
+The sync relay is run by a person, not by the project. This tutorial runs one locally and connects
 two Canvas clients to it. It proves the transport; it is not the shipped security model.
 
-> The demo room is plaintext, has no TLS and binds to `127.0.0.1` by default. Do not expose it beyond
-> a trusted machine until the blind-relay work lands.
+> The relay stores sealed frames it cannot read, plus the signed roles, invitations, pinned keys and
+> removals it needs to admit them. It has no TLS and binds to `127.0.0.1` by default; do not expose it
+> beyond a trusted machine.
 
 ## What you need
 
@@ -14,28 +15,29 @@ two Canvas clients to it. It proves the transport; it is not the shipped securit
 
 ## The shape
 
-1. Build and start `suite-sync` with a workspace directory.
-2. Create a sync workspace. It gets a 64-hex workspace id, an owner id and an editor id.
-3. Open two Canvas clients with the same workspace id and different member ids.
-4. Edit a card in one; watch it arrive in the other.
+1. Start `suite-sync` — Start supervises one, or run the CLI against a store directory.
+2. Open the document in Canvas desktop and press **Share** in the Sync dialog.
+3. Give a second device a copy of the `.canvas` file and an invitation link from the first device.
+4. Press **Join** on the second device; the first device admits it from the invitation.
+5. Edit a card in one; watch it arrive in the other.
 
-The exact commands, including fixed ids for copy-paste, are in
+The exact steps, including the relay address and the invitation, are in
 [Run the Canvas sync demo](../../apps/sync/docs/how-to/canvas-sync-demo.md). Follow that page
-rather than retyping the commands here; it also covers the desktop case with two copies of one file.
+rather than retyping the commands here.
 
 ## What to look for
 
 - `GET /health` reports two clients.
 - The title bar no longer says "Local only".
 - A card created in one client appears in the other.
-- Restarting the server keeps the workspace, because it writes the snapshot back to disk.
+- Restarting the relay keeps the frames and their positions; clients reconnect and catch up.
 
 ## What this does not prove
 
-- No encryption. The room holds a plaintext replica.
-- No invite or accept flow. Membership is a CLI step.
-- No presence or attachments in this phase.
+- No TLS. The relay speaks `ws://` and binds to `127.0.0.1` by default, so a network attacker sees the
+  header, timing and availability even though the payload is sealed.
+- The relay sees metadata: workspace and device ids, epoch, kind, size and timing, plus the signed
+  roles, invitations, pinned keys and removals. See [the threat model](../../apps/sync/docs/threat-model.md).
 - No background delivery. Both clients are open and connected.
 
-The design target is a blind relay that stores ciphertext it cannot read; see
-`apps/sync/docs/reference/decisions.md`.
+The store is described in [the blind relay record](../../apps/sync/docs/reference/blind-relay.md).

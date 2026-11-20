@@ -16,7 +16,7 @@ document is a file you own. There is no account, no telemetry, and no server ope
 | <img src="apps/start/build/app-icons/planner.png" width="20" height="20" alt=""> **Suite Planner** | A daily planner: inbox, estimates, capacity and a local calendar | Pre-alpha |
 | <img src="apps/start/build/app-icons/budget.png" width="20" height="20" alt=""> **Suite Budget** | An envelope budget: accounts, register, month grid and rolling backups | Pre-alpha |
 | **Suite Start** | The hub: installs, updates, opens and removes the other apps | Working |
-| **Suite Sync** | The sync protocol and a server a person runs | Phase 2 demo |
+| **Suite Sync** | The sync protocol and a relay a person runs | Phase 4 demo |
 | **Suite Go** | One mobile container that hosts the domains as packs | Shell only |
 
 Canvas, Planner and Budget own their documents. Start launches them as separate processes and is not
@@ -50,8 +50,9 @@ troubleshooting steps are in [Install Suite Start](docs/tutorials/01-install.md)
   can be copied, backed up and opened offline.
 - **The hub is not a host.** Start returns a path or a URL and launches a separate signed process. It
   never proxies document bytes.
-- **Sync is yours.** A person runs the server on a NAS, a Raspberry Pi or a laptop. The target is a
-  relay that stores ciphertext it cannot read; today the room is plaintext and loopback-only.
+- **Sync is yours.** A person runs the relay on a NAS, a Raspberry Pi or a laptop. It stores sealed
+  frames it cannot read, plus the signed roles, invitations, pinned keys and removals it needs to
+  admit them. It is loopback by default and has no TLS yet.
 - **The mobile container follows the mini-app model.** A manifest, declared capabilities, one
   instance per app, and a document the container never parses. The desktop hub shares the manifest
   and the one-instance rule.
@@ -67,7 +68,7 @@ met and which are still partial.
 | --- | --- |
 | Platforms | Linux x86_64. AppImage and Arch package for the hub; Flatpak experimental; no macOS or Windows build. |
 | Sync | Canvas syncs through a user-run server. Planner and Budget do not sync yet. |
-| Security | No account or telemetry. Documents are unencrypted; use disk encryption. The sync room is plaintext. |
+| Security | No account or telemetry. Document files are unencrypted; use disk encryption. The sync relay holds sealed frames, but has no TLS and is loopback by default. |
 | Mobile | Suite Go installs on Android as a debug build. No domain ships; iOS is unbuilt. |
 | Gate | Local, at the repository root. No CI service gates a pull request. |
 

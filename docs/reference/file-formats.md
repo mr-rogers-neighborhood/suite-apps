@@ -44,25 +44,29 @@ recovery mode with a copy in `recovered/`.
 The library index (`library.json`) and `recovered/` live in the application directory, because they
 describe this machine rather than the document.
 
-## Sync workspaces
+## Sync relay store
 
-The sync server stores a workspace as a directory:
+The relay is not a document store. For each workspace it keeps append-only JSONL files in its data
+directory:
 
 ```
-<workspace>/
-  membership.json    signed membership log and roles
-  snapshot.loro      the current document snapshot
+<workspaceId>.frames.jsonl    sealed frames with the position the relay assigned
+<workspaceId>.roles.jsonl     signed role records
+<workspaceId>.invites.jsonl   signed, single-use invitations
+<workspaceId>.keys.jsonl      pinned device keys and names
+<workspaceId>.removed.jsonl   signed removals
 ```
 
-`suite-sync workspace init <dir>` creates one. The server writes the snapshot back on change, so a
-restart keeps the document. Membership state and invite/accept are a Phase 2 admin shape, not the
-signed invite flow.
+A frame carries a readable header and a base64 MLS payload the relay never opens. There is no
+`membership.json`, no `snapshot.loro` and no version vector. Retention drops the oldest frames, but
+the surviving positions are not renumbered.
 
 ## Encryption and backups
 
 The apps do not encrypt their files. Anyone with a `.canvas`, `.planner` or `.budget` file can read
 it; use OS disk encryption. Backups are the app's rolling copies plus whatever the person keeps
-elsewhere. The sync room is also plaintext today, and loopback-only while the transport is proven.
+elsewhere. The sync relay stores sealed frames, but it has no TLS and binds to loopback by default;
+the header and the signed records beside the frames are visible to it.
 
 Details per app: [Canvas desktop](../../apps/canvas/docs/reference/desktop.md),
 [Planner data model](../../apps/planner/docs/reference/data-model.md), and the
