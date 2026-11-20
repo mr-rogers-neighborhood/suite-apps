@@ -81,10 +81,14 @@ node scripts/flatpak.mjs --no-build   # reuse release/linux-unpacked
 flatpak run run.suite.canvas
 ```
 
-It exports to `~/suite-flatpak/repo`, adds it as the user remote `suite-local`, and installs from
-that remote, so `flatpak update` is the real update path. The repo is unsigned and the remote is
-added with `--no-gpg-verify`; a published repo needs `flatpak build-update-repo --gpg-sign` and a
-key the client already trusts.
+It exports to `~/suite-flatpak/repo`, adds it as the user remote `suite-local`, and installs into
+`~/.local/share/flatpak` from that remote, so `flatpak update` is the real update path. The repo is
+unsigned and the remote is added with `--no-gpg-verify`; a published repo needs `flatpak
+build-update-repo --gpg-sign` and a key the client already trusts.
+
+Orca points `XDG_DATA_HOME` at a per-session directory. The script installs into the real user
+installation anyway; in an Orca terminal, run the app with
+`XDG_DATA_HOME=$HOME/.local/share flatpak run run.suite.canvas`.
 
 The hub stays an unpacked install until it manages Flatpaks. Packaging it earlier would need
 `--filesystem=home` and `flatpak-spawn --host` to keep writing `~/Applications`, which is sandbox

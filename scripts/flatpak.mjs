@@ -50,6 +50,7 @@ const buildDir = join(ROOT, "packaging", "flatpak", ".build", app.id);
 // and a user Flatpak installed there exists only inside that session. The app
 // belongs in the user's real data directory so the desktop sees it.
 const dataHome = process.env.SUITE_FLATPAK_XDG_DATA_HOME ?? join(homedir(), ".local", "share");
+const sessionDataHome = process.env.XDG_DATA_HOME;
 process.env.XDG_DATA_HOME = dataHome;
 
 function run(command, args, cwd = ROOT) {
@@ -109,3 +110,8 @@ if (install) {
 
 process.stdout.write(`\n${app.id} is in ${repo}\n`);
 process.stdout.write(`run it with: flatpak run ${app.id}\n`);
+if (sessionDataHome !== undefined && sessionDataHome !== dataHome) {
+  process.stdout.write(
+    `this session's XDG_DATA_HOME is elsewhere, so use:\n  XDG_DATA_HOME=${dataHome} flatpak run ${app.id}\n`,
+  );
+}
