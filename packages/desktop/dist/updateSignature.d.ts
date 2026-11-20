@@ -8,10 +8,13 @@
  * does not verify.
  *
  * The public half is here, in the source, because a public key is public. The
- * private half lives on the publisher's machine and in CI, and never in this
- * repository.
+ * private half lives on the publisher's machine and never in this repository.
+ *
+ * A rotation is not a local edit: an installed build verifies with the key it was
+ * built with, so the new pin has to reach Start before a feed signed with the new
+ * key exists. See [Decisions](../../../docs/reference/decisions.md).
  */
-export declare const SUITE_UPDATE_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEACSihFH4Hjh0d4n8xncXd+VXMw6+MUDKTwbyVTI9UwFM=\n-----END PUBLIC KEY-----\n";
+export declare const SUITE_UPDATE_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAuJgPg+M3OivP9ELOYoU+/xgUTw5AWQv29+yt76APlTw=\n-----END PUBLIC KEY-----\n";
 /** The signature's file name beside a feed manifest. */
 export declare const UPDATE_SIGNATURE_SUFFIX = ".sig";
 /** A fingerprint a person can compare, so a key rotation is visible. */

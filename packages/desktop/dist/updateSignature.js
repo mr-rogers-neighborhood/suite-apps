@@ -9,11 +9,14 @@ import { createHash, createPublicKey, verify } from "node:crypto";
  * does not verify.
  *
  * The public half is here, in the source, because a public key is public. The
- * private half lives on the publisher's machine and in CI, and never in this
- * repository.
+ * private half lives on the publisher's machine and never in this repository.
+ *
+ * A rotation is not a local edit: an installed build verifies with the key it was
+ * built with, so the new pin has to reach Start before a feed signed with the new
+ * key exists. See [Decisions](../../../docs/reference/decisions.md).
  */
 export const SUITE_UPDATE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEACSihFH4Hjh0d4n8xncXd+VXMw6+MUDKTwbyVTI9UwFM=
+MCowBQYDK2VwAyEAuJgPg+M3OivP9ELOYoU+/xgUTw5AWQv29+yt76APlTw=
 -----END PUBLIC KEY-----
 `;
 /** The signature's file name beside a feed manifest. */

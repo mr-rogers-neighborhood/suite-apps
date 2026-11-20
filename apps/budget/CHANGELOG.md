@@ -10,6 +10,14 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 No changes yet.
 
+## [0.2.3] - 2026-11-20
+
+### Changed
+
+- **Rebuilt to trust the rotated update key.** Nothing in the budget changes; the binary verifies the
+  feed Suite Start reads with the current publishing key. An install that keeps the previous build
+  will not see this release through its own updater, so Suite Start replaces it.
+
 ## [0.2.2] - 2026-11-08
 
 ### Changed

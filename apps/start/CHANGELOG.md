@@ -9,6 +9,20 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.3.13] - 2026-11-20
+
+### Changed
+
+- **Feeds come from one folder per app on GitHub Pages.** The hub reads
+  `feeds/<app>/latest-linux.yml` instead of reaching into each app's own repository, so four apps can
+  publish from this one repository without sharing a single `releases/latest` URL. The manifest is
+  signed and names the release asset it offers.
+- **The update key is rotated.** An installed build verifies a feed with the key it was built with,
+  and this build pins the new key. Start does not update itself, so download this release once; it
+  becomes the root of trust for every feed signed afterwards.
+
 ### Added
 
 - **Start installs and updates from the local Flatpak store.** A card whose app the store offers says
