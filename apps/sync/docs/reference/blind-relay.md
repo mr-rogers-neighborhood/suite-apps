@@ -96,7 +96,8 @@ device.
 ## The frame
 
 The relay stores one record per message. It is the unit of ordering, retention and replay. It is not
-a document.
+a document. The stored record is this frame together with the position the relay assigned it; the
+position is not part of the signed frame, so it never travels inside the payload or the signature.
 
 ```ts
 type Frame = {
@@ -144,10 +145,10 @@ the sender does not get to say when its frame arrived.
   `since(after)`. The position must be monotonic and durable across compaction: a client that
   reconnects with an old cursor must be able to tell that the relay no longer holds what comes after
   it, and ask a peer for a snapshot instead of concluding it is current.
-- Today the position is the array index in `FrameLog`, and `FileHostStore.compact` rewrites the array,
-  which renumbers it. `joined` reports a count but not the oldest index still held, so a cursor older
-  than retention reads as an empty catch-up rather than a gap. S3 stores the index with the frame and
-  reports the oldest one.
+- Today the position is stored with the frame in `FrameLog` and `FileHostStore`, so compaction drops
+  entries without renumbering the ones that remain. `joined` reports `oldestIndex`, the oldest position
+  the log can still serve; a cursor below it is a gap, not an empty catch-up. A file written before S3
+  has bare frame lines, which are read as consecutive positions from zero.
 - Signatures make attribution independent of the relay's order, but not causality: commits chain, so a
   client applies them in index order and does not skip to the newest.
 
@@ -344,7 +345,7 @@ relay already reads to order the log.
 1. If the app is not running, the delivery channel starts it. This build has none; the only trigger in
    the tree is the app coming to the foreground (`syncTrigger.ts` in Go). Canvas reconnects when sync
    is enabled and has no foreground trigger of its own.
-2. Connect, `join`, read `newestEpoch`, `frames` and, once S3 adds it, the oldest index still held.
+2. Connect, `join`, read `newestEpoch`, `frames` and the oldest index still held.
 3. `since(lastAppliedIndex)`; apply frames in index order, commits before the application frames they
    unlock.
 4. Use the decrypted version vectors to decide whether anything is new for the document in view. Only
