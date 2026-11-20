@@ -30,6 +30,8 @@ The rules that shape this repository. Each is current; the code follows it.
 - `scripts/release.mjs` is the release path. It refuses a dirty tree, a version with no changelog
   heading, a commit the gate has not proven, and a manifest whose artifact is missing. It is a dry
   run unless `--publish` is passed.
+- A version lives in one place and a tag names one app's release. [Version ownership](../how-to/package-and-release.md#version-ownership)
+  states which file owns it and which prefix the tag uses.
 - Linux is the published platform. macOS and Windows have no signing identity.
 
 ## Product boundary

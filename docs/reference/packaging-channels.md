@@ -111,5 +111,6 @@ monorepo `releases/latest` cannot serve several different `latest-linux.yml` fil
 the Pages folder are what let all four resolve at once.
 
 `scripts/release.mjs` writes the pair and signs the exact bytes it commits. A dry run is the default;
-`--publish` uploads and commits, and `--verify` reads the published feed back. See
-[Package and release](../how-to/package-and-release.md).
+`--publish` uploads and commits, and `--verify` reads the published feed back. Which file owns a
+version and which tag a release uses is [Version ownership](../how-to/package-and-release.md#version-ownership);
+this page does not repeat it.

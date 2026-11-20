@@ -3,8 +3,9 @@
 Written for people, not commits: what you can do now that you could not before, and what changed
 underneath enough to matter.
 
-Versions here are Suite Start's own. The `v0.x` tags in this repository belong to the shared packages
-the apps pin, and are not releases of the launcher.
+Versions here are Suite Start's own, tagged `start-v<version>`. The historical `v0.1.x` tags are
+Canvas's releases from before the monorepo, not the launcher's. The rules are in
+[Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
 
 ## [Unreleased]
 

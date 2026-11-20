@@ -133,11 +133,36 @@ The app's card says `update available` after **Check for updates**; **Update** a
 replace the deployment. Remove the marker and run `node scripts/flatpak.mjs --no-build` again to
 publish the clean build and bring the client back to it.
 
-## Release notes and versions
+## Version ownership
 
-- The version lives in the app's `package.json`. Do not restate it in a README or a doc page.
-- The app's `CHANGELOG.md` records what changed, in a person's words. The release script reads the
-  section for the version rather than asking for a second copy.
-- Tags use the `<app>-v<version>` prefix, so several apps can share one repository without colliding.
-- The manifest's signature is made with the publisher key at `SUITE_UPDATE_KEY`, or
-  `~/.config/suite/update-key.pem` by default. The private half never enters this repository.
+A version has one home: the app's entry `package.json`. Nothing else restates it — not this page, not
+a README, not a tag name. The app's release path reads it, refuses a changelog without a section for
+it, and stamps it into the artifact.
+
+| What | Where the version lives | Its tag |
+| --- | --- | --- |
+| Start, Canvas, Planner, Budget | `apps/<app>/package.json` | `<app>-v<version>` |
+| The relay (`suite-sync`) | `apps/sync/package.json` | `sync-v<version>` |
+| Suite Go | `apps/go/app.config.json` | none yet |
+| A shared package (`@suite/*`) | `packages/<name>/package.json` | none; consumed as `workspace:*` |
+
+A tag names one app's release, not the repository's. The relay is three packages that ship as one
+artifact: `apps/sync/package.json` carries the release version and
+`apps/sync/packages/{protocol,host}/package.json` mirror it, so they move together. Its wire protocol
+has its own integer, `RELAY_PROTOCOL_VERSION` in
+[`apps/sync/packages/protocol/src/relay.ts`](../../apps/sync/packages/protocol/src/relay.ts), and a
+protocol change does not rename the package release. Suite Go needs its version in `app.config.json`,
+`package.json` and Gradle because the Android build reads all three; `app.config.json` is the home and
+a test fails when the copies disagree.
+
+The `v0.1.0`–`v0.1.8` tags predate this monorepo. They are Canvas releases from when Canvas was the
+repository — not shared-package tags and not Start releases. They stay where GitHub put them; a new
+release uses its app prefix.
+
+A changelog is the release notes for a version, not a second version store. Every release adds its
+`## [version]` section before it is tagged, and each app's `CHANGELOG.md` names the tag prefix that is
+its own. Where a version shipped without written notes, the changelog says so in one sentence rather
+than inventing a section.
+
+The manifest's signature is made with the publisher key at `SUITE_UPDATE_KEY`, or
+`~/.config/suite/update-key.pem` by default. The private half never enters this repository.

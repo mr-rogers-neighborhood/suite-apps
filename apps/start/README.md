@@ -91,8 +91,9 @@ committed output has drifted. The root gate builds the same packages once before
 3. `node scripts/release.mjs start --publish`. It builds the AppImage, writes the signed feed under
    `feeds/start/`, builds the Arch package when `makepkg` is present, uploads them, and commits the
    manifest.
-4. Keep the `start-` tag prefix: the shared packages' tags are a separate namespace, and a hub
-   release must not land on one.
+4. Keep the `start-` tag prefix: a hub release is tagged `start-v<version>` so it cannot collide with
+   another app's release. [Version ownership](../../docs/how-to/package-and-release.md#version-ownership)
+   names the tag for every app.
 
 [Package and release](../../docs/how-to/package-and-release.md) describes the script and what it
 refuses; [Packaging channels](../../docs/reference/packaging-channels.md) explains the two artifact

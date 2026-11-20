@@ -4,9 +4,13 @@ What changed, in a person's words rather than commits.
 
 ## Versioning
 
-[`package.json`](package.json) carries the current version, which is what `--version` reports and
-what the artifact ships. This prose record may lag it, so read the package for the current version
-rather than the newest heading below.
+[`package.json`](package.json) is the version the relay reports and ships, and the version a release
+is tagged with: `sync-v<version>` here, `v<version>` in the standalone repository this one was
+imported from. The wire protocol has its own integer and is not this version; the rules are in
+[Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
+
+Entries stop at 0.4.0. Versions 0.5.0 through 0.11.3 carry tags in the standalone repository but no
+written notes, and this file does not invent them; every release from here adds its section first.
 
 ## [0.4.0] - 2026-11-18
 

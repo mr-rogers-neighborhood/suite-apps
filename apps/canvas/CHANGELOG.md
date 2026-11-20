@@ -1,5 +1,9 @@
 # Changelog
 
+Versions here are Canvas's own. Releases up to `0.1.8` are the historical `v0.1.x` tags; from `0.1.9`
+a release is tagged `canvas-v<version>`. See
+[Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
+
 ## [Unreleased]
 
 No changes yet.

@@ -3,6 +3,9 @@
 Written for people, not commits: what you can do now that you could not before, and what changed
 underneath enough to matter.
 
+Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
+[Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
+
 ## [Unreleased]
 
 No changes yet.

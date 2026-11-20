@@ -2,6 +2,11 @@
 
 What changed, in a person's words rather than commits.
 
+Versions here are Suite Go's own. Its version lives in [`app.config.json`](app.config.json), the copy
+the Android build reads; `package.json` and Gradle repeat it because the build needs all three. No
+release tag exists yet. The rules are in
+[Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
+
 ## Unreleased
 
 No changes yet.
