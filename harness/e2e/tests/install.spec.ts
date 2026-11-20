@@ -113,7 +113,7 @@ async function launchHub(root: string, env: Record<string, string>): Promise<Hub
     app,
     page,
     card,
-    text: async () => (await card.innerText()).replace(/\s*\n\s*/gu, " | "),
+    text: async () => (await card.textContent()).replace(/\s*\n\s*/gu, " | "),
     close: async () => {
       await app.close().catch(() => undefined);
     },

@@ -3,7 +3,7 @@
  * Two devices, one workspace, one relay binary — and the document converges.
  *
  *   node scripts/verify-convergence.mjs
- *   node scripts/verify-convergence.mjs --cli ../suite-sync/apps/server/dist/cli.js
+ *   node scripts/verify-convergence.mjs --cli ../apps/suite-sync/apps/server/dist/cli.js
  *
  * This closes the "done means" on the relay issue: *two devices sync through it, with no Electron
  * and no X server*. It runs the relay as a child process from the **release artifact** when one
@@ -93,7 +93,7 @@ async function relayCommand() {
     return { entry: path, source: "the CLI you named" };
   }
 
-  const releaseDir = resolve(ROOT, "../suite-sync/dist/release");
+  const releaseDir = resolve(ROOT, "../apps/suite-sync/dist/release");
   const tarballs = existsSync(releaseDir)
     ? readdirSync(releaseDir).filter((name) => name.endsWith(".tar.gz"))
     : [];
@@ -107,7 +107,7 @@ async function relayCommand() {
     return { entry, source: `the released artifact (${tarballs.sort().at(-1)})` };
   }
 
-  const built = resolve(ROOT, "../suite-sync/apps/server/dist/cli.js");
+  const built = resolve(ROOT, "../apps/suite-sync/apps/server/dist/cli.js");
   if (!existsSync(built)) {
     fail("no artifact and no build; run `pnpm --filter @suite/sync-server build` or release:relay");
   }

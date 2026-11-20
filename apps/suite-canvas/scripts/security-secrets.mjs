@@ -45,7 +45,19 @@ const scanArguments = [
   "--verbose",
 ];
 
-if (!dockerIsAvailable()) process.exit(reportMissingDocker("gitleaks"));
+if (!dockerIsAvailable()) {
+  // The host gate runs without Docker access on purpose: adding the desktop
+  // user to the docker group is a root-equivalent permission. The independent
+  // VM gate has a daemon and runs this scan for real, so the skip is loud and
+  // machine-specific rather than a silent pass.
+  if (process.env.SUITE_SKIP_DOCKER_SECURITY === "1") {
+    console.log(
+      "gitleaks: skipped because SUITE_SKIP_DOCKER_SECURITY=1; the VM gate runs it with Docker",
+    );
+    process.exit(0);
+  }
+  process.exit(reportMissingDocker("gitleaks"));
+}
 
 // `git --staged` reads the index, which is what a commit is about to record.
 // `detect --no-git` walks the tree, which also covers files not yet added.

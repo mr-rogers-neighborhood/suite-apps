@@ -101,6 +101,15 @@ function exportHead() {
 const workdir = fresh ? exportHead() : ROOT;
 const results = [];
 
+// Docker is what runs gitleaks for Canvas's `security:secrets` step. This
+// desktop does not grant the agent access to the daemon because that is a
+// root-equivalent permission; the independent VM gate has a daemon and runs the
+// scan for real. Make the local skip explicit rather than a silent pass.
+const docker = spawnSync("docker", ["info", "--format", "{{.ServerVersion}}"], {
+  encoding: "utf8",
+});
+if (docker.status !== 0) process.env.SUITE_SKIP_DOCKER_SECURITY = "1";
+
 if (!json) {
   process.stdout.write(
     `\nSuite gate · ${fresh ? `fresh export of ${gitSha()}` : "working tree"} · ${relative(ROOT, workdir) || "."}\n`,

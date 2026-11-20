@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,7 +25,8 @@ export const LINK_DIR = join(DEV, "link");
 export const PID_DIR = join(DEV, "pids");
 
 export function sibling(name) {
-  return resolve(SIBLINGS_ROOT, name);
+  const imported = resolve(SIBLINGS_ROOT, "apps", name);
+  return existsSync(imported) ? imported : resolve(SIBLINGS_ROOT, name);
 }
 
 export function appDir(appId) {
