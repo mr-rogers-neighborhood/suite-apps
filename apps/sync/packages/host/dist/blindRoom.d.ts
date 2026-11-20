@@ -1,4 +1,5 @@
 import { type Frame, type FrameKind, type FrameRejection, type RoleState, type SealedFrame } from "@suite/sync";
+import type { StoredFrame } from "./store.js";
 /**
  * What a host is allowed to decide, and the only things it is allowed to decide.
  *
@@ -43,22 +44,48 @@ export interface AdmitOptions {
 }
 export declare function admitFrame(sealed: SealedFrame, host: HostWorkspace, roles: RoleState, keyOf: (deviceId: string) => string | null, verify: FrameVerifier, receivedAt?: string, admitOptions?: AdmitOptions): HostVerdict;
 /**
- * The frames one workspace has, oldest first.
+ * The frames one workspace has, oldest first, each with the position it was given.
  *
  * Held in memory and persisted by whatever writes them out. The host may drop the oldest
  * when a retention window closes; it cannot compact them, because compaction is reading.
+ * Dropping never renumbers what stays, so a cursor a client already holds still means the
+ * same frame after the window moves.
  */
 export declare class FrameLog {
     readonly workspaceId: string;
-    private readonly frames;
+    private readonly entries;
+    private next;
     constructor(workspaceId: string);
+    /**
+     * Put back what a store held across a restart.
+     *
+     * `nextIndex` is the store's durable position, not a count: a log that was compacted to
+     * empty still starts where it left off.
+     */
+    restore(entries: readonly StoredFrame[], nextIndex: number): void;
     get length(): number;
+    /**
+     * The oldest position this log can serve.
+     *
+     * When nothing is held it is the position the next frame will take, so a cursor below it
+     * still reads as a gap rather than an empty catch-up.
+     */
+    get oldestIndex(): number;
+    /** The position the next frame will take. */
+    get nextIndex(): number;
     /** The newest epoch stored, which is the one a later frame is measured against. */
     get newestEpoch(): number | null;
-    append(frame: Frame): void;
-    all(): readonly Frame[];
-    /** Frames after the first `count`, which is how a returning device catches up. */
-    since(count: number): readonly Frame[];
+    append(frame: Frame): StoredFrame;
+    all(): readonly StoredFrame[];
+    /** Frames from `after` onward, by the position the host stored with each one. */
+    since(after: number): readonly StoredFrame[];
+    /**
+     * Whether a cursor predates what retention still holds.
+     *
+     * `after` is the first position the client is asking for, so it is a gap exactly when
+     * that position is older than the oldest this log can serve.
+     */
+    hasGap(after: number): boolean;
     /**
      * Forget frames that arrived before a cutoff.
      *

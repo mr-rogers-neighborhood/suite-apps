@@ -13,10 +13,10 @@ import { memberRoleSchema } from "./roles.js";
  * nothing lets it answer a question about one.
  */
 /**
- * 3: a device may say something the host is asked to forget, and an owner may take a device
- * out of a workspace.
+ * 4: `joined` reports the oldest position the log can still serve, so a cursor older than
+ * retention reads as a gap rather than an empty catch-up.
  */
-export const RELAY_PROTOCOL_VERSION = 3;
+export const RELAY_PROTOCOL_VERSION = 4;
 /**
  * A client announces itself.
  *
@@ -139,6 +139,17 @@ const joinedSchema = z
     newestEpoch: z.number().int().nonnegative().nullable(),
     /** How many frames it holds, so a client knows whether to ask for a catch-up. */
     frames: z.number().int().nonnegative(),
+    /**
+     * The oldest position the log can still serve.
+     *
+     * A client whose cursor is below this has missed what retention dropped: it needs a
+     * snapshot from a peer rather than an empty catch-up. It is the position the next frame
+     * will take while the log is empty, so a fresh workspace reports `0`.
+     *
+     * Optional because a host that predates the field says nothing, and a client must still
+     * read the rest of the greeting.
+     */
+    oldestIndex: z.number().int().nonnegative().optional(),
     /**
      * Who is in the workspace and what each of them may do.
      *

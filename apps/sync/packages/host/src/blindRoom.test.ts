@@ -152,7 +152,7 @@ describe("the log the host keeps", () => {
     log.append(frame({ epoch: 1 }));
     log.append(frame({ epoch: 2 }));
     log.append(frame({ epoch: 3 }));
-    expect(log.since(2)).toHaveLength(1);
+    expect(log.since(2).map((stored) => stored.index)).toEqual([2]);
     expect(log.since(0)).toHaveLength(3);
   });
 
@@ -163,6 +163,53 @@ describe("the log the host keeps", () => {
     log.append(frame({ epoch: 3 }));
     expect(log.dropBefore(3)).toBe(2);
     expect(log.all()).toHaveLength(1);
+  });
+
+  it("does not renumber a position a client already holds", () => {
+    const log = new FrameLog(workspaceId);
+    log.append(frame({ epoch: 1 }));
+    log.append(frame({ epoch: 2 }));
+    log.append(frame({ epoch: 3 }));
+
+    log.dropBefore(3);
+    expect(log.oldestIndex).toBe(2);
+    expect(log.since(2).map((stored) => stored.index)).toEqual([2]);
+    expect(log.append(frame({ epoch: 4 })).index).toBe(3);
+  });
+
+  it("reads a cursor older than retention as a gap", () => {
+    const log = new FrameLog(workspaceId);
+    log.append(frame({ epoch: 1 }));
+    log.append(frame({ epoch: 2 }));
+    log.append(frame({ epoch: 3 }));
+
+    log.dropBefore(3);
+    expect(log.hasGap(0)).toBe(true);
+    expect(log.hasGap(1)).toBe(true);
+    expect(log.hasGap(2)).toBe(false);
+    expect(log.since(0).map((stored) => stored.index)).toEqual([2]);
+  });
+
+  it("keeps the next position when the log is restored empty", () => {
+    const log = new FrameLog(workspaceId);
+    log.restore([], 5);
+    expect(log.oldestIndex).toBe(5);
+    expect(log.hasGap(4)).toBe(true);
+    expect(log.hasGap(5)).toBe(false);
+    expect(log.append(frame({ epoch: 6 })).index).toBe(5);
+  });
+
+  it("keeps stored positions when it is restored", () => {
+    const log = new FrameLog(workspaceId);
+    const first = log.append(frame({ epoch: 1 }));
+    const second = log.append(frame({ epoch: 2 }));
+
+    const restored = new FrameLog(workspaceId);
+    restored.restore([second], 3);
+    expect(restored.oldestIndex).toBe(1);
+    expect(restored.since(1).map((stored) => stored.index)).toEqual([1]);
+    expect(restored.append(frame({ epoch: 3 })).index).toBe(3);
+    expect(first.index).toBe(0);
   });
 });
 

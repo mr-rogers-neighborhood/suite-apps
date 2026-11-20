@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { frameSchema, inviteRecordSchema, memberRoleSchema, removalRecordSchema, roleRecordSchema, } from "@suite/sync";
 export class MemoryHostStore {
     frames = new Map();
+    nextIndex = new Map();
     invites = new Map();
     roles = new Map();
     keys = new Map();
@@ -10,10 +11,14 @@ export class MemoryHostStore {
     async loadFrames(workspaceId) {
         return [...(this.frames.get(workspaceId) ?? [])];
     }
-    async appendFrame(workspaceId, frame) {
+    async loadNextIndex(workspaceId) {
+        return this.nextIndex.get(workspaceId) ?? 0;
+    }
+    async appendFrame(workspaceId, entry) {
         const existing = this.frames.get(workspaceId) ?? [];
-        existing.push(frame);
+        existing.push(entry);
         this.frames.set(workspaceId, existing);
+        this.nextIndex.set(workspaceId, Math.max(this.nextIndex.get(workspaceId) ?? 0, entry.index + 1));
     }
     async loadRoles(workspaceId) {
         return [...(this.roles.get(workspaceId) ?? [])];
@@ -48,7 +53,7 @@ export class MemoryHostStore {
         this.removals.set(workspaceId, existing);
     }
     async compact(workspaceId, cutoff) {
-        const kept = (this.frames.get(workspaceId) ?? []).filter((f) => f.receivedAt >= cutoff);
+        const kept = (this.frames.get(workspaceId) ?? []).filter((entry) => entry.frame.receivedAt >= cutoff);
         this.frames.set(workspaceId, kept);
     }
 }
@@ -58,6 +63,10 @@ export class MemoryHostStore {
  * A crash mid-append can leave a partial line. That line is dropped on load rather than
  * failing the workspace: a torn write should cost one frame, not the room, because a frame
  * is only ever a message some device can still send again.
+ *
+ * The frame file holds the frame together with its position. Compaction rewrites the file
+ * but never the positions, and a first line records the next position so an emptied log
+ * still knows where it was.
  */
 export class FileHostStore {
     directory;
@@ -65,10 +74,13 @@ export class FileHostStore {
         this.directory = directory;
     }
     async loadFrames(workspaceId) {
-        return readLines(this.framePath(workspaceId), (value) => frameSchema.safeParse(value).data);
+        return (await this.readLog(workspaceId)).frames;
     }
-    async appendFrame(workspaceId, frame) {
-        await this.appendLine(this.framePath(workspaceId), frame);
+    async loadNextIndex(workspaceId) {
+        return (await this.readLog(workspaceId)).nextIndex;
+    }
+    async appendFrame(workspaceId, entry) {
+        await this.appendLine(this.framePath(workspaceId), storedLine(entry));
     }
     async loadRoles(workspaceId) {
         return readLines(this.rolePath(workspaceId), (value) => roleRecordSchema.safeParse(value).data);
@@ -98,12 +110,60 @@ export class FileHostStore {
         await this.appendLine(this.removalPath(workspaceId), record);
     }
     async compact(workspaceId, cutoff) {
-        const kept = (await this.loadFrames(workspaceId)).filter((f) => f.receivedAt >= cutoff);
+        const { frames, nextIndex } = await this.readLog(workspaceId);
+        const kept = frames.filter((entry) => entry.frame.receivedAt >= cutoff);
         await mkdir(this.directory, { recursive: true });
         const target = this.framePath(workspaceId);
         const temporary = `${target}.tmp`;
-        await writeFile(temporary, kept.map((frame) => `${JSON.stringify(frame)}\n`).join(""), "utf8");
+        const header = `${JSON.stringify({ type: "log", nextIndex })}\n`;
+        const body = kept.map((entry) => `${JSON.stringify(storedLine(entry))}\n`).join("");
+        await writeFile(temporary, `${header}${body}`, "utf8");
         await rename(temporary, target);
+    }
+    /**
+     * Read the frame file as positions plus frames.
+     *
+     * A file written before positions were stored has bare frame lines. Those are read as
+     * consecutive positions from zero, which is exactly what the old array index meant, and
+     * the next compaction writes the durable form.
+     */
+    async readLog(workspaceId) {
+        let text;
+        try {
+            text = await readFile(this.framePath(workspaceId), "utf8");
+        }
+        catch (error) {
+            if (isMissingFile(error))
+                return { frames: [], nextIndex: 0 };
+            throw error;
+        }
+        const frames = [];
+        let declaredNext = 0;
+        let legacyIndex = 0;
+        for (const line of text.split("\n")) {
+            if (line.trim().length === 0)
+                continue;
+            const value = safeJson(line);
+            const header = logHeader(value);
+            if (header !== null) {
+                declaredNext = Math.max(declaredNext, header);
+                continue;
+            }
+            const entry = storedFrame(value);
+            if (entry !== undefined) {
+                frames.push(entry);
+                continue;
+            }
+            const legacy = frameSchema.safeParse(value);
+            if (legacy.success) {
+                frames.push({ index: legacyIndex, frame: legacy.data });
+                legacyIndex += 1;
+            }
+        }
+        let nextIndex = declaredNext;
+        for (const entry of frames)
+            nextIndex = Math.max(nextIndex, entry.index + 1);
+        return { frames, nextIndex };
     }
     async appendLine(path, value) {
         await mkdir(this.directory, { recursive: true });
@@ -124,6 +184,34 @@ export class FileHostStore {
     removalPath(workspaceId) {
         return join(this.directory, `${workspaceId}.removed.jsonl`);
     }
+}
+/** The stored form of one frame: its position, and the ciphertext frame beside it. */
+function storedLine(entry) {
+    return { type: "frame", index: entry.index, frame: entry.frame };
+}
+function storedFrame(value) {
+    if (typeof value !== "object" || value === null)
+        return undefined;
+    const record = value;
+    if (record.type !== "frame")
+        return undefined;
+    const index = record.index;
+    if (typeof index !== "number" || !Number.isInteger(index) || index < 0)
+        return undefined;
+    const parsed = frameSchema.safeParse(record.frame);
+    return parsed.success ? { index, frame: parsed.data } : undefined;
+}
+/** The next position a file records, or null for a file that predates the record. */
+function logHeader(value) {
+    if (typeof value !== "object" || value === null)
+        return null;
+    const record = value;
+    if (record.type !== "log")
+        return null;
+    const nextIndex = record.nextIndex;
+    return typeof nextIndex === "number" && Number.isInteger(nextIndex) && nextIndex >= 0
+        ? nextIndex
+        : null;
 }
 async function readLines(path, parse) {
     let text;

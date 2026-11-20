@@ -14,6 +14,19 @@ import {
 } from "@suite/sync";
 
 /**
+ * One frame with the position the host assigned it.
+ *
+ * The position is stored beside the frame rather than inferred from the frame's place in
+ * the array. Retention drops the oldest entries, and a client that reconnects must still
+ * see the positions it already applied; renumbering the survivors would move its cursor
+ * without telling it.
+ */
+export interface StoredFrame {
+  readonly index: number;
+  readonly frame: Frame;
+}
+
+/**
  * What a host keeps between process lifetimes: frames, and who may write.
  *
  * Frames are ciphertext and role records are signed public metadata — a device id and a
@@ -24,8 +37,15 @@ import {
  * restart, which looks exactly like a broken workspace.
  */
 export interface HostStore {
-  loadFrames(workspaceId: string): Promise<readonly Frame[]>;
-  appendFrame(workspaceId: string, frame: Frame): Promise<void>;
+  loadFrames(workspaceId: string): Promise<readonly StoredFrame[]>;
+  /**
+   * The position the next frame will take.
+   *
+   * Kept even when no frame is held: compaction can empty the log, and a client's cursor
+   * must not be moved back to zero by a process that starts again afterwards.
+   */
+  loadNextIndex(workspaceId: string): Promise<number>;
+  appendFrame(workspaceId: string, entry: StoredFrame): Promise<void>;
   loadRoles(workspaceId: string): Promise<readonly RoleRecord[]>;
   appendRole(workspaceId: string, record: RoleRecord): Promise<void>;
   /** Invites an owner wrote. They expire, so they are kept as records rather than as grants. */
@@ -63,20 +83,29 @@ export interface PinnedKey {
 }
 
 export class MemoryHostStore implements HostStore {
-  private readonly frames = new Map<string, Frame[]>();
+  private readonly frames = new Map<string, StoredFrame[]>();
+  private readonly nextIndex = new Map<string, number>();
   private readonly invites = new Map<string, InviteRecord[]>();
   private readonly roles = new Map<string, RoleRecord[]>();
   private readonly keys = new Map<string, PinnedKey[]>();
   private readonly removals = new Map<string, RemovalRecord[]>();
 
-  async loadFrames(workspaceId: string): Promise<readonly Frame[]> {
+  async loadFrames(workspaceId: string): Promise<readonly StoredFrame[]> {
     return [...(this.frames.get(workspaceId) ?? [])];
   }
 
-  async appendFrame(workspaceId: string, frame: Frame): Promise<void> {
+  async loadNextIndex(workspaceId: string): Promise<number> {
+    return this.nextIndex.get(workspaceId) ?? 0;
+  }
+
+  async appendFrame(workspaceId: string, entry: StoredFrame): Promise<void> {
     const existing = this.frames.get(workspaceId) ?? [];
-    existing.push(frame);
+    existing.push(entry);
     this.frames.set(workspaceId, existing);
+    this.nextIndex.set(
+      workspaceId,
+      Math.max(this.nextIndex.get(workspaceId) ?? 0, entry.index + 1),
+    );
   }
 
   async loadRoles(workspaceId: string): Promise<readonly RoleRecord[]> {
@@ -120,7 +149,9 @@ export class MemoryHostStore implements HostStore {
   }
 
   async compact(workspaceId: string, cutoff: string): Promise<void> {
-    const kept = (this.frames.get(workspaceId) ?? []).filter((f) => f.receivedAt >= cutoff);
+    const kept = (this.frames.get(workspaceId) ?? []).filter(
+      (entry) => entry.frame.receivedAt >= cutoff,
+    );
     this.frames.set(workspaceId, kept);
   }
 }
@@ -131,6 +162,10 @@ export class MemoryHostStore implements HostStore {
  * A crash mid-append can leave a partial line. That line is dropped on load rather than
  * failing the workspace: a torn write should cost one frame, not the room, because a frame
  * is only ever a message some device can still send again.
+ *
+ * The frame file holds the frame together with its position. Compaction rewrites the file
+ * but never the positions, and a first line records the next position so an emptied log
+ * still knows where it was.
  */
 export class FileHostStore implements HostStore {
   readonly directory: string;
@@ -139,12 +174,16 @@ export class FileHostStore implements HostStore {
     this.directory = directory;
   }
 
-  async loadFrames(workspaceId: string): Promise<readonly Frame[]> {
-    return readLines(this.framePath(workspaceId), (value) => frameSchema.safeParse(value).data);
+  async loadFrames(workspaceId: string): Promise<readonly StoredFrame[]> {
+    return (await this.readLog(workspaceId)).frames;
   }
 
-  async appendFrame(workspaceId: string, frame: Frame): Promise<void> {
-    await this.appendLine(this.framePath(workspaceId), frame);
+  async loadNextIndex(workspaceId: string): Promise<number> {
+    return (await this.readLog(workspaceId)).nextIndex;
+  }
+
+  async appendFrame(workspaceId: string, entry: StoredFrame): Promise<void> {
+    await this.appendLine(this.framePath(workspaceId), storedLine(entry));
   }
 
   async loadRoles(workspaceId: string): Promise<readonly RoleRecord[]> {
@@ -186,12 +225,61 @@ export class FileHostStore implements HostStore {
   }
 
   async compact(workspaceId: string, cutoff: string): Promise<void> {
-    const kept = (await this.loadFrames(workspaceId)).filter((f) => f.receivedAt >= cutoff);
+    const { frames, nextIndex } = await this.readLog(workspaceId);
+    const kept = frames.filter((entry) => entry.frame.receivedAt >= cutoff);
     await mkdir(this.directory, { recursive: true });
     const target = this.framePath(workspaceId);
     const temporary = `${target}.tmp`;
-    await writeFile(temporary, kept.map((frame) => `${JSON.stringify(frame)}\n`).join(""), "utf8");
+    const header = `${JSON.stringify({ type: "log", nextIndex })}\n`;
+    const body = kept.map((entry) => `${JSON.stringify(storedLine(entry))}\n`).join("");
+    await writeFile(temporary, `${header}${body}`, "utf8");
     await rename(temporary, target);
+  }
+
+  /**
+   * Read the frame file as positions plus frames.
+   *
+   * A file written before positions were stored has bare frame lines. Those are read as
+   * consecutive positions from zero, which is exactly what the old array index meant, and
+   * the next compaction writes the durable form.
+   */
+  private async readLog(
+    workspaceId: string,
+  ): Promise<{ frames: StoredFrame[]; nextIndex: number }> {
+    let text: string;
+    try {
+      text = await readFile(this.framePath(workspaceId), "utf8");
+    } catch (error) {
+      if (isMissingFile(error)) return { frames: [], nextIndex: 0 };
+      throw error;
+    }
+
+    const frames: StoredFrame[] = [];
+    let declaredNext = 0;
+    let legacyIndex = 0;
+    for (const line of text.split("\n")) {
+      if (line.trim().length === 0) continue;
+      const value = safeJson(line);
+      const header = logHeader(value);
+      if (header !== null) {
+        declaredNext = Math.max(declaredNext, header);
+        continue;
+      }
+      const entry = storedFrame(value);
+      if (entry !== undefined) {
+        frames.push(entry);
+        continue;
+      }
+      const legacy = frameSchema.safeParse(value);
+      if (legacy.success) {
+        frames.push({ index: legacyIndex, frame: legacy.data });
+        legacyIndex += 1;
+      }
+    }
+
+    let nextIndex = declaredNext;
+    for (const entry of frames) nextIndex = Math.max(nextIndex, entry.index + 1);
+    return { frames, nextIndex };
   }
 
   private async appendLine(path: string, value: unknown): Promise<void> {
@@ -218,6 +306,32 @@ export class FileHostStore implements HostStore {
   private removalPath(workspaceId: string): string {
     return join(this.directory, `${workspaceId}.removed.jsonl`);
   }
+}
+
+/** The stored form of one frame: its position, and the ciphertext frame beside it. */
+function storedLine(entry: StoredFrame): { type: "frame"; index: number; frame: Frame } {
+  return { type: "frame", index: entry.index, frame: entry.frame };
+}
+
+function storedFrame(value: unknown): StoredFrame | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const record = value as Record<string, unknown>;
+  if (record.type !== "frame") return undefined;
+  const index = record.index;
+  if (typeof index !== "number" || !Number.isInteger(index) || index < 0) return undefined;
+  const parsed = frameSchema.safeParse(record.frame);
+  return parsed.success ? { index, frame: parsed.data } : undefined;
+}
+
+/** The next position a file records, or null for a file that predates the record. */
+function logHeader(value: unknown): number | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (record.type !== "log") return null;
+  const nextIndex = record.nextIndex;
+  return typeof nextIndex === "number" && Number.isInteger(nextIndex) && nextIndex >= 0
+    ? nextIndex
+    : null;
 }
 
 async function readLines<T>(path: string, parse: (value: unknown) => T | undefined): Promise<T[]> {

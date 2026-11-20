@@ -156,18 +156,20 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
     if (pending !== undefined) return pending;
 
     const created = (async () => {
+      const log = new FrameLog(workspaceId);
+      log.restore(await store.loadFrames(workspaceId), await store.loadNextIndex(workspaceId));
+      const cutoff = cutoffIso(now(), retentionDays);
+      if (log.dropOlderThan(cutoff) > 0) await store.compact(workspaceId, cutoff);
+
       const room: HostedRoom = {
         workspaceId,
-        log: new FrameLog(workspaceId),
+        log,
         roles: createRoleState(workspaceId),
         invites: createInviteState(workspaceId),
         removals: createRemovalState(workspaceId),
         keys: new Map(),
         sockets: new Set(),
       };
-
-      for (const frame of await store.loadFrames(workspaceId)) room.log.append(frame);
-      room.log.dropOlderThan(cutoffIso(now(), retentionDays));
 
       for (const key of await store.loadKeys(workspaceId)) {
         room.keys.set(key.deviceId, {
@@ -311,6 +313,7 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
       workspaceId: room.workspaceId,
       newestEpoch: room.log.newestEpoch,
       frames: room.log.length,
+      oldestIndex: room.log.oldestIndex,
       members: rosterOf(room),
     });
 
@@ -437,9 +440,8 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
     // what clears a removal. Otherwise "remove" would be a door that only opens one way.
     context.room.removals = reinstateDevice(context.room.removals, message.deviceId);
 
-    const index = context.room.log.length;
-    context.room.log.append(verdict.frame);
-    await store.appendFrame(context.room.workspaceId, verdict.frame);
+    const entry = context.room.log.append(verdict.frame);
+    await store.appendFrame(context.room.workspaceId, entry);
 
     // The invitation decided who this device is and what it may do, and the person adding it
     // cannot ask: the invitation may have been written by somebody else. The host read it to
@@ -460,7 +462,7 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
       if (peer !== socket) send(peer, waiting);
     }
 
-    const relayed = { type: "frame" as const, index, frame: verdict.frame };
+    const relayed = { type: "frame" as const, index: entry.index, frame: verdict.frame };
     send(socket, relayed);
     for (const peer of context.room.sockets) {
       if (peer !== socket) send(peer, relayed);
@@ -517,12 +519,11 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
       return;
     }
 
-    const index = context.room.log.length;
-    context.room.log.append(verdict.frame);
-    await store.appendFrame(context.room.workspaceId, verdict.frame);
+    const entry = context.room.log.append(verdict.frame);
+    await store.appendFrame(context.room.workspaceId, entry);
     await enforceRetention(context.room);
 
-    const relayed = { type: "frame" as const, index, frame: verdict.frame };
+    const relayed = { type: "frame" as const, index: entry.index, frame: verdict.frame };
     send(socket, relayed);
     for (const peer of context.room.sockets) {
       if (peer !== socket) send(peer, relayed);
@@ -628,15 +629,14 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
   async function enforceRetention(room: HostedRoom): Promise<void> {
     const cutoff = cutoffIso(now(), retentionDays);
     const oldest = room.log.all()[0];
-    if (oldest === undefined || oldest.receivedAt >= cutoff) return;
+    if (oldest === undefined || oldest.frame.receivedAt >= cutoff) return;
     room.log.dropOlderThan(cutoff);
     await store.compact(room.workspaceId, cutoff);
   }
 
   function handleSince(socket: WebSocket, context: SocketContext, after: number): void {
-    const frames = context.room.log.since(after);
-    for (const [offset, frame] of frames.entries()) {
-      send(socket, { type: "frame", index: after + offset, frame });
+    for (const entry of context.room.log.since(after)) {
+      send(socket, { type: "frame", index: entry.index, frame: entry.frame });
     }
   }
 

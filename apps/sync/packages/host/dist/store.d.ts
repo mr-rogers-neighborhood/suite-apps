@@ -1,5 +1,17 @@
 import { type Frame, type InviteRecord, type MemberRole, type RemovalRecord, type RoleRecord } from "@suite/sync";
 /**
+ * One frame with the position the host assigned it.
+ *
+ * The position is stored beside the frame rather than inferred from the frame's place in
+ * the array. Retention drops the oldest entries, and a client that reconnects must still
+ * see the positions it already applied; renumbering the survivors would move its cursor
+ * without telling it.
+ */
+export interface StoredFrame {
+    readonly index: number;
+    readonly frame: Frame;
+}
+/**
  * What a host keeps between process lifetimes: frames, and who may write.
  *
  * Frames are ciphertext and role records are signed public metadata — a device id and a
@@ -10,8 +22,15 @@ import { type Frame, type InviteRecord, type MemberRole, type RemovalRecord, typ
  * restart, which looks exactly like a broken workspace.
  */
 export interface HostStore {
-    loadFrames(workspaceId: string): Promise<readonly Frame[]>;
-    appendFrame(workspaceId: string, frame: Frame): Promise<void>;
+    loadFrames(workspaceId: string): Promise<readonly StoredFrame[]>;
+    /**
+     * The position the next frame will take.
+     *
+     * Kept even when no frame is held: compaction can empty the log, and a client's cursor
+     * must not be moved back to zero by a process that starts again afterwards.
+     */
+    loadNextIndex(workspaceId: string): Promise<number>;
+    appendFrame(workspaceId: string, entry: StoredFrame): Promise<void>;
     loadRoles(workspaceId: string): Promise<readonly RoleRecord[]>;
     appendRole(workspaceId: string, record: RoleRecord): Promise<void>;
     /** Invites an owner wrote. They expire, so they are kept as records rather than as grants. */
@@ -51,12 +70,14 @@ export interface PinnedKey {
 }
 export declare class MemoryHostStore implements HostStore {
     private readonly frames;
+    private readonly nextIndex;
     private readonly invites;
     private readonly roles;
     private readonly keys;
     private readonly removals;
-    loadFrames(workspaceId: string): Promise<readonly Frame[]>;
-    appendFrame(workspaceId: string, frame: Frame): Promise<void>;
+    loadFrames(workspaceId: string): Promise<readonly StoredFrame[]>;
+    loadNextIndex(workspaceId: string): Promise<number>;
+    appendFrame(workspaceId: string, entry: StoredFrame): Promise<void>;
     loadRoles(workspaceId: string): Promise<readonly RoleRecord[]>;
     appendRole(workspaceId: string, record: RoleRecord): Promise<void>;
     loadInvites(workspaceId: string): Promise<readonly InviteRecord[]>;
@@ -73,12 +94,17 @@ export declare class MemoryHostStore implements HostStore {
  * A crash mid-append can leave a partial line. That line is dropped on load rather than
  * failing the workspace: a torn write should cost one frame, not the room, because a frame
  * is only ever a message some device can still send again.
+ *
+ * The frame file holds the frame together with its position. Compaction rewrites the file
+ * but never the positions, and a first line records the next position so an emptied log
+ * still knows where it was.
  */
 export declare class FileHostStore implements HostStore {
     readonly directory: string;
     constructor(directory: string);
-    loadFrames(workspaceId: string): Promise<readonly Frame[]>;
-    appendFrame(workspaceId: string, frame: Frame): Promise<void>;
+    loadFrames(workspaceId: string): Promise<readonly StoredFrame[]>;
+    loadNextIndex(workspaceId: string): Promise<number>;
+    appendFrame(workspaceId: string, entry: StoredFrame): Promise<void>;
     loadRoles(workspaceId: string): Promise<readonly RoleRecord[]>;
     appendRole(workspaceId: string, record: RoleRecord): Promise<void>;
     loadInvites(workspaceId: string): Promise<readonly InviteRecord[]>;
@@ -88,6 +114,14 @@ export declare class FileHostStore implements HostStore {
     loadRemovals(workspaceId: string): Promise<readonly RemovalRecord[]>;
     appendRemoval(workspaceId: string, record: RemovalRecord): Promise<void>;
     compact(workspaceId: string, cutoff: string): Promise<void>;
+    /**
+     * Read the frame file as positions plus frames.
+     *
+     * A file written before positions were stored has bare frame lines. Those are read as
+     * consecutive positions from zero, which is exactly what the old array index meant, and
+     * the next compaction writes the durable form.
+     */
+    private readLog;
     private appendLine;
     private framePath;
     private rolePath;

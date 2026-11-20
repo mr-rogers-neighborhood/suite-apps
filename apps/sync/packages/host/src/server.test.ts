@@ -21,7 +21,7 @@ import {
 import { describe, expect, it } from "vitest";
 import { deviceIdFromPublicKey, ed25519Verifier } from "./crypto.js";
 import { createSyncServer, HostRegistry } from "./server.js";
-import { MemoryHostStore } from "./store.js";
+import { MemoryHostStore, type StoredFrame } from "./store.js";
 
 const workspaceId = "a".repeat(64);
 
@@ -129,6 +129,11 @@ function sealedFrame(
     payload,
   };
   return { ...header, signature: actor.sign(framePayload(header)) };
+}
+
+/** A frame as a store would already hold it, with the position the host gave it. */
+function storedFrame(index: number, epoch: number, receivedAt: string): StoredFrame {
+  return { index, frame: { ...sealedFrame(owner, epoch, "AAAA"), receivedAt } };
 }
 
 function removalRecord(actor: ReturnType<typeof device>, target: { deviceId: string }) {
@@ -441,6 +446,29 @@ describe("taking a device out", () => {
 });
 
 describe("what the host remembers across a restart", () => {
+  it("reports the oldest position retention still holds, without renumbering it", async () => {
+    const store = new MemoryHostStore();
+    await store.appendFrame(workspaceId, storedFrame(4, 1, "2026-01-01T00:00:00.000Z"));
+    await store.appendFrame(workspaceId, storedFrame(5, 2, "2026-11-05T00:00:00.000Z"));
+
+    const { server } = await started(store);
+    const alice = await RelayClient.connect(server.url);
+    await joined(alice, owner);
+
+    const greeting = alice.messages.find((message) => message.type === "joined");
+    expect(greeting).toMatchObject({ frames: 1, oldestIndex: 5 });
+
+    // A cursor below the oldest index is a gap: the host still answers with the frame it
+    // has, at its stored position, rather than pretending the catch-up was empty.
+    alice.messages.length = 0;
+    alice.send({ type: "since", after: 4 });
+    const replayed = await alice.until((message) => message.type === "frame");
+    expect(replayed.type === "frame" && replayed.index).toBe(5);
+
+    alice.close();
+    await server.close();
+  });
+
   it("still knows who may write after it is rebuilt from disk", async () => {
     const store = new MemoryHostStore();
     const first = await started(store);

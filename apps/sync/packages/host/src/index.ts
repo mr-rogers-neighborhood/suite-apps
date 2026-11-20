@@ -14,4 +14,10 @@ export {
   type SyncServer,
   type SyncServerOptions,
 } from "./server.js";
-export { FileHostStore, type HostStore, MemoryHostStore, type PinnedKey } from "./store.js";
+export {
+  FileHostStore,
+  type HostStore,
+  MemoryHostStore,
+  type PinnedKey,
+  type StoredFrame,
+} from "./store.js";

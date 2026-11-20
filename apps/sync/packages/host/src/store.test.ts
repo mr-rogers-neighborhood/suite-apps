@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Frame } from "@suite/sync";
 import { describe, expect, it } from "vitest";
-import { FileHostStore, MemoryHostStore } from "./store.js";
+import { FileHostStore, MemoryHostStore, type StoredFrame } from "./store.js";
 
 const workspaceId = "a".repeat(64);
 
@@ -20,6 +20,10 @@ function frame(overrides: Partial<Frame> = {}): Frame {
   };
 }
 
+function entry(index: number, overrides: Partial<Frame> = {}): StoredFrame {
+  return { index, frame: frame(overrides) };
+}
+
 async function folder(): Promise<string> {
   return mkdtemp(join(tmpdir(), "suite-sync-store-"));
 }
@@ -27,56 +31,81 @@ async function folder(): Promise<string> {
 describe("the store", () => {
   it("gives back what it was given, in order, through the memory store", async () => {
     const store = new MemoryHostStore();
-    await store.appendFrame(workspaceId, frame({ epoch: 1 }));
-    await store.appendFrame(workspaceId, frame({ epoch: 2 }));
+    await store.appendFrame(workspaceId, entry(0, { epoch: 1 }));
+    await store.appendFrame(workspaceId, entry(1, { epoch: 2 }));
     const loaded = await store.loadFrames(workspaceId);
-    expect(loaded.map((f) => f.epoch)).toEqual([1, 2]);
+    expect(loaded.map((stored) => stored.index)).toEqual([0, 1]);
+    expect(loaded.map((stored) => stored.frame.epoch)).toEqual([1, 2]);
+    expect(await store.loadNextIndex(workspaceId)).toBe(2);
   });
 
   it("keeps workspaces apart", async () => {
     const store = new MemoryHostStore();
-    await store.appendFrame(workspaceId, frame());
+    await store.appendFrame(workspaceId, entry(0));
     expect(await store.loadFrames("c".repeat(64))).toEqual([]);
+    expect(await store.loadNextIndex("c".repeat(64))).toBe(0);
   });
 });
 
 describe("the file store", () => {
-  it("round-trips frames across a restart", async () => {
+  it("round-trips frames byte for byte across a restart", async () => {
     const directory = await folder();
     const store = new FileHostStore(directory);
-    await store.appendFrame(workspaceId, frame({ epoch: 1 }));
-    await store.appendFrame(workspaceId, frame({ epoch: 2 }));
+    const first = entry(0, { epoch: 1, payload: "q83vAAAA+Zg" });
+    const second = entry(1, { epoch: 2, payload: "q83vAQAA+Zg" });
+    await store.appendFrame(workspaceId, first);
+    await store.appendFrame(workspaceId, second);
 
     const reopened = new FileHostStore(directory);
-    expect((await reopened.loadFrames(workspaceId)).map((f) => f.epoch)).toEqual([1, 2]);
+    const loaded = await reopened.loadFrames(workspaceId);
+    expect(loaded).toEqual([first, second]);
+    expect(loaded[0]?.frame.payload).toBe("q83vAAAA+Zg");
+    expect(await reopened.loadNextIndex(workspaceId)).toBe(2);
   });
 
   it("returns nothing for a workspace it has never seen", async () => {
     const store = new FileHostStore(await folder());
     expect(await store.loadFrames(workspaceId)).toEqual([]);
+    expect(await store.loadNextIndex(workspaceId)).toBe(0);
   });
 
   it("drops a torn line rather than the workspace", async () => {
     const directory = await folder();
     const store = new FileHostStore(directory);
-    await store.appendFrame(workspaceId, frame({ epoch: 1 }));
+    await store.appendFrame(workspaceId, entry(0, { epoch: 1 }));
     // A crash mid-append leaves half a line behind.
     await writeFile(
       join(directory, `${workspaceId}.frames.jsonl`),
-      `${JSON.stringify(frame())}\n{"kind":"app`,
+      `${JSON.stringify(entry(0, { epoch: 1 }).frame)}\n{"kind":"app`,
       "utf8",
     );
 
     const loaded = await store.loadFrames(workspaceId);
     expect(loaded).toHaveLength(1);
-    expect(loaded[0]?.epoch).toBe(1);
+    expect(loaded[0]?.index).toBe(0);
+    expect(loaded[0]?.frame.epoch).toBe(1);
+  });
+
+  it("reads a file written before positions were stored", async () => {
+    const directory = await folder();
+    const store = new FileHostStore(directory);
+    await writeFile(
+      join(directory, `${workspaceId}.frames.jsonl`),
+      `${JSON.stringify(frame({ epoch: 1 }))}\n${JSON.stringify(frame({ epoch: 2 }))}\n`,
+      "utf8",
+    );
+
+    const loaded = await store.loadFrames(workspaceId);
+    expect(loaded.map((stored) => stored.index)).toEqual([0, 1]);
+    expect(loaded.map((stored) => stored.frame.epoch)).toEqual([1, 2]);
+    expect(await store.loadNextIndex(workspaceId)).toBe(2);
   });
 
   it("writes no readable document text to disk", async () => {
     const directory = await folder();
     const store = new FileHostStore(directory);
     // The payload is what a client seals: ciphertext, never the document.
-    await store.appendFrame(workspaceId, frame({ payload: "q83vAAAA+Zg" }));
+    await store.appendFrame(workspaceId, entry(0, { payload: "q83vAAAA+Zg" }));
 
     const onDisk = await readFile(join(directory, `${workspaceId}.frames.jsonl`), "utf8");
     expect(onDisk).not.toContain("Q4 planning");
@@ -134,15 +163,34 @@ describe("what the host must not forget", () => {
     expect(await store.loadRoles(workspaceId)).toEqual([]);
   });
 
-  it("compacts a workspace down to the frames a window still covers", async () => {
+  it("compacts a workspace down to the frames a window still covers, without renumbering", async () => {
     const directory = await folder();
     const store = new FileHostStore(directory);
-    await store.appendFrame(workspaceId, frame({ receivedAt: "2026-01-01T00:00:00.000Z" }));
-    await store.appendFrame(workspaceId, frame({ receivedAt: "2026-11-06T00:00:00.000Z" }));
+    await store.appendFrame(workspaceId, entry(0, { receivedAt: "2026-01-01T00:00:00.000Z" }));
+    await store.appendFrame(workspaceId, entry(1, { receivedAt: "2026-11-06T00:00:00.000Z" }));
 
     await store.compact(workspaceId, "2026-06-01T00:00:00.000Z");
     const kept = await store.loadFrames(workspaceId);
     expect(kept).toHaveLength(1);
-    expect(kept[0]?.receivedAt).toBe("2026-11-06T00:00:00.000Z");
+    expect(kept[0]?.index).toBe(1);
+    expect(kept[0]?.frame.receivedAt).toBe("2026-11-06T00:00:00.000Z");
+    expect(await store.loadNextIndex(workspaceId)).toBe(2);
+  });
+
+  it("keeps the next position when compaction empties the log", async () => {
+    const directory = await folder();
+    const store = new FileHostStore(directory);
+    await store.appendFrame(workspaceId, entry(0, { receivedAt: "2026-01-01T00:00:00.000Z" }));
+    await store.appendFrame(workspaceId, entry(1, { receivedAt: "2026-02-01T00:00:00.000Z" }));
+
+    await store.compact(workspaceId, "2026-06-01T00:00:00.000Z");
+    expect(await store.loadFrames(workspaceId)).toEqual([]);
+
+    const reopened = new FileHostStore(directory);
+    expect(await reopened.loadNextIndex(workspaceId)).toBe(2);
+    await reopened.appendFrame(workspaceId, entry(2, { receivedAt: "2026-11-06T00:00:00.000Z" }));
+
+    const again = await new FileHostStore(directory).loadFrames(workspaceId);
+    expect(again.map((stored) => stored.index)).toEqual([2]);
   });
 });

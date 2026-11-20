@@ -7,10 +7,10 @@ import { z } from "zod";
  * nothing lets it answer a question about one.
  */
 /**
- * 3: a device may say something the host is asked to forget, and an owner may take a device
- * out of a workspace.
+ * 4: `joined` reports the oldest position the log can still serve, so a cursor older than
+ * retention reads as a gap rather than an empty catch-up.
  */
-export declare const RELAY_PROTOCOL_VERSION = 3;
+export declare const RELAY_PROTOCOL_VERSION = 4;
 export declare const relayClientMessageSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     type: z.ZodLiteral<"join">;
     protocolVersion: z.ZodNumber;
@@ -124,6 +124,7 @@ declare const joinedSchema: z.ZodObject<{
     workspaceId: z.ZodString;
     newestEpoch: z.ZodNullable<z.ZodNumber>;
     frames: z.ZodNumber;
+    oldestIndex: z.ZodOptional<z.ZodNumber>;
     members: z.ZodArray<z.ZodObject<{
         deviceId: z.ZodString;
         name: z.ZodString;
@@ -228,6 +229,7 @@ export declare const relayHostMessageSchema: z.ZodDiscriminatedUnion<[z.ZodObjec
     workspaceId: z.ZodString;
     newestEpoch: z.ZodNullable<z.ZodNumber>;
     frames: z.ZodNumber;
+    oldestIndex: z.ZodOptional<z.ZodNumber>;
     members: z.ZodArray<z.ZodObject<{
         deviceId: z.ZodString;
         name: z.ZodString;

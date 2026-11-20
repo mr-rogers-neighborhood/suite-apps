@@ -57,18 +57,20 @@ export async function createSyncServer(options) {
         if (pending !== undefined)
             return pending;
         const created = (async () => {
+            const log = new FrameLog(workspaceId);
+            log.restore(await store.loadFrames(workspaceId), await store.loadNextIndex(workspaceId));
+            const cutoff = cutoffIso(now(), retentionDays);
+            if (log.dropOlderThan(cutoff) > 0)
+                await store.compact(workspaceId, cutoff);
             const room = {
                 workspaceId,
-                log: new FrameLog(workspaceId),
+                log,
                 roles: createRoleState(workspaceId),
                 invites: createInviteState(workspaceId),
                 removals: createRemovalState(workspaceId),
                 keys: new Map(),
                 sockets: new Set(),
             };
-            for (const frame of await store.loadFrames(workspaceId))
-                room.log.append(frame);
-            room.log.dropOlderThan(cutoffIso(now(), retentionDays));
             for (const key of await store.loadKeys(workspaceId)) {
                 room.keys.set(key.deviceId, {
                     publicKey: key.publicKey,
@@ -197,6 +199,7 @@ export async function createSyncServer(options) {
             workspaceId: room.workspaceId,
             newestEpoch: room.log.newestEpoch,
             frames: room.log.length,
+            oldestIndex: room.log.oldestIndex,
             members: rosterOf(room),
         });
         // Anyone who asked to be let in while nobody was listening. A key package is replayed from
@@ -293,9 +296,8 @@ export async function createSyncServer(options) {
         // An owner minting a fresh invitation is the permission to come back, so spending one is
         // what clears a removal. Otherwise "remove" would be a door that only opens one way.
         context.room.removals = reinstateDevice(context.room.removals, message.deviceId);
-        const index = context.room.log.length;
-        context.room.log.append(verdict.frame);
-        await store.appendFrame(context.room.workspaceId, verdict.frame);
+        const entry = context.room.log.append(verdict.frame);
+        await store.appendFrame(context.room.workspaceId, entry);
         // The invitation decided who this device is and what it may do, and the person adding it
         // cannot ask: the invitation may have been written by somebody else. The host read it to
         // decide whether to honour it, so it is the only party that can answer — and the token is
@@ -315,7 +317,7 @@ export async function createSyncServer(options) {
             if (peer !== socket)
                 send(peer, waiting);
         }
-        const relayed = { type: "frame", index, frame: verdict.frame };
+        const relayed = { type: "frame", index: entry.index, frame: verdict.frame };
         send(socket, relayed);
         for (const peer of context.room.sockets) {
             if (peer !== socket)
@@ -353,11 +355,10 @@ export async function createSyncServer(options) {
             send(socket, { type: "refused", reason: verdict.reason });
             return;
         }
-        const index = context.room.log.length;
-        context.room.log.append(verdict.frame);
-        await store.appendFrame(context.room.workspaceId, verdict.frame);
+        const entry = context.room.log.append(verdict.frame);
+        await store.appendFrame(context.room.workspaceId, entry);
         await enforceRetention(context.room);
-        const relayed = { type: "frame", index, frame: verdict.frame };
+        const relayed = { type: "frame", index: entry.index, frame: verdict.frame };
         send(socket, relayed);
         for (const peer of context.room.sockets) {
             if (peer !== socket)
@@ -446,15 +447,14 @@ export async function createSyncServer(options) {
     async function enforceRetention(room) {
         const cutoff = cutoffIso(now(), retentionDays);
         const oldest = room.log.all()[0];
-        if (oldest === undefined || oldest.receivedAt >= cutoff)
+        if (oldest === undefined || oldest.frame.receivedAt >= cutoff)
             return;
         room.log.dropOlderThan(cutoff);
         await store.compact(room.workspaceId, cutoff);
     }
     function handleSince(socket, context, after) {
-        const frames = context.room.log.since(after);
-        for (const [offset, frame] of frames.entries()) {
-            send(socket, { type: "frame", index: after + offset, frame });
+        for (const entry of context.room.log.since(after)) {
+            send(socket, { type: "frame", index: entry.index, frame: entry.frame });
         }
     }
     await new Promise((resolve, reject) => {
