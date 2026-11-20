@@ -4,8 +4,6 @@ Suite's host model — one container that opens packaged apps — follows the W3
 WeChat popularised. The standard describes the model directly; a product documents whatever it
 happened to ship.
 
-The source reading is in the [archive](../archive/research/README.md).
-
 ## What the standard defines
 
 The [W3C MiniApp Standardization White Paper](https://www.w3.org/TR/mini-app-white-paper/) describes a
@@ -22,13 +20,15 @@ operating system. Four mechanisms matter here:
   paper's own summary is that "the rendering can be considered stateless, and all the states will be
   stored in the worker."
 - **Single-instance, multi-entry.** One instance per app, reachable from a store, a search result, a
-  QR code, a message or the host's own surfaces, with its state kept across entries.
+  QR code, a message or the host's own surfaces, with its state kept across entries. The white paper
+  treats it as a core feature (§2.1.6).
 
 WeChat adds product behaviour around that model: a host capsule that always offers a way out, a
 mini-app header the app may take over without breaking host controls, a lifecycle that distinguishes
 *suspended* from *destroyed*, and a three-tier capability model (platform review, per-scope user
 authorisation, and domain allowlisting at the bridge). Some of those are WeChat policy rather than
-standard.
+standard; the white paper documents the capability tiers in its security and privacy section
+(§6.1–6.4).
 
 ## What Suite borrows
 
@@ -61,4 +61,10 @@ standard.
 
 - [What Suite is](why-suite-exists.md) for the product overview.
 - [Architecture](architecture.md) for how the host and the apps relate today.
-- [Archive](../archive/research/README.md) for the sources and open questions.
+
+## Sources
+
+The comparison above reads the [W3C MiniApp Standardization White
+Paper](https://www.w3.org/TR/mini-app-white-paper/) (§2.1.1 for the logic and view layers, §2.1.6 for
+single-instance multi-entry, §6.1–6.4 for security and privacy), and WeChat's own framework,
+operating-mechanism and update pages for packaging, lifecycle and updates.
