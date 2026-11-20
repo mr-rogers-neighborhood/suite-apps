@@ -63,14 +63,25 @@ function gitSha() {
 
 /** A clean export of HEAD, with no node_modules, dist or untracked files. */
 function exportHead() {
-  const target = join(ROOT, ".dev", "gate", gitSha());
+  const sha = gitSha();
+  const gateDir = join(ROOT, ".dev", "gate");
+  const target = join(gateDir, sha);
+  const bundle = join(gateDir, `${sha}.tar`);
   rmSync(target, { recursive: true, force: true });
+  rmSync(bundle, { force: true });
   mkdirSync(target, { recursive: true });
 
-  const archive = spawnSync("git", ["archive", "HEAD"], { cwd: ROOT, stdio: ["ignore", "pipe", "inherit"] });
-  if (archive.status !== 0) throw new Error("git archive HEAD failed");
+  // `git archive` writes to a file rather than a pipe: spawnSync buffers a piped
+  // stdout up to `maxBuffer` and the Suite's archive is larger than the 1 MiB
+  // default, which fails as ENOBUFS.
+  const archive = spawnSync("git", ["archive", "--format=tar", "-o", bundle, "HEAD"], {
+    cwd: ROOT,
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  if (archive.status !== 0) throw new Error(`git archive HEAD failed (exit ${archive.status})`);
 
-  const untar = spawnSync("tar", ["-x", "-C", target], { input: archive.stdout, stdio: ["pipe", "inherit", "inherit"] });
+  const untar = spawnSync("tar", ["-xf", bundle, "-C", target], { stdio: ["ignore", "inherit", "inherit"] });
+  rmSync(bundle, { force: true });
   if (untar.status !== 0) throw new Error("tar failed to unpack the archive");
 
   const install = run("pnpm", ["install", "--frozen-lockfile"], target);
