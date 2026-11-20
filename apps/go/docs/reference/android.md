@@ -69,6 +69,13 @@ emulator by the port it landed on (`emulator-5554`), so the AVD name never match
 safe to run while that AVD is already up — it finds the running emulator and leaves it alone — and it
 detaches the emulator, so the terminal comes back for `android:install`.
 
+The ATD image has a stub display: `adb screencap` returns an all-black frame and `screenrecord`
+writes zero bytes, with the host GPU and with `-gpu guest` alike. That is measured, not inferred —
+the two modes produce the same file down to the checksum. So a screenshot cannot prove anything on
+this image, and an empty black home (`com.android.fakesystemapp/.local…EmptyHomeActivity`) is what a
+freshly booted emulator shows rather than a hang. Verify through `android:eval` and `android:ax`,
+which read the WebView directly, and take a screenshot only from a non-ATD image.
+
 The equivalent by hand, for a window or a different renderer:
 
 ```sh
