@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The AppStream record is what a store reads: name, summary, categories, icon.
+  Start's marketplace will read it from the same OSTree repo, so it is written
+  once here rather than in two places.
+-->
+<component type="desktop-application">
+  <id>run.suite.canvas</id>
+  <name>Suite Canvas</name>
+  <summary>Your documents, drawn and linked</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Canvas is a local-first workspace of cards, links and drawings. Documents
+      are ordinary files on your machine; there is no account and no server.
+    </p>
+    <p>
+      This flatpak is the same build as the other artifact forms; Flatpak is a
+      second way to install it, not a different application.
+    </p>
+  </description>
+  <launchable type="desktop-id">run.suite.canvas.desktop</launchable>
+  <provides>
+    <binary>suite-canvas</binary>
+  </provides>
+  <releases>
+    <release version="0.1.0" date="2026-11-18"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

@@ -30,6 +30,10 @@ at `~/Projects/suite/` as read-only archives.
 
 ## Known follow-up
 
+- Canvas's doc indexes were regenerated after the import. `git log` now has one
+  commit for every imported page, so the generator can only report the import
+  date; the original per-page dates remain in the archived repositories under
+  `~/Projects/suite/`.
 - The per-repo `pnpm-lock.yaml` files are vestigial. The root lockfile is the
   only one that should be installed or committed.
 - Committed `dist/` output under the shared packages can be removed once the

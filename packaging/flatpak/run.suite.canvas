@@ -1,0 +1,5 @@
+#!/bin/sh
+# Flatpak's launcher for Suite Canvas. zypak-wrapper.sh comes from
+# org.electronjs.Electron2.BaseApp and arranges Electron's sandbox without a
+# setuid helper, which a read-only /app cannot have.
+exec zypak-wrapper.sh /app/canvas/suite-canvas "$@"

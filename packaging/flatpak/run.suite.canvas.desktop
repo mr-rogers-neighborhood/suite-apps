@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Suite Canvas
+Comment=Your documents, drawn and linked
+Exec=run.suite.canvas %U
+Icon=run.suite.canvas
+Terminal=false
+Type=Application
+Categories=Office;Graphics;
+MimeType=application/x-suite-canvas;x-scheme-handler/suite-canvas;
+StartupWMClass=Suite Canvas

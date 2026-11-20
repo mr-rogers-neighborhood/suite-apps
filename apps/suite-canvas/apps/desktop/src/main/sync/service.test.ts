@@ -12,7 +12,7 @@ import {
   type RelayWebSocket,
   seal,
 } from "@suite/sync";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { loadGroup, saveGroup } from "./groupStore.js";
 import { loadOrCreateIdentity } from "./identity.js";
 import { createSyncService, type SyncStatus } from "./service.js";
@@ -545,11 +545,12 @@ describe("inviting someone in", () => {
         receivedAt: "2026-11-06T12:00:00.000Z",
       },
     });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
     // The identity that asked is the identity that opened the welcome, which is the whole
-    // reason it had to survive the restart.
-    expect(await loadGroup(dataDir, workspaceId)).not.toBeNull();
+    // reason it had to survive the restart. Wait for the frame to be stored rather than
+    // assuming 50 ms is enough on a machine running the rest of the suite beside it.
+    await vi.waitFor(async () => {
+      expect(await loadGroup(dataDir, workspaceId)).not.toBeNull();
+    });
     expect(after.status()).toMatchObject({ state: "syncing" });
   });
 
