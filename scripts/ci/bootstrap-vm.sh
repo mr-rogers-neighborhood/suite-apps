@@ -44,6 +44,17 @@ scp -q "$HERE/post-receive" "$HOST:/tmp/suite-post-receive"
 ssh "$HOST" "install -m 755 /tmp/suite-run-gate.sh '$ROOT/run-gate.sh'
   install -m 755 /tmp/suite-post-receive '$BARE/hooks/post-receive'
   rm -f /tmp/suite-run-gate.sh /tmp/suite-post-receive
+  if [ ! -f '$ROOT/notify.env' ]; then
+    cat > '$ROOT/notify.env' <<'ENV'
+# Optional: send each gate result to a phone or desktop over ntfy.
+# Set NTFY_TOPIC to a topic you own, then push again. Leave it empty to send
+# nothing. The file stays on this machine and is never committed.
+# NTFY_URL=https://ntfy.sh
+# NTFY_TOPIC=
+# NTFY_TOKEN=
+ENV
+    chmod 600 '$ROOT/notify.env'
+  fi
   node -v; pnpm -v; df -h / | tail -1
   if ! systemctl is-active --quiet docker || [ ! -S /var/run/docker.sock ]; then
     echo 'warning: docker is not running; the secret scan needs it'

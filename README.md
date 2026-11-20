@@ -130,6 +130,12 @@ starts a transient system unit that runs as `aurora` with `MemoryHigh=5G` and
 doubling memory. The run is `node scripts/gate.mjs --fresh`, so the tree under
 test is a `git archive` of the commit with a lockfile install.
 
+A result can also reach a phone or desktop. `scripts/ci/bootstrap-vm.sh` writes
+`~/ci/notify.env` on the VM; set `NTFY_TOPIC` to a topic you own and every
+pass/fail is posted there. The file stays on the VM and is never committed. No
+topic means no notification, and a failed notification never fails the gate:
+`status.json` is the source of truth.
+
 The VM has 4 vCPU, 8 GiB RAM, and a 4 GiB swapfile; Canvas's gate is the heavy
 one. It also needs Docker (Canvas's secret scan runs gitleaks in a container;
 the unit gets `SupplementaryGroups=docker`), Xvfb, Electron's GTK libraries and
