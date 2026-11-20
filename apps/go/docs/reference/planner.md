@@ -70,8 +70,12 @@ file would corrupt the document; writing per keystroke is the amplification the 
   global, so it cannot share the shell's document without restyling the shell. Planner therefore mounts
   as an isolated pack (`./planner/index.html` with a bridge prelude on `@suite/go`'s `createFrameHost`),
   which is also what makes the container stay domain-blind.
-- **Layout.** `Shell.tsx` is three fixed panes and `Sidebar` is `w-[228px]` with no breakpoints, so a
-  phone shows the sidebar before the calendar has room. `@suite/theme`'s density axis fixes
-  control size, not layout. A breakpoint that collapses the sidebar is the minimum before this ships.
+- **Layout: decided — the rail collapses below `md`.** At 768 px and wider the shell keeps its
+  three panes exactly as before. Below that, `Sidebar` is not rendered and the same navigation rides
+  in a drawer opened from a header button, so the day view takes the full width; `DayCalendar`
+  still appears only at `lg`. `apps/planner/e2e/mobile-layout.spec.ts` asserts, at 360, 390 and
+  430 px, that the rail takes no horizontal space and `scrollWidth <= clientWidth`.
+  `@suite/theme`'s density axis (v0.16.0) fixes control size, not layout, so this breakpoint is
+  still Planner's own.
 - **Reminders.** `onReminder` has no notification plugin yet; the bridge returns a no-op unsubscriber
   and the UI says so rather than silently dropping them.
