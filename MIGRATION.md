@@ -40,3 +40,17 @@ at `~/Projects/suite/` as read-only archives.
   root build order is proven.
 - `harness/` still contains `suite-dev`'s sibling-repo scripts; those become
   root scripts as the monorepo workflow settles.
+
+## Publishing and archive state (2026-11-19)
+
+- Published at <https://github.com/mr-rogers-neighborhood/suite-apps>.
+- Archived on GitHub: `suite-dev` (replaced by `harness/`) and `suite-go`
+  (no releases and no feed references).
+- Kept active on purpose: `suite-canvas`, `suite-planner`, `suite-budget`,
+  `suite-start` (their `releases/latest/download` URLs are the update feeds still
+  compiled into installed apps) and `suite-sync` (the server's separate release
+  and trust boundary).
+- Retire the four feed repositories only after the monorepo publishes per-app
+  feeds and the manifests point there. A monorepo `releases/latest` cannot serve
+  four different `latest-linux.yml` files; use per-app tags or a static feed
+  host.
