@@ -1,0 +1,293 @@
+import { useEffect, useMemo, useRef } from "react";
+import { setEntityIcon } from "../canvas/entityIcon";
+import { useNavigateTarget } from "../canvas/navigateTarget";
+import {
+  primaryNodeIdFor,
+  selectionSubject,
+  selectionSummaryText,
+  styleTargetsFor,
+} from "../entities/subject";
+import { ContainerPanel } from "../panels/ContainerPanel";
+import { LinkInspector } from "../panels/LinkInspector";
+import { useContainerPanelModel } from "../panels/useContainerPanelModel";
+import { useLinkInspectorModel } from "../panels/useLinkInspectorModel";
+import { isShareSession } from "../session/session";
+import { useEscapeLayer } from "../shell/escapeLayers";
+import { useCanvasStore } from "../store/useCanvasStore";
+import { useUiStore } from "../store/useUiStore";
+import { useWorkspaceSnapshot } from "../store/workspaceStore";
+import { CardInspector } from "./CardInspector";
+import { portalTargetId } from "./portal";
+import { useCardPanelModel } from "./useCardPanelModel";
+
+/**
+ * Binds the inspector drawer to the workspace. The model comes from
+ * `useCardPanelModel`, which the full-canvas focus surface also uses, so both
+ * surfaces render one editor binding of the same card.
+ */
+export function CardInspectorHost() {
+  const inspectorNodeId = useUiStore((state) => state.inspectorNodeId);
+  const inspectorFieldId = useUiStore((state) => state.inspectorFieldId);
+  const editingNodeId = useUiStore((state) => state.editingNodeId);
+  const editingField = useUiStore((state) => state.editingField);
+  const editingSurface = useUiStore((state) => state.editingSurface);
+  const closeInspector = useUiStore((state) => state.closeInspector);
+  const openCardFocus = useUiStore((state) => state.openCardFocus);
+  const readOnly = useUiStore((state) => state.readOnly);
+  const canEditContent = useUiStore((state) => state.canEditContent);
+  const canEditLayout = useUiStore((state) => state.canEditLayout);
+  const canManageSchema = useUiStore((state) => state.canManageSchema);
+
+  /**
+   * The drawer describes the selection, so it opens on a marquee as well as on a click: the
+   * primary card is the last one selected, the same `.at(-1)` rule the container panel uses for
+   * a frame. A click sets `inspectorNodeId`, which still wins — the card the reader pressed is
+   * the one they meant.
+   */
+  const selectedNodeIds = useUiStore((state) => state.selectedNodeIds);
+  const selectedSectionIds = useUiStore((state) => state.selectedSectionIds);
+  const selectedEdgeIds = useUiStore((state) => state.selectedEdgeIds);
+  const snapshot = useWorkspaceSnapshot();
+  const primaryNodeId = primaryNodeIdFor(inspectorNodeId, selectedNodeIds);
+  const subject = useMemo(
+    () =>
+      selectionSubject({
+        nodeIds: selectedNodeIds,
+        sectionIds: selectedSectionIds,
+        edgeIds: selectedEdgeIds,
+        portalIds: new Set(
+          selectedNodeIds.filter(
+            (id) => portalTargetId(snapshot.cards.find((card) => card.id === id)) !== null,
+          ),
+        ),
+      }),
+    [selectedNodeIds, selectedSectionIds, selectedEdgeIds, snapshot.cards],
+  );
+  // One list for one editor: every card, link and frame in the selection, so the Style tab
+  // colours the whole of it from the row a single card already uses.
+  const styleTargets = useMemo(() => styleTargetsFor(subject), [subject]);
+  // What a colour press will reach, said once above the Style tab of every panel.
+  const selectionSummary = useMemo(() => selectionSummaryText(subject.counts), [subject]);
+
+  const model = useCardPanelModel(primaryNodeId, "panel");
+  const container = useContainerPanelModel();
+  const workspace = useCanvasStore((state) => state.workspace);
+  const activeBoardId = useUiStore((state) => state.activeBoardId);
+  const requestPortalOpen = useUiStore((state) => state.requestPortalOpen);
+  const focusCard = useUiStore((state) => state.focusCard);
+  const focusSection = useUiStore((state) => state.focusSection);
+
+  const link = useLinkInspectorModel();
+  // Quiet is the mode that says "no drawer". A link keeps its selection there — a selected
+  // edge is what Delete acts on — but the panel that describes it stays shut, exactly as it
+  // does for a card.
+  const interactionMode = useUiStore((state) => state.interactionMode);
+  const linkEndMove = useUiStore((state) => state.linkEndMove);
+  const startLinkEndMove = useUiStore((state) => state.startLinkEndMove);
+  const cancelLinkEndMove = useUiStore((state) => state.cancelLinkEndMove);
+  const setSelectedEdgeIds = useUiStore((state) => state.setSelectedEdgeIds);
+  const navigateTo = useNavigateTarget();
+  const linking = useUiStore((state) => state.linkingInProgress);
+
+  /**
+   * Escape closes the panel before anything under it reacts, and its own × does the same, so the
+   * key and the button agree. The drawer describes the selection now, so closing it also drops
+   * the selection — leaving the ids behind would reopen the panel on the next render.
+   *
+   * While *any* card is being edited the panel steps out of the layer stack: an
+   * editor owns Escape, and it is the innermost thing on screen whichever surface
+   * it is on. That is the canvas card body as much as a field in the panel, which
+   * is why the test is `editingNodeId` and not "editing inside the panel".
+   */
+  useEscapeLayer(closeInspector, !subject.isEmpty && editingNodeId === null);
+  // A container that vanished (deleted in another tab, trashed) closes the drawer
+  // rather than leaving a panel describing something that is not there.
+  /**
+   * The drawer is one surface in three shapes, and a drawn link crosses it: the
+   * preview runs under the panel and the destination is usually what the panel
+   * covers. The fade is paint only — no pointer-events change, so a release over
+   * the panel still lands on the panel and the press-on-canvas dismissal rule is
+   * untouched. It rides a root attribute because the three panels do not share a
+   * wrapper: they are early returns, and `display: contents` frames cost more than
+   * the rule they would enable.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!linking) {
+      root.removeAttribute("data-inspector-linking");
+      return;
+    }
+    root.setAttribute("data-inspector-linking", "true");
+    return () => root.removeAttribute("data-inspector-linking");
+  }, [linking]);
+
+  useEffect(() => {
+    if (inspectorNodeId && !model) closeInspector();
+  }, [inspectorNodeId, model, closeInspector]);
+
+  // Closing or switching the panel releases this card's panel editing session.
+  const previousInspectorId = useRef(inspectorNodeId);
+  useEffect(() => {
+    const previous = previousInspectorId.current;
+    previousInspectorId.current = inspectorNodeId;
+    if (previous === inspectorNodeId) return;
+    const state = useUiStore.getState();
+    if (state.editingSurface === "panel" && state.editingNodeId === previous) {
+      state.stopEditing();
+    }
+  }, [inspectorNodeId]);
+
+  // One link, one panel. A link is selected by the edge selection it already has,
+  // so the drawer needs no second open flag for it. A selection that holds a card keeps the
+  // card's panel: the card is the more specific subject, and its Style tab reaches the link.
+  if (
+    link &&
+    selectedEdgeIds.length === 1 &&
+    subject.counts.cards === 0 &&
+    interactionMode === "inspect"
+  ) {
+    const edgeId = link.edge.id;
+    return (
+      <LinkInspector
+        model={link}
+        styleTargets={styleTargets}
+        selectionSummary={selectionSummary}
+        // The same dismissal rule as the other two panels: closing drops what the panel described.
+        onClose={closeInspector}
+        onNavigateEnd={(end) => {
+          navigateTo({ kind: end.kind, id: end.id });
+        }}
+        onMoveEnd={(end) => startLinkEndMove({ edgeId, end })}
+        movingEnd={linkEndMove?.edgeId === edgeId ? linkEndMove.end : null}
+        onCancelMoveEnd={cancelLinkEndMove}
+        onSetPath={(path) => workspace.setEdgePath(edgeId, path)}
+        onSetBidirectional={(bidirectional) =>
+          workspace.setEdgeBidirectional(edgeId, bidirectional)
+        }
+        onReverse={() => workspace.reverseEdge(edgeId)}
+        onDelete={() => {
+          workspace.removeEdge(edgeId);
+          setSelectedEdgeIds([]);
+        }}
+        onSetDescription={(description) =>
+          workspace.setEdgeLabel(edgeId, description.trim() ? description : null)
+        }
+        onSetLabelOffset={(offset) => workspace.setEdgeLabelOffset(edgeId, offset)}
+      />
+    );
+  }
+
+  // Containers next: they share the drawer, and only one of the three can be open. A frame's panel
+  // follows the selection, so quiet mode is the only thing that keeps it shut — the same rule a link
+  // answers to, and the reason there is no second "is the container panel open" flag. A box that
+  // caught cards inside a frame leaves the card panel where it is, because the frame is a ring
+  // around them rather than the subject.
+  if (container && subject.counts.cards === 0 && interactionMode === "inspect") {
+    return (
+      <ContainerPanel
+        model={container}
+        styleTargets={styleTargets}
+        selectionSummary={selectionSummary}
+        onClose={() => useUiStore.getState().closeInspector()}
+        onOpenBoard={(cardId, boardId) => requestPortalOpen(cardId, boardId)}
+        onLocate={() => {
+          if (container.kind === "portal") {
+            if (container.boardId) focusCard(container.id, container.boardId);
+            return;
+          }
+          if (container.section) focusSection(container.section.id, container.section.boardId);
+        }}
+        // One writer: a portal's icon is its own card's, and a section's is the section's.
+        onSetIcon={(icon) => {
+          setEntityIcon(
+            workspace,
+            { kind: container.kind === "portal" ? "portal" : "section", id: container.id },
+            icon,
+          );
+        }}
+        onSetCover={(attachmentId) => {
+          if (container.kind === "portal" && container.board) {
+            workspace.setBoardCover(container.board.id, attachmentId);
+          }
+        }}
+        onRename={(title) => {
+          if (container.kind === "section") workspace.renameSection(container.id, title);
+        }}
+        onNavigate={(target) => {
+          navigateTo(target);
+        }}
+        // An orphaned portal is a dead end unless the panel can point it
+        // somewhere: a new board, or off this one.
+        onRetarget={(boardId) => {
+          if (!canEditLayout) return;
+          workspace.setPortalTarget(container.id, boardId);
+        }}
+        onRemove={() => {
+          if (!canEditLayout || !activeBoardId) return;
+          workspace.unplaceCard(activeBoardId, container.id);
+          // Nothing is drawn where the panel was pointing, so the drawer goes with it.
+          useUiStore.getState().closeInspector();
+        }}
+      />
+    );
+  }
+
+  // Quiet mode means no drawer, the rule the link and the container already answer to. A card
+  // whose panel follows the selection would otherwise open on every marquee in a reading mode.
+  if (!model || interactionMode !== "inspect") return null;
+
+  const panelEditing =
+    editingNodeId === model.card.id && editingSurface === "panel" ? editingField : null;
+
+  return (
+    <CardInspector
+      card={model.card}
+      styleTargets={styleTargets}
+      selectionSummary={selectionSummary}
+      title={model.title}
+      types={model.types}
+      tags={model.tags}
+      boards={model.boards}
+      fields={model.fields}
+      where={model.where}
+      cards={model.cards}
+      links={model.links}
+      focusedField={inspectorFieldId}
+      bodyEmpty={model.bodyEmpty}
+      linkCount={model.linkCount}
+      editing={panelEditing}
+      cardDoc={model.cardDoc}
+      contentId={model.contentId}
+      titleId={model.titleId}
+      cursorStore={model.cursorStore}
+      localUser={model.localUser}
+      peers={model.peers}
+      readOnly={readOnly}
+      canEditContent={canEditContent}
+      canEditLayout={canEditLayout}
+      canManageSchema={canManageSchema}
+      restrictLinks={isShareSession()}
+      onClose={closeInspector}
+      // Edit opens the full-canvas surface; the inspector keeps reading the same
+      // card behind it, so closing either one leaves the other consistent.
+      onEdit={() => openCardFocus(model.card.id)}
+      onStartEditing={model.onStartEditing}
+      onEditEnd={model.onEditEnd}
+      onSetType={model.onSetType}
+      onAddType={model.onAddType}
+      onRemoveType={model.onRemoveType}
+      onAddTag={model.onAddTag}
+      onRemoveTag={model.onRemoveTag}
+      onCreateTag={model.onCreateTag}
+      onSetProperty={model.onSetProperty}
+      onClearProperty={model.onClearProperty}
+      onOpenCardPanel={model.onOpenCardPanel}
+      onManageTypes={model.onManageTypes}
+      onFocusCard={model.onFocusCard}
+      onFocusSection={model.onFocusSection}
+      onPlace={model.onPlace}
+      onRemoveFromBoard={model.onRemoveFromBoard}
+      onFocusLink={model.onFocusLink}
+    />
+  );
+}

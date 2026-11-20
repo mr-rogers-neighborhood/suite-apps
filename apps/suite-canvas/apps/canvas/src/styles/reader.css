@@ -1,0 +1,1681 @@
+/*
+ * The book reader, inside a card and when it is open large.
+ *
+ * The chapter is a book's markup in our own document, so its type is ours: a measure that is comfortable to
+ * read, a line height that gives the words room, and nothing from the book's own stylesheet (the sanitiser drops
+ * it). The palette sits over the text rather than below it, because the selection it acts on is the thing the
+ * reader is looking at.
+ */
+
+.reader {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.reader-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.reader-title {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.reader-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-contents {
+  flex: none;
+  max-height: 40%;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--hairline);
+  list-style: none;
+  font-size: 11px;
+}
+
+.reader-contents-row {
+  width: 100%;
+  padding: 2px 6px;
+  border: none;
+  background: none;
+  text-align: left;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.reader-contents-row:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+}
+
+.reader-contents-row[aria-current="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* The rule under the header: a page's worth of progress through the book, updated from the scroll. */
+.reader-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: color-mix(in srgb, var(--ink-muted) 18%, transparent);
+}
+
+.reader-progress-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-progress-bar {
+    transition: none;
+  }
+}
+
+.reader-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 12px;
+}
+
+/*
+ * The measure: about 34 characters is too narrow and 90 too wide, so the default lands near 70 and the reader can move
+ * it either way. Size, measure and page are device preferences from `appearance.ts` (ADR-0071), published on the root
+ * as `--reader-size`, `--reader-measure` and `data-reading`.
+ */
+.reader-chapter {
+  /* Positioned for the area layer, which is painted inside the column rather than over the reader. */
+  position: relative;
+  max-width: var(--reader-measure, 68ch);
+  margin: 0 auto;
+  padding: 12px 0 32px;
+  font-size: var(--reader-size, 13px);
+  line-height: 1.65;
+  color: var(--reader-ink, var(--ink));
+}
+
+.reader-chapter h1,
+.reader-chapter h2,
+.reader-chapter h3,
+.reader-chapter h4 {
+  margin: 1.4em 0 0.4em;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.reader-chapter h1 {
+  font-size: 1.5em;
+}
+.reader-chapter h2 {
+  font-size: 1.28em;
+}
+.reader-chapter h3 {
+  font-size: 1.12em;
+}
+
+.reader-chapter p {
+  margin: 0 0 0.85em;
+}
+
+.reader-chapter blockquote {
+  margin: 0 0 0.85em;
+  padding-left: 12px;
+  border-left: 2px solid var(--hairline);
+  color: var(--ink-muted);
+}
+
+.reader-chapter em {
+  font-style: italic;
+}
+.reader-chapter strong {
+  font-weight: 600;
+}
+
+.reader-chapter img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.reader-chapter figure {
+  margin: 0 0 0.85em;
+}
+
+.reader-chapter table {
+  width: 100%;
+  margin: 0 0 0.85em;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.reader-chapter th,
+.reader-chapter td {
+  padding: 3px 6px;
+  border: 1px solid var(--hairline);
+  text-align: left;
+}
+
+.reader-chapter ul,
+.reader-chapter ol {
+  margin: 0 0 0.85em;
+  padding-left: 1.4em;
+}
+
+.reader-highlight {
+  color: inherit;
+  border-radius: 2px;
+}
+
+.reader-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.reader-note-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+/* Over the words rather than under them: the selection it acts on is what the reader is looking at. */
+.reader-palette {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px -10px rgb(0 0 0 / 0.4);
+  transform: translateX(-50%);
+}
+
+/* Measured: the host reports where the words are, so the fallback above is only for a surface that cannot. */
+.reader-palette[data-positioned="true"] {
+  bottom: auto;
+  transform: translateX(-50%);
+}
+
+.reader-palette-color {
+  width: 18px;
+  height: 18px;
+  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.reader-palette-color:hover {
+  transform: scale(1.12);
+}
+
+.reader-palette-color:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A card's link to the highlight it came from. Read-only in every surface, because the anchor is the truth. */
+/*
+ * A highlight's words, wherever they are shown.
+ *
+ * One component draws the card's header and the `Highlight` block in a body, so this is one set of rules: the spine in
+ * the kind's colour, the passage in full, and the kind and book underneath. There is deliberately no line clamp — the
+ * clamp is what forced a card to be a fixed box with its own quotation cropped.
+ */
+.annotation-passage {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.annotation-passage-spine {
+  width: 3px;
+  flex: none;
+  border-radius: 9999px;
+}
+
+.annotation-passage-text {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.annotation-passage-words {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ink);
+  /* A long passage wraps and the card grows; a very long one scrolls its own strip rather than the whole card. */
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.annotation-passage-where {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.annotation-passage-source {
+  overflow: hidden;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 10px;
+  color: var(--ink-muted);
+  text-align: left;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-passage-link {
+  max-width: 150px;
+  cursor: pointer;
+}
+
+.annotation-passage-link:hover {
+  color: var(--ink);
+}
+
+/* In a body the passage is its own block: a paragraph's worth of words, not a chip in a sentence. */
+.annotation-field,
+.annotation-field-block {
+  display: block;
+  min-width: 0;
+  margin: 4px 0;
+}
+
+.annotation-passage[data-variant="inline"] {
+  padding: 5px 6px 5px 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 70%, var(--hairline));
+}
+
+.annotation-field--missing {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+/* ---------- The block in a card body: a cover, not a reader ---------- */
+
+.book-cover {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.book-cover-art {
+  display: flex;
+  width: 44px;
+  height: 62px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--segmented-bg);
+  color: var(--ink-muted);
+}
+
+.book-cover-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.book-cover-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.book-cover-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.book-cover-meta {
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.book-cover-refused {
+  font-size: 10px;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.book-cover-read {
+  flex: none;
+}
+
+/* ---------- Reading in focus mode ---------- */
+
+.book-focus {
+  height: 100%;
+  min-height: 0;
+  padding: 10px;
+}
+
+.book-focus .reader {
+  height: 100%;
+}
+
+/* The chapter gets the room the focus surface has rather than a card's measure. */
+.book-focus .reader-chapter {
+  max-width: 74ch;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* ---------- Carrying a highlight out of the book ---------- */
+
+/*
+ * The focus surface steps aside while a highlight is in hand: a strip at the top, still there, still the thing the
+ * drag came from. The library drawer animates away for the same reason and comes back on release.
+ */
+.card-focus[data-concealed="true"] {
+  transform: translateY(calc(100% - 56px));
+  opacity: 0.35;
+  transition:
+    transform 140ms ease-out,
+    opacity 140ms ease-out;
+}
+
+/*
+ * Nothing inside a concealing surface may answer a pointer, or the drop would hit the book instead of the board
+ * underneath it. Inherited, and stated for children as well because a `pointer-events` of their own would win.
+ */
+.card-focus[data-concealed="true"] * {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-focus[data-concealed="true"] {
+    transition: none;
+  }
+}
+
+.highlight-ghost {
+  position: fixed;
+  z-index: 60;
+  width: 90px;
+  height: 22px;
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.4);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* A highlight is grabbable: the press that carries it is the press a reader already makes on a mark. */
+.reader-highlight {
+  cursor: grab;
+}
+
+.reader-highlight:hover {
+  filter: brightness(0.97);
+}
+
+/* ---------- A book card on the canvas: the cover is the card ---------- */
+
+.book-card {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+/*
+ * The cover fills what the card is: an image card draws its picture this way, and a book is the same shape of thing.
+ * `cover` rather than `contain` because a jacket is a picture with its own proportions; the box is what the card owns.
+ */
+.book-card-art {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--segmented-bg);
+  color: var(--ink-muted);
+}
+
+.book-card-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+/* The book's open-book mark, drawn as the theme's icon rather than as an emoji in the card's own colour. */
+.book-card-placeholder {
+  opacity: 0.5;
+}
+
+.book-card-text {
+  display: flex;
+  min-width: 0;
+  flex: none;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 2px 4px;
+}
+
+.book-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.book-card-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.book-card-actions {
+  display: flex;
+  gap: 4px;
+  margin: 0 2px 2px;
+}
+
+.book-card-read-canvas {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-contrast, #ffffff);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.book-card-read-canvas:hover {
+  opacity: 0.9;
+}
+
+.book-card-read-canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.book-card-read {
+  flex: none;
+  margin: 0;
+  padding: 3px 10px;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.book-card-read:hover {
+  background: color-mix(in srgb, var(--ink) 88%, black);
+}
+
+.book-card-read:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.book-canvas-reader {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+.book-canvas-reader-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+/*
+ * Carrying a highlight suspends selection everywhere.
+ *
+ * The press that starts the drag is a press on text, and without this the browser selects as the pointer travels:
+ * the reader ends up with the shell highlighted, which looks like a bug because it is one.
+ */
+[data-carrying-highlight="true"],
+[data-carrying-highlight="true"] body {
+  cursor: grabbing;
+}
+
+[data-carrying-highlight="true"] .reader-chapter,
+[data-carrying-highlight="true"] .book-card {
+  user-select: none;
+}
+
+/* ---------- A highlight, raised ---------- */
+
+.raise {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * The backdrop blurs rather than dims. The point of raising a highlight is to read it without the chapter competing,
+ * and a flat scrim would hide the context a reader still wants to see the shape of.
+ */
+.raise-scrim {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  backdrop-filter: blur(6px);
+  cursor: default;
+}
+
+.raise-panel {
+  position: relative;
+  display: flex;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(80vh, 640px);
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 24px 64px -28px rgb(0 0 0 / 0.45);
+}
+
+.raise-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.raise-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.raise-count {
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.raise-colours {
+  display: flex;
+  gap: 5px;
+}
+
+.raise-colour {
+  width: 18px;
+  height: 18px;
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.raise-colour[aria-pressed="true"] {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* The quote as the reader sees it, so a range can be chosen where the words actually are. */
+.raise-quote {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--segmented-bg);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+/*
+ * A part is dotted, not filled.
+ *
+ * The passage already carries the type's colour; a second fill per part would turn one highlight into a patchwork and
+ * lose the fact that it is one mark. Dots say "these words are claimed" while the colour keeps saying what it is.
+ */
+.raise-covered {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+.raise-part {
+  padding: 0;
+}
+
+/* One destination: the dot is a ring until words fill it, then the type's colour. */
+.raise-part-arm {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  text-align: left;
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.raise-part-arm:hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.raise-part-arm[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  outline: 1px solid var(--accent);
+}
+
+.raise-part-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border: 1.5px dotted;
+  border-radius: 9999px;
+}
+
+.raise-part[data-filled="true"] .raise-part-dot {
+  border-style: solid;
+}
+
+.raise-part-label {
+  flex: none;
+  min-width: 74px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.raise-part[data-filled="true"] .raise-part-label {
+  color: var(--ink);
+}
+
+.raise-part-text[data-empty="true"] {
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.raise-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.raise-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.raise-part {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.raise-part-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.raise-part-arrow {
+  color: var(--ink-muted);
+}
+
+.raise-part-target {
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 1px 4px;
+  font-size: 11px;
+  color: var(--ink);
+}
+
+.raise-pending {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+}
+
+.raise-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--hairline);
+}
+
+/* ---------- What a book is connected to ---------- */
+
+.reader-backlinks {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.reader-backlink-group + .reader-backlink-group {
+  margin-top: 8px;
+}
+
+.reader-backlink {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reader-backlink:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.reader-backlink-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The reason is the quiet half: "mentions this book" answers why the row is here, not what it says. */
+.reader-backlink-reason {
+  flex: none;
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+/* ---------- Finding a place by its words ---------- */
+
+.reader-search {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.reader-search-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  color: var(--ink-muted);
+}
+
+.reader-search-field:focus-within {
+  border-color: color-mix(in srgb, var(--ink) 30%, transparent);
+  color: var(--ink);
+}
+
+.reader-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  outline: none;
+}
+
+.reader-search-count {
+  margin: 5px 0 2px;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.reader-search-chapter {
+  margin-top: 6px;
+}
+
+.reader-search-chapter-title {
+  margin: 0 0 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.reader-search-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The words lead and the hit is lit inside them: a list of bare matches tells no one which match they meant. */
+.reader-search-row {
+  display: block;
+  width: 100%;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reader-search-row:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+}
+
+.reader-search-match {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--ink);
+}
+
+/* ---------- Marking an area ---------- */
+
+/* The layer an area highlight is painted in: over the words, and out of the way of every press. */
+.reader-areas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.reader-area {
+  position: absolute;
+  border-radius: 2px;
+}
+
+/* The rectangle being drawn, in viewport coordinates, so it tracks the pointer rather than the chapter. */
+.reader-area-drag {
+  position: fixed;
+  z-index: 30;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  pointer-events: none;
+}
+
+/* ---------- The book's own marks ---------- */
+
+.reader-marks {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* The count and any one affordance beside it: the header of a panel, not a row of its own. */
+.reader-marks-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.reader-marks-count {
+  margin: 0 0 4px;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.reader-marks-head .reader-marks-count {
+  margin: 0;
+}
+
+.reader-marks-head .views-icon-button {
+  margin-left: auto;
+}
+
+.reader-marks-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row is a press away from being raised: the words are what a reader is choosing between, so they lead. */
+.annotation-row-wrap {
+  display: flex;
+  /* The expanded passage is a line of its own: without wrapping, the full block below squeezes the row's own controls to
+     nothing and overflows the panel instead of growing it. */
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 2px;
+  border-radius: 6px;
+  padding-right: 2px;
+}
+
+/* A picked row reads as picked without moving: the tick is the affordance, the tint only confirms it. */
+.annotation-row-wrap[data-picked="true"] {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.annotation-row-pick {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin: 5px 0 0 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.annotation-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 5px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  font-size: 11px;
+  color: var(--ink);
+  cursor: grab;
+}
+
+.annotation-row:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.annotation-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Expanded, a row shows the whole passage: the line is a first sight, not the thing itself. */
+.annotation-row-text[data-expanded="true"] {
+  white-space: pre-wrap;
+}
+
+.annotation-row-full {
+  flex: 1 0 100%;
+  min-width: 0;
+  margin: 2px 4px 6px 20px;
+  padding: 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.annotation-row-full-words {
+  display: block;
+  white-space: pre-wrap;
+}
+
+.annotation-row-full-parts {
+  margin: 6px 0 0;
+  padding-left: 14px;
+  color: var(--ink-muted);
+}
+
+.annotation-row-full-target {
+  margin-right: 5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.annotation-row-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 9999px;
+}
+
+.annotation-row-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-row-parts {
+  flex: none;
+  margin-left: 6px;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.annotation-row-where {
+  flex: none;
+  font-size: 10px;
+}
+
+.annotation-row-unplaced {
+  color: var(--ink-muted);
+}
+
+.annotation-row-card {
+  color: var(--ink);
+}
+
+.annotation-row-mark {
+  flex: none;
+  color: var(--ink-muted);
+}
+
+/* Both lists mount this row, so the list is only a column of them. */
+.annotation-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The bar that appears with a selection: the order it will be placed in is the order rows were ticked. */
+/* The same bar as the one that floats over the board, seated in this panel: it ends a gesture here too. */
+.reader-marks .action-bar {
+  border-bottom: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* ---------- The library's annotation list ---------- */
+
+.library-annotations {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+.library-annotation-book-title {
+  margin: 0 0 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* The list is the row now: what is left here is the column, the group heading and the search. */
+
+/* ---------- Annotation types ---------- */
+
+.ann-kinds-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.ann-kinds-scrim-hit {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgb(0 0 0 / 0.28);
+}
+
+.ann-kinds {
+  position: relative;
+  display: flex;
+  max-height: min(80vh, 620px);
+  width: min(560px, calc(100vw - 32px));
+  flex-direction: column;
+  /* The panel clips; the list scrolls. A panel that scrolled as one block took its header out of sight, which is
+     how a dialog with a great many slots ended up with no visible way out. */
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 24px 64px -28px rgb(0 0 0 / 0.45);
+}
+
+.ann-kinds-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.ann-kinds-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ann-kinds-sub {
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.ann-kinds-list {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  overflow-y: auto;
+  padding: 10px 16px;
+  list-style: none;
+}
+
+.ann-type {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+}
+
+.ann-type-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The colour is the type's identity, so it is a control rather than a swatch beside a name. */
+.ann-type-color {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+  background: none;
+  cursor: pointer;
+}
+
+.ann-type-name {
+  min-width: 0;
+  flex: 1;
+}
+
+.ann-type-target {
+  flex: none;
+  max-width: 160px;
+}
+
+.ann-type-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 2px;
+}
+
+.ann-type-slots-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.ann-type-empty {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.ann-type-slot-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ann-type-slot {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.ann-type-slot-target {
+  width: auto;
+  padding: 1px 4px;
+  font-size: 11px;
+}
+
+.ann-type-add-slot {
+  display: flex;
+  gap: 4px;
+}
+
+.ann-kinds-foot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+/* The filter row in a book's Highlights panel: one chip per kind, plus all and not-yet-card. */
+.reader-mark-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 10px 6px;
+}
+
+.reader-mark-filter {
+  display: inline-flex;
+  align-items: center;
+}
+
+.library-annotations-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+
+/* The row's own search: the drawer's is built for cards, and a highlight has no type or section to facet on. */
+.library-annotations-search {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 11px;
+}
+
+/* ---------- A mention of a highlight ---------- */
+
+/*
+ * It reads as a passage, not as a card: the highlight's colour on the leading edge, a dotted rule under the words, and
+ * the same 48-character excerpt a raised highlight shows. A mention of a card and a mention of a sentence are
+ * different things, so they do not look the same.
+ */
+.annotation-mention {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  max-width: 44ch;
+  padding: 0 5px;
+  border: 1px dashed var(--hairline);
+  border-left-width: 3px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  font-size: 0.95em;
+  color: var(--ink);
+  vertical-align: baseline;
+  cursor: pointer;
+}
+
+.annotation-mention:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.annotation-mention-dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 9999px;
+}
+
+.annotation-mention-text {
+  overflow: hidden;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-chip--missing {
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+/* ---------- A card that came out of a book ---------- */
+
+/*
+ * The passage, above the writing.
+ *
+ * An annotation card is not a book card: the reader writes *around* the passage, so the passage is a strip over the
+ * body rather than the whole face. The spine is the kind's own colour, which is the one thing that tells two cards from
+ * the same page apart at a glance.
+ */
+.annotation-strip {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  gap: 6px;
+  margin: 0 2px 4px;
+  padding: 5px 6px 5px 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 70%, var(--hairline));
+}
+
+/* The strip's own two buttons sit beside the passage, which is the shared component. */
+.annotation-strip-actions {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.annotation-strip-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+/* A mark is a control once it can be reached from the keyboard, so it has to look like one when it is focused. */
+.reader-chapter mark.reader-highlight:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* ---------- The page a book is printed on ---------- */
+
+/*
+ * A reading theme tints the page, not the app. Sepia and dim are the two a reader asks for by name, and both are
+ * applied to the reader's own column so nothing outside the book moves.
+ */
+/* The rule under the header: a page's worth of progress through the book, updated from the scroll. */
+.reader-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: color-mix(in srgb, var(--ink-muted) 18%, transparent);
+}
+
+.reader-progress-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-progress-bar {
+    transition: none;
+  }
+}
+
+.reader-body {
+  transition: background-color 140ms ease-out;
+}
+
+[data-reading="sepia"] /* The rule under the header: a page's worth of progress through the book, updated from the scroll. */
+.reader-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: color-mix(in srgb, var(--ink-muted) 18%, transparent);
+}
+
+.reader-progress-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-progress-bar {
+    transition: none;
+  }
+}
+
+.reader-body {
+  background: #f6efdf;
+  --reader-ink: #3b3327;
+}
+
+[data-reading="dim"] /* The rule under the header: a page's worth of progress through the book, updated from the scroll. */
+.reader-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: color-mix(in srgb, var(--ink-muted) 18%, transparent);
+}
+
+.reader-progress-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-progress-bar {
+    transition: none;
+  }
+}
+
+.reader-body {
+  background: #1c1f24;
+  --reader-ink: #cbd2dc;
+}
+
+[data-reading="sepia"] .reader-chapter blockquote,
+[data-reading="dim"] .reader-chapter blockquote {
+  color: color-mix(in srgb, var(--reader-ink) 65%, transparent);
+  border-left-color: color-mix(in srgb, var(--reader-ink) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The rule under the header: a page's worth of progress through the book, updated from the scroll. */
+  .reader-progress {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: color-mix(in srgb, var(--ink-muted) 18%, transparent);
+  }
+
+  .reader-progress-bar {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--accent);
+    transition: width 120ms linear;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reader-progress-bar {
+      transition: none;
+    }
+  }
+
+  .reader-body {
+    transition: none;
+  }
+}
+
+/* The note a reader wrote on the mark: on the raised surface, and in the outline's expanded row. */
+.raise-note {
+  display: block;
+  margin: 6px 0 2px;
+}
+
+.raise-note-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.raise-note-input {
+  width: 100%;
+  resize: vertical;
+  padding: 5px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.annotation-row-full-note {
+  margin: 6px 0 0;
+  padding-left: 7px;
+  border-left: 2px solid var(--hairline);
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+/* The note on a card's strip: the reader's own remark, quieter than the passage it is about. */
+.annotation-passage-note {
+  display: block;
+  padding-left: 6px;
+  border-left: 2px solid var(--hairline);
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--ink-muted);
+  white-space: pre-wrap;
+}
+
+/* The tags a mark joins, as the same chips the outline filters with. */
+.raise-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 6px 0 0;
+}
+
+.raise-tag {
+  font-size: 10px;
+}

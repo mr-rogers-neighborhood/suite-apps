@@ -1,0 +1,353 @@
+import { applyWorkspaceTemplate, defaultConnectors, type WorkspaceDocument } from "@suite/graph";
+import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useRef } from "react";
+import { DEFAULT_CARD_WIDTH } from "../canvas/interactions/multiSelect";
+import { ensureWhiteboardType } from "../cards/whiteboard";
+import type { FocusState } from "../collab/presence";
+import { TAB_ID } from "../collab/tabId";
+import { markBoot, measureBoot } from "../dev/bootTiming";
+import type { WorkspaceSnapshot } from "../hooks/snapshotMerge";
+import { hostKind } from "../host/bridge";
+import { preloadIconRefs } from "../icons/iconSets";
+import { takeChosenTemplate } from "../launcher/starterTemplates";
+import { readLastBoard, rememberLastBoard } from "../session/lastBoard";
+import type { ShareSession } from "../session/session";
+import { DEFAULT_WORKSPACE_NAME, readWorkspaceNames } from "../session/workspaceName";
+import { rememberWorkspace } from "../session/workspaceTransfer";
+import type { SyncInfo } from "../store/useCanvasStore";
+import { resolveBoardId, useCanvasStore } from "../store/useCanvasStore";
+
+/**
+ * The effects that turn a created document into a usable workspace: connect,
+ * wait for the first sync, seed once, resolve the board, and keep the URL and
+ * the recents mirror in step. Split from the shell so the render component does
+ * not own the ordering rules.
+ */
+export function useWorkspaceBoot(args: {
+  workspace: WorkspaceDocument;
+  workspaceId: string;
+  workspaceName: string;
+  setWorkspaceName: Dispatch<SetStateAction<string>>;
+  snapshot: WorkspaceSnapshot;
+  share: ShareSession | null;
+  readOnly: boolean;
+  ready: boolean;
+  synced: boolean;
+  standalone: boolean;
+  activeBoardId: string | null;
+  /** The placeholder tab is open: the reader asked for no board yet. */
+  newTab: boolean;
+  setActiveBoardId: (id: string | null) => void;
+  connect: () => void;
+  provider: unknown;
+  /** What sync is doing and who is here, so presence knows whether anyone is listening. */
+  sync: SyncInfo | null;
+  presence: unknown;
+  bindPresence: (presence: never, tabId: string) => void;
+  setBoard: (boardId: string | null) => void;
+  editingNodeId: string | null;
+  editingField: "title" | "body";
+  setFocus: (focus: FocusState | null) => void;
+  openInspector: (id: string) => void;
+}): void {
+  const {
+    workspace,
+    workspaceId,
+    workspaceName,
+    setWorkspaceName,
+    snapshot,
+    share,
+    readOnly,
+    ready,
+    synced,
+    standalone,
+    activeBoardId,
+    newTab,
+    setActiveBoardId,
+    connect,
+    provider,
+    sync,
+    presence,
+    bindPresence,
+    setBoard,
+    editingNodeId,
+    editingField,
+    setFocus,
+    openInspector,
+  } = args;
+  const shareCardOpened = useRef(false);
+  /** The board a launcher template wrote, so a new workspace opens on it. */
+  const templatedBoardId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (standalone) return;
+    connect();
+  }, [connect, standalone]);
+
+  useEffect(() => {
+    // A build with no transport has nothing to wait for, so the first paint is not held up by
+    // a sync that will never happen. It is not a reason to skip presence either: the desktop
+    // app is built from the standalone bundle, so `standalone` is true there and the hub is
+    // as real as it gets.
+    if (standalone && !useCanvasStore.getState().synced) {
+      useCanvasStore.setState({ synced: true });
+    }
+    // Presence binds when this workspace is actually shared. A page with a document and no hub
+    // has nobody to be present to, and a cursor nobody receives is not worth sending.
+    if (provider || sync?.status.state === "syncing") bindPresence(presence as never, TAB_ID);
+  }, [bindPresence, presence, provider, standalone, sync]);
+
+  // Seeding is once per workspace, so deleting every card stays deleted. It also
+  // waits for the first server sync: seeding an empty local doc would resurrect
+  // starter cards in a workspace someone emptied on another client.
+  useEffect(() => {
+    // A share reads a projection the owner's workspace already seeded; writing
+    // in a share room (even the idempotent type repair) belongs to the draft,
+    // not to this page's boot.
+    if (share || readOnly || !ready || !synced) return;
+    // Starter types are structural, not sample data: every workspace has them,
+    // and the note type is the fallback for cards with no type.
+    workspace.ensureDefaultTypes();
+    // The sketch type is structural too, even though nothing in production can make one:
+    // a card of that type is how a drawing is stored, and a document that does not know
+    // the type renders one as a plain note. Idempotent, and it repairs the pre-rename
+    // label and the display field on the way past.
+    ensureWhiteboardType(workspace);
+    if (!workspace.hasSeeded()) {
+      const board = workspace.ensureBoard();
+      // A direct URL can create the first document without the launcher, so
+      // the friendly default is applied here too; an existing name always wins.
+      if (!workspace.hasWorkspaceName()) {
+        workspace.renameWorkspace(DEFAULT_WORKSPACE_NAME);
+        setWorkspaceName(workspace.workspaceName());
+      }
+      // A workspace created from the launcher starts blank; older workspaces
+      // keep the two-card demo they were seeded with.
+      const fresh = new URLSearchParams(window.location.search).get("fresh") === "1";
+      if (!fresh && workspace.listCards().length === 0) {
+        // Connector ids are derived from the card id, not random. Two clients
+        // opening the same new workspace both seed it; the cards carry fixed ids
+        // and converge, so random dot ids would union into eight connectors on
+        // one card instead of four.
+        const starters = (cardId: string) =>
+          defaultConnectors().map((connector, index) => ({
+            ...connector,
+            id: `${cardId}-connector-${index + 1}`,
+          }));
+        workspace.createCard({
+          id: "starter-1",
+          boardId: board.id,
+          position: { x: 0, y: 0 },
+          connectors: starters("starter-1"),
+        });
+        // One card width plus a gap, so the two starters read as two cards and a
+        // section drawn around the first does not reach into the second.
+        workspace.createCard({
+          id: "starter-2",
+          boardId: board.id,
+          position: { x: DEFAULT_CARD_WIDTH + 192, y: 0 },
+          connectors: starters("starter-2"),
+        });
+      }
+      // The template the launcher offered, applied here because this is where
+      // the document is first written: one board (and its regions and cards)
+      // lands as a single undoable change, and the reader opens on it. A blank
+      // workspace has no template, which is why the picker's default is empty.
+      //
+      // The object is preferred over the id: a template the launcher fetched from
+      // the account service has no built-in id to look up, so the id alone would
+      // open the workspace empty and say nothing about why.
+      const chosen = takeChosenTemplate(workspaceId);
+      const templateId = new URLSearchParams(window.location.search).get("template");
+      const applied =
+        chosen === null
+          ? templateId
+            ? applyWorkspaceTemplate(workspace, templateId)
+            : null
+          : applyWorkspaceTemplate(workspace, chosen);
+      templatedBoardId.current = applied?.boardIds[0] ?? null;
+      workspace.markSeeded();
+    }
+    // The reference index is derived, so repairing it is safe and idempotent. It
+    // runs after the first sync so mentions that arrived offline are indexed too.
+    workspace.ensureReferences();
+  }, [ready, synced, workspace, workspaceId, readOnly, share, setWorkspaceName]);
+
+  useEffect(() => {
+    document.title = `${workspaceName} — Suite`;
+  }, [workspaceName]);
+
+  useEffect(() => {
+    if (!ready) return;
+    markBoot("shell:ready");
+    measureBoot("to-ready", "store:created", "shell:ready");
+  }, [ready]);
+
+  // The launcher may have named this workspace before its document existed.
+  // Adopt that mirror once, and only when the document has no name of its own.
+  useEffect(() => {
+    if (!ready || !synced || share || readOnly || workspace.hasWorkspaceName()) return;
+    const mirror = readWorkspaceNames()[workspaceId]?.trim();
+    if (!mirror) return;
+    try {
+      workspace.renameWorkspace(mirror);
+      setWorkspaceName(workspace.workspaceName());
+    } catch {
+      // A name that no longer validates stays in the mirror; the document keeps
+      // its derived label rather than failing the boot.
+    }
+  }, [ready, synced, share, readOnly, workspace, workspaceId, setWorkspaceName]);
+
+  // The document is the truth for its own name, but the shell seeds its display
+  // state before the document hydrates, so the canvas showed "Untitled workspace"
+  // while the launcher — which reads the local mirror — showed the real name.
+  // Adopt the stored name as soon as it is readable. A share keeps its own label,
+  // and a rename already writes to the document before it updates the state, so
+  // this can never undo what someone just typed.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: synced is a re-read trigger, not an input.
+  useEffect(() => {
+    if (!ready || share) return;
+    if (!workspace.hasWorkspaceName()) return;
+    setWorkspaceName(workspace.workspaceName());
+  }, [ready, synced, workspace, share, setWorkspaceName]);
+
+  // Every icon the document names, asked for once, so the first paint after a reload
+  // already has them. A glyph asks for its own set on mount too; this only removes the
+  // one empty frame that costs.
+  useEffect(() => {
+    preloadIconRefs([
+      ...snapshot.cards.map((card) => card.style?.icon),
+      ...snapshot.cards.map((card) => card.icon),
+      ...snapshot.types.map((type) => type.icon),
+      ...snapshot.boards.map((board) => board.icon),
+      ...snapshot.sections.map((section) => section.icon),
+    ]);
+  }, [snapshot.cards, snapshot.types, snapshot.boards, snapshot.sections]);
+
+  // Resolve the board from the URL, falling back to the first one.
+  useEffect(() => {
+    if (!ready || !synced) return;
+    const boards = snapshot.boards;
+    if (boards.length === 0) {
+      // A projection can arrive a moment after the room joins; wait for it
+      // instead of minting a board the share may not write.
+      if (!share && !readOnly) workspace.ensureBoard();
+      return;
+    }
+    if (activeBoardId && boards.some((board) => board.id === activeBoardId)) return;
+    // A new tab is an answer, not a gap: the reader asked for no board yet, so
+    // the start page stays until they pick one.
+    if (activeBoardId === null && newTab) return;
+
+    // What the reader asked for, then the template they just chose, then the
+    // board they were last on in this workspace, then the board the link was
+    // shared from, then the first board. There is no home board to configure any
+    // more: "where I was" is the answer people gave to that question anyway
+    // (ADR-0064 amendment).
+    //
+    // The start board sits after "last" on purpose. A first-time visitor has no
+    // last board, so a share opens where it was made; a returning visitor does,
+    // so their own choice wins and the link never pulls them back. A start board
+    // outside the projection is simply not found, and the chain falls through.
+    const requested = resolveBoardId();
+    const template = templatedBoardId.current;
+    const last = readLastBoard(workspaceId);
+    const start = share?.startBoardId ?? null;
+    const next =
+      boards.find((board) => board.id === requested)?.id ??
+      (template === null ? undefined : boards.find((board) => board.id === template)?.id) ??
+      (last === null ? undefined : boards.find((board) => board.id === last)?.id) ??
+      (start === null ? undefined : boards.find((board) => board.id === start)?.id) ??
+      boards[0]?.id ??
+      null;
+    if (next && next !== activeBoardId) setActiveBoardId(next);
+  }, [
+    ready,
+    synced,
+    snapshot.boards,
+    activeBoardId,
+    newTab,
+    setActiveBoardId,
+    workspace,
+    workspaceId,
+    readOnly,
+    share,
+  ]);
+
+  // Keep the URL shareable without a reload. A share keeps its token and never
+  // gains a workspace id: the link is the whole credential.
+  useEffect(() => {
+    // A desktop window has no address bar to keep in step, and the file is the
+    // document's identity: writing the workspace into the URL would put a second
+    // copy of the id where the shell already answered it. The board is still
+    // remembered, which is what the URL was carrying on the web.
+    if (hostKind() === "desktop") {
+      if (activeBoardId && !share) rememberLastBoard(workspaceId, activeBoardId);
+      return;
+    }
+
+    if (!activeBoardId) {
+      // A placeholder tab is the workspace without a board, so the address stops
+      // naming the last one. Without this a reload would reopen it.
+      if (share || !newTab) return;
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has("board")) return;
+      url.searchParams.delete("board");
+      window.history.replaceState(null, "", url);
+      return;
+    }
+    // Remembering the board here is what replaced the home-board setting: the
+    // next open of this workspace lands where this one left off.
+    rememberLastBoard(workspaceId, activeBoardId);
+    const url = new URL(window.location.href);
+    if (share) {
+      url.searchParams.set("share", share.token);
+      url.searchParams.set("board", activeBoardId);
+      // A share link carries no workspace id, even if it was pasted with one,
+      // and never carries the owner fragment of the page it was created from.
+      url.searchParams.delete("workspace");
+      url.searchParams.delete("doc");
+      url.searchParams.delete("fresh");
+      url.searchParams.delete("template");
+      url.hash = "";
+    } else {
+      url.searchParams.set("workspace", workspaceId);
+      url.searchParams.set("board", activeBoardId);
+      url.searchParams.delete("fresh");
+      // The template has been applied; keeping it would re-apply on a reload
+      // that found the workspace unseeded again.
+      url.searchParams.delete("template");
+    }
+    window.history.replaceState(null, "", url);
+  }, [activeBoardId, workspaceId, share, newTab]);
+
+  useEffect(() => {
+    // A share is a visit, not a workspace to come back to from the launcher.
+    if (!activeBoardId || share) return;
+    rememberWorkspace({
+      id: workspaceId,
+      title: snapshot.boards.find((board) => board.id === activeBoardId)?.name,
+      boardId: activeBoardId,
+    });
+  }, [workspaceId, activeBoardId, snapshot.boards, share]);
+
+  // A card link opens on that card. The projection may still be syncing, so wait
+  // for the card to exist; once opened, closing the panel is the reader's choice.
+  useEffect(() => {
+    if (share?.scope !== "card" || shareCardOpened.current) return;
+    if (!ready || !synced || !share.cardId) return;
+    if (!snapshot.cards.some((card) => card.id === share.cardId)) return;
+    shareCardOpened.current = true;
+    openInspector(share.cardId);
+  }, [share, ready, synced, snapshot.cards, openInspector]);
+
+  useEffect(() => {
+    setBoard(activeBoardId);
+  }, [activeBoardId, setBoard]);
+
+  // Carets are card- and field-scoped: peers only draw them in the editor the
+  // author is actually typing in.
+  useEffect(() => {
+    setFocus(editingNodeId ? { nodeId: editingNodeId, field: editingField } : null);
+  }, [editingNodeId, editingField, setFocus]);
+}

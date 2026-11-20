@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "cloudflare": {
+      "type": "http",
+      "url": "https://mcp.cloudflare.com/mcp",
+      "tools": ["docs", "search", "execute", "whoami"]
+    },
+    "resend": {
+      "type": "http",
+      "url": "https://mcp.resend.com/mcp",
+      "tools": [
+        "send-email",
+        "list-emails",
+        "get-email",
+        "get-email-metrics",
+        "list-domains",
+        "get-domain",
+        "create-domain",
+        "verify-domain-claim",
+        "list-templates",
+        "get-template",
+        "list-contacts",
+        "create-contact",
+        "create-api-key"
+      ]
+    },
+    "cloudwatch": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["awslabs.cloudwatch-mcp-server@latest"],
+      "env": {
+        "AWS_PROFILE": "suite",
+        "AWS_REGION": "us-east-2",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "tools": [
+        "describe_log_groups",
+        "analyze_log_group",
+        "execute_log_insights_query",
+        "get_logs_insight_query_results",
+        "cancel_logs_insight_query",
+        "get_metric_data",
+        "get_active_alarms",
+        "get_alarm_history",
+        "get_recommended_metric_alarms"
+      ]
+    }
+  }
+}

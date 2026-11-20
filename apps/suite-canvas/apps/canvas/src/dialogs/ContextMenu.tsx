@@ -1,0 +1,259 @@
+import { focusFirstMenuItem, menuKeyDown } from "@suite/ui";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { useSurfacePaint } from "../canvas/surfaceContext";
+import { ColourStrip } from "../inspector/ColourStrip";
+import { useEscapeLayer } from "../shell/escapeLayers";
+
+export interface ContextMenuItem {
+  label: string;
+  onSelect?: () => void;
+  danger?: boolean;
+  /** Nested menu, e.g. the "Position" submenu. */
+  items?: ContextMenuItem[];
+  /**
+   * A row of colour dots laid out in the menu itself, in place of a submenu.
+   *
+   * Colour is the verb a reader reaches for most often, and a submenu made it two presses and a hover
+   * to see what was on offer. The dots read as one row, so picking a colour is one press and the
+   * palette is visible before you commit to opening it.
+   */
+  swatches?: ContextMenuItem[];
+  /** A colour dot beside the label, for the palette quick-picks. */
+  swatch?: { light: string; dark: string } | undefined;
+  /** Marks the swatch this surface already wears. */
+  swatchSelected?: boolean | undefined;
+  /** Checkbox state for toggles */
+  checked?: boolean | undefined;
+}
+
+export interface ContextMenuProps {
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
+  onClose: () => void;
+}
+
+const itemClass = (danger?: boolean) =>
+  `flex w-full items-center justify-between gap-3 rounded px-3 py-1.5 text-left text-sm ${
+    danger
+      ? "text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15"
+      : "hover:bg-black/5 dark:hover:bg-white/10"
+  }`;
+
+export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
+  const viewportWidth = typeof window === "undefined" ? 0 : window.innerWidth;
+  const viewportHeight = typeof window === "undefined" ? 0 : window.innerHeight;
+  // The menu is portalled at the pointer, which can be at the bottom-right of a
+  // narrow pane. Clamp it to the viewport instead of opening off-screen.
+  const menuLeft = Math.max(8, Math.min(x, viewportWidth - 208));
+  const menuTop = Math.max(8, Math.min(y, viewportHeight - (items.length * 32 + 16)));
+  // A submenu that always opens rightward disappears off a narrow window. Flip
+  // it to the left of its parent when the menu was opened near the right edge.
+  const flipSubmenu = x + 360 > viewportWidth;
+
+  useEscapeLayer(onClose);
+
+  // Portalled: a `position: fixed` menu inside the canvas viewport (or an
+  // editor) would be positioned against that transformed ancestor instead of
+  // the window, which puts it off-screen.
+  return createPortal(
+    <>
+      <button
+        type="button"
+        aria-label="Close context menu"
+        className="fixed inset-0 z-40 cursor-default border-0 bg-transparent p-0"
+        onClick={onClose}
+        onContextMenu={(event) => event.preventDefault()}
+      />
+      <div
+        ref={focusFirstMenuItem}
+        data-testid="context-menu"
+        role="menu"
+        className="fixed z-50 min-w-[180px] rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-xl"
+        style={{ left: menuLeft, top: menuTop }}
+        onKeyDown={menuKeyDown}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        {items.map((item) =>
+          item.items ? (
+            <div key={item.label} className="relative">
+              <button
+                type="button"
+                role="menuitem"
+                aria-haspopup="menu"
+                aria-expanded={openSubmenu === item.label}
+                className={itemClass(item.danger)}
+                onMouseEnter={() => setOpenSubmenu(item.label)}
+                onFocus={() => setOpenSubmenu(item.label)}
+                // Pointer hover already opened it; a click must not toggle it
+                // shut again. Escape or an outside click closes the menu.
+                onClick={() => setOpenSubmenu(item.label)}
+              >
+                {item.label}
+                <span aria-hidden="true" className="text-xs opacity-60">
+                  {"\u25b8"}
+                </span>
+              </button>
+              {openSubmenu === item.label ? (
+                <div
+                  role="menu"
+                  aria-label={item.label}
+                  onKeyDown={menuKeyDown}
+                  data-testid="context-submenu"
+                  className={`absolute top-0 min-w-[170px] rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-xl ${
+                    flipSubmenu ? "right-full mr-1" : "left-full ml-1"
+                  }`}
+                >
+                  {item.items.map((subItem) => (
+                    <button
+                      key={subItem.label}
+                      type="button"
+                      role="menuitem"
+                      className={itemClass(subItem.danger)}
+                      onClick={() => {
+                        subItem.onSelect?.();
+                        onClose();
+                      }}
+                    >
+                      <SwatchLabel item={subItem} />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : item.swatches !== undefined ? (
+            <div key={item.label} className="px-2 py-1.5">
+              <span className="mb-1 block text-[10px] uppercase tracking-wide text-[var(--ink-muted)]">
+                {item.label}
+              </span>
+              <ColourStrip
+                label={item.label}
+                testId="context-menu-swatches"
+                options={item.swatches.map((swatch) => ({
+                  label: swatch.label,
+                  light: swatch.swatch?.light ?? "transparent",
+                  dark: swatch.swatch?.dark ?? "transparent",
+                  selected: swatch.swatchSelected === true,
+                  testId: `context-menu-swatch-${swatch.label.toLowerCase().replace(/\s+/g, "-")}`,
+                  onPick: () => {
+                    swatch.onSelect?.();
+                    onClose();
+                  },
+                }))}
+              />
+            </div>
+          ) : item.checked !== undefined ? (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={item.checked}
+              className={itemClass(item.danger)}
+              data-swatch-selected={item.swatchSelected ? "true" : undefined}
+              onClick={() => {
+                item.onSelect?.();
+                onClose();
+              }}
+            >
+              <SwatchLabel item={item} />
+            </button>
+          ) : item.checked !== undefined ? (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={item.checked}
+              className={itemClass(item.danger)}
+              data-swatch-selected={item.swatchSelected ? "true" : undefined}
+              onClick={() => {
+                item.onSelect?.();
+                onClose();
+              }}
+            >
+              <SwatchLabel item={item} />
+            </button>
+          ) : (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              className={itemClass(item.danger)}
+              data-swatch-selected={item.swatchSelected ? "true" : undefined}
+              onClick={() => {
+                item.onSelect?.();
+                onClose();
+              }}
+            >
+              <SwatchLabel item={item} />
+            </button>
+          ),
+        )}
+      </div>
+    </>,
+    document.body,
+  );
+}
+
+/**
+ * A palette quick-pick: the colour, then its name.
+ *
+ * The dot is the swatch's value for the theme in force, read from the same context a card's fill reads. It used to set the
+ * light value as the background and park the dark one in a custom property nothing consumed, so every colour in a menu was
+ * the daylight one at night.
+ */
+function SwatchLabel({ item }: { item: ContextMenuItem }) {
+  const { mode } = useSurfacePaint();
+  if (item.checked !== undefined) {
+    return (
+      <span className="flex min-w-0 items-center gap-2">
+        <span
+          aria-hidden="true"
+          className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors ${
+            item.checked
+              ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]"
+              : "border-[var(--border-strong)] bg-transparent"
+          }`}
+        >
+          {item.checked ? (
+            <svg
+              width="9"
+              height="9"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          ) : null}
+        </span>
+        <span className="truncate">{item.label}</span>
+      </span>
+    );
+  }
+  if (!item.swatch) return <>{item.label}</>;
+  return (
+    <>
+      <span className="flex min-w-0 items-center gap-2">
+        {/* The dot is the colour for the theme in force, resolved by the same context a card's fill reads. It used to
+            paint the light value with the dark one sitting unused in a custom property, so every swatch in a menu was
+            the wrong colour at night. */}
+        <span
+          aria-hidden="true"
+          data-testid="menu-swatch"
+          className="h-3 w-3 shrink-0 rounded-full border border-[var(--hairline)]"
+          style={{ backgroundColor: mode === "dark" ? item.swatch.dark : item.swatch.light }}
+        />
+        <span className="truncate">{item.label}</span>
+      </span>
+      <span aria-hidden="true" className="text-xs opacity-60">
+        {item.swatchSelected ? "\u2713" : ""}
+      </span>
+    </>
+  );
+}

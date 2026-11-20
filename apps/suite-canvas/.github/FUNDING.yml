@@ -1,0 +1,7 @@
+# The funding door this project has.
+#
+# There is no sponsorship account behind this file yet, and a fake sponsor button
+# would be a worse sign than none. What exists is the source, MIT and free, and the
+# intent to leave the door open: point `custom` at whatever page should take money
+# and GitHub will show it without any other change here.
+custom: ["https://github.com/mr-rogers-neighborhood/suite-canvas"]

@@ -1,0 +1,70 @@
+appId: run.suite.budget
+productName: Suite Budget
+executableName: suite-budget
+artifactName: suite-budget-${version}-${arch}.${ext}
+copyright: Copyright © Suite contributors
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - out/**
+  - package.json
+
+asar: true
+
+# The switches an attacker cannot turn back on after packaging.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  # Every page is served from a custom protocol now, so file:// needs no extra privileges.
+  grantFileProtocolExtraPrivileges: false
+
+extraResources:
+  - from: resources
+    to: .
+  # The window's own icon: a desktop entry reads the theme, but `_NET_WM_ICON` — what a
+  # panel draws in the taskbar — comes from `BrowserWindow({ icon })` and nothing else.
+  - from: resources/icon.png
+    to: icon.png
+# The hub discovers an app by the manifest beside its executable, so this lands next to the
+# binary rather than in resources.
+extraFiles:
+  - from: suite.app.json
+    to: suite.app.json
+
+fileAssociations:
+  - ext: budget
+    name: Suite Budget
+    description: A Suite Budget file
+    role: Editor
+    mimeType: application/x-suite-budget
+
+linux:
+  syncDesktopName: true
+  target:
+    - AppImage
+    - deb
+  category: Office
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.finance
+
+win:
+  target:
+    - nsis
+
+# The feed the app's updater reads, and the one the hub reads when a person asks.
+# `latest/download` is a stable redirect to the newest release's assets, so the
+# URL never has to be rewritten per version, and GitHub serves the manifest the
+# updater writes beside the artifacts.
+publish:
+  provider: generic
+  url: https://github.com/mr-rogers-neighborhood/suite-budget/releases/latest/download

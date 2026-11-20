@@ -1,0 +1,44 @@
+{
+  "name": "@suite/start",
+  "version": "0.3.12",
+  "productName": "Suite Start",
+  "desktopName": "suite-start.desktop",
+  "private": true,
+  "description": "The Suite launcher: discovers installed apps from signed manifests, routes suite:// links and files, and starts the right process. It never holds a document.",
+  "type": "module",
+  "bin": {
+    "suite-start-cli": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/stage.mjs",
+    "package:dir": "pnpm build && electron-builder --dir",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@suite/contracts": "workspace:*",
+    "@suite/desktop": "workspace:*",
+    "@suite/host": "workspace:*",
+    "@suite/sync": "workspace:*",
+    "@suite/theme": "workspace:*",
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.5",
+    "electron": "^45.2.2",
+    "electron-builder": "^26.0.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mr-rogers-neighborhood/suite-start.git",
+    "directory": "apps/start"
+  },
+  "main": "./dist/main.js",
+  "author": {
+    "name": "Suite contributors",
+    "email": "maintainers@suite.run"
+  },
+  "license": "MIT"
+}

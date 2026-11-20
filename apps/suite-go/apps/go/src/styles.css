@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/*
+ * `@suite/ui` ships Tailwind class names rather than plain CSS, so Tailwind has to see
+ * them or every class it uses compiles to nothing. Same instruction the package gives
+ * its consumers.
+ */
+@source "../node_modules/@suite/ui/dist";
+
+/*
+ * The palette is not ours. `@suite/theme` publishes every role as `var(--<role>)` on the
+ * root at runtime, so this file names roles and never a colour. The values in between a
+ * fresh launch and the first `applyTheme` are the browser's, which is why `applyTheme`
+ * runs before the first paint.
+ */
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    /* A phone should not rubber-band the whole document; a module scrolls inside. */
+    overscroll-behavior: none;
+  }
+
+  /* System text scaling reaches us through MainActivity's textZoom; this keeps the
+     layout honest when it does, rather than letting a fixed height clip a bigger face. */
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+@layer components {
+  /*
+   * The 44px floor, which is ours rather than the suite's.
+   *
+   * `@suite/ui` sizes buttons `sm | md` for a pointer; on a phone the floor is a thumb.
+   * 44px also takes WCAG 2.5.5 from a AAA gap to met, on the surface where it matters.
+   */
+  .touch {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* The shell's own page frame: padded for the notch, and centred like the desktop card. */
+  .screen {
+    min-height: 100%;
+    padding-block: calc(env(safe-area-inset-top, 0px) + 16px)
+      calc(env(safe-area-inset-bottom, 0px) + 24px);
+    padding-inline: 16px;
+  }
+
+  .module {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .module-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .module-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .scratch {
+    padding: 16px;
+  }
+
+  .scratch-input {
+    width: 100%;
+    min-height: 60vh;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    line-height: 1.5;
+    resize: none;
+  }
+
+  .scratch-input:focus {
+    outline: none;
+  }
+}

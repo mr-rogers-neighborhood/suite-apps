@@ -1,0 +1,38 @@
+/**
+ * `@suite/ui` — the primitives the suite shares.
+ *
+ * Ten exports, chosen because the apps already had most of them separately and had already
+ * drifted: two `Button`s with different variants and different hardcoded ink on a themed paint.
+ *
+ * Every colour is `var(--role)` from `@suite/theme`, never a Tailwind theme name and never a
+ * hex. That is what lets one `Button` work in three apps that extend Tailwind differently and
+ * in a fourth that has no Tailwind at all.
+ *
+ * ## Consuming this
+ *
+ * 1. Add the package at a tag, like `@suite/contracts`.
+ * 2. Teach Tailwind to scan it, or every class compiles to nothing:
+ *
+ *    ```css
+ *    @source "../../node_modules/@suite/ui/dist";
+ *    ```
+ *
+ * 3. React 19 is a peer, not a dependency.
+ */
+export { AppMark } from "./AppMark.js";
+export { Button } from "./Button.js";
+export { cx } from "./cx.js";
+export { Dialog } from "./Dialog.js";
+export { EmptyState } from "./EmptyState.js";
+export { Field } from "./Field.js";
+export { IconButton } from "./IconButton.js";
+export { ImportMenu } from "./ImportMenu.js";
+export { Launch, } from "./Launch.js";
+export { Modal } from "./Modal.js";
+export { MenuBar } from "./menu/MenuBar.js";
+export { focusFirstMenuItem, handleMenuBarKeyDown, menuBarKeyDown, menuItemsIn, menuKeyDown, } from "./menu/menuKeys.js";
+export { SyncPill } from "./menu/SyncPill.js";
+export { PRIVACY_SENTENCE, PrivacyLine } from "./PrivacyLine.js";
+export { Toast } from "./Toast.js";
+export { EDGE, FOCUS_RING, INK, INK_ON, PRESSABLE, SURFACE } from "./tokens.js";
+//# sourceMappingURL=index.js.map

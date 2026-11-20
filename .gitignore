@@ -1,0 +1,9 @@
+node_modules/
+.pnpm-store/
+.turbo/
+.dev/
+release/
+out/
+dist/
+*.log
+.DS_Store

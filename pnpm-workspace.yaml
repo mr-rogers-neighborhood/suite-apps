@@ -1,0 +1,29 @@
+packages:
+  - "apps/*"
+  - "apps/*/apps/*"
+  - "apps/*/packages/*"
+  - "apps/*/e2e"
+  - "harness"
+
+# The imported repositories were written against sibling checkouts and git tags.
+# Their dependencies now point at workspace packages, so a local edit is always
+# the one that builds.
+linkWorkspacePackages: true
+
+allowBuilds:
+  esbuild: true
+  electron: true
+  # Only electron-builder's Windows target reaches this, and the Suite does not
+  # build Windows artifacts here.
+  electron-winstaller: false
+
+overrides:
+  lodash-es: ^4.18.1
+  qs: ^6.17.0
+  nanoid@3: 3.3.20
+  nanoid@4: 5.1.16
+  katex: ^0.18.2
+
+patchedDependencies:
+  loro-prosemirror@0.4.4: apps/suite-canvas/patches/loro-prosemirror@0.4.4.patch
+  "@stryker-mutator/vitest-runner@10.0.0": apps/suite-canvas/patches/@stryker-mutator__vitest-runner@10.0.0.patch

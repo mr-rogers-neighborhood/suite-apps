@@ -1,0 +1,271 @@
+import type { SuiteReleaseChannel } from "@suite/contracts";
+import type { ReportedUpdate } from "./reportedUpdate.js";
+
+/**
+ * What the hub window asks the main process for.
+ *
+ * Same discipline as the Canvas bridge: no method takes a path it wants written,
+ * and every one is a capability the main process chooses to grant. `addApp` runs
+ * a file picker in main, so the renderer never learns a directory it could point
+ * somewhere else.
+ */
+
+export const START_IPC = {
+  listApps: "suite:start:list",
+  launch: "suite:start:launch",
+  addApp: "suite:start:add",
+  removeApp: "suite:start:remove",
+  installApp: "suite:start:install",
+  uninstallApp: "suite:start:uninstall",
+  rollbackApp: "suite:start:rollback",
+  setTheme: "suite:start:theme",
+  revealApp: "suite:start:reveal",
+  recents: "suite:start:recents",
+  forgetRecent: "suite:start:forget",
+  openFile: "suite:start:open-file",
+  checkUpdates: "suite:start:check-updates",
+  startSync: "suite:start:sync-start",
+  stopSync: "suite:start:sync-stop",
+  setSyncScope: "suite:start:sync-scope",
+  info: "suite:start:info",
+} as const;
+
+/** Pushed rather than invoked: the window redraws from what arrives here. */
+export const START_CHANGED = "suite:start:changed";
+
+/**
+ * Pushed while an install runs, and only then.
+ *
+ * A whole `LauncherState` carries an index of every document on this machine, which is
+ * far too much to send per downloaded chunk; this is the one thing that changes while a
+ * bar moves.
+ */
+export const START_INSTALL_PROGRESS = "suite:start:install-progress";
+
+export type StartChannel = (typeof START_IPC)[keyof typeof START_IPC];
+
+/**
+ * Which mode the window draws.
+ *
+ * Declared here rather than in `theme.ts` because the page imports this module and that one
+ * reads the filesystem. `theme.ts` owns the rules; this owns the vocabulary.
+ *
+ * `system` is a *choice*, not a mode: by the time a value reaches the page it has been
+ * resolved against the desktop, so a stylesheet never sees it.
+ */
+export type ThemeSource = "system" | "light" | "dark";
+
+/** What a person chose: a preset, and how bright to draw it. */
+export interface ThemeChoice {
+  /** The preset's id, from `@suite/theme`. */
+  readonly preset: string;
+  readonly mode: ThemeSource;
+}
+
+/** One entry in the picker. The colours are not here: `themeValues` carries the chosen one. */
+export interface ThemeOption {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string | null;
+}
+
+/**
+ * The chosen theme, already resolved.
+ *
+ * The page cannot import `@suite/theme` — it is plain ES modules served over `start://` with
+ * no bundler — so main does the resolving and sends the answer. That keeps the renderer
+ * dependency-free and puts the one place that knows how a preset becomes CSS in the process
+ * that already imports the package.
+ */
+export interface ResolvedTheme {
+  readonly choice: ThemeChoice;
+  /** The preset list, for the picker. */
+  readonly options: readonly ThemeOption[];
+  /** The resolved mode, never `system`. */
+  readonly mode: "light" | "dark";
+  /** Every role as a custom property, ready for `style.setProperty`. */
+  readonly values: Readonly<Record<string, string>>;
+}
+
+/** Whether an install can be launched, and why not when it cannot. */
+export type AppHealth = { readonly ok: true } | { readonly ok: false; readonly reason: string };
+
+/**
+ * What a card is offering, in the four honest states and the two corners around them.
+ *
+ * `local` is the app a person built themselves: D44 makes it first-class, so it is not
+ * a lesser card — it simply is not in the suite's catalogue, and this hub has no feed to
+ * offer it versions from. `refused` is an install that cannot be launched.
+ */
+export type AppCardState =
+  | "not-installed"
+  | "no-release"
+  | "update-available"
+  | "current"
+  | "local"
+  | "refused";
+
+/** How one install is going, for the bar that replaces its button. */
+export interface InstallProgress {
+  readonly id: string;
+  readonly phase: "downloading" | "placed" | "failed";
+  /** Bytes written so far. Zero unless something is being downloaded. */
+  readonly received: number;
+  /** Bytes the feed said to expect, or null when it did not say. */
+  readonly total: number | null;
+  /** What went wrong, in the same words the card will show. */
+  readonly reason: string | null;
+}
+
+/** One app card, installed, offered, or refused. */
+export interface AppCard {
+  /** Null for a refused install with no record, because there is nothing to act on. */
+  readonly id: string | null;
+  readonly name: string;
+  /** The app's own mark, as a data URI, when the hub knows one. */
+  readonly icon: string | null;
+  readonly state: AppCardState;
+  /** The version installed here, or null when this machine does not have it. */
+  readonly version: string | null;
+  /** The version the feed offers, when one verified. */
+  readonly available: string | null;
+  /** Why no version is offered, when none is. */
+  readonly reason: string | null;
+  /** Where a newer build can be fetched by hand, when this app cannot fetch it itself. */
+  readonly releases: string | null;
+  /** How many versions of this app are on disk here. */
+  readonly versions: number;
+  /**
+   * The version a rollback would return to, or null when there is nothing to go back to.
+   *
+   * Only ever a version already on this machine. It is offered, never taken automatically:
+   * going back is a decision, and a hub that silently reverted an update would be doing the
+   * thing this card exists to make visible.
+   */
+  readonly previousVersion: string | null;
+  /**
+   * Whether the process Start started is still alive.
+   *
+   * Only ever true for an app Start launched this session: a window opened from the menu
+   * is not this process's child, and guessing otherwise would be a claim nobody made.
+   */
+  readonly running: boolean;
+  readonly channel: SuiteReleaseChannel;
+  /** What the app says about its own updating, or `unknown` before it has asked. */
+  readonly update: ReportedUpdate;
+  readonly executable: string | null;
+  readonly fileExtensions: readonly string[];
+  readonly lastOpenedAt: number | null;
+  /** How many documents the index found in this app's folder. */
+  readonly fileCount: number;
+  readonly health: AppHealth;
+}
+
+/** One file the index found, with the app that claims it. */
+export interface FileCard {
+  readonly path: string;
+  readonly name: string;
+  readonly appId: string;
+  readonly appName: string;
+  readonly folder: string;
+  readonly modifiedAt: number;
+  readonly installed: boolean;
+  /** The link that opens this document in its app, when its name survives one. */
+  readonly link: string | null;
+}
+
+/** One recent file. */
+export interface RecentCard {
+  readonly path: string;
+  readonly name: string;
+  readonly appId: string;
+  readonly appName: string;
+  readonly openedAt: number;
+}
+
+/** A refused install, shown so a broken app is visible rather than absent. */
+export interface RefusedInstall {
+  readonly path: string;
+  readonly reason: string;
+}
+
+/** What Start knows about itself, for the Settings pane. */
+/**
+ * One installed app, and every place it keeps something.
+ *
+ * The point of the list is that a person can leave: knowing where the binary, the
+ * machine-local state and the documents are is what makes "uninstall this" a decision
+ * rather than a leap. Nothing here is new — these are the same paths `@suite/contracts`
+ * defines and the app itself resolves — and that is the point of showing them.
+ */
+export interface AppLocation {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  /** The binary Start launches, as the install record names it. */
+  readonly executable: string;
+  /** `~/Documents/Suite/<App>`, where this app's files are. */
+  readonly documents: string;
+  /** The per-user directory for machine-local state. Never beside a document. */
+  readonly data: string;
+}
+
+export interface StartSettings {
+  readonly dataDirectory: string;
+  readonly documentsRoot: string;
+  readonly installRoots: readonly string[];
+  /** Where each app Start can see keeps its things. Empty before anything is installed. */
+  readonly locations: readonly AppLocation[];
+  /** Which palette the window draws, and how bright. */
+  readonly theme: ResolvedTheme;
+}
+
+export interface LauncherState {
+  readonly apps: readonly AppCard[];
+  readonly recents: readonly RecentCard[];
+  readonly files: readonly FileCard[];
+  readonly settings: StartSettings;
+  readonly version: string;
+  /** The relay this machine runs, and what it is holding. */
+  readonly sync: SyncState;
+  /** Installs running right now, so a window that opens mid-install still sees the bar. */
+  readonly installing: readonly InstallProgress[];
+  /**
+   * Launches that did not work, by app id, since this window opened.
+   *
+   * A card with a sentence here is telling the person why the window they expected never
+   * appeared, which is the one thing a launcher can say that a file manager cannot.
+   */
+  readonly launchErrors: Readonly<Record<string, string>>;
+  /** The hub's own row, which it can show but cannot act on. */
+  readonly self: AppCard | null;
+}
+
+/** What the Sync pane shows. No document content, because the host has none. */
+export interface SyncState {
+  readonly running: boolean;
+  readonly scope: "loopback" | "network";
+  readonly address: string | null;
+  readonly port: number;
+  readonly workspaces: readonly SyncWorkspace[];
+}
+
+export interface SyncWorkspace {
+  readonly workspaceId: string;
+  readonly frames: number;
+  readonly newestEpoch: number | null;
+  readonly members: readonly SyncMember[];
+  /**
+   * Whether any app on this machine kept a way back in for this workspace.
+   *
+   * Read from the apps' own reports, not from the host: the hub carries frames and cannot
+   * know what a device saved, and a pane that guessed would be worse than one that is quiet.
+   */
+  readonly recovery: "made" | "declined" | "none";
+}
+
+export interface SyncMember {
+  readonly deviceId: string;
+  readonly name: string;
+  readonly role: "owner" | "editor" | "viewer" | null;
+}

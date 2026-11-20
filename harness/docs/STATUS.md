@@ -1,0 +1,37 @@
+# Status
+
+What works, per subsystem. "Working" means a test fails if it breaks.
+
+Last reviewed 2026-11-18, at Suite Start 0.3.12.
+
+| Subsystem                 | State     | Notes                                                                                                                                                                                                                                      |
+| ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Install                   | Working   | Signed feed, fingerprint check, binary placed, menu entry written.                                                                                                                                                                         |
+| Update                    | Working   | A card offers the feed's version; pressing it replaces and relaunches. An app that keeps a tray now hands over to the newer copy instead of losing the single-instance race and showing its old window.                                    |
+| Rollback                  | Working   | One step back, from disk, no download.                                                                                                                                                                                                     |
+| Uninstall                 | Working   | Versions, entry, icon and record removed. Documents are not touched.                                                                                                                                                                       |
+| Icons                     | Working   | Each app's own artwork, at 256 px, in the hicolor theme.                                                                                                                                                                                   |
+| Routing                   | Working   | `suite://` links and document files open the owning app.                                                                                                                                                                                   |
+| Document index            | Working   | Lists documents without importing any app's code.                                                                                                                                                                                          |
+| Sync: protocol, transport | Working   | Encrypted frames through a blind relay.                                                                                                                                                                                                    |
+| Sync: invite and join     | Missing   | Adding a device is a CLI step.                                                                                                                                                                                                             |
+| Sync: headless relay      | Working   | Built and signed as one artifact, installed by a systemd unit, started with no display, and two devices converge through it with document content absent from its store. Its signature is a development key until the release key is used. |
+| Sync in the apps          | Partial   | Canvas syncs. Planner and Budget do not yet.                                                                                                                                                                                               |
+| Packs: a real domain      | Working   | Planner installs as a signed pack and runs in Suite Go without the container learning a domain name: create, edit, leave, return, and a cold start all keep the document.                                                                  |
+| Start screens             | Working   | One centred card, `Launch`, in all four apps. The three apps show it only on a first run.                                                                                                                                                  |
+| Accessibility             | Partial   | Colour and the start screens are gated by machine. No manual pass has been run yet; the map says which criteria that leaves unverified.                                                                                                    |
+| App features              | Alpha     | Canvas is furthest along. Each app's README says what it has.                                                                                                                                                                              |
+| macOS and Windows         | Not built | No signing identity, so nothing is published.                                                                                                                                                                                              |
+| Standalone app installs   | Not built | Apps currently arrive through Start.                                                                                                                                                                                                       |
+| The gate                  | Working   | Local, in three parts: a pre-push hook per repository, `scripts/ci.mjs` across all seven, and `--fresh` to prove a commit rather than a working tree. No CI service; see ADR-0002.                                                         |
+
+Missing and Not built are listed so their absence is not a surprise rather than a discovery.
+
+The gate being local is a decision, not a gap. What it costs: nothing checks a pull request, and
+nothing runs overnight. What it buys: the evidence is a command you can run, and it cannot be
+"skipped because the account lapsed".
+
+## Where things are
+
+Suite Start's Settings pane lists the binary, documents folder and data directory for each app.
+Those are the same paths the apps resolve, so the list cannot drift.

@@ -1,0 +1,91 @@
+/* Link routes (ADR-0052). Kept apart from global.css so the route work and the
+   paint work never edit the same file. */
+
+/* Links that asked to paint above the cards. React Flow has one edge layer, so
+   an edge with `layer: "above"` is drawn here instead of being raised in place.
+   Above the nodes, below the section grips, which only exist while selected. */
+.above-link-layer {
+  position: absolute;
+  inset: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.above-link {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  pointer-events: none;
+}
+
+.above-link.is-selected,
+.above-link-group.is-selected .above-link {
+  stroke: var(--accent-strong, var(--accent));
+  stroke-width: 2.2;
+}
+
+/* The hit stroke is wide and invisible: a 1.6px line is not a target. */
+.above-link__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 20;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+/* ----------------------------------------------------------------- the route */
+
+/* A bend is a drag handle inside the edge's own SVG group. The group inherits
+   `pointer-events: visibleStroke` from React Flow's edge wrapper, so the circle
+   has to ask for the pointer itself or the stroke around it wins. */
+.route-bend {
+  fill: var(--surface, #fff);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+  cursor: grab;
+}
+
+.route-bend:hover,
+.route-bend:focus-visible {
+  fill: var(--accent);
+}
+
+/* Isolate (ADR-0052 §7): everything but the chosen link recedes. The link
+   inspector sets `data-isolate-edge` on <body>, because the cards, sections and
+   section links belong to surfaces a route does not own and a class inside the
+   inspector's subtree cannot reach them. */
+body[data-isolate-edge] .node-card,
+body[data-isolate-edge] .section-region,
+body[data-isolate-edge] .section-header {
+  opacity: var(--lens-dim-opacity);
+}
+
+body[data-isolate-edge] .route-edge.is-dimmed .react-flow__edge-path,
+body[data-isolate-edge] .route-edge.is-dimmed .edge-description,
+body[data-isolate-edge] .above-link-group.is-dimmed .above-link {
+  opacity: var(--lens-dim-opacity);
+}
+
+/* A dashed or dotted link animates along its own path (ADR-0051 §6): the pattern
+   travels one full repeat per cycle, so the loop has no seam. `reverse` is the
+   explicit exception, and the default flow is source to target. */
+@keyframes link-dash {
+  to {
+    stroke-dashoffset: calc(-1 * var(--link-dash-cycle, 12));
+  }
+}
+
+/* The march of a dashed or dotted link is motion, not a colour change: a reader
+   who asked for reduced motion sees the pattern hold still. The painter sets
+   `animation` inline on the stroke, so this has to outrank an inline style. */
+@media (prefers-reduced-motion: reduce) {
+  .route-edge .react-flow__edge-path,
+  .above-link {
+    /* biome-ignore lint/complexity/noImportantStyles: the painter sets `animation` inline, so only `!important` outranks it */
+    animation: none !important;
+  }
+}

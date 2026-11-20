@@ -1,0 +1,16 @@
+{
+  "name": "suite-apps",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The Suite: a local-first hub, apps and sync server in one workspace.",
+  "license": "MIT",
+  "packageManager": "pnpm@12.17.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "pnpm -r --workspace-concurrency=1 run check",
+    "format": "pnpm -r --workspace-concurrency=1 run format",
+    "build": "pnpm -r --workspace-concurrency=1 run build"
+  }
+}

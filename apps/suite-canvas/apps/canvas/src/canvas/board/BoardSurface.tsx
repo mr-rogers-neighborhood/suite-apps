@@ -1,0 +1,892 @@
+import { type LayoutPlan, proposeReflowPlan, type Rect, sectionsAt } from "@suite/graph";
+import type { Node, NodeChange, NodePositionChange } from "@xyflow/react";
+import { Background, ConnectionMode, ReactFlow, SelectionMode, useStore } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { useCallback, useRef, useState } from "react";
+import { portalTargetId } from "../../cards/portal";
+import { useUiStore } from "../../store/useUiStore";
+import { useViewsStore } from "../../store/viewsStore";
+import { edgeTypes } from "../EdgeDescription";
+import { DEFAULT_CARD_HEIGHT, DEFAULT_CARD_WIDTH } from "../interactions/multiSelect";
+import { AboveLinkLayer } from "../links/AboveLinkLayer";
+import { useLinkThreadStore } from "../links/linkThread";
+import { SectionLinkLayer } from "../links/SectionLinkLayer";
+import { LocalDragEase, prefersReducedMotion } from "../localEasing";
+import { COLLAPSED_CARD_HEIGHT } from "../nodeData";
+import { PeerLibraryDragLayer } from "../PeerLibraryDragLayer";
+import { pickCard } from "../pickCard";
+import { PeerReconnectLayer } from "../presence/PeerReconnectLayer";
+import { PresenceLayer } from "../presence/PresenceLayer";
+import { SnapGuideLayer } from "../SnapGuideLayer";
+import { SectionLayer } from "../sections/SectionLayer";
+import { type SnapGuide, type SnapRect, snapRect } from "../snapping";
+import { ZOOM_MAX, ZOOM_MIN } from "../zoomRange";
+import {
+  type CommittedMove,
+  canvasNodeTypes,
+  DRAG_THROTTLE_MS,
+  FIT_MAX_ZOOM,
+  isEditorTarget,
+  samePointMap,
+  sameRectMap,
+  useArrowMovement,
+} from "./boardSupport";
+import { CanvasControls } from "./CanvasControls";
+import { SelectionOutline } from "./SelectionOutline";
+import type { useBoardCamera } from "./useBoardCamera";
+import type { useBoardCommands } from "./useBoardCommands";
+import type { useBoardLinks } from "./useBoardLinks";
+import type { useBoardNodes } from "./useBoardNodes";
+import type { useBoardProjection } from "./useBoardProjection";
+import type { useBoardRefs } from "./useBoardRefs";
+import type { useBoardSections } from "./useBoardSections";
+import type { useBoardSelection } from "./useBoardSelection";
+import type { useBoardUi } from "./useBoardUi";
+import { useDragFollow } from "./useDragFollow";
+import { usePaneDoubleClick } from "./usePaneDoubleClick";
+import { useSelectionExtent } from "./useSelectionExtent";
+
+type BoardSurfaceProps = {
+  ui: ReturnType<typeof useBoardUi>;
+  refs: ReturnType<typeof useBoardRefs>;
+  projection: ReturnType<typeof useBoardProjection>;
+  sections: ReturnType<typeof useBoardSections>;
+  nodesApi: ReturnType<typeof useBoardNodes>;
+  selection: ReturnType<typeof useBoardSelection>;
+  links: ReturnType<typeof useBoardLinks>;
+  camera: ReturnType<typeof useBoardCamera>;
+  commands: ReturnType<typeof useBoardCommands>;
+};
+
+/**
+ * The React Flow surface and everything drawn inside it. It owns no state: every
+ * value and handler arrives from the board's hooks, so a layer can be read on its
+ * own without knowing how the board works.
+ */
+export function BoardSurface({
+  ui,
+  refs,
+  projection,
+  sections,
+  nodesApi,
+  selection,
+  links,
+  camera,
+  commands,
+}: BoardSurfaceProps) {
+  const {
+    workspace,
+    activeBoardId,
+    peers,
+    setDragging,
+    selectedSectionIds,
+    presenting,
+    editingSectionId,
+    setEditingSection,
+    selectedEdgeIds,
+    setSelectedEdgeIds,
+    setSelectedConnector,
+    setSectionDragPresence,
+    openContextMenu,
+    canEditContent,
+    canEditLayout,
+    locked,
+    canCreateContent,
+    canManageTrash,
+    canManageStructure,
+    screenToFlowPosition,
+    recordBoardViewport,
+    openCardFocus,
+    selectedNodeIds,
+  } = ui;
+  const {
+    locallyDraggingIds,
+    draggedNodeIds,
+    lastDragSent,
+    marqueeActive,
+    marqueeScope,
+    marqueeTakesCards,
+    marqueeBox,
+    marqueePress,
+    localEase,
+    sectionLinkSelection,
+    previewDisplacedCards,
+  } = refs;
+  const {
+    cardsById,
+    boardSections,
+    projectedLinks,
+    sectionMembershipMap,
+    boardPlacements,
+    boardPlacementList,
+  } = projection;
+  const {
+    selectedSectionConnector,
+    setSelectedSectionConnector,
+    sectionOffsetsMap,
+    sectionResizes,
+    dimmedSectionIds,
+    handleSelectSection,
+    handleSectionDrag,
+    handleSectionDragEnd,
+    handleSectionResize,
+    handleSectionResizeEnd,
+    handleSectionRename,
+    shrinkSectionToFit,
+    toggleSectionShrinkToFit,
+  } = sections;
+  const {
+    nodes,
+    edges,
+    setNodes,
+    onNodesChange,
+    onEdgesChange,
+    liveSelectedIds,
+    applyBoardNodes,
+    stopLocalEase,
+    runLocalEase,
+  } = nodesApi;
+  const { endMarquee } = selection;
+  const {
+    threadStepAt,
+    revealState,
+    startEdgeDescription,
+    resolveLinkTarget,
+    onSectionLinkCommit,
+    onConnect,
+    onConnectStart,
+    onConnectEnd,
+    onReconnect,
+    onReconnectStart,
+    onReconnectStop,
+  } = links;
+  const { enterPortal, readCameraGesture, gestureStartZoom, zoomToSelection } = camera;
+  const { commitDrop, createNoteAt } = commands;
+
+  /**
+   * The boxes this drag may snap to, captured when it starts. Other cards do not
+   * move during a local drag, so one snapshot is enough and the guides cannot
+   * chase a card that is being dragged by a peer.
+   */
+  const snapOthers = useRef<SnapRect[]>([]);
+  /** The last position the snapper chose, so the drop commits exactly what was drawn. */
+  const lastSnapped = useRef<{ id: string; x: number; y: number } | null>(null);
+
+  const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
+  const snapGuideKey = useRef("");
+
+  /** Section bounds expanded dynamically during a live drag gesture. */
+  const [previewSectionResizes, setPreviewSectionResizes] = useState<Map<string, Rect>>(new Map());
+  const lastPreviewTick = useRef(0);
+  const lastDragEndedAt = useRef(0);
+  const arrowMoving = useArrowMovement();
+
+  const publishGuides = useCallback((guides: SnapGuide[]) => {
+    const key = guides
+      .map((guide) => `${guide.axis}:${guide.at}:${guide.start}:${guide.end}`)
+      .join("|");
+    if (key === snapGuideKey.current) return;
+    snapGuideKey.current = key;
+    setSnapGuides(guides);
+  }, []);
+
+  const boxes = useCallback(
+    (excluded: ReadonlySet<string>): SnapRect[] =>
+      [...ui.store.getState().nodeLookup.values()].flatMap((node) => {
+        const position = node.internals.positionAbsolute;
+        if (excluded.has(node.id)) return [];
+        if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return [];
+        return [
+          {
+            x: position.x,
+            y: position.y,
+            width: node.measured?.width ?? node.width ?? DEFAULT_CARD_WIDTH,
+            height: node.measured?.height ?? node.height ?? DEFAULT_CARD_HEIGHT,
+          },
+        ];
+      }),
+    [ui.store],
+  );
+
+  const sizeOf = useCallback(
+    (id: string) => {
+      const isCollapsed = useUiStore.getState().collapsedCards[id] === true;
+      const node = ui.store.getState().nodeLookup.get(id);
+      return {
+        width: node?.measured?.width ?? node?.width ?? DEFAULT_CARD_WIDTH,
+        height: isCollapsed
+          ? COLLAPSED_CARD_HEIGHT
+          : (node?.measured?.height ?? node?.height ?? DEFAULT_CARD_HEIGHT),
+      };
+    },
+    [ui.store],
+  );
+
+  const getCardSizes = useCallback(() => {
+    const lookup = ui.store.getState().nodeLookup;
+    const collapsedCards = useUiStore.getState().collapsedCards;
+    const sizes = new Map<string, { width: number; height: number }>();
+    for (const [id, node] of lookup) {
+      const isCollapsed = collapsedCards[id] === true;
+      const w = node.measured?.width ?? node.width;
+      const h = isCollapsed ? COLLAPSED_CARD_HEIGHT : (node.measured?.height ?? node.height);
+      if (w !== undefined && h !== undefined) sizes.set(id, { width: w, height: h });
+    }
+    return sizes;
+  }, [ui.store]);
+
+  const createCardOnPane = useCallback(
+    (client: { x: number; y: number }) => createNoteAt(screenToFlowPosition(client)),
+    [createNoteAt, screenToFlowPosition],
+  );
+
+  const applyReflowPreview = useCallback(
+    (plan: LayoutPlan | null, activeCardId: string) => {
+      if (plan) {
+        const nextDisplaced = new Map<string, { x: number; y: number }>();
+        for (const p of plan.placements) {
+          if (p.cardId !== activeCardId) nextDisplaced.set(p.cardId, { x: p.x, y: p.y });
+        }
+
+        if (!samePointMap(previewDisplacedCards.current, nextDisplaced)) {
+          previewDisplacedCards.current = nextDisplaced;
+          setNodes((current) =>
+            current.map((entry) => {
+              if (entry.id === activeCardId) return entry;
+              const displaced = nextDisplaced.get(entry.id);
+              if (displaced) {
+                const base = entry.className?.replace("is-reflow-displaced", "").trim();
+                const className = `${base ? `${base} ` : ""}is-reflow-displaced`;
+                return { ...entry, position: displaced, className };
+              }
+              if (entry.className?.includes("is-reflow-displaced")) {
+                const original = boardPlacements.get(entry.id);
+                const cleaned = entry.className.replace("is-reflow-displaced", "").trim();
+                const { className: _omitted, ...rest } = entry;
+                return {
+                  ...rest,
+                  position: original ? { x: original.x, y: original.y } : entry.position,
+                  ...(cleaned ? { className: cleaned } : {}),
+                };
+              }
+              return entry;
+            }),
+          );
+        }
+
+        const nextSec = new Map<string, Rect>();
+        if (plan.sections) {
+          for (const s of plan.sections) {
+            nextSec.set(s.sectionId, { x: s.x, y: s.y, width: s.width, height: s.height });
+          }
+        }
+        if (!sameRectMap(previewSectionResizes, nextSec)) {
+          setPreviewSectionResizes(nextSec);
+        }
+      } else {
+        if (previewDisplacedCards.current.size > 0) {
+          previewDisplacedCards.current.clear();
+          setNodes((current) =>
+            current.map((entry) => {
+              if (entry.id === activeCardId) return entry;
+              if (entry.className?.includes("is-reflow-displaced")) {
+                const original = boardPlacements.get(entry.id);
+                const cleaned = entry.className.replace("is-reflow-displaced", "").trim();
+                const { className: _omitted, ...rest } = entry;
+                return {
+                  ...rest,
+                  position: original ? { x: original.x, y: original.y } : entry.position,
+                  ...(cleaned ? { className: cleaned } : {}),
+                };
+              }
+              return entry;
+            }),
+          );
+        }
+        if (previewSectionResizes.size > 0) {
+          setPreviewSectionResizes(new Map());
+        }
+      }
+    },
+    [boardPlacements, previewDisplacedCards, previewSectionResizes, setNodes],
+  );
+
+  const settleReflowPreview = useCallback(() => {
+    if (previewDisplacedCards.current.size > 0) {
+      previewDisplacedCards.current.clear();
+      setNodes((current) =>
+        current.map((entry) => {
+          if (entry.className?.includes("is-reflow-displaced")) {
+            const cleaned = entry.className.replace("is-reflow-displaced", "").trim();
+            const { className: _omitted, ...rest } = entry;
+            return {
+              ...rest,
+              position: entry.position,
+              ...(cleaned ? { className: cleaned } : {}),
+            };
+          }
+          return entry;
+        }),
+      );
+    }
+    if (previewSectionResizes.size > 0) {
+      setPreviewSectionResizes(new Map());
+    }
+  }, [previewDisplacedCards, previewSectionResizes, setNodes]);
+
+  usePaneDoubleClick({
+    store: ui.store,
+    // A locked canvas is a picture to move: a double-click on the pane must not leave a
+    // new card behind in the middle of what the reader was only looking at.
+    enabled: canCreateContent && activeBoardId !== null && !locked,
+    onDoubleClick: createCardOnPane,
+  });
+
+  /**
+   * One commit per position React Flow decides without a drag: the arrow keys
+   * move the focused selection and report it as a position change, and no drag
+   * stop ever follows, so a move that is only painted here is lost on reload.
+   * A pointer drag owns its own commit (`onNodeDragStop`) and is skipped by the
+   * open-session guard, which also covers the final `dragging: false` sample
+   * React Flow sends just before it calls that handler.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: gesture refs are stable
+  const changeNodes = useCallback(
+    (changes: NodeChange<Node>[]) => {
+      // Check for node resizing events and update live reflow preview
+      for (const change of changes) {
+        if (change.type === "dimensions") {
+          if (change.resizing && activeBoardId) {
+            const nowMs = performance.now();
+            if (nowMs - lastPreviewTick.current > 24) {
+              lastPreviewTick.current = nowMs;
+              const node = ui.store.getState().nodeLookup.get(change.id);
+              const posChange = changes.find(
+                (c): c is NodePositionChange => c.type === "position" && c.id === change.id,
+              );
+              const targetPos = posChange?.position ?? (node ? node.position : { x: 0, y: 0 });
+              const targetSize = change.dimensions ?? sizeOf(change.id);
+              const plan = proposeReflowPlan({
+                boardId: activeBoardId,
+                targetCardId: change.id,
+                targetPosition: targetPos,
+                targetSize,
+                placements: boardPlacementList,
+                sections: boardSections,
+                cardSizes: getCardSizes(),
+              });
+              applyReflowPreview(plan, change.id);
+            }
+          } else if (change.resizing === false) {
+            settleReflowPreview();
+          }
+        }
+      }
+
+      // A single-card drag snaps to the board's other edges and centres. A
+      // multi-card drag is deliberately left alone: snapping the group to one
+      // member's line would move the other members apart.
+      const dragAnchor =
+        draggedNodeIds.current.length === 1 ? draggedNodeIds.current[0] : undefined;
+      const applied = dragAnchor
+        ? changes.map((change) => {
+            if (change.type !== "position" || !change.position || change.id !== dragAnchor) {
+              return change;
+            }
+            const snap = snapRect({
+              position: change.position,
+              size: sizeOf(dragAnchor),
+              others: snapOthers.current,
+            });
+            lastSnapped.current = { id: dragAnchor, ...snap.position };
+            publishGuides(snap.guides);
+            return { ...change, position: snap.position };
+          })
+        : changes;
+      onNodesChange(applied);
+      if (
+        draggedNodeIds.current.length > 0 ||
+        locallyDraggingIds.current.size > 0 ||
+        performance.now() - lastDragEndedAt.current < 400 ||
+        !arrowMoving.current
+      ) {
+        return;
+      }
+      const moved = changes.filter(
+        (change): change is CommittedMove =>
+          change.type === "position" && change.position !== undefined && change.dragging !== true,
+      );
+      if (moved.length === 0) return;
+      // The internal node carries the measured box the drop's section check
+      // needs; the change carries the position React Flow just committed.
+      const dropped: Node[] = moved.flatMap((change) => {
+        const node = ui.store.getState().nodeLookup.get(change.id);
+        return node ? [{ ...node, position: change.position }] : [];
+      });
+      if (dropped.length > 0) commitDrop(dropped);
+    },
+    [
+      activeBoardId,
+      applyReflowPreview,
+      boardPlacementList,
+      boardSections,
+      commitDrop,
+      draggedNodeIds,
+      getCardSizes,
+      locallyDraggingIds,
+      onNodesChange,
+      publishGuides,
+      settleReflowPreview,
+      sizeOf,
+      ui.store,
+    ],
+  );
+
+  // The camera scale, for the outline's constant-width edge and its label.
+  const zoom = useStore((state) => state.transform[2]);
+
+  const dragFollow = useDragFollow({
+    sections: boardSections,
+    selectedSectionIds,
+    draggedNodeIds,
+    setSectionDragPresence,
+  });
+
+  const extent = useSelectionExtent({
+    lookup: ui.store.getState().nodeLookup,
+    sections: boardSections,
+    offsets: sectionOffsetsMap,
+    resizes: sectionResizes,
+    selectedNodeIds,
+    selectedSectionIds,
+    selectedEdgeIds,
+    links: [...projectedLinks.flow, ...projectedLinks.sections, ...projectedLinks.above],
+  });
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={changeNodes}
+      onEdgesChange={onEdgesChange}
+      nodeTypes={canvasNodeTypes}
+      edgeTypes={edgeTypes}
+      // Unmount nodes and edges outside the viewport. React Flow keeps measured
+      // sizes and handle bounds for unmounted nodes, so edges still route and
+      // connectors remeasure when a card scrolls back in.
+      onlyRenderVisibleElements
+      fitView
+      fitViewOptions={{ maxZoom: FIT_MAX_ZOOM }}
+      // The camera reaches far enough out to read a whole board and far enough
+      // in to work on one card. Presenting is unclamped, because a tour step
+      // asks for the viewport that frames what it is talking about
+      // (ADR-0051 §9).
+      minZoom={presenting ? 0 : ZOOM_MIN}
+      maxZoom={presenting ? Number.POSITIVE_INFINITY : ZOOM_MAX}
+      deleteKeyCode={null}
+      // Double-clicking empty canvas creates a card (see `usePaneDoubleClick`),
+      // so the same gesture cannot also zoom. Wheel, pinch and the controls
+      // still own zoom.
+      zoomOnDoubleClick={false}
+      // Selection, panning, zoom and the inspector stay for every role.
+      // Layout writes follow the session capabilities: an editor share may
+      // move and reconnect what exists, but never draw a new link.
+      // Locked is the reader's own choice on top of the role: the capability says what
+      // may be written, the lock says "not while I am looking at the shape of this".
+      nodesDraggable={canEditLayout && !locked}
+      nodesConnectable={canCreateContent && !locked}
+      edgesReconnectable={canEditLayout && !locked}
+      // Panning and zooming stay: a locked canvas is the one you drag around to see the
+      // whole picture. Selection goes with the drag, so a box cannot arm a move either.
+      elementsSelectable={!locked}
+      // Shift, Ctrl and Cmd all toggle membership; Shift also starts the
+      // marquee (React Flow's `selectionKeyCode` default). `Partial` selects a
+      // card the box merely touches, which is what a card board should do.
+      multiSelectionKeyCode={["Meta", "Control", "Shift"]}
+      selectionMode={SelectionMode.Partial}
+      onSelectionStart={() => {
+        marqueeBox.current = null;
+        const press = marqueePress.current;
+        const inside = press ? sectionsAt(press, boardSections)[0] : undefined;
+        marqueeScope.current = inside ? { sectionId: inside.id } : null;
+        // The reader's toggles are read here, once, into the flag the node builder consults: React Flow only boxes
+        // `selectable` cards, so a subject switched off must be off before the first box frame rather than filtered out
+        // after the last one. That is the difference between "the option does nothing" and "the option is the rule".
+        const takes = useUiStore.getState().marqueeSelects.cards;
+        const narrowed = marqueeTakesCards.current !== takes;
+        marqueeTakesCards.current = takes;
+        marqueeActive.current = true;
+        // Applied here rather than on the first box frame: by then React Flow has already committed a selection, and a
+        // card caught by that frame stays caught. Flag writes only, so the live box is untouched; the commit filters
+        // again in case a frame slipped through.
+        if (inside || narrowed) applyBoardNodes([...liveSelectedIds()], true);
+      }}
+      onSelectionEnd={() => {
+        // React Flow's final selection is authoritative; `endMarquee` releases
+        // the guard and reconciles the store with it.
+        endMarquee();
+      }}
+      connectionMode={ConnectionMode.Loose}
+      // The layer itself rises while an edge is selected (see `.react-flow__edges`
+      // in global.css); React Flow must not also raise the edge per element, or a
+      // selected link keeps a 20px hit stroke over the cards once deselected.
+      elevateEdgesOnSelect={false}
+      onConnect={onConnect}
+      onConnectStart={onConnectStart}
+      onConnectEnd={onConnectEnd}
+      onReconnect={onReconnect}
+      onReconnectStart={onReconnectStart}
+      onReconnectEnd={onReconnectStop}
+      onEdgeContextMenu={(event, edge) => {
+        if (!canEditLayout) return;
+        event.preventDefault();
+        openContextMenu({ x: event.clientX, y: event.clientY, kind: "edge", edgeId: edge.id });
+      }}
+      onEdgeClick={(event) => {
+        setSelectedConnector(null);
+        setSelectedSectionConnector(null);
+        // A plain click replaces the selection; a modified one adds to it.
+        if (!event.shiftKey && !event.metaKey && !event.ctrlKey) {
+          sectionLinkSelection.current = [];
+        }
+      }}
+      onNodeDoubleClick={(event, node) => {
+        // A portal is a doorway: the camera transition replaces the board in
+        // place. Any other card opens the full-canvas focus surface.
+        const targetBoardId = portalTargetId(cardsById.get(node.id));
+        if (targetBoardId) {
+          event.preventDefault();
+          enterPortal(node.id, targetBoardId);
+          return;
+        }
+        openCardFocus(node.id);
+      }}
+      onMoveStart={(_event, viewport) => {
+        gestureStartZoom.current = viewport.zoom;
+      }}
+      onMoveEnd={(_event, viewport) => {
+        if (activeBoardId) recordBoardViewport(activeBoardId, viewport);
+        readCameraGesture(gestureStartZoom.current ?? viewport.zoom, viewport.zoom);
+      }}
+      onEdgeDoubleClick={(event, edge) => {
+        if (!canEditLayout) return;
+        event.preventDefault();
+        startEdgeDescription(edge.id, { x: event.clientX, y: event.clientY });
+      }}
+      onNodeDragStart={(_, node, dragged) => {
+        if (!canEditLayout) return;
+        // React Flow drags the whole selection; the node under the pointer is
+        // the anchor peers derive every other member's position from.
+        const ids = dragged.length > 0 ? dragged.map((entry) => entry.id) : [node.id];
+        draggedNodeIds.current = ids;
+        locallyDraggingIds.current = new Set(ids);
+        // The frame the reader boxed with these cards travels too.
+        dragFollow.begin(node);
+        snapOthers.current = ids.length === 1 ? boxes(new Set(ids)) : [];
+        lastSnapped.current = null;
+        // The rendered delta is eased from here to drop. Reduced motion keeps
+        // the pre-A10 behaviour: paint the pointer sample directly.
+        if (prefersReducedMotion()) stopLocalEase();
+        else {
+          const ease = new LocalDragEase();
+          ease.begin(
+            (dragged.length > 0 ? dragged : [node]).map((entry) => ({
+              id: entry.id,
+              position: entry.position,
+            })),
+            performance.now(),
+          );
+          localEase.current = ease;
+        }
+        setDragging({ nodeId: node.id, position: node.position, nodeIds: ids });
+        previewDisplacedCards.current.clear();
+        setPreviewSectionResizes(new Map());
+      }}
+      onNodeDrag={(_, node) => {
+        if (!canEditLayout) return;
+        localEase.current?.target(node.id, node.position);
+        if (localEase.current) runLocalEase();
+
+        // Calculate live reflow preview for single-card drags
+        if (draggedNodeIds.current.length === 1 && activeBoardId) {
+          const nowMs = performance.now();
+          if (nowMs - lastPreviewTick.current > 24) {
+            lastPreviewTick.current = nowMs;
+            const targetSize = sizeOf(node.id);
+            const plan = proposeReflowPlan({
+              boardId: activeBoardId,
+              targetCardId: node.id,
+              targetPosition: node.position,
+              targetSize,
+              placements: boardPlacementList,
+              sections: boardSections,
+              cardSizes: getCardSizes(),
+            });
+            applyReflowPreview(plan, node.id);
+          }
+        }
+
+        const now = performance.now();
+        if (now - lastDragSent.current < DRAG_THROTTLE_MS) return;
+        lastDragSent.current = now;
+        setDragging({
+          nodeId: node.id,
+          position: node.position,
+          nodeIds: draggedNodeIds.current,
+        });
+        dragFollow.follow(node);
+      }}
+      onNodeDragStop={(_, node, dragged) => {
+        if (!canEditLayout) return;
+        const dropped = dragged.length > 0 ? dragged : [node];
+        // The pointer position is the truth: land the render on it and paint
+        // it before the one commit, so the drop never lingers a frame behind.
+        const droppedAt = localEase.current?.finish();
+        stopLocalEase();
+        if (droppedAt && droppedAt.size > 0) {
+          setNodes((current) =>
+            current.map((entry) => {
+              const position = droppedAt.get(entry.id);
+              return position ? { ...entry, position, dragging: false } : entry;
+            }),
+          );
+        }
+        const anchorId = draggedNodeIds.current.length === 1 ? draggedNodeIds.current[0] : null;
+        const anchor = anchorId ? dropped.find((entry) => entry.id === anchorId) : undefined;
+        // The last snap the reader saw is the drop position. Falling back to a
+        // fresh snap covers a press that ended without one more move event.
+        const snapped =
+          anchorId && anchor
+            ? lastSnapped.current?.id === anchorId
+              ? lastSnapped.current
+              : snapRect({
+                  position: anchor.position,
+                  size: sizeOf(anchorId),
+                  others: snapOthers.current,
+                }).position
+            : null;
+        const delta =
+          anchor && snapped
+            ? { x: snapped.x - anchor.position.x, y: snapped.y - anchor.position.y }
+            : { x: 0, y: 0 };
+        const committed =
+          delta.x === 0 && delta.y === 0
+            ? dropped
+            : dropped.map((entry) => ({
+                ...entry,
+                position: { x: entry.position.x + delta.x, y: entry.position.y + delta.y },
+              }));
+        lastDragEndedAt.current = performance.now();
+        dragFollow.end();
+        draggedNodeIds.current = [];
+        locallyDraggingIds.current = new Set();
+        snapOthers.current = [];
+        lastSnapped.current = null;
+        publishGuides([]);
+        setDragging(null);
+        commitDrop(committed, { allowReflow: true });
+        settleReflowPreview();
+      }}
+      onPaneClick={() => {
+        const thread = useLinkThreadStore.getState();
+        if (performance.now() - Math.max(threadStepAt.current, thread.armedAt) > 300) {
+          thread.clear();
+        }
+        setSelectedConnector(null);
+        setSelectedSectionConnector(null);
+        handleSelectSection(null);
+        // Empty canvas closes the drawer: nothing is selected any more. A
+        // section link is not a React Flow edge, so React Flow cannot clear it
+        // for us — that is why selecting one used to be a trap.
+        sectionLinkSelection.current = [];
+        useUiStore.getState().setSelectedEdgeIds([]);
+      }}
+      onNodeClick={(_event, node) => {
+        // Picking is a projection being built: a press adds the card to the view being picked for, and
+        // does nothing else. The whole board is the surface, so one press is one answer.
+        if (useViewsStore.getState().picking) {
+          pickCard(node.id);
+          return;
+        }
+        // React Flow also reports a connector press as a node click, so this
+        // must not undo the arm that press just made.
+        const thread = useLinkThreadStore.getState();
+        if (performance.now() - Math.max(threadStepAt.current, thread.armedAt) > 300) {
+          thread.clear();
+        }
+        setSelectedConnector(null);
+        setSelectedSectionConnector(null);
+        handleSelectSection(null);
+      }}
+      onNodeContextMenu={(event, node) => {
+        if (!canEditContent && !canEditLayout && !canManageTrash && !canManageStructure) return;
+        // Rich text keeps the browser's own menu (copy, paste, spelling).
+        // Chips inside the editor stop propagation before this handler.
+        if (isEditorTarget(event)) return;
+        event.preventDefault();
+        openContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          kind: "node",
+          nodeId: node.id,
+          // Lets "New section from N cards" fall back to the card it was
+          // opened on when no card is selected.
+          flowPosition: node.position,
+        });
+      }}
+      onPaneContextMenu={(event) => {
+        if (!canCreateContent) return;
+        event.preventDefault();
+        const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        openContextMenu({ x: event.clientX, y: event.clientY, kind: "canvas", flowPosition });
+      }}
+      // A marquee leaves React Flow's selection overlay over the cards, so a
+      // right-click there reaches this handler rather than the card's.
+      onSelectionContextMenu={(event, selected) => {
+        if (
+          (!canEditContent && !canEditLayout && !canManageTrash && !canManageStructure) ||
+          isEditorTarget(event)
+        ) {
+          return;
+        }
+        event.preventDefault();
+        const anchor = selected[0];
+        if (!anchor) return;
+        openContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          kind: "node",
+          nodeId: anchor.id,
+          flowPosition: anchor.position,
+        });
+      }}
+    >
+      <SectionLayer
+        sections={boardSections}
+        dimmedSectionIds={dimmedSectionIds}
+        membership={sectionMembershipMap}
+        offsets={sectionOffsetsMap}
+        resizes={
+          previewSectionResizes.size > 0
+            ? new Map([...sectionResizes, ...previewSectionResizes])
+            : sectionResizes
+        }
+        peers={peers}
+        selectedSectionIds={new Set(selectedSectionIds)}
+        editingSectionId={editingSectionId}
+        onSelect={handleSelectSection}
+        onStartRename={setEditingSection}
+        onCommitRename={handleSectionRename}
+        onCancelRename={() => setEditingSection(null)}
+        onDrag={handleSectionDrag}
+        onDragEnd={handleSectionDragEnd}
+        onResize={handleSectionResize}
+        onResizeEnd={handleSectionResizeEnd}
+        onShrinkToFit={shrinkSectionToFit}
+        onToggleShrinkToFit={toggleSectionShrinkToFit}
+        readOnly={!canEditLayout}
+        onContextMenu={(event, sectionId) => {
+          if (!canEditLayout) return;
+          event.preventDefault();
+          openContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            kind: "section",
+            sectionId,
+          });
+        }}
+        chaining={revealState.chaining}
+        draftActive={revealState.draftActive}
+        armed={revealState.armed}
+        selectedConnector={selectedSectionConnector}
+        onConnectorSelect={(sectionId, connectorId) => {
+          setSelectedSectionConnector({ sectionId, connectorId });
+          setSelectedConnector(null);
+        }}
+        onConnectorMoveEnd={(sectionId, connectorId, position) => {
+          if (!canManageStructure) return;
+          workspace.moveSectionConnector(sectionId, connectorId, position);
+        }}
+        onConnectorContextMenu={(event, sectionId, connectorId) => {
+          if (!canManageStructure) return;
+          openContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            kind: "connector",
+            sectionId,
+            connectorId,
+          });
+        }}
+        resolveLinkTarget={resolveLinkTarget}
+        onLinkCommit={onSectionLinkCommit}
+        onReconnectEnd={(edgeId, end, sectionId, connectorId) => {
+          workspace.reconnectEdge(edgeId, end, sectionId, connectorId, "section");
+        }}
+      />
+      <AboveLinkLayer
+        links={projectedLinks.above}
+        selectedEdgeIds={new Set(selectedEdgeIds)}
+        onSelectEdge={(edgeId, additive = false) => {
+          setSelectedConnector(null);
+          setSelectedSectionConnector(null);
+          if (additive) {
+            const current = sectionLinkSelection.current;
+            sectionLinkSelection.current = current.includes(edgeId)
+              ? current.filter((id) => id !== edgeId)
+              : [...current, edgeId];
+          } else {
+            sectionLinkSelection.current = [edgeId];
+          }
+          setSelectedEdgeIds(sectionLinkSelection.current);
+        }}
+        onEdgeContextMenu={(event, edgeId) => {
+          if (!canEditLayout) return;
+          event.preventDefault();
+          openContextMenu({ x: event.clientX, y: event.clientY, kind: "edge", edgeId });
+        }}
+      />
+      <SectionLinkLayer
+        links={projectedLinks.sections}
+        selectedEdgeIds={new Set(selectedEdgeIds)}
+        onSelectEdge={(edgeId, additive = false) => {
+          setSelectedConnector(null);
+          setSelectedSectionConnector(null);
+          if (additive) {
+            const current = sectionLinkSelection.current;
+            sectionLinkSelection.current = current.includes(edgeId)
+              ? current.filter((id) => id !== edgeId)
+              : [...current, edgeId];
+          } else {
+            sectionLinkSelection.current = [edgeId];
+          }
+          const flowEdgeIds = selectedEdgeIds.filter(
+            (id) => !sectionLinkSelection.current.includes(id) && id !== edgeId,
+          );
+          setSelectedEdgeIds(
+            additive
+              ? [...new Set([...flowEdgeIds, ...sectionLinkSelection.current])]
+              : [...sectionLinkSelection.current],
+          );
+        }}
+        onEdgeContextMenu={(event, edgeId) => {
+          if (!canEditLayout) return;
+          openContextMenu({ x: event.clientX, y: event.clientY, kind: "edge", edgeId });
+        }}
+        onReconnect={(edgeId, end, point) => {
+          if (!canEditLayout) return;
+          const target = resolveLinkTarget(point);
+          if (!target) return;
+          workspace.reconnectEdge(edgeId, end, target.id, target.connectorId, target.kind);
+        }}
+        toFlow={(client) => screenToFlowPosition(client)}
+      />
+      <SelectionOutline extent={extent} zoom={zoom} />
+      <SnapGuideLayer guides={snapGuides} />
+      <Background color="var(--rf-dot)" />
+      <CanvasControls selectedCount={selectedNodeIds.length} onZoomToSelection={zoomToSelection} />
+      <PresenceLayer />
+      <PeerReconnectLayer />
+      <PeerLibraryDragLayer />
+    </ReactFlow>
+  );
+}

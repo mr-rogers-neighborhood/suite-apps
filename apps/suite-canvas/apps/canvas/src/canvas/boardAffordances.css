@@ -1,0 +1,144 @@
+/**
+ * Chrome the board adds to itself: the nudge hint, the alignment guides, the
+ * camera readout and the bulk style bar.
+ *
+ * Every surface here floats over the canvas without taking pointer events,
+ * except its own controls, so a press still reaches React Flow.
+ */
+
+.board-hint {
+  position: absolute;
+  z-index: 15;
+  bottom: 84px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  box-shadow: var(--card-shadow);
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 18px;
+  pointer-events: none;
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+
+.board-hint--lifted {
+  bottom: 132px;
+}
+
+.board-hint kbd {
+  min-width: 16px;
+  padding: 0 3px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 10px;
+  text-align: center;
+}
+
+/* Alignment guides, drawn in flow units inside a viewport portal. */
+.board-snap-guide {
+  position: absolute;
+  z-index: 12;
+  background: var(--accent);
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.board-snap-guide--x {
+  width: 1px;
+}
+
+.board-snap-guide--y {
+  height: 1px;
+}
+
+/*
+ * What a link released over empty canvas is offered: a card here, or a card the reader
+ * places later. Fixed, because it opens at the pointer and the pointer is screen space.
+ */
+.drop-offer__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  cursor: default;
+}
+
+.drop-offer {
+  position: fixed;
+  z-index: 41;
+  display: flex;
+  min-width: 180px;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+  font-size: 12px;
+}
+
+.drop-offer__item {
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-align: left;
+  color: var(--ink);
+}
+
+.drop-offer__item:hover,
+.drop-offer__item:focus-visible {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+/*
+ * The style editor for a multi-selection.
+ *
+ * Same controls as the inspector's Style tab, docked where the old bulk bar sat: a
+ * selection is the same record written to each of its members, so it is the same
+ * editor. Only the frame belongs to the canvas.
+ */
+.selection-style {
+  position: absolute;
+  z-index: 16;
+  bottom: 84px;
+  left: 50%;
+  display: flex;
+  max-width: min(680px, calc(100vw - 32px));
+  max-height: min(60vh, 520px);
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--card-shadow);
+  transform: translateX(-50%);
+  backdrop-filter: blur(16px) saturate(1.1);
+}
+
+.selection-style__label {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.board-outline__empty {
+  padding: 10px 10px 12px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.board-outline__empty p {
+  margin: 0;
+}

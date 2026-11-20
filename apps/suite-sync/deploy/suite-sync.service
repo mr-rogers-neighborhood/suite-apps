@@ -1,0 +1,34 @@
+[Unit]
+Description=Suite sync relay (a blind mailbox for encrypted frames)
+Documentation=https://github.com/mr-rogers-neighborhood/suite-sync/blob/main/docs/how-to/relay.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# No account to create and no uid to settle on: the relay owns nothing but its state directory.
+DynamicUser=yes
+StateDirectory=suite-sync
+EnvironmentFile=-/etc/suite-sync/relay.env
+# $SUITE_SYNC_ARGS is split on whitespace, so the flags live in one readable line in the env file
+# instead of being duplicated here where they could drift from the docs.
+ExecStart=/usr/local/bin/suite-sync serve $SUITE_SYNC_ARGS
+Restart=on-failure
+RestartSec=5s
+
+# The relay reads frames it cannot decrypt and writes them to one directory. Nothing else is needed.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# Deliberately not set: MemoryDenyWriteExecute breaks Node's JIT, and SystemCallFilter presets have
+# to be re-verified against every Node release. A unit that fails to start protects nothing.
+
+[Install]
+WantedBy=multi-user.target

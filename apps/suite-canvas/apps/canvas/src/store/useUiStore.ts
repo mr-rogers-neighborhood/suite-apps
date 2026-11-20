@@ -1,0 +1,852 @@
+import { create } from "zustand";
+import type { CanvasMode } from "../canvas/links/linkGesture";
+import type { CanvasPurpose } from "../canvas/purpose";
+import { useRecordRunStore } from "../canvas/recordRun";
+import type { ClipboardEntry } from "../entities/clipboard";
+import { getSession, type SessionCapabilities, sessionCapabilities } from "../session/session";
+import { type InteractionMode, interactionModePatch, nextInteractionMode } from "./interactionMode";
+import { type MarqueeSlice, marqueeActions, marqueeInitial } from "./marqueeSlice";
+import { type ReaderUiSlice, readerUiActions, readerUiInitial } from "./readerUiSlice";
+import { type TourSlice, tourActions, tourInitial } from "./tourSlice";
+
+/** What a share link used to cover. The dialog that asked is gone; the name stays for its callers. */
+export type ShareScope = "workspace" | "board" | "card" | "selection";
+
+export type { InteractionMode } from "./interactionMode";
+export type { MarqueeSubject } from "./marqueeSlice";
+export type { TourState } from "./tourSlice";
+
+export interface ContextMenuState {
+  x: number;
+  y: number;
+  kind: "canvas" | "node" | "connector" | "edge" | "section";
+  nodeId?: string;
+  connectorId?: string;
+  edgeId?: string;
+  sectionId?: string;
+  flowPosition?: { x: number; y: number };
+}
+
+/**
+ * A section riding a card drag: which frame, how far it has moved, and which cards React Flow is
+ * already carrying so they are not shifted twice.
+ */
+export interface DragFollow {
+  /** Every selected frame: an outer frame and the one inside it both travel. */
+  sectionIds: readonly string[];
+  dx: number;
+  dy: number;
+  carrying: readonly string[];
+}
+
+export interface SelectedConnector {
+  nodeId: string;
+  connectorId: string;
+}
+
+/**
+ * A link released over empty canvas, and the offer to give it something to point at.
+ *
+ * It is UI state, not a draft: nothing is created until the reader answers, because a
+ * link dropped in the wrong place must not leave a card behind.
+ */
+export interface DropOffer {
+  /** Where the menu opens, in screen coordinates. */
+  x: number;
+  y: number;
+  /** Where the card would land, in flow coordinates. */
+  point: { x: number; y: number };
+  /** The end the gesture already had: the card and dot the line leaves. */
+  from: { nodeId: string; connectorId: string };
+}
+
+/**
+ * Boards are not a tab: a board row sits in Cards beside the cards, filtered by
+ * the Board facet. A second list would need a second set of actions for the same
+ * gesture (open, place, drag).
+ */
+export type LibraryTab =
+  | "inbox"
+  | "cards"
+  // The same cards, narrowed to one built-in type. A tab rather than only a facet
+  // because "where are my sketches" is a question, and a facet answers it in a
+  // filter bar the reader has to read first.
+  | "views"
+  | "sketches"
+  | "portals"
+  | "media"
+  // Cards promoted from a highlight. A tab rather than only a facet for the same reason sketches have one:
+  // "what have I marked" is a question, and a facet answers it in a filter bar the reader has to read first.
+  | "annotations"
+  | "trash";
+
+/**
+ * Who asked for the library. `mode` means a mode opened it as its own starting
+ * point, so leaving that mode closes it again; `reader` is a drawer the person
+ * opened and only the person closes.
+ */
+/**
+ * Who put the drawer away, so the same party can bring it back.
+ *
+ * `mode` was the purpose control's, and it is gone with that control's cycling.
+ * `reader` is the only door left: the person opened it, so only the person closes it.
+ */
+export type LibraryReason = "reader";
+
+/**
+ * Puts a board at the front of the session's recency list, once.
+ *
+ * This is the order the switcher and the back stack both read: the board you
+ * were just on is the one you are most likely to want, and a visit is a fact
+ * about this tab rather than about the document, so it is never written.
+ */
+function withRecent(boardRecency: string[], boardId: string): string[] {
+  if (boardRecency[0] === boardId) return boardRecency;
+  return [boardId, ...boardRecency.filter((id) => id !== boardId)].slice(0, 32);
+}
+
+/**
+ * Which editor of one card holds the keystrokes; only one may be editable at a
+ * time. `focus` is the full-canvas card surface, which owns the body editor the
+ * same way the inspector's `panel` does.
+ */
+export type EditingSurface = "canvas" | "panel" | "focus";
+
+/** React Flow's viewport: world-to-screen translate plus zoom. */
+export interface ViewportState {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+/** A board the user left, with the viewport that returns to it exactly. */
+export interface BoardVisit {
+  boardId: string;
+  viewport: ViewportState;
+  /**
+   * How the board was entered. A portal visit can also be left by zooming out;
+   * a tab switch is only undone by Escape or the back control.
+   */
+  via: "portal" | "manual";
+}
+
+/** Screen rectangle of a portal node, in window coordinates. */
+export interface ScreenRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** A portal the user activated; the canvas draws the camera transition for it. */
+export interface PortalEntryRequest {
+  nodeId: string;
+  targetBoardId: string;
+  rect: ScreenRect;
+}
+
+/** Library scope: the whole workspace, or the cards placed on the active board. */
+export type LibraryScope = "all" | "board";
+
+export interface FocusTarget {
+  kind: "card" | "section";
+  id: string;
+  boardId: string;
+  /**
+   * Bumped on every request so focusing the same object twice still moves the
+   * viewport; consumers key their effect on it.
+   */
+  nonce: number;
+}
+
+let focusNonce = 0;
+
+const nextFocusTarget = (kind: FocusTarget["kind"], id: string, boardId: string): FocusTarget => {
+  focusNonce += 1;
+  return { kind, id, boardId, nonce: focusNonce };
+};
+
+/** One camera instruction per board switch; the canvas consumes it once. */
+let navigationNonce = 0;
+const nextNavigationNonce = () => {
+  navigationNonce += 1;
+  return navigationNonce;
+};
+
+interface UiState extends SessionCapabilities, ReaderUiSlice, TourSlice, MarqueeSlice {
+  /** Board currently on screen; null until the shell resolves one. */
+  activeBoardId: string | null;
+  /**
+   * Boards this session has been on, most recent first. Ordering only: a board
+   * is reachable whether or not it is here, and nothing is closed or claimed.
+   */
+  boardRecency: string[];
+  /**
+   * A tab with no board in it yet: the start page stands where the canvas would.
+   * One at a time — a second empty tab has nothing to show the first does not.
+   */
+  newTab: boolean;
+  /** Viewport last seen on each board, so a return lands where it left. */
+  boardViewports: Record<string, ViewportState>;
+  /** Boards visited from the current one, newest last. */
+  boardHistory: BoardVisit[];
+  /**
+   * A one-shot instruction to move the camera after a board switch; `viewport`
+   * null means "fit the board's content".
+   */
+  viewportRequest: { boardId: string; viewport: ViewportState | null; nonce: number } | null;
+  /**
+   * The card whose type menu is open, and where under its glyph it sits. The
+   * glyph is the card's own type control, so the menu is anchored to the card
+   * rather than to a corner of the drawer.
+   */
+  typeMenu: { cardId: string; anchor: DOMRect } | null;
+  openTypeMenu: (cardId: string, anchor: DOMRect) => void;
+  closeTypeMenu: () => void;
+  /**
+   * The full-canvas focus surface, and its two actions.
+   *
+   * These stay on the store rather than in `readerUiSlice`: opening the focus surface also closes the inspector, and
+   * closing it ends a focus editing session. The slice owns the reading *requests*, not the surface's own lifecycle.
+   */
+  openCardFocus: (cardId: string) => void;
+  closeCardFocus: () => void;
+  /** A portal entry waiting for the camera transition to play. */
+  portalEntry: PortalEntryRequest | null;
+  /**
+   * Viewer shorthand; capability flags remain the gate for every write path.
+   * It is UI state (not read from the session in each component) so tests and
+   * stories can render a read-only surface without a `?share=` URL. Editor
+   * shares keep `readOnly` false while their capability flags decide what they
+   * may create, publish, trash or manage.
+   */
+  readOnly: boolean;
+  setReadOnly: (readOnly: boolean) => void;
+  /** Tests and stories override the capability matrix derived from the session. */
+  setCapabilities: (capabilities: Partial<SessionCapabilities>) => void;
+  libraryOpen: boolean;
+  /** Who asked for the drawer: the reader, who is also the one who closes it. */
+  libraryReason: LibraryReason;
+  libraryTab: LibraryTab;
+  trashedMediaIds: string[];
+  selectedNodeIds: string[];
+  selectedEdgeIds: string[];
+  /**
+   * A card drag that is carrying a selected section, in flow units.
+   *
+   * A section is not a React Flow node, so the drag that carries it reports nothing about it; this
+   * is how the frame paints at the pointer instead of jumping when the drop lands. Transient by
+   * construction: written on every drag frame and cleared on release, never persisted and never
+   * synced — a peer sees the same movement through `setSectionDrag`.
+   */
+  dragFollow: DragFollow | null;
+  setDragFollow: (follow: DragFollow | null) => void;
+  /**
+   * What Cut and Copy put aside, for this tab only.
+   *
+   * Not the system clipboard: the canvas suppresses the native menu, so these verbs have to live here,
+   * and the document has no serialisation a browser clipboard could carry anyway.
+   */
+  clipboard: ClipboardEntry | null;
+  setClipboard: (entry: ClipboardEntry | null) => void;
+  /**
+   * A card being dragged out of the library, in *screen* units. The drawer owns
+   * the gesture; the canvas owns the camera, so it converts this to flow space
+   * before publishing presence.
+   */
+  libraryDrag: { cardId: string; screen: { x: number; y: number }; count: number } | null;
+  setLibraryDrag: (
+    drag: { cardId: string; screen: { x: number; y: number }; count: number } | null,
+  ) => void;
+  /**
+   * A link end waiting for a connector to be clicked. The link inspector arms
+   * this so an end can be moved without dragging on the canvas; the next
+   * connector press re-attaches it and clears the field.
+   */
+  linkEndMove: { edgeId: string; end: "source" | "target" } | null;
+  startLinkEndMove: (move: { edgeId: string; end: "source" | "target" }) => void;
+  cancelLinkEndMove: () => void;
+  /**
+   * Sections selected on the active board, innermost last.
+   *
+   * A list rather than one id: frames nest, and a reader who wants the outer frame and the frame
+   * inside it to move together has to be able to hold both. Every verb that acts on "the" section
+   * reads `primarySectionId`, the most recently picked one, which is the one a panel describes.
+   */
+  selectedSectionIds: string[];
+  /**
+   * Adds or removes one frame from the selection.
+   *
+   * A modifier press is membership and nothing else: it never opens a panel or clears the cards the
+   * same selection holds, because the reader is building a set rather than asking to look at one
+   * thing. `selectSection` remains the plain press.
+   */
+  toggleSection: (id: string) => void;
+  /** Replaces the frames in the selection without touching the cards or the panel. */
+  selectSections: (ids: readonly string[]) => void;
+  /** Section whose title input is open for renaming. */
+  editingSectionId: string | null;
+  editingNodeId: string | null;
+  /** Which editor on the card has focus; titles come first for new cards. */
+  editingField: "title" | "body";
+  editingSurface: EditingSurface;
+  /** Card or section a surface asked to reveal; consumed once by the canvas. */
+  focusTarget: FocusTarget | null;
+  /**
+   * A link is being drawn from a connector right now. Shared because the
+   * inspector fades for it (`CardInspectorHost`): the preview runs under the
+   * panel, and the destination is usually the thing the panel covers. Reader
+   * state only — nothing about a draft is ever written to the document.
+   */
+  linkingInProgress: boolean;
+  setLinkingInProgress: (linking: boolean) => void;
+  /** Card whose inspector panel is open, if any. */
+  inspectorNodeId: string | null;
+  /** Field the panel was asked to reveal, so a link can land on it. */
+  inspectorFieldId: string | null;
+  /** Cards whose frontmatter is expanded on the canvas. Local UI state only. */
+  expandedCardMeta: Record<string, boolean>;
+  /** Type registry editor, opened from the dock or the inspector. */
+  typeSettingsOpen: boolean;
+  /** Facet filters for the library drawer; OR within a group, AND across. */
+  libraryTypeFilter: string[];
+  libraryTagFilter: string[];
+  /** Sections facet of the board-scoped library; selecting one includes its subtree. */
+  librarySectionFilter: string[];
+  libraryScope: LibraryScope;
+  /**
+   * The drawer is taking the whole window rather than floating above the dock.
+   * A library with sections for cards, sketches, boards and types is a browser,
+   * and browsing wants room; the floating drawer stays the default because it
+   * lets a row be dragged onto the canvas beside it.
+   */
+  libraryFull: boolean;
+  setLibraryFull: (full: boolean) => void;
+  /**
+   * What the canvas is for (ADR-0064).
+   * The second axis, beside `mode`: `mode` says what the next click does, `purpose`
+   * says what the reader is doing at all. Always exactly one, because the control
+   * cycles and because two purposes both claiming the next click is how a canvas
+   * ends up placing a card into a tour.
+   */
+  purpose: CanvasPurpose;
+  /**
+   * Choose a purpose the reader may choose, and carry out what it implies:
+   * leaving `present` stops the takeover.
+   *
+   * `present` is refused, always. A presentation is scoped to a tour, so only a
+   * tour can put the reader in one — the widget can show the state and get out of
+   * it, never select it (ADR-0064 §11).
+   */
+  setPurpose: (purpose: CanvasPurpose) => void;
+  libraryGroupBySection: boolean;
+  /**
+   * Live text of the library search box. The drawer owns the box and mirrors
+   * it here so the app bar can offer "save current search" without reaching
+   * into another component's state.
+   */
+  libraryQuery: string;
+  setLibraryQuery: (query: string) => void;
+  /** Whether the board outline rail is expanded. */
+  outlineOpen: boolean;
+  /** Whether the version-history panel is open beside the board. */
+  historyOpen: boolean;
+  /**
+   * The surface whose appearance panel is open on the board, and where it opened.
+   *
+   * The same editor the inspector mounts, placed where the reader right-clicked,
+   * so "change how this looks" never means "find the panel first".
+   */
+  appearanceTarget: {
+    kind: "card" | "edge";
+    /** The thing that was right-clicked. */
+    id: string;
+    /** Every card the panel edits: the right-clicked one, or the whole selection. */
+    ids: readonly string[];
+    at: { x: number; y: number };
+  } | null;
+  /**
+   * Cards reduced to their header line, and sections whose members are hidden.
+   *
+   * Reader state, never document data. Two people looking at one board may want
+   * different things folded away, and a fold is not a change to the work, so it
+   * does not travel through the CRDT.
+   */
+  collapsedCards: Record<string, true>;
+  collapsedSections: Record<string, true>;
+  /**
+   * The card whose blueprint install is on screen, if any. The panel previews a
+   * type written in a card's title and body, so it opens over the board rather
+   * than inside the palette row that asked for it.
+   */
+  blueprintCardId: string | null;
+  /** The command palette: one surface for navigation and actions from `⌘K`. */
+  paletteOpen: boolean;
+  /**
+   * What a plain click on a connector starts. `connect` drags one link;
+   * `thread` keeps the chain going. Shift-click chains in either mode, which is
+   * the gesture people already know from other tools.
+   */
+  mode: CanvasMode;
+  setMode: (mode: CanvasMode) => void;
+  /** What a press on a card does: open the inspector, edit only, or nothing. */
+  interactionMode: InteractionMode;
+  setInteractionMode: (mode: InteractionMode) => void;
+  /** Walks `inspect` -> `quiet` -> `locked` -> `inspect`. */
+  cycleInteractionMode: () => void;
+  contextMenu: ContextMenuState | null;
+  dropOffer: DropOffer | null;
+  setDropOffer: (offer: DropOffer | null) => void;
+  selectedConnector: SelectedConnector | null;
+  /** Scope a canvas gesture asked the app-bar dialog to open on; consumed once. */
+  shareRequest: ShareScope | null;
+  requestShare: (scope: ShareScope) => void;
+  clearShareRequest: () => void;
+  setActiveBoardId: (id: string | null) => void;
+  /** Opens the placeholder tab: no board, the start page in its place. */
+  openNewTab: () => void;
+  /**
+   * Switches boards and remembers where the user came from. Tab clicks, the
+   * library's "go to board" and a finished portal transition all use it, so a
+   * back stack exists for every path into another board.
+   */
+  activateBoard: (
+    boardId: string,
+    options?: { via?: BoardVisit["via"]; viewport?: ViewportState | null },
+  ) => void;
+  /** Returns to the previous board and viewport; false when there is nowhere to go. */
+  goBackBoard: () => boolean;
+  recordBoardViewport: (boardId: string, viewport: ViewportState) => void;
+  clearViewportRequest: () => void;
+  requestPortalEntry: (request: PortalEntryRequest) => void;
+  clearPortalEntry: () => void;
+  setLibraryOpen: (open: boolean, reason?: LibraryReason) => void;
+  /** The named style rules: the list and its editor. */
+  setLibraryTab: (tab: LibraryTab) => void;
+  trashMedia: (id: string) => void;
+  restoreMedia: (id: string) => void;
+  emptyMediaTrash: () => void;
+  setSelectedNodeIds: (ids: string[]) => void;
+  setSelectedEdgeIds: (ids: string[]) => void;
+  selectSection: (id: string | null) => void;
+  /**
+   * A surface asked to step through a portal. The camera owns the doorway — it
+   * needs the node's screen rect to fly from — so the panel only names the board
+   * and the canvas performs the entry.
+   */
+  portalOpenRequest: { cardId: string; boardId: string; at: number } | null;
+  requestPortalOpen: (cardId: string, boardId: string) => void;
+  clearPortalOpenRequest: () => void;
+  setEditingSection: (id: string | null) => void;
+  setSelectedConnector: (connector: SelectedConnector | null) => void;
+  startEditing: (id: string, field?: "title" | "body", surface?: EditingSurface) => void;
+  stopEditing: () => void;
+  setEditingField: (field: "title" | "body") => void;
+  setEditingSurface: (surface: EditingSurface) => void;
+  focusCard: (cardId: string, boardId: string) => void;
+  focusSection: (sectionId: string, boardId: string) => void;
+  clearFocusTarget: () => void;
+  /** Replaces the selection with every card on the board; the inspector is untouched. */
+  selectAllOnBoard: (ids: string[]) => void;
+  openInspector: (id: string, fieldId?: string | null) => void;
+  closeInspector: () => void;
+  toggleCardMeta: (id: string) => void;
+  openTypeSettings: () => void;
+  /** The command palette: one surface for navigation and actions from `⌘K`. */
+  setPaletteOpen: (open: boolean) => void;
+  closeTypeSettings: () => void;
+  toggleLibraryType: (id: string) => void;
+  toggleLibraryTag: (id: string) => void;
+  toggleLibrarySection: (id: string) => void;
+  clearLibraryFilters: () => void;
+  setLibraryScope: (scope: LibraryScope) => void;
+  toggleLibraryGroupBySection: () => void;
+  toggleOutline: () => void;
+  toggleHistory: () => void;
+  closeHistory: () => void;
+  openAppearance: (target: {
+    kind: "card" | "edge";
+    id: string;
+    ids?: readonly string[];
+    at: { x: number; y: number };
+  }) => void;
+  closeAppearance: () => void;
+  toggleCardCollapsed: (cardId: string) => void;
+  toggleSectionCollapsed: (sectionId: string) => void;
+  openBlueprintInstall: (cardId: string) => void;
+  closeBlueprintInstall: () => void;
+  openContextMenu: (menu: ContextMenuState) => void;
+  closeContextMenu: () => void;
+}
+
+/** Adds or removes one key from a set-shaped record without mutating it. */
+function toggled(current: Record<string, true>, key: string): Record<string, true> {
+  const next = { ...current };
+  if (next[key]) delete next[key];
+  else next[key] = true;
+  return next;
+}
+
+export const useUiStore = create<UiState>((set, get) => ({
+  ...sessionCapabilities(getSession()),
+  activeBoardId: null,
+  newTab: false,
+  boardRecency: [],
+  boardViewports: {},
+  typeMenu: null,
+  boardHistory: [],
+  viewportRequest: null,
+  portalEntry: null,
+  ...readerUiInitial,
+  readOnly: getSession().readOnly,
+  setReadOnly: (readOnly) => set({ readOnly }),
+  setCapabilities: (capabilities) => set(capabilities),
+  libraryOpen: false,
+  libraryReason: "reader",
+  libraryTab: "inbox",
+  trashedMediaIds: [],
+  selectedNodeIds: [],
+  selectedEdgeIds: [],
+  ...marqueeInitial,
+  dragFollow: null,
+  clipboard: null,
+  selectedSectionIds: [],
+  ...tourInitial,
+  portalOpenRequest: null,
+  libraryDrag: null,
+  linkEndMove: null,
+  editingSectionId: null,
+  editingNodeId: null,
+  editingField: "body",
+  editingSurface: "canvas",
+  focusTarget: null,
+  linkingInProgress: false,
+  interactionMode: "inspect",
+  inspectorNodeId: null,
+  inspectorFieldId: null,
+  expandedCardMeta: {},
+  typeSettingsOpen: false,
+  paletteOpen: false,
+  mode: "place",
+  libraryTypeFilter: [],
+  libraryTagFilter: [],
+  librarySectionFilter: [],
+  libraryScope: "all",
+  libraryFull: false,
+  purpose: "explore",
+  libraryGroupBySection: false,
+  libraryQuery: "",
+  outlineOpen: true,
+  historyOpen: false,
+  appearanceTarget: null,
+  collapsedCards: {},
+  collapsedSections: {},
+  blueprintCardId: null,
+  contextMenu: null,
+  dropOffer: null,
+  setDropOffer: (dropOffer) => set({ dropOffer }),
+  selectedConnector: null,
+  shareRequest: null,
+  requestShare: (shareRequest) => set({ shareRequest }),
+  clearShareRequest: () => set({ shareRequest: null }),
+  setActiveBoardId: (activeBoardId) =>
+    set((state) => ({
+      activeBoardId,
+      ...(activeBoardId === null ? {} : { newTab: false }),
+      boardRecency: activeBoardId
+        ? withRecent(state.boardRecency, activeBoardId)
+        : state.boardRecency,
+    })),
+  openNewTab: () =>
+    set((state) =>
+      state.newTab && state.activeBoardId === null
+        ? state
+        : {
+            newTab: true,
+            activeBoardId: null,
+            editingNodeId: null,
+            editingSurface: "canvas" as EditingSurface,
+            editingSectionId: null,
+            selectedSectionIds: [],
+            selectedNodeIds: [],
+            selectedEdgeIds: [],
+            selectedConnector: null,
+            cardFocusId: null,
+          },
+    ),
+  activateBoard: (boardId, options = {}) =>
+    set((state) => {
+      if (state.activeBoardId === boardId) {
+        const boardRecency = withRecent(state.boardRecency, boardId);
+        return boardRecency === state.boardRecency ? state : { boardRecency };
+      }
+      const from = state.activeBoardId;
+      const leaving = from
+        ? [
+            {
+              boardId: from,
+              viewport: state.boardViewports[from] ?? { x: 0, y: 0, zoom: 1 },
+              via: options.via ?? ("manual" as const),
+            },
+          ]
+        : [];
+      const request =
+        options.viewport !== undefined ? options.viewport : (state.boardViewports[boardId] ?? null);
+      return {
+        activeBoardId: boardId,
+        newTab: false,
+        // A switcher, a portal and the library all land here, so every one of
+        // them is what "recent" means.
+        boardRecency: withRecent(state.boardRecency, boardId),
+        // Bounded: a long portal chain should not grow the session forever.
+        boardHistory: [...state.boardHistory, ...leaving].slice(-24),
+        viewportRequest: { boardId, viewport: request, nonce: nextNavigationNonce() },
+        // Editing, focus and a marquee belong to the board that left the screen.
+        editingNodeId: null,
+        editingSurface: "canvas" as EditingSurface,
+        editingSectionId: null,
+        selectedSectionIds: [],
+        // A card selection is also board-scoped; entering a portal starts clean.
+        selectedNodeIds: options.via === "portal" ? [] : state.selectedNodeIds,
+        selectedEdgeIds: [],
+        selectedConnector: null,
+        cardFocusId: null,
+      };
+    }),
+  goBackBoard: () => {
+    const state = get();
+    const previous = state.boardHistory.at(-1);
+    if (!previous) return false;
+    set({
+      activeBoardId: previous.boardId,
+      boardRecency: withRecent(state.boardRecency, previous.boardId),
+      boardHistory: state.boardHistory.slice(0, -1),
+      viewportRequest: {
+        boardId: previous.boardId,
+        viewport: previous.viewport,
+        nonce: nextNavigationNonce(),
+      },
+      editingNodeId: null,
+      editingSurface: "canvas" as EditingSurface,
+      editingSectionId: null,
+      selectedSectionIds: [],
+      selectedNodeIds: [],
+      selectedEdgeIds: [],
+      selectedConnector: null,
+      cardFocusId: null,
+    });
+    return true;
+  },
+  recordBoardViewport: (boardId, viewport) =>
+    set((state) => {
+      const current = state.boardViewports[boardId];
+      if (
+        current &&
+        current.x === viewport.x &&
+        current.y === viewport.y &&
+        current.zoom === viewport.zoom
+      ) {
+        return state;
+      }
+      return { boardViewports: { ...state.boardViewports, [boardId]: viewport } };
+    }),
+  clearViewportRequest: () => set({ viewportRequest: null }),
+  requestPortalEntry: (request) =>
+    // One transition at a time: a second activation during the animation would
+    // stack overlays and write a second board switch.
+    set((state) => (state.portalEntry ? state : { portalEntry: request })),
+  clearPortalEntry: () => set({ portalEntry: null }),
+  openTypeMenu: (cardId, anchor) => set({ typeMenu: { cardId, anchor } }),
+  closeTypeMenu: () => set({ typeMenu: null }),
+  ...readerUiActions(set),
+  openCardFocus: (cardFocusId) =>
+    // Focus owns the canvas: the drawer would duplicate the same card and
+    // reserve a strip of the focus surface.
+    set({ cardFocusId, inspectorNodeId: null, inspectorFieldId: null }),
+  closeCardFocus: () =>
+    set((state) => ({
+      cardFocusId: null,
+      ...(state.editingSurface === "focus"
+        ? { editingNodeId: null, editingSurface: "canvas" as EditingSurface }
+        : {}),
+    })),
+  setLibraryOpen: (libraryOpen, libraryReason = "reader") => set({ libraryOpen, libraryReason }),
+  setLibraryTab: (libraryTab) => set({ libraryTab }),
+  trashMedia: (id) =>
+    set((state) => ({
+      trashedMediaIds: state.trashedMediaIds.includes(id)
+        ? state.trashedMediaIds
+        : [...state.trashedMediaIds, id],
+    })),
+  restoreMedia: (id) =>
+    set((state) => ({
+      trashedMediaIds: state.trashedMediaIds.filter((mId) => mId !== id),
+    })),
+  emptyMediaTrash: () => set({ trashedMediaIds: [] }),
+  setSelectedNodeIds: (selectedNodeIds) => set({ selectedNodeIds }),
+  setSelectedEdgeIds: (selectedEdgeIds) => set({ selectedEdgeIds }),
+  ...marqueeActions(set, get),
+  setDragFollow: (dragFollow) => set({ dragFollow }),
+  setClipboard: (clipboard) => set({ clipboard }),
+  setLibraryDrag: (libraryDrag) => set({ libraryDrag }),
+  startLinkEndMove: (linkEndMove) => set({ linkEndMove }),
+  cancelLinkEndMove: () => set({ linkEndMove: null }),
+  selectSection: (selectedSectionId) =>
+    set({
+      selectedSectionIds: selectedSectionId === null ? [] : [selectedSectionId],
+      ...(selectedSectionId
+        ? {
+            selectedNodeIds: [],
+            selectedEdgeIds: [],
+            selectedConnector: null,
+            inspectorNodeId: null,
+            inspectorFieldId: null,
+            editingNodeId: null,
+          }
+        : {}),
+    }),
+  toggleSection: (id) =>
+    set((state) => {
+      return {
+        selectedSectionIds: state.selectedSectionIds.includes(id)
+          ? state.selectedSectionIds.filter((entry) => entry !== id)
+          : [...state.selectedSectionIds, id],
+      };
+    }),
+  selectSections: (ids) => set({ selectedSectionIds: [...new Set(ids)] }),
+  setEditingSection: (editingSectionId) => set({ editingSectionId }),
+  setSelectedConnector: (selectedConnector) => set({ selectedConnector }),
+  startEditing: (editingNodeId, editingField = "body", editingSurface = "canvas") =>
+    set((state) => (state.canEditContent ? { editingNodeId, editingField, editingSurface } : {})),
+  stopEditing: () => set({ editingNodeId: null, editingSurface: "canvas" }),
+  setEditingField: (editingField) => set({ editingField }),
+  setEditingSurface: (editingSurface) => set({ editingSurface }),
+  focusCard: (cardId, boardId) => set({ focusTarget: nextFocusTarget("card", cardId, boardId) }),
+  focusSection: (sectionId, boardId) =>
+    set({ focusTarget: nextFocusTarget("section", sectionId, boardId) }),
+  clearFocusTarget: () => set({ focusTarget: null }),
+  selectAllOnBoard: (ids) =>
+    set({
+      selectedNodeIds: ids,
+      selectedSectionIds: [],
+      editingSectionId: null,
+      selectedEdgeIds: [],
+      selectedConnector: null,
+    }),
+  setLinkingInProgress: (linkingInProgress) => set({ linkingInProgress }),
+  openInspector: (inspectorNodeId, fieldId = null) =>
+    set((state) => ({
+      inspectorNodeId,
+      inspectorFieldId: fieldId,
+      // The inspector is the reading surface: opening it ends a focus session,
+      // and the panel starts its own edit before accepting keys.
+      cardFocusId: null,
+      ...(state.editingSurface === "panel" && state.editingNodeId !== inspectorNodeId
+        ? { editingNodeId: null, editingSurface: "canvas" as EditingSurface }
+        : state.editingSurface === "focus"
+          ? { editingNodeId: null, editingSurface: "canvas" as EditingSurface }
+          : {}),
+      selectedNodeIds: [inspectorNodeId],
+      selectedSectionIds: [],
+      editingSectionId: null,
+    })),
+
+  ...tourActions(set, get),
+  requestPortalOpen: (cardId, boardId) =>
+    set({ portalOpenRequest: { cardId, boardId, at: performance.now() } }),
+  clearPortalOpenRequest: () => set({ portalOpenRequest: null }),
+  closeInspector: () =>
+    set((state) => ({
+      inspectorNodeId: null,
+      inspectorFieldId: null,
+      // The drawer describes the selection, so dismissing it dismisses what it describes. A
+      // selection left behind would reopen the panel on the next render — the same reason the
+      // link panel clears its edge ids when it closes.
+      selectedNodeIds: [],
+      selectedSectionIds: [],
+      selectedEdgeIds: [],
+      // Closing the inspector leaves focus mode with it, so Escape cannot strand
+      // the canvas behind a surface the reader has already dismissed.
+      cardFocusId: null,
+      ...(state.editingSurface === "panel" || state.editingSurface === "focus"
+        ? { editingNodeId: null, editingSurface: "canvas" as EditingSurface }
+        : {}),
+    })),
+  toggleCardMeta: (id) =>
+    set((state) => ({
+      expandedCardMeta: { ...state.expandedCardMeta, [id]: !state.expandedCardMeta[id] },
+    })),
+  openTypeSettings: () => set({ typeSettingsOpen: true }),
+  setPaletteOpen: (paletteOpen) =>
+    set((state) => (state.paletteOpen === paletteOpen ? state : { paletteOpen })),
+  setMode: (mode) => set((state) => (state.mode === mode ? state : { mode })),
+  setInteractionMode: (interactionMode) =>
+    set((state) =>
+      state.interactionMode === interactionMode
+        ? state
+        : interactionModePatch(state, interactionMode),
+    ),
+  cycleInteractionMode: () =>
+    set((state) => interactionModePatch(state, nextInteractionMode(state.interactionMode))),
+  closeTypeSettings: () => set({ typeSettingsOpen: false }),
+  toggleLibraryType: (id) =>
+    set((state) => ({
+      libraryTypeFilter: state.libraryTypeFilter.includes(id)
+        ? state.libraryTypeFilter.filter((entry) => entry !== id)
+        : [...state.libraryTypeFilter, id],
+    })),
+  toggleLibraryTag: (id) =>
+    set((state) => ({
+      libraryTagFilter: state.libraryTagFilter.includes(id)
+        ? state.libraryTagFilter.filter((entry) => entry !== id)
+        : [...state.libraryTagFilter, id],
+    })),
+  clearLibraryFilters: () =>
+    set({ libraryTypeFilter: [], libraryTagFilter: [], librarySectionFilter: [] }),
+  toggleLibrarySection: (id) =>
+    set((state) => ({
+      librarySectionFilter: state.librarySectionFilter.includes(id)
+        ? state.librarySectionFilter.filter((entry) => entry !== id)
+        : [...state.librarySectionFilter, id],
+    })),
+  setLibraryScope: (libraryScope) => set({ libraryScope }),
+  setLibraryFull: (libraryFull) => set({ libraryFull }),
+  setPurpose: (purpose) =>
+    set((state) => {
+      if (state.purpose === purpose) return state;
+      // Never a purpose a reader chooses. A control that offered "present" would
+      // be offering to present nothing, then asking which tour — a worse way to
+      // pick one than opening the tour itself (ADR-0064 §11).
+      if (purpose === "present") return state;
+      // A recording ends with the purpose that armed it (ADR-0064 §10): the
+      // tutorial card keeps the steps it has, but no further click is a step.
+      if (state.purpose === "record") useRecordRunStore.getState().stop();
+      return {
+        purpose,
+        // Leaving a presentation stops the takeover but keeps the tour, so the
+        // reader lands back on its steps. Escape closes it entirely; the widget is
+        // the gentler exit.
+        ...(state.tour?.presenting ? { tour: { ...state.tour, presenting: false } } : {}),
+      };
+    }),
+  toggleLibraryGroupBySection: () =>
+    set((state) => ({ libraryGroupBySection: !state.libraryGroupBySection })),
+  setLibraryQuery: (libraryQuery) => set({ libraryQuery }),
+  toggleOutline: () => set((state) => ({ outlineOpen: !state.outlineOpen })),
+  toggleHistory: () => set((state) => ({ historyOpen: !state.historyOpen })),
+  closeHistory: () => set({ historyOpen: false }),
+  openAppearance: (target) =>
+    set({
+      appearanceTarget: { ...target, ids: target.ids ?? [target.id] },
+      contextMenu: null,
+    }),
+  closeAppearance: () => set({ appearanceTarget: null }),
+  toggleCardCollapsed: (cardId) =>
+    set((state) => ({ collapsedCards: toggled(state.collapsedCards, cardId) })),
+  toggleSectionCollapsed: (sectionId) =>
+    set((state) => ({ collapsedSections: toggled(state.collapsedSections, sectionId) })),
+  openBlueprintInstall: (blueprintCardId) => set({ blueprintCardId }),
+  closeBlueprintInstall: () => set({ blueprintCardId: null }),
+  openContextMenu: (contextMenu) => set({ contextMenu }),
+  closeContextMenu: () => set({ contextMenu: null }),
+}));

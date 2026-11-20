@@ -1,0 +1,33 @@
+.whiteboard-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.whiteboard-preview__ground {
+  fill: color-mix(in srgb, var(--surface) 76%, var(--canvas-bg));
+  stroke: var(--hairline);
+  stroke-width: 0.4;
+}
+
+/* Seamless means the drawing sits straight on the canvas: no ground, no frame,
+   nothing behind the strokes at all. */
+.whiteboard-card--seamless .whiteboard-preview__ground {
+  fill: none;
+  stroke: none;
+}
+
+.whiteboard-preview__empty {
+  fill: var(--ink-muted);
+  font-size: 5px;
+  letter-spacing: 0.02em;
+}
+
+/* In dark mode, Excalidraw's canvas inverts default strokes (#1e1e1e) via
+   `invert(93%) hue-rotate(180deg)`. The preview applies the same filter to its
+   shape elements so sketches render with matching light strokes on dark backgrounds. */
+:where(.dark, [data-theme="dark"]) .whiteboard-preview__shapes {
+  filter: invert(93%) hue-rotate(180deg);
+}

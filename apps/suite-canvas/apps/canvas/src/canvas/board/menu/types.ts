@@ -1,0 +1,76 @@
+import type { LayerAction } from "@suite/graph";
+import type { ContextMenuItem } from "../../../dialogs/ContextMenu";
+import type { ColourSelection } from "../../../entities/colour";
+import type { ContextMenuState } from "../../../store/useUiStore";
+import type { AlignEdge, DistributeAxis } from "../../interactions/arrangeCommand";
+import type { useBoardProjection } from "../useBoardProjection";
+import type { useBoardUi } from "../useBoardUi";
+
+/** What a board context menu can show, and what each item does. */
+export interface BoardMenuContext {
+  menu: ContextMenuState;
+  workspace: ReturnType<typeof useBoardUi>["workspace"];
+  activeBoardId: string | null;
+  boards: { id: string; name: string }[];
+  cardsById: ReturnType<typeof useBoardProjection>["cardsById"];
+  sectionMembershipMap: Map<string, string>;
+  selectedNodeIds: string[];
+  selectedSectionIds: string[];
+  selectedEdgeIds: string[];
+  store: ReturnType<typeof useBoardUi>["store"];
+  mode: ReturnType<typeof useBoardUi>["mode"];
+  setMode: ReturnType<typeof useBoardUi>["setMode"];
+  canCreateContent: boolean;
+  /** Views are configuration as well as content, so the menu asks for both. */
+  canManageSchema: boolean;
+  canEditLayout: boolean;
+  canCreateBoards: boolean;
+  canManageTrash: boolean;
+  canManageStructure: boolean;
+  canManageLinks: boolean;
+  requestShare: ReturnType<typeof useBoardUi>["requestShare"];
+  /** The workspace palette, for the colour quick-picks. */
+  palette: ReturnType<typeof useBoardUi>["palette"];
+  openAppearance: ReturnType<typeof useBoardUi>["openAppearance"];
+  createNoteAt: (position: { x: number; y: number }) => void;
+  createWhiteboardAt: (position: { x: number; y: number }) => void;
+  createSectionAt: (position: { x: number; y: number }, wrapSelection?: boolean) => void;
+  createPortalAt: (position: { x: number; y: number }, targetBoardId: string) => void;
+  createPortalToNewBoard: (position: { x: number; y: number }) => void;
+  /** A view card at the click, and the layer open on the view it will present. */
+  createViewAt: (position: { x: number; y: number }) => void;
+  /** A view whose context is what is selected right now, opened as a draft. */
+  createViewFromSelection: () => void;
+  /** The media picker at the click: it asks which kind, then makes the card that holds it. */
+  createMediaAt: (position: { x: number; y: number }) => void;
+  duplicateCards: (ids: string[]) => void;
+  /** Put the selection aside, remove it, or make it again at the click. */
+  copySelection: () => void;
+  cutSelection: () => void;
+  pasteAt: (point: { x: number; y: number }) => void;
+  /** Whether anything is on the clipboard: Paste has nothing to offer until something is. */
+  clipboardReady: boolean;
+  /** One colour across the entities a press named, each kind in its own field. */
+  setSelectionColour: (swatch: string | null, selection: ColourSelection) => void;
+  moveCardToBoard: (cardId: string, boardId: string) => void;
+  alsoPlaceCardOnBoard: (cardId: string, boardId: string) => void;
+  otherBoards: (boardId: string | null) => { id: string; name: string }[];
+  changeLayer: (nodeId: string, action: LayerAction) => void;
+  changeLayerBulk: (ids: string[], action: LayerAction) => void;
+  arrangeSelection: (kind: "align" | "distribute", value: AlignEdge | DistributeAxis) => void;
+  unplaceSelected: () => void;
+  trashSelected: () => void;
+  startEdgeDescription: (edgeId: string, point: { x: number; y: number }) => void;
+  enterPortal: (nodeId: string, targetBoardId: string) => void;
+  setSelectedNodeIds: ReturnType<typeof useBoardUi>["setSelectedNodeIds"];
+  setSelectedConnector: ReturnType<typeof useBoardUi>["setSelectedConnector"];
+  setSelectedSectionConnector: (
+    connector: { sectionId: string; connectorId: string } | null,
+  ) => void;
+  setEditingSection: ReturnType<typeof useBoardUi>["setEditingSection"];
+  selectSection: ReturnType<typeof useBoardUi>["selectSection"];
+  shrinkSectionToFit: (sectionId: string) => void;
+  toggleSectionShrinkToFit: (sectionId: string) => void;
+}
+
+export type MenuBranch = (ctx: BoardMenuContext) => ContextMenuItem[] | null;

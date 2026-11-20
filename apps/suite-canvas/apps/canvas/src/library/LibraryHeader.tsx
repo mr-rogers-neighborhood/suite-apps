@@ -1,0 +1,252 @@
+import { useState } from "react";
+import { Dialog } from "../dialogs/Dialog";
+import { tabKeyDown } from "../dialogs/tabKeys";
+import type { LibraryTab } from "../store/useUiStore";
+import { viewsEnabled } from "../views/availability";
+
+/**
+ * The strip, in reading order: what is loose, what exists, then the kinds worth their
+ * own door, then the two lists that are not cards at all.
+ *
+ * Seven labels do not fit the drawer's width, so the strip wraps to a second row
+ * instead of scrolling or truncating: a tab a reader cannot read is not a tab.
+ */
+const TABS: Array<{ id: LibraryTab; label: string }> = [
+  { id: "inbox", label: "Inbox" },
+  { id: "cards", label: "Cards" },
+  { id: "views", label: "Views" },
+  { id: "sketches", label: "Sketches" },
+  { id: "portals", label: "Portals" },
+  { id: "media", label: "Media" },
+  { id: "annotations", label: "Annotations" },
+  { id: "trash", label: "Trash" },
+];
+
+/**
+ * What a press has to land on to *not* dismiss the drawer: the drawer, the button
+ * that toggles it, and the menu and dialogs it portals out of its own tree. A row
+ * menu's backdrop is deliberately absent — pressing off the menu closes the menu,
+ * and the library with it.
+
+/** The drawer header: section tabs, the active view, scope, and the actions. */
+export function LibraryHeader({
+  tab,
+  counts,
+  canManageTrash,
+  onTab,
+  scope,
+  onScope,
+  activeBoardId,
+  activeBoardName,
+  full,
+  onFull,
+  selectableCount,
+  selecting,
+  onToggleSelecting,
+  onManageTypes,
+  onNewView,
+  onCreateInInbox,
+  trashCount,
+  onEmptyTrash,
+  onClose,
+}: {
+  tab: LibraryTab;
+  counts: Partial<Record<LibraryTab, number>>;
+  canManageTrash: boolean;
+  onTab: (tab: LibraryTab) => void;
+  scope: "all" | "board";
+  onScope: (scope: "all" | "board") => void;
+  activeBoardId: string | null;
+  activeBoardName: string | null;
+  full: boolean;
+  onFull: (full: boolean) => void;
+  /** Rows a selection could hold; zero hides the Select button. */
+  selectableCount: number;
+  selecting: boolean;
+  onToggleSelecting: () => void;
+  /** Opens the type editor. Absent on a surface where schema cannot be managed. */
+  onManageTypes?: (() => void) | undefined;
+  /** Opens the views editor on a new view; absent where views are not offered. */
+  onNewView?: (() => void) | undefined;
+  onCreateInInbox: () => void;
+  trashCount: number;
+  onEmptyTrash: () => void;
+  onClose: () => void;
+}) {
+  const [confirmingEmptyTrash, setConfirmingEmptyTrash] = useState(false);
+  const trashNoun = trashCount === 1 ? "card" : "cards";
+  // A tab nobody can use is a dead end: the views list would hold cards of a type whose surface is shut.
+  const tabs = TABS.filter(
+    (entry) => (canManageTrash || entry.id !== "trash") && (viewsEnabled || entry.id !== "views"),
+  );
+
+  return (
+    <div
+      className="library-header flex flex-wrap items-center gap-1 border-b border-[var(--hairline)] px-2 py-1.5"
+      data-handbook-region="library-tabs"
+    >
+      <div
+        role="tablist"
+        aria-label="Library sections"
+        className="flex flex-wrap items-center gap-1"
+        // One tab stop for the strip, arrows inside it: the role promises it,
+        // and three tabs in the tab order made the drawer a maze.
+        onKeyDown={(event) =>
+          tabKeyDown(
+            event,
+            tabs.findIndex((entry) => entry.id === tab),
+            tabs.length,
+            (index) => {
+              const next = tabs[index];
+              if (next === undefined) return;
+              onTab(next.id);
+              document.getElementById(`library-tab-${next.id}`)?.focus();
+            },
+          )
+        }
+      >
+        {tabs.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            role="tab"
+            id={`library-tab-${entry.id}`}
+            tabIndex={tab === entry.id ? 0 : -1}
+            aria-selected={tab === entry.id}
+            data-testid={`library-tab-${entry.id}`}
+            className="library-tab"
+            data-active={tab === entry.id ? "true" : undefined}
+            onClick={() => onTab(entry.id)}
+          >
+            {entry.label}
+            <span className="tabular-nums text-[var(--ink-muted)]">{counts[entry.id] ?? 0}</span>
+          </button>
+        ))}
+      </div>
+
+      {tab === "cards" ? (
+        <div className="library-scope" data-testid="library-scope">
+          <button
+            type="button"
+            data-testid="library-scope-all"
+            className="library-tab"
+            data-active={scope === "all" ? "true" : undefined}
+            aria-pressed={scope === "all"}
+            onClick={() => onScope("all")}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            data-testid="library-scope-board"
+            className="library-tab max-w-[10rem]"
+            data-active={scope === "board" ? "true" : undefined}
+            aria-pressed={scope === "board"}
+            disabled={!activeBoardId}
+            title={activeBoardName ?? "Active board"}
+            onClick={() => onScope("board")}
+          >
+            <span className="truncate">{activeBoardName ?? "Board"}</span>
+          </button>
+        </div>
+      ) : null}
+
+      <div className="ml-auto flex items-center gap-1">
+        {/* The drawer floats so a row can be dragged onto the board beside it; a
+            library with six sections is also a browser, and browsing wants the
+            window. Both are the same component and the same rows, and this is
+            one button in the header's action group rather than a second mode. */}
+        <button
+          type="button"
+          aria-pressed={full}
+          aria-label={full ? "Restore the library drawer" : "Expand the library"}
+          title={full ? "Restore the library drawer" : "Expand the library"}
+          data-testid="library-expand"
+          className="library-action"
+          onClick={() => onFull(!full)}
+        >
+          {/* Bidirectional arrows rather than a box or a cross: a cross next to
+              the drawer's own close button would read as a second close. */}
+          {full ? "\u2921" : "\u2922"}
+        </button>
+        {selectableCount > 0 || selecting ? (
+          <button
+            type="button"
+            aria-pressed={selecting}
+            data-testid="library-select-toggle"
+            className="library-action"
+            data-active={selecting ? "true" : undefined}
+            title={selecting ? "Leave selection" : "Select rows to act on them together"}
+            onClick={onToggleSelecting}
+          >
+            Select
+          </button>
+        ) : null}
+        {onNewView && tab === "views" ? (
+          <button
+            type="button"
+            data-testid="library-new-view"
+            className="library-action"
+            title="Write a query, choose how it is shown, and save it."
+            onClick={onNewView}
+          >
+            New view
+          </button>
+        ) : null}
+        {onManageTypes ? (
+          <button
+            type="button"
+            data-testid="library-types"
+            className="library-action"
+            title="Rename types, add fields, set the default look and pick templates."
+            onClick={onManageTypes}
+          >
+            Types
+          </button>
+        ) : null}
+        {tab === "inbox" ? (
+          <button
+            type="button"
+            data-testid="library-new-card"
+            className="library-action"
+            onClick={onCreateInInbox}
+          >
+            New
+          </button>
+        ) : null}
+        {tab === "trash" && canManageTrash && trashCount > 0 ? (
+          <button
+            type="button"
+            data-testid="library-empty-trash"
+            className="library-action text-red-600"
+            onClick={() => setConfirmingEmptyTrash(true)}
+          >
+            Empty trash
+          </button>
+        ) : null}
+        <button
+          type="button"
+          aria-label="Close library"
+          data-testid="library-close"
+          className="library-action library-close"
+          onClick={onClose}
+        >
+          {"\u00d7"}
+        </button>
+      </div>
+      {/* Emptying the trash is permanent: one press used to delete every card
+          in it with nothing to undo. The dialog says the number it will take. */}
+      {confirmingEmptyTrash ? (
+        <Dialog
+          title="Empty trash?"
+          description={`${trashCount} ${trashNoun} will be deleted for good, with everything written on them. This cannot be undone.`}
+          onClose={() => setConfirmingEmptyTrash(false)}
+          actions={[
+            { label: "Cancel", onSelect: () => {} },
+            { label: "Empty trash", danger: true, onSelect: onEmptyTrash },
+          ]}
+        />
+      ) : null}
+    </div>
+  );
+}

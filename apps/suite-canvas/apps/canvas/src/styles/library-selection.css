@@ -1,0 +1,389 @@
+/* The library's row selection: a selected row is tinted, and the bar that acts on it
+   is tinted with it. */
+
+/* A selected row is not a focused one: the focus ring says "the canvas is
+   pointing here", the tint says "this will be acted on". */
+.library-entry[data-selected="true"] .library-row {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.library-selection {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/*
+ * The stack in hand during a "Place cards" run of picks: a rolled-up set of cards
+ * that follows the pointer, with the count of what is left. It is drawn at the
+ * pointer in screen space because the card it stands for does not exist on the
+ * board yet.
+ */
+.held-stack {
+  position: fixed;
+  z-index: 70;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.held-stack__under,
+.held-stack__card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 168px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.held-stack__under--far {
+  transform: translate(6px, 6px) rotate(3deg);
+  opacity: 0.5;
+}
+
+.held-stack__under--near {
+  transform: translate(3px, 3px) rotate(1.5deg);
+  opacity: 0.75;
+}
+
+.held-stack__card {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  box-shadow: 0 14px 30px -14px rgba(0, 0, 0, 0.45);
+}
+
+.held-stack__title {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.held-stack__count {
+  flex: none;
+  font-size: 10px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Where a library drag would land.
+ *
+ * A dashed card, drawn in flow units under the pointer, so the drop has a size and a
+ * place before anything is written. Dragging a picked stack says so in the label:
+ * the outline is the same, the count is the difference.
+ */
+.library-drop-preview {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  border-style: dashed;
+  color: var(--accent);
+  pointer-events: none;
+}
+
+.library-drop-preview__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The link tool: three segments in the widget pill, each painted by its value
+ * (`--value-place-*`, `--value-thread-*`, `--value-fan-*`) so the active one is the
+ * colour that value already means everywhere else. The pill owns the chrome.
+ */
+/*
+ * The link tool is one 26px segment, like every other in the pill: a glyph for the shape
+ * the mode draws, painted by the value it holds (`--value-place-*`, `--value-thread-*`,
+ * `--value-fan-*`), so the colour says the mode before the glyph does.
+ */
+.link-mode-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  background: var(--value-fill);
+  color: var(--value-ink);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.link-mode-control:hover {
+  background: color-mix(in srgb, var(--value-hue) 10%, var(--value-fill));
+}
+
+/*
+ * The stack in hand, listed in the order it will be placed.
+ *
+ * A stack goes down one press at a time, in the order it was built, so the order is the reader's last decision before
+ * the first press. It sits **top-left**, under the 44px app bar: bottom-left is React Flow's own `<Controls>` pill, which
+ * holds the placement-mode and purpose buttons, and a panel over it hides the controls the gesture needs.
+ */
+.place-outline {
+  position: fixed;
+  top: 56px;
+  left: 16px;
+  z-index: 71;
+  display: flex;
+  width: 244px;
+  max-height: 42vh;
+  flex-direction: column;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px -18px rgb(0 0 0 / 0.5);
+  font-size: 11px;
+  overflow: hidden;
+}
+
+.place-outline-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.place-outline-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.place-outline-rows {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  margin: 0;
+  padding: 3px 0;
+  list-style: none;
+}
+
+.place-outline-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+}
+
+/* The card that goes down next: the one the next press will place. */
+.place-outline-row[data-first="true"] {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.place-outline-index {
+  width: 12px;
+  flex: none;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.place-outline-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.place-outline-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+}
+
+.place-outline-hint {
+  flex: none;
+  padding: 4px 6px;
+  border-top: 1px solid var(--hairline);
+  color: var(--ink-muted);
+  font-size: 10px;
+}
+
+.place-outline-hint kbd {
+  padding: 0 3px;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  font-size: 9px;
+}
+
+/*
+ * The choice after the last card lands.
+ *
+ * Centred at the bottom rather than pinned to a corner: it is a decision about the whole gesture, not a tool, and the
+ * board beneath it has to stay usable while it is up.
+ */
+.action-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+/* The note is the sentence; the actions keep their width, because the numbers in them move as a reader picks. */
+.action-bar-note {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+
+/*
+ * The choice after the last card lands.
+ *
+ * Centred at the bottom rather than pinned to a corner: it is a decision about the whole gesture, not a tool, and the
+ * board beneath it has to stay usable while it is up.
+ */
+.action-bar--floating {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  z-index: 72;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px -18px rgb(0 0 0 / 0.5);
+  font-size: 11px;
+  transform: translateX(-50%);
+}
+
+/* The placement mode, under the queue's header: one control, the same component the canvas pill draws. */
+.place-outline-mode {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.place-outline-mode-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+/* In the panel the button is a button, not an edge of the pill: same glyph, its own frame. */
+.place-outline-mode-button {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+}
+
+/* What a selection box picks up: one control in the canvas pill, opening to three toggles. */
+.select-mode {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.select-mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  background: var(--value-fill);
+  color: var(--value-ink);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.select-mode-toggle:hover {
+  background: color-mix(in srgb, var(--value-hue) 10%, var(--value-fill));
+}
+
+/* The count in force, so a closed widget still says something about the mode. */
+.select-mode-count {
+  font-size: 8px;
+  opacity: 0.75;
+}
+
+/*
+ * The menu is a portal, not a child of the pill: the pill clips to its own radius
+ * (`overflow: hidden` in `global.css`), so an absolutely-positioned child was invisible.
+ * Its position, size and height cap come from the button's rect in `SelectModeControl`.
+ */
+.select-mode-menu {
+  position: fixed;
+  z-index: 45;
+  display: flex;
+  min-width: 132px;
+  flex-direction: column;
+  padding: 3px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 10px 26px -16px rgb(0 0 0 / 0.5);
+}
+
+.select-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font-size: 11px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.select-mode-row:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.select-mode-label {
+  flex: 1 1 auto;
+}
+
+/* The state mark, drawn rather than typed: a tick and a cross are icons in the app's own set, like the rows' glyphs. */
+.select-mode-tick {
+  display: flex;
+  align-items: center;
+  width: 12px;
+  color: var(--accent);
+}

@@ -1,0 +1,52 @@
+{
+  // Dead-code and dependency-drift reporting. `pnpm knip` is a report, not a
+  // gate: it exits 1 on the unused-export list, which is deliberate. Most of that
+  // list is exported for a co-located test and imported by nothing else, and the
+  // rest is a vocabulary the modules share (mode names, constants that name a
+  // value the code compares against). Deleting either kind to satisfy a report
+  // makes the next change worse. What the report is trusted for is `Unused
+  // files` and `Unused devDependencies`: those were two real findings, and the
+  // two configuration entries below are the false ones, silenced where they are
+  // generated rather than deleted.
+  //
+  // This file exists so the run resolves the same entry points the app actually
+  // starts from instead of guessing, which keeps the report free of false
+  // "unused file" noise.
+  //
+  // Knip's own plugins (vite, tsx, playwright, vitest) already resolve most of
+  // what is spelled out here, so it prints "Remove redundant entry pattern" and
+  // "Remove from ignore" under *Configuration hints*. Those hints are not
+  // findings: the entries are recorded intent, and the report's value is the
+  // unused-file/export/dependency list above them.
+  //
+  "$schema": "./node_modules/knip/schema-jsonc.json",
+  "ignore": [
+    "dist/**",
+    "coverage/**",
+    "storybook-static/**",
+    "e2e/test-results/**",
+    "reports/**",
+    "apps/site/.astro/**"
+  ],
+  "workspaces": {
+    ".": {
+      // The repo-root `.mjs` scripts are run by `pnpm <script>`, which knip does
+      // not read as an import edge.
+      "entry": ["scripts/*.mjs"],
+      "project": ["scripts/*.mjs"]
+    },
+    "apps/canvas": {
+      // Vite's HTML entry resolves `src/main.tsx`.
+      "entry": ["index.html", "src/main.tsx"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/graph": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "e2e": {
+      "entry": ["tests/**/*.spec.ts"],
+      "project": ["**/*.ts"]
+    }
+  }
+}

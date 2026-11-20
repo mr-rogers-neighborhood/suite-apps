@@ -1,0 +1,73 @@
+# The hub's own package.
+#
+# Start is installed like any other app, so `pnpm package:dir` has to produce a
+# binary a person can run. It ships no `suite.app.json`: the hub is not an app the
+# hub lists, and a manifest beside this binary would only invite it to.
+appId: run.suite.start
+productName: Suite Start
+executableName: suite-start
+# No spaces: GitHub rewrites a space in an asset name to a dot, and the feed names the
+# file it published — so `Suite Start-0.3.0.AppImage` in the yml became
+# `Suite.Start-0.3.0.AppImage` on the release, and the download the feed promised 404ed.
+artifactName: suite-start-${version}-${arch}.${ext}
+copyright: Copyright © Suite contributors
+
+directories:
+  output: release
+  buildResources: build
+
+# The window's own icon comes from here at runtime: the desktop entry's icon and the
+# taskbar icon have different sources, and only the entry reads the hicolor theme.
+extraResources:
+  - from: build/icon.png
+    to: icon.png
+  # Each app's artwork, at the size a menu entry's icon folder claims. Copied into
+  # `resources/icons/<id>.png` so `writeShortcut` can install one per app instead of
+  # putting the hub's own mark under every app's name.
+  - from: build/app-icons
+    to: icons
+
+files:
+  - dist/**/*
+  - package.json
+
+asar: true
+
+# The same fuses the apps set: without them a modified binary can be told to run
+# any Node script.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  # Every page is served from a custom protocol now, so file:// needs no extra privileges.
+  grantFileProtocolExtraPrivileges: false
+
+linux:
+  target:
+    - AppImage
+    - deb
+  # The package declares its own desktop entry, so the shell must agree with it about
+  # WM_CLASS or a panel draws a second, generic icon for the same window.
+  syncDesktopName: true
+  category: Utility
+  synopsis: The Suite hub
+  description: Discovers installed Suite apps, opens their documents and routes suite:// links.
+
+# The hub is the one process that owns `suite://`. Every app is reached through
+# it, so the scheme is declared here rather than on three app packages that
+# would each claim it.
+protocols:
+  - name: Suite
+    schemes:
+      - suite
+
+# The feed the app's updater reads, and the one the hub reads when a person asks.
+# `latest/download` is a stable redirect to the newest release's assets, so the
+# URL never has to be rewritten per version, and GitHub serves the manifest the
+# updater writes beside the artifacts.
+publish:
+  provider: generic
+  url: https://github.com/mr-rogers-neighborhood/suite-start/releases/latest/download

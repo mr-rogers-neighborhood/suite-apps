@@ -1,0 +1,14 @@
+{
+  "format": "suite.app",
+  "id": "budget",
+  "name": "Suite Budget",
+  "version": "0.2.2",
+  "contractVersion": "1.0.0",
+  "deepLinkPrefix": "suite://budget/",
+  "fileExtensions": ["budget"],
+  "update": {
+    "feed": "https://github.com/mr-rogers-neighborhood/suite-budget/releases/latest/download",
+    "channel": "alpha"
+  },
+  "capabilities": ["document.file"]
+}
