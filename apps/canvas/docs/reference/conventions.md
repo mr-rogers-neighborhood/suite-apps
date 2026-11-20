@@ -10,8 +10,9 @@ Pure modules take data and return data: schema, records, planning (`layoutPlan`)
 planning, link geometry, name derivation. No DOM, no Loro, no `fetch`, no timers, and a test that needs
 none of them.
 
-Shell modules own state or I/O: `WorkspaceDocument` and its domain modules, `LoroIndexeddbPersistence`,
-the collab provider, the projection worker, HTTP handlers, React host components.
+Shell modules own state or I/O: `WorkspaceDocument` and its domain modules,
+`LoroIndexeddbPersistence`, the sync service in `desktop/src/main/sync/`, the file store and the React
+host components.
 
 Dependencies point inward. A pure module that imports `loro/WorkspaceDocument.ts` is a bug; the graph
 layer passes plain values down and interprets results up.
@@ -21,10 +22,9 @@ Zustand, and transient view state may live in React. Never keep a second copy.
 
 ## Files and folders
 
-Folder by feature, not by file type: `src/{canvas,cards,library,panels,command,field,shell,sharing,session,store,collab,editor,theme}`,
-`apps/collab-server/src/{http,store,projection,config,sync}`,
-`services/auth/src/{identity,organizations,invitations,licensing,http,store}`, and
-`packages/graph/src/loro/<domain>`.
+Folder by feature, not by file type:
+`src/{canvas,cards,chrome,command,field,library,panels,session,store,collab,editor,theme}`,
+`desktop/src/{main,preload,shared}`, and `packages/graph/src/loro/<domain>`.
 
 Each folder exposes one `index.ts` and nothing else as public surface. No barrel files that re-export
 everything. The facade (`WorkspaceDocument`) and the folder index are the API.
@@ -232,8 +232,7 @@ with `doc.export({ mode: "update" })` and `doc.import(...)` in both directions, 
 `workspace.convergence.test.ts` fuzzes this across seeds, so add a seeded case for a new kind of write.
 
 React Testing Library covers non-trivial UI in `src`, and Playwright covers journeys in `e2e`.
-Tests run under Node's runner in `services/billing` and Vitest elsewhere; the tiers are in
-[../how-to/test-and-verify.md](../how-to/test-and-verify.md).
+Everything runs under Vitest; the tiers are in [../how-to/test-and-verify.md](../how-to/test-and-verify.md).
 
 ## Commits
 

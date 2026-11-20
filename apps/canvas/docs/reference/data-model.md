@@ -1,8 +1,8 @@
 # Data model
 
-This page does not cover how the canvas draws these records or how a share link is authenticated;
-[architecture.md](architecture.md) and [security-model.md](security-model.md) own those. It describes the
-records `@suite/graph` stores, the rules a write follows, and the two derived surfaces beside the document.
+This page does not cover how the canvas draws these records; [architecture.md](architecture.md) and
+[canvas.md](canvas.md) own that. It describes the records `@suite/graph` stores, the rules a write follows,
+and the two derived surfaces beside the document.
 
 ## One document, thirteen roots
 
@@ -260,8 +260,9 @@ the same rule a private card reference follows.
 
 ## Publish: plan, then apply
 
-A share editor never writes the owner's document. It edits a draft, and publishing copies the captured
-values onto the source in one commit.
+Publishing is a plan and an apply. The plan compares a draft with the source and captures the value of
+every change; the apply writes those values onto the source in one commit. No shipped surface opens a
+draft, because sync edits the same document on both devices.
 
 `packages/graph/src/publish/` owns both halves. `planPublish` is pure: it compares the draft, the baseline
 and the source, records `changes`, `conflicts` and `unsupported` keys, and captures the exact value of each
@@ -276,17 +277,17 @@ change kind, so the replay rule for each kind can be read on its own.
 The caps the schema enforces live with it in `@suite/graph`: bytes per card text, coordinate range,
 rich-text nesting and a fixed allowlist of node and mark names.
 
-## Projection: a second document per share
+## Projection: a document for a subset
 
-A board, card or selection share reads a projection, which is a fresh `LoroDoc` built from the owner's
-document. `projectWorkspace` in `packages/graph/src/projection/workspace.ts` copies the board, the selected
-cards, their placements, their sections and the edges whose ends both travel, then commits once under
-`sys:projection`.
+`projectWorkspace` in `packages/graph/src/projection/workspace.ts` builds a fresh `LoroDoc` from a board,
+a card or a selection: the board, the selected cards, their placements, their sections and the edges
+whose ends both travel, committed once under `sys:projection`. Nothing outside that scope is copied, and
+a reference to a card that stayed behind is reported with `private: true` rather than copied; a board
+projection redacts those titles to `PRIVATE_REFERENCE_TITLE`. `applyProjection` in
+`packages/graph/src/projection/apply.ts` replays such a document into a live one.
 
-Nothing outside the selected scope is copied, so the projection cannot leak a record the share does not
-cover. A reference to a card that stayed behind is reported with `private: true` instead of being copied, and
-a board share replaces the title with `PRIVATE_REFERENCE_TITLE`. The relay keeps one such document per open
-share room, and `apps/collab-server/src/projection/` rebuilds it when the owner's copy changes.
+The builder has tests and no caller in the app. The share room that served it is retired, and a share
+is an invite into a workspace or a file ([Decisions](decisions.md#sharing)).
 
 ## History is the oplog
 

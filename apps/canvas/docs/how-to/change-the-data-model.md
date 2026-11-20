@@ -123,7 +123,7 @@ node scripts/check-shape.mjs
 
 ## 5. Carry it through publish and projection
 
-A share editor publishes a plan, so a field that a draft can edit needs the whole path:
+Publishing a draft is a plan, so a field that a draft can edit needs the whole path:
 
 | Step | File |
 | --- | --- |
@@ -136,10 +136,10 @@ A share editor publishes a plan, so a field that a draft can edit needs the whol
 `apply.ts` keeps one named applier per change kind, so a new kind is a new function and one line in the
 `APPLIERS` table.
 
-A field a share must show also travels through the projection: `packages/graph/src/projection/workspace.ts`
+A field a projection must carry also travels through it: `packages/graph/src/projection/workspace.ts`
 for the selection, `packages/graph/src/projection/containers.ts` for text, and
 `packages/graph/src/projection/references.ts` for a reference that stays behind. A field left out of the
-projection is invisible to every viewer, and no error says so.
+projection is invisible to whoever receives it, and no error says so.
 
 ## 6. Repair documents already stored
 
@@ -175,8 +175,8 @@ A new record kind under an existing root: steps 1 to 4. Add `list*` and `get*` o
 a record nobody can list is not reachable by the canvas.
 
 A new root: add the key to `STRUCT_KEYS`, add it to `WorkspaceDocument.ROOT_KEYS`, open it in the facade
-constructor, and check `apps/collab-server/src/store/` and `packages/graph/src/projection/` for anything that
-copies roots by name.
+constructor, and check `packages/graph/src/projection/apply.ts` and `packages/graph/src/portable.ts` for
+anything that copies roots by name.
 
 A change to the reference index only: edit `packages/graph/src/loro/cards/references.ts`, keep the recompute
 `INDEX_ORIGIN`-tagged, and add a case to `packages/graph/src/references.test.ts`.

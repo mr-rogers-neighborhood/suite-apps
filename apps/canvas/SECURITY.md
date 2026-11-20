@@ -15,40 +15,51 @@ maintainer can, is the commitment.
 
 ## Access model
 
-Anonymous workspaces are the shipped path. Access travels as bearer links: an owner key for a
-workspace, a share token for a share of it. The relay keeps documents in plaintext and keeps
-credentials only as SHA-256 hashes. Document contents are not end-to-end encrypted, and nothing on the
-relay attributes a change to a person.
+Canvas ships one document in one file, and sync when the owner turns it on for that workspace.
 
-An account layer exists in `services/auth`: organizations, roles, invitations and licensing. It is
-built and tested, and no running process mounts it. The relay refuses an account session with
-`account-check-unavailable` rather than guessing a seat count, and no process opens a Postgres pool.
-[Security model](docs/reference/security-model.md) has the full picture, including what the account
-layer will and will not change.
+A workspace is a `.canvas` file: a JSON envelope around a base64 Loro snapshot. Anyone who has the
+file can read the workspace, so file permissions, disk encryption and where the file is kept are the
+access control. The shell writes atomically, keeps a backup beside it, and refuses to replace a file it
+could not parse.
+
+Sync is opt-in and off by default. The device that turns it on creates the workspace's group; another
+device joins with an invite that names a role, and a member's device adds it to the group. Group keys
+live in the main process, never in the page, and document updates travel sealed. The host that carries
+them stores frames it cannot read, plus signed records that name a device and a role. Removing a device
+revokes it and moves the group to a new epoch, so the removed copy cannot read anything new.
+
+There is no account layer and no hosted build. The account, billing and collab services this page once
+described are not in the tree, and no sign-in path is reachable. A share is an invite into the
+workspace a device runs, or a file, so there is no share token to mint or authenticate.
+[Decisions](docs/reference/decisions.md#sharing) is the record of what replaced them.
 
 ## In scope
 
-- A credential accepted for the wrong room, or accepted after revocation.
-- A share token that can mint or revoke another link.
-- Path traversal or arbitrary file write through an attachment or a store path.
-- Signature, HMAC or key-handling mistakes in the licence verifier or the Stripe webhook.
-- Cross-site scripting through card content, attachment types or error pages.
-- A rate limit that can be bypassed trivially.
+- An IPC message the shell accepts from a page it did not load, or a renderer reaching a capability
+  the preload does not expose.
+- A frame or an invite a device can use after it was removed, or a device reading an epoch it has left.
+- A group key that leaves the main process, or a recovery file that opens without the passphrase set
+  on it.
+- Path traversal or arbitrary file write through an attachment, a recovery file or a store path.
+- Signature or key-handling mistakes in a frame, an invite or a membership record.
+- Cross-site scripting through card content, attachment types or the handbook renderer.
+- A document truncated or replaced when a write fails, or a backup lost on the way.
 
 ## Known and accepted for Beta
 
-- No end-to-end encryption. The relay can read every document it stores.
-- Single instance, six SQLite stores on one volume, no multi-tenant isolation beyond the per-room
-  credential check.
-- No per-user attribution and no audit log for anonymous workspaces.
-- Hosted billing is closed; a licence key is a signed token you hold.
-- The account layer is not deployed, so no sign-in path is reachable on a running relay.
+- No encryption at rest. A `.canvas` file is readable by anyone who has it.
+- No TLS on the sync transport yet. A host belongs on a private network or behind a tunnel, and the
+  host sees device ids, roles and timing even though it cannot read the document.
+- The host keeps a retention window of sealed frames. A device away longer asks a peer for a snapshot,
+  because the host cannot hand out a document it cannot read.
+- Roles belong to devices, not people: no per-person attribution and no audit log.
+- Sync is opt-in, so a workspace with it off sends nothing.
 
 ## Deployment expectations
 
-TLS, disk encryption and backups belong to the person running it. Canvas talks to no service, so there
-is no deployment to secure: the file and the machine it is on are the whole surface.
-[Security model](docs/reference/security-model.md) is the detail.
+Canvas has no hosted deployment. The file, the machine and, when sync is on, the host you run are the
+whole surface. TLS, disk encryption and backups belong to the person running it.
+[Security model](docs/reference/security-model.md) covers the renderer, the binary and the file.
 
 ## Supported versions
 

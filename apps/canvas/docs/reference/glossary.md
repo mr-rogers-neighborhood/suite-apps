@@ -23,9 +23,6 @@ One definition per term, in the sense this repository uses it. The model behind 
 | view | A saved query: search text, scope, facets, grouping and order, stored without any card ids | `views`, `ViewQuery` |
 | lens | What a saved view does to the canvas: it dims everything the query did not select | `activeViewId`, `runViewQuery` |
 | portal | A card that opens another board and shows a live miniature of it | `PortalNode`, `board` field |
-| share projection | The read-only copy of a board, card or selection that a share link opens | `projectWorkspace`, `share-<token>` |
-| account | A person in the identity service, mapped to workspace capabilities through an organization role | `services/auth`, `account` |
-| licence | A signed Ed25519 token that sets a hosted relay's workspace and byte caps, and never gates a feature | `licence.ts`, `LicenceClaims` |
 | presence | Ephemeral signals about a peer: pointer, selection, gesture, caret | `EphemeralStore`, `presence.ts` |
 | target | The one shape for "the thing I mean", shared by focus, Follow, Goto, tours and the handbook; `ui` names a region of the shell | `Target`, `focusTarget`, `HandbookRegion` |
 | handbook article | One Markdown file in `handbook/`, rendered by the shell and by the docs site from the same source | `handbook/`, `HandbookArticle` |
@@ -35,7 +32,6 @@ One definition per term, in the sense this repository uses it. The model behind 
 | inbox | The cards with no placement on any board | `listInboxCards`, `Inbox` tab |
 | home board | The board a card returns to and the workspace lands on; the oldest placement wins | `homeBoardId`, `homeBoardId(cardId)` |
 | layer rank | The fractional `z` value ordering cards within one board | `placements.<id>.z`, `moveLayer` |
-| claim | Recording the organization that owns a workspace, which happens on the first signed-in join | `workspace_orgs`, `claimWorkspaceForSession` |
 | fold | A card or a section reduced to its header. Reader state, never a document write | `collapsedCards`, `collapsedSections` |
 | swatch | One colour in the workspace palette: a name and a value for each mode | `palette`, `PaletteSwatch` |
 | type style | The default paint for every card of a type. A card's own style wins over it | `cardTypeSchema.style` |
@@ -45,6 +41,10 @@ One definition per term, in the sense this repository uses it. The model behind 
 A card is never a node, a note or a document. A node is a React Flow node, a note is the built-in card
 type, and a document is the whole workspace document. A placement is never a deletion: say "remove from
 board". Trash is never a delete: "delete forever" belongs to purging.
+
+An account, a licence and a share link are not part of the app, so a page does not describe one as
+something to sign in to or to buy. [Decisions](decisions.md#sharing) records what replaced the hosted
+tier.
 
 A board is not a canvas, and a workspace is not a file. The canvas is the surface that renders a board, and
 a file is a `.canvas` backup on disk. A `.suite` file is a bundle of several apps' files, and a `.suite`

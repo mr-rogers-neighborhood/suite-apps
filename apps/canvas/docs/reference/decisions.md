@@ -37,8 +37,16 @@ The rules that shape Canvas. The architecture and data model pages describe how 
 
 ## Sharing
 
-- A share is a projection over a redacted copy. The workspace index is never shared.
-- Authentication is per room: workspace or card.
+- The hosted tier is gone from the tree, not moved: there is no collab server, no account service, no
+  billing service, no control plane and no hosted build. There is no share link either, so nothing
+  resolves a `?share=` address.
+- What ships is a local document plus opt-in sync. One device runs the workspace and a `suite-sync` host
+  carries the frames; another device joins with an invite. Sharing is that invite, or the exported
+  file. Roles are viewer and editor.
+- Sync sends sealed frames. Group keys live in each member's main process, so the host stores frames
+  it cannot read and signed records that name a device and a role, never the document.
+- A removed device is revoked: the group moves to a new epoch, so the removed copy cannot read
+  anything new. Membership is the authority, not an account.
 
 ## Non-goals
 

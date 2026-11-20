@@ -91,28 +91,22 @@ Tests sit beside the thing they test: `src/cards/NodeCard.test.tsx` covers the c
   new node, mark or field renderer also has to keep
   `src/editor/editorSchemaContract.test.ts` passing; the procedure is in
   [change-the-editor.md](change-the-editor.md).
-- A Playwright spec under the matching `e2e/tests/<area>/` folder when the behaviour only exists
-  across the server and the browser. The areas today are `account`, `appearance`, `boards`, `boot`,
-  `cards`, `collab`, `input`, `library`, `links`, `selection`, `sharing`, `views` and `visual`. Tag the
-  happy path `@smoke` if that area already has a smoke test, since `pnpm e2e:smoke` runs exactly those.
+- A Playwright spec under the matching `e2e/tests/<area>/` folder when the behaviour only exists in
+  the running app. The areas today are `appearance`, `boards`, `boot`, `cards`, `desktop`, `input`,
+  `library`, `links`, `selection`, `views` and `visual`. Tag the happy path `@smoke` if that area
+  already has a smoke test, since `pnpm e2e:smoke` runs exactly those.
 
-## 6. Touch the server only if the feature reaches it
+## 6. Touch the sync wire only if the feature reaches it
 
-The collab server does not know about card fields; it stores documents. A feature reaches it when it
-adds a route, a stored format, a quota or a metric, and each has one home:
+Canvas ships no server, and the collab server, control plane, account and billing services this section
+used to name are gone. Sync is opt-in per workspace and runs through a `suite-sync` host that someone
+runs; the Canvas half is the main-process service in `desktop/src/main/sync/`.
+[Decisions](../reference/decisions.md#sharing) holds what replaced the hosted tier.
 
-| Concern | Home under `apps/collab-server/src` |
-| --- | --- |
-| Route, request parsing, CORS, rate limit | `http/` |
-| Persisted file, migration, store schema | `store/` |
-| Share projection, room, sweep | `projection/` |
-| Socket, seat gate, room save | `sync/` |
-| Env parsing, limits resolution | `config/` |
-| Admin API, metrics, log line | `ops/` |
-
-The account control plane has the same shape in `services/auth/src/` (`http/`, `identity/`,
-`invitations/`, `licensing/`, `organizations/`, `store/`), and billing in `services/billing/src/`
-(`handler/`, `stripe/`, `store/`, `ops/`).
+A feature reaches the wire when it adds a frame, a membership rule or an epoch transition. The frame
+types and their schemas live in `apps/sync/packages/protocol`, and the host in
+`apps/sync/packages/host`. Text, fields and layout stay in the document: nothing about a card becomes a
+message of its own.
 
 A new limit is a constant in the package that enforces it, with a test at the boundary. A new stored
 format needs a fixture of the previous shape and a test that opens it.
@@ -125,9 +119,9 @@ pnpm check                    # biome, tsc, vitest run --changed, docs symbols, 
 pnpm exec vitest run  src/cards   # one area, while iterating
 ```
 
-That is the whole per-change gate. `pnpm verify` runs it plus the billing tests, the story suite and
-the build. Playwright runs when the owner asks for a run, and [test-and-verify.md](test-and-verify.md)
-has the area scripts.
+That is the whole per-change gate. `pnpm verify` runs it plus the story suite, the build and the
+security scans. Playwright runs when the owner asks for a run, and
+[test-and-verify.md](test-and-verify.md) has the area scripts.
 
 Then update the docs that describe the new fact, and say it in `CHANGELOG.md` under the version it
 lands in. A decision that changes ownership, or that a future reader would otherwise re-litigate,

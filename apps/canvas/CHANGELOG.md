@@ -6,7 +6,11 @@ a release is tagged `canvas-v<version>`. See
 
 ## [Unreleased]
 
-No changes yet.
+### Changed
+
+- **Canvas's documentation describes the app that ships.** The pages that sent a reader to the retired
+  collab server, account service or billing service now describe a local document with optional sync,
+  and `SECURITY.md` describes that same surface.
 
 ## [0.1.9] - 2026-11-18
 
