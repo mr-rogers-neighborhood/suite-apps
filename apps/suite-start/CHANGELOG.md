@@ -8,7 +8,14 @@ the apps pin, and are not releases of the launcher.
 
 ## [Unreleased]
 
-No changes yet.
+### Added
+
+- **Start sees Flatpak installs.** An app installed with Flatpak appears on its card with its own
+  version, opens through `flatpak run`, can be shown in the file manager, and can be removed by
+  asking Flatpak to remove it. The card says `Flatpak` instead of borrowing the AppImage feed's
+  version, because the remote is that install's update path. When the same app is also installed as
+  an AppImage, the AppImage is the one shown: two copies cannot run at once, and the AppImage is the
+  one Start may replace.
 
 ## [0.3.12] - 2026-11-08
 
