@@ -2,12 +2,12 @@
   "format": "suite.app",
   "id": "planner",
   "name": "Suite Planner",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "contractVersion": "1.0.0",
   "deepLinkPrefix": "suite://planner/",
   "fileExtensions": ["planner"],
   "update": {
-    "feed": "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/planner",
+    "feed": "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/planner",
     "channel": "alpha"
   },
   "capabilities": ["document.file"]

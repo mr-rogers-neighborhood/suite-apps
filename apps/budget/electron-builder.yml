@@ -67,4 +67,4 @@ win:
 # tag, so the manifest can move while the artifact stays a release asset.
 publish:
   provider: generic
-  url: https://mr-rogers-neighborhood.github.io/suite-apps/feeds/budget
+  url: https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/budget

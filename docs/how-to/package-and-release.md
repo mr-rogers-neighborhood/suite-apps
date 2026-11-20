@@ -11,11 +11,15 @@ A release is three things that must describe the same commit:
 - a signed manifest committed at `feeds/<app>/latest-linux.yml`;
 - a changelog section for the version in the app's `CHANGELOG.md`.
 
-GitHub Pages serves the repository root, so the manifest is fetched from
-`https://mr-rogers-neighborhood.github.io/suite-apps/feeds/<app>/latest-linux.yml`. Its detached
-signature sits beside it as `latest-linux.yml.sig`. The artifact stays a release asset; the manifest
-names it by absolute URL on the app's tag, so the manifest can move while the bytes stay where a
-release put them.
+The manifest is committed, so it is fetched straight from the repository at
+`https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/<app>/latest-linux.yml`.
+Its detached signature sits beside it as `latest-linux.yml.sig`. The artifact stays a release asset;
+the manifest names it by absolute URL on the app's tag, so the manifest can move while the bytes stay
+where a release put them.
+
+The host is the raw file server rather than GitHub Pages because a Pages build needs GitHub Actions,
+and Actions is not available on this account. A signed manifest does not need a build step: the bytes
+in the repository are the bytes served, and the signature is the trust anchor.
 
 ## One command per app
 

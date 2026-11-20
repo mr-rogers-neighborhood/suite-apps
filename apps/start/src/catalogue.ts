@@ -72,7 +72,7 @@ export const CATALOGUE_APPS = [
     folder: "Canvas",
     extensions: ["canvas"],
     capabilities: ["document.file", "sync", "attachments", "publish"],
-    feed: "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/canvas",
+    feed: "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/canvas",
     channel: "alpha",
   },
   {
@@ -81,7 +81,7 @@ export const CATALOGUE_APPS = [
     folder: "Planner",
     extensions: ["planner"],
     capabilities: ["document.file"],
-    feed: "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/planner",
+    feed: "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/planner",
     channel: "alpha",
   },
   {
@@ -90,7 +90,7 @@ export const CATALOGUE_APPS = [
     folder: "Budget",
     extensions: ["budget"],
     capabilities: ["document.file"],
-    feed: "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/budget",
+    feed: "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/budget",
     channel: "alpha",
   },
 ] as const satisfies readonly CatalogueEntry[];

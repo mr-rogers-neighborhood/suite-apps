@@ -99,10 +99,14 @@ feeds/budget/latest-linux.yml
 feeds/start/latest-linux.yml
 ```
 
-GitHub Pages serves the repository root, so the base URL for an app is
-`https://mr-rogers-neighborhood.github.io/suite-apps/feeds/<app>`. A detached ed25519 signature sits
-beside each manifest as `latest-linux.yml.sig`; the same base URL is compiled into the app's
-`suite.app.json`, its electron-builder config and Start's catalogue.
+The manifest is committed, so it is served straight from the repository: the base URL for an app is
+`https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/<app>`. A detached
+ed25519 signature sits beside each manifest as `latest-linux.yml.sig`; the same base URL is compiled
+into the app's `suite.app.json`, its electron-builder config and Start's catalogue.
+
+A raw file server, not GitHub Pages: a Pages build needs GitHub Actions, and Actions is unavailable
+on this account. Nothing is lost, because the manifest is signed — the signature is checked, and the
+host only has to return the bytes that were committed.
 
 The manifest keeps the shape electron-builder writes, with one difference: its artifact URL is
 absolute, pointing at `https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/<app>-v<version>/<file>`.

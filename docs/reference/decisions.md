@@ -25,8 +25,9 @@ The rules that shape this repository. Each is current; the code follows it.
 - The hub is packaged; the apps are AppImages. A copy a person placed manages itself.
 - Flatpak is a second channel: Start lists and launches installs, installs from the store, updates a
   deployment whose commit is behind, and removes through Flatpak. Flatpak is the writer, never Start.
-- Signed manifests live at `feeds/<app>/latest-linux.yml` in this repository, served by GitHub Pages.
-  The artifact they name stays an asset on the app's `<app>-v<version>` release tag.
+- Signed manifests live at `feeds/<app>/latest-linux.yml` in this repository, served from the raw
+  file host at `main` because GitHub Pages would need Actions. The artifact they name stays an asset
+  on the app's `<app>-v<version>` release tag.
 - `scripts/release.mjs` is the release path. It refuses a dirty tree, a version with no changelog
   heading, a commit the gate has not proven, and a manifest whose artifact is missing. It is a dry
   run unless `--publish` is passed.

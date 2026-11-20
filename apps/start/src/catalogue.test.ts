@@ -50,7 +50,7 @@ function unsignedHost(body: string): FeedFetch {
 }
 
 const base = "https://local.test/feed";
-const FEED_HOST = "https://mr-rogers-neighborhood.github.io/suite-apps";
+const FEED_HOST = "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main";
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
 /** Where each app's own manifest and builder config live in this checkout. */

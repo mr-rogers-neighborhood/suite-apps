@@ -100,7 +100,7 @@ describe("installApp", () => {
       entry: planner,
       version: "0.2.0",
       artifact: { ...artifactFor(bytes), url },
-      feed: "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/planner",
+      feed: "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/planner",
       appsRoot,
       registry,
       download: async (source, destination) => {

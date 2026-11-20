@@ -11,14 +11,15 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 No changes yet.
 
-## [0.3.13] - 2026-11-20
+## [0.3.14] - 2026-11-20
 
 ### Changed
 
-- **Feeds come from one folder per app on GitHub Pages.** The hub reads
-  `feeds/<app>/latest-linux.yml` instead of reaching into each app's own repository, so four apps can
-  publish from this one repository without sharing a single `releases/latest` URL. The manifest is
-  signed and names the release asset it offers.
+- **Feeds come from one folder per app, served from the repository.** The hub reads
+  `feeds/<app>/latest-linux.yml` at `main` instead of reaching into each app's own repository, so
+  four apps can publish from this one repository without sharing a single `releases/latest` URL. The
+  manifest is signed and names the release asset it offers. A raw file host rather than GitHub
+  Pages, because a Pages build needs Actions and Actions is unavailable on this account.
 - **The update key is rotated.** An installed build verifies a feed with the key it was built with,
   and this build pins the new key. Start does not update itself, so download this release once; it
   becomes the root of trust for every feed signed afterwards.

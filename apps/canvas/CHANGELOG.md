@@ -12,6 +12,14 @@ a release is tagged `canvas-v<version>`. See
   collab server, account service or billing service now describe a local document with optional sync,
   and `SECURITY.md` describes that same surface.
 
+## [0.1.10] - 2026-11-20
+
+### Changed
+
+- **The update feed is read from the repository's raw file host.** GitHub Pages would need GitHub
+  Actions to build, and Actions is unavailable, so the signed manifest is served straight from
+  `main`. Nothing in the app changes; the signature is still what makes a feed acceptable.
+
 ## [0.1.9] - 2026-11-18
 
 A maintenance release with one change that matters and one that will matter later. Nothing looks

@@ -41,7 +41,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-export const FEED_HOST = "https://mr-rogers-neighborhood.github.io/suite-apps";
+export const FEED_HOST = "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main";
 export const RELEASE_REPO = "mr-rogers-neighborhood/suite-apps";
 export const FEED_FILE = "latest-linux.yml";
 
