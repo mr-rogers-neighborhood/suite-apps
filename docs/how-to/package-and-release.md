@@ -88,6 +88,21 @@ node scripts/release.mjs <app> --verify
 Packaging is not proven until the built app runs. Install the artifact and open a document after the
 release, not before the gate.
 
+The packaged hub has one check that runs on request, after its unpacked build exists:
+
+```sh
+pnpm --filter @suite/start run package:dir
+pnpm --filter @suite/start run e2e:packaged
+```
+
+It starts `apps/start/release/linux-unpacked/suite-start` itself, connects to the window over the
+Chromium DevTools endpoint, and waits for Canvas's card to offer `Update to <version>` where
+`<version>` is the one the published `feeds/canvas/latest-linux.yml` names. That is the path
+Playwright's `_electron.launch` cannot take: the shipped build turns CLI inspect arguments off with an
+Electron fuse, so Playwright waits for an inspector line that never arrives, while the binary itself
+opens normally. A test build with the fuse flipped would not be the artifact that ships. The check
+reads the real host, so it runs after a publish and never in the gate.
+
 ## Build without publishing
 
 The release script is the publishing path. For a local build:

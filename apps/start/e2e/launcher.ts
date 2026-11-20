@@ -66,7 +66,7 @@ export async function sandbox(): Promise<Sandbox> {
  */
 export async function fakeApp(
   box: Sandbox,
-  options: { id?: string; name?: string; extensions?: string[] } = {},
+  options: { id?: string; name?: string; extensions?: string[]; version?: string } = {},
 ): Promise<{ executable: string; manifestPath: string; logPath: string }> {
   const id = options.id ?? "canvas";
   const app = join(box.apps, id);
@@ -82,7 +82,7 @@ export async function fakeApp(
       format: "suite.app",
       id,
       name: options.name ?? "Suite Canvas",
-      version: "0.1.0",
+      version: options.version ?? "0.1.0",
       contractVersion: "1.0.0",
       deepLinkPrefix: `suite://${id}/`,
       fileExtensions: options.extensions ?? ["canvas"],

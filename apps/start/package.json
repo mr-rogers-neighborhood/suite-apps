@@ -24,6 +24,7 @@
     "verify": "pnpm check",
     "build:verify": "pnpm --filter @suite/contracts --filter @suite/files --filter @suite/theme --filter @suite/ui --filter @suite/desktop --filter @suite/start --workspace-concurrency=1 run build && git diff --exit-code -- ../../packages",
     "e2e": "playwright test",
+    "e2e:packaged": "playwright test --config playwright.packaged.config.ts",
     "dev": "pnpm build:all && pnpm --filter @suite/start start"
   },
   "dependencies": {

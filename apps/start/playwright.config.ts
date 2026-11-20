@@ -10,6 +10,9 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   outputDir: "./e2e/test-results",
+  // The packaged check needs a built release and the real feed; it has its own
+  // config and command so this run stays hermetic and offline.
+  testIgnore: ["packaged.spec.ts"],
   fullyParallel: false,
   workers: 1,
   retries: 0,
