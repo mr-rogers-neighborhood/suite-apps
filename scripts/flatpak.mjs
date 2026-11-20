@@ -46,6 +46,12 @@ const stateDir = join(homedir(), "suite-flatpak");
 const repo = process.env.SUITE_FLATPAK_REPO ?? join(stateDir, "repo");
 const buildDir = join(ROOT, "packaging", "flatpak", ".build", app.id);
 
+// Orca (and similar launchers) point XDG_DATA_HOME at a per-session directory,
+// and a user Flatpak installed there exists only inside that session. The app
+// belongs in the user's real data directory so the desktop sees it.
+const dataHome = process.env.SUITE_FLATPAK_XDG_DATA_HOME ?? join(homedir(), ".local", "share");
+process.env.XDG_DATA_HOME = dataHome;
+
 function run(command, args, cwd = ROOT) {
   process.stdout.write(`\n$ ${command} ${args.join(" ")}\n`);
   const result = spawnSync(command, args, { cwd, stdio: "inherit", env: process.env });
@@ -64,6 +70,7 @@ if (builder === null) {
   process.exit(1);
 }
 process.stdout.write(`flatpak-builder ${builder} · ${app.id}\n`);
+process.stdout.write(`user installation · ${join(dataHome, "flatpak")}\n`);
 
 if (build) {
   run("pnpm", ["--filter", app.package, "run", "package:dir"]);
