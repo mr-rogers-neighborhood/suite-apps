@@ -44,30 +44,23 @@ The shell holds no document data. Selection, the active board, open tabs, filter
 
 ## The start screen
 
-`src/launcher/WorkspaceLauncher.tsx` lists the workspaces this browser has opened,
-from `localStorage`, and asks `/api/account/workspaces` which of them the account already
-holds. Those are two different facts, and the row says which: on this device, or synced.
+`src/launcher/WorkspaceLauncher.tsx` lists the workspaces this browser has opened, from
+`localStorage`. A row says whether that workspace is this browser's copy or one this device is syncing
+through a host, which is the only distinction the list carries now. There is no account service to ask,
+so nothing else decides what it holds.
 
-A signed-in account that holds nothing, beside local workspaces, gets one notice about it.
-That notice carries the door to the only thing that fixes it: **See plans** opens the account
-panel on its plan tab. The copy says a plan is what puts a workspace in an account, because
-that is now true; the earlier sentence invited the reader to open one while signed in, which
-the claim refuses with `plan-required` and which left the workspace exactly where it was.
-
-The account list is read again when the tab comes back and when the account panel closes,
-because those are the two moments a payment made elsewhere becomes visible here. One read at
-mount left the notice and every row describing the account as it was before a checkout.
+There is no plan, no account panel and no checkout. A workspace is a file, plus optionally a sync host
+this machine or another one runs; [Sharing](decisions.md#sharing) records what was retired and why.
 
 ### The alpha notice
 
-`src/launcher/AlphaNotice.tsx` is the modal a first visit lands on, before the list
-is usable: what alpha means, what a subscription buys, that the source is public and can be run by
-its reader (with a link to the repository), and that an unclaimed workspace is this browser's
-copy. Dismissing it, or taking its **See plans** button, records a timestamp in `localStorage`
-under `suite.alpha-notice.v2` (`alphaNotice.ts`), and the notice returns once ten minutes have
-passed: a reload a moment later does not repeat it, and a visit the next day does, which is what
-alpha is worth. The record is per browser rather than per account, and storage that refuses to
-write shows the notice on every visit, the harmless direction.
+`src/launcher/AlphaNotice.tsx` is the modal a first visit lands on, before the list is usable: what
+alpha means here (the tests pin down behaviour, not understanding, so data should be exported rather
+than trusted), and that the source is public and can be run by its reader, with a link to the
+repository. Dismissing it records a timestamp in `localStorage` under `suite.alpha-notice.v2`
+(`alphaNotice.ts`), and the notice returns once ten minutes have passed: a reload a moment later does
+not repeat it, and a visit the next day does, which is what alpha is worth. The record is per browser,
+and storage that refuses to write shows the notice on every visit, the harmless direction.
 
 Share is the one action that used to sit inside the workspace menu and no longer does: it is a verb about the thing on screen, so it sits beside the status control that already says who else is here, and the menu stays about the document (imports, exports, the starter template, the launcher and delete).
 
@@ -112,9 +105,9 @@ Two details at the boundary between Excalidraw and the graph are worth knowing:
   use. The drawing schema refuses an explicit `undefined`, because the CRDT cannot store one, so
   `toDrawingElement` drops those keys once at the boundary.
 - A picture's bytes never enter the document. The element carries an id under
-  `customData.suiteFile.id`, and the bytes go where a pasted image's bytes go: this browser's IndexedDB
-  first, the relay second. `stampElements` applies those ids to every commit, so a stroke drawn after a
-  picture does not drop the mapping.
+  `customData.suiteFile.id`, and the bytes go where a pasted image's bytes go: this browser's IndexedDB.
+  The workspace file carries them when it is exported; nothing uploads them. `stampElements` applies those
+  ids to every commit, so a stroke drawn after a picture does not drop the mapping.
 
 A sketch has no text body. Its inspector shows the drawing where a note shows its body: the Content tab
 paints `SketchPanel`, the same SVG the card face uses, and clicking it opens the surface that draws.
@@ -125,10 +118,9 @@ A sketch is a behaviour, and a behaviour is never an extra type. `CardTypePicker
 or a tour: each owns its renderer and its own record, so a card either is one or is not. Converting a
 card is the type glyph's job, and that replaces the type set rather than growing it.
 
-Anyone whose session may edit the board may draw, which includes a share with the editor role: the
-surface takes `readOnly` from the session, and a viewer's or a selection share's session is read-only.
-A picture inserted on a share, or anywhere without an account session, is kept in this browser only and
-is not visible to a peer until it uploads.
+Anyone whose session may edit the board may draw, which includes a peer with the editor role: the
+surface takes `readOnly` from the session, and a viewer's session is read-only. A picture is kept in this
+browser only: there is no uploader, so a peer sees a placeholder until the workspace file itself travels.
 
 ### Views are shut, and the code is kept
 
@@ -337,14 +329,14 @@ prepended, so a report about a paragraph arrives saying which paragraph.
 
 Two surfaces ask the same question. `/media` and the toolbar insert a block **at a caret**; the canvas's **New
 media…** makes a card **at a point**. `useMediaPicker` holds the *target* rather than an editor, so a kind is defined
-once (`MEDIA_CHOICES`) and both targets reach it. `prepareMediaFile` owns the upload either way (permission check,
-local copy, relay attempt), and `placeBlock` decides between `insertMediaNode` and a media card in the shape
+once (`MEDIA_CHOICES`) and both targets reach it. `prepareMediaFile` owns the bytes either way (a local
+copy; there is no uploader), and `placeBlock` decides between `insertMediaNode` and a media card in the shape
 `createMediaCard` writes. The card is made after a file is chosen, so a cancelled dialog leaves nothing behind.
 
 ## Reading a book
 
-A book is a `media` block with `kind: "epub"`, so it takes the path every attachment takes: this browser's copy
-first, the relay second. `archive/zip.ts` reads the archive (the vault importer shares it), `archive/epub/` reads
+A book is a `media` block with `kind: "epub"`, so it takes the path every attachment takes: this browser's copy,
+carried in the workspace file when it leaves. `archive/zip.ts` reads the archive (the vault importer shares it), `archive/epub/` reads
 the container, package, spine and contents, and `archive/epub/sanitise.ts` turns each chapter into markup we are
 willing to render: no script, no handlers, no frames, no remote images or fonts, and no book stylesheet.
 
@@ -595,9 +587,9 @@ is the verb a reader reaches for most, and a submenu made it two presses and a h
 
 `Dialog` is the confirmation shell: a title, optional description, and a list of actions marked primary or danger. The scrim is a labelled button, so a pointer press outside the panel is a dismissal a screen reader can also reach.
 
-Every dialog that says `aria-modal="true"` traps Tab. `SignInDialog`, `AdmissionPanel`, `ShareDialog`, the publish conflict dialog in `SharePublishButton.tsx`, `SettingsDialog` and the shortcut sheet all call `useFocusTrap`, and `AdmissionPanel` starts on the answer it recommends ("Keep working locally") and closes on Escape. Card focus mode is a modal for the board rather than for the window: `CardFocusSurface` carries `role="dialog"` and the same trap, and a sketch's drawing surface takes the initial focus, because a sketch listens for keys and had none of them before.
+Every dialog that says `aria-modal="true"` traps Tab. `DeleteWorkspaceDialog`, `DisplayStyleDialog`, `SyncDialog`, `MediaPickerHost`, `BlueprintInstallHost` and the shortcut sheet all call `useFocusTrap`, and the blueprint installer closes on Escape. Card focus mode is a modal for the board rather than for the window: `CardFocusSurface` carries `role="dialog"` and the same trap, and a sketch's drawing surface takes the initial focus, because a sketch listens for keys and had none of them before.
 
-Three questions that used `window.confirm` ask in the surface that owns them. Deleting a trashed card for good opens the library's `Dialog` through `pendingPurge`. Revoking every share link and reloading a draft both replace the control with an inline confirmation inside the dialog they belong to, so the thing about to be lost stays on screen.
+Three questions that used `window.confirm` ask in the surface that owns them. Deleting a trashed card for good opens the library's `Dialog` through `pendingPurge`. Removing a device and reloading a draft both replace the control with an inline confirmation inside the dialog they belong to, so the thing about to be lost stays on screen.
 
 One confirmation asks for more than a press. `DeleteWorkspaceDialog` requires the workspace name or id to be typed and reports a failure inline without touching the local copy. Leaving a workspace asks nothing: an in-app dialog and the browser's tab-close prompt both stood there once, and both were removed because they fired for signed-in readers whose work was already synced and could not be acted on. Whether this browser keeps the copy is reported by the storage ladder, in `StoragePanel`.
 
@@ -723,4 +715,4 @@ Storybook covers the components whose look is the behaviour: `*.stories.tsx` bes
 
 The surfaces that mount without a live document have a story: `WorkspaceLauncher.stories.tsx` (empty state, because the recents come from this browser), `CommandPalette.stories.tsx` (static rows, including the shortcut column), `ShortcutSheet.stories.tsx`, `SettingsDialog.stories.tsx`, and `ContainerPanel.stories.tsx` in `src/panels/` with a plain document fixture.
 
-Three surfaces cannot be mounted that way, so the story suite cannot catch a regression in them: the canvas (`src/canvas/**`) needs the projection, the camera and a real `LoroDoc` fed by the provider; the shell (`src/app/WorkspaceShellView.tsx`) needs the same document plus a live session; and the share dialogs that call the relay need a `/api/shares` answer, which is why only the pure `ConflictDialog` has a story.
+Three surfaces cannot be mounted that way, so the story suite cannot catch a regression in them: the canvas (`src/canvas/**`) needs the projection, the camera and a real `LoroDoc` fed by the provider; the shell (`src/app/WorkspaceShellView.tsx`) needs the same document plus a live session; and the sync dialogs need a running host, which is why neither has a story.

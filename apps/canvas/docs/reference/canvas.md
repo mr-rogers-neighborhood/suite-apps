@@ -394,8 +394,10 @@ because neither a card nor a section could fold; the fold is on the two headers 
 
 ## Presence and cursors
 
-Presence rides one `EphemeralStore` per workspace, joined by `collab/loroProvider.ts` at
-`<workspaceId>:presence`. Signals are fields in `AWARENESS_FIELDS` (`collab/presence.ts`), typed in
+Presence is one `EphemeralStore` per workspace, under `<workspaceId>:presence`. The shipped sync host
+carries sealed document frames, not ephemeral state, so two devices converge on the document and see no
+live cursors; [Sharing](decisions.md#sharing) is the record of what the transport covers. Signals are
+fields in `AWARENESS_FIELDS` (`collab/presence.ts`), typed in
 `PeerPresence`: `board`, `user`, `pointer`, `focus`, `dragging`, `selection`, `selectionBox`,
 `connector`, `resizing`, `sectionDrag`, `sectionResize`, `reconnect`, `connect`, `labelDrag`,
 `libraryDrag`, `purpose`, `gesture`, `gestureBeat` and `presenceBeat`. A new signal is a new field on that
@@ -412,14 +414,13 @@ and drops the payload after `GESTURE_TTL_MS` (3000 ms) of silence. A one second 
 gesture bumps `gestureBeat` every `GESTURE_BEAT_MS` (1000 ms) so a press with no movement does not age
 out. Selections and carets are state, so they outlive the TTL.
 
-Leaving is the client's problem, not the relay's. `loro-websocket` has no awareness protocol: measured
-against a real `SimpleServer`, a client that disconnects leaves its ephemeral state in place and nothing
-is announced, so a peer who closed the tab looks exactly like a peer who is reading. Every client
-therefore publishes `presenceBeat` every `PRESENCE_BEAT_MS` (15 s), and `projectPeers` drops a peer it has
-not heard from within `PRESENCE_TTL_MS` (60 s). Both numbers are inside the timer budget a background tab
-gets, so a tab left in the background stays counted. The beat also distinguishes a live-and-idle peer from
-one whose state the relay has just replayed, which is what made a departed collaborator reappear until a
-reload.
+Leaving is the client's problem, not the host's. The sync host relays frames and has no awareness
+channel, so a disconnect announces nothing: a peer who closed the tab would look exactly like a peer who
+is reading. Every client therefore publishes `presenceBeat` every `PRESENCE_BEAT_MS` (5 s), and
+`projectPeers` drops a peer it has not heard from within `PRESENCE_TTL_MS` (15 s). Both numbers are inside
+the timer budget a background tab gets, so a tab left in the background stays counted. The beat also
+separates a live-and-idle peer from one whose state arrived once and then stopped, which is what a
+departed collaborator looks like after a reconnect.
 
 Every published coordinate is in flow units. Presence is workspace-wide, so a board-scoped surface filters
 by `peer.board` through `hooks/useBoardPeers.ts`; a cursor from another board is not drawn at all. The

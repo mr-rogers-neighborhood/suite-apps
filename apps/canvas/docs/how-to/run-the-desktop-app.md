@@ -9,8 +9,8 @@ working on it. It assumes a checkout and `pnpm install`.
 pnpm dev:desktop
 ```
 
-That starts the renderer on Vite in the profile the shell actually runs (`standalone`, so no relay and no
-account client), waits for it to answer on `:5173`, then opens the window on it. A component edit appears
+That starts the renderer on Vite in the profile the shell actually runs (`standalone`: no sync host, no
+account client, no socket), waits for it to answer on `:5173`, then opens the window on it. A component edit appears
 without a reload. An edit to the main process or the preload restarts the window, which reopens the file
 , which is the same path a crash takes.
 
@@ -93,4 +93,6 @@ observational: the app runs, opens a document and writes backups.
 
 - `app://` asset resolution and the page policy, which only the built bundle uses. `pnpm e2e:desktop`
   covers those.
-- Anything hosted: sign-in, sync, sharing. The desktop build is the local profile.
+- Anything hosted: sign-in and sharing. Sync is opt-in through a host this machine runs, not a service;
+  the desktop dev profile is the local one, and [Sharing](../reference/decisions.md#sharing) is the
+  record of what was retired.

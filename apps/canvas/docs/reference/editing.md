@@ -97,15 +97,15 @@ Most rows answer in place. Media is the exception: it opens `MediaPickerHost`, o
 
 ## Media
 
-New content is written as one `media` block. `kind` decides which of the four renderers draws it, and the attributes are the union of what the four it replaced carried, so nothing a document already knew is lost. Where the bytes are is data, not schema: an image with an `id` is served by the relay, and an image with a `src` is fetched from a third party.
+New content is written as one `media` block. `kind` decides which of the four renderers draws it, and the attributes are the union of what the four it replaced carried, so nothing a document already knew is lost. Where the bytes are is data, not schema: an image with an `id` is read from this browser's copy, and an image with a `src` is fetched from wherever it points.
 
 `attachment`, `image`, `video` and `youtube` stay in the schema and stay publishable. A document written before `media` existed must keep rendering, so removing them would lose media a reader can still see. `migrateLegacyMedia` converts them the first time a body is opened for editing. It is one transaction, proposed only when there is something to convert, so an untouched body writes nothing and an extra undo entry never appears. An inline `attachment` converts only when it is the whole paragraph, because `media` is a block: the alternative is either a schema error or splitting prose the reader wrote.
 
-A stored `media` block names an id, a MIME type, dimensions and a name, while the bytes live in IndexedDB and, when a relay is configured, on the relay. A share projection copies the metadata and not the pixels, which is what keeps a shared document small; a viewer without the bytes sees the upload state instead of a broken image.
+A stored `media` block names an id, a MIME type, dimensions and a name, while the bytes live in this browser's IndexedDB and travel inside the workspace file when it is exported. A projection that is not that file copies the metadata and not the pixels; a reader without the bytes sees a placeholder instead of a broken image.
 
-A link `media` block stores a URL, alt text and a size. It works with no relay at all, which is why a standalone build can still hold a picture.
+A link `media` block stores a URL, alt text and a size. It needs no host at all, which is why a standalone build can still hold a picture.
 
-Pasting an image runs `PasteImages`, which measures the image, stores the bytes locally, uploads when a relay exists, and marks the node uploaded when the upload lands. A failed upload leaves the local copy in place, so the picture survives a reload. When the relay answers with a stated refusal (a 401, or a 403 for a workspace whose plan excludes uploads), the refusal is raised as a prompt rather than swallowed, because a card that looks uploaded and is not is the worst of the three outcomes.
+Pasting an image runs `PasteImages`, which measures the image and stores the bytes in this browser's IndexedDB. There is no uploader, so a picture does not leave the device except inside the workspace file; the node's `uploadState` stays local. A failed local write leaves the picture as a link or an empty block rather than a card that looks stored and is not.
 
 A media card is the same reference, not a copy. A card of the media type holds one media block in its
 body, made from a library row with "Place as card"; the bytes stay where they are and the card points at
@@ -134,7 +134,7 @@ A row click hands the card over instead of placing it: the stack follows the poi
 
 ## The face a card shows before it is focused
 
-`StaticCardFace` draws the same body without an editor, and it draws media itself: an image at the relay or at its own address with `loading="lazy"`, `decoding="async"` and the size the node recorded, so a picture arriving late cannot reflow the card; a video with `preload="metadata"`; an embed as its poster still rather than an iframe, because one iframe per card is the cost that made this path worth special-casing. Anything with nothing to point at keeps a labelled chip instead of a blank line.
+`StaticCardFace` draws the same body without an editor, and it draws media itself: an image from this browser's copy or at its own address with `loading="lazy"`, `decoding="async"` and the size the node recorded, so a picture arriving late cannot reflow the card; a video with `preload="metadata"`; an embed as its poster still rather than an iframe, because one iframe per card is the cost that made this path worth special-casing. Anything with nothing to point at keeps a labelled chip instead of a blank line.
 
 ## Read-only surfaces
 

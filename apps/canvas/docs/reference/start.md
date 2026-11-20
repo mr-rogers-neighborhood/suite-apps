@@ -12,7 +12,7 @@ Four sections, fixed. Anything else is a row inside one of them.
 | --- | --- |
 | Apps | One card per install, and one per install that cannot be used |
 | Files | Recently opened files, then every app's documents |
-| Sync | Whether a relay is configured, and why it is not |
+| Sync | Whether this machine runs the sync host, what it is holding, and who is connected |
 | Settings | The data directory, the documents root, the install roots, the catalog, the version |
 
 The rail is a tab set. Arrow keys move the selection and the pane together, Home and End reach the ends,
