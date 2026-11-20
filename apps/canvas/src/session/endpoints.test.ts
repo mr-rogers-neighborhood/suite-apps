@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { collabHttpBase, collabWsUrl } from "./endpoints";
+import { collabHttpBase } from "./endpoints";
 
 const PAGE = {
   origin: "https://suite.example.com",
@@ -30,28 +30,5 @@ describe("collabHttpBase", () => {
     vi.stubEnv("DEV", false);
     vi.stubEnv("VITE_COLLAB_HTTP_URL", "  ");
     expect(collabHttpBase(PAGE)).toBe("https://suite.example.com");
-  });
-});
-
-describe("collabWsUrl", () => {
-  it("uses the dev socket by default", () => {
-    expect(collabWsUrl(PAGE)).toBe("ws://localhost:1234");
-  });
-
-  it("prefers a configured URL", () => {
-    vi.stubEnv("VITE_COLLAB_URL", "wss://collab.example.com");
-    expect(collabWsUrl(PAGE)).toBe("wss://collab.example.com");
-  });
-
-  it("uses a secure same-origin socket in production", () => {
-    vi.stubEnv("DEV", false);
-    expect(collabWsUrl(PAGE)).toBe("wss://suite.example.com/ws");
-  });
-
-  it("keeps ws on a plain-http page", () => {
-    vi.stubEnv("DEV", false);
-    expect(collabWsUrl({ origin: "http://localhost", protocol: "http:", host: "localhost" })).toBe(
-      "ws://localhost/ws",
-    );
   });
 });

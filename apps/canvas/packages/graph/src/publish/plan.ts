@@ -10,6 +10,9 @@
  *
  * The implementation lives beside this file (`planModel`, `planGuards`,
  * `planCards`, `planLayout`, `planRun`); import from here.
+ *
+ * Dormant: no app surface calls it since the hosted tier was retired. See
+ * `../merge.ts` for why it stays and what would revive it.
  */
 
 export { allowedFieldIds } from "./planGuards.js";

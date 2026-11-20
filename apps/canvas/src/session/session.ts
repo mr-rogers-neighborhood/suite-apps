@@ -52,7 +52,11 @@ export const LOCAL_CAPABILITIES: SessionCapabilities = {
   canManageLinks: false,
 };
 
-/** A share link is a capability the retired relay minted; no value of this type can be made. */
+/**
+ * A share link is a capability the retired relay minted; no value of this type can
+ * be made. It comes back with a share surface that serves a projection from a
+ * service.
+ */
 export type ShareSession = {
   readonly scope: "workspace" | "board" | "card" | "selection";
   readonly role: "editor" | "viewer";
@@ -137,7 +141,9 @@ export function standaloneSession(
 
 /**
  * Never true. A share is a capability a link holder presented to the relay, and
- * the relay is gone; the name survives because surfaces still branch on it.
+ * the relay is gone; the name survives because surfaces still branch on it. It
+ * would return true again only if a share link could present a credential to a
+ * service that projects a document.
  */
 export function isShareSession(_session: SessionConfig = current): boolean {
   return false;

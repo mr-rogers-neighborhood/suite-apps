@@ -10,7 +10,6 @@
  */
 
 import { STARTER_TEMPLATES, type WorkspaceTemplate, workspaceTemplateSchema } from "@suite/graph";
-import { accountHttpBase } from "../session/endpoints";
 import { isStandalone } from "../session/mode";
 
 /** Public on purpose: the launcher needs the list before anyone has signed in. */
@@ -126,7 +125,7 @@ export async function fetchStarterTemplates(
     options.timeoutMs ?? STARTER_TEMPLATES_TIMEOUT_MS,
   );
   try {
-    const response = await call(`${options.base ?? accountHttpBase()}${TEMPLATES_PATH}`, {
+    const response = await call(`${options.base ?? ""}${TEMPLATES_PATH}`, {
       method: "GET",
       headers: { accept: "application/json" },
       signal: controller.signal,

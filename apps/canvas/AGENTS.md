@@ -102,7 +102,7 @@ return data, with no DOM, Loro, `fetch` or timers; `WorkspaceDocument`, persiste
 handlers and React hosts own state and I/O. Dependencies point inward, one owner per piece of state.
 
 `remeda` is for transforms that remove a loop; do not wrap a one-liner. `neverthrow` `Result<T, E>`
-belongs at fallible boundaries: parsing, validation, HTTP handlers, licence and admission checks.
+belongs at fallible boundaries: parsing, validation, HTTP handlers and admission checks.
 
 [docs/reference/conventions.md](docs/reference/conventions.md) has the file, naming, error and import
 rules, and [docs/reference/glossary.md](docs/reference/glossary.md) fixes the vocabulary.

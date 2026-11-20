@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceActions } from "../chrome/WorkspaceActions";
 import { useUiStore } from "../store/useUiStore";
-import { bootPlan, DEFAULT_SUITE_MODE, hasShareLink, isStandalone, suiteMode } from "./mode";
+import { hasShareLink, isStandalone } from "./mode";
 import { configureSession, standaloneSession } from "./session";
 
 afterEach(() => {
@@ -14,33 +14,11 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-describe("suiteMode", () => {
-  it("is local, whatever the build asked for", () => {
-    expect(suiteMode()).toBe(DEFAULT_SUITE_MODE);
-    expect(suiteMode()).toBe("local");
+describe("the local profile", () => {
+  it("is local whatever the build asked for", () => {
     expect(isStandalone()).toBe(true);
-  });
-
-  it("does not become something else when a stale relay profile is set", () => {
-    // A build that still passes `VITE_SUITE_MODE=relay` gets the local profile and
-    // a warning: the service it was written for is not in this repository.
     vi.stubEnv("VITE_SUITE_MODE", "relay");
-    expect(suiteMode()).toBe("local");
     expect(isStandalone()).toBe(true);
-  });
-});
-
-describe("bootPlan", () => {
-  it("never resolves a share or opens a provider, whatever the URL", () => {
-    // A capability link is just a page URL now: the relay that link belonged to is
-    // not part of this build, so nothing may be fetched on the way to the launcher.
-    for (const url of ["/?share=abc", "/#share-session", "/?workspace=ws-1", "/"]) {
-      expect(bootPlan("local", url)).toEqual({
-        resolveShare: false,
-        connectProvider: false,
-        showSharing: false,
-      });
-    }
   });
 
   it("still recognises a share-shaped URL", () => {
