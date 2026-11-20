@@ -19,8 +19,10 @@ import { checkSignedFeed, type FeedArtifact, type FeedFetch } from "@suite/deskt
  * **The feed URL appears three times on purpose, and this is the third.** The app's own
  * `suite.app.json` declares it for its updater, `electron-builder.yml` writes it beside a
  * packaged binary, and this table holds it because an app that is not installed has no
- * manifest to read it from. Installed or not, the signature still has to verify against
- * the key compiled into `@suite/desktop`, so a wrong URL buys nothing.
+ * manifest to read it from. All three name the Pages host, `feeds/<app>/`; the release
+ * script writes the signed manifest there and the artifact it names stays a release asset.
+ * Installed or not, the signature still has to verify against the key compiled into
+ * `@suite/desktop`, so a wrong URL buys nothing.
  *
  * **When the network is read.** When the launcher opens, and when a person presses a
  * button asking it to look again. Not on a timer, and never to download: a version can be
@@ -70,7 +72,7 @@ export const CATALOGUE_APPS = [
     folder: "Canvas",
     extensions: ["canvas"],
     capabilities: ["document.file", "sync", "attachments", "publish"],
-    feed: "https://github.com/mr-rogers-neighborhood/suite-canvas/releases/latest/download",
+    feed: "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/canvas",
     channel: "alpha",
   },
   {
@@ -79,7 +81,7 @@ export const CATALOGUE_APPS = [
     folder: "Planner",
     extensions: ["planner"],
     capabilities: ["document.file"],
-    feed: "https://github.com/mr-rogers-neighborhood/suite-planner/releases/latest/download",
+    feed: "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/planner",
     channel: "alpha",
   },
   {
@@ -88,7 +90,7 @@ export const CATALOGUE_APPS = [
     folder: "Budget",
     extensions: ["budget"],
     capabilities: ["document.file"],
-    feed: "https://github.com/mr-rogers-neighborhood/suite-budget/releases/latest/download",
+    feed: "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/budget",
     channel: "alpha",
   },
 ] as const satisfies readonly CatalogueEntry[];
@@ -114,7 +116,7 @@ export const SELF_ENTRY: CatalogueEntry = {
   capabilities: [],
   feed: "",
   channel: "alpha",
-  releases: "https://github.com/mr-rogers-neighborhood/suite-start/releases/latest",
+  releases: "https://github.com/mr-rogers-neighborhood/suite-apps/releases",
 };
 
 /** What the catalogue knows about one app. */
@@ -160,7 +162,7 @@ export interface CatalogueOptions {
  * The feed to read for one entry.
  *
  * A base replaces the whole URL rather than a prefix: a local release folder holds one
- * folder per app, and rewriting a GitHub path would describe a server that does not exist.
+ * folder per app, and rewriting a feed-host path would describe a server that does not exist.
  */
 export function feedFor(entry: CatalogueEntry, feedBase?: string | undefined): string | null {
   const base = feedBase?.trim().replace(/\/+$/u, "");

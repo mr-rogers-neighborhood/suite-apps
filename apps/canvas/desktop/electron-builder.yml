@@ -116,4 +116,4 @@ fileAssociations:
 # updater writes beside the artifacts.
 publish:
   provider: generic
-  url: https://github.com/mr-rogers-neighborhood/suite-canvas/releases/latest/download
+  url: https://mr-rogers-neighborhood.github.io/suite-apps/feeds/canvas

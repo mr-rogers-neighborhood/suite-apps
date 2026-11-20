@@ -1,4 +1,7 @@
 import { generateKeyPairSync, sign } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { FeedFetch } from "@suite/desktop";
 import { describe, expect, it } from "vitest";
 import {
@@ -47,12 +50,34 @@ function unsignedHost(body: string): FeedFetch {
 }
 
 const base = "https://local.test/feed";
+const FEED_HOST = "https://mr-rogers-neighborhood.github.io/suite-apps";
+const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+
+/** Where each app's own manifest and builder config live in this checkout. */
+const APP_SOURCES = {
+  canvas: {
+    manifest: join(REPO_ROOT, "apps/canvas/desktop/suite.app.json"),
+    builder: join(REPO_ROOT, "apps/canvas/desktop/electron-builder.yml"),
+  },
+  planner: {
+    manifest: join(REPO_ROOT, "apps/planner/suite.app.json"),
+    builder: join(REPO_ROOT, "apps/planner/electron-builder.yml"),
+  },
+  budget: {
+    manifest: join(REPO_ROOT, "apps/budget/suite.app.json"),
+    builder: join(REPO_ROOT, "apps/budget/electron-builder.yml"),
+  },
+} as const;
+
+/** The `publish.url` a builder config hands to the app's own updater. */
+function publishUrl(builderText: string): string | null {
+  const block = /^publish:\s*\n((?:[ \t]+.*(?:\n|$))*)/mu.exec(builderText)?.[1] ?? "";
+  return /^\s+url:\s*(\S+)\s*$/mu.exec(block)?.[1] ?? null;
+}
 
 describe("feedFor", () => {
   it("uses the app's declared URL when nothing replaces it", () => {
-    expect(feedFor(CATALOGUE_APPS[1])).toBe(
-      "https://github.com/mr-rogers-neighborhood/suite-planner/releases/latest/download",
-    );
+    expect(feedFor(CATALOGUE_APPS[1])).toBe(`${FEED_HOST}/feeds/planner`);
   });
 
   it("puts a local release folder in place of the whole URL, one folder per app", () => {
@@ -61,6 +86,40 @@ describe("feedFor", () => {
 
   it("is null for the hub when the build named no feed", () => {
     expect(feedFor(SELF_ENTRY)).toBeNull();
+  });
+});
+
+describe("feed declarations", () => {
+  it("gives every app the Pages feed its manifest and builder config name", () => {
+    // The URL has three homes on purpose: the hub's catalogue, the app's suite.app.json
+    // and its electron-builder config. This is the test that keeps them one fact.
+    for (const entry of CATALOGUE_APPS) {
+      const source = APP_SOURCES[entry.id as keyof typeof APP_SOURCES];
+      const expected = `${FEED_HOST}/feeds/${entry.id}`;
+
+      expect(entry.feed, `${entry.id} catalogue`).toBe(expected);
+
+      const manifest = JSON.parse(readFileSync(source.manifest, "utf8")) as {
+        update?: { feed?: string };
+      };
+      expect(manifest.update?.feed, `${entry.id} suite.app.json`).toBe(expected);
+
+      expect(publishUrl(readFileSync(source.builder, "utf8")), `${entry.id} builder`).toBe(
+        expected,
+      );
+    }
+  });
+
+  it("gives the hub the same feed its builder config names", () => {
+    expect(
+      publishUrl(readFileSync(join(REPO_ROOT, "apps/start/electron-builder.yml"), "utf8")),
+    ).toBe(`${FEED_HOST}/feeds/start`);
+  });
+
+  it("keeps every feed off a releases/latest redirect", () => {
+    for (const entry of [...CATALOGUE_APPS, SELF_ENTRY]) {
+      expect(entry.feed).not.toContain("/releases/latest");
+    }
   });
 });
 

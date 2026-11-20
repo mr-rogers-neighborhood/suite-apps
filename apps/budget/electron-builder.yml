@@ -62,9 +62,9 @@ win:
     - nsis
 
 # The feed the app's updater reads, and the one the hub reads when a person asks.
-# `latest/download` is a stable redirect to the newest release's assets, so the
-# URL never has to be rewritten per version, and GitHub serves the manifest the
-# updater writes beside the artifacts.
+# The release script writes the signed manifest under `feeds/budget/`, which Pages
+# serves from this repository. The manifest names the AppImage on this app's release
+# tag, so the manifest can move while the artifact stays a release asset.
 publish:
   provider: generic
-  url: https://github.com/mr-rogers-neighborhood/suite-budget/releases/latest/download
+  url: https://mr-rogers-neighborhood.github.io/suite-apps/feeds/budget

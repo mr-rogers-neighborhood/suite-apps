@@ -7,7 +7,7 @@
   "deepLinkPrefix": "suite://planner/",
   "fileExtensions": ["planner"],
   "update": {
-    "feed": "https://github.com/mr-rogers-neighborhood/suite-planner/releases/latest/download",
+    "feed": "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/planner",
     "channel": "alpha"
   },
   "capabilities": ["document.file"]

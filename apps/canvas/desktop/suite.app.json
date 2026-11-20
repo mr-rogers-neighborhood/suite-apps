@@ -7,7 +7,7 @@
   "deepLinkPrefix": "suite://canvas/",
   "fileExtensions": ["canvas"],
   "update": {
-    "feed": "https://github.com/mr-rogers-neighborhood/suite-canvas/releases/latest/download",
+    "feed": "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/canvas",
     "channel": "alpha"
   },
   "capabilities": ["document.file", "sync", "attachments", "publish"]

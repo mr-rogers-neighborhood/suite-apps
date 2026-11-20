@@ -7,7 +7,7 @@
   "deepLinkPrefix": "suite://budget/",
   "fileExtensions": ["budget"],
   "update": {
-    "feed": "https://github.com/mr-rogers-neighborhood/suite-budget/releases/latest/download",
+    "feed": "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/budget",
     "channel": "alpha"
   },
   "capabilities": ["document.file"]
