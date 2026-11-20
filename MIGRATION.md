@@ -5,6 +5,13 @@ was not rewritten; each source tree was imported from the commit below with
 `git archive`, which carries tracked files only. The original repositories remain
 at `~/Projects/suite/` as read-only archives.
 
+The published repository at <https://github.com/mr-rogers-neighborhood/suite-apps>
+is the **renamed `suite-canvas` repository**. On 2026-11-20 `suite-canvas` was
+renamed to `suite-apps` and this monorepo's `main` replaced its contents, so the
+stars and the Canvas releases stayed with the project. The repository first
+published as `suite-apps` is now `suite-apps-1`, a bootstrap snapshot. Canvas's
+pre-import history is kept on the `legacy/canvas` branch at `d93ebb7`.
+
 | Imported as | Source | Commit | Date |
 | --- | --- | --- | --- |
 | `apps/suite-canvas` | `suite-canvas` | `d93ebb72f04980257bc8c1da9b75121e8b7e3087` | 2026-11-18 |
@@ -41,16 +48,22 @@ at `~/Projects/suite/` as read-only archives.
 - `harness/` still contains `suite-dev`'s sibling-repo scripts; those become
   root scripts as the monorepo workflow settles.
 
-## Publishing and archive state (2026-11-19)
+## Publishing and archive state (2026-11-20)
 
-- Published at <https://github.com/mr-rogers-neighborhood/suite-apps>.
-- Archived on GitHub: `suite-dev` (replaced by `harness/`) and `suite-go`
-  (no releases and no feed references).
-- Kept active on purpose: `suite-canvas`, `suite-planner`, `suite-budget`,
-  `suite-start` (their `releases/latest/download` URLs are the update feeds still
-  compiled into installed apps) and `suite-sync` (the server's separate release
-  and trust boundary).
-- Retire the four feed repositories only after the monorepo publishes per-app
-  feeds and the manifests point there. A monorepo `releases/latest` cannot serve
-  four different `latest-linux.yml` files; use per-app tags or a static feed
-  host.
+- Canonical: <https://github.com/mr-rogers-neighborhood/suite-apps>. It is the
+  renamed `suite-canvas` repository, so its stars and its 0.1.0–0.1.9 releases
+  came with it. `legacy/canvas` holds Canvas's pre-import `main` (`d93ebb7`).
+- `suite-apps-1` is the bootstrap snapshot: the first monorepo publish, before the
+  rename. It is not canonical and needs no releases.
+- Archived on GitHub: `suite-dev` (replaced by `harness/`) and `suite-go` (no
+  releases and no feed references).
+- Still active: `suite-planner`, `suite-budget`, `suite-start` (their
+  `releases/latest/download` URLs are the update feeds compiled into installed
+  apps) and `suite-sync` (the server's separate release and trust boundary).
+- Archiving a feed repository does **not** stop downloads: release assets stay
+  available, which was verified before archiving anything. It only stops new
+  releases. The four feed repositories can therefore be archived once the
+  monorepo publishes its own feeds; until then they are the last published
+  version, not a live pipeline.
+- A monorepo `releases/latest` cannot serve four different `latest-linux.yml`
+  files; per-app feeds need per-app tags or a static feed host.

@@ -14,6 +14,8 @@ each app:
 
 The full gate is `node scripts/gate.mjs`; `--fresh` proves the commit rather
 than the working tree. Use `mise exec --` so Node 22 and pnpm 12.17 resolve.
+The gate runs suite-start's e2e suite after the repository checks pass, under
+`xvfb-run` when there is no display; `--no-e2e` skips it for a quick loop.
 
 The independent gate runs on `suite-dev`: pushing `main` to the `vm` remote
 queues the same gate there, in a memory-capped unit. Results are in
@@ -22,19 +24,24 @@ See `scripts/ci/` and the README.
 
 ## Publishing and archives
 
-- `origin` is <https://github.com/mr-rogers-neighborhood/suite-apps>.
+- `origin` is <https://github.com/mr-rogers-neighborhood/suite-apps>. It is the
+  renamed `suite-canvas` repository: the stars and Canvas's 0.1.0–0.1.9 releases
+  moved with it. `legacy/canvas` holds Canvas's pre-import history.
+- `suite-apps-1` is the bootstrap snapshot from before the rename. Not canonical.
 - `vm` is the independent gate. Push the commit you want gated:
   `git push origin main && git push vm main`.
 - `suite-dev` is archived on GitHub; the import replaced it under `harness/`.
-- The five `suite-canvas`, `suite-planner`, `suite-budget`, `suite-start` and
-  `suite-sync` repositories are **still active on purpose**. Their
-  `releases/latest/download` URLs are the update feeds in every `suite.app.json`
-  and in Start's own builder config. Archiving them now would stop new releases
-  on the path installed apps actually read.
-- Retire them only after the monorepo publishes per-app feeds and the manifests
-  point at the new location. A single monorepo `releases/latest` cannot serve
-  four different `latest-linux.yml` files; use per-app release tags or a static
-  feed host.
+  `suite-go` is archived too (no releases, no feed references).
+- `suite-planner`, `suite-budget`, `suite-start` and `suite-sync` are still
+  active. The first three carry the `releases/latest/download` URLs compiled into
+  installed apps; `suite-sync` is the server's separate trust boundary.
+- Archiving a repository **keeps its release assets downloadable**; it only
+  stops new releases. That was verified before proposing any archive. So the
+  feed repositories can be archived once the monorepo publishes its own feeds,
+  and doing so does not break an installed app's update path.
+- A single monorepo `releases/latest` cannot serve four different
+  `latest-linux.yml` files. Per-app feeds need per-app tags or a static feed
+  host, and the manifests must point at the new location.
 
 ## Monorepo rules
 

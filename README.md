@@ -37,6 +37,10 @@ sync, start, canvas, planner, budget, go. Before that it builds the twelve
 `.dev/gate-status.json`. `--fresh` exports `HEAD` with `git archive`, installs
 from the lockfile, and runs the same order in that clean tree.
 
+After the checks pass, it runs suite-start's Playwright e2e suite against the real
+Electron app. A display is used when there is one; otherwise the run goes through
+`xvfb-run`. `--no-e2e` skips it for a quick loop.
+
 Run heavy checks under a memory cap on this machine; the monorepo's first
 attempt fanned out across all 28 packages and took the desktop with it:
 
@@ -140,7 +144,8 @@ The VM has 4 vCPU, 8 GiB RAM, and a 4 GiB swapfile; Canvas's gate is the heavy
 one. It also needs Docker (Canvas's secret scan runs gitleaks in a container;
 the unit gets `SupplementaryGroups=docker`), Xvfb, Electron's GTK libraries and
 a Playwright Chromium (`pnpm exec playwright install chromium`) for the story
-tests. e2e is installed but not wired into the gate yet.
+tests. Suite Start's e2e runs inside the gate under `xvfb-run`, because the unit
+has no display.
 
 ## Orca memory
 
