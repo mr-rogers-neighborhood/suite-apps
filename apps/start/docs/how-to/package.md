@@ -88,15 +88,14 @@ for it:
 - **Heavier to build:** `flatpak-builder` plus an `org.freedesktop.Sdk` runtime.
 
 Where Flatpak fits: each app can ship as a Flatpak beside its AppImage (Canvas first; see
-`packaging/flatpak/`). Start already treats an installed Flatpak as a first-class app: it reads
-`flatpak list`, starts it with `flatpak run`, reveals the deployment, and asks Flatpak to remove it
-(`src/flatpak.ts`). It does not install or update one yet.
+`packaging/flatpak/`). Start treats an installed Flatpak as a first-class app: it reads `flatpak list`,
+starts it with `flatpak run`, reveals the deployment, asks Flatpak to remove it, and — when the local
+store offers the app — asks Flatpak to install it or to replace a deployment whose commit is behind
+(`src/flatpak.ts`). Flatpak stays the writer; Start reads the deployed commit and the published one and
+never swaps a deployment itself.
 
-The hub itself becomes a Flatpak **when it manages Flatpaks end to end** — install and update, not
-only launch and remove. At that point the Flatpak portal is the writer, Start needs no access to
-`~/Applications`, and its sandbox is real. Packaging the hub before then would mean
-`--filesystem=home` and `flatpak-spawn --host` to keep managing AppImages: a sandbox with the door
-propped open, and a second update channel for the same binary. So: apps first, hub last. The one-writer rule is unchanged — only the writer changes.
+The hub is still packaged as an AppImage and an Arch package. Packaging it as a Flatpak is a separate
+decision, and the one-writer rule is unchanged — only the writer changes.
 
 ## Cutting a release that includes the package
 

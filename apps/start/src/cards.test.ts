@@ -71,6 +71,11 @@ const NO_VERSIONS: ReadonlyMap<string, number> = new Map();
 const NO_RUNNING: ReadonlySet<string> = new Set();
 const APPS_ROOT = "/home/me/Applications/Suite";
 
+/** A copy Start placed, which is the only kind it may replace. */
+function managed(overrides: Partial<SuiteAppManifest> = {}): DiscoveredApp {
+  return { ...discovered(overrides), executable: `${APPS_ROOT}/Canvas/0.1.1/suite-canvas` };
+}
+
 describe("appCards", () => {
   it("offers a card for an app that is not on this machine at all", () => {
     // The empty window was the thing this replaced, so this is the test that matters.
@@ -114,7 +119,7 @@ describe("appCards", () => {
 
   it("asks for an update when the feed is ahead, and keeps the installed version visible", () => {
     const [card] = appCards({
-      apps: [discovered()],
+      apps: [managed()],
       rejected: [],
       files: [],
       recents: [],
@@ -128,14 +133,14 @@ describe("appCards", () => {
       state: "update-available",
       version: "0.1.0",
       available: "0.2.0",
-      executable: "/opt/suite/canvas",
+      executable: `${APPS_ROOT}/Canvas/0.1.1/suite-canvas`,
       versions: 2,
     });
   });
 
   it("offers the version it replaced, and only when one is on disk", () => {
     const withPrevious = appCards({
-      apps: [discovered()],
+      apps: [managed()],
       rejected: [],
       files: [],
       recents: [],
@@ -149,7 +154,7 @@ describe("appCards", () => {
     expect(withPrevious[0]?.previousVersion).toBe("0.1.0");
 
     const withoutOne = appCards({
-      apps: [discovered()],
+      apps: [managed()],
       rejected: [],
       files: [],
       recents: [],
@@ -164,7 +169,7 @@ describe("appCards", () => {
 
   it("says up to date when the installed version is the offered one", () => {
     const [card] = appCards({
-      apps: [discovered()],
+      apps: [managed()],
       rejected: [],
       files: [],
       recents: [],
@@ -230,6 +235,108 @@ describe("appCards", () => {
       versions: 1,
       previousVersion: null,
     });
+  });
+
+  it("offers the store as the install channel when it has the app", () => {
+    const [card] = appCards({
+      apps: [],
+      rejected: [],
+      files: [],
+      recents: [],
+      updates: NO_UPDATES,
+      catalogue: [offered({ available: "0.1.0" })],
+      versions: NO_VERSIONS,
+      running: NO_RUNNING,
+      appsRoot: APPS_ROOT,
+      store: new Map([["canvas", "a".repeat(64)]]),
+    });
+    expect(card).toMatchObject({ state: "not-installed", installChannel: "flatpak" });
+  });
+
+  it("is still installable from the store when no AppImage feed answered", () => {
+    // The store is the channel, so a silent feed must not hide the Install button.
+    const [card] = appCards({
+      apps: [],
+      rejected: [],
+      files: [],
+      recents: [],
+      updates: NO_UPDATES,
+      catalogue: [offered({ available: null, reason: "the feed could not be read" })],
+      versions: NO_VERSIONS,
+      running: NO_RUNNING,
+      appsRoot: APPS_ROOT,
+      store: new Map([["canvas", "a".repeat(64)]]),
+    });
+    expect(card).toMatchObject({ state: "not-installed", installChannel: "flatpak" });
+  });
+
+  it("leaves a copy a person placed under its own updater, whatever the feed says", () => {
+    const [card] = appCards({
+      apps: [{ ...discovered(), executable: "/home/me/Downloads/suite-canvas.AppImage" }],
+      rejected: [],
+      files: [],
+      recents: [],
+      updates: NO_UPDATES,
+      catalogue: [offered({ available: "0.9.0" })],
+      versions: NO_VERSIONS,
+      running: NO_RUNNING,
+      appsRoot: APPS_ROOT,
+    });
+    expect(card).toMatchObject({ source: "folder", state: "local", version: "0.1.0" });
+  });
+
+  it("says a Flatpak has an update when the store publishes another commit", () => {
+    const [card] = appCards({
+      apps: [
+        {
+          ...discovered(),
+          executable: "/usr/bin/flatpak",
+          flatpak: {
+            application: "run.suite.canvas",
+            installation: "user",
+            commit: "a".repeat(64),
+          },
+        },
+      ],
+      rejected: [],
+      files: [],
+      recents: [],
+      updates: NO_UPDATES,
+      catalogue: [offered({ installed: "0.1.0" })],
+      versions: NO_VERSIONS,
+      running: NO_RUNNING,
+      appsRoot: APPS_ROOT,
+      store: new Map([["canvas", "b".repeat(64)]]),
+    });
+    expect(card).toMatchObject({
+      source: "flatpak",
+      state: "update-available",
+      available: null,
+      installChannel: "flatpak",
+    });
+  });
+
+  it("leaves a Flatpak current when the store has the installed commit", () => {
+    const commit = "a".repeat(64);
+    const [card] = appCards({
+      apps: [
+        {
+          ...discovered(),
+          executable: "/usr/bin/flatpak",
+          flatpak: { application: "run.suite.canvas", installation: "user", commit },
+        },
+      ],
+      rejected: [],
+      files: [],
+      recents: [],
+      updates: NO_UPDATES,
+      catalogue: [offered({ installed: "0.1.0" })],
+      versions: NO_VERSIONS,
+      running: NO_RUNNING,
+      appsRoot: APPS_ROOT,
+      store: new Map([["canvas", commit]]),
+    });
+    expect(card).toMatchObject({ source: "flatpak", state: "current" });
   });
 
   it("calls an install under Start's own root managed, whoever asked first", () => {

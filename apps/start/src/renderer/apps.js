@@ -12,8 +12,15 @@ function stateLine(card) {
   const running = card.running ? " · running" : "";
   // Flatpak is a writer, not a folder: the app updates when Flatpak updates it, and
   // saying "updates itself" or "up to date" would both be claims this hub cannot make.
-  if (card.source === "flatpak") return `${card.version} · Flatpak${running}`;
-  if (card.state === "not-installed") return "Not installed yet";
+  if (card.source === "flatpak") {
+    const newer = card.state === "update-available" ? " · update available" : "";
+    return `${card.version} · Flatpak${newer}${running}`;
+  }
+  if (card.state === "not-installed") {
+    return card.installChannel === "flatpak"
+      ? "Not installed yet · from the store"
+      : "Not installed yet";
+  }
   if (card.state === "no-release") {
     return card.version === null ? "No release found" : `${card.version} · no release found`;
   }
@@ -54,14 +61,15 @@ function fileCountLabel(count) {
 function progressBar(card, progress) {
   const holder = el("div", "card-progress");
   const bar = el("progress", "card-progress-bar");
+  const verb = progress.phase === "installing" ? "Installing…" : "Downloading…";
   bar.max = 100;
   if (progress.total !== null && progress.total > 0) {
     bar.value = Math.min(100, Math.round((progress.received / progress.total) * 100));
-    holder.append(bar, el("span", "card-progress-label", `Downloading… ${bar.value}%`));
+    holder.append(bar, el("span", "card-progress-label", `${verb} ${bar.value}%`));
   } else {
     // A feed that named no size gets a bar that moves without claiming to know how far.
     bar.removeAttribute("value");
-    holder.append(bar, el("span", "card-progress-label", "Downloading…"));
+    holder.append(bar, el("span", "card-progress-label", verb));
   }
   holder.dataset.state = "downloading";
   holder.setAttribute("role", "status");
@@ -88,10 +96,12 @@ function cardActions(card, actions) {
   // Nothing is installed, so there is nothing to open and nothing to remove.
   if (card.id === null || card.version === null) return buttons;
 
-  if (card.state === "update-available" && card.available !== null) {
-    buttons.append(
-      button(`Update to ${card.available}`, "primary", () => actions.install(card.id)),
-    );
+  if (card.state === "update-available") {
+    const label =
+      card.available === null || card.source === "flatpak"
+        ? "Update"
+        : `Update to ${card.available}`;
+    buttons.append(button(label, "primary", () => actions.install(card.id)));
     buttons.append(button("Open", "quiet", () => actions.launch(card.id)));
   } else {
     buttons.append(button("Open", "primary", () => actions.launch(card.id)));
@@ -170,7 +180,8 @@ function appCard(card, actions, progress, launchError) {
     node.append(el("p", "card-meta card-files", fileCountLabel(card.fileCount)));
   }
 
-  if (progress?.phase === "downloading") node.append(progressBar(card, progress));
+  const busy = progress?.phase === "downloading" || progress?.phase === "installing";
+  if (busy && progress) node.append(progressBar(card, progress));
   else node.append(cardActions(card, actions));
 
   return node;

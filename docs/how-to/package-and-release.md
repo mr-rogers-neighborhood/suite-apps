@@ -39,8 +39,11 @@ node scripts/flatpak.mjs              # package, build, publish, install
 node scripts/flatpak.mjs --no-build   # reuse release/linux-unpacked
 ```
 
-The development remote is unsigned. A published repository needs a signed OSTree repository and a key
-the client already trusts; see [Packaging channels](../reference/packaging-channels.md).
+The script publishes to `~/suite-flatpak/repo` and adds it as the user remote `suite-local`. Run
+`scripts/store-key.sh` once to make the store's signing key: the script then signs the repository
+summary and adds the remote with the public key, so `flatpak update` verifies what it downloads. With
+no key the remote is added with `--no-gpg-verify` for local testing only, and the script says so. See
+[Packaging channels](../reference/packaging-channels.md).
 
 ## Release notes and versions
 

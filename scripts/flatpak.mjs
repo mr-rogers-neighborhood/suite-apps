@@ -10,12 +10,12 @@
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
  *
  * The repository lives outside the checkout, at ~/suite-flatpak/repo, and is
- * added as the user remote `suite-local`. It is unsigned: local testing adds it
- * with --no-gpg-verify. A shared or published repo needs `flatpak
- * build-update-repo --gpg-sign=...` and a key the client already trusts.
+ * added as the user remote `suite-local`. When scripts/store-key.sh has made a
+ * key, the repo summary is signed and the remote verifies it; without a key the
+ * remote is added with --no-gpg-verify for local testing only.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,6 +45,43 @@ if (!app) {
 const stateDir = join(homedir(), "suite-flatpak");
 const repo = process.env.SUITE_FLATPAK_REPO ?? join(stateDir, "repo");
 const buildDir = join(ROOT, "packaging", "flatpak", ".build", app.id);
+
+// The store's signing key, when one has been made. The fingerprint is not a
+// secret; the private key stays in ~/.gnupg and never enters the repository.
+const keyIdPath = join(stateDir, "store-key.id");
+const publicKeyPath = join(stateDir, "suite-store.gpg");
+const keyId =
+  process.env.SUITE_STORE_KEY_ID?.trim() ||
+  (existsSync(keyIdPath) ? readFileSync(keyIdPath, "utf8").trim() : "");
+
+/**
+ * A fingerprint whose key is gone fails deep inside flatpak-builder with a GPG
+ * message, after the build. Name it here instead, and say what to run.
+ */
+if (keyId.length > 0) {
+  const listed = spawnSync("gpg", ["--batch", "--list-keys", keyId], { stdio: "ignore" });
+  if (listed.error) {
+    process.stderr.write(`gpg is not installed, so the store key ${keyId} cannot be used\n`);
+    process.exit(1);
+  }
+  if (listed.status !== 0) {
+    process.stderr.write(
+      `store key ${keyId} is not in the keyring. Run scripts/store-key.sh to make one,\n` +
+        "or unset SUITE_STORE_KEY_ID to publish an unsigned repository.\n",
+    );
+    process.exit(1);
+  }
+
+  // Keep the public key beside the fingerprint in step with the keyring, so the
+  // remote always imports the key the summary was signed with.
+  mkdirSync(stateDir, { recursive: true });
+  const exported = spawnSync("gpg", ["--batch", "--export", keyId]);
+  if (exported.status !== 0 || exported.stdout.length === 0) {
+    process.stderr.write(`could not export the public half of ${keyId}\n`);
+    process.exit(1);
+  }
+  writeFileSync(publicKeyPath, exported.stdout);
+}
 
 // Orca (and similar launchers) point XDG_DATA_HOME at a per-session directory,
 // and a user Flatpak installed there exists only inside that session. The app
@@ -85,6 +122,7 @@ if (!existsSync(app.unpacked)) {
 mkdirSync(buildDir, { recursive: true });
 run("flatpak-builder", [
   "--user",
+  ...(keyId.length > 0 ? [`--gpg-sign=${keyId}`] : []),
   "--force-clean",
   `--repo=${repo}`,
   `--state-dir=${join(stateDir, "builder")}`,
@@ -92,11 +130,40 @@ run("flatpak-builder", [
   app.manifest,
 ]);
 
-run("flatpak", ["build-update-repo", "--prune", repo]);
+if (keyId.length === 0) {
+  process.stdout.write(
+    "\nno store key: the repository summary will be unsigned. Run scripts/store-key.sh to make one.\n",
+  );
+}
+
+run("flatpak", [
+  "build-update-repo",
+  "--prune",
+  ...(keyId.length > 0 ? [`--gpg-sign=${keyId}`] : []),
+  repo,
+]);
 
 const remotes = spawnSync("flatpak", ["remotes", "--user", "--columns=name"], { encoding: "utf8" });
-if (!(remotes.stdout ?? "").split("\n").includes("suite-local")) {
-  run("flatpak", ["remote-add", "--user", "--if-not-exists", "--no-gpg-verify", "suite-local", repo]);
+const hasRemote = (remotes.stdout ?? "").split("\n").includes("suite-local");
+if (!hasRemote) {
+  run("flatpak", [
+    "remote-add",
+    "--user",
+    "--if-not-exists",
+    ...(keyId.length > 0 ? [`--gpg-import=${publicKeyPath}`] : ["--no-gpg-verify"]),
+    "suite-local",
+    repo,
+  ]);
+} else if (keyId.length > 0) {
+  // An earlier run added the remote unsigned. Import the key and turn
+  // verification on, so `flatpak update` checks the summary from now on.
+  run("flatpak", [
+    "remote-modify",
+    "--user",
+    `--gpg-import=${publicKeyPath}`,
+    "--gpg-verify",
+    "suite-local",
+  ]);
 }
 
 // Install through the named remote, not flatpak-builder's own `<id>-origin`,

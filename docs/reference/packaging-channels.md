@@ -40,8 +40,8 @@ Details and the checksum step are in
 
 ## Arch package
 
-`apps/start/packaging/arch/PKGBUILD` builds `suite-start-bin` by repackaging the
-published AppImage, so the package and the feed cannot describe different releases. It extracts with
+`packaging/arch/PKGBUILD` builds `suite-start-bin` by repackaging the published AppImage,
+so the package and the feed cannot describe different releases. It extracts with
 `--appimage-extract`, which removes the FUSE dependency.
 
 The hub is the only app packaged this way.
@@ -58,13 +58,19 @@ flatpak run run.suite.canvas
 ```
 
 The script exports to `~/suite-flatpak/repo`, adds it as the user remote `suite-local`, and installs
-from that remote, so `flatpak update` is the real update path. The development repository is unsigned
-and the remote is added with `--no-gpg-verify`; a published repository needs
-`flatpak build-update-repo --gpg-sign` and a key the client already trusts.
+from that remote, so `flatpak update` is the real update path.
 
-Start lists Flatpak installs, launches them through `flatpak run`, and can ask Flatpak to remove one.
-Start does not install Flatpaks yet, and the hub stays an unpacked install until it manages Flatpak
-installs and updates end to end.
+`scripts/store-key.sh` makes the store's signing key once. When it has run, `flatpak.mjs` signs the
+repository summary, exports the public key beside the fingerprint in `~/suite-flatpak`, and adds the
+remote with `--gpg-import`, so every later `flatpak install` and `flatpak update` verifies what it
+downloads. A remote that an earlier run added unsigned is switched to verification on the next run.
+Without a key the remote is added with `--no-gpg-verify`, which is for local testing only, and the
+script says so.
+
+Start lists Flatpak installs, launches them through `flatpak run`, asks Flatpak to remove one, and —
+when the store offers the app — asks Flatpak to install it or to replace a deployment whose commit is
+behind. Start reads the commits and never writes a deployment itself. The hub is still an AppImage and
+an Arch package; packaging it as a Flatpak is a separate decision.
 
 `XDG_DATA_HOME` decides which Flatpak installation is visible. A tool that points it at a per-session
 directory, such as Orca, hides the real user installation; run with

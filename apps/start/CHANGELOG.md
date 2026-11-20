@@ -10,6 +10,15 @@ the apps pin, and are not releases of the launcher.
 
 ### Added
 
+- **Start installs and updates from the local Flatpak store.** A card whose app the store offers says
+  `Not installed yet · from the store`, and Install asks Flatpak to install it even when no AppImage
+  feed answered. A deployment whose commit is behind the store's says `update available`, and Update
+  asks Flatpak to replace it. Start reads the published commit and the deployed one; it never swaps a
+  deployment itself, and a running Flatpak keeps running the old commit until it restarts.
+- **A copy you placed yourself is described by who owns it.** The card says
+  `from a folder · updates itself` whatever the hub's feed says, instead of borrowing the feed's
+  version and offering an Update that would install a second copy in another format.
+
 - **Start sees Flatpak installs.** An app installed with Flatpak appears on its card with its own
   version, opens through `flatpak run`, can be shown in the file manager, and can be removed by
   asking Flatpak to remove it. The card says `Flatpak` instead of borrowing the AppImage feed's

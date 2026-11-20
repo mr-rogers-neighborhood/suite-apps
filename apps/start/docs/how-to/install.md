@@ -72,16 +72,20 @@ sudo dnf install fuse         # Fedora
 
 You get one window with a card per app the suite offers:
 
-| What the card says                  | What it means                                                                  |
-| ----------------------------------- | ------------------------------------------------------------------------------ |
-| **Install Suite Canvas**            | A release is published and verified; one press downloads it.                   |
-| **No release found**                | Nothing is published for that app yet. The button appears when a version does. |
-| **0.1.0 · up to date**              | Installed, and the published version is the one you have.                      |
-| **0.1.0 · newer version available** | Installed, with **Update to …** as the main button.                            |
+| What the card says                     | What it means                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------ |
+| **Install Suite Canvas**               | A release is published and verified; one press downloads it.                   |
+| **Not installed yet · from the store** | The local Flatpak store has it; one press asks Flatpak to install it.          |
+| **No release found**                   | Nothing is published for that app yet. The button appears when a version does. |
+| **0.1.0 · up to date**                 | Installed, and the published version is the one you have.                      |
+| **0.1.0 · newer version available**    | Installed, with **Update to …** as the main button.                            |
+| **0.1.0 · Flatpak**                    | Flatpak installed it, and Flatpak is its update path.                          |
+| **0.1.0 · Flatpak · update available** | The store publishes a different build; **Update** asks Flatpak to replace it.  |
 
 A download shows a bar **on the card**, in place of the button, and a failure says what went wrong in
-the same place. Nothing installs itself: Start reads a version when the window opens, and fetches a
-file only when you press something.
+the same place. An install through Flatpak shows **Installing…** there instead, because Flatpak does
+not report a percentage. Nothing installs itself: Start reads a version when the window opens, and
+fetches a file only when you press something.
 
 The last row is Start itself. It cannot replace its own running binary, so when a newer Start exists
 that row links to the release page instead of offering a button.

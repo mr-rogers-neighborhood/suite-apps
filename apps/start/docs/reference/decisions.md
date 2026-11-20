@@ -13,6 +13,7 @@ The rules that shape Start.
 - `suite://<app>/workspace/<file name>` names a file, not an id. The hub routes it; the app resolves
   it against its own folder.
 - The hub is packaged and does not update itself. Its own row links to the release page.
-- Flatpak installs are listed, launched and removable through Start. Start does not install them.
+- Flatpak installs are listed, installed from the store, launched and removable through Start. Start
+  asks Flatpak to install or update; it never replaces a deployment itself.
 - The renderer is sandboxed: context isolation, sandbox, no `nodeIntegration`, no remote content.
 - The gate is local: `pnpm check`.

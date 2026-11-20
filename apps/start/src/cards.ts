@@ -37,6 +37,14 @@ export interface CardInput {
   readonly running: ReadonlySet<string>;
   /** Where Start installs. An app under it is Start's to manage, whoever asked first. */
   readonly appsRoot: string;
+  /**
+   * What the store offers, by app id: the commit `suite-local` publishes.
+   *
+   * Absent when the store has not been read (no Flatpak, no remote, or the
+   * window has not opened yet), which is why the card treats it as "no
+   * information" rather than "nothing available".
+   */
+  readonly store?: ReadonlyMap<string, string> | undefined;
 }
 
 /** Whether an executable is one Start placed.
@@ -73,9 +81,19 @@ function nameFor(path: string): string {
  * The installed version comes from discovery rather than from the catalogue: discovery is
  * what read the disk, and a catalogue that remembered an install after it was removed
  * would put "up to date" on a card with no version at all.
+ *
+ * A store that offers the app is enough to make "not installed yet" true even when
+ * no AppImage feed answered: the Install button works through Flatpak, so calling the
+ * card "no release found" would hide the one channel that can install it.
  */
-function stateFor(installedVersion: string | null, available: string | null): AppCardState {
-  if (installedVersion === null) return available !== null ? "not-installed" : "no-release";
+function stateFor(
+  installedVersion: string | null,
+  available: string | null,
+  installChannel: "appimage" | "flatpak" = "appimage",
+): AppCardState {
+  if (installedVersion === null) {
+    return available !== null || installChannel === "flatpak" ? "not-installed" : "no-release";
+  }
   if (available === null) return "no-release";
   return isNewer(available, installedVersion) ? "update-available" : "current";
 }
@@ -85,6 +103,7 @@ export function appCards(input: CardInput): readonly AppCard[] {
     id: install.id ?? null,
     name: nameFor(install.path),
     source: "folder",
+    installChannel: "appimage",
     icon: install.id === undefined ? null : (APP_ICONS[install.id] ?? null),
     state: "refused",
     version: null,
@@ -114,12 +133,29 @@ export function appCards(input: CardInput): readonly AppCard[] {
       // "newer version available" from a feed this install cannot read would
       // offer an Update button that installs a second copy in another format.
       const fromFlatpak = found?.flatpak !== undefined;
+      const storeCommit = input.store?.get(entry.id) ?? null;
+      const installChannel: "appimage" | "flatpak" = storeCommit !== null ? "flatpak" : "appimage";
+      const source = found === null ? "managed" : sourceOf(found, input.appsRoot);
+      const flatpakUpdate =
+        fromFlatpak &&
+        found?.flatpak?.commit !== undefined &&
+        storeCommit !== null &&
+        found.flatpak.commit !== storeCommit;
       return {
         id: entry.id,
         name: found?.manifest.name ?? entry.name,
-        source: found === null ? "managed" : sourceOf(found, input.appsRoot),
+        source,
+        installChannel,
         icon: APP_ICONS[entry.id] ?? null,
-        state: fromFlatpak ? "current" : stateFor(found?.manifest.version ?? null, entry.available),
+        state: fromFlatpak
+          ? flatpakUpdate
+            ? "update-available"
+            : "current"
+          : source === "folder"
+            ? // A copy a person placed updates itself. Reading the hub's feed into its
+              // state would offer an Update that installs a second copy in another format.
+              "local"
+            : stateFor(found?.manifest.version ?? null, entry.available, installChannel),
         version: found?.manifest.version ?? null,
         available: fromFlatpak ? null : entry.available,
         reason: fromFlatpak ? null : entry.reason,
@@ -146,6 +182,7 @@ export function appCards(input: CardInput): readonly AppCard[] {
       id: entry.manifest.id,
       name: entry.manifest.name,
       source,
+      installChannel: "appimage",
       icon: APP_ICONS[entry.manifest.id] ?? null,
       state: source === "folder" ? "local" : source === "flatpak" ? "current" : "no-release",
       version: entry.manifest.version,
@@ -179,6 +216,7 @@ export function selfCard(entry: CatalogueApp, version: string): AppCard {
     id: SELF_ID,
     name: entry.name,
     source: "managed",
+    installChannel: "appimage",
     icon: null,
     state:
       entry.available === null

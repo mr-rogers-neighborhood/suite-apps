@@ -23,7 +23,8 @@ The rules that shape this repository. Each is current; the code follows it.
 
 - Start replaces only a file it can write. It installs, updates and removes the apps it placed.
 - The hub is packaged; the apps are AppImages. A copy a person placed manages itself.
-- Flatpak is a second channel: Start lists, launches and removes, but does not install.
+- Flatpak is a second channel: Start lists and launches installs, installs from the store, updates a
+  deployment whose commit is behind, and removes through Flatpak. Flatpak is the writer, never Start.
 - Linux is the published platform. macOS and Windows have no signing identity.
 
 ## Product boundary

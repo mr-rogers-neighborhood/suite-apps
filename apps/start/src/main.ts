@@ -45,13 +45,23 @@ import {
 } from "./catalogue.js";
 import { type DocumentsFolder, indexDocuments, isInsideDocuments } from "./fileIndex.js";
 import {
+  FLATPAK_APP_PREFIX,
   type FlatpakApp,
   findFlatpak,
+  flatpakIdFor,
   flatpakLocation,
   flatpakRunArgs,
   flatpakScopeArgs,
+  installedCommitArgs,
+  installedInfoArgs,
   listFlatpaks,
+  parseCommitOutput,
+  parseVersionOutput,
   runFlatpak,
+  storeInfoArgs,
+  storeInstallArgs,
+  storeRemote,
+  storeUpdateArgs,
   withFlatpakInstalls,
 } from "./flatpak.js";
 import { StartHost } from "./host.js";
@@ -72,6 +82,7 @@ import {
   appById,
   type DiscoveredApp,
   discoverApps,
+  type FlatpakInstall,
   type InstallRecord,
 } from "./registry.js";
 import { type ReportedUpdate, readReportedUpdate, type UpdateLookup } from "./reportedUpdate.js";
@@ -306,12 +317,18 @@ const installProgress = new Map<string, InstallProgress>();
  */
 async function refreshCatalogue(): Promise<void> {
   const { apps } = await discover();
-  catalogue = await readCatalogue({
-    installed: new Map(apps.map((entry) => [entry.manifest.id, entry.manifest.version])),
-    feedBase: feedBase(),
-    selfFeed: await selfFeed(),
-    fetch: fetchFeed,
-  });
+  const [next] = await Promise.all([
+    readCatalogue({
+      installed: new Map(apps.map((entry) => [entry.manifest.id, entry.manifest.version])),
+      feedBase: feedBase(),
+      selfFeed: await selfFeed(),
+      fetch: fetchFeed,
+    }),
+    // The store is read on the same occasions as the feeds: when the window opens
+    // and when a person asks it to look again. Never on a timer.
+    storeCommits(true),
+  ]);
+  catalogue = next;
 }
 
 /** How many versions of each catalogue app are on disk here. One listing each. */
@@ -438,9 +455,62 @@ async function flatpakInstalls(): Promise<readonly FlatpakApp[]> {
   if (flatpakCache !== null && now - flatpakCache.at < FLATPAK_CACHE_MS) {
     return flatpakCache.apps;
   }
-  const apps = await listFlatpaks();
+  const listed = await listFlatpaks();
+  // `flatpak list` does not carry the commit, and the commit is the only stable
+  // way to say "the store has a different build": `remote-info` does not publish
+  // the app's version. One extra query per suite app, cached with the listing.
+  const apps = await Promise.all(
+    listed.map(async (app): Promise<FlatpakApp> => {
+      if (!app.applicationId.startsWith(FLATPAK_APP_PREFIX)) return app;
+      try {
+        const commit = parseCommitOutput(
+          await runFlatpak(
+            installedCommitArgs({
+              application: app.applicationId,
+              installation: app.installation,
+            }),
+          ),
+        );
+        return commit === null ? app : { ...app, commit };
+      } catch {
+        return app;
+      }
+    }),
+  );
   flatpakCache = { at: now, apps };
   return apps;
+}
+
+/** What `suite-local` offers, by catalogue app id. Empty when the store is not there. */
+let storeCache: { readonly at: number; readonly commits: ReadonlyMap<string, string> } | null =
+  null;
+
+const STORE_CACHE_MS = 60_000;
+const NO_STORE: ReadonlyMap<string, string> = new Map();
+
+async function storeCommits(force = false): Promise<ReadonlyMap<string, string>> {
+  if (findFlatpak() === null) return NO_STORE;
+  const now = Date.now();
+  if (!force && storeCache !== null && now - storeCache.at < STORE_CACHE_MS) {
+    return storeCache.commits;
+  }
+
+  const remote = storeRemote();
+  const commits = new Map<string, string>();
+  await Promise.all(
+    CATALOGUE_APPS.map(async (entry) => {
+      try {
+        const commit = parseCommitOutput(
+          await runFlatpak(storeInfoArgs(remote, flatpakIdFor(entry.id))),
+        );
+        if (commit !== null) commits.set(entry.id, commit);
+      } catch {
+        // Not in this store is the ordinary answer for an app nobody published.
+      }
+    }),
+  );
+  storeCache = { at: now, commits };
+  return commits;
 }
 
 async function discover(): Promise<{
@@ -573,6 +643,7 @@ async function state(): Promise<LauncherState> {
     previous: await previousVersions(apps),
     running: liveRunning(),
     appsRoot: applicationsRoot(),
+    store: storeCache?.commits ?? NO_STORE,
   });
 
   const recentCards: RecentCard[] = recent
@@ -957,6 +1028,72 @@ function describeInstallFailure(error: unknown): string {
     : "the install did not finish, and nothing was replaced";
 }
 
+/** The version a deployment reports, or null when Flatpak will not say. */
+async function flatpakVersionOf(install: FlatpakInstall): Promise<string | null> {
+  try {
+    return parseVersionOutput(await runFlatpak(installedInfoArgs(install)));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Finish a Flatpak install or update.
+ *
+ * The listing and the store are both re-read, because either may have changed:
+ * the app now exists, and the commit the store offers is the one that was just
+ * installed. The card then has one answer rather than a stale one.
+ */
+async function finishFlatpak(id: string, install: FlatpakInstall): Promise<void> {
+  flatpakCache = null;
+  const version = await flatpakVersionOf(install);
+  if (version !== null) catalogue = withInstalled(catalogue, id, version);
+  await storeCommits(true);
+  installProgress.delete(id);
+  sendProgress();
+  await broadcast();
+}
+
+/** Install one app from the store, with the card saying Flatpak is working. */
+async function installFromFlatpak(id: string): Promise<void> {
+  reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
+  try {
+    await runFlatpak(storeInstallArgs(storeRemote(), flatpakIdFor(id)));
+    await finishFlatpak(id, { application: flatpakIdFor(id), installation: "user" });
+  } catch (error) {
+    reportProgress({
+      id,
+      phase: "failed",
+      received: 0,
+      total: null,
+      reason: describeInstallFailure(error),
+    });
+  }
+}
+
+/**
+ * Replace a deployment Flatpak already owns.
+ *
+ * A running app keeps running the old commit until it restarts; Flatpak swaps the
+ * deployment underneath it. That is the writer's rule, and closing the window
+ * would be Start doing a job it does not own.
+ */
+async function replaceWithFlatpak(id: string, install: FlatpakInstall): Promise<void> {
+  reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
+  try {
+    await runFlatpak(storeUpdateArgs(install));
+    await finishFlatpak(id, install);
+  } catch (error) {
+    reportProgress({
+      id,
+      phase: "failed",
+      received: 0,
+      total: null,
+      reason: describeInstallFailure(error),
+    });
+  }
+}
+
 /**
  * Install or update one app, and let the card watch it happen.
  *
@@ -967,6 +1104,21 @@ function describeInstallFailure(error: unknown): string {
 async function installOne(id: string): Promise<void> {
   const entry = catalogue.find((app) => app.id === id);
   if (entry === undefined) return;
+
+  // Flatpak owns its installs, so when it is the writer Start asks it and waits.
+  // The store is also the install channel for an app it offers, which is what
+  // makes a fresh machine's Install button work without an AppImage feed.
+  const { apps } = await discover();
+  const installed = appById(apps, id);
+  if (installed?.flatpak !== undefined) {
+    await replaceWithFlatpak(entry.id, installed.flatpak);
+    return;
+  }
+  const store = await storeCommits();
+  if (installed === null && store.has(id)) {
+    await installFromFlatpak(entry.id);
+    return;
+  }
 
   if (entry.available === null || entry.artifact === null) {
     reportProgress({

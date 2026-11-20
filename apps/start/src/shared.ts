@@ -108,7 +108,7 @@ export type AppCardState =
 /** How one install is going, for the bar that replaces its button. */
 export interface InstallProgress {
   readonly id: string;
-  readonly phase: "downloading" | "placed" | "failed";
+  readonly phase: "downloading" | "installing" | "placed" | "failed";
   /** Bytes written so far. Zero unless something is being downloaded. */
   readonly received: number;
   /** Bytes the feed said to expect, or null when it did not say. */
@@ -135,6 +135,14 @@ export interface AppCard {
   readonly name: string;
   /** How this copy got here. Decides which buttons the card can honestly offer. */
   readonly source: AppSource;
+  /**
+   * What Install would use for this app right now.
+   *
+   * `flatpak` when the store offers it, `appimage` otherwise. A card states the
+   * channel before the button is pressed, so nobody has to guess which format
+   * they are about to get.
+   */
+  readonly installChannel: "appimage" | "flatpak";
   /** The app's own mark, as a data URI, when the hub knows one. */
   readonly icon: string | null;
   readonly state: AppCardState;

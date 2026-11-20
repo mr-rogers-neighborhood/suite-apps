@@ -63,6 +63,8 @@ export interface FlatpakInstall {
   readonly application: string;
   /** `user` or `system`. */
   readonly installation: string;
+  /** The deployed commit, when Start resolved it. */
+  readonly commit?: string;
 }
 
 export interface DiscoveredApp {

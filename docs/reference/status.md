@@ -9,7 +9,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Hub: update and rollback | Working | Replaces the managed copy and relaunches; one step back from disk |
 | Hub: uninstall | Working | Versions, entry, icon and record removed; documents untouched |
 | Hub: routing | Working | `suite://` links and document files open the owning app |
-| Hub: Flatpak | Partial | Lists, launches and removes Flatpak installs; does not install them yet |
+| Hub: Flatpak | Working | Lists, installs from the store, updates, launches and removes Flatpak installs |
 | Canvas | Alpha | Cards, boards, editor, library, views, sharing and sync; still changes shape |
 | Planner | Pre-alpha | Day view, inbox, capture, estimates; no sync transport |
 | Budget | Pre-alpha | Launcher, accounts, register, month grid, rollover, reconcile, backups; no network |
@@ -19,7 +19,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Go | Shell only | Android debug build installs; no domain ships; iOS unbuilt; no sync transport |
 | Shared packages | Working | `@suite/contracts`, `files`, `desktop`, `theme`, `ui` are consumed as workspace packages |
 | Linux packaging | Working | AppImage and Arch package for the hub; app AppImages through Start |
-| Flatpak | Experimental | Proven on Canvas; unsigned development remote |
+| Flatpak | Experimental | Local store built and installed on Canvas; signing available, no published remote |
 | macOS and Windows | Not built | No signing identity, so nothing is published |
 | Accessibility | Partial | Contrast and start screens are machine-checked; no full manual pass recorded |
 | The gate | Working | Local, at the root; `--fresh` proves a commit rather than a working tree |

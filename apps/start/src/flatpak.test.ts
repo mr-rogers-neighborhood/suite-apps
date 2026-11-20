@@ -7,7 +7,14 @@ import {
   flatpakManifest,
   flatpakRunArgs,
   flatpakScopeArgs,
+  installedCommitArgs,
+  installedInfoArgs,
+  parseCommitOutput,
   parseFlatpakList,
+  parseVersionOutput,
+  storeInfoArgs,
+  storeInstallArgs,
+  storeUpdateArgs,
   suiteFlatpakFor,
   withFlatpakInstalls,
 } from "./flatpak.js";
@@ -164,6 +171,15 @@ describe("withFlatpakInstalls", () => {
     expect(withFlatpakInstalls(empty, apps, [CANVAS], "/usr/bin/flatpak").apps).toEqual([]);
   });
 
+  it("carries the deployed commit so a store update can be told apart", () => {
+    const commit = "a".repeat(64);
+    const apps = parseFlatpakList(LIST).map((app) =>
+      app.applicationId === "run.suite.canvas" ? { ...app, commit } : app,
+    );
+    const merged = withFlatpakInstalls(empty, apps, [CANVAS], "/usr/bin/flatpak");
+    expect(merged.apps[0]?.flatpak?.commit).toBe(commit);
+  });
+
   it("leaves refusals where discovery put them", () => {
     const rejected = [{ path: "/installs/budget/suite.app.json", reason: "no manifest" }];
     const merged = withFlatpakInstalls({ apps: [], rejected }, [], [CANVAS], "/usr/bin/flatpak");
@@ -186,5 +202,77 @@ describe("flatpakScopeArgs", () => {
     expect(flatpakScopeArgs("user")).toEqual(["--user"]);
     expect(flatpakScopeArgs("system")).toEqual(["--system"]);
     expect(flatpakScopeArgs("")).toEqual([]);
+  });
+});
+
+const COMMIT = "0ba312d3ac85a838bcc25f73cf090978a4875a3a962ea38aca68553703ef1354";
+
+describe("parseCommitOutput", () => {
+  it("reads the one line --show-commit prints", () => {
+    expect(parseCommitOutput(`${COMMIT}\n`)).toBe(COMMIT);
+  });
+
+  it("rejects anything that is not a commit", () => {
+    expect(parseCommitOutput("")).toBeNull();
+    expect(parseCommitOutput("abc123")).toBeNull();
+    expect(parseCommitOutput(`error: ${COMMIT}`)).toBeNull();
+  });
+});
+
+describe("parseVersionOutput", () => {
+  it("finds the version among flatpak info's lines", () => {
+    const text = [
+      "",
+      "Suite Canvas - Your documents",
+      "",
+      "       Version: 0.1.0",
+      "        Branch: master",
+      "",
+    ].join("\n");
+    expect(parseVersionOutput(text)).toBe("0.1.0");
+  });
+
+  it("answers null when there is no version line", () => {
+    expect(parseVersionOutput("Suite Canvas\nBranch: master\n")).toBeNull();
+  });
+});
+
+describe("store commands", () => {
+  const install = { application: "run.suite.canvas", installation: "user" };
+
+  it("asks the store for the commit it offers", () => {
+    expect(storeInfoArgs("suite-local", "run.suite.canvas")).toEqual([
+      "remote-info",
+      "--user",
+      "--show-commit",
+      "suite-local",
+      "run.suite.canvas",
+    ]);
+  });
+
+  it("installs and updates non-interactively through the same remote", () => {
+    expect(storeInstallArgs("suite-local", "run.suite.canvas")).toEqual([
+      "install",
+      "--user",
+      "--noninteractive",
+      "suite-local",
+      "run.suite.canvas",
+    ]);
+    expect(storeUpdateArgs(install)).toEqual([
+      "--user",
+      "update",
+      "--noninteractive",
+      "run.suite.canvas",
+    ]);
+  });
+
+  it("reads the installed commit and version from the deployment", () => {
+    expect(installedCommitArgs(install)).toEqual([
+      "--user",
+      "info",
+      "--show-commit",
+      "run.suite.canvas",
+    ]);
+    expect(installedInfoArgs(install)).toEqual(["--user", "info", "run.suite.canvas"]);
   });
 });

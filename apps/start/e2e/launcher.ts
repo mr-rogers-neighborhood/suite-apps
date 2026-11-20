@@ -25,6 +25,15 @@ export interface Sandbox {
   readonly data: string;
   /** Where every fake app's directory lives, one per app. */
   readonly apps: string;
+  /** A throwaway applications root, so an install never writes into $HOME. */
+  readonly installedApps: string;
+  /**
+   * An empty release-feed root, so no spec can read a published feed.
+   *
+   * Without it, `feedFor` falls back to the feed compiled into each catalogue
+   * entry, and a test that pressed Install would download a real release.
+   */
+  readonly feeds: string;
   dispose(): Promise<void>;
 }
 
@@ -32,9 +41,20 @@ export async function sandbox(): Promise<Sandbox> {
   const root = await mkdtemp(join(tmpdir(), "suite-start-e2e-"));
   const data = join(root, "data");
   const apps = join(root, "apps");
+  const installedApps = join(root, "installed-apps");
+  const feeds = join(root, "feeds");
   await mkdir(data, { recursive: true });
   await mkdir(apps, { recursive: true });
-  return { root, data, apps, dispose: () => rm(root, { recursive: true, force: true }) };
+  await mkdir(installedApps, { recursive: true });
+  await mkdir(feeds, { recursive: true });
+  return {
+    root,
+    data,
+    apps,
+    installedApps,
+    feeds,
+    dispose: () => rm(root, { recursive: true, force: true }),
+  };
 }
 
 /**
@@ -78,25 +98,46 @@ export async function install(box: Sandbox, record: unknown): Promise<void> {
 }
 
 /**
- * A stand-in `flatpak` CLI.
+ * A stand-in `flatpak` CLI, with enough state to test the store.
  *
- * Start asks one binary three questions — what is installed, where a deployment
- * lives, and to run one — so the script answers exactly those and writes the
- * `run` arguments where a spec can read them.
+ * Start asks one binary what is installed, what the remote offers, where a
+ * deployment lives, and to install/update/run one. Files under the sandbox stand
+ * in for Flatpak's database, so an install is visible to the next `list` and an
+ * update changes the commit the next `info` reports.
  */
 export async function fakeFlatpak(
   box: Sandbox,
-  options: { application?: string; version?: string; name?: string } = {},
+  options: {
+    application?: string;
+    version?: string;
+    name?: string;
+    installed?: boolean;
+    commit?: string;
+    storeCommit?: string;
+  } = {},
 ): Promise<{ executable: string; logPath: string; location: string }> {
+  const application = options.application ?? "run.suite.canvas";
+  const version = options.version ?? "0.1.0";
+  const commit = options.commit ?? "a".repeat(64);
+  const storeCommit = options.storeCommit ?? commit;
+  const installed = options.installed ?? true;
+
   const executable = join(box.apps, "flatpak");
   const logPath = join(box.root, "flatpak-launched.txt");
   const location = join(box.root, "flatpak-deploy");
+  const state = join(box.root, "flatpak-state");
   await mkdir(location, { recursive: true });
+  await mkdir(state, { recursive: true });
+  await writeFile(join(state, "version"), version);
+  await writeFile(join(state, "installed-commit"), commit);
+  await writeFile(join(state, "store-commit"), storeCommit);
+  if (installed) await writeFile(join(state, "installed"), "");
+
   const listing = JSON.stringify([
     {
       name: options.name ?? "Suite Canvas",
-      application_id: options.application ?? "run.suite.canvas",
-      version: options.version ?? "0.1.0",
+      application_id: application,
+      version: "@VERSION@",
       branch: "master",
       arch: "x86_64",
       origin: "suite-local",
@@ -107,8 +148,15 @@ export async function fakeFlatpak(
   await writeFile(
     executable,
     `#!/bin/sh
+STATE="${state}"
+LOG="${logPath}"
+LOCATION="${location}"
 if [ "$1" = "list" ]; then
-  cat <<'JSON'
+  if [ ! -f "$STATE/installed" ]; then
+    printf '[]\\n'
+    exit 0
+  fi
+  sed "s/@VERSION@/$(cat "$STATE/version")/" <<'JSON'
 ${listing}
 JSON
   exit 0
@@ -116,15 +164,34 @@ fi
 if [ "$1" = "--user" ] || [ "$1" = "--system" ]; then
   shift
 fi
-if [ "$1" = "run" ]; then
-  shift
-  printf '%s\\n' "$@" > "${logPath}"
-  exit 0
-fi
-if [ "$1" = "info" ]; then
-  printf '%s\\n' "${location}"
-  exit 0
-fi
+case "$1" in
+  remote-info)
+    printf '%s\\n' "$(cat "$STATE/store-commit")"
+    ;;
+  info)
+    shift
+    case "$1" in
+      --show-commit) printf '%s\\n' "$(cat "$STATE/installed-commit")" ;;
+      --show-location) printf '%s\\n' "$LOCATION" ;;
+      *)
+        printf '\\nSuite Canvas\\n\\n            ID: ${application}\\n       Version: %s\\n\\n' "$(cat "$STATE/version")"
+        ;;
+    esac
+    ;;
+  install)
+    touch "$STATE/installed"
+    cp "$STATE/store-commit" "$STATE/installed-commit"
+    printf 'install\\n' >>"$LOG"
+    ;;
+  update)
+    cp "$STATE/store-commit" "$STATE/installed-commit"
+    printf 'update\\n' >>"$LOG"
+    ;;
+  run)
+    shift
+    printf '%s\\n' "$@" >"$LOG"
+    ;;
+esac
 exit 0
 `,
     { mode: 0o755 },
@@ -150,6 +217,10 @@ export async function launch(
       ...process.env,
       SUITE_START_DATA: box.data,
       SUITE_START_VERSION: "0.1.0-e2e",
+      // An install must land in the sandbox, never in the real ~/Applications.
+      SUITE_START_APPS_ROOT: box.installedApps,
+      // No published feed: a spec that wants one supplies its own base.
+      SUITE_START_FEED_BASE: box.feeds,
       // Hermetic on a machine that has Flatpak and a real suite app installed:
       // only a spec that supplies a stand-in may see a Flatpak.
       SUITE_START_FLATPAK: "",

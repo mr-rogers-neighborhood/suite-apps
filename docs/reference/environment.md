@@ -44,9 +44,11 @@ These are read by the desktop shell and passed to the renderer, so one Start pro
 ## Packaging
 
 `SUITE_FLATPAK_REPO` and `SUITE_FLATPAK_XDG_DATA_HOME` move the output repository and the Flatpak
-data root for `scripts/flatpak.mjs`. `SUITE_GO_KEYSTORE`, `SUITE_GO_KEY_ALIAS`,
-`SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_PASSWORD` and `SUITE_GO_JAVA_HOME` are used when building
-and signing an Android pack.
+data root for `scripts/flatpak.mjs`. `SUITE_STORE_KEY_ID` names the store's signing key when it is not
+the one recorded in `~/suite-flatpak/store-key.id`; `SUITE_STORE_STATE` and `SUITE_STORE_IDENTITY` move
+where `scripts/store-key.sh` writes and whose name the key carries. `SUITE_GO_KEYSTORE`,
+`SUITE_GO_KEY_ALIAS`, `SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_PASSWORD` and `SUITE_GO_JAVA_HOME`
+are used when building and signing an Android pack.
 
 ## Development
 

@@ -9,7 +9,9 @@ remove documents.
 2. On an app card, choose **Install**.
 3. When it finishes, choose **Open**.
 
-Start downloads the artifact named by the verified feed manifest, checks its sha512, places it under
+Start installs through the channel the card names. When the local Flatpak store offers the app, the
+card says `Not installed yet · from the store` and Install asks Flatpak to install it. Otherwise Start
+downloads the artifact named by the verified feed manifest, checks its sha512, places it under
 `~/Applications/Suite/<App>/<version>/`, and writes an install record. Nothing is unpacked into a
 shared location.
 
@@ -24,7 +26,12 @@ card offers Open, Reveal and Forget rather than Update and Uninstall.
 Choose **Update** on a managed card, or **Check for updates** to ask every feed again. If the app is
 running, Start asks before closing and replacing it.
 
-A copy you placed yourself updates itself; Start only launches it.
+A Flatpak card says `update available` when the store publishes a different commit from the one
+deployed on this machine. **Update** asks Flatpak to replace it. A running app keeps the old commit
+until it restarts: Flatpak swaps the deployment underneath it, and Start does not close an app it did
+not start.
+
+A copy you placed yourself updates itself; Start only launches it, whatever the feed says.
 
 ## Remove
 

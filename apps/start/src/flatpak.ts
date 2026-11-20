@@ -35,6 +35,15 @@ export interface FlatpakApp {
   readonly origin: string;
   /** `user` or `system`; where the deployment lives. */
   readonly installation: string;
+  /**
+   * The deployed commit, when it was resolved.
+   *
+   * `flatpak list --json` does not carry it, so discovery asks `flatpak info
+   * --show-commit` once per suite app. It is what makes "the store has a
+   * different build" a fact rather than a version guess: the remote does not
+   * publish the app's version in `remote-info`.
+   */
+  readonly commit?: string;
 }
 
 /** The Flatpak application id a catalogue app publishes under. */
@@ -150,7 +159,11 @@ export function withFlatpakInstalls(
       manifestPath: "",
       executable,
       installedAt: null,
-      flatpak: { application: install.applicationId, installation: install.installation },
+      flatpak: {
+        application: install.applicationId,
+        installation: install.installation,
+        ...(install.commit === undefined ? {} : { commit: install.commit }),
+      },
     });
   }
 
@@ -204,8 +217,9 @@ export function runFlatpak(
   binary: string = findFlatpak() ?? "flatpak",
 ): Promise<string> {
   return new Promise((resolvePromise, reject) => {
-    execFile(binary, [...args], { maxBuffer: 8 * 1024 * 1024 }, (error, stdout) => {
-      if (error) reject(error);
+    execFile(binary, [...args], { maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
+      // Flatpak's own words are what the card should show; "Command failed" is not.
+      if (error) reject(new Error(stderr.trim() || error.message));
       else resolvePromise(stdout);
     });
   });
@@ -241,4 +255,66 @@ export async function flatpakLocation(install: FlatpakInstall): Promise<string |
   } catch {
     return null;
   }
+}
+
+/**
+ * The store this hub installs from.
+ *
+ * One named remote, because that is the one `scripts/flatpak.mjs` creates and
+ * the one a person can inspect with `flatpak remotes`. An empty
+ * `SUITE_START_FLATPAK_REMOTE` (or a machine with no Flatpak) means no store.
+ */
+export const STORE_REMOTE = "suite-local";
+
+export function storeRemote(): string {
+  const named = process.env.SUITE_START_FLATPAK_REMOTE?.trim();
+  return named === undefined || named.length === 0 ? STORE_REMOTE : named;
+}
+
+const COMMIT_HASH = /^[0-9a-f]{64}$/u;
+
+/** Read the one line `--show-commit` prints. */
+export function parseCommitOutput(text: string): string | null {
+  const first = text.trim().split(/\s+/u)[0] ?? "";
+  return COMMIT_HASH.test(first) ? first : null;
+}
+
+/** Read the `Version:` line from `flatpak info`. */
+export function parseVersionOutput(text: string): string | null {
+  for (const line of text.split(/\r?\n/u)) {
+    if (!line.trim().startsWith("Version:")) continue;
+    const value = line.slice(line.indexOf(":") + 1).trim();
+    return value.length > 0 ? value : null;
+  }
+  return null;
+}
+
+/** What the store says it offers for one catalogue app. */
+export function storeInfoArgs(remote: string, application: string): readonly string[] {
+  return ["remote-info", "--user", "--show-commit", remote, application];
+}
+
+/** The commit of the deployment on this machine. */
+export function installedCommitArgs(install: FlatpakInstall): readonly string[] {
+  return [...flatpakScopeArgs(install.installation), "info", "--show-commit", install.application];
+}
+
+/** `flatpak info` for one deployment, which is where the version lives. */
+export function installedInfoArgs(install: FlatpakInstall): readonly string[] {
+  return [...flatpakScopeArgs(install.installation), "info", install.application];
+}
+
+/** Install one app from the store. */
+export function storeInstallArgs(remote: string, application: string): readonly string[] {
+  return ["install", "--user", "--noninteractive", remote, application];
+}
+
+/** Replace the deployment Flatpak already owns. */
+export function storeUpdateArgs(install: FlatpakInstall): readonly string[] {
+  return [
+    ...flatpakScopeArgs(install.installation),
+    "update",
+    "--noninteractive",
+    install.application,
+  ];
 }
