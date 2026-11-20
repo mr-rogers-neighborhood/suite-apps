@@ -29,15 +29,15 @@ module, hand it a document handle, and nothing else.
 
 ## What exists
 
-| Area                 | State                                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| `@suite/go` contract | Module declarations, capability routing, capture intents, host services, teardown isolation |
-| Shell                | Home surface: capture bar, pinned domains, recents; honest empty states                     |
-| Domain modules       | Scratch proves mount, document handoff, capture and teardown; Canvas is a placeholder      |
+| Area                 | State                                                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `@suite/go` contract | Module declarations, capability routing, capture intents, host services, teardown isolation                                         |
+| Shell                | Home surface: capture bar, pinned domains, recents; honest empty states                                                             |
+| Domain modules       | Scratch proves mount, document handoff, capture and teardown; Canvas is a placeholder                                               |
 | Packs                | A signed pack installs and appears on home; [Planner's state](docs/reference/planner.md) records where the first real domain stands |
-| Android              | Debug APK installs and launches on a physical device over USB                               |
-| iOS                  | Wired by convention, unbuilt — Xcode needs macOS                                            |
-| Sync                 | Seam designed, no transport. `ModuleHost` is where it will arrive                           |
+| Android              | Debug APK installs and launches on a physical device over USB                                                                       |
+| iOS                  | Wired by convention, unbuilt — Xcode needs macOS                                                                                    |
+| Sync                 | Seam designed, no transport. `ModuleHost` is where it will arrive                                                                   |
 
 ## Run it
 
