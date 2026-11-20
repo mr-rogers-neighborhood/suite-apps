@@ -109,5 +109,17 @@ replacement lives and how the next rotation works.
 
 ## Reminders
 
-`onReminder` has no notification plugin yet; the prelude returns a no-op unsubscriber and the UI says
-so rather than silently dropping them. The follow-up is issue #26.
+The renderer owns the schedule, because the renderer owns the schema: it derives the pending
+reminders with `pendingReminders` in `@suite/planner-core` and hands them to the bridge through
+`syncReminders`. The desktop preload does not implement that member, because its main process already
+schedules from the document and can notify while the window is hidden.
+
+In the pack, the prelude asks the container's `notifications` service — the `notifications`
+capability, contract 2 — which passes each reminder to the phone's own alarm clock through
+`@capacitor/local-notifications`. Two details make it behave: cancelling a reminder that is no longer
+pending is what stops a completed or deleted task from still ringing, and a permission the person
+denied comes back to the UI as a notice instead of silence. Past-due times are never scheduled; a
+platform alarm handed a time in the past fires immediately.
+
+A host older than contract 2 refuses the pack rather than accepting it and silently dropping the
+alarm.

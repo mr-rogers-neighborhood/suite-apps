@@ -53,6 +53,7 @@ wasCreated?(): Promise<boolean>;   // optional; absent means false
 commit(update: Uint8Array): Promise<void>;
 onWorkspaceReplaced(listener): () => void;
 onReminder(listener): () => void;
+syncReminders?(reminders): Promise<{ permission: string }>; // optional; a host that schedules itself omits it
 onCommand(listener): () => void;
 exportWorkspace(): Promise<ExportResult>;
 importWorkspace(): Promise<ImportResult>;
@@ -70,6 +71,12 @@ and produces an app that throws on first open. It is nullable for the same reaso
 optional: a container with no document has nothing schema-valid to hand over, and manufacturing one
 would make the host own a domain's schema. `null` means "there is none", and the app calls
 `WorkspaceDocument.create()` itself.
+
+**`syncReminders` is how a phone gets a reminder that survives a closed app.** The renderer owns the
+schedule because it owns the schema; the pack passes each pending reminder to the container's
+`notifications` service, which hands it to the platform alarm. The desktop preload omits the member,
+because the main process already schedules and can notify from the tray. A denial comes back as
+`permission: "denied"`, and the renderer says reminders are blocked instead of going quiet.
 
 **`adopt` is what closes the loop, and it is not a convenience.** `commit(update)` carries what
 happens _after_ creation. Measured: 98 bytes, and a replica rebuilt from it alone has

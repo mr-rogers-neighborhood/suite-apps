@@ -49,14 +49,15 @@ nobody can reproduce.
 
 ## What the host provides, and what it refuses to
 
-`ModuleHost` gives a mounted module four things:
+`ModuleHost` gives a mounted module these services:
 
-| Service      | Shape                            | The refusal                                                            |
-| ------------ | -------------------------------- | ---------------------------------------------------------------------- |
-| `documents`  | list, create, open, save, remove | Never returns a parsed document. Bytes, a name, a title, a timestamp   |
-| `storage`    | get, set, delete, keys           | Already namespaced per module, so one module cannot read another's key |
-| `navigation` | `setTitle`, `close`              | Not a general stack: leaving a module returns to home, always          |
-| `theme`      | scheme, density, CSS variables   | Names no colour and no spacing value                                   |
+| Service         | Shape                                 | The refusal                                                            |
+| --------------- | ------------------------------------- | ---------------------------------------------------------------------- |
+| `documents`     | list, create, open, save, remove      | Never returns a parsed document. Bytes, a name, a title, a timestamp   |
+| `storage`       | get, set, delete, keys                | Already namespaced per module, so one module cannot read another's key |
+| `navigation`    | `setTitle`, `close`                   | Not a general stack: leaving a module returns to home, always          |
+| `theme`         | scheme, density, CSS variables        | Names no colour and no spacing value                                   |
+| `notifications` | permission, request, schedule, cancel | Carries a title and a time, stores nothing, and restarts nothing       |
 
 Two consequences follow from the document refusal, and both are load-bearing:
 

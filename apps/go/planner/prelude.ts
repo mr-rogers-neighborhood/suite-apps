@@ -25,6 +25,13 @@ interface ReminderEvent {
   readonly remindAt: string;
 }
 
+/** One reminder the renderer handed over, in the shape an alarm needs. */
+interface ReminderSchedule {
+  readonly id: string;
+  readonly title: string;
+  readonly at: number;
+}
+
 type AppCommand = "capture" | "today" | "inbox";
 
 interface WorkspaceInfo {
@@ -55,6 +62,7 @@ interface PlannerBridge {
   commit(update: Uint8Array): Promise<void>;
   onWorkspaceReplaced(listener: (snapshot: Uint8Array) => void): () => void;
   onReminder(listener: (reminder: ReminderEvent) => void): () => void;
+  syncReminders?(reminders: readonly ReminderSchedule[]): Promise<{ permission: string }>;
   onCommand(listener: (command: AppCommand) => void): () => void;
   exportWorkspace(): Promise<ExportResult>;
   importWorkspace(): Promise<ImportResult>;
@@ -156,6 +164,45 @@ async function persist(): Promise<void> {
   }
 }
 
+/** The reminder ids this pack has handed to the container's notification service. */
+const scheduledReminders = new Set<string>();
+/** The permission the last schedule attempt ended with, for the UI and a device assertion. */
+let reminderPermission = "unsupported";
+
+/**
+ * Deliver Planner's reminders through the phone's own alarm clock.
+ *
+ * The renderer owns the schedule because the renderer owns the schema; this only moves a task id,
+ * a title and a time across the bridge. Cancelling what is no longer pending before scheduling is
+ * what keeps a deleted or completed task from still ringing.
+ */
+async function syncReminders(
+  reminders: readonly ReminderSchedule[],
+): Promise<{ permission: string }> {
+  const wanted = new Map(reminders.map((reminder) => [reminder.id, reminder]));
+
+  for (const id of [...scheduledReminders]) {
+    if (wanted.has(id)) continue;
+    await host.notifications.cancel(id);
+    scheduledReminders.delete(id);
+  }
+
+  let permission = await host.notifications.permission();
+  if (permission === "prompt" && reminders.length > 0) {
+    permission = await host.notifications.request();
+  }
+  reminderPermission = permission;
+
+  if (permission !== "granted") return { permission };
+
+  for (const reminder of wanted.values()) {
+    const outcome = await host.notifications.schedule(reminder);
+    if (outcome.ok) scheduledReminders.add(reminder.id);
+  }
+
+  return { permission };
+}
+
 const bridge: PlannerBridge = {
   loadSnapshot,
 
@@ -185,9 +232,10 @@ const bridge: PlannerBridge = {
     };
   },
 
-  // A phone has no reminder channel yet (issue #26). An unsubscriber that does nothing is honest;
-  // inventing a notification would be worse than the UI saying reminders are desktop-only.
+  // The OS shows the notification, so there is no in-app event to deliver. The pack keeps the
+  // unsubscriber shape the renderer expects and reports permission through `syncReminders`.
   onReminder: () => () => undefined,
+  syncReminders,
   onCommand: () => () => undefined,
 
   // A pack has no file picker in this host yet. Cancelling is the contract's own word for it.
@@ -224,5 +272,7 @@ Object.assign(globalThis, {
     name: () => documentName,
     snapshotBytes: () => (loro === null ? 0 : loro.export({ mode: "snapshot" }).byteLength),
     flush: () => persist(),
+    reminderPermission: () => reminderPermission,
+    scheduledReminders: () => [...scheduledReminders],
   },
 });

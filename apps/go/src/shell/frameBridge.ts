@@ -49,6 +49,11 @@ const REQUIRED_CAPABILITY: Readonly<Record<FrameRequest["method"], PackCapabilit
   "storage.set": "storage",
   "storage.delete": "storage",
   "recents.remember": "recents",
+  "notifications.permission": "notifications",
+  "notifications.request": "notifications",
+  "notifications.schedule": "notifications",
+  "notifications.cancel": "notifications",
+  "notifications.cancelAll": "notifications",
 };
 
 export interface FrameBridgeOptions {
@@ -159,6 +164,30 @@ async function answer(
 
       case "recents.remember":
         host.recents.remember(request.documentId, request.title);
+        return { ok: true, value: null };
+
+      case "notifications.permission":
+        return { ok: true, value: await host.notifications.permission() };
+
+      case "notifications.request":
+        return { ok: true, value: await host.notifications.request() };
+
+      case "notifications.schedule":
+        return {
+          ok: true,
+          value: await host.notifications.schedule({
+            id: request.id,
+            title: request.title,
+            at: request.at,
+          }),
+        };
+
+      case "notifications.cancel":
+        await host.notifications.cancel(request.id);
+        return { ok: true, value: null };
+
+      case "notifications.cancelAll":
+        await host.notifications.cancelAll();
         return { ok: true, value: null };
 
       default: {

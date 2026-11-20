@@ -129,6 +129,52 @@ export interface WriteFileInput {
 }
 
 /**
+ * What the platform will allow a reminder to do.
+ *
+ * `prompt` means nothing has been decided yet, which is the only state worth asking about: the
+ * platform remembers a denial and asking again does not bring the prompt back. `unsupported` is
+ * the honest answer on a target with no notification channel, not a failure.
+ */
+export type NotificationPermission = "granted" | "denied" | "prompt" | "unsupported";
+
+/**
+ * One reminder a domain wants delivered later.
+ *
+ * `id` is the domain's, and stable: scheduling the same id twice replaces the first rather than
+ * stacking a second alarm, which is what makes a re-render safe. `title` is the domain's text,
+ * carried the way a document title is — the container shows it and never reads it. `at` is epoch
+ * milliseconds; the platform chooses the exactness it is allowed.
+ */
+export interface ScheduledNotification {
+  readonly id: string;
+  readonly title: string;
+  readonly at: number;
+}
+
+export interface NotificationOutcome {
+  readonly ok: boolean;
+  /** The permission after the attempt, so a caller can show a denied state without asking again. */
+  readonly permission: NotificationPermission;
+  readonly reason?: "denied" | "unsupported" | "failed";
+}
+
+/**
+ * Local notifications, for work that happens at a time rather than while an app is open.
+ *
+ * The container is a delivery channel, not a scheduler: it stores nothing, reads nothing and
+ * restarts nothing. A pack that wants a reminder asks for it again on the next launch, which is
+ * the property that makes a phone's alarm behaviour predictable.
+ */
+export interface NotificationService {
+  permission(): Promise<NotificationPermission>;
+  /** Asks the platform, once. A decision already made is returned rather than re-asked. */
+  request(): Promise<NotificationPermission>;
+  schedule(notification: ScheduledNotification): Promise<NotificationOutcome>;
+  cancel(id: string): Promise<void>;
+  cancelAll(): Promise<void>;
+}
+
+/**
  * Reading and writing files the person can reach.
  *
  * Three verbs, because a phone has three real capabilities and pretending otherwise
@@ -171,5 +217,6 @@ export interface ModuleHost {
   readonly navigation: ModuleNavigation;
   readonly recents: ModuleRecents;
   readonly files: FileService;
+  readonly notifications: NotificationService;
   readonly theme: ThemeTokens;
 }

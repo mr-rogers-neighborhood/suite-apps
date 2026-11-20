@@ -8,5 +8,6 @@ export {
 } from "./dayPlan";
 export { inboxTasks } from "./inbox";
 export { isOccurrence, isOccurrenceDone, occurrencesBetween } from "./recurrence";
+export { pendingReminders } from "./reminders";
 export { searchTasks } from "./search";
 export { nextOrder, sortByOrder, sortByPriority } from "./sort";

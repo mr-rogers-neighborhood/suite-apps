@@ -4,6 +4,7 @@ import { createModuleRegistry } from "@suite/go";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createDocumentStore } from "../host/documents.js";
 import { createFileService, mimeFor } from "../host/files.js";
+import { createNotifications } from "../host/notifications.js";
 import { createPackStore, type InstalledPack } from "../host/packs.js";
 import { createPins, orderModules } from "../host/pins.js";
 import { createRecents, type RecentEntry } from "../host/recents.js";
@@ -89,6 +90,7 @@ const pins = createPins(shellStorage);
 const recents = createRecents(shellStorage);
 const files = createFileService();
 const packs = createPackStore();
+const notifications = createNotifications();
 
 /**
  * Dev handles, for `pnpm android:eval`.
@@ -298,6 +300,7 @@ export function App() {
         close: () => void closeModule(),
       },
       files,
+      notifications,
       recents: {
         remember: (documentId, title) => {
           // Update the list when the write lands, not when the route changes.

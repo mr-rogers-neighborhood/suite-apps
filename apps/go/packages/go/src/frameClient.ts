@@ -18,7 +18,13 @@ import {
   isFrameControl,
   isFrameReply,
 } from "./frame.js";
-import type { DocumentRecord, ModuleHost, ThemeTokens } from "./host.js";
+import type {
+  DocumentRecord,
+  ModuleHost,
+  NotificationOutcome,
+  NotificationPermission,
+  ThemeTokens,
+} from "./host.js";
 
 interface ReplyValue {
   readonly bytes?: string;
@@ -229,6 +235,31 @@ export function createFrameHost(options: FrameHostOptions): FrameHost {
         reason: "failed",
         message: "Files are not available inside a frame yet.",
       }),
+    },
+    notifications: {
+      async permission() {
+        const value = await send({ method: "notifications.permission" });
+        return (typeof value === "string" ? value : "unsupported") as NotificationPermission;
+      },
+      async request() {
+        const value = await send({ method: "notifications.request" });
+        return (typeof value === "string" ? value : "unsupported") as NotificationPermission;
+      },
+      async schedule(notification) {
+        const value = await send({
+          method: "notifications.schedule",
+          id: notification.id,
+          title: notification.title,
+          at: notification.at,
+        });
+        return value as unknown as NotificationOutcome;
+      },
+      async cancel(id) {
+        await send({ method: "notifications.cancel", id });
+      },
+      async cancelAll() {
+        await send({ method: "notifications.cancelAll" });
+      },
     },
     // The painted values live in the shell; `currentTheme()` asks for them. This static copy is
     // what a domain reads after awaiting it, so nothing has to remember to refresh.

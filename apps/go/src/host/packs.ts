@@ -45,8 +45,13 @@ const ROOT = "packs";
  */
 export const PACK_PUBLIC_KEY = "x5QN5OKEGya9gsrbNGaKZMfznsAv6+Cux/qrBYHuSfc=";
 
-/** What this build implements. Bumped when the host services a pack may call change. */
-export const HOST_CONTRACT_VERSION = 1;
+/**
+ * What this build implements. Bumped when the host services a pack may call change.
+ *
+ * 2 added `notifications`: a pack may ask for a reminder to be delivered by the phone's own alarm
+ * clock. A pack that declares 2 needs a host that has it; a pack that declares 1 still installs.
+ */
+export const HOST_CONTRACT_VERSION = 2;
 export const HOST_VERSION = 1;
 
 export interface InstalledPack {

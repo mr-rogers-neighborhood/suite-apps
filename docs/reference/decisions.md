@@ -49,3 +49,6 @@ The rules that shape this repository. Each is current; the code follows it.
 - No account, no telemetry, no project-operated server.
 - Sync is a server the user runs. It persists and authenticates; it does not own the truth.
 - Collaboration is a session while devices are connected. A sleeping device is not woken.
+- A reminder is a delivery, not a subscription: the container passes a title and a time to the
+  platform, stores nothing, and carries nothing on the next launch. A pack asks again, and a denied
+  permission is shown rather than swallowed.

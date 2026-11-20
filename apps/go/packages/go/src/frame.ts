@@ -33,7 +33,17 @@ export type FrameRequest =
   | { readonly method: "storage.get"; readonly key: string }
   | { readonly method: "storage.set"; readonly key: string; readonly value: string }
   | { readonly method: "storage.delete"; readonly key: string }
-  | { readonly method: "recents.remember"; readonly documentId: string; readonly title: string };
+  | { readonly method: "recents.remember"; readonly documentId: string; readonly title: string }
+  | { readonly method: "notifications.permission" }
+  | { readonly method: "notifications.request" }
+  | {
+      readonly method: "notifications.schedule";
+      readonly id: string;
+      readonly title: string;
+      readonly at: number;
+    }
+  | { readonly method: "notifications.cancel"; readonly id: string }
+  | { readonly method: "notifications.cancelAll" };
 
 export interface FrameEnvelope {
   readonly protocol: typeof FRAME_PROTOCOL;

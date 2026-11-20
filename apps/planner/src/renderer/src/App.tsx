@@ -1,5 +1,6 @@
 import { todayKey } from "@suite/planner-core";
 import { useEffect, useState } from "react";
+import { ReminderScheduler } from "./app/ReminderScheduler";
 import { Shell } from "./app/Shell";
 import { Toast } from "./app/Toast";
 import { PlannerLauncher } from "./launcher/PlannerLauncher";
@@ -38,6 +39,7 @@ export function App({ replica, created }: { replica: DocumentReplica; created: b
   return (
     <WorkspaceContext.Provider value={replica}>
       {begun ? <Shell /> : <PlannerLauncher onBegin={() => setBegun(true)} />}
+      <ReminderScheduler />
       <Toast />
     </WorkspaceContext.Provider>
   );

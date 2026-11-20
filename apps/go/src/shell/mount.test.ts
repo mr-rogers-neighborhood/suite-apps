@@ -1,5 +1,6 @@
 import type { ModuleHost, SuiteGoModule } from "@suite/go";
 import { describe, expect, it, vi } from "vitest";
+import { unsupportedNotifications } from "../host/notifications.js";
 import { mountModule } from "./mount.js";
 
 function host(): ModuleHost {
@@ -24,6 +25,7 @@ function host(): ModuleHost {
     },
     navigation: { setTitle: () => undefined, close: () => undefined },
     recents: { remember: () => undefined, forget: () => undefined },
+    notifications: unsupportedNotifications(),
     files: {
       pickOpen: async () => null,
       write: async () => ({ ok: true, uri: "file:///documents/x" }),

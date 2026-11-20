@@ -40,6 +40,7 @@ export {
   nextOrder,
   occurrencesBetween,
   occurrencesInRange,
+  pendingReminders,
   searchTasks,
   sortByOrder,
   sortByPriority,
@@ -50,6 +51,7 @@ export type {
   ImportResult,
   PlannerBridge,
   ReminderEvent,
+  ReminderSchedule,
   WorkspaceInfo,
 } from "./ports";
 export {

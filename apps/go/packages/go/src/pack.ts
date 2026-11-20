@@ -71,7 +71,14 @@ export type PackIsolation = "shared" | "isolated";
  * The other four are enforced per request by the frame bridge, which is a capability boundary
  * rather than a sandbox: a pack can still reach the shell's DOM (ADR-0002).
  */
-export const PACK_CAPABILITIES = ["documents", "storage", "files", "recents", "network"] as const;
+export const PACK_CAPABILITIES = [
+  "documents",
+  "storage",
+  "files",
+  "recents",
+  "notifications",
+  "network",
+] as const;
 
 export type PackCapability = (typeof PACK_CAPABILITIES)[number];
 

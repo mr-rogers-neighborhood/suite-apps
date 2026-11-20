@@ -4,6 +4,19 @@ export type ReminderEvent = {
   remindAt: string;
 };
 
+/**
+ * One reminder the renderer wants delivered later, wherever the host can deliver it.
+ *
+ * The id is the task's, so asking twice replaces rather than stacks. `at` is epoch milliseconds
+ * because that is the only form a platform alarm understands; the ISO string stays in the
+ * document.
+ */
+export type ReminderSchedule = {
+  id: string;
+  title: string;
+  at: number;
+};
+
 export type AppCommand = "capture" | "today" | "inbox";
 
 export type WorkspaceInfo = {
@@ -56,6 +69,15 @@ export type PlannerBridge = {
   commit(update: Uint8Array): Promise<void>;
   onWorkspaceReplaced(listener: (snapshot: Uint8Array) => void): () => void;
   onReminder(listener: (reminder: ReminderEvent) => void): () => void;
+  /**
+   * Hand the pending reminders to the host, when the host can deliver them.
+   *
+   * Absent on the desktop app, whose main process runs the scheduler itself and can notify while
+   * the window is hidden. A container-hosted pack implements it by asking the container's
+   * notification service, and returns the permission it ended with so the UI can say when
+   * reminders are blocked instead of going quiet.
+   */
+  syncReminders?(reminders: readonly ReminderSchedule[]): Promise<{ permission: string }>;
   onCommand(listener: (command: AppCommand) => void): () => void;
   exportWorkspace(): Promise<ExportResult>;
   importWorkspace(): Promise<ImportResult>;

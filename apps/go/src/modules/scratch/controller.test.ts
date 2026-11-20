@@ -6,6 +6,7 @@ import type {
   SaveDocumentInput,
 } from "@suite/go";
 import { describe, expect, it, vi } from "vitest";
+import { unsupportedNotifications } from "../../host/notifications.js";
 import { createScratchController } from "./controller.js";
 
 /** A document store in a Map, so the lifecycle can be observed without IndexedDB. */
@@ -76,6 +77,7 @@ function hostWith(store: DocumentStore) {
       remember: (_documentId, title) => void remembered.push(title),
       forget: () => undefined,
     },
+    notifications: unsupportedNotifications(),
     theme: { scheme: "light", density: "comfortable", cssVariables: {} },
   };
   return { host, remembered };
