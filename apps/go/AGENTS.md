@@ -29,16 +29,17 @@ Both are load-bearing. A change that needs a domain name to work belongs in that
 
 ## Repo map
 
-| Path             | Purpose                                                               |
-| ---------------- | --------------------------------------------------------------------- |
-| `packages/go`    | The module contract: declarations, routing, host interfaces, teardown |
-| `src/host`       | Container services: documents, storage, recents, pins, theme, routing |
-| `src/shell`      | The container itself: home, module frame, capture resolution          |
-| `src/modules`    | Domain modules. `scratch` is a reference module and is disposable     |
-| `android`        | The generated native project, plus the share intent                   |
-| `scripts`        | `preflight`, the install/watch loop, and `webeval`                    |
-| `docs/reference` | Contract, Android notes                                               |
-| `docs/how-to`    | Adding a domain                                                       |
+| Path             | Purpose                                                                |
+| ---------------- | ---------------------------------------------------------------------- |
+| `packages/go`    | The module contract: declarations, routing, host interfaces, teardown  |
+| `src/host`       | Container services: documents, storage, recents, pins, theme, routing  |
+| `src/shell`      | The container itself: home, module frame, capture resolution           |
+| `src/modules`    | Domain modules. `scratch` is a reference module and is disposable      |
+| `planner`        | The Planner pack's bridge prelude, built into the pack (not the shell) |
+| `android`        | The generated native project, plus the share intent                    |
+| `scripts`        | `preflight`, the install/watch loop, `webeval`, and `planner-pack`     |
+| `docs/reference` | Contract, Android notes                                                |
+| `docs/how-to`    | Adding a domain                                                        |
 
 ## Commands
 
@@ -56,11 +57,13 @@ pnpm android:ax --assert  # fail on an unnamed interactive node
 pnpm pack:keygen          # a signing keypair, printed once, never stored
 pnpm pack:build -- --dir <dir> --id <id> --name <name> --version <v> --key <base64>
 pnpm planner:build        # prove Planner's renderer still builds as a web bundle
+pnpm planner:pack         # renderer + bridge prelude + signed .dev/planner.pack
 ```
 
 `planner:build` writes only into `planner-dist` and `.vite-planner`, so it never dirties
-the Planner checkout. It is not wired into the shell yet: [docs/reference/planner.md](docs/reference/planner.md)
-carries the one decision that blocks it.
+the Planner checkout. `planner:pack` adds the prelude `apps/go/planner` and signs the result;
+[docs/reference/planner.md](docs/reference/planner.md) states what the pack owns and which
+boundaries it writes at.
 
 ## Verify
 

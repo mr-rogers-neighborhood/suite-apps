@@ -8,5 +8,11 @@
       "@suite/go": ["./packages/go/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "capacitor.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "planner/**/*.ts",
+    "vite.config.ts",
+    "capacitor.config.ts"
+  ]
 }

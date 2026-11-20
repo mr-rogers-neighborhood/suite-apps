@@ -63,6 +63,20 @@ What it still does not cover is **process-level** memory: the frame and the shel
 process, so if total RSS exceeds what Android allows, the whole process goes. Whether that matters for
 Canvas is a measurement against Canvas, not an argument.
 
+## The durability boundary
+
+A pack owns its document, so the shell can carry it but cannot write it. At the boundaries a phone
+gives us — foreground loss, leaving the module, closing the app — the shell sends the pack a
+`flush` control on the frame protocol and waits for the reply before removing the frame. The pack
+answers only after its own write settles, or with a failure the shell can report.
+
+Control ids are negative. The pack's requests count up from 1, so a control reply can never be
+mistaken for a reply to a request when both are in flight. This is generic: the shell says
+"flush", not "save Planner".
+
+Planner is the first pack to use it, and [`planner.md`](planner.md#the-pack-owns-the-document) records
+what its prelude does with the boundary.
+
 ## Why `shared` is not wired yet
 
 The plan was an import map: the shell publishes React at a stable URL, packs mark it external, both

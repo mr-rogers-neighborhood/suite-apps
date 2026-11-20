@@ -37,8 +37,12 @@ const ROOT = "packs";
  * **This is a development key.** It exists so the pipeline can be exercised end to end while
  * there is no release process. The release key replaces it in the same commit that adds
  * signing to CI, and the private half is a release secret that never enters this repository.
+ *
+ * Rotated when Planner was wired as the first real pack: the previous development key had no
+ * private half in any build pipeline, so nothing could be signed with it. `pnpm planner:pack`
+ * reads the matching private half from `.dev/suite-pack-key` (ignored) or `SUITE_PACK_KEY`.
  */
-export const PACK_PUBLIC_KEY = "0suFTmk5Jwx6zx+tLckcug1nZzFIRgkiflBSwuUCr8A=";
+export const PACK_PUBLIC_KEY = "IHbF2Q8pBAvXq/DaaxxV50WfuXG1+WqJgGFVpahtewk=";
 
 /** What this build implements. Bumped when the host services a pack may call change. */
 export const HOST_CONTRACT_VERSION = 1;
