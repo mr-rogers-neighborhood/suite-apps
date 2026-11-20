@@ -49,6 +49,19 @@ copy Start may replace.
 Suite Start does not update itself. Download the newer package or AppImage from its release page and
 install it the same way as the first time. The hub's own row links to the release.
 
+## A build from before the update-key rotation
+
+The update key was replaced on 2026-11-20. An installed build verifies a feed with the key it was built
+with, so a copy of Suite Start from before that date refuses every feed signed after it. The cards say
+`no release found` and offer no Update, and the hub's own row has no release link to follow. It reads
+like a server problem; it is the key the build carries.
+[Packaging channels](../reference/packaging-channels.md#the-update-key) has the rule.
+
+The way out is one manual download. Open the
+[Suite releases page](https://github.com/mr-rogers-neighborhood/suite-apps/releases), download the
+current Suite Start, and install it as described under [Update the hub](#update-the-hub). That build
+pins the current key, and the apps it manages can update again from there.
+
 ## Flatpak visibility
 
 Start reads the Flatpak installation selected by `XDG_DATA_HOME`. If a tool points that at a
