@@ -51,6 +51,12 @@ export function resolveJdk() {
     process.env.SUITE_GO_JAVA_HOME,
     "/usr/lib/jvm/java-21-openjdk",
     "/usr/lib/jvm/java-17-openjdk",
+    // The JDK `docs/reference/android.md` tells a person to unpack, because a
+    // distribution without a package for it leaves this as the only copy. Found
+    // rather than required: the scripts export JAVA_HOME from whatever resolves,
+    // so a build should not need an environment variable the machine can answer.
+    join(homedir(), "Android", "jdk-21"),
+    join(homedir(), "Android", "jdk-17"),
   ];
   for (const candidate of candidates) {
     if (candidate && isJdk(candidate)) return candidate;
@@ -105,8 +111,8 @@ async function adbDevices(adb) {
 
 const findings = [];
 
-function pass(label, detail) {
-  findings.push({ level: "pass", label, detail });
+function pass(label, detail, remedy) {
+  findings.push({ level: "pass", label, detail, remedy });
 }
 
 function warn(label, detail, remedy) {
@@ -156,12 +162,21 @@ async function main() {
 
   const jdk = resolveJdk();
   const jdkMajor = jdk ? await javaMajorOf(jdk) : null;
-  if (jdk) pass("jdk (gradle)", `${jdk} — Java ${jdkMajor ?? "?"}`);
+  if (jdk)
+    pass(
+      "jdk (gradle)",
+      `${jdk} — Java ${jdkMajor ?? "?"}`,
+      process.env.SUITE_GO_JAVA_HOME
+        ? undefined
+        : `The pnpm scripts set JAVA_HOME; a gradlew run by hand needs SUITE_GO_JAVA_HOME="${jdk}" exported`,
+    );
   else
     fail(
       "jdk (gradle)",
-      "no JDK 17 or 21 found",
-      "pacman -S jdk21-openjdk. A newer JDK than Gradle supports fails with a message that never names the JDK.",
+      "no JDK 17 or 21 found in SUITE_GO_JAVA_HOME, /usr/lib/jvm or ~/Android",
+      "Install one with `pacman -S jdk21-openjdk`, or unpack JDK 21 under ~/Android/jdk-21. " +
+        "Set SUITE_GO_JAVA_HOME when it lives elsewhere. A newer JDK than Gradle supports fails " +
+        "with a message that never names the JDK.",
     );
 
   const packKey = inspectKey("pack");

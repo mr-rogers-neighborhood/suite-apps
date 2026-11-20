@@ -407,6 +407,38 @@ async function listEmulators() {
     .filter(Boolean);
 }
 
+/**
+ * The adb serial of the emulator running `avd`.
+ *
+ * adb names an emulator by the port it landed on, `emulator-5554`, never by the AVD, so waiting for
+ * `emulator-<name>` waits for a serial that does not exist. Ask each attached emulator which AVD it
+ * is instead. `emu avd name` answers once the guest is far enough along; before that, an emulator
+ * this command just started is the only new one, which is what `since` narrows to.
+ */
+async function emulatorSerialFor(adb, avd, since = null) {
+  const devices = await listDevices();
+  const candidates = devices
+    .filter((device) => device.serial.startsWith("emulator-"))
+    .filter((device) => since === null || !since.has(device.serial));
+
+  for (const device of candidates) {
+    if ((await avdNameOf(adb, device.serial)) === avd) return device.serial;
+  }
+
+  return since !== null && candidates.length === 1 ? candidates[0].serial : null;
+}
+
+/** Which AVD a running emulator is, or null while it cannot answer yet. */
+async function avdNameOf(adb, serial) {
+  const output = await capture(adb, ["-s", serial, "emu", "avd", "name"]);
+  return (
+    output
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line !== "" && line !== "OK") ?? null
+  );
+}
+
 async function emulatorCommand(options) {
   const avds = await listEmulators();
   if (avds.length === 0) {
@@ -430,20 +462,46 @@ async function emulatorCommand(options) {
   }
 
   const sdkRoot = resolveSdkRoot();
-  const emulator = join(sdkRoot, "emulator", "emulator");
-  console.log(`${DIM}booting ${options.start}${RESET}`);
-
-  // Detached on purpose: the emulator outlives this command, and the caller wants
-  // the terminal back so it can run `install` against the booted device.
-  const child = spawn(emulator, ["-avd", options.start, "-no-snapshot-load"], {
-    env: environment(),
-    stdio: "ignore",
-    detached: true,
-  });
-  child.unref();
+  const emulator = sdkRoot === null ? null : join(sdkRoot, "emulator", "emulator");
+  if (emulator === null || !existsSync(emulator)) {
+    fail("No emulator binary in the SDK.", "pacman -S android-emulator");
+    return;
+  }
 
   const adb = adbPath();
-  const serial = `emulator-${options.start}`;
+  if (!adb) {
+    fail("adb is missing from the SDK.", "sdkmanager --sdk_root=<sdk> platform-tools");
+    return;
+  }
+
+  let serial = await emulatorSerialFor(adb, options.start);
+  if (serial === null) {
+    const before = new Set((await listDevices()).map((device) => device.serial));
+    console.log(`${DIM}booting ${options.start}${RESET}`);
+
+    // Detached on purpose: the emulator outlives this command, and the caller wants
+    // the terminal back so it can run `install` against the booted device.
+    const child = spawn(emulator, ["-avd", options.start, "-no-snapshot-load"], {
+      env: environment(),
+      stdio: "ignore",
+      detached: true,
+    });
+    child.unref();
+
+    for (let attempt = 0; attempt < 30 && serial === null; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      serial = await emulatorSerialFor(adb, options.start, before);
+    }
+
+    if (serial === null) {
+      fail(
+        `${options.start} started, but adb never reported an emulator for it.`,
+        `Attached: ${(await listDevices()).map((device) => device.serial).join(", ") || "none"}`,
+      );
+      return;
+    }
+  }
+
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const booted = (
       await capture(adb, ["-s", serial, "shell", "getprop", "sys.boot_completed"])
@@ -455,7 +513,7 @@ async function emulatorCommand(options) {
     }
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
-  fail(`${options.start} did not finish booting within four minutes.`);
+  fail(`${serial} did not finish booting within four minutes.`);
 }
 
 async function devicesCommand() {

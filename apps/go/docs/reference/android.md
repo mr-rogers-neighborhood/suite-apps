@@ -22,8 +22,9 @@ trace.
 ## Installing it without root
 
 Everything can live under `~/Android`, which the user owns, so Gradle can write the components it
-fetches and no `sudo` is involved. `scripts/preflight.mjs` already looks in `~/Android/Sdk`, and
-`SUITE_GO_JAVA_HOME` names a JDK that is not in `/usr/lib/jvm`.
+fetches and no `sudo` is involved. `scripts/preflight.mjs` already looks in `~/Android/Sdk`, and it
+finds a JDK at `~/Android/jdk-21` or `~/Android/jdk-17` without any variable; `SUITE_GO_JAVA_HOME`
+names one that lives somewhere else.
 
 ```sh
 # Command-line tools, unpacked so sdkmanager lands in cmdline-tools/latest.
@@ -55,19 +56,30 @@ Command-line tools 23 accepts the licences during install, so `--licenses` is a 
 releases need it. Both build-tools 35 and 36 are installed because AGP asks for 35 against a platform
 36. `pnpm run doctor` reports each piece — `pnpm doctor` is pnpm's own command, not this project's.
 
-Boot the AVD headless, then run the loop:
+Boot the AVD, then run the loop:
 
 ```sh
-"$ANDROID_HOME/emulator/emulator" -avd suite-go-atd -no-window -no-audio \
-  -no-boot-anim -gpu guest -feature -Vulkan -no-snapshot-load
-
+mise exec -- pnpm android:emulator --start suite-go-atd
 mise exec -- pnpm android:install
 mise exec -- pnpm android:eval "document.title"
 ```
 
+`android:emulator --start` waits on the serial adb reports, not on `emulator-<name>`: adb names an
+emulator by the port it landed on (`emulator-5554`), so the AVD name never matches a serial. It is
+safe to run while that AVD is already up — it finds the running emulator and leaves it alone — and it
+detaches the emulator, so the terminal comes back for `android:install`.
+
+The equivalent by hand, for a window or a different renderer:
+
+```sh
+"$ANDROID_HOME/emulator/emulator" -avd suite-go-atd -no-window -no-audio \
+  -no-boot-anim -gpu guest -feature -Vulkan -no-snapshot-load
+```
+
 `-gpu guest` is the software renderer; `swiftshader_indirect` segfaulted emulator 37.3.10 on this
-machine. `mise exec` supplies the Node and pnpm pinned in `package.json`, and `SUITE_GO_JAVA_HOME` must
-be exported in the same shell. `android:install` ends with `installed` and starts
+machine. `mise exec` supplies the Node and pnpm pinned in `package.json`; the pnpm scripts export
+`JAVA_HOME` from the JDK they resolve, and a `gradlew` run by hand needs that path exported as
+`SUITE_GO_JAVA_HOME`. `android:install` ends with `installed` and starts
 `run.suite.go/.MainActivity`; `android:eval` prints the value, here `Suite Go`.
 
 ## The share intent
