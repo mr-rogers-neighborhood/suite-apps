@@ -45,6 +45,36 @@ export function feedUrlFromAppUpdateYml(text) {
     return null;
 }
 const UNSAFE_FILENAME = /[\\/\0]/u;
+/**
+ * A feed's artifact locator, split into the name an install writes and the URL it reads.
+ *
+ * `electron-builder` writes a bare filename when the artifact sits beside the
+ * manifest. A manifest published on Pages names a release asset instead, and that
+ * value is an absolute URL; its last path segment is still the only part used as a
+ * destination. Both forms refuse anything that could escape the version directory.
+ */
+function artifactLocation(raw) {
+    const name = (() => {
+        if (!/^https:\/\//u.test(raw))
+            return raw;
+        try {
+            const parsed = new URL(raw);
+            if (parsed.protocol !== "https:")
+                return null;
+            return decodeURIComponent(parsed.pathname.split("/").at(-1) ?? "");
+        }
+        catch {
+            return null;
+        }
+    })();
+    if (name === null || name.length === 0)
+        return null;
+    if (name === "." || name === ".." || name.endsWith(".blockmap"))
+        return null;
+    if (UNSAFE_FILENAME.test(name))
+        return null;
+    return name === raw ? { path: name } : { path: name, url: raw };
+}
 function scalar(value) {
     return value.replace(/^["']|["']$/gu, "").trim();
 }
@@ -106,15 +136,14 @@ export function artifactFromFeed(text) {
     const { entries, path: declared, sha512: declaredSha } = readFeedFiles(text);
     const declaredEntry = declared === null ? undefined : entries.find((entry) => entry.url === declared);
     const chosen = declaredEntry ?? entries.find((entry) => !entry.url.endsWith(".blockmap")) ?? entries[0];
-    const path = declared ?? chosen?.url ?? null;
+    const raw = declared ?? chosen?.url ?? null;
     const sha512 = declaredSha ?? chosen?.sha512 ?? null;
-    if (path === null || sha512 === null)
+    if (raw === null || sha512 === null)
         return null;
-    if (path === "." || path === ".." || path.endsWith(".blockmap"))
+    const location = artifactLocation(raw);
+    if (location === null)
         return null;
-    if (UNSAFE_FILENAME.test(path))
-        return null;
-    return { path, sha512, size: chosen?.size ?? null };
+    return { ...location, sha512, size: chosen?.size ?? null };
 }
 /**
  * Read one app's feed, and refuse a manifest the publisher did not sign.

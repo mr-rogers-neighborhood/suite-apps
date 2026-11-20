@@ -78,6 +78,40 @@ describe("artifactFromFeed", () => {
     });
   });
 
+  it("reads a release-asset URL, keeping only its filename as the install name", () => {
+    // The Pages feed names an artifact that stays on a per-app release tag. The
+    // URL is what gets downloaded; only the last segment is a filesystem name.
+    const url =
+      "https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/" +
+      "canvas-v0.1.9/suite-canvas-0.1.9-x86_64.AppImage";
+    const feed = [
+      "version: 0.1.9",
+      "files:",
+      `  - url: ${url}`,
+      "    sha512: BBB",
+      "    size: 34",
+      `path: ${url}`,
+      "sha512: BBB",
+      "",
+    ].join("\n");
+    expect(artifactFromFeed(feed)).toEqual({
+      path: "suite-canvas-0.1.9-x86_64.AppImage",
+      url,
+      sha512: "BBB",
+      size: 34,
+    });
+  });
+
+  it("refuses a locator that is not a plain https URL", () => {
+    const feed = [
+      "version: 1.0.0",
+      "path: http://example.test/Suite.AppImage",
+      "sha512: CCC",
+      "",
+    ].join("\n");
+    expect(artifactFromFeed(feed)).toBeNull();
+  });
+
   it("prefers the primary file over the block map beside it", () => {
     const feed = [
       "version: 1.0.0",

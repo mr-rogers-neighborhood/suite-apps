@@ -55,13 +55,22 @@ export function feedUrlFromAppUpdateYml(text: string): string | null {
 /** The file a feed offers, as the manifest names it. */
 export interface FeedArtifact {
   /**
-   * The file's name as published.
+   * The file's name as published, never a path.
    *
-   * Never a path: a feed names one file beside itself, and a name carrying a
-   * separator or a traversal would be a feed trying to write somewhere else. A
-   * value like that is refused rather than resolved.
+   * It is the name an install writes inside the app's version directory, so a
+   * value carrying a separator or a traversal would be a feed trying to write
+   * somewhere else. Such a value is refused rather than resolved.
    */
   readonly path: string;
+  /**
+   * The absolute URL the manifest named, when it named one.
+   *
+   * A feed served from Pages can name an artifact that stays a GitHub release
+   * asset. The URL is still checked before use: its filename must be a safe
+   * name, and only `https:` is accepted. Absent means "beside the manifest",
+   * which is what an electron-builder feed written for a single host holds.
+   */
+  readonly url?: string;
   /** Base64 SHA-512 of the file's bytes, exactly as `electron-builder` writes it. */
   readonly sha512: string;
   /** Bytes, for a progress bar. Null when the feed did not say. */
@@ -75,6 +84,32 @@ interface FilesEntry {
 }
 
 const UNSAFE_FILENAME = /[\\/\0]/u;
+
+/**
+ * A feed's artifact locator, split into the name an install writes and the URL it reads.
+ *
+ * `electron-builder` writes a bare filename when the artifact sits beside the
+ * manifest. A manifest published on Pages names a release asset instead, and that
+ * value is an absolute URL; its last path segment is still the only part used as a
+ * destination. Both forms refuse anything that could escape the version directory.
+ */
+function artifactLocation(raw: string): { path: string; url?: string } | null {
+  const name = ((): string | null => {
+    if (!/^https:\/\//u.test(raw)) return raw;
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol !== "https:") return null;
+      return decodeURIComponent(parsed.pathname.split("/").at(-1) ?? "");
+    } catch {
+      return null;
+    }
+  })();
+
+  if (name === null || name.length === 0) return null;
+  if (name === "." || name === ".." || name.endsWith(".blockmap")) return null;
+  if (UNSAFE_FILENAME.test(name)) return null;
+  return name === raw ? { path: name } : { path: name, url: raw };
+}
 
 function scalar(value: string): string {
   return value.replace(/^["']|["']$/gu, "").trim();
@@ -143,13 +178,14 @@ export function artifactFromFeed(text: string): FeedArtifact | null {
   const chosen =
     declaredEntry ?? entries.find((entry) => !entry.url.endsWith(".blockmap")) ?? entries[0];
 
-  const path = declared ?? chosen?.url ?? null;
+  const raw = declared ?? chosen?.url ?? null;
   const sha512 = declaredSha ?? chosen?.sha512 ?? null;
-  if (path === null || sha512 === null) return null;
-  if (path === "." || path === ".." || path.endsWith(".blockmap")) return null;
-  if (UNSAFE_FILENAME.test(path)) return null;
+  if (raw === null || sha512 === null) return null;
 
-  return { path, sha512, size: chosen?.size ?? null };
+  const location = artifactLocation(raw);
+  if (location === null) return null;
+
+  return { ...location, sha512, size: chosen?.size ?? null };
 }
 
 export interface FeedResponse {

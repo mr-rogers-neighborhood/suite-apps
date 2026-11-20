@@ -22,13 +22,22 @@ export declare function feedUrlFromAppUpdateYml(text: string): string | null;
 /** The file a feed offers, as the manifest names it. */
 export interface FeedArtifact {
     /**
-     * The file's name as published.
+     * The file's name as published, never a path.
      *
-     * Never a path: a feed names one file beside itself, and a name carrying a
-     * separator or a traversal would be a feed trying to write somewhere else. A
-     * value like that is refused rather than resolved.
+     * It is the name an install writes inside the app's version directory, so a
+     * value carrying a separator or a traversal would be a feed trying to write
+     * somewhere else. Such a value is refused rather than resolved.
      */
     readonly path: string;
+    /**
+     * The absolute URL the manifest named, when it named one.
+     *
+     * A feed served from Pages can name an artifact that stays a GitHub release
+     * asset. The URL is still checked before use: its filename must be a safe
+     * name, and only `https:` is accepted. Absent means "beside the manifest",
+     * which is what an electron-builder feed written for a single host holds.
+     */
+    readonly url?: string;
     /** Base64 SHA-512 of the file's bytes, exactly as `electron-builder` writes it. */
     readonly sha512: string;
     /** Bytes, for a progress bar. Null when the feed did not say. */

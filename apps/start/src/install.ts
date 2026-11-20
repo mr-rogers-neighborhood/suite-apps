@@ -300,7 +300,10 @@ export async function installApp(request: InstallRequest): Promise<InstalledApp>
 
   try {
     const downloaded = join(staging, artifact.path);
-    await download(`${feed.replace(/\/+$/u, "")}/${artifact.path}`, downloaded, request.onProgress);
+    // A manifest on the Pages feed names its artifact as an absolute release-asset
+    // URL. A local folder's manifest names a bare file beside itself.
+    const source = artifact.url ?? `${feed.replace(/\/+$/u, "")}/${artifact.path}`;
+    await download(source, downloaded, request.onProgress);
 
     const actual = await fingerprintOfFile(downloaded);
     if (actual !== artifact.sha512) {

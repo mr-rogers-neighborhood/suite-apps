@@ -88,6 +88,33 @@ describe("installApp", () => {
     ]);
   });
 
+  it("downloads a release-asset URL but still names the file by its last segment", async () => {
+    const { appsRoot, registry } = await workspace();
+    const bytes = bytesOf("an app from Pages");
+    const url =
+      "https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/" +
+      "planner-v0.2.0/suite-planner-0.2.0-x86_64.AppImage";
+    const seen: string[] = [];
+
+    const installed = await installApp({
+      entry: planner,
+      version: "0.2.0",
+      artifact: { ...artifactFor(bytes), url },
+      feed: "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/planner",
+      appsRoot,
+      registry,
+      download: async (source, destination) => {
+        seen.push(source);
+        await writeFile(destination, bytes);
+      },
+    });
+
+    expect(seen).toEqual([url]);
+    expect(installed.executable).toBe(
+      join(appsRoot, "Planner", "0.2.0", "suite-planner-0.2.0-x86_64.AppImage"),
+    );
+  });
+
   it("writes a manifest the contract accepts, describing what was verified", async () => {
     const { appsRoot, registry } = await workspace();
     const bytes = bytesOf("an app");
