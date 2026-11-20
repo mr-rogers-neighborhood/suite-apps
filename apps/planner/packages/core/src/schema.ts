@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const timestampSchema = z
   .string()
@@ -108,6 +108,14 @@ export const settingsSchema = z.object({
   defaultEstimateMinutes: z.number().int().positive().default(30),
   theme: z.enum(["system", "light", "dark"]).default("system"),
   remindersEnabled: z.boolean().default(true),
+  /**
+   * When this build first asked the platform for notification permission, or null.
+   *
+   * Added in schema 2. The platform remembers a decision, but a revoked permission resets it to
+   * "ask again", so recording the ask is what lets the app show "reminders are blocked" instead of
+   * opening the same prompt every time the document changes.
+   */
+  notificationsAskedAt: timestampSchema.nullable().default(null),
 });
 
 export const workspaceMetaSchema = z.object({

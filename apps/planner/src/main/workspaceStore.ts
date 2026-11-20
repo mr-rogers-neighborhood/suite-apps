@@ -1,6 +1,11 @@
 import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 
-import { decodeWorkspaceFile, encodeWorkspaceFile, WorkspaceDocument } from "@suite/planner-core";
+import {
+  decodeWorkspaceFile,
+  encodeWorkspaceFile,
+  WorkspaceDocument,
+  WorkspaceFileError,
+} from "@suite/planner-core";
 
 import type { WorkspacePaths } from "./paths";
 
@@ -127,6 +132,15 @@ async function loadOrCreate(
       const raw = await readFile(candidate, "utf8");
       const decoded = decodeWorkspaceFile(raw);
       if (decoded.isErr()) {
+        // A newer file is not a damaged one. Falling back to the backup and then creating a fresh
+        // workspace would end with this build writing its older schema over the newer document, so
+        // the version refusal is terminal and the person is told which version they need.
+        if (
+          decoded.error.code === "unsupported-version" ||
+          decoded.error.code === "unsupported-schema"
+        ) {
+          throw decoded.error;
+        }
         console.warn(
           `Suite Planner: ${candidate} is not a valid workspace (${decoded.error.code})`,
         );
@@ -139,7 +153,8 @@ async function loadOrCreate(
         continue;
       }
       return { doc, created: false };
-    } catch {
+    } catch (error) {
+      if (error instanceof WorkspaceFileError) throw error;
       // The file does not exist yet; try the backup, then start a new workspace.
     }
   }

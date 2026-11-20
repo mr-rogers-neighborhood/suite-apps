@@ -63,6 +63,7 @@ interface PlannerBridge {
   onWorkspaceReplaced(listener: (snapshot: Uint8Array) => void): () => void;
   onReminder(listener: (reminder: ReminderEvent) => void): () => void;
   syncReminders?(reminders: readonly ReminderSchedule[]): Promise<{ permission: string }>;
+  requestNotifications?(): Promise<string>;
   onCommand(listener: (command: AppCommand) => void): () => void;
   exportWorkspace(): Promise<ExportResult>;
   importWorkspace(): Promise<ImportResult>;
@@ -187,10 +188,9 @@ async function syncReminders(
     scheduledReminders.delete(id);
   }
 
-  let permission = await host.notifications.permission();
-  if (permission === "prompt" && reminders.length > 0) {
-    permission = await host.notifications.request();
-  }
+  // Asking is the renderer's decision, because it is the side that knows whether the prompt was
+  // already shown. This only reports what the platform currently allows.
+  const permission = await host.notifications.permission();
   reminderPermission = permission;
 
   if (permission !== "granted") return { permission };
@@ -201,6 +201,13 @@ async function syncReminders(
   }
 
   return { permission };
+}
+
+/** Ask the platform, once. The renderer records that it did, so a revoke is reported, not re-asked. */
+async function requestNotifications(): Promise<string> {
+  const permission = await host.notifications.request();
+  reminderPermission = permission;
+  return permission;
 }
 
 const bridge: PlannerBridge = {
@@ -236,6 +243,7 @@ const bridge: PlannerBridge = {
   // unsubscriber shape the renderer expects and reports permission through `syncReminders`.
   onReminder: () => () => undefined,
   syncReminders,
+  requestNotifications,
   onCommand: () => () => undefined,
 
   // A pack has no file picker in this host yet. Cancelling is the contract's own word for it.

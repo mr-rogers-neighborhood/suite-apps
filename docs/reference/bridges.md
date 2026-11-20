@@ -54,6 +54,7 @@ commit(update: Uint8Array): Promise<void>;
 onWorkspaceReplaced(listener): () => void;
 onReminder(listener): () => void;
 syncReminders?(reminders): Promise<{ permission: string }>; // optional; a host that schedules itself omits it
+requestNotifications?(): Promise<string>; // optional; asks the platform once
 onCommand(listener): () => void;
 exportWorkspace(): Promise<ExportResult>;
 importWorkspace(): Promise<ImportResult>;

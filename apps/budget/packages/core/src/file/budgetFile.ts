@@ -18,6 +18,7 @@ export type BudgetFileErrorCode =
   | "not-json"
   | "wrong-format"
   | "unsupported-version"
+  | "unsupported-schema"
   | "bad-snapshot";
 
 export class BudgetFileError extends Error {
@@ -56,7 +57,18 @@ export function decodeBudgetFile(raw: string): Result<Uint8Array, BudgetFileErro
     return err(
       new BudgetFileError(
         "unsupported-version",
-        `File version ${parsed.formatVersion} is newer than this build understands`,
+        `This budget was written by a newer Suite Budget (file version ` +
+          `${parsed.formatVersion}); this build understands up to ${BUDGET_FILE_VERSION}. ` +
+          "Open it in a newer Suite Budget.",
+      ),
+    );
+  }
+  if (parsed.schemaVersion > SCHEMA_VERSION) {
+    return err(
+      new BudgetFileError(
+        "unsupported-schema",
+        `This budget uses Suite Budget schema ${parsed.schemaVersion}; this build understands ` +
+          `up to ${SCHEMA_VERSION}. Open it in a newer Suite Budget.`,
       ),
     );
   }

@@ -18,6 +18,7 @@ export type WorkspaceFileErrorCode =
   | "not-json"
   | "wrong-format"
   | "unsupported-version"
+  | "unsupported-schema"
   | "bad-snapshot";
 
 export class WorkspaceFileError extends Error {
@@ -51,7 +52,7 @@ export function decodeWorkspaceFile(raw: string): Result<Uint8Array, WorkspaceFi
 
   if (!isEnvelope(parsed)) {
     return err(
-      new WorkspaceFileError("wrong-format", "The file is not a Suite Planner workspace export"),
+      new WorkspaceFileError("wrong-format", "The file is not a Suite Planner workspace file"),
     );
   }
 
@@ -59,7 +60,19 @@ export function decodeWorkspaceFile(raw: string): Result<Uint8Array, WorkspaceFi
     return err(
       new WorkspaceFileError(
         "unsupported-version",
-        `File version ${parsed.formatVersion} is newer than this build understands`,
+        `This workspace was written by a newer Suite Planner (file version ` +
+          `${parsed.formatVersion}); this build understands up to ${WORKSPACE_FILE_VERSION}. ` +
+          "Open it in a newer Suite Planner.",
+      ),
+    );
+  }
+
+  if (parsed.schemaVersion > SCHEMA_VERSION) {
+    return err(
+      new WorkspaceFileError(
+        "unsupported-schema",
+        `This workspace uses Suite Planner schema ${parsed.schemaVersion}; this build ` +
+          `understands up to ${SCHEMA_VERSION}. Open it in a newer Suite Planner.`,
       ),
     );
   }

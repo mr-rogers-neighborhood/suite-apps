@@ -61,6 +61,29 @@ A frame carries a readable header and a base64 MLS payload the relay never opens
 `membership.json`, no `snapshot.loro` and no version vector. Retention drops the oldest frames, but
 the surviving positions are not renumbered.
 
+## Opening a file another version wrote
+
+Each app records two numbers: a **format** version for the envelope and a **schema** version for the
+document inside it. They answer different questions, and the rule that follows is the same in each
+app:
+
+- **An older document opens.** The app migrates it on open: every field a later schema added has a
+  default, the migration writes the current schema number before any record is read, and the file
+  carries the new version at its next save. Planner's schema 2 is the worked example: it added a
+  nullable settings field, and the fixture written by schema 1 opens with its task and project
+  intact.
+- **A newer document is refused.** An app that sees a schema or format version above its own stops,
+  leaves the file untouched and names itself and both numbers: "This workspace uses Suite Planner
+  schema 3; this build understands up to 2. Open it in a newer Suite Planner." It does not fall back
+  to a backup, open recovery mode, or invent a fresh document over the newer file.
+- **Nothing is silently downgraded.** A file is rewritten only by the version that understands it,
+  so opening with an older build never writes an older schema over newer data.
+
+Planner enforces this in `decodeWorkspaceFile` and again in `WorkspaceDocument.fromSnapshot`, because
+a file can arrive through the store or straight from the hub. Budget checks both numbers on import
+and refuses a newer file rather than treating it as damaged. Canvas has checked its envelope and
+schema versions since the legacy `suite.workspace` kind and migrates that kind on import.
+
 ## Encryption and backups
 
 The apps do not encrypt their files. Anyone with a `.canvas`, `.planner` or `.budget` file can read

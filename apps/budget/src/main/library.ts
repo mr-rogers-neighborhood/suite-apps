@@ -229,6 +229,13 @@ export async function importFromPath(
       throw new LibraryError("unreadable", "That budget file failed validation");
     }
     doc = restored;
+  } else if (
+    budgetFile.error.code === "unsupported-version" ||
+    budgetFile.error.code === "unsupported-schema"
+  ) {
+    // A newer file is not a records file and not a damaged one. Say which version is needed
+    // instead of trying the other shape, which would report "not a Suite Budget file".
+    throw new LibraryError("unreadable", budgetFile.error.message);
   } else {
     const records = decodeRecords(raw);
     if (records.isErr()) {
@@ -407,10 +414,21 @@ async function tryLoad(path: string): Promise<BudgetDocument | null> {
   try {
     const raw = await readFile(path, "utf8");
     const decoded = decodeBudgetFile(raw);
-    if (decoded.isErr()) return null;
+    if (decoded.isErr()) {
+      // A newer file must not become a recovery copy: the copy would be this build's older
+      // schema, and the person would be told their file was unreadable rather than too new.
+      if (
+        decoded.error.code === "unsupported-version" ||
+        decoded.error.code === "unsupported-schema"
+      ) {
+        throw new LibraryError("unreadable", decoded.error.message);
+      }
+      return null;
+    }
     const doc = BudgetDocument.fromSnapshot(decoded.value);
     return doc.validate().isOk() ? doc : null;
-  } catch {
+  } catch (error) {
+    if (error instanceof LibraryError) throw error;
     return null;
   }
 }

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { suitePaths } from "@suite/contracts";
 import type { ReminderEvent } from "@suite/planner-core";
-import { app, BrowserWindow, Notification, type Tray } from "electron";
+import { app, BrowserWindow, dialog, Notification, type Tray } from "electron";
 
 import { registerIpc } from "./ipc";
 import { installMenu } from "./menu";
@@ -117,6 +117,10 @@ if (!gotLock) {
     .then(() => bootstrap(workspaceFromCommandLine(process.argv)))
     .catch((error: unknown) => {
       console.error("Suite Planner failed to start", error);
+      // A version refusal reaches here with a sentence meant for the person: which app wrote the
+      // file and which version they need. Quitting without it would be the crash this path exists
+      // to avoid.
+      dialog.showErrorBox("Suite Planner", error instanceof Error ? error.message : String(error));
       app.quit();
     });
 
@@ -198,7 +202,15 @@ async function openWorkspaceFile(file: string): Promise<void> {
     return;
   }
   const previous = store;
-  const next = await WorkspaceStore.open(workspacePaths(file));
+  let next: WorkspaceStore;
+  try {
+    next = await WorkspaceStore.open(workspacePaths(file));
+  } catch (error) {
+    // Opening a newer file from the hub must keep the current workspace and say why, not replace
+    // the window with a failed open.
+    dialog.showErrorBox("Suite Planner", error instanceof Error ? error.message : String(error));
+    return;
+  }
   await previous.close();
   scheduler?.stop();
 

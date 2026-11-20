@@ -14,6 +14,9 @@ The rules that shape Planner.
 - The calendar is local. There is no calendar account and no network client.
 - The workspace is one `.planner` file, written atomically with a temp-file rename and one rolling
   backup.
+- A schema bump is additive or it migrates. An older file opens and is upgraded on open; a newer
+  one is refused with a sentence naming Planner and both versions, and is never rewritten by an
+  older build. Schema 2 added `settings.notificationsAskedAt`.
 - Capture is one line: project, tag, estimate, priority and time are parsed from the text.
 - UI uses Tailwind v4 with Radix primitives. There is no Turborepo.
 - The gate is local: `pnpm check` to edit, `pnpm verify` for the full gate.

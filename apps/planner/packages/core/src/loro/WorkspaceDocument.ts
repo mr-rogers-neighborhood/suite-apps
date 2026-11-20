@@ -34,7 +34,7 @@ import {
   startFocusSession,
   updateFocusSession,
 } from "./focus";
-import { initializeMeta, readMeta } from "./meta";
+import { ensureCurrentSchema, initializeMeta, readMeta } from "./meta";
 import { getNote, getNoteText, setNote } from "./notes";
 import { createProject, deleteProject, listProjects, updateProject } from "./projects";
 import { ensureSettings, readSettings, updateSettings } from "./settings";
@@ -63,9 +63,17 @@ import {
  */
 export class WorkspaceDocument {
   readonly #doc: LoroDoc;
+  /**
+   * The schema this document was upgraded from on open, or null when it was already current.
+   *
+   * A host that keeps its own copy needs it: the upgrade is a local commit made before the replica
+   * subscribed, so it would otherwise never travel as an update.
+   */
+  readonly migratedFrom: number | null;
 
-  private constructor(doc: LoroDoc) {
+  private constructor(doc: LoroDoc, migratedFrom: number | null = null) {
     this.#doc = doc;
+    this.migratedFrom = migratedFrom;
   }
 
   static create(options: { now?: Date } = {}): WorkspaceDocument {
@@ -81,7 +89,10 @@ export class WorkspaceDocument {
     // A replica must not reuse the peer id baked into the snapshot, or its first edit collides
     // with the document that produced it.
     doc.setPeerId(randomPeerId());
-    return new WorkspaceDocument(doc);
+    // Older documents are upgraded here, and a newer one is refused here: both before any caller
+    // can read a record through this build's schema.
+    const migratedFrom = ensureCurrentSchema(doc);
+    return new WorkspaceDocument(doc, migratedFrom);
   }
 
   /** Escape hatch for the note editor, which binds a ProseMirror view to a Loro text container. */

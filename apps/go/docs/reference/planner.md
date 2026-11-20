@@ -121,5 +121,6 @@ pending is what stops a completed or deleted task from still ringing, and a perm
 denied comes back to the UI as a notice instead of silence. Past-due times are never scheduled; a
 platform alarm handed a time in the past fires immediately.
 
-A host older than contract 2 refuses the pack rather than accepting it and silently dropping the
-alarm.
+The renderer records the first ask in `settings.notificationsAskedAt`, so a permission the person
+revoked is reported rather than prompted for again on the next edit. A host older than contract 2
+refuses the pack rather than accepting it and silently dropping the alarm.

@@ -15,7 +15,7 @@ slogan.
 | **2. Not trapped on one device** | Partial. Canvas syncs through a server the user runs. Planner and Budget have no sync transport yet. |
 | **3. The network is optional** | Met. The apps open and edit offline. Budget has no network client at all. |
 | **4. Seamless collaboration** | Partial. Canvas has live presence and collaborative editing. Collaboration is a foreground session; a sleeping device is not woken. |
-| **5. The Long Now** | Met in shape. Files are plain and exportable, the licence is MIT, and the project operates no service that can be shut down. Schema upgrades between app versions are not yet guaranteed. |
+| **5. The Long Now** | Met. Files are plain and exportable, the licence is MIT, and the project operates no service that can be shut down. An older file opens and is migrated; a newer one is refused by name instead of being corrupted ([the policy](../reference/file-formats.md#opening-a-file-another-version-wrote)). |
 | **6. Security and privacy by default** | Partial. There is no account, no telemetry and no project-operated server. Document files are not encrypted, and the sync relay has no TLS, so a network attacker still sees its metadata. |
 | **7. Ownership and control** | Met. A document is a file the user owns and can copy, back up or export. Apps install and uninstall without an account. |
 

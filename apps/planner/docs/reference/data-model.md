@@ -75,7 +75,11 @@ A day holds no task list: the tasks point at it.
 ### settings
 
 `weekStartsOn`, `workdayStart`, `workdayEnd`, `dailyCapacityMinutes`, `defaultEstimateMinutes`,
-`theme`, `remindersEnabled`.
+`theme`, `remindersEnabled`, `notificationsAskedAt`.
+
+`notificationsAskedAt` arrived with schema 2. It records when this build first asked the platform
+for notification permission, because a revoked permission resets the platform to "ask again" and
+the app should report that rather than re-open the prompt on every edit.
 
 ### workspaceMeta
 
@@ -120,15 +124,21 @@ A `.planner` file is a JSON envelope:
 {
   "format": "suite.planner",
   "formatVersion": 1,
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "exportedAt": "2026-01-05T09:00:00.000Z",
   "snapshot": "<base64 Loro snapshot>"
 }
 ```
 
-`decodeWorkspaceFile` returns a `Result` and rejects bad JSON, another app's JSON, a newer format and
-a snapshot that will not decode. Import then builds a fresh document and validates every record
-before replacing the authority.
+`decodeWorkspaceFile` returns a `Result` and rejects bad JSON, another app's JSON, a newer format,
+a newer schema and a snapshot that will not decode. The refusal names Planner and both versions.
+Import then builds a fresh document, which migrates an older schema in place, and validates every
+record before replacing the authority.
+
+Schema 2 is additive: it added `settings.notificationsAskedAt`. A schema-1 file opens, the field
+reads as `null`, and the migration stamps the document at 2 before the renderer sees it. The fixture
+test in `packages/core/src/file/migration.test.ts` opens a file written at schema 1 and a file
+stamped 3, so both directions are proven by the gate rather than by the version number alone.
 
 The live workspace is the same envelope at `~/Documents/Suite/Planner/workspace.planner`, with
 `workspace.backup.planner` holding the previous write and `workspace.planner.tmp` used for the atomic

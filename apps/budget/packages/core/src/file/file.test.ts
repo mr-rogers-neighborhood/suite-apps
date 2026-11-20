@@ -47,6 +47,30 @@ describe("the .budget envelope", () => {
     expect(decodeBudgetFile('{"format":"other"}').isErr()).toBe(true);
     expect(decodeBudgetFile("not json").isErr()).toBe(true);
   });
+
+  it("should refuse a newer schema and name the versions", () => {
+    const { doc } = sample();
+    const envelope = JSON.parse(encodeBudgetFile(doc)) as Record<string, unknown>;
+    const decoded = decodeBudgetFile(JSON.stringify({ ...envelope, schemaVersion: 9 }));
+
+    expect(decoded.isErr()).toBe(true);
+    if (decoded.isOk()) return;
+    expect(decoded.error.code).toBe("unsupported-schema");
+    expect(decoded.error.message).toContain("Suite Budget schema 9");
+    expect(decoded.error.message).toContain("up to 1");
+  });
+
+  it("should refuse a newer file format and name the app", () => {
+    const { doc } = sample();
+    const envelope = JSON.parse(encodeBudgetFile(doc)) as Record<string, unknown>;
+    const decoded = decodeBudgetFile(JSON.stringify({ ...envelope, formatVersion: 4 }));
+
+    expect(decoded.isErr()).toBe(true);
+    if (decoded.isOk()) return;
+    expect(decoded.error.code).toBe("unsupported-version");
+    expect(decoded.error.message).toContain("newer Suite Budget");
+    expect(decoded.error.message).toContain("file version 4");
+  });
 });
 
 describe("the records envelope", () => {

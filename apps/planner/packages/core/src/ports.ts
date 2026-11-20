@@ -78,6 +78,14 @@ export type PlannerBridge = {
    * reminders are blocked instead of going quiet.
    */
   syncReminders?(reminders: readonly ReminderSchedule[]): Promise<{ permission: string }>;
+  /**
+   * Ask the platform for notification permission, once, when the first reminder needs it.
+   *
+   * Separate from `syncReminders` because asking is a decision the person makes in a moment, and
+   * the app records that it happened: a revoked permission resets the platform to "ask again", and
+   * re-opening the prompt on every edit is how an app becomes noise.
+   */
+  requestNotifications?(): Promise<string>;
   onCommand(listener: (command: AppCommand) => void): () => void;
   exportWorkspace(): Promise<ExportResult>;
   importWorkspace(): Promise<ImportResult>;

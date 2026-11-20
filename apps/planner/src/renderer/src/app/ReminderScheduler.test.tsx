@@ -5,15 +5,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   setNotice: vi.fn(),
   syncReminders: vi.fn(),
+  requestNotifications: vi.fn(),
+  updateSettings: vi.fn(),
   tasks: [] as readonly Task[],
+  askedAt: null as string | null,
 }));
 
 vi.mock("../platform/bridge", () => ({
-  getBridge: () => ({ syncReminders: mocks.syncReminders }),
+  getBridge: () => ({
+    syncReminders: mocks.syncReminders,
+    requestNotifications: mocks.requestNotifications,
+  }),
 }));
 
 vi.mock("../store/snapshotStore", () => ({
-  useWorkspaceSnapshot: () => ({ tasks: mocks.tasks }),
+  useWorkspaceSnapshot: () => ({
+    tasks: mocks.tasks,
+    settings: { notificationsAskedAt: mocks.askedAt },
+  }),
+  useReplica: () => ({ document: { updateSettings: mocks.updateSettings } }),
 }));
 
 vi.mock("../store/uiStore", () => ({
@@ -53,7 +63,10 @@ describe("ReminderScheduler", () => {
   beforeEach(() => {
     mocks.setNotice.mockReset();
     mocks.syncReminders.mockReset();
+    mocks.requestNotifications.mockReset();
+    mocks.updateSettings.mockReset();
     mocks.tasks = [];
+    mocks.askedAt = null;
   });
 
   it("should hand the pending reminder to a bridge that can deliver it", async () => {
@@ -69,17 +82,41 @@ describe("ReminderScheduler", () => {
     expect(mocks.setNotice).not.toHaveBeenCalled();
   });
 
-  it("should say so when a reminder cannot arrive because notifications are blocked", async () => {
+  it("should ask once, record the ask, and schedule after a grant", async () => {
+    mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
+    mocks.syncReminders
+      .mockResolvedValueOnce({ permission: "prompt" })
+      .mockResolvedValueOnce({ permission: "granted" });
+    mocks.requestNotifications.mockResolvedValue("granted");
+
+    render(<ReminderScheduler />);
+
+    await waitFor(() => expect(mocks.requestNotifications).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.syncReminders).toHaveBeenCalledTimes(2));
+    expect(mocks.updateSettings).toHaveBeenCalledWith({
+      notificationsAskedAt: expect.any(String),
+    });
+    expect(mocks.setNotice).not.toHaveBeenCalled();
+  });
+
+  it("should report a blocked state instead of asking again once the ask is recorded", async () => {
+    mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
+    mocks.askedAt = "2026-11-20T08:00:00.000Z";
+    mocks.syncReminders.mockResolvedValue({ permission: "prompt" });
+
+    render(<ReminderScheduler />);
+
+    await waitFor(() => expect(mocks.setNotice).toHaveBeenCalledWith(BLOCKED_MESSAGE));
+    expect(mocks.requestNotifications).not.toHaveBeenCalled();
+  });
+
+  it("should say so when notifications are denied outright", async () => {
     mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
     mocks.syncReminders.mockResolvedValue({ permission: "denied" });
 
     render(<ReminderScheduler />);
 
-    await waitFor(() =>
-      expect(mocks.setNotice).toHaveBeenCalledWith(
-        "Reminders are off: notifications are blocked for Suite Go in system settings.",
-      ),
-    );
+    await waitFor(() => expect(mocks.setNotice).toHaveBeenCalledWith(BLOCKED_MESSAGE));
   });
 
   it("should not mention reminders when there are none to deliver", async () => {
@@ -91,3 +128,6 @@ describe("ReminderScheduler", () => {
     expect(mocks.setNotice).not.toHaveBeenCalled();
   });
 });
+
+const BLOCKED_MESSAGE =
+  "Reminders are off: notifications are blocked for Suite Go in system settings.";

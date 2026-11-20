@@ -13,6 +13,9 @@ storybook-static/
 *.planner.tmp
 *.planner.bak
 
+# The migration fixtures are real .planner files, written by older builds on purpose.
+!packages/core/src/file/__fixtures__/*.planner
+
 # Test and packaging output
 test-results/
 playwright-report/
