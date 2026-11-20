@@ -20,6 +20,22 @@ queues the same gate there, in a memory-capped unit. Results are in
 `~/ci/status.json` on the VM and `ssh suite-dev cat ~/ci/status.json` from here.
 See `scripts/ci/` and the README.
 
+## Publishing and archives
+
+- `origin` is <https://github.com/mr-rogers-neighborhood/suite-apps>.
+- `vm` is the independent gate. Push the commit you want gated:
+  `git push origin main && git push vm main`.
+- `suite-dev` is archived on GitHub; the import replaced it under `harness/`.
+- The five `suite-canvas`, `suite-planner`, `suite-budget`, `suite-start` and
+  `suite-sync` repositories are **still active on purpose**. Their
+  `releases/latest/download` URLs are the update feeds in every `suite.app.json`
+  and in Start's own builder config. Archiving them now would stop new releases
+  on the path installed apps actually read.
+- Retire them only after the monorepo publishes per-app feeds and the manifests
+  point at the new location. A single monorepo `releases/latest` cannot serve
+  four different `latest-linux.yml` files; use per-app release tags or a static
+  feed host.
+
 ## Monorepo rules
 
 - Shared packages are `workspace:*`. Never reintroduce a `git+https://…#vX`
