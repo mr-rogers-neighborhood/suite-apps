@@ -37,6 +37,10 @@ systemd-run --user --scope -p MemoryHigh=10G -p MemoryMax=15G \
   mise exec -- node scripts/gate.mjs
 ```
 
+`git push vm main` is the independent gate: a push to the VM's bare repository
+runs the same `--fresh` gate there in a capped unit. Results are in
+`~/ci/status.json` on `suite-dev`; see `scripts/ci/`.
+
 ## Cross-app flow
 
 The old `suite-dev` harness is `harness/` and is reference only. The build and
@@ -45,6 +49,9 @@ release commands now live at the root:
 - `pnpm --filter @suite/start run package:dir` builds the hub.
 - `pnpm --filter @suite/start exec electron-builder --linux AppImage` builds
   the AppImage.
+- `node scripts/flatpak.mjs` packages Canvas for Flatpak and publishes it to
+  the local OSTree repo `~/suite-flatpak/repo` (remote `suite-local`). The hub
+  is not a Flatpak while it still manages AppImages; see `package.md`.
 - The local install, desktop entry and `suite://` handler are described in
   `README.md`.
 
