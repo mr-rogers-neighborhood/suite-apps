@@ -255,8 +255,10 @@ describe("a book with a highlight", () => {
     await waitFor(() =>
       expect(screen.getByTestId("reader-body").textContent).toContain("The first sentence"),
     );
-    // The passage is painted onto the words it covers, which is what a highlight is.
-    expect(document.querySelector("mark.reader-highlight")).not.toBeNull();
+    // The passage is painted onto the words it covers, which is what a highlight is. The paint is a
+    // pass of its own after the body renders, so waiting for the text alone is not waiting for it —
+    // under load this assertion ran before the mark existed.
+    await waitFor(() => expect(document.querySelector("mark.reader-highlight")).not.toBeNull());
   });
 
   it("should list the mark in the book's own panel, and raise it on a press", async () => {
