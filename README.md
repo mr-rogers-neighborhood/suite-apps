@@ -1,170 +1,111 @@
-# Suite Apps
+# Suite
 
-One workspace for the Suite. The seven `suite-*` repositories were imported here
-from their 2026-11-18 HEADs; see [MIGRATION.md](MIGRATION.md) for the exact
-commits and the changes made at import.
+A local-first suite of apps, a hub that installs and updates them, and sync you run yourself. Every
+document is a file you own. There is no account, no telemetry, and no server operated by the project.
 
-## Layout
+![Suite Canvas: a board with a card, its references, and the library dock](apps/canvas/assets/preview-dark.png)
 
-```
-apps/
-  suite-canvas/    Canvas: the app, its Electron shell, @suite/graph
-  suite-planner/   Planner: the app and @suite/planner-core
-  suite-budget/    Budget: the app and @suite/budget-core
-  suite-start/     The hub, @suite/contracts, @suite/desktop, @suite/files,
-                   @suite/theme, @suite/ui
-  suite-sync/      @suite/sync protocol, @suite/host, the sync server
-  suite-go/        Capacitor container and @suite/go
-harness/           the old suite-dev orchestrator, kept for reference
-scripts/gate.mjs   the one gate
-```
+> **Alpha.** Canvas is the most developed app; Planner and Budget are pre-alpha. Linux is the only
+> platform with published builds. Keep documents somewhere you back up.
 
-Shared packages resolve with `workspace:*`. A local edit is the edit that
-builds; there are no git-tag pins and no sibling-checkout `link:` paths.
+## The apps
 
-## The gate
+| App | What it is | State |
+| --- | --- | --- |
+| <img src="apps/start/build/app-icons/canvas.png" width="20" height="20" alt=""> **Suite Canvas** | Thinking and research: cards, boards, writing, links and views in one document | Alpha |
+| <img src="apps/start/build/app-icons/planner.png" width="20" height="20" alt=""> **Suite Planner** | A daily planner: inbox, estimates, capacity and a local calendar | Pre-alpha |
+| <img src="apps/start/build/app-icons/budget.png" width="20" height="20" alt=""> **Suite Budget** | An envelope budget: accounts, register, month grid and rolling backups | Pre-alpha |
+| **Suite Start** | The hub: installs, updates, opens and removes the other apps | Working |
+| **Suite Sync** | The sync protocol and a server a person runs | Phase 2 demo |
+| **Suite Go** | One mobile container that hosts the domains as packs | Shell only |
 
-```sh
-mise exec -- node scripts/gate.mjs                 # this working tree
-mise exec -- node scripts/gate.mjs --only suite-canvas
-mise exec -- node scripts/gate.mjs --fresh         # this commit, clean install
-```
+Canvas, Planner and Budget own their documents. Start launches them as separate processes and is not
+in the data path. Sync carries a document between devices; it never defines its schema.
 
-The gate runs each repository's own `check:full`, in dependency order:
-sync, start, canvas, planner, budget, go. Before that it builds the twelve
-`apps/*/packages/*` libraries once: their consumers resolve `@suite/*` through
-`dist/`, which is the old repos' turbo `typecheck: dependsOn ["^build"]`. It writes
-`.dev/gate-status.json`. `--fresh` exports `HEAD` with `git archive`, installs
-from the lockfile, and runs the same order in that clean tree.
+## Install
 
-After the checks pass, it runs suite-start's Playwright e2e suite against the real
-Electron app. A display is used when there is one; otherwise the run goes through
-`xvfb-run`. `--no-e2e` skips it for a quick loop.
+Suite Start is the only piece you fetch by hand. Every other app arrives through it.
 
-Run heavy checks under a memory cap on this machine; the monorepo's first
-attempt fanned out across all 28 packages and took the desktop with it:
+**On Arch**, download the current package from the
+[latest release](https://github.com/mr-rogers-neighborhood/suite-start/releases/latest):
 
 ```sh
-systemd-run --user --scope -p MemoryHigh=10G -p MemoryMax=15G \
-  --setenv=NODE_OPTIONS=--max-old-space-size=3072 \
-  mise exec -- node scripts/gate.mjs
+sudo pacman -U suite-start-bin-<version>-1-x86_64.pkg.tar.zst
 ```
 
-## Toolchain
-
-Node 22 and pnpm 12.17 are pinned in `package.json` and the mise config. Biome
-and Vitest stay at each repository's locked version: Biome 2.6 formats Markdown
-that 2.5 left alone, and Vitest 5.1.1 changes `rejects.toThrow` enough that
-Canvas's custom-error assertions lose their message. Do not "upgrade everything"
-without running the owning repo's gate.
-
-## Installing Suite Start locally
-
-The hub is built from `apps/suite-start/apps/start`:
+**Everywhere else**, download `suite-start-<version>-x86_64.AppImage` from the same release:
 
 ```sh
-pnpm --filter @suite/start run package:dir
-pnpm --filter @suite/start exec electron-builder --linux AppImage --publish never
+chmod +x suite-start-<version>-x86_64.AppImage
+./suite-start-<version>-x86_64.AppImage
 ```
 
-The unpacked build is installed at `~/Applications/Suite/Start/0.3.12/unpacked`
-with a desktop entry at `~/.local/share/applications/suite-start.desktop` and
-the `suite://` handler in `~/.config/mimeapps.list`. The AppImage needs
-`--no-sandbox` because its `chrome-sandbox` cannot be setuid on a read-only
-mount; the unpacked build keeps the sandbox. A Flatpak build uses zypak and
-avoids that tradeoff.
+An AppImage needs FUSE 2; `--appimage-extract-and-run` works without it. Open Start, install Canvas,
+and start with [Make a first workspace](docs/tutorials/02-first-workspace.md). The full checksum and
+troubleshooting steps are in [Install Suite Start](docs/tutorials/01-install.md).
 
-## Flatpak (Canvas first)
+## How it fits together
 
-Flatpak is a second channel: the same `package:dir` build, packaged with zypak from the Electron base
-app. The manifest is `packaging/flatpak/run.suite.canvas.yml`.
+- **Documents are files.** `.canvas`, `.planner` and `.budget` live in `~/Documents/Suite/<App>`. They
+  can be copied, backed up and opened offline.
+- **The hub is not a host.** Start returns a path or a URL and launches a separate signed process. It
+  never proxies document bytes.
+- **Sync is yours.** A person runs the server on a NAS, a Raspberry Pi or a laptop. The target is a
+  relay that stores ciphertext it cannot read; today the room is plaintext and loopback-only.
+- **The mobile container follows the mini-app model.** A manifest, declared capabilities, one
+  instance per app, and a document the container never parses. The desktop hub shares the manifest
+  and the one-instance rule.
+
+[Architecture](docs/explanation/architecture.md) has the boundaries,
+[the mini-app model](docs/explanation/mini-app-model.md) explains what is borrowed from WeChat and the
+W3C MiniApp specification, and [Local-first](docs/explanation/local-first.md) records which ideals are
+met and which are still partial.
+
+## Status
+
+| | |
+| --- | --- |
+| Platforms | Linux x86_64. AppImage and Arch package for the hub; Flatpak experimental; no macOS or Windows build. |
+| Sync | Canvas syncs through a user-run server. Planner and Budget do not sync yet. |
+| Security | No account or telemetry. Documents are unencrypted; use disk encryption. The sync room is plaintext. |
+| Mobile | Suite Go installs on Android as a debug build. No domain ships; iOS is unbuilt. |
+| Gate | Local, at the repository root. No CI service gates a pull request. |
+
+[Status](docs/reference/status.md) has the subsystem-by-subsystem detail.
+
+## Build from source
+
+Node and pnpm are pinned in `package.json`; `mise exec --` resolves both.
 
 ```sh
-node scripts/flatpak.mjs              # package, build, publish, install
-node scripts/flatpak.mjs --no-build   # reuse release/linux-unpacked
-flatpak run run.suite.canvas
+mise exec -- pnpm install
+mise exec -- node scripts/gate.mjs                 # every app, in dependency order
+mise exec -- node scripts/gate.mjs --only canvas
+mise exec -- node scripts/gate.mjs --fresh         # prove the commit, not the tree
 ```
 
-It exports to `~/suite-flatpak/repo`, adds it as the user remote `suite-local`, and installs into
-`~/.local/share/flatpak` from that remote, so `flatpak update` is the real update path. The repo is
-unsigned and the remote is added with `--no-gpg-verify`; a published repo needs `flatpak
-build-update-repo --gpg-sign` and a key the client already trusts.
+Read [Commands](docs/reference/commands.md) before running a heavy check; the first unbounded run
+took the desktop down. The layout and package ownership are in
+[Repository layout](docs/reference/repo-layout.md).
 
-Start now sees Flatpak installs. `apps/start/src/flatpak.ts` reads
-`flatpak list --app --json`, maps `run.suite.<id>` onto the catalogue, and launches
-the app through `flatpak run <id> <arg>`. The card says `Flatpak` and offers
-Open, Reveal and Uninstall; Uninstall asks Flatpak to remove the app. Start does
-not install Flatpaks and does not write into their deploy tree — Flatpak is the
-writer, which is the same rule ADR-0001 already applies to AppImages. An AppImage
-Start placed wins when both exist, because two copies of one app cannot run at
-once and the AppImage is the one Start may replace.
+## Documentation
 
-Installing a Flatpak from Start's own store is the next step, after the store
-remote is part of the product. Relabelling the AppImage feed as the Flatpak
-update path would be a lie: they are different channels.
+| | |
+| --- | --- |
+| [Tutorials](docs/tutorials/index.md)<br>Install, first workspace, two devices. | [How-to](docs/how-to/index.md)<br>Update apps, back up, run the gate, package, contribute. |
+| [Reference](docs/reference/index.md)<br>Layout, commands, channels, formats, environment, status. | [Explanation](docs/explanation/index.md)<br>What Suite is, local-first, the mini-app model, architecture. |
 
-Orca points `XDG_DATA_HOME` at a per-session directory. The script installs into the real user
-installation anyway; in an Orca terminal, run the app with
-`XDG_DATA_HOME=$HOME/.local/share flatpak run run.suite.canvas`. Start uses the
-same rule: its user-installed Flatpaks are only visible inside that session
-unless `XDG_DATA_HOME` is the real one.
+App-specific docs stay beside each app: `apps/<app>/docs/`. The current rules are in
+[Decisions](docs/reference/decisions.md); historical research is in [Archive](docs/archive/README.md).
 
-The hub itself stays an unpacked install until it manages Flatpaks end to end
-(install and update, not only launch and remove). Packaging it earlier would need
-`--filesystem=home` and `flatpak-spawn --host` to keep writing `~/Applications`,
-which is sandbox theater and a second update channel. See
-`apps/suite-start/docs/how-to/package.md` and ADR-0001.
+## Contributing
 
-## The gate on the VM
+Read `AGENTS.md` at the root and the owning app's `AGENTS.md` before editing. One app per change;
+shared packages are `workspace:*`. [Contribute a change](docs/how-to/contribute.md) has the branch,
+commit, docs and verification rules.
 
-`suite-dev` is the independent machine. `scripts/ci/bootstrap-vm.sh` prepares it
-(idempotent), and from then on a push to `main` is the trigger:
+Report a vulnerability per the owning app's `SECURITY.md`.
 
-```sh
-node scripts/ci/bootstrap-vm.sh     # once, and safe to re-run
-git push vm main                    # queues one gate run for that commit
+## Licence
 
-ssh suite-dev cat ~/ci/status.json          # last result
-ssh suite-dev tail -f ~/ci/logs/<sha>.log   # one log per commit
-```
-
-The bare repository lives at `~/git/suite-apps.git`. Its `post-receive` hook
-starts a transient system unit that runs as `aurora` with `MemoryHigh=5G` and
-`MemoryMax=6G`; the runner takes a lock, so a second push waits rather than
-doubling memory. The run is `node scripts/gate.mjs --fresh`, so the tree under
-test is a `git archive` of the commit with a lockfile install.
-
-A result can also reach a phone or desktop. `scripts/ci/bootstrap-vm.sh` writes
-`~/ci/notify.env` on the VM; set `NTFY_TOPIC` to a topic you own and every
-pass/fail is posted there. The file stays on the VM and is never committed. No
-topic means no notification, and a failed notification never fails the gate:
-`status.json` is the source of truth.
-
-The VM has 4 vCPU, 8 GiB RAM, and a 4 GiB swapfile; Canvas's gate is the heavy
-one. It also needs Docker (Canvas's secret scan runs gitleaks in a container;
-the unit gets `SupplementaryGroups=docker`), Xvfb, Electron's GTK libraries and
-a Playwright Chromium (`pnpm exec playwright install chromium`) for the story
-tests. Suite Start's e2e runs inside the gate under `xvfb-run`, because the unit
-has no display.
-
-## Orca memory
-
-Orca keeps a headless terminal emulator with its own scrollback per PTY. On
-2026-11-19 a spike (the kernel log names `pacquet-startup`) plus 50,000-row
-scrollback took the desktop into OOM.
-
-- Scrollback is back at 5,000 rows (`terminalScrollbackRows`); Orca clamps it at
-  50,000 and the buffers are per pane.
-- `~/.local/bin/orca-capped` starts Orca in a scope capped at `MemoryHigh=10G`
-  and `MemoryMax=16G`, and `orca.desktop` now points at it. A leaked Orca is
-  reclaimed inside Orca instead of freezing the machine. The pre-cap entry is at
-  `orca.desktop.pre-cap`; an Orca update that rewrites its desktop entry will
-  drop the wrapper, so re-check `Exec=` after an update.
-- Run heavy checks under the same idea: `systemd-run --user --scope -p
-  MemoryMax=… mise exec -- …` rather than at the desktop's mercy.
-
-## Orca
-
-Open `~/Projects/suite-apps` as the project. The old `~/Projects/suite` folder
-is the archive of the pre-monorepo checkouts. `harness/` still describes the
-sibling-repo workflow; the root gate replaces it.
+MIT, © Suite contributors.

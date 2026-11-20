@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+*.log
+.DS_Store
+
+# The host store a local `serve` writes.
+.suite-sync/
+
+# Release artifacts: built by scripts/release.mjs, never committed.
+/dist/

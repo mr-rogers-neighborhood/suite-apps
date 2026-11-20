@@ -1,19 +1,20 @@
 # suite-apps
 
-This is one workspace, not seven repositories. The product rules still belong to
+This is one workspace, not six repositories. The product rules still belong to
 each app:
 
 | Before editing | Read | Gate |
 | --- | --- | --- |
-| `apps/suite-canvas` | `apps/suite-canvas/AGENTS.md` | `node scripts/gate.mjs --only suite-canvas` |
-| `apps/suite-planner` | `apps/suite-planner/AGENTS.md` | `node scripts/gate.mjs --only suite-planner` |
-| `apps/suite-budget` | `apps/suite-budget/AGENTS.md` | `node scripts/gate.mjs --only suite-budget` |
-| `apps/suite-go` | `apps/suite-go/AGENTS.md` | `node scripts/gate.mjs --only suite-go` |
-| `apps/suite-sync` | `apps/suite-sync/README.md` and `docs/` | `node scripts/gate.mjs --only suite-sync` |
-| `apps/suite-start` | `apps/suite-start/README.md` and `docs/` | `node scripts/gate.mjs --only suite-start` |
+| `apps/canvas` | `apps/canvas/AGENTS.md` | `node scripts/gate.mjs --only canvas` |
+| `apps/planner` | `apps/planner/AGENTS.md` | `node scripts/gate.mjs --only planner` |
+| `apps/budget` | `apps/budget/AGENTS.md` | `node scripts/gate.mjs --only budget` |
+| `apps/go` | `apps/go/AGENTS.md` | `node scripts/gate.mjs --only go` |
+| `apps/sync` | `apps/sync/README.md` and `docs/` | `node scripts/gate.mjs --only sync` |
+| `apps/start` | `apps/start/README.md` and `docs/` | `node scripts/gate.mjs --only start` |
 
 The full gate is `node scripts/gate.mjs`; `--fresh` proves the commit rather
-than the working tree. Use `mise exec --` so Node 22 and pnpm 12.17 resolve.
+than the working tree. Use `mise exec --` so the Node and pnpm versions pinned
+in `package.json` resolve.
 The gate runs suite-start's e2e suite after the repository checks pass, under
 `xvfb-run` when there is no display; `--no-e2e` skips it for a quick loop.
 
@@ -48,8 +49,8 @@ See `scripts/ci/` and the README.
 - Shared packages are `workspace:*`. Never reintroduce a `git+https://…#vX`
   pin or a `link:../suite-*` path.
 - A repository-root script must name its own packages. Bare `pnpm -r` now means
-  all 28 projects and recurses through every app. `typecheck` and `build` are
-  already scoped; keep them that way.
+  every workspace project and recurses through every app. `typecheck` and
+  `build` are already scoped; keep them that way.
 - `@suite/desktop` is the shared Electron policy package. Canvas's shell is
   `@suite/canvas-desktop`.
 - Biome and Vitest versions are per-repo on purpose. Do not hoist a newer one
@@ -70,8 +71,20 @@ These still hold, from the old workspace skill:
   component, never document state in Zustand, React state or localStorage.
 - Keep the renderer sandboxed (`contextIsolation`, `sandbox`, no
   `nodeIntegration`).
-- Conventional commits. A decision that changes the shape gets an ADR in the
-  owning repo.
+- Conventional commits. A decision that changes the shape updates the owning app's
+  `docs/reference/decisions.md`, or [docs/reference/decisions.md](docs/reference/decisions.md)
+  when it spans apps.
+
+## Documentation
+
+- Cross-app docs live in `docs/`: tutorials, how-to, reference and explanation. Each app keeps
+  `apps/<app>/docs/` beside its code.
+- One fact has one home. Fix the owning page and link from the rest. Never restate a version; link
+  to `package.json` or the changelog.
+- Docs describe the tree as it is. The flattened layout is a proposal in
+  `docs/reference/decisions.md`, not something a page may instruct today.
+- Run `node scripts/docs-check.mjs` with any docs change. Canvas also runs its own `docs:check`,
+  `docs:symbols` and `shape`.
 
 If a change needs another app edited to work, stop and coordinate; changing a
 sibling to make one app pass is not the fix.

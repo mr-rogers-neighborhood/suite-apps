@@ -12,12 +12,12 @@ owns its rules and its gate; this skill routes you there.
 
 | App | Read before editing | Per-change check |
 | --- | --- | --- |
-| `suite-canvas` | `apps/suite-canvas/AGENTS.md` | `node scripts/gate.mjs --only suite-canvas` |
-| `suite-planner` | `apps/suite-planner/AGENTS.md` | `node scripts/gate.mjs --only suite-planner` |
-| `suite-budget` | `apps/suite-budget/AGENTS.md` | `node scripts/gate.mjs --only suite-budget` |
-| `suite-go` | `apps/suite-go/AGENTS.md` | `node scripts/gate.mjs --only suite-go` |
-| `suite-sync` | `apps/suite-sync/README.md`, `docs/` | `node scripts/gate.mjs --only suite-sync` |
-| `suite-start` | `apps/suite-start/README.md`, `docs/` | `node scripts/gate.mjs --only suite-start` |
+| `suite-canvas` | `apps/canvas/AGENTS.md` | `node scripts/gate.mjs --only canvas` |
+| `suite-planner` | `apps/planner/AGENTS.md` | `node scripts/gate.mjs --only planner` |
+| `suite-budget` | `apps/budget/AGENTS.md` | `node scripts/gate.mjs --only budget` |
+| `suite-go` | `apps/go/AGENTS.md` | `node scripts/gate.mjs --only go` |
+| `suite-sync` | `apps/sync/README.md`, `docs/` | `node scripts/gate.mjs --only sync` |
+| `suite-start` | `apps/start/README.md`, `docs/` | `node scripts/gate.mjs --only start` |
 
 If a change needs a sibling app edited, stop and coordinate.
 
@@ -40,6 +40,17 @@ systemd-run --user --scope -p MemoryHigh=10G -p MemoryMax=15G \
 `git push vm main` is the independent gate: a push to the VM's bare repository
 runs the same `--fresh` gate there in a capped unit. Results are in
 `~/ci/status.json` on `suite-dev`; see `scripts/ci/`.
+
+## Documentation
+
+Cross-app docs are in `docs/`: tutorials, how-to, reference and explanation. Each app keeps its own
+`apps/<app>/docs/` beside its code.
+
+- One fact has one home. Fix the owning page, link from the rest, and never restate a version.
+- Run `node scripts/docs-check.mjs` with any docs change; Canvas also runs `pnpm docs:check`,
+  `docs:symbols` and `shape`.
+- Current rules are in `docs/reference/decisions.md`, with one page per app. There is no ADR archive
+  in the reading path.
 
 ## Cross-app flow
 

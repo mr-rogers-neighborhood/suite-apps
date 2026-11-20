@@ -46,7 +46,7 @@ modules:
       - install -Dm644 icons/run.suite.canvas-512.png /app/share/icons/hicolor/512x512/apps/run.suite.canvas.png
     sources:
       - type: dir
-        path: ../../apps/suite-canvas/apps/desktop/release/linux-unpacked
+        path: ../../apps/canvas/desktop/release/linux-unpacked
         dest: app
       - type: file
         path: run.suite.canvas

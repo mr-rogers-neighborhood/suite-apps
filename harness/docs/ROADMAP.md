@@ -15,7 +15,7 @@ _Shape is decided, not built:_ the handshake is written as a session type in
 [Suite Go's pairing note](https://github.com/mr-rogers-neighborhood/suite-go/blob/main/docs/reference/pairing-protocol.md),
 and it transports the **existing recovery kit** rather than inventing a second way back in. A **second
 owner** is out of scope here: role records are flat and owner-signed, so delegating ownership is a
-different decision (see F27 in the [research register](research/findings.md)).
+different decision (see F27 in the [research register](../../docs/archive/research/findings.md)).
 
 ## Later
 

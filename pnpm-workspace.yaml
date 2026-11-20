@@ -1,13 +1,10 @@
 packages:
   - "apps/*"
-  - "apps/*/apps/*"
+  - "apps/*/*"
   - "apps/*/packages/*"
-  - "apps/*/e2e"
-  - "harness"
+  - "packages/*"
 
-# The imported repositories were written against sibling checkouts and git tags.
-# Their dependencies now point at workspace packages, so a local edit is always
-# the one that builds.
+# Shared packages are workspace packages. A local edit is the one that builds.
 linkWorkspacePackages: true
 
 allowBuilds:
@@ -38,5 +35,5 @@ overrides:
   katex: ^0.18.2
 
 patchedDependencies:
-  loro-prosemirror@0.4.4: apps/suite-canvas/patches/loro-prosemirror@0.4.4.patch
-  "@stryker-mutator/vitest-runner@10.0.0": apps/suite-canvas/patches/@stryker-mutator__vitest-runner@10.0.0.patch
+  loro-prosemirror@0.4.4: apps/canvas/patches/loro-prosemirror@0.4.4.patch
+  "@stryker-mutator/vitest-runner@10.0.0": apps/canvas/patches/@stryker-mutator__vitest-runner@10.0.0.patch

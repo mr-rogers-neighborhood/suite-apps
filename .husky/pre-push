@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# The gate that a CI service would have run.
+node scripts/gate.mjs

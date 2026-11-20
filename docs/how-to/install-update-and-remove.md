@@ -1,0 +1,52 @@
+# Install, update and remove apps
+
+Suite Start manages the apps it installed. It never edits a document, and removing an app does not
+remove documents.
+
+## Install
+
+1. Open Suite Start.
+2. On an app card, choose **Install**.
+3. When it finishes, choose **Open**.
+
+Start downloads the artifact named by the verified feed manifest, checks its sha512, places it under
+`~/Applications/Suite/<App>/<version>/`, and writes an install record. Nothing is unpacked into a
+shared location.
+
+## Add a copy you built
+
+Choose **Add app…**, then select the executable. Start reads the `suite.app.json` beside it and writes
+the install record. A copy you placed this way is first-class: it manages its own updates, and the
+card offers Open, Reveal and Forget rather than Update and Uninstall.
+
+## Update
+
+Choose **Update** on a managed card, or **Check for updates** to ask every feed again. If the app is
+running, Start asks before closing and replacing it.
+
+A copy you placed yourself updates itself; Start only launches it.
+
+## Remove
+
+- **Uninstall** on a managed card removes the versions, menu entry, icon and install record. Documents
+  are untouched.
+- **Forget** on a placed copy removes the record only.
+- A Flatpak card offers **Uninstall**, which asks Flatpak to remove the app.
+
+One copy per app is the rule. Two copies share a profile and its single-instance lock, so only one can
+run. An AppImage that Start placed wins over a Flatpak when both exist, because the AppImage is the
+copy Start may replace.
+
+## Update the hub
+
+Suite Start does not update itself. Download the newer package or AppImage from its release page and
+install it the same way as the first time. The hub's own row links to the release.
+
+## Flatpak visibility
+
+Start reads the Flatpak installation selected by `XDG_DATA_HOME`. If a tool points that at a
+per-session directory, run Start or the app with `XDG_DATA_HOME=$HOME/.local/share` to see the real
+user installation.
+
+See [Packaging channels](../reference/packaging-channels.md) for why the hub is packaged while the
+apps are AppImages.

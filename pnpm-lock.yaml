@@ -178,48 +178,19 @@ patchedDependencies:
 
 importers:
 
-  .: {}
-
-  apps/suite-budget:
+  .:
     devDependencies:
-      '@biomejs/biome':
-        specifier: 2.6.5
-        version: 2.6.5
       '@commitlint/cli':
         specifier: ^21.2.4
         version: 21.2.4(conventional-commits-parser@7.1.4)(typescript@5.9.3)
       '@commitlint/config-conventional':
         specifier: ^21.2.4
         version: 21.2.4
-      '@testing-library/jest-dom':
-        specifier: ^7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.2)(@vitest/browser-playwright@5.0.5)(vitest@5.1.0)
-      '@testing-library/react':
-        specifier: ^16.3.3
-        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@types/node':
-        specifier: 26.6.6
-        version: 26.6.6
-      '@vitejs/plugin-react':
-        specifier: ^6.2.1
-        version: 6.3.0(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
       husky:
         specifier: ^9.1.7
         version: 9.1.7
-      jsdom:
-        specifier: ^30.1.3
-        version: 30.1.3(@noble/hashes@2.4.0)
-      knip:
-        specifier: ^6.44.1
-        version: 6.46.1
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-budget/apps/desktop:
+  apps/budget:
     dependencies:
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
@@ -232,19 +203,19 @@ importers:
         version: 2.4.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@suite/budget-core':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:packages/core
       '@suite/contracts':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/contracts
+        version: link:../../packages/contracts
       '@suite/desktop':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/desktop
+        version: link:../../packages/desktop
       '@suite/theme':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/theme
+        version: link:../../packages/theme
       '@suite/ui':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/ui
+        version: link:../../packages/ui
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -273,6 +244,9 @@ importers:
         specifier: ^5.0.16
         version: 5.1.0(@types/react@19.3.0)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
     devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.5
+        version: 2.6.5
       '@playwright/test':
         specifier: ^1.64.1
         version: 1.65.1
@@ -288,6 +262,15 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.4
         version: 4.3.5(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      '@testing-library/jest-dom':
+        specifier: ^7.0.1
+        version: 7.0.1(@testing-library/dom@10.4.2)(@vitest/browser-playwright@5.0.5)(vitest@5.1.0)
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0
@@ -306,6 +289,12 @@ importers:
       electron-vite:
         specifier: ^6.0.0
         version: 6.0.0(supports-color@7.2.0)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      jsdom:
+        specifier: ^30.1.3
+        version: 30.1.3(@noble/hashes@2.4.0)
+      knip:
+        specifier: ^6.44.1
+        version: 6.46.1
       storybook:
         specifier: ^10.6.5
         version: 10.6.7(@types/react@19.3.0)(@vitest/browser-playwright@5.0.5)(react@19.3.1)
@@ -318,8 +307,11 @@ importers:
       vite:
         specifier: ^8.3.5
         version: 8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-budget/packages/core:
+  apps/budget/packages/core:
     dependencies:
       loro-crdt:
         specifier: ^1.17.1
@@ -338,81 +330,29 @@ importers:
         specifier: ~5.9.3
         version: 5.9.3
 
-  apps/suite-canvas:
-    dependencies:
-      '@suite/desktop':
-        specifier: workspace:*
-        version: link:../suite-start/packages/desktop
-      '@suite/sync':
-        specifier: workspace:*
-        version: link:../suite-sync/packages/protocol
-      '@suite/ui':
-        specifier: workspace:*
-        version: link:../suite-start/packages/ui
-    devDependencies:
-      '@biomejs/biome':
-        specifier: 2.5.15
-        version: 2.5.15
-      '@commitlint/cli':
-        specifier: ^21.2.4
-        version: 21.2.4(conventional-commits-parser@7.1.4)(typescript@5.9.3)
-      '@commitlint/config-conventional':
-        specifier: ^21.2.4
-        version: 21.2.4
-      '@stryker-mutator/core':
-        specifier: 10.0.0
-        version: 10.0.0(@types/node@26.6.6)
-      '@stryker-mutator/vitest-runner':
-        specifier: 10.0.0
-        version: 10.0.0(patch_hash=45958502dea64cbea638210b2d080d1b48dd5e5246df4e4e4f85a815d986c734)(@stryker-mutator/core@10.0.0(@types/node@26.6.6))(vitest@5.0.5)
-      '@vitest/coverage-v8':
-        specifier: 5.0.5
-        version: 5.0.5(@vitest/browser@5.0.5)(vitest@5.0.5)
-      fast-check:
-        specifier: ^4.10.2
-        version: 4.10.3
-      husky:
-        specifier: ^9.1.7
-        version: 9.1.7
-      knip:
-        specifier: ^6.43.0
-        version: 6.46.1
-      lint-staged:
-        specifier: ^17.6.0
-        version: 17.6.1
-      marked:
-        specifier: ^18.1.2
-        version: 18.2.1
-      turbo:
-        specifier: ^2.11.10
-        version: 2.11.13
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.0.5
-        version: 5.0.5(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-      yaml:
-        specifier: ^2.9.1
-        version: 2.9.1
-
-  apps/suite-canvas/apps/canvas:
+  apps/canvas:
     dependencies:
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@suite/desktop':
+        specifier: workspace:*
+        version: link:../../packages/desktop
       '@suite/graph':
         specifier: workspace:*
-        version: link:../../packages/graph
+        version: link:packages/graph
       '@suite/import-obsidian':
         specifier: workspace:*
-        version: link:../../packages/import-obsidian
+        version: link:packages/import-obsidian
+      '@suite/sync':
+        specifier: workspace:*
+        version: link:../sync/packages/protocol
       '@suite/theme':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/theme
+        version: link:../../packages/theme
       '@suite/ui':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/ui
+        version: link:../../packages/ui
       '@tiptap/extensions':
         specifier: ^3.32.0
         version: 3.34.0(@tiptap/core@3.34.0(@tiptap/pm@3.34.0))(@tiptap/pm@3.34.0)
@@ -450,6 +390,9 @@ importers:
         specifier: ^5.0.15
         version: 5.1.0(@types/react@19.3.0)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
     devDependencies:
+      '@biomejs/biome':
+        specifier: 2.5.15
+        version: 2.5.15
       '@iconify-json/lucide':
         specifier: ^1.2.147
         version: 1.2.156
@@ -465,6 +408,12 @@ importers:
       '@storybook/react-vite':
         specifier: 10.6.2
         version: 10.6.2(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(storybook@10.6.2(@types/react@19.3.0)(@vitest/browser-playwright@5.0.5)(react@19.3.1))(supports-color@7.2.0)(typescript@5.9.3)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      '@stryker-mutator/core':
+        specifier: 10.0.0
+        version: 10.0.0(@types/node@26.6.6)
+      '@stryker-mutator/vitest-runner':
+        specifier: 10.0.0
+        version: 10.0.0(patch_hash=45958502dea64cbea638210b2d080d1b48dd5e5246df4e4e4f85a815d986c734)(@stryker-mutator/core@10.0.0(@types/node@26.6.6))(vitest@5.0.5)
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.5(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
@@ -489,15 +438,30 @@ importers:
       '@vitest/browser-playwright':
         specifier: 5.0.5
         version: 5.0.5(playwright@1.65.1)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(vitest@5.0.5)
+      '@vitest/coverage-v8':
+        specifier: 5.0.5
+        version: 5.0.5(@vitest/browser@5.0.5)(vitest@5.0.5)
       fake-indexeddb:
         specifier: ^6.2.6
         version: 6.2.8
+      fast-check:
+        specifier: ^4.10.2
+        version: 4.10.3
       jsdom:
         specifier: ^30.1.3
         version: 30.1.3(@noble/hashes@2.4.0)
+      knip:
+        specifier: ^6.43.0
+        version: 6.46.1
+      marked:
+        specifier: ^18.1.2
+        version: 18.2.1
       storybook:
         specifier: 10.6.2
         version: 10.6.2(@types/react@19.3.0)(@vitest/browser-playwright@5.0.5)(react@19.3.1)
+      turbo:
+        specifier: ^2.11.10
+        version: 2.11.13
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
@@ -510,24 +474,27 @@ importers:
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
 
-  apps/suite-canvas/apps/desktop:
+  apps/canvas/desktop:
     dependencies:
       '@suite/contracts':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/contracts
+        version: link:../../../packages/contracts
       '@suite/desktop':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/desktop
+        version: link:../../../packages/desktop
       '@suite/files':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/files
+        version: link:../../../packages/files
       '@suite/graph':
         specifier: workspace:*
-        version: link:../../packages/graph
+        version: link:../packages/graph
       '@suite/sync':
         specifier: workspace:*
-        version: link:../../../suite-sync/packages/protocol
+        version: link:../../sync/packages/protocol
       electron-updater:
         specifier: ^6.6.2
         version: 6.8.11(supports-color@7.2.0)
@@ -551,7 +518,7 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-canvas/e2e:
+  apps/canvas/e2e:
     devDependencies:
       '@playwright/test':
         specifier: ^1.64.1
@@ -563,7 +530,7 @@ importers:
         specifier: 26.6.6
         version: 26.6.6
 
-  apps/suite-canvas/packages/graph:
+  apps/canvas/packages/graph:
     dependencies:
       loro-crdt:
         specifier: ^1.17.1
@@ -588,7 +555,7 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-canvas/packages/import-obsidian:
+  apps/canvas/packages/import-obsidian:
     dependencies:
       '@suite/graph':
         specifier: workspace:*
@@ -613,31 +580,7 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-go:
-    devDependencies:
-      '@biomejs/biome':
-        specifier: 2.6.6
-        version: 2.6.6
-      '@commitlint/cli':
-        specifier: ^21.2.4
-        version: 21.2.4(conventional-commits-parser@7.1.4)(typescript@5.9.3)
-      '@commitlint/config-conventional':
-        specifier: ^21.2.4
-        version: 21.2.4
-      fflate:
-        specifier: ^0.8.3
-        version: 0.8.3
-      husky:
-        specifier: ^9.1.7
-        version: 9.1.7
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-
-  apps/suite-go/apps/go:
+  apps/go:
     dependencies:
       '@capacitor/android':
         specifier: ^8.6.0
@@ -656,13 +599,13 @@ importers:
         version: 8.0.3(@capacitor/core@8.6.2)
       '@suite/go':
         specifier: workspace:*
-        version: link:../../packages/go
+        version: link:packages/go
       '@suite/theme':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/theme
+        version: link:../../packages/theme
       '@suite/ui':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/ui
+        version: link:../../packages/ui
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -676,6 +619,9 @@ importers:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
     devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.6
+        version: 2.6.6
       '@capacitor/cli':
         specifier: ^8.6.0
         version: 8.6.2(supports-color@7.2.0)
@@ -706,8 +652,11 @@ importers:
       vite-plugin-wasm:
         specifier: ^3.6.0
         version: 3.6.0(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-go/packages/go:
+  apps/go/packages/go:
     dependencies:
       '@noble/ed25519':
         specifier: ^3.2.0
@@ -729,46 +678,7 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-planner:
-    devDependencies:
-      '@biomejs/biome':
-        specifier: 2.6.5
-        version: 2.6.5
-      '@commitlint/cli':
-        specifier: ^21.2.4
-        version: 21.2.4(conventional-commits-parser@7.1.4)(typescript@5.9.3)
-      '@commitlint/config-conventional':
-        specifier: ^21.2.4
-        version: 21.2.4
-      '@testing-library/jest-dom':
-        specifier: ^7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.2)(@vitest/browser-playwright@5.0.5)(vitest@5.1.0)
-      '@testing-library/react':
-        specifier: ^16.3.3
-        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@types/node':
-        specifier: 26.6.6
-        version: 26.6.6
-      '@vitejs/plugin-react':
-        specifier: ^6.2.1
-        version: 6.3.0(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-      husky:
-        specifier: ^9.1.7
-        version: 9.1.7
-      jsdom:
-        specifier: ^30.1.3
-        version: 30.1.3(@noble/hashes@2.4.0)
-      knip:
-        specifier: ^6.44.1
-        version: 6.46.1
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-
-  apps/suite-planner/apps/desktop:
+  apps/planner:
     dependencies:
       '@radix-ui/react-checkbox':
         specifier: ^1.3.3
@@ -778,19 +688,19 @@ importers:
         version: 2.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@suite/contracts':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/contracts
+        version: link:../../packages/contracts
       '@suite/desktop':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/desktop
+        version: link:../../packages/desktop
       '@suite/planner-core':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:packages/core
       '@suite/theme':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/theme
+        version: link:../../packages/theme
       '@suite/ui':
         specifier: workspace:*
-        version: link:../../../suite-start/packages/ui
+        version: link:../../packages/ui
       electron-updater:
         specifier: ^6.6.2
         version: 6.8.11(supports-color@7.2.0)
@@ -813,6 +723,9 @@ importers:
         specifier: ^5.0.16
         version: 5.1.0(@types/react@19.3.0)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
     devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.5
+        version: 2.6.5
       '@playwright/test':
         specifier: ^1.64.1
         version: 1.65.1
@@ -828,6 +741,15 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.4
         version: 4.3.5(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      '@testing-library/jest-dom':
+        specifier: ^7.0.1
+        version: 7.0.1(@testing-library/dom@10.4.2)(@vitest/browser-playwright@5.0.5)(vitest@5.1.0)
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0
@@ -846,6 +768,12 @@ importers:
       electron-vite:
         specifier: ^6.0.0
         version: 6.0.0(supports-color@7.2.0)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      jsdom:
+        specifier: ^30.1.3
+        version: 30.1.3(@noble/hashes@2.4.0)
+      knip:
+        specifier: ^6.44.1
+        version: 6.46.1
       storybook:
         specifier: ^10.6.5
         version: 10.6.7(@types/react@19.3.0)(@vitest/browser-playwright@5.0.5)(react@19.3.1)
@@ -858,15 +786,18 @@ importers:
       vite:
         specifier: ^8.3.5
         version: 8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-planner/apps/pack:
+  apps/planner/pack:
     dependencies:
       '@suite/go':
         specifier: workspace:*
-        version: link:../../../suite-go/packages/go
+        version: link:../../go/packages/go
       '@suite/planner-core':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../packages/core
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.3.3
@@ -887,7 +818,7 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-planner/packages/core:
+  apps/planner/packages/core:
     dependencies:
       date-fns:
         specifier: ^4.4.0
@@ -909,25 +840,7 @@ importers:
         specifier: ~5.9.3
         version: 5.9.3
 
-  apps/suite-start:
-    devDependencies:
-      '@biomejs/biome':
-        specifier: 2.6.4
-        version: 2.6.4
-      '@playwright/test':
-        specifier: ^1.64.1
-        version: 1.65.1
-      husky:
-        specifier: ^9.1.7
-        version: 9.1.7
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-
-  apps/suite-start/apps/start:
+  apps/start:
     dependencies:
       '@suite/contracts':
         specifier: workspace:*
@@ -937,10 +850,10 @@ importers:
         version: link:../../packages/desktop
       '@suite/host':
         specifier: workspace:*
-        version: link:../../../suite-sync/packages/host
+        version: link:../sync/packages/host
       '@suite/sync':
         specifier: workspace:*
-        version: link:../../../suite-sync/packages/protocol
+        version: link:../sync/packages/protocol
       '@suite/theme':
         specifier: workspace:*
         version: link:../../packages/theme
@@ -948,6 +861,12 @@ importers:
         specifier: ^6.6.2
         version: 6.8.11(supports-color@7.2.0)
     devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.4
+        version: 2.6.4
+      '@playwright/test':
+        specifier: ^1.64.1
+        version: 1.65.1
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
@@ -964,7 +883,76 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-start/packages/contracts:
+  apps/sync:
+    dependencies:
+      '@suite/host':
+        specifier: workspace:*
+        version: link:packages/host
+      '@suite/sync':
+        specifier: workspace:*
+        version: link:packages/protocol
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.5
+        version: 2.6.5
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      '@types/ws':
+        specifier: ^8.18.2
+        version: 8.18.2
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  apps/sync/packages/host:
+    dependencies:
+      '@suite/sync':
+        specifier: ^0.11.3
+        version: link:../protocol
+      ws:
+        specifier: ^8.22.1
+        version: 8.23.0
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      '@types/ws':
+        specifier: ^8.18.2
+        version: 8.18.2
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  apps/sync/packages/protocol:
+    dependencies:
+      '@noble/ciphers':
+        specifier: ^2.1.1
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
+      ts-mls:
+        specifier: 1.6.4
+        version: 1.6.4(@noble/ciphers@2.4.0)
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/contracts:
     dependencies:
       zod:
         specifier: ^4.6.7
@@ -977,7 +965,7 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-start/packages/desktop:
+  packages/desktop:
     devDependencies:
       '@types/node':
         specifier: 26.6.6
@@ -989,7 +977,7 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-start/packages/files:
+  packages/files:
     dependencies:
       zod:
         specifier: ^4.6.7
@@ -1005,7 +993,7 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-start/packages/theme:
+  packages/theme:
     devDependencies:
       typescript:
         specifier: ~5.9.3
@@ -1014,7 +1002,7 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  apps/suite-start/packages/ui:
+  packages/ui:
     devDependencies:
       '@suite/theme':
         specifier: workspace:*
@@ -1049,120 +1037,6 @@ importers:
       vitest:
         specifier: 5.1.0
         version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@28.1.0(@noble/hashes@2.4.0)(supports-color@7.2.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-
-  apps/suite-sync:
-    devDependencies:
-      '@biomejs/biome':
-        specifier: 2.6.5
-        version: 2.6.5
-      '@types/node':
-        specifier: 26.6.6
-        version: 26.6.6
-      husky:
-        specifier: ^9.1.7
-        version: 9.1.7
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-
-  apps/suite-sync/apps/server:
-    dependencies:
-      '@suite/host':
-        specifier: workspace:*
-        version: link:../../packages/host
-      '@suite/sync':
-        specifier: workspace:*
-        version: link:../../packages/protocol
-    devDependencies:
-      '@types/node':
-        specifier: 26.6.6
-        version: 26.6.6
-      '@types/ws':
-        specifier: ^8.18.2
-        version: 8.18.2
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-
-  apps/suite-sync/packages/host:
-    dependencies:
-      '@suite/sync':
-        specifier: ^0.11.3
-        version: link:../protocol
-      ws:
-        specifier: ^8.22.1
-        version: 8.23.0
-    devDependencies:
-      '@types/node':
-        specifier: 26.6.6
-        version: 26.6.6
-      '@types/ws':
-        specifier: ^8.18.2
-        version: 8.18.2
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-
-  apps/suite-sync/packages/protocol:
-    dependencies:
-      '@noble/ciphers':
-        specifier: ^2.1.1
-        version: 2.4.0
-      '@noble/hashes':
-        specifier: ^2.4.0
-        version: 2.4.0
-      ts-mls:
-        specifier: 1.6.4
-        version: 1.6.4(@noble/ciphers@2.4.0)
-      zod:
-        specifier: ^4.6.7
-        version: 4.6.7
-    devDependencies:
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.1.0
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-
-  harness:
-    devDependencies:
-      '@biomejs/biome':
-        specifier: ^2.6.5
-        version: 2.6.8
-      '@playwright/test':
-        specifier: ^1.64.1
-        version: 1.65.1
-      '@suite/sync':
-        specifier: workspace:*
-        version: link:../apps/suite-sync/packages/protocol
-      '@types/node':
-        specifier: 26.6.6
-        version: 26.6.6
-      axe-core:
-        specifier: ^4.14.0
-        version: 4.14.1
-      husky:
-        specifier: ^9.1.7
-        version: 9.1.7
-      loro-crdt:
-        specifier: ^1.17.1
-        version: 1.18.0
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^5.0.1
-        version: 5.1.1(@types/node@26.6.6)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
 packages:
 
@@ -1500,11 +1374,6 @@ packages:
     engines: {node: '>=14.21.3'}
     hasBin: true
 
-  '@biomejs/biome@2.6.8':
-    resolution: {integrity: sha512-kqZUFvX6/aYQOmzfRN5ANcfNS9wLH4aHLWWP/dQKyhRZVoA6rdWszA7DGugFcxPbMiznUyVYyukVl+ExZN4PQA==}
-    engines: {node: '>=14.21.3'}
-    hasBin: true
-
   '@biomejs/cli-android-arm64@2.6.4':
     resolution: {integrity: sha512-jwrwigP4tBcHxzuV8izioX/BOUhJL/4e2rNSOE5nCjBkVC018LQAQUGiH+CNkFYvLtQ1dcZo5/xXERmaAGc7JQ==}
     engines: {node: '>=14.21.3'}
@@ -1523,12 +1392,6 @@ packages:
     cpu: [arm64]
     os: [android]
 
-  '@biomejs/cli-android-arm64@2.6.8':
-    resolution: {integrity: sha512-X4JKPLK85kfUTwuuaORFplnBfGjKkp62PsFhhcL7F/Tpltc7pyUofjlkkMnlZZLWsifFl7LNB8ngVrwJg1uo1Q==}
-    engines: {node: '>=14.21.3'}
-    cpu: [arm64]
-    os: [android]
-
   '@biomejs/cli-android-x64@2.6.4':
     resolution: {integrity: sha512-HdGInPJ4nZFwHxzvEtcp2nmSBtUyJrurmtIK43upFckuS3+ZqVM05HtsxQWnqGsuy/pxckIAjyKWlEKRlBXUyA==}
     engines: {node: '>=14.21.3'}
@@ -1543,12 +1406,6 @@ packages:
 
   '@biomejs/cli-android-x64@2.6.6':
     resolution: {integrity: sha512-N443kDSElF4kDMKjarsL+ymj/ewLA5R9VAdawA7fJ7pwgN3JVDZp0K+xhKBglH8EwsKi2+K8xC6WxXSkgziFfw==}
-    engines: {node: '>=14.21.3'}
-    cpu: [x64]
-    os: [android]
-
-  '@biomejs/cli-android-x64@2.6.8':
-    resolution: {integrity: sha512-C3Hk485vl+deEj53K08+SYYelPIPkdSZL3qHuD31Xi+qydVa4q2ze+aCYo1k3iJGWtvWtjHaGkDh7S2sX6wk8w==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [android]
@@ -1577,12 +1434,6 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
-  '@biomejs/cli-darwin-arm64@2.6.8':
-    resolution: {integrity: sha512-DHyj+JnRHcn4YdvpiqgTFZMYKSPELMCfFpNNlEuu1L8DKTGXhzW7raIwdsbo2Ie9nCljQLAQkVWQk/mwM0ueiA==}
-    engines: {node: '>=14.21.3'}
-    cpu: [arm64]
-    os: [darwin]
-
   '@biomejs/cli-darwin-x64@2.5.15':
     resolution: {integrity: sha512-V5Kw63V+fVGNFhFrizDxMbGXAzZCh8kYzJpy3GI6gTapWDg7bZK9oYC9CbVgQSEdTnupz0U5Efz8Ev+5vdBBXw==}
     engines: {node: '>=14.21.3'}
@@ -1603,12 +1454,6 @@ packages:
 
   '@biomejs/cli-darwin-x64@2.6.6':
     resolution: {integrity: sha512-lLdOAJKbrAoDs+3GvTyVmMW345D9IhrIE3GgoL2eeHwO1boN4VhrSlALtFYsP0p+Jy4udUp4bTguij0qjKrH8w==}
-    engines: {node: '>=14.21.3'}
-    cpu: [x64]
-    os: [darwin]
-
-  '@biomejs/cli-darwin-x64@2.6.8':
-    resolution: {integrity: sha512-QWWUPjlA0RnkkgYnFLUHZu+RrDc0FdK0A+wEPA+dENQJwsuSHMH89lspnAw2QUWWc9VHyfluGx1Xmp6Y2GZi8Q==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [darwin]
@@ -1636,13 +1481,6 @@ packages:
 
   '@biomejs/cli-linux-arm64-musl@2.6.6':
     resolution: {integrity: sha512-rw2Vsoi/WZGDyRjMXx9KZH9zsHe79LIzkdWHkLqsIkeKZm6qiGxtiIApxn7cmJSoEPaSvHaH5pRj1FhTcyL/XA==}
-    engines: {node: '>=14.21.3'}
-    cpu: [arm64]
-    os: [linux]
-    libc: [musl]
-
-  '@biomejs/cli-linux-arm64-musl@2.6.8':
-    resolution: {integrity: sha512-WB9PhOitX+bRc0G3+GNJGlvbKoWn3JoB9z4E04JQizIC9aPCQyIvwvWG7QZHxw6k20Fi+dHLmZ2fSEmBa9HqiA==}
     engines: {node: '>=14.21.3'}
     cpu: [arm64]
     os: [linux]
@@ -1676,13 +1514,6 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  '@biomejs/cli-linux-arm64@2.6.8':
-    resolution: {integrity: sha512-0Bjim8lKwnrvXUHoI4k3Tb51BjoiLEwDnovCI8nSzkk6wj3dShiuAjrx6+X0Hjf4ejR1sRZgTQiSDHlpy9vB7w==}
-    engines: {node: '>=14.21.3'}
-    cpu: [arm64]
-    os: [linux]
-    libc: [glibc]
-
   '@biomejs/cli-linux-x64-musl@2.5.15':
     resolution: {integrity: sha512-IlxUcyxilVGPsE008x13pWdkTbU3nQpP2i9b5UrbOYj6goBkKsRX1XB7yJLcV+O1H9LBchIIm4adOaVLZBX0ZQ==}
     engines: {node: '>=14.21.3'}
@@ -1706,13 +1537,6 @@ packages:
 
   '@biomejs/cli-linux-x64-musl@2.6.6':
     resolution: {integrity: sha512-DiKejs+GnFbOVQsBnukUpiB+T13tqUDFGwwjsTq51vatAsaflzFzVD0BOgjVUGRrqKgE0K0Xf+wNtkcmdN2chw==}
-    engines: {node: '>=14.21.3'}
-    cpu: [x64]
-    os: [linux]
-    libc: [musl]
-
-  '@biomejs/cli-linux-x64-musl@2.6.8':
-    resolution: {integrity: sha512-64Yzo+J4fEk7Kf9SMnVdVxC+Y2A2e/L86QTP9JjGQ57lsddyELLpbBcNMxSJggre2T1AvISwwSrOApkBAHDqNA==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [linux]
@@ -1746,13 +1570,6 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  '@biomejs/cli-linux-x64@2.6.8':
-    resolution: {integrity: sha512-XIk3pLQT56I6Tti+u0DF8FtSNXjCMTPbxVTzfJ9cS2t1ImVKvrqV5b52GuEaJg6/wuiXvz0sjfb5saB4TPRjzA==}
-    engines: {node: '>=14.21.3'}
-    cpu: [x64]
-    os: [linux]
-    libc: [glibc]
-
   '@biomejs/cli-win32-arm64@2.5.15':
     resolution: {integrity: sha512-2kPKzhNlm8C+Ru3GcO0Me2ODkCBLrVOUNuyi84RJyWDVKAA4+Kjj3jMjL938lF6BRfvltC4vB2nPY9SvN51Ovg==}
     engines: {node: '>=14.21.3'}
@@ -1777,12 +1594,6 @@ packages:
     cpu: [arm64]
     os: [win32]
 
-  '@biomejs/cli-win32-arm64@2.6.8':
-    resolution: {integrity: sha512-ezjCEZzHIWE2pdh83a7zLVcAAcDaERcTcvfA7uWlxqz/1CuDxgtfO19pDg9B6YY4wKYIDvYBw2QCMnqIshSwmw==}
-    engines: {node: '>=14.21.3'}
-    cpu: [arm64]
-    os: [win32]
-
   '@biomejs/cli-win32-x64@2.5.15':
     resolution: {integrity: sha512-yAzh4UqEImV6Hcy0zjUqNfJAsUhoD64FBQCdTG8Md/Z2wQeVP/ZmJ3XRYAs1g8J9fjTFyl2fCtc5FB5til47+g==}
     engines: {node: '>=14.21.3'}
@@ -1803,12 +1614,6 @@ packages:
 
   '@biomejs/cli-win32-x64@2.6.6':
     resolution: {integrity: sha512-B7KMG26A4I9lAuxwBGMmiVcjMGAeJRoz+pzFt9brRvOAsIrgOu8ptJld5rUWui6tM1uiJwxeJhhDPuAiZtxXdw==}
-    engines: {node: '>=14.21.3'}
-    cpu: [x64]
-    os: [win32]
-
-  '@biomejs/cli-win32-x64@2.6.8':
-    resolution: {integrity: sha512-cD6HvGczZUiAYsY8s2TxxXj2AHFzEdMomvVJfEjzOjBM45nGqIDfBpbtvwGQzDCN8X2yKKk9u1jnDZisT2nxIg==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
@@ -4522,17 +4327,6 @@ packages:
       vite:
         optional: true
 
-  '@vitest/mocker@5.1.1':
-    resolution: {integrity: sha512-b2OgTB4+3ImWIVafXKazJXwLKwQxUNnix6b3xUvUTMh7RyXlrtzoxfZr8aEz9zkHOMAS4K5lu3TvFWoiVeVTQg==}
-    peerDependencies:
-      msw: ^2.4.9 || ^3.0.0
-      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
-    peerDependenciesMeta:
-      msw:
-        optional: true
-      vite:
-        optional: true
-
   '@vitest/pretty-format@3.2.4':
     resolution: {integrity: sha512-IVNZik8IVRJRTr9fxlitMKeJeXFFFN0JaB9PHPGQ8NKQbGpfjlTx9zO4RefN8gp7eqjNy8nyK3NZmBzOPeIxtA==}
 
@@ -4547,9 +4341,6 @@ packages:
 
   '@vitest/spy@5.1.0':
     resolution: {integrity: sha512-2DPO5OMHWKrBngC+fCmTQqemNF0gidRhp3lxbBmRhW+M1XJrfgPpqNqWVevXtn2f2ufD5ZaR1B6B641aAlcX5A==}
-
-  '@vitest/spy@5.1.1':
-    resolution: {integrity: sha512-6K8C6alQG1/Yc8/ZI22iJS7JEsxPdVzqtqDq+/xM4Z0mGVykemMVjLhqMy/q6/IHYG3kKD8hKSwRen/ZdyI9vQ==}
 
   '@vitest/ui@5.0.5':
     resolution: {integrity: sha512-dCoGUOdgmCaSB2g+WQ/spPCBkytAWdNUkFSXY4z+eYp2d8JEOY8v0uDRaJTG9qf/kTlTVZ4CuYMYMz/f1HS/qQ==}
@@ -6032,11 +5823,6 @@ packages:
   linkifyjs@4.4.0:
     resolution: {integrity: sha512-InTexvtbai+2c+dEVGcc6O6P2DMVIiwD9a/i4zFroazOIYLOS6FSVmAJ7kFeumnCMx6/gQqNAkbUvgMubV4+MA==}
 
-  lint-staged@17.6.1:
-    resolution: {integrity: sha512-3MXgVN7BERDR/6CXZs2fDHGc+r0+hlvGAa9wqMlVbIS6RVRuaPOnb5SnN6wMXulwfEy9DXVkMVUN/8cUlpPDnw==}
-    engines: {node: '>=22.22.1'}
-    hasBin: true
-
   lodash-es@4.18.1:
     resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
 
@@ -6897,10 +6683,6 @@ packages:
   strictdom@1.0.1:
     resolution: {integrity: sha512-cEmp9QeXXRmjj/rVp9oyiqcvyocWab/HaoN4+bwFeZ7QzykJD6L3yD4v12K1x0tHpqRqVpJevN3gW7kyM39Bqg==}
 
-  string-argv@0.4.0:
-    resolution: {integrity: sha512-UOtaksJ3SK3KLHba2i9I27fvuZNfBlImDP5wKsCOxCDMRDNxlipCe8rmnUAaDpqlQ93upnA0SzF2pjWhttozSA==}
-    engines: {node: '>=16.20.0'}
-
   string-width@4.2.3:
     resolution: {integrity: sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==}
     engines: {node: '>=8'}
@@ -7319,47 +7101,6 @@ packages:
       '@vitest/coverage-istanbul': 5.1.0
       '@vitest/coverage-v8': 5.1.0
       '@vitest/ui': 5.1.0
-      happy-dom: '*'
-      jsdom: '*'
-      vite: ^6.4.0 || ^7.0.0 || ^8.0.0
-    peerDependenciesMeta:
-      '@edge-runtime/vm':
-        optional: true
-      '@opentelemetry/api':
-        optional: true
-      '@types/node':
-        optional: true
-      '@vitest/browser-playwright':
-        optional: true
-      '@vitest/browser-preview':
-        optional: true
-      '@vitest/browser-webdriverio':
-        optional: true
-      '@vitest/coverage-istanbul':
-        optional: true
-      '@vitest/coverage-v8':
-        optional: true
-      '@vitest/ui':
-        optional: true
-      happy-dom:
-        optional: true
-      jsdom:
-        optional: true
-
-  vitest@5.1.1:
-    resolution: {integrity: sha512-trVmzUFOSraCZcI3uZIMD5FqBh4atFkC/XuJP/IU7qtyQay0FCs3Ia+0QiQ2JJwGyWG/xrcBoJNel2+O7kEZ0g==}
-    engines: {node: ^22.12.0 || ^24.0.0 || >=26.0.0}
-    hasBin: true
-    peerDependencies:
-      '@edge-runtime/vm': '*'
-      '@opentelemetry/api': ^1.9.0
-      '@types/node': 26.6.6
-      '@vitest/browser-playwright': 5.1.1
-      '@vitest/browser-preview': 5.1.1
-      '@vitest/browser-webdriverio': ^5.0.0-beta.5 || >=5.0.0
-      '@vitest/coverage-istanbul': 5.1.1
-      '@vitest/coverage-v8': 5.1.1
-      '@vitest/ui': 5.1.1
       happy-dom: '*'
       jsdom: '*'
       vite: ^6.4.0 || ^7.0.0 || ^8.0.0
@@ -8057,19 +7798,6 @@ snapshots:
       '@biomejs/cli-win32-arm64': 2.6.6
       '@biomejs/cli-win32-x64': 2.6.6
 
-  '@biomejs/biome@2.6.8':
-    optionalDependencies:
-      '@biomejs/cli-android-arm64': 2.6.8
-      '@biomejs/cli-android-x64': 2.6.8
-      '@biomejs/cli-darwin-arm64': 2.6.8
-      '@biomejs/cli-darwin-x64': 2.6.8
-      '@biomejs/cli-linux-arm64': 2.6.8
-      '@biomejs/cli-linux-arm64-musl': 2.6.8
-      '@biomejs/cli-linux-x64': 2.6.8
-      '@biomejs/cli-linux-x64-musl': 2.6.8
-      '@biomejs/cli-win32-arm64': 2.6.8
-      '@biomejs/cli-win32-x64': 2.6.8
-
   '@biomejs/cli-android-arm64@2.6.4':
     optional: true
 
@@ -8079,9 +7807,6 @@ snapshots:
   '@biomejs/cli-android-arm64@2.6.6':
     optional: true
 
-  '@biomejs/cli-android-arm64@2.6.8':
-    optional: true
-
   '@biomejs/cli-android-x64@2.6.4':
     optional: true
 
@@ -8089,9 +7814,6 @@ snapshots:
     optional: true
 
   '@biomejs/cli-android-x64@2.6.6':
-    optional: true
-
-  '@biomejs/cli-android-x64@2.6.8':
     optional: true
 
   '@biomejs/cli-darwin-arm64@2.5.15':
@@ -8106,9 +7828,6 @@ snapshots:
   '@biomejs/cli-darwin-arm64@2.6.6':
     optional: true
 
-  '@biomejs/cli-darwin-arm64@2.6.8':
-    optional: true
-
   '@biomejs/cli-darwin-x64@2.5.15':
     optional: true
 
@@ -8119,9 +7838,6 @@ snapshots:
     optional: true
 
   '@biomejs/cli-darwin-x64@2.6.6':
-    optional: true
-
-  '@biomejs/cli-darwin-x64@2.6.8':
     optional: true
 
   '@biomejs/cli-linux-arm64-musl@2.5.15':
@@ -8136,9 +7852,6 @@ snapshots:
   '@biomejs/cli-linux-arm64-musl@2.6.6':
     optional: true
 
-  '@biomejs/cli-linux-arm64-musl@2.6.8':
-    optional: true
-
   '@biomejs/cli-linux-arm64@2.5.15':
     optional: true
 
@@ -8149,9 +7862,6 @@ snapshots:
     optional: true
 
   '@biomejs/cli-linux-arm64@2.6.6':
-    optional: true
-
-  '@biomejs/cli-linux-arm64@2.6.8':
     optional: true
 
   '@biomejs/cli-linux-x64-musl@2.5.15':
@@ -8166,9 +7876,6 @@ snapshots:
   '@biomejs/cli-linux-x64-musl@2.6.6':
     optional: true
 
-  '@biomejs/cli-linux-x64-musl@2.6.8':
-    optional: true
-
   '@biomejs/cli-linux-x64@2.5.15':
     optional: true
 
@@ -8179,9 +7886,6 @@ snapshots:
     optional: true
 
   '@biomejs/cli-linux-x64@2.6.6':
-    optional: true
-
-  '@biomejs/cli-linux-x64@2.6.8':
     optional: true
 
   '@biomejs/cli-win32-arm64@2.5.15':
@@ -8196,9 +7900,6 @@ snapshots:
   '@biomejs/cli-win32-arm64@2.6.6':
     optional: true
 
-  '@biomejs/cli-win32-arm64@2.6.8':
-    optional: true
-
   '@biomejs/cli-win32-x64@2.5.15':
     optional: true
 
@@ -8209,9 +7910,6 @@ snapshots:
     optional: true
 
   '@biomejs/cli-win32-x64@2.6.6':
-    optional: true
-
-  '@biomejs/cli-win32-x64@2.6.8':
     optional: true
 
   '@blazediff/core@1.10.0': {}
@@ -10320,7 +10018,7 @@ snapshots:
   '@testing-library/jest-dom@6.9.1(@vitest/browser-playwright@5.0.5)':
     dependencies:
       '@adobe/css-tools': 4.5.0
-      '@vitest/browser-playwright': 5.0.5(playwright@1.65.1)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(vitest@5.0.5)
+      '@vitest/browser-playwright': 5.0.5(playwright@1.65.1)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(vitest@5.1.0)
       aria-query: 5.3.2
       css.escape: 1.5.1
       dom-accessibility-api: 0.6.3
@@ -10902,15 +10600,6 @@ snapshots:
     optionalDependencies:
       vite: 8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
 
-  '@vitest/mocker@5.1.1(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))':
-    dependencies:
-      '@jridgewell/trace-mapping': 0.3.31
-      '@vitest/spy': 5.1.1
-      estree-walker: 3.0.3
-      magic-string: 1.4.5
-    optionalDependencies:
-      vite: 8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
-
   '@vitest/pretty-format@3.2.4':
     dependencies:
       tinyrainbow: 2.0.0
@@ -10926,8 +10615,6 @@ snapshots:
   '@vitest/spy@5.0.5': {}
 
   '@vitest/spy@5.1.0': {}
-
-  '@vitest/spy@5.1.1': {}
 
   '@vitest/ui@5.0.5(vitest@5.0.5)':
     dependencies:
@@ -12517,14 +12204,6 @@ snapshots:
 
   linkifyjs@4.4.0: {}
 
-  lint-staged@17.6.1:
-    dependencies:
-      picomatch: 4.0.7
-      string-argv: 0.4.0
-      tinyexec: 1.3.1
-    optionalDependencies:
-      yaml: 2.9.1
-
   lodash-es@4.18.1: {}
 
   lodash.debounce@4.0.8: {}
@@ -13519,8 +13198,6 @@ snapshots:
 
   strictdom@1.0.1: {}
 
-  string-argv@0.4.0: {}
-
   string-width@4.2.3:
     dependencies:
       emoji-regex: 8.0.0
@@ -13871,28 +13548,6 @@ snapshots:
     optionalDependencies:
       '@types/node': 26.6.6
       '@vitest/browser-playwright': 5.0.5(playwright@1.65.1)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(vitest@5.1.0)
-      jsdom: 30.1.3(@noble/hashes@2.4.0)
-    transitivePeerDependencies:
-      - msw
-
-  vitest@5.1.1(@types/node@26.6.6)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)):
-    dependencies:
-      '@types/chai': 5.2.3
-      '@vitest/mocker': 5.1.1(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-      chai: 6.3.0
-      es-module-lexer: 2.3.2
-      expect-type: 1.4.0
-      magic-string: 1.4.5
-      obug: 3.0.0
-      picomatch: 4.0.7
-      std-env: 4.3.0
-      tinybench: 6.2.4
-      tinyexec: 1.3.1
-      tinyglobby: 0.2.17
-      vite: 8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
-      why-is-node-running: 3.2.1
-    optionalDependencies:
-      '@types/node': 26.6.6
       jsdom: 30.1.3(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - msw

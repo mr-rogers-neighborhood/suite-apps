@@ -31,14 +31,14 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
-/** Repository roots inside the monorepo, in the order their gates must run. */
+/** App roots inside the monorepo, in the order their gates must run. */
 const PIPELINE = [
-  { repo: "suite-sync", package: "suite-sync" },
-  { repo: "suite-start", package: "suite-start", e2e: true },
-  { repo: "suite-canvas", package: "suite" },
-  { repo: "suite-planner", package: "suite-planner" },
-  { repo: "suite-budget", package: "suite-budget" },
-  { repo: "suite-go", package: "suite-go" },
+  { repo: "sync", package: "@suite/sync-server" },
+  { repo: "start", package: "@suite/start", e2e: true },
+  { repo: "canvas", package: "@suite/canvas" },
+  { repo: "planner", package: "@suite/planner" },
+  { repo: "budget", package: "@suite/budget" },
+  { repo: "go", package: "@suite/go-app" },
 ];
 
 const argv = process.argv.slice(2);
@@ -154,7 +154,15 @@ const build = dry
       if (!json) process.stdout.write("\n▶ libraries\n");
       const result = run(
         "pnpm",
-        ["--filter", "./apps/*/packages/*", "--workspace-concurrency=2", "run", "build"],
+        [
+          "--filter",
+          "./packages/*",
+          "--filter",
+          "./apps/*/packages/*",
+          "--workspace-concurrency=2",
+          "run",
+          "build",
+        ],
         workdir,
       );
       return { ok: result.status === 0, detail: result.status === 0 ? "built" : `exit ${result.status}` };

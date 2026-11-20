@@ -27,7 +27,7 @@ const APPS = {
     id: "run.suite.canvas",
     package: "@suite/canvas-desktop",
     manifest: join(ROOT, "packaging", "flatpak", "run.suite.canvas.yml"),
-    unpacked: join(ROOT, "apps", "suite-canvas", "apps", "desktop", "release", "linux-unpacked"),
+    unpacked: join(ROOT, "apps", "canvas", "desktop", "release", "linux-unpacked"),
   },
 };
 

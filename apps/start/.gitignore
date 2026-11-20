@@ -1,0 +1,14 @@
+node_modules/
+.turbo/
+coverage/
+*.tsbuildinfo
+.DS_Store
+
+# Build output.
+dist/
+
+# Playwright rewrites its own output on every run.
+e2e/test-results/
+
+# electron-builder output.
+release/
