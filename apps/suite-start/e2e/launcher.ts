@@ -77,6 +77,62 @@ export async function install(box: Sandbox, record: unknown): Promise<void> {
   await writeFile(join(box.data, "installs.json"), JSON.stringify({ apps: [record] }, null, 2));
 }
 
+/**
+ * A stand-in `flatpak` CLI.
+ *
+ * Start asks one binary three questions — what is installed, where a deployment
+ * lives, and to run one — so the script answers exactly those and writes the
+ * `run` arguments where a spec can read them.
+ */
+export async function fakeFlatpak(
+  box: Sandbox,
+  options: { application?: string; version?: string; name?: string } = {},
+): Promise<{ executable: string; logPath: string; location: string }> {
+  const executable = join(box.apps, "flatpak");
+  const logPath = join(box.root, "flatpak-launched.txt");
+  const location = join(box.root, "flatpak-deploy");
+  await mkdir(location, { recursive: true });
+  const listing = JSON.stringify([
+    {
+      name: options.name ?? "Suite Canvas",
+      application_id: options.application ?? "run.suite.canvas",
+      version: options.version ?? "0.1.0",
+      branch: "master",
+      arch: "x86_64",
+      origin: "suite-local",
+      installation: "user",
+    },
+  ]);
+
+  await writeFile(
+    executable,
+    `#!/bin/sh
+if [ "$1" = "list" ]; then
+  cat <<'JSON'
+${listing}
+JSON
+  exit 0
+fi
+if [ "$1" = "--user" ] || [ "$1" = "--system" ]; then
+  shift
+fi
+if [ "$1" = "run" ]; then
+  shift
+  printf '%s\\n' "$@" > "${logPath}"
+  exit 0
+fi
+if [ "$1" = "info" ]; then
+  printf '%s\\n' "${location}"
+  exit 0
+fi
+exit 0
+`,
+    { mode: 0o755 },
+  );
+
+  return { executable, logPath, location };
+}
+
 export interface Launched {
   readonly app: ElectronApplication;
   readonly page: Page;
@@ -94,6 +150,9 @@ export async function launch(
       ...process.env,
       SUITE_START_DATA: box.data,
       SUITE_START_VERSION: "0.1.0-e2e",
+      // Hermetic on a machine that has Flatpak and a real suite app installed:
+      // only a spec that supplies a stand-in may see a Flatpak.
+      SUITE_START_FLATPAK: "",
       ...env,
     },
     timeout: 45_000,

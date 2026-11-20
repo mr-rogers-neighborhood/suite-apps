@@ -10,6 +10,9 @@ import { el, relativeTime } from "./format.js";
 function stateLine(card) {
   const versions = card.versions > 1 ? ` · ${card.versions} versions` : "";
   const running = card.running ? " · running" : "";
+  // Flatpak is a writer, not a folder: the app updates when Flatpak updates it, and
+  // saying "updates itself" or "up to date" would both be claims this hub cannot make.
+  if (card.source === "flatpak") return `${card.version} · Flatpak${running}`;
   if (card.state === "not-installed") return "Not installed yet";
   if (card.state === "no-release") {
     return card.version === null ? "No release found" : `${card.version} · no release found`;
@@ -99,6 +102,14 @@ function cardActions(card, actions) {
     // Deleting it is not Start's to do — the person put it there.
     buttons.append(button("Reveal", "quiet", () => actions.reveal(card.id)));
     buttons.append(button("Forget", "quiet", () => actions.remove(card.id)));
+    return buttons;
+  }
+
+  if (card.source === "flatpak") {
+    // Flatpak owns the deployment. Start can say where it is and ask Flatpak to remove
+    // it; replacing the files is the one thing it must not do (ADR-0001).
+    buttons.append(button("Reveal", "quiet", () => actions.reveal(card.id)));
+    buttons.append(button("Uninstall", "quiet", () => actions.uninstall(card.id)));
     return buttons;
   }
 

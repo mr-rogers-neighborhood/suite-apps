@@ -142,6 +142,20 @@ describe("spawnCommand", () => {
       args: ["/home/me/Research.canvas"],
     });
   });
+
+  it("starts a Flatpak through the CLI that owns it", () => {
+    const flatpak: DiscoveredApp = {
+      ...app("canvas", ["canvas"]),
+      executable: "/usr/bin/flatpak",
+      flatpak: { application: "run.suite.canvas", installation: "user" },
+    };
+    const result = routeLaunch("suite://canvas/card/1", [flatpak]);
+    if (!result.ok) throw new Error("expected a plan");
+    expect(spawnCommand(result.plan)).toEqual({
+      command: "/usr/bin/flatpak",
+      args: ["run", "run.suite.canvas", "suite://canvas/card/1"],
+    });
+  });
 });
 
 describe("describeRouteRejection", () => {

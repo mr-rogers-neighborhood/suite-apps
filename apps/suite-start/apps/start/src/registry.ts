@@ -57,11 +57,27 @@ export interface DiscoverOptions {
   readonly hubContract?: string;
 }
 
+/** Which Flatpak deployment a discovered app came from, when one did. */
+export interface FlatpakInstall {
+  /** Reverse-DNS application id, e.g. `run.suite.canvas`. */
+  readonly application: string;
+  /** `user` or `system`. */
+  readonly installation: string;
+}
+
 export interface DiscoveredApp {
   readonly manifest: SuiteAppManifest;
   readonly manifestPath: string;
   readonly executable: string;
   readonly installedAt: string | null;
+  /**
+   * Set when Flatpak owns this install rather than Start or a person.
+   *
+   * The executable is then the `flatpak` CLI, and starting the app means
+   * `flatpak run <application>`. It is also the one fact that says Start must
+   * not write into this install: Flatpak is the writer (ADR-0001).
+   */
+  readonly flatpak?: FlatpakInstall;
 }
 
 export interface RejectedInstall {

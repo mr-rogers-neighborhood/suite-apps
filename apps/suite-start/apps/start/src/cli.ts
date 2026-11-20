@@ -2,6 +2,8 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { CATALOGUE_APPS } from "./catalogue.js";
+import { findFlatpak, listFlatpaks, withFlatpakInstalls } from "./flatpak.js";
 import { launchPlan } from "./launch.js";
 import { defaultRoots, nodeRegistryFileSystem } from "./nodeFileSystem.js";
 import { discoverApps, type InstallRecord } from "./registry.js";
@@ -69,16 +71,27 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
 
-  const discovery = await discoverApps({
+  const found = await discoverApps({
     roots: defaultRoots(homedir(), process.platform),
     records: await loadRecords(),
     fileSystem: nodeRegistryFileSystem(),
   });
+  // The same merge the window does: Flatpak installs have their own database,
+  // not an install record, and the CLI is meant to answer what Start would do.
+  const flatpak = findFlatpak();
+  const discovery =
+    flatpak === null
+      ? found
+      : withFlatpakInstalls(found, await listFlatpaks(), CATALOGUE_APPS, flatpak);
 
   if (command === "list") {
     if (discovery.apps.length === 0) process.stdout.write("No Suite apps installed.\n");
     for (const app of discovery.apps) {
-      process.stdout.write(`${app.manifest.id}\t${app.manifest.version}\t${app.executable}\n`);
+      const where =
+        app.flatpak === undefined
+          ? app.executable
+          : `${app.executable} run ${app.flatpak.application}`;
+      process.stdout.write(`${app.manifest.id}\t${app.manifest.version}\t${where}\n`);
     }
     for (const entry of discovery.rejected) {
       process.stdout.write(`refused\t${entry.path}\t${entry.reason}\n`);

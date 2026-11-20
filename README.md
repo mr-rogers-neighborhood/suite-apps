@@ -72,8 +72,8 @@ avoids that tradeoff.
 
 ## Flatpak (Canvas first)
 
-Flatpak is a second channel for one app, not yet a replacement for Start's AppImage installs. The
-manifest packages the same `package:dir` build, with zypak from the Electron base app.
+Flatpak is a second channel: the same `package:dir` build, packaged with zypak from the Electron base
+app. The manifest is `packaging/flatpak/run.suite.canvas.yml`.
 
 ```sh
 node scripts/flatpak.mjs              # package, build, publish, install
@@ -86,13 +86,30 @@ It exports to `~/suite-flatpak/repo`, adds it as the user remote `suite-local`, 
 unsigned and the remote is added with `--no-gpg-verify`; a published repo needs `flatpak
 build-update-repo --gpg-sign` and a key the client already trusts.
 
+Start now sees Flatpak installs. `apps/start/src/flatpak.ts` reads
+`flatpak list --app --json`, maps `run.suite.<id>` onto the catalogue, and launches
+the app through `flatpak run <id> <arg>`. The card says `Flatpak` and offers
+Open, Reveal and Uninstall; Uninstall asks Flatpak to remove the app. Start does
+not install Flatpaks and does not write into their deploy tree — Flatpak is the
+writer, which is the same rule ADR-0001 already applies to AppImages. An AppImage
+Start placed wins when both exist, because two copies of one app cannot run at
+once and the AppImage is the one Start may replace.
+
+Installing a Flatpak from Start's own store is the next step, after the store
+remote is part of the product. Relabelling the AppImage feed as the Flatpak
+update path would be a lie: they are different channels.
+
 Orca points `XDG_DATA_HOME` at a per-session directory. The script installs into the real user
 installation anyway; in an Orca terminal, run the app with
-`XDG_DATA_HOME=$HOME/.local/share flatpak run run.suite.canvas`.
+`XDG_DATA_HOME=$HOME/.local/share flatpak run run.suite.canvas`. Start uses the
+same rule: its user-installed Flatpaks are only visible inside that session
+unless `XDG_DATA_HOME` is the real one.
 
-The hub stays an unpacked install until it manages Flatpaks. Packaging it earlier would need
-`--filesystem=home` and `flatpak-spawn --host` to keep writing `~/Applications`, which is sandbox
-theater and a second update channel. See `apps/suite-start/docs/how-to/package.md` and ADR-0001.
+The hub itself stays an unpacked install until it manages Flatpaks end to end
+(install and update, not only launch and remove). Packaging it earlier would need
+`--filesystem=home` and `flatpak-spawn --host` to keep writing `~/Applications`,
+which is sandbox theater and a second update channel. See
+`apps/suite-start/docs/how-to/package.md` and ADR-0001.
 
 ## The gate on the VM
 

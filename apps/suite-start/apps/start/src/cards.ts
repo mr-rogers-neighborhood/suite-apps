@@ -5,7 +5,7 @@ import type { IndexedFile } from "./fileIndex.js";
 import type { RecentEntry } from "./recents.js";
 import type { DiscoveredApp, RejectedInstall } from "./registry.js";
 import { type ReportedUpdate, UNREPORTED } from "./reportedUpdate.js";
-import type { AppCard, AppCardState, FileCard } from "./shared.js";
+import type { AppCard, AppCardState, AppSource, FileCard } from "./shared.js";
 
 /**
  * One card per app the suite offers, one per app it does not know, and one per
@@ -39,8 +39,7 @@ export interface CardInput {
   readonly appsRoot: string;
 }
 
-/**
- * Whether an executable is one Start placed.
+/** Whether an executable is one Start placed.
  *
  * The path is the proof: only installs land under the applications root, so an app there was
  * put there by Start and Start replaces it. Reading that from the disk rather than from the
@@ -51,6 +50,12 @@ export interface CardInput {
 function isManaged(executable: string, appsRoot: string): boolean {
   const root = appsRoot.endsWith("/") ? appsRoot : `${appsRoot}/`;
   return executable.startsWith(root);
+}
+
+/** Who owns this install, which is also who may replace it. */
+function sourceOf(app: DiscoveredApp, appsRoot: string): AppSource {
+  if (app.flatpak !== undefined) return "flatpak";
+  return isManaged(app.executable, appsRoot) ? "managed" : "folder";
 }
 
 /** The folder name a refused install is known by. */
@@ -79,6 +84,7 @@ export function appCards(input: CardInput): readonly AppCard[] {
   const refused: AppCard[] = input.rejected.map((install) => ({
     id: install.id ?? null,
     name: nameFor(install.path),
+    source: "folder",
     icon: install.id === undefined ? null : (APP_ICONS[install.id] ?? null),
     state: "refused",
     version: null,
@@ -104,18 +110,23 @@ export function appCards(input: CardInput): readonly AppCard[] {
     .map((entry) => {
       const found = byId.get(entry.id) ?? null;
       byId.delete(entry.id);
+      // A Flatpak answers to its remote, not to the AppImage feed. Saying
+      // "newer version available" from a feed this install cannot read would
+      // offer an Update button that installs a second copy in another format.
+      const fromFlatpak = found?.flatpak !== undefined;
       return {
         id: entry.id,
         name: found?.manifest.name ?? entry.name,
+        source: found === null ? "managed" : sourceOf(found, input.appsRoot),
         icon: APP_ICONS[entry.id] ?? null,
-        state: stateFor(found === null ? null : found.manifest.version, entry.available),
+        state: fromFlatpak ? "current" : stateFor(found?.manifest.version ?? null, entry.available),
         version: found?.manifest.version ?? null,
-        available: entry.available,
-        reason: entry.reason,
-        versions: input.versions.get(entry.id) ?? (found === null ? 0 : 1),
-        previousVersion: input.previous?.get(entry.id) ?? null,
+        available: fromFlatpak ? null : entry.available,
+        reason: fromFlatpak ? null : entry.reason,
+        versions: fromFlatpak ? 1 : (input.versions.get(entry.id) ?? (found === null ? 0 : 1)),
+        previousVersion: fromFlatpak ? null : (input.previous?.get(entry.id) ?? null),
         running: input.running.has(entry.id),
-        releases: entry.releases ?? null,
+        releases: fromFlatpak ? null : (entry.releases ?? null),
         channel: found?.manifest.update?.channel ?? entry.channel,
         update: input.updates.get(entry.id) ?? UNREPORTED,
         executable: found?.executable ?? null,
@@ -129,28 +140,30 @@ export function appCards(input: CardInput): readonly AppCard[] {
   // Discovery found an app the catalogue does not name — either a copy this person placed
   // (D44 makes it first-class) or a managed install whose feed has not answered yet. Only
   // the first is "from a folder"; the second is Start's, and says so.
-  const local: AppCard[] = [...byId.values()].map((entry) => ({
-    id: entry.manifest.id,
-    name: entry.manifest.name,
-    icon: APP_ICONS[entry.manifest.id] ?? null,
-    state: isManaged(entry.executable, input.appsRoot) ? "no-release" : "local",
-    version: entry.manifest.version,
-    available: null,
-    reason: isManaged(entry.executable, input.appsRoot)
-      ? "its release feed has not been read yet"
-      : null,
-    versions: input.versions.get(entry.manifest.id) ?? 1,
-    previousVersion: input.previous?.get(entry.manifest.id) ?? null,
-    running: input.running.has(entry.manifest.id),
-    releases: null,
-    channel: entry.manifest.update?.channel ?? "stable",
-    update: input.updates.get(entry.manifest.id) ?? UNREPORTED,
-    executable: entry.executable,
-    fileExtensions: entry.manifest.fileExtensions,
-    lastOpenedAt: input.recents.find((row) => row.appId === entry.manifest.id)?.openedAt ?? null,
-    fileCount: input.files.filter((file) => file.appId === entry.manifest.id).length,
-    health: { ok: true },
-  }));
+  const local: AppCard[] = [...byId.values()].map((entry) => {
+    const source = sourceOf(entry, input.appsRoot);
+    return {
+      id: entry.manifest.id,
+      name: entry.manifest.name,
+      source,
+      icon: APP_ICONS[entry.manifest.id] ?? null,
+      state: source === "folder" ? "local" : source === "flatpak" ? "current" : "no-release",
+      version: entry.manifest.version,
+      available: null,
+      reason: source === "managed" ? "its release feed has not been read yet" : null,
+      versions: source === "flatpak" ? 1 : (input.versions.get(entry.manifest.id) ?? 1),
+      previousVersion: input.previous?.get(entry.manifest.id) ?? null,
+      running: input.running.has(entry.manifest.id),
+      releases: null,
+      channel: entry.manifest.update?.channel ?? "stable",
+      update: input.updates.get(entry.manifest.id) ?? UNREPORTED,
+      executable: entry.executable,
+      fileExtensions: entry.manifest.fileExtensions,
+      lastOpenedAt: input.recents.find((row) => row.appId === entry.manifest.id)?.openedAt ?? null,
+      fileCount: input.files.filter((file) => file.appId === entry.manifest.id).length,
+      health: { ok: true },
+    };
+  });
 
   return [...refused, ...offered, ...local];
 }
@@ -165,6 +178,7 @@ export function selfCard(entry: CatalogueApp, version: string): AppCard {
   return {
     id: SELF_ID,
     name: entry.name,
+    source: "managed",
     icon: null,
     state:
       entry.available === null

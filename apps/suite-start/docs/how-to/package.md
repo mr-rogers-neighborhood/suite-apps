@@ -4,12 +4,12 @@ A note for anyone arriving from web development, where "deploy" means one thing.
 means four, and they differ in **who owns the file on disk** — which decides everything else, including
 who is allowed to update it.
 
-| Form                   | Closest web analogy                             | Who owns the installed files     | Updates arrive by           | Root needed |
-| ---------------------- | ----------------------------------------------- | -------------------------------- | --------------------------- | ----------- |
-| **AppImage**           | a self-contained static build you run with `./` | the user, in `~/Applications`    | Start, from the signed feed | no          |
-| **pacman / deb / rpm** | deploying into the host's package registry      | **root**, under `/opt` or `/usr` | the package manager         | yes         |
-| **Flatpak**            | a container runtime for desktop apps            | root, inside a sandbox           | an OSTree remote            | yes         |
-| **snap**               | same shape, Canonical's runtime                 | root, sandboxed                  | the Snap Store              | yes         |
+| Form                   | Closest web analogy                             | Who owns the installed files               | Updates arrive by           | Root needed                         |
+| ---------------------- | ----------------------------------------------- | ------------------------------------------ | --------------------------- | ----------------------------------- |
+| **AppImage**           | a self-contained static build you run with `./` | the user, in `~/Applications`              | Start, from the signed feed | no                                  |
+| **pacman / deb / rpm** | deploying into the host's package registry      | **root**, under `/opt` or `/usr`           | the package manager         | yes                                 |
+| **Flatpak**            | a container runtime for desktop apps            | Flatpak (user or system), inside a sandbox | an OSTree remote            | no for `--user`, yes for `--system` |
+| **snap**               | same shape, Canonical's runtime                 | root, sandboxed                            | the Snap Store              | yes                                 |
 
 ## The rule this repository is built on
 
@@ -88,11 +88,16 @@ for it:
 - **Heavier to build:** `flatpak-builder` plus an `org.freedesktop.Sdk` runtime.
 
 Where Flatpak fits: each app can ship as a Flatpak beside its AppImage (Canvas first; see
-`packaging/flatpak/`). The hub itself becomes a Flatpak **when it manages Flatpaks** — at that point the
-Flatpak portal is the writer, Start needs no access to `~/Applications`, and its sandbox is real.
-Packaging the hub before then would mean `--filesystem=home` and `flatpak-spawn --host` to keep
-managing AppImages: a sandbox with the door propped open, and a second update channel for the same
-binary. So: apps first, hub last. ADR-0001's one-writer rule is unchanged — only the writer changes.
+`packaging/flatpak/`). Start already treats an installed Flatpak as a first-class app: it reads
+`flatpak list`, starts it with `flatpak run`, reveals the deployment, and asks Flatpak to remove it
+(`apps/start/src/flatpak.ts`). It does not install or update one yet.
+
+The hub itself becomes a Flatpak **when it manages Flatpaks end to end** — install and update, not
+only launch and remove. At that point the Flatpak portal is the writer, Start needs no access to
+`~/Applications`, and its sandbox is real. Packaging the hub before then would mean
+`--filesystem=home` and `flatpak-spawn --host` to keep managing AppImages: a sandbox with the door
+propped open, and a second update channel for the same binary. So: apps first, hub last. ADR-0001's
+one-writer rule is unchanged — only the writer changes.
 
 ## Cutting a release that includes the package
 

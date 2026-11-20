@@ -117,11 +117,24 @@ export interface InstallProgress {
   readonly reason: string | null;
 }
 
+/**
+ * Who put this install on the machine.
+ *
+ * It decides what the card may offer, and it is read from the install rather
+ * than from the catalogue: an AppImage Start placed and one somebody downloaded
+ * themselves are the same file shape and different promises. `flatpak` is the
+ * third writer — it owns the deployment, so Start opens and removes it but
+ * never replaces it.
+ */
+export type AppSource = "managed" | "folder" | "flatpak";
+
 /** One app card, installed, offered, or refused. */
 export interface AppCard {
   /** Null for a refused install with no record, because there is nothing to act on. */
   readonly id: string | null;
   readonly name: string;
+  /** How this copy got here. Decides which buttons the card can honestly offer. */
+  readonly source: AppSource;
   /** The app's own mark, as a data URI, when the hub knows one. */
   readonly icon: string | null;
   readonly state: AppCardState;

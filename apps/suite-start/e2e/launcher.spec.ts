@@ -1,7 +1,15 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { fakeApp, install, launch, launchedWith, type Sandbox, sandbox } from "./launcher.js";
+import {
+  fakeApp,
+  fakeFlatpak,
+  install,
+  launch,
+  launchedWith,
+  type Sandbox,
+  sandbox,
+} from "./launcher.js";
 
 /**
  * What the launcher promises.
@@ -395,6 +403,48 @@ test("drops a deleted file when the window refreshes", async () => {
     await run.page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await expect(run.page.locator("#all-files .row")).toHaveCount(1);
     await expect(run.page.locator("#all-files .row-name")).toHaveText("Kept.canvas");
+  } finally {
+    await run.close();
+  }
+});
+
+test("lists a Flatpak install and says Flatpak owns it", async () => {
+  const flatpak = await fakeFlatpak(box);
+  const run = await launch(box, [], { SUITE_START_FLATPAK: flatpak.executable });
+  try {
+    await expect(run.page.locator(".card-name")).toHaveText("Suite Canvas");
+    // No feed was read and no version is promised: the remote is the update path.
+    await expect(run.page.locator(".card-state")).toHaveText("0.1.0 · Flatpak");
+    await expect(run.page.getByRole("button", { name: "Open" })).toBeVisible();
+    await expect(run.page.getByRole("button", { name: "Uninstall" })).toBeVisible();
+    await expect(run.page.getByRole("button", { name: "Roll back to 0.1.0" })).toHaveCount(0);
+  } finally {
+    await run.close();
+  }
+});
+
+test("starts a Flatpak through the CLI that owns it", async () => {
+  const flatpak = await fakeFlatpak(box);
+  const run = await launch(box, [], { SUITE_START_FLATPAK: flatpak.executable });
+  try {
+    await run.page.getByRole("button", { name: "Open" }).click();
+    await expect
+      .poll(async () => launchedWith(flatpak.logPath), { timeout: 15_000 })
+      .toEqual(["run.suite.canvas"]);
+  } finally {
+    await run.close();
+  }
+});
+
+test("hands a suite:// link to a Flatpak as the app's own argument", async () => {
+  const flatpak = await fakeFlatpak(box);
+  const run = await launch(box, ["suite://canvas/workspace/ws_1?card=c1"], {
+    SUITE_START_FLATPAK: flatpak.executable,
+  });
+  try {
+    await expect
+      .poll(async () => launchedWith(flatpak.logPath), { timeout: 15_000 })
+      .toEqual(["run.suite.canvas", "suite://canvas/workspace/ws_1?card=c1"]);
   } finally {
     await run.close();
   }

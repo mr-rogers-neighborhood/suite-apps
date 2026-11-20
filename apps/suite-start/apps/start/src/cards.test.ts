@@ -193,10 +193,58 @@ describe("appCards", () => {
     expect(card).toMatchObject({
       id: "scratch",
       state: "local",
+      source: "folder",
       version: "0.1.0",
       available: null,
       executable: "/opt/suite/canvas",
     });
+  });
+
+  it("labels a Flatpak install and does not sell it the AppImage feed", () => {
+    // The feed is a different channel: offering its version here would install a
+    // second copy in another format rather than update the one that is running.
+    const [card] = appCards({
+      apps: [
+        {
+          ...discovered(),
+          executable: "/usr/bin/flatpak",
+          flatpak: { application: "run.suite.canvas", installation: "user" },
+        },
+      ],
+      rejected: [],
+      files: [],
+      recents: [],
+      updates: NO_UPDATES,
+      catalogue: [offered({ available: "0.3.0", installed: "0.1.0" })],
+      versions: NO_VERSIONS,
+      running: NO_RUNNING,
+      appsRoot: APPS_ROOT,
+    });
+    expect(card).toMatchObject({
+      id: "canvas",
+      source: "flatpak",
+      state: "current",
+      version: "0.1.0",
+      available: null,
+      reason: null,
+      versions: 1,
+      previousVersion: null,
+    });
+  });
+
+  it("calls an install under Start's own root managed, whoever asked first", () => {
+    const [card] = appCards({
+      apps: [{ ...discovered(), executable: `${APPS_ROOT}/Canvas/0.1.0/suite-canvas` }],
+      rejected: [],
+      files: [],
+      recents: [],
+      updates: NO_UPDATES,
+      catalogue: [offered({ installed: "0.1.0", available: "0.1.0" })],
+      versions: NO_VERSIONS,
+      running: NO_RUNNING,
+      appsRoot: APPS_ROOT,
+    });
+    expect(card).toMatchObject({ source: "managed", state: "current" });
   });
 
   it("counts the files the index found for the app", () => {

@@ -51,6 +51,12 @@ As applied:
   `installs.json` to a directory already on disk: no download, no second record shape, and the version
   just left becomes the way back. Keeping more would make the hub a package manager with a retention
   policy, which is a much larger promise than "a bad update is a button".
+- **A Flatpak is written by Flatpak.** Start lists what Flatpak installed, launches it through
+  `flatpak run`, shows where the deployment lives, and asks Flatpak to remove it. The version comes
+  from Flatpak's own database and the remote is the update channel, so Start neither reads the app's
+  signed AppImage feed for it nor offers a rollback. When both an AppImage and a Flatpak of one app
+  exist, the AppImage is shown: two copies cannot run at once, and the AppImage is the one Start may
+  replace.
 
 ## Consequences
 
@@ -67,10 +73,13 @@ As applied:
 - An app installed by a package manager is not Start's to launch, so it keeps its own updater and may
   need root to use it. The suite ships apps as AppImages precisely so that case does not arise — see
   `docs/how-to/package.md`.
-- A Flatpak app is written by Flatpak, not by Start. When an app ships as a Flatpak, Start asks the
-  Flatpak portal (or its CLI) to install and update it and never writes into the install tree: the
-  one-writer rule is unchanged, only the writer changes. The hub itself can be a Flatpak once that is
-  its only path; until then it keeps managing AppImages outside one.
+- A Flatpak app is written by Flatpak, not by Start. Start discovers it from `flatpak list`, starts it
+  with `flatpak run`, and removes it with `flatpak uninstall`; it never writes into the deploy tree.
+  The one-writer rule is unchanged, only the writer changes. Installing and updating from Start's own
+  store is a later step: until the store remote is part of the product, the person's
+  `flatpak update` is the update path. The hub itself can be a Flatpak once Start installs and
+  updates Flatpaks, because then the portal is its only writer; until then it keeps managing
+  AppImages outside one.
 - Start cannot replace its own running binary. Its own row links to the release page instead of
   offering a button that would fail.
 

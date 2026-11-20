@@ -44,6 +44,16 @@ import {
   withInstalled,
 } from "./catalogue.js";
 import { type DocumentsFolder, indexDocuments, isInsideDocuments } from "./fileIndex.js";
+import {
+  type FlatpakApp,
+  findFlatpak,
+  flatpakLocation,
+  flatpakRunArgs,
+  flatpakScopeArgs,
+  listFlatpaks,
+  runFlatpak,
+  withFlatpakInstalls,
+} from "./flatpak.js";
 import { StartHost } from "./host.js";
 import { writeHubReport } from "./hubReport.js";
 import {
@@ -410,16 +420,47 @@ function documentFolders(): readonly DocumentsFolder[] {
   }));
 }
 
+/**
+ * What Flatpak has installed, cached for a moment.
+ *
+ * `state()` runs on every broadcast, including once per download chunk's
+ * screen. The listing changes only when Flatpak does something, so a short
+ * cache keeps the window honest without spawning a process per redraw. Start
+ * clears it after it has just changed the answer.
+ */
+const FLATPAK_CACHE_MS = 30_000;
+
+let flatpakCache: { readonly at: number; readonly apps: readonly FlatpakApp[] } | null = null;
+
+async function flatpakInstalls(): Promise<readonly FlatpakApp[]> {
+  if (findFlatpak() === null) return [];
+  const now = Date.now();
+  if (flatpakCache !== null && now - flatpakCache.at < FLATPAK_CACHE_MS) {
+    return flatpakCache.apps;
+  }
+  const apps = await listFlatpaks();
+  flatpakCache = { at: now, apps };
+  return apps;
+}
+
 async function discover(): Promise<{
   apps: readonly DiscoveredApp[];
   refused: readonly { path: string; reason: string }[];
 }> {
-  const result = await discoverApps({
-    roots: roots(),
-    records: await registry.list(),
-    fileSystem: nodeRegistryFileSystem(),
-  });
-  return { apps: result.apps, refused: result.rejected };
+  const [result, installs] = await Promise.all([
+    discoverApps({
+      roots: roots(),
+      records: await registry.list(),
+      fileSystem: nodeRegistryFileSystem(),
+    }),
+    flatpakInstalls(),
+  ]);
+  const executable = findFlatpak();
+  const merged =
+    executable === null
+      ? result
+      : withFlatpakInstalls(result, installs, CATALOGUE_APPS, executable);
+  return { apps: merged.apps, refused: merged.rejected };
 }
 
 /**
@@ -667,7 +708,10 @@ function spawnExecutable(executable: string, argv: readonly string[], appId?: st
 }
 
 function spawnApp(app_: DiscoveredApp, argv: readonly string[]): void {
-  spawnExecutable(app_.executable, argv, app_.manifest.id);
+  // A Flatpak is started by the CLI that owns it; everything after `run <id>` is
+  // the app's own argument, exactly as an AppImage would receive it.
+  const args = app_.flatpak === undefined ? argv : flatpakRunArgs(app_.flatpak.application, argv);
+  spawnExecutable(app_.executable, args, app_.manifest.id);
 }
 
 /** Resolve one target and start the app that owns it. */
@@ -1194,6 +1238,13 @@ function registerIpc(): void {
     const { apps } = await discover();
     const target = appById(apps, id);
     if (target === null) return;
+    // A Flatpak has no file of its own to show. The deployment directory is the
+    // closest true answer, and it is the one `flatpak info` already knows.
+    if (target.flatpak !== undefined) {
+      const location = await flatpakLocation(target.flatpak);
+      if (location !== null) await shell.openPath(location);
+      return;
+    }
     shell.showItemInFolder(target.executable);
   });
 
@@ -1208,6 +1259,52 @@ function registerIpc(): void {
     if (typeof id !== "string" || window === null) return;
     const entry = CATALOGUE_APPS.find((candidate) => candidate.id === id);
     if (entry === undefined) return;
+
+    const found = appById((await discover()).apps, id);
+    if (found?.flatpak !== undefined) {
+      // Flatpak owns these files, so Start asks Flatpak to remove them and then
+      // stops describing itself as installed. Nothing under ~/Applications is
+      // touched: there may be an AppImage there that is somebody else's.
+      const confirm = await dialog.showMessageBox(window, {
+        type: "warning",
+        title: "Uninstall",
+        message: `Uninstall ${entry.name} from Flatpak?`,
+        detail:
+          `This asks Flatpak to remove ${found.flatpak.application} from the ` +
+          `${found.flatpak.installation} installation. Documents are not touched.`,
+        buttons: ["Cancel", "Uninstall"],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (confirm.response !== 1) return;
+
+      if (runningPids.has(id)) {
+        stopApp(id);
+        await waitForExit(id);
+        runningPids.delete(id);
+      }
+      try {
+        await runFlatpak([
+          ...flatpakScopeArgs(found.flatpak.installation),
+          "uninstall",
+          "--noninteractive",
+          found.flatpak.application,
+        ]);
+      } catch (error) {
+        console.warn(`[flatpak] could not uninstall ${found.flatpak.application}`, error);
+        await dialog.showMessageBox(window, {
+          type: "error",
+          title: "Uninstall",
+          message: `${entry.name} was not removed.`,
+          detail: "Flatpak refused the request; its own output is in the log.",
+        });
+        return;
+      }
+      flatpakCache = null;
+      catalogue = withInstalled(catalogue, id, null);
+      await broadcast();
+      return;
+    }
 
     const versions = await installedVersions(applicationsRoot(), entry);
     const answer = await dialog.showMessageBox(window, {
