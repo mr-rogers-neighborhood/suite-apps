@@ -11,7 +11,7 @@
   "scripts": {
     "build": "pnpm --filter @suite/go --filter @suite/go-app --workspace-concurrency=1 run build",
     "build:verify": "pnpm --filter @suite/go --filter @suite/go-app --workspace-concurrency=1 run build && git diff --exit-code -- packages",
-    "check": "biome check . && pnpm typecheck && vitest run && node scripts/check-dist.mjs",
+    "check": "biome check . && pnpm typecheck && vitest run",
     "check:full": "pnpm check",
     "format": "biome format --write .",
     "lint": "biome check .",

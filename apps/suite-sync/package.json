@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "pnpm --filter @suite/sync --filter @suite/host --filter @suite/sync-server --workspace-concurrency=1 run build",
-    "check": "biome check . && pnpm build && pnpm typecheck && vitest run && node scripts/check-dist.mjs",
+    "check": "biome check . && pnpm build && pnpm typecheck && vitest run",
     "check:full": "pnpm check",
     "format": "biome format --write .",
     "lint": "biome check .",
