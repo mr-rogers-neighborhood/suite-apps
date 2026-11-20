@@ -2,7 +2,10 @@ import { framePayload, hostAcceptsEpoch, mayWrite, } from "@suite/sync";
 export function admitFrame(sealed, host, roles, keyOf, verify, receivedAt = new Date().toISOString(), admitOptions = {}) {
     if (sealed.workspaceId !== host.workspaceId)
         return { ok: false, reason: "wrong-workspace" };
-    if (!hostAcceptsEpoch(sealed.epoch, host.newestEpoch))
+    // The join request is exempt from the epoch floor, and nothing else is: a key package
+    // is not group traffic and cannot carry a meaningful epoch.
+    const joinRequest = sealed.kind === "keypackage";
+    if (!joinRequest && !hostAcceptsEpoch(sealed.epoch, host.newestEpoch))
         return { ok: false, reason: "stale-epoch" };
     const invited = admitOptions.kindAllowedWithoutRole === sealed.kind;
     if (!invited && !mayWrite(roles, sealed.deviceId))

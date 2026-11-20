@@ -101,7 +101,7 @@ const removalSchema = z
     .strict();
 /** One sealed frame, on its way to the store and everybody else. */
 const sealedSchema = z.object({ type: z.literal("frame"), frame: sealedFrameSchema }).strict();
-/** Everything after the index a client already has. `0` means everything. */
+/** The first index to send. `0` means everything, which is what a device that has never synced sends. */
 const sinceSchema = z
     .object({ type: z.literal("since"), after: z.number().int().nonnegative() })
     .strict();

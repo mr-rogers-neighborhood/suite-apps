@@ -75,13 +75,22 @@ export const frameRejectionSchema = z.enum([
  * than refused (ADR-0006, measured), so two devices that committed from the same
  * epoch would each quietly absorb the other's and disagree about the group. The
  * receiver compares epochs and drops what is not for the epoch it is in.
+ *
+ * There is one exception, and it is the only way a device moves: a *commit* at the
+ * receiver's epoch plus one. Applying it is how the receiver reaches the new epoch,
+ * so exact equality would refuse the very frame that carries the change. Every
+ * other kind at any other epoch — including an application frame one epoch ahead —
+ * is `stale-epoch`, which the receiver reads as "a commit is missing; catch up in
+ * index order before opening anything".
  */
 export function frameRejection(frame, current) {
     if (frame.workspaceId !== current.workspaceId)
         return "wrong-workspace";
-    if (frame.epoch !== current.epoch)
-        return "stale-epoch";
-    return null;
+    if (frame.epoch === current.epoch)
+        return null;
+    if (frame.kind === "commit" && frame.epoch === current.epoch + 1)
+        return null;
+    return "stale-epoch";
 }
 /**
  * Whether the host should store a frame at all.
