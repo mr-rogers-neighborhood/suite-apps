@@ -13,6 +13,7 @@ const workspaceId = "a".repeat(64);
 const ownerDevice = "b".repeat(64);
 const viewerDevice = "c".repeat(64);
 const strangerDevice = "d".repeat(64);
+const joinerDevice = "e".repeat(64);
 
 const roleVerifier: RoleVerifier = (_payload, signature, signerId) =>
   signature === `signed-by-${signerId}`;
@@ -23,7 +24,13 @@ const frameVerifier: FrameVerifier = (_payload, signature, publicKey) =>
 
 /** A device's pinned key, or nothing when it never joined. */
 const keyOf = (deviceId: string) =>
-  deviceId === ownerDevice ? "owner-key" : deviceId === viewerDevice ? "viewer-key" : null;
+  deviceId === ownerDevice
+    ? "owner-key"
+    : deviceId === viewerDevice
+      ? "viewer-key"
+      : deviceId === joinerDevice
+        ? "joiner-key"
+        : null;
 
 function roles(): RoleState {
   const seeded = applyRoleRecord(
@@ -123,6 +130,61 @@ describe("the four things a host may refuse", () => {
   it("refuses a signature that does not verify", () => {
     const verdict = admitFrame(frame({ signature: "forged" }), host, roles(), keyOf, frameVerifier);
     expect(verdict).toEqual({ ok: false, reason: "invalid-signature" });
+  });
+});
+
+describe("the join request is exempt from the epoch floor", () => {
+  const laterHost = { workspaceId, newestEpoch: 5 };
+
+  it("admits a key package at epoch 0 into a workspace that has moved on", () => {
+    // A device with no group has no epoch. Measuring its key package against the newest
+    // stored epoch would refuse every device asking to join an active workspace.
+    const verdict = admitFrame(
+      frame({
+        kind: "keypackage",
+        deviceId: joinerDevice,
+        epoch: 0,
+        signature: "signed-by-joiner-key",
+      }),
+      laterHost,
+      roles(),
+      keyOf,
+      frameVerifier,
+      "2026-11-06T12:00:00.000Z",
+      { kindAllowedWithoutRole: "keypackage" },
+    );
+    expect(verdict.ok).toBe(true);
+  });
+
+  it("still asks the invite for the key package, and only for it", () => {
+    // The exemption is from the epoch floor, not from the authorisation: without the
+    // invite exception a device with no role is refused exactly as before.
+    const verdict = admitFrame(
+      frame({
+        kind: "keypackage",
+        deviceId: joinerDevice,
+        epoch: 0,
+        signature: "signed-by-joiner-key",
+      }),
+      laterHost,
+      roles(),
+      keyOf,
+      frameVerifier,
+    );
+    expect(verdict).toEqual({ ok: false, reason: "not-authorized" });
+  });
+
+  it("does not exempt any other kind", () => {
+    for (const kind of ["application", "commit", "welcome"] as const) {
+      const verdict = admitFrame(
+        frame({ kind, epoch: 0 }),
+        laterHost,
+        roles(),
+        keyOf,
+        frameVerifier,
+      );
+      expect(verdict).toEqual({ ok: false, reason: "stale-epoch" });
+    }
   });
 });
 

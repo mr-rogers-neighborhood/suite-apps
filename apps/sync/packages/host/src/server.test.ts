@@ -5,10 +5,14 @@ import {
   createDeviceIdentity,
   createRoleState,
   createWorkspaceGroup,
+  decodeKeyPackageBytes,
   encodeBase64,
+  encodeKeyPackageBytes,
   encodeRelayMessage,
   ephemeralPayload,
+  type FrameKind,
   framePayload,
+  inviteRecordPayload,
   joinWorkspaceGroup,
   open,
   RELAY_PROTOCOL_VERSION,
@@ -120,9 +124,10 @@ function sealedFrame(
   actor: ReturnType<typeof device>,
   epoch: number,
   payload: string,
+  kind: FrameKind = "application",
 ): SealedFrame {
   const header = {
-    kind: "application" as const,
+    kind,
     workspaceId,
     deviceId: actor.deviceId,
     epoch,
@@ -144,6 +149,45 @@ function removalRecord(actor: ReturnType<typeof device>, target: { deviceId: str
     signerId: actor.deviceId,
   };
   return { ...unsigned, signature: actor.sign(removalRecordPayload(unsigned)) };
+}
+
+/** An invitation an owner writes. The host keeps it; the code is the bearer token. */
+function inviteRecord(
+  actor: ReturnType<typeof device>,
+  inviteId: string,
+  role: "editor" | "viewer" = "editor",
+) {
+  const unsigned = {
+    workspaceId,
+    inviteId,
+    role,
+    expiresAt: "2026-11-07T12:00:00.000Z",
+    signerId: actor.deviceId,
+  };
+  return { ...unsigned, signature: actor.sign(inviteRecordPayload(unsigned)) };
+}
+
+/** A device asking to join: a key package at epoch 0, which is all it may send. */
+function keyPackage(
+  actor: ReturnType<typeof device>,
+  keyPackageBytes: Uint8Array,
+  inviteId: string,
+) {
+  const header = {
+    kind: "keypackage" as const,
+    workspaceId,
+    deviceId: actor.deviceId,
+    epoch: 0,
+    payload: encodeBase64(keyPackageBytes),
+  };
+  return {
+    type: "keypackage" as const,
+    inviteId,
+    deviceId: actor.deviceId,
+    publicKey: actor.publicKey,
+    name: "a joining device",
+    frame: { ...header, signature: actor.sign(framePayload(header)) },
+  };
 }
 
 /** A presence message: signed like any other, sealed with its own key, and stored like none. */
@@ -279,6 +323,144 @@ describe("two devices through one host", () => {
     expect(replayed.type === "frame" && replayed.index).toBe(2);
 
     alice.close();
+    await server.close();
+  });
+});
+
+describe("a device joining a workspace that already has frames", () => {
+  it("a second device joins a workspace that already has frames, and syncs", async () => {
+    const { server } = await started();
+    const alice = await RelayClient.connect(server.url);
+    await joined(alice, owner);
+    alice.send({ type: "role", record: roleRecord(owner, owner, "owner") });
+    await alice.until((m) => m.type === "applied");
+
+    // The owner's side of the group, as the app would hold it.
+    const ownerGroup = await createWorkspaceGroup(
+      workspaceId,
+      await createDeviceIdentity("owner-laptop"),
+    );
+
+    // Bob asks with an invitation and a key package at epoch 0. The host is empty, so this
+    // is the easy case; the next device is the one that matters.
+    const bobIdentity = await createDeviceIdentity("bob-laptop");
+    const bob = device();
+    const bobInvite = "b1".repeat(32);
+    alice.send({ type: "invite", record: inviteRecord(owner, bobInvite) });
+    await alice.until((m) => m.type === "invited");
+
+    const bobClient = await RelayClient.connect(server.url);
+    await joined(bobClient, bob);
+    bobClient.send(keyPackage(bob, encodeKeyPackageBytes(bobIdentity.keyPackage), bobInvite));
+    const bobAsked = await alice.until((m) => m.type === "frame");
+    if (bobAsked.type !== "frame") throw new Error("expected a key package");
+    expect(bobAsked.frame.kind).toBe("keypackage");
+
+    // The owner adds the device the host announced. This is the commit that makes epoch 1
+    // exist, so everything after it happens in a workspace that has moved on.
+    const addedBob = await addDevice(
+      ownerGroup,
+      decodeKeyPackageBytes(Buffer.from(bobAsked.frame.payload, "base64")),
+    );
+    alice.send({
+      type: "frame",
+      frame: sealedFrame(owner, addedBob.group.epoch, encodeBase64(addedBob.commit), "commit"),
+    });
+    alice.send({
+      type: "frame",
+      frame: sealedFrame(owner, addedBob.group.epoch, encodeBase64(addedBob.welcome), "welcome"),
+    });
+    await bobClient.until((m) => m.type === "frame" && m.frame.kind === "welcome");
+    const bobWelcome = bobClient.messages.find(
+      (m) => m.type === "frame" && m.frame.kind === "welcome",
+    );
+    if (bobWelcome?.type !== "frame") throw new Error("expected a welcome");
+    const bobGroup = await joinWorkspaceGroup(
+      Buffer.from(bobWelcome.frame.payload, "base64"),
+      bobIdentity,
+    );
+    expect(bobGroup.epoch).toBe(1);
+
+    // And the workspace now has frames Bob can read: epoch 1 is the newest the host holds.
+    const firstUpdate = '{"title":"before the second device"}';
+    const sealedFirst = await seal(addedBob.group, new TextEncoder().encode(firstUpdate));
+    alice.send({
+      type: "frame",
+      frame: sealedFrame(owner, sealedFirst.group.epoch, encodeBase64(sealedFirst.message)),
+    });
+    const bobFirst = await bobClient.until(
+      (m) => m.type === "frame" && m.frame.kind === "application",
+    );
+    if (bobFirst.type !== "frame") throw new Error("expected an application frame");
+    const openedFirst = await open(bobGroup, Buffer.from(bobFirst.frame.payload, "base64"));
+    expect(new TextDecoder().decode(openedFirst.plaintext ?? new Uint8Array())).toBe(firstUpdate);
+
+    // Carol asks to join now, at epoch 0, into a workspace whose newest epoch is 1. Before
+    // S2 the epoch floor refused this and the door never opened.
+    const carolIdentity = await createDeviceIdentity("carol-laptop");
+    const carol = device();
+    const carolInvite = "c1".repeat(32);
+    alice.send({ type: "invite", record: inviteRecord(owner, carolInvite) });
+    await alice.until((m) => m.type === "invited" && m.inviteId === carolInvite);
+
+    const carolClient = await RelayClient.connect(server.url);
+    await joined(carolClient, carol);
+    carolClient.send(
+      keyPackage(carol, encodeKeyPackageBytes(carolIdentity.keyPackage), carolInvite),
+    );
+    const carolAsked = await alice.until(
+      (m) =>
+        m.type === "frame" && m.frame.kind === "keypackage" && m.frame.deviceId === carol.deviceId,
+    );
+    if (carolAsked.type !== "frame") throw new Error("expected Carol's key package");
+    // The answer the joiner is owed: its key package was stored and numbered, not refused.
+    expect(carolClient.messages.some((m) => m.type === "refused")).toBe(false);
+
+    const addedCarol = await addDevice(
+      addedBob.group,
+      decodeKeyPackageBytes(Buffer.from(carolAsked.frame.payload, "base64")),
+    );
+    alice.send({
+      type: "frame",
+      frame: sealedFrame(owner, addedCarol.group.epoch, encodeBase64(addedCarol.commit), "commit"),
+    });
+    alice.send({
+      type: "frame",
+      frame: sealedFrame(
+        owner,
+        addedCarol.group.epoch,
+        encodeBase64(addedCarol.welcome),
+        "welcome",
+      ),
+    });
+    const carolWelcome = await carolClient.until(
+      (m) => m.type === "frame" && m.frame.kind === "welcome",
+    );
+    if (carolWelcome.type !== "frame") throw new Error("expected Carol's welcome");
+    const carolGroup = await joinWorkspaceGroup(
+      Buffer.from(carolWelcome.frame.payload, "base64"),
+      carolIdentity,
+    );
+
+    const nextUpdate = '{"title":"after the second device joined"}';
+    const sealedNext = await seal(addedCarol.group, new TextEncoder().encode(nextUpdate));
+    alice.send({
+      type: "frame",
+      frame: sealedFrame(owner, sealedNext.group.epoch, encodeBase64(sealedNext.message)),
+    });
+    const carolFrame = await carolClient.until(
+      (m) =>
+        m.type === "frame" &&
+        m.frame.kind === "application" &&
+        m.frame.epoch === addedCarol.group.epoch,
+    );
+    if (carolFrame.type !== "frame") throw new Error("expected Carol's application frame");
+    const openedNext = await open(carolGroup, Buffer.from(carolFrame.frame.payload, "base64"));
+    expect(new TextDecoder().decode(openedNext.plaintext ?? new Uint8Array())).toBe(nextUpdate);
+
+    alice.close();
+    bobClient.close();
+    carolClient.close();
     await server.close();
   });
 });

@@ -81,7 +81,7 @@ export interface RelayClient {
   sendEphemeral(message: EphemeralMessage): void;
   /** Take a device out of the workspace. Only an owner's record is applied. */
   sendRemoval(record: RemovalRecord): void;
-  /** Ask for everything after `after`. 0 means everything the host holds. */
+  /** Ask for frames from `after` onward. `0` means everything the host holds. */
   since(after: number): void;
   setRole(record: RoleRecord): void;
   close(): void;

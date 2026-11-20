@@ -129,17 +129,42 @@ describe("the group survives a restart", () => {
 
 describe("the frame rules the library does not enforce", () => {
   it("refuses a frame from an epoch this device has left", () => {
-    expect(frameRejection({ workspaceId, epoch: 1 }, { workspaceId, epoch: 2 })).toBe(
-      "stale-epoch",
-    );
-    expect(frameRejection({ workspaceId, epoch: 2 }, { workspaceId, epoch: 2 })).toBeNull();
+    expect(
+      frameRejection({ workspaceId, epoch: 1, kind: "application" }, { workspaceId, epoch: 2 }),
+    ).toBe("stale-epoch");
+    expect(
+      frameRejection({ workspaceId, epoch: 2, kind: "application" }, { workspaceId, epoch: 2 }),
+    ).toBeNull();
+  });
+
+  it("admits the commit that moves the receiver, and only that one", () => {
+    // Applying the next commit is how a device reaches the new epoch; exact equality
+    // would refuse the frame that carries the change.
+    expect(
+      frameRejection({ workspaceId, epoch: 2, kind: "commit" }, { workspaceId, epoch: 1 }),
+    ).toBeNull();
+    // A commit two epochs ahead is a missing commit, not the next one.
+    expect(
+      frameRejection({ workspaceId, epoch: 3, kind: "commit" }, { workspaceId, epoch: 1 }),
+    ).toBe("stale-epoch");
+    // And the exception is for commits: an application frame one epoch ahead means the
+    // receiver is missing the commit and must catch up before it opens anything.
+    expect(
+      frameRejection({ workspaceId, epoch: 2, kind: "application" }, { workspaceId, epoch: 1 }),
+    ).toBe("stale-epoch");
+    expect(
+      frameRejection({ workspaceId, epoch: 1, kind: "welcome" }, { workspaceId, epoch: 1 }),
+    ).toBeNull();
   });
 
   it("refuses a frame for another workspace before it looks at the epoch", () => {
     const other = "d".repeat(64);
-    expect(frameRejection({ workspaceId: other, epoch: 2 }, { workspaceId, epoch: 2 })).toBe(
-      "wrong-workspace",
-    );
+    expect(
+      frameRejection(
+        { workspaceId: other, epoch: 2, kind: "application" },
+        { workspaceId, epoch: 2 },
+      ),
+    ).toBe("wrong-workspace");
   });
 
   it("lets the host store a newer epoch and refuse an older one", () => {
@@ -151,7 +176,9 @@ describe("the frame rules the library does not enforce", () => {
 
   it("keeps device ids in the header so a reader can attribute a frame", () => {
     // Ownership and authorship are decided from this, not from the host's ordering.
-    expect(frameRejection({ workspaceId, epoch: 1 }, { workspaceId, epoch: 1 })).toBeNull();
+    expect(
+      frameRejection({ workspaceId, epoch: 1, kind: "application" }, { workspaceId, epoch: 1 }),
+    ).toBeNull();
     expect(ownerDevice).not.toBe(secondDevice);
   });
 });

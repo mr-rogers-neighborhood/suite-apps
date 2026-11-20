@@ -15,8 +15,9 @@ import type { StoredFrame } from "./store.js";
  *
  * A blind host orders frames, stores them and hands them on. It cannot read one, cannot
  * merge two, and cannot tell whether the document inside is well formed. So its whole
- * authority is four refusals: the wrong workspace, an epoch it has already passed, a
- * sender with no role, and a signature that does not verify.
+ * authority is four refusals: the wrong workspace, an epoch it has already passed (except
+ * for a key package, which is the join request), a sender with no role, and a signature
+ * that does not verify.
  *
  * Everything else is the clients' business. This module exists so those four refusals
  * are testable without a socket, and so the socket layer has nothing to decide.
@@ -42,6 +43,12 @@ export interface HostWorkspace {
  * The order matters: the workspace and the epoch are cheap and unambiguous, the role
  * record is next, and the signature is last because it is the most expensive. A frame
  * is only stored when all four agree.
+ *
+ * A key package is the one kind that skips the epoch floor. It carries `0` because a
+ * device with no group has no epoch, and it is a request to join rather than a message
+ * in the group's ordering; measuring it against `newestEpoch` would refuse every device
+ * that asks to join a workspace that has already moved. It still has to be signed by the
+ * key it claims, and a live invitation still makes it safe.
  */
 export interface AdmitOptions {
   /**
@@ -64,7 +71,10 @@ export function admitFrame(
 ): HostVerdict {
   if (sealed.workspaceId !== host.workspaceId) return { ok: false, reason: "wrong-workspace" };
 
-  if (!hostAcceptsEpoch(sealed.epoch, host.newestEpoch))
+  // The join request is exempt from the epoch floor, and nothing else is: a key package
+  // is not group traffic and cannot carry a meaningful epoch.
+  const joinRequest = sealed.kind === "keypackage";
+  if (!joinRequest && !hostAcceptsEpoch(sealed.epoch, host.newestEpoch))
     return { ok: false, reason: "stale-epoch" };
 
   const invited = admitOptions.kindAllowedWithoutRole === sealed.kind;
