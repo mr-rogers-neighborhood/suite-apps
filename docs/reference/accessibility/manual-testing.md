@@ -1,8 +1,8 @@
 # Manual accessibility testing
 
-The automated gate (`e2e/tests/accessibility.spec.ts`) runs axe against each app's start screen. axe
-catches roughly a third of real accessibility problems. This document is the other two thirds, and
-it is written so you can run it without re-deriving what to look for.
+The automated gate runs axe against each app's start screen. axe catches roughly a third of real
+accessibility problems. This document is the other two thirds, and it is written so you can run it
+without re-deriving what to look for.
 
 Run this after any change to layout, colour, focus handling, or a dialog. It takes about twenty
 minutes for one app.

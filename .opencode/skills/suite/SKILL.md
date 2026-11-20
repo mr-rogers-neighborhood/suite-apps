@@ -54,8 +54,7 @@ Cross-app docs are in `docs/`: tutorials, how-to, reference and explanation. Eac
 
 ## Cross-app flow
 
-The old `suite-dev` harness is `harness/` and is reference only. The build and
-release commands now live at the root:
+The build and release commands live at the root:
 
 - `pnpm --filter @suite/start run package:dir` builds the hub.
 - `pnpm --filter @suite/start exec electron-builder --linux AppImage` builds
@@ -78,5 +77,5 @@ release commands now live at the root:
   component, never document state in Zustand, React state or localStorage.
 - Keep the renderer sandboxed (`contextIsolation`, `sandbox`, no
   `nodeIntegration`).
-- Conventional commits; an architectural decision gets an ADR in the owning
-  app.
+- Conventional commits; a decision that changes the shape updates the owning
+  app's `docs/reference/decisions.md`.

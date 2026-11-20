@@ -16,7 +16,7 @@ network that you did not put there.
 ## 1. Install the binary
 
 From a release, the artifact is a single signed `suite-sync` executable and a `.minisig` beside it.
-Verify it before running it (`docs/reference/signed-artifacts.md` in `suite-dev`):
+Verify it before running it:
 
 ```sh
 minisign -Vm suite-sync -x suite-sync.minisig -P "$(cat suite-sync.pub)"

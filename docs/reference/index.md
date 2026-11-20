@@ -10,6 +10,9 @@ Facts to look up. These pages describe the repository as it is today.
 | [File formats](file-formats.md) | `.canvas`, `.planner`, `.budget`, sync workspaces and backups |
 | [Environment](environment.md) | Variables that move data roots or configure sync |
 | [Decisions](decisions.md) | The rules that shape the repository |
+| [Menu bar](menu-bar.md) | The shared top bar: seven zones, the takeover rule and keyboard behaviour |
+| [Bridges](bridges.md) | What each renderer's host bridge must provide |
+| [Accessibility](accessibility/wcag-22-map.md) | The WCAG 2.2 criterion map and the manual testing protocol |
 | [Glossary](glossary.md) | The words shared across apps: app, domain, pack, document, workspace |
 | [Status](status.md) | What works, per subsystem, and what is missing |
 

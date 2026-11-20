@@ -60,7 +60,7 @@ Seven zones, left to right: `mark`, `context`, `navigation`, `search`, `peers` +
 `controls`. Every one takes a `ReactNode`, so an app passes what it already renders and the bar decides
 nothing about it. The decision this encodes is that the _host_ keeps two anchors — where you came from
 and how you leave — while the app takes over the middle. See
-[ADR-0003](../../../../harness/docs/adr/0003-cross-app-menubar.md).
+[the menu bar reference](../../docs/reference/menu-bar.md).
 
 Three things it deliberately does not do: import an icon set, read a state store, or name a colour.
 `mark` is a node the app supplies, so `@suite/ui` never learns what Canvas's or Planner's logo is.

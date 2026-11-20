@@ -41,6 +41,9 @@ one copy is already wrong.
 | App and process boundaries | [Architecture](explanation/architecture.md) |
 | The rules that shape the repository | [Decisions](reference/decisions.md) |
 | Directories and packages | [Repository layout](reference/repo-layout.md) |
+| The shared top bar and its takeover rule | [Menu bar](reference/menu-bar.md) |
+| App renderer bridge contracts | [Bridges](reference/bridges.md) |
+| WCAG 2.2 coverage and manual tests | [Accessibility](reference/accessibility/wcag-22-map.md) |
 | Commands and the gate | [Commands](reference/commands.md) |
 | AppImage, Arch package, Flatpak, update ownership | [Packaging channels](reference/packaging-channels.md) |
 | Document files, folders and backups | [File formats](reference/file-formats.md) |

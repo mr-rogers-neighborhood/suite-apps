@@ -22,7 +22,6 @@ const SECTIONS = ["tutorials", "how-to", "reference", "explanation"];
 const ROOT_PAGES = [
   "README.md",
   "AGENTS.md",
-  "harness/README.md",
   "apps/canvas/README.md",
   "apps/planner/README.md",
   "apps/budget/README.md",

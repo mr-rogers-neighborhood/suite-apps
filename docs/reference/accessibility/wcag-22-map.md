@@ -90,7 +90,7 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 | 2.5.4  | A     | Motion Actuation              | N/A     | No device-motion input.                                                                                                                                                                                                                                                                                    |
 | 2.5.5  | AAA   | Target Size (Enhanced)        | Gap     | 44px is not enforced; AA's 24px is the target.                                                                                                                                                                                                                                                             |
 | 2.5.6  | AAA   | Concurrent Input Mechanisms   | Manual  | Keyboard and pointer work simultaneously.                                                                                                                                                                                                                                                                  |
-| 2.5.7  | AA    | Dragging Movements            | Manual  | **New in 2.2.** Measured in [drag-audit.md](drag-audit.md): eight of eleven drag interactions already have a non-drag path, because the card and section command menus are deep and the board nudges by arrow key. Three remain: arbitrary section resize, section link endpoints, connector bend handles. |
+| 2.5.7  | AA    | Dragging Movements            | Manual  | **New in 2.2.** Measured: eight of eleven drag interactions already have a non-drag path, because the card and section command menus are deep and the board nudges by arrow key. Three remain: arbitrary section resize, section link endpoints, connector bend handles. |
 | 2.5.8  | AA    | Target Size (Minimum)         | Manual  | **New in 2.2.** 24×24 CSS px for icon buttons; measured during review.                                                                                                                                                                                                                                     |
 
 ## Principle 3: Understandable
@@ -138,7 +138,7 @@ These are the honest list. Each is tracked, and none is claimed as working in `A
 | 2.5.5  | AAA. Targets are 24px, not 44px.                               |
 
 Order of work: **2.1.4 first** (A, and the only gap that is unambiguously real), then the three
-2.5.7 items in [drag-audit.md](drag-audit.md), then the AAA rows.
+2.5.7 items above, then the AAA rows.
 
 4.1.3 is a _verification_ gap rather than a known failure: the markup is right, and whether a reader
 hears it needs the screen-reader step to answer. Do not upgrade it to "working" until someone has

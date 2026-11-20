@@ -46,7 +46,7 @@ had no way to say "there is no document yet". That is no longer necessary:
 
 - `apps/planner/packages/core/src/ports.ts` now declares `loadSnapshot(): Promise<Uint8Array | null>`.
 - `bootDocument()` calls `WorkspaceDocument.create()` when it receives `null`.
-- [The bridge reference](../../../../harness/docs/reference/bridges.md) documents the nullable contract,
+- [The bridge reference](../../../../docs/reference/bridges.md) documents the nullable contract,
   and [`loadsnapshot-proposal.md`](loadsnapshot-proposal.md) — the request that asked for it — is landed.
 
 So the fixture is gone, and so is its cost. Points 1–3 of the old decision are withdrawn:

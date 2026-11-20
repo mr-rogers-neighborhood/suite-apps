@@ -126,11 +126,13 @@ Nothing in this repository prescribes how that adapter is written. What this doc
 the four assumptions above so an adapter author knows which parts of a bridge are load-bearing and
 which are Electron ceremony.
 
-## Contract: Cross-App MenuBar & Capsule Bridge (`menuBar`)
+## Specified but not built: MenuBar & capsule bridge (`menuBar`)
 
-Following ADR-0003, mini-apps delegate top chrome to `@suite/ui/MenuBar`. In multi-app containers
-such as `suite-go` or desktop shell tabs, the host controls the physical application bar while the
-active mini-app populates semantic slots via bridge hooks:
+Mini-apps delegate top chrome to `@suite/ui/MenuBar`; the zones and takeover rule are in
+[the menu bar reference](menu-bar.md). In a multi-app container such as `suite-go` or desktop shell
+tabs, the host would control the physical application bar while the active mini-app populated
+semantic slots through these hooks. **No preload exposes this bridge and no host consumes it yet.**
+The shape below is the specification, not a shipped contract:
 
 ```ts
 interface MenuBarBridge {
@@ -145,8 +147,9 @@ interface MenuBarBridge {
 }
 ```
 
-A standalone app renders `<MenuBar>` directly; a mounted module in a container shell may project its
-takeover navigation and action descriptors through `menuBar.setSlots` into the host's container capsule.
+A standalone app renders `<MenuBar>` directly. A mounted module in a container shell would project its
+takeover navigation and action descriptors through `menuBar.setSlots` into the host's container
+capsule; that path does not exist yet.
 
 ## Known inconsistencies worth resolving later
 

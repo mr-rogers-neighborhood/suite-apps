@@ -5,7 +5,7 @@ of WCAG does not apply to it.
 
 The accessibility work for this project lives in the applications, which are where people actually
 meet it. Their statements are in each app repository, and the shared criterion map is in
-[`../../harness/docs/accessibility/wcag-22-map.md`](../../harness/docs/accessibility/wcag-22-map.md).
+[`../../docs/reference/accessibility/wcag-22-map.md`](../../docs/reference/accessibility/wcag-22-map.md).
 
 ## What this service does
 

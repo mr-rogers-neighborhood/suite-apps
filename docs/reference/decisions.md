@@ -17,7 +17,8 @@ The rules that shape this repository. Each is current; the code follows it.
 - Apps live under `apps/<name>`. Each app owns its private packages: Canvas has `desktop/` and
   `packages/graph`, Planner has `pack/` and `packages/core`, and so on.
 - Packages used by two or more apps live at the root `packages/`.
-- `harness/` is archive material. Do not add work there.
+- The top bar is a host–app contract: the host keeps `mark` and `controls`, and the active app takes
+  over the middle. [Menu bar](menu-bar.md) names the seven zones.
 
 ## Packaging
 

@@ -14,7 +14,6 @@ apps/
   go/           @suite/go-app mobile container; packages/go contract; docs
 packages/       contracts, files, desktop, theme, ui
 docs/           Cross-cutting documentation
-harness/        The old orchestrator, kept as reference
 packaging/      Flatpak manifests
 scripts/        gate.mjs, flatpak.mjs, ci/, docs-check.mjs
 ```

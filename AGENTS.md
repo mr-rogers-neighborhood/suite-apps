@@ -31,8 +31,9 @@ See `scripts/ci/` and the README.
 - `suite-apps-1` is the bootstrap snapshot from before the rename. Not canonical.
 - `vm` is the independent gate. Push the commit you want gated:
   `git push origin main && git push vm main`.
-- `suite-dev` is archived on GitHub; the import replaced it under `harness/`.
-  `suite-go` is archived too (no releases, no feed references).
+- `suite-dev` is archived on GitHub; this repository is its successor and owns the
+  build and release scripts. `suite-go` is archived too (no releases, no feed
+  references).
 - `suite-planner`, `suite-budget`, `suite-start` and `suite-sync` are still
   active. The first three carry the `releases/latest/download` URLs compiled into
   installed apps; `suite-sync` is the server's separate trust boundary.
@@ -55,7 +56,6 @@ See `scripts/ci/` and the README.
   `@suite/canvas-desktop`.
 - Biome and Vitest versions are per-repo on purpose. Do not hoist a newer one
   without running the owning app's gate.
-- `harness/` is the old suite-dev orchestrator. Do not add new work there.
 
 ## Product constraints
 

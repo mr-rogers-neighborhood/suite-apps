@@ -5,7 +5,7 @@ checked, rather than what is intended.
 
 The target is **WCAG 2.2 level AA**. That is 55 of the 86 success criteria in the standard. The full
 breakdown is in
-[`harness/docs/accessibility/wcag-22-map.md`](../../harness/docs/accessibility/wcag-22-map.md).
+[`docs/reference/accessibility/wcag-22-map.md`](../../docs/reference/accessibility/wcag-22-map.md).
 
 ## What is verified by machine
 
@@ -28,7 +28,7 @@ at 11px. It is fixed.
 down. Until then, do not read the machine checks above as coverage of the interface.
 
 The protocol is written and ready to run:
-[`harness/docs/accessibility/manual-testing.md`](../../harness/docs/accessibility/manual-testing.md).
+[`docs/reference/accessibility/manual-testing.md`](../../docs/reference/accessibility/manual-testing.md).
 It covers six passes per screen:
 
 1. Keyboard only, including that focus is never hidden behind a sticky region.

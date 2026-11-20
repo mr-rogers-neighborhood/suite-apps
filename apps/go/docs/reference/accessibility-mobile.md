@@ -1,6 +1,6 @@
 # Accessibility on mobile — the WCAG 2.2 delta
 
-The desktop map is [suite-dev's WCAG 2.2 criterion map](../../../../harness/docs/accessibility/wcag-22-map.md).
+The desktop map is [the shared WCAG 2.2 criterion map](../../../../docs/reference/accessibility/wcag-22-map.md).
 This file does not fork it. It records only where **a phone changes the answer**, using the same status
 vocabulary: **Gated**, **Manual**, **N/A**, **Gap**. Target is Level AA, as on the desktop.
 
