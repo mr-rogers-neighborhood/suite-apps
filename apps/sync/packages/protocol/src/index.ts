@@ -16,6 +16,16 @@ export {
   sealedFrameSchema,
 } from "./frame.js";
 export {
+  type GenesisBody,
+  type GenesisRecord,
+  type GenesisVerifier,
+  genesisNamesItsRoot,
+  genesisPayload,
+  genesisRecordSchema,
+  verifyGenesis,
+  workspaceIdFromRootKey,
+} from "./genesis.js";
+export {
   type AddDeviceResult,
   type AppliedCommit,
   addDevice,
