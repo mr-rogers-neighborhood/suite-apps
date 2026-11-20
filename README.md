@@ -31,7 +31,9 @@ mise exec -- node scripts/gate.mjs --fresh         # this commit, clean install
 ```
 
 The gate runs each repository's own `check:full`, in dependency order:
-sync, start, canvas, planner, budget, go. It writes
+sync, start, canvas, planner, budget, go. Before that it builds the twelve
+`apps/*/packages/*` libraries once: their consumers resolve `@suite/*` through
+`dist/`, which is the old repos' turbo `typecheck: dependsOn ["^build"]`. It writes
 `.dev/gate-status.json`. `--fresh` exports `HEAD` with `git archive`, installs
 from the lockfile, and runs the same order in that clean tree.
 

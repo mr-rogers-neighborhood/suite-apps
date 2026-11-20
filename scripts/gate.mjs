@@ -3,8 +3,9 @@
  * The whole Suite's gate, from one repository.
  *
  * Each entry below names a repository root that still owns its own `check:full`.
- * This runner decides only the order and, with `--fresh`, that the tree under
- * test came from the commit rather than from whatever is lying around.
+ * This runner decides the order, builds the shared libraries those gates
+ * typecheck against, and, with `--fresh`, that the tree under test came from the
+ * commit rather than from whatever is lying around.
  *
  * Order is dependency order: sync publishes the protocol, start publishes the
  * shared packages, then the apps. `suite-go` is last because it consumes the
@@ -106,7 +107,30 @@ if (!json) {
   );
 }
 
-for (const entry of selected) {
+// The library packages publish `dist/`, and their consumers resolve through
+// that output rather than through source. Turbo used to express this as
+// `typecheck: dependsOn ["^build"]`; one build up front is the monorepo
+// equivalent. Without it a clean export typechecks against directories that do
+// not exist yet, while a warm checkout passes.
+const build = dry
+  ? { ok: true, detail: "dry run" }
+  : (() => {
+      if (!json) process.stdout.write("\n▶ libraries\n");
+      const result = run(
+        "pnpm",
+        ["--filter", "./apps/*/packages/*", "--workspace-concurrency=2", "run", "build"],
+        workdir,
+      );
+      return { ok: result.status === 0, detail: result.status === 0 ? "built" : `exit ${result.status}` };
+    })();
+
+if (!json) process.stdout.write(`${build.ok ? "ok  " : "FAIL"}  libraries  ${build.detail}\n`);
+
+if (!build.ok) {
+  results.push({ repo: "libraries", package: "apps/*/packages/*", ok: false, detail: build.detail });
+}
+
+for (const entry of build.ok ? selected : []) {
   const repoDir = join(workdir, "apps", entry.repo);
   if (!existsSync(join(repoDir, "package.json"))) {
     results.push({ ...entry, ok: false, detail: "missing repo" });
@@ -130,6 +154,7 @@ const status = {
   fresh,
   commit: gitSha(),
   at: new Date().toISOString(),
+  build,
   results,
 };
 const statusPath = join(ROOT, ".dev", "gate-status.json");
