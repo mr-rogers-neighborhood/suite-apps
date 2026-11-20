@@ -43,7 +43,7 @@ module, hand it a document handle, and nothing else.
 
 ```sh
 pnpm install
-pnpm doctor              # what is present, what is missing, what to run
+pnpm run doctor          # what is present, what is missing, what to run
 pnpm android:install     # build, install and launch on the attached phone
 pnpm android:watch       # the same, again, on every save
 pnpm android:emulator --start suite-go-atd
@@ -56,7 +56,7 @@ pnpm check               # lint, types, tests
 `uiautomator` and screenshot diffing only guesses, so the container's own state is read back over
 DevTools: `pnpm android:eval "localStorage.getItem('suite-go:shell:list')"`.
 
-`pnpm doctor` exists because the failure modes here are unhelpful: a phone that is attached but
+`pnpm run doctor` exists because the failure modes here are unhelpful: a phone that is attached but
 unauthorised looks exactly like one that is not attached, and Gradle reports a missing SDK component
 in a stack trace whose useful sentence is twenty lines in.
 

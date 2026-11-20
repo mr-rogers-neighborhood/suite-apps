@@ -44,7 +44,7 @@ Both are load-bearing. A change that needs a domain name to work belongs in that
 
 ```sh
 pnpm install
-pnpm doctor               # toolchain, and the command that fixes each gap
+pnpm run doctor           # toolchain, and the command that fixes each gap
 pnpm check                # biome, typecheck, vitest
 pnpm android:install      # build, install, launch on the attached device
 pnpm android:watch        # the same, again, on every save

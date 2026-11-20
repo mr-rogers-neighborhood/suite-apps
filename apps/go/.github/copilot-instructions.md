@@ -21,7 +21,7 @@ Read [AGENTS.md](../AGENTS.md) for the repo map, the two rules and the sharp edg
 
 - Verify on a device by asking the app, not by reading a screenshot: `pnpm android:eval "…"`. WebView
   content is invisible to `uiautomator` and screenshot diffing guesses.
-- `pnpm doctor` is the first command when a build fails on the toolchain.
+- `pnpm run doctor` is the first command when a build fails on the toolchain.
 - Do not regenerate `android`. `cap add android` would drop the hand-edited share intent.
 
 ## Files

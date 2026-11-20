@@ -15,8 +15,60 @@ versions the build compiles against:
 | Gradle                                   | 8.14.3 | Run it on JDK 17 or 21; a newer JDK fails with a message that never names the JDK |
 
 A distribution that installs the SDK through its package manager makes the SDK directory root-owned,
-which means Gradle cannot fetch a component AGP asks for. `pnpm doctor` reports the state, and a failed
-build prints the exact `sudo sdkmanager` command for the missing component rather than a stack trace.
+which means Gradle cannot fetch a component AGP asks for. `pnpm run doctor` reports the state, and a
+failed build prints the exact `sudo sdkmanager` command for the missing component rather than a stack
+trace.
+
+## Installing it without root
+
+Everything can live under `~/Android`, which the user owns, so Gradle can write the components it
+fetches and no `sudo` is involved. `scripts/preflight.mjs` already looks in `~/Android/Sdk`, and
+`SUITE_GO_JAVA_HOME` names a JDK that is not in `/usr/lib/jvm`.
+
+```sh
+# Command-line tools, unpacked so sdkmanager lands in cmdline-tools/latest.
+mkdir -p ~/Android/Sdk/cmdline-tools
+curl -LO https://dl.google.com/android/repository/commandlinetools-linux-16111833_latest.zip
+unzip -q commandlinetools-linux-16111833_latest.zip -d /tmp/cmdline-tools
+mv /tmp/cmdline-tools/cmdline-tools ~/Android/Sdk/cmdline-tools/latest
+
+# JDK 21, user-owned. Gradle 8.14.3 rejects newer, and this distribution ships none.
+curl -L 'https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse' \
+  -o /tmp/jdk21.tar.gz
+tar -xzf /tmp/jdk21.tar.gz -C ~/Android
+mv ~/Android/jdk-21.* ~/Android/jdk-21
+export JAVA_HOME="$HOME/Android/jdk-21"
+export SUITE_GO_JAVA_HOME="$JAVA_HOME"
+
+export ANDROID_HOME="$HOME/Android/Sdk"
+SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses
+"$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
+  platform-tools emulator platforms/android-36 build-tools/35.0.0 build-tools/36.0.0 \
+  system-images/android-36/aosp_atd/x86_64
+
+echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+  -n suite-go-atd -k "system-images;android-36;aosp_atd;x86_64" -d pixel_7
+```
+
+Command-line tools 23 accepts the licences during install, so `--licenses` is a no-op there; older
+releases need it. Both build-tools 35 and 36 are installed because AGP asks for 35 against a platform
+36. `pnpm run doctor` reports each piece — `pnpm doctor` is pnpm's own command, not this project's.
+
+Boot the AVD headless, then run the loop:
+
+```sh
+"$ANDROID_HOME/emulator/emulator" -avd suite-go-atd -no-window -no-audio \
+  -no-boot-anim -gpu guest -feature -Vulkan -no-snapshot-load
+
+mise exec -- pnpm android:install
+mise exec -- pnpm android:eval "document.title"
+```
+
+`-gpu guest` is the software renderer; `swiftshader_indirect` segfaulted emulator 37.3.10 on this
+machine. `mise exec` supplies the Node and pnpm pinned in `package.json`, and `SUITE_GO_JAVA_HOME` must
+be exported in the same shell. `android:install` ends with `installed` and starts
+`run.suite.go/.MainActivity`; `android:eval` prints the value, here `Suite Go`.
 
 ## The share intent
 
