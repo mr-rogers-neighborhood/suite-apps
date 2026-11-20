@@ -60,10 +60,13 @@ async function launchPackaged(box: Sandbox): Promise<Running> {
   const child = spawn(BINARY, ["--no-sandbox", "--remote-debugging-port=0"], {
     env: {
       ...process.env,
-      // Its own profile, so the single-instance lock cannot be held by whatever
-      // Start the person already has running.
-      SUITE_START_USER_DATA: join(box.root, "user-data"),
+      // The same isolation the launcher spec gets: a profile, a home and a port
+      // of its own, so a running hub cannot take this one's lock or its port.
+      HOME: box.home,
+      XDG_DATA_HOME: join(box.home, ".local", "share"),
+      SUITE_START_USER_DATA: box.userData,
       SUITE_START_DATA: box.data,
+      SUITE_START_SYNC_PORT: "0",
       // The fake lives under `box.apps`, so this is the root that makes the
       // record a managed install rather than a copy the person placed.
       SUITE_START_APPS_ROOT: box.apps,

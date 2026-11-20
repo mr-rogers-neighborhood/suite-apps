@@ -34,6 +34,21 @@ export interface Sandbox {
    * entry, and a test that pressed Install would download a real release.
    */
   readonly feeds: string;
+  /**
+   * A throwaway `$HOME`, so desktop entries, the hub's report and the default
+   * documents root belong to this spec rather than to the person running it.
+   */
+  readonly home: string;
+  /**
+   * Electron's `userData`, which holds Chromium's profile and the
+   * single-instance lock inside it.
+   *
+   * One per sandbox: two launchers sharing a profile do not run side by side —
+   * the second `requestSingleInstanceLock` fails, the process quits, and the
+   * spec that was starting it fails with "Target page, context or browser has
+   * been closed". That is the whole flake when a gate runs beside another one.
+   */
+  readonly userData: string;
   dispose(): Promise<void>;
 }
 
@@ -43,16 +58,22 @@ export async function sandbox(): Promise<Sandbox> {
   const apps = join(root, "apps");
   const installedApps = join(root, "installed-apps");
   const feeds = join(root, "feeds");
+  const home = join(root, "home");
+  const userData = join(root, "user-data");
   await mkdir(data, { recursive: true });
   await mkdir(apps, { recursive: true });
   await mkdir(installedApps, { recursive: true });
   await mkdir(feeds, { recursive: true });
+  await mkdir(home, { recursive: true });
+  await mkdir(userData, { recursive: true });
   return {
     root,
     data,
     apps,
     installedApps,
     feeds,
+    home,
+    userData,
     dispose: () => rm(root, { recursive: true, force: true }),
   };
 }
@@ -215,12 +236,27 @@ export async function launch(
     args: [START_DIR, ...args],
     env: {
       ...process.env,
+      // The home a person's hub writes into: desktop entries, the hub report and
+      // the documents root Start scans when a spec does not name one. A spec's
+      // own `$HOME` keeps those out of the real one, and out of another spec's.
+      HOME: box.home,
+      // `hubReportPath` reads `XDG_DATA_HOME` before `$HOME/.local/share`, and the
+      // environment this runs in may set it. Pin it inside the sandbox, or two
+      // runs rename the same temporary file and each writes the other's answer.
+      XDG_DATA_HOME: join(box.home, ".local", "share"),
+      // Chromium's profile and the single-instance lock it carries. Without an
+      // override every launch — and every other Playwright run on the machine —
+      // shares one, and all but the first quit before a window exists.
+      SUITE_START_USER_DATA: box.userData,
       SUITE_START_DATA: box.data,
       SUITE_START_VERSION: "0.1.0-e2e",
       // An install must land in the sandbox, never in the real ~/Applications.
       SUITE_START_APPS_ROOT: box.installedApps,
       // No published feed: a spec that wants one supplies its own base.
       SUITE_START_FEED_BASE: box.feeds,
+      // The hub's own port, 8787, belongs to whoever is running a hub. Zero asks
+      // the kernel for a free one, so a second run never competes for it.
+      SUITE_START_SYNC_PORT: "0",
       // Hermetic on a machine that has Flatpak and a real suite app installed:
       // only a spec that supplies a stand-in may see a Flatpak.
       SUITE_START_FLATPAK: "",
