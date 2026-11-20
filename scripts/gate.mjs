@@ -84,6 +84,14 @@ function exportHead() {
   rmSync(bundle, { force: true });
   if (untar.status !== 0) throw new Error("tar failed to unpack the archive");
 
+  // The export sits inside this working tree, so git would walk up and find the
+  // real repository above it. Anything in the export that asks git for history
+  // would get "no such path" instead of "this tree has no history", and tools
+  // that stay idempotent by reading history (Canvas's doc indexes) would rewrite
+  // their output. A ceiling at the export makes the tree look like the archive
+  // it is.
+  process.env.GIT_CEILING_DIRECTORIES = target;
+
   const install = run("pnpm", ["install", "--frozen-lockfile"], target);
   if (install.status !== 0) throw new Error("pnpm install failed in the fresh export");
   return target;

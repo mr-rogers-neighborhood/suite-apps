@@ -33,6 +33,7 @@ while read -r old new ref; do
   # a second push waits its turn instead of doubling the memory footprint.
   sudo -n systemd-run --unit="$unit" --collect --quiet \
     --uid="$(id -u)" --gid="$(id -g)" \
+    --property=SupplementaryGroups=docker \
     --working-directory="$ROOT" \
     --property=MemoryHigh=5G \
     --property=MemoryMax=6G \

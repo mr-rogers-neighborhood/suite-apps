@@ -88,8 +88,10 @@ doubling memory. The run is `node scripts/gate.mjs --fresh`, so the tree under
 test is a `git archive` of the commit with a lockfile install.
 
 The VM has 4 vCPU, 8 GiB RAM, and a 4 GiB swapfile; Canvas's gate is the heavy
-one. Xvfb and Electron's GTK libraries are installed for the e2e phase, which is
-not wired into the gate yet.
+one. It also needs Docker (Canvas's secret scan runs gitleaks in a container;
+the unit gets `SupplementaryGroups=docker`), Xvfb, Electron's GTK libraries and
+a Playwright Chromium (`pnpm exec playwright install chromium`) for the story
+tests. e2e is installed but not wired into the gate yet.
 
 ## Orca memory
 
