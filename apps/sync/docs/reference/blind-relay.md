@@ -4,8 +4,8 @@ A relay that stores frames it cannot read has been the target since [Decisions](
 This record is the design: which key does what, what the relay keeps, what a revoke rotates, what a
 wake may say, and what happens to a demo workspace that predates all of it.
 
-It is a design record, not a claim that the tree already does all of it. Each part says where the
-tree differs today. The message set the tree runs is [the protocol](../protocol.md); the conversation
+It is the design record, and it describes what the merged tree does. Where a part is still future, it
+says so. The message set the tree runs is [the protocol](../protocol.md); the conversation
 as a session type is [the protocol as a session type](../protocol-sessions.md); the accepted risks are
 [the threat model](../threat-model.md).
 
@@ -26,33 +26,32 @@ from the workspace key; membership is what joins them.
 
 | Key           | What it is                                                                                           | Where it lives                                                                                                        | What it does                                                                                   |
 | ------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Root key      | Ed25519, one per workspace, made when the workspace is first shared                                  | the creating device, beside `sync/identity.json`, and its recovery kit; never another device, never the relay         | names the workspace and signs its genesis. Encrypts nothing.                                   |
+| Root key      | Ed25519, one per workspace, made when the workspace is first shared                                  | the creating device, beside `sync/identity.json`, and its recovery kit; never another device, never the relay         | signs one record, the genesis, for the id the document already owns. Encrypts nothing.         |
 | Workspace key | the MLS epoch's secrets, and the labels exported from them (`suite/workspace-key`, `suite/presence`) | every member device, in the group state at `dataDir/sync/groups/<workspaceId>.mls` (1.6 kB measured); never the relay | encrypts frame payloads and the content that travels outside a frame. A new value every epoch. |
 | Device key    | Ed25519, one per installation                                                                        | that device, in `sync/identity.json`, mode 0600; the public half is pinned by the relay                               | signs frames, role records, invites, removals and presence. Its SHA-256 is the device id.      |
 
 ### Root
 
-- For a workspace created under this record, `workspaceId = SHA-256(root public key)`, as the
-  [identity table](../protocol.md#identity) already says. The app keeps the mapping from its document
-  to that id in its own file; the relay never sees a document id.
+- The workspace id is the id the app's document already owns when the workspace is first shared. The
+  root signs that id; it does not derive it, and this record does not migrate a document id. The id
+  travels in the app's own document file; the relay sees the workspace id and never a document id.
+  `workspaceIdFromRootKey` is the derivation for a workspace created root-first,
+  and `genesisNamesItsRoot` distinguishes a root-first id from a document-first one. The shipped
+  Canvas path is document-first, so the check is false and the genesis is still valid.
 - The root signs one record: the genesis. It carries the workspace id, the creation time, the
   creating device's id and public key, and the relay address the workspace was created against. It is
-  the first record in the workspace's history, before any role record.
+  the first record in the workspace's local history, before any role record. It is not a frame, and
+  the relay never receives it: `HostStore` stores frames, roles, invites, pinned keys and removals,
+  and has no genesis record type. The creating device's root file
+  (`dataDir/sync/roots/<workspaceId>.json`) owns it, and the recovery kit carries it.
 - The root private key is never copied to another device, never wrapped into the group, never sent to
   the relay, and never written into the document. It travels in the creating device's recovery kit,
   under the same protection as the group state, and nowhere else. A second owner can invite and revoke;
   it cannot re-found the workspace, because it does not hold the root. Ownership transfer is out of
   scope, so nothing else needed it.
-- A workspace shared before this record has an id that is not a root hash and no genesis. It is not
-  invalid; it is a workspace without an identity root, and this record does not migrate it. Only new
-  workspaces get one.
-
-Where the tree differs today: `share()` in Canvas's desktop service makes the root and writes the
-genesis beside it. A Canvas document owns its workspace id before it is shared, so the root signs the
-id in use rather than a hash of itself; `workspaceIdFromRootKey` and `genesisNamesItsRoot` are the
-derivation and the check for a workspace created root-first, and this record does not migrate a
-document id. The relay does not receive the genesis: the host has no stored record type for it, so it
-is the creating device's record and travels in that device's kit.
+- A workspace shared before this record has no genesis. It is not invalid; it is a workspace without
+  an identity root, and this record does not migrate it. A workspace shared since then gets one the
+  first time it is shared.
 
 ### Workspace
 
@@ -138,11 +137,12 @@ the sender does not get to say when its frame arrived.
   application message 0.3 kB, and a device's group state 1.6 kB.
 - The header is bounded by its fields: two 64-character ids, a kind under ten characters, an epoch
   under 16 digits, an 88-character signature. It is under 400 bytes before the payload.
-- The payload bound is 1 MiB of base64 text (about 0.75 MiB of bytes). The relay rejects a larger
-  payload before it stores anything. It is an operational bound, not a measured one: the largest
-  measured message is 0.8 kB, and the cap exists so one member cannot fill the store with one write.
-  An update larger than the cap must be split by the app; chunking is not designed. The number is not
-  a protocol guarantee and a later measurement may move it.
+- The design bound is 1 MiB of base64 text (about 0.75 MiB of bytes), so one member cannot fill the
+  store with one write. **This build does not enforce it:** `frameSchema` accepts any non-empty
+  payload string, and the relay has no size check before it stores one. It is an operational bound,
+  not a measured one; the largest measured message is 0.8 kB. An update larger than the bound must be
+  split by the app; chunking is not designed. The number is not a protocol guarantee and a later
+  measurement may move it.
 - The count is bounded by the retention window (30 days by default), not by a per-day message limit. A
   relay may drop the oldest frames; it cannot merge them.
 
@@ -264,8 +264,9 @@ The rule this record settles:
   a stale commit with retained receiver data and hands it back as an application message rather than
   refusing it. The test is `ignores a frame from an epoch it has left`.
 - A frame newer than the receiver's epoch is not conforming, even an application frame. It is a signal
-  that a commit is missing. The client must not try to open it; it asks `since(lastAppliedIndex)`,
-  applies the commits in index order, and only then opens the application frames that follow.
+  that a commit is missing. The client must not try to open it; it asks for the frames after
+  `lastAppliedIndex` (`since(lastAppliedIndex + 1)`), applies the commits in index order, and only
+  then opens the application frames that follow.
 - If the cursor is older than the relay's oldest retained frame, the client cannot catch up from the
   relay. It needs a snapshot from a peer, sealed with the `suite/workspace-key` of the epoch that
   produced it, or it stays out. Saying "it will catch up" when the relay has dropped the commit is the
@@ -279,7 +280,7 @@ Two consequences:
 - [The protocol as a session type](../protocol-sessions.md) states `epoch ≥ my epoch` for a conforming
   frame. This record sharpens that: a newer frame is not conforming either; it is a reason to catch
   up. The service applies `frameRejection` and, for a frame newer than its epoch that is not the next
-  commit, asks for `since(cursor)` instead of opening it.
+  commit, asks for `since(cursor + 1)` instead of opening it.
 - `frameRejection` in `frame.ts` now carries the commit exception: exact equality for every kind, plus
   a commit at the receiver's epoch plus one. It is the service's rule, not a second opinion beside it.
 
@@ -352,8 +353,8 @@ relay already reads to order the log.
    the tree is the app coming to the foreground (`syncTrigger.ts` in Go). Canvas reconnects when sync
    is enabled and has no foreground trigger of its own.
 2. Connect, `join`, read `newestEpoch`, `frames` and the oldest index still held.
-3. `since(lastAppliedIndex)`; apply frames in index order, commits before the application frames they
-   unlock.
+3. `since(lastAppliedIndex + 1)`; apply frames in index order, commits before the application frames
+   they unlock.
 4. Use the decrypted version vectors to decide whether anything is new for the document in view. Only
    then notify the person. The wake itself is never a notification.
 5. If the cursor is older than what the relay holds, ask a peer for a snapshot. If the device was
@@ -384,21 +385,21 @@ It does not convert in place and does not delete.
   path, and says what to do. It does not rewrite or delete; deleting a person's file is the person's
   decision.
 - The conversion is in the app. The owner opens the local document (Canvas's file or its IndexedDB
-  copy), creates a fresh workspace under this record — new root key, new workspace id, new MLS group —
-  and invites the devices again. The document survives; the old sync workspace does not. That is a
-  re-creation, not a migration.
-- The old workspace id and its invite links stop working. Every device is re-invited. That cost is
-  acceptable for a demo, and it is why this record does not carry a compatibility path for an id that
-  was never a root hash.
+  copy), creates a fresh workspace under this record — new root key, new MLS group — and invites the
+  devices again. The document survives and keeps its own id; the old plaintext sync workspace does
+  not. That is a re-creation, not a migration.
+- The old plaintext store's workspace id and invite links stop working. Every device is re-invited.
+  That cost is acceptable for a demo, and it is why this record does not carry a compatibility path
+  for a store that predates the group.
 - If the server's plaintext snapshot is the only copy, it is not a document of record. The refusal
   message says to open the app and export; if there is no app copy, the demo data is lost, and the
   message says that too.
 
 The tree has already moved past the issue's description in one respect: `apps/sync` has no Loro
 dependency, the host stores frames, and Canvas's desktop service seals each update before sending it.
-The plaintext replica survives in the old demo directory format and in the pages that still describe
-it. This record is therefore less about turning encryption on than about making the key hierarchy,
-the revoke, the wake and the demo exit true at once.
+The plaintext replica survives only in the old demo directory format; the CLI and the pages now
+describe the frame store. This record is therefore less about turning encryption on than about making
+the key hierarchy, the revoke, the wake and the demo exit true at once.
 
 ## Follow-on slices
 
@@ -411,13 +412,17 @@ and nothing else. A stale client keeps its last applied index beside the group a
 that index rather than from a count that only means anything within one process. `frameRejection`
 carries the commit exception, and the service uses it. Covered by a second device joining a workspace
 that already has frames, a revoked device failing to open a post-revoke frame, and a member one commit
-behind catching up and writing again.
+behind catching up and writing again. S2 landed on the tree's side of two disagreements: the workspace
+id is the document's own id, which the root signs, and the genesis belongs to the creating device's
+root file rather than to the relay's store.
 
-**S3 — the frame log.** Store the position with the frame so it survives compaction. Report the oldest
-index still held, so an old cursor reads as a gap rather than an empty catch-up. Keep the 1 MiB cap and
-the retention window on ciphertext, with no plaintext snapshot and no merge. Done when a frame
-round-trips byte for byte, the stored file contains no known plaintext, and a cursor older than
-retention is detected.
+**S3 — the frame log (landed, except the size cap).** Store the position with the frame so it survives
+compaction. Report the oldest index still held, so an old cursor reads as a gap rather than an empty
+catch-up. Keep the retention window on ciphertext, with no plaintext snapshot and no merge; the 1 MiB
+payload bound above is still a design bound, not a check in this build. Done when a frame round-trips
+byte for byte, the stored file contains no known plaintext, and a cursor older than retention is
+detected. S3 landed on the tree's side of the third disagreement: `since(after)` is inclusive, so the
+client asks for `cursor + 1`.
 
 **S4 — the wake.** Define the `wake` message, coalesce per device, and pick one delivery channel
 (UnifiedPush or an endpoint on the user's relay), with the foreground fallback kept. Done when N frames
@@ -440,9 +445,9 @@ and S3. Done when a plaintext store is refused and two clients sync a document t
   until an owner revokes it. The relay cannot tell a lost device from a quiet one. If the lost device
   is the creator, the root key is gone and the genesis cannot be re-signed; the workspace still reads
   and writes.
-- **Size.** The 1 MiB payload cap is operational, and no measurement justifies it. MLS padding is at
-  its default, so lengths leak, and this record does not require padding. An update larger than the
-  cap has no chunking design.
+- **Size.** The 1 MiB design bound is operational, no measurement justifies it, and this build does
+  not enforce it. MLS padding is at its default, so lengths leak, and this record does not require
+  padding. An update larger than the bound has no chunking design.
 - **A member's epoch claim.** The relay trusts the header's epoch and can be pushed forward to a huge
   number, after which it refuses honest frames as stale. That is a denial of service by a member, not
   a confidentiality break. A rule that an epoch may advance by at most one per stored commit is
