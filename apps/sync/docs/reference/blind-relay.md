@@ -24,11 +24,11 @@ a file the app owns.
 Three kinds, in an authority hierarchy rather than a derivation chain. A device key is not derived
 from the workspace key; membership is what joins them.
 
-| Key           | What it is                                                                                       | Where it lives                                                                                                                         | What it does                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Root key      | Ed25519, one per workspace, made when the workspace is first shared                              | the creating device and its recovery kit. The tree does not make one yet; S2 adds it beside `sync/identity.json`                        | names the workspace and signs its genesis. Encrypts nothing.                                     |
-| Workspace key | the MLS epoch's secrets, and the labels exported from them (`suite/workspace-key`, `suite/presence`) | every member device, in the group state at `dataDir/sync/groups/<workspaceId>.mls` (1.6 kB measured); never the relay                    | encrypts frame payloads and the content that travels outside a frame. A new value every epoch.   |
-| Device key    | Ed25519, one per installation                                                                    | that device, in `sync/identity.json`, mode 0600; the public half is pinned by the relay                                                | signs frames, role records, invites, removals and presence. Its SHA-256 is the device id.        |
+| Key           | What it is                                                                                           | Where it lives                                                                                                        | What it does                                                                                   |
+| ------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Root key      | Ed25519, one per workspace, made when the workspace is first shared                                  | the creating device and its recovery kit. The tree does not make one yet; S2 adds it beside `sync/identity.json`      | names the workspace and signs its genesis. Encrypts nothing.                                   |
+| Workspace key | the MLS epoch's secrets, and the labels exported from them (`suite/workspace-key`, `suite/presence`) | every member device, in the group state at `dataDir/sync/groups/<workspaceId>.mls` (1.6 kB measured); never the relay | encrypts frame payloads and the content that travels outside a frame. A new value every epoch. |
+| Device key    | Ed25519, one per installation                                                                        | that device, in `sync/identity.json`, mode 0600; the public half is pinned by the relay                               | signs frames, role records, invites, removals and presence. Its SHA-256 is the device id.      |
 
 ### Root
 
@@ -79,15 +79,15 @@ from the workspace key; membership is what joins them.
 
 ### What opens what
 
-| Thing                          | Key                                               | Where it is opened                    |
-| ------------------------------ | ------------------------------------------------- | ------------------------------------- |
-| Application frame (an update)  | the epoch's MLS application secret                | a member device, `open()`             |
-| Commit                         | the epoch's MLS handshake secret, or public and signed | a member device, `applyCommit()` |
-| Welcome                        | the joining device's key package                  | the joining device, `joinWorkspaceGroup()` |
-| Key package                    | none; it is public by design                      | anyone; it is the join request        |
-| Snapshot or attachment (future) | `suite/workspace-key` of the epoch that produced it | a member device                    |
-| Presence                       | `suite/presence` of the epoch                     | a member device; the relay only forwards |
-| Role, invite and removal records | none; signed public metadata                    | the relay checks the signature; clients read |
+| Thing                            | Key                                                    | Where it is opened                           |
+| -------------------------------- | ------------------------------------------------------ | -------------------------------------------- |
+| Application frame (an update)    | the epoch's MLS application secret                     | a member device, `open()`                    |
+| Commit                           | the epoch's MLS handshake secret, or public and signed | a member device, `applyCommit()`             |
+| Welcome                          | the joining device's key package                       | the joining device, `joinWorkspaceGroup()`   |
+| Key package                      | none; it is public by design                           | anyone; it is the join request               |
+| Snapshot or attachment (future)  | `suite/workspace-key` of the epoch that produced it    | a member device                              |
+| Presence                         | `suite/presence` of the epoch                          | a member device; the relay only forwards     |
+| Role, invite and removal records | none; signed public metadata                           | the relay checks the signature; clients read |
 
 A public commit is signed, not secret. Its path secrets are encrypted to the remaining members, but
 its structure is not a document. A key package is public because an owner has to read it to add the
@@ -110,15 +110,15 @@ type Frame = {
 };
 ```
 
-| Field        | Value                                                                              | Why the relay may read it                                                       |
-| ------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `kind`       | `keypackage`, `commit`, `welcome` or `application`                                 | it must admit a key package from a device with no role, and it orders the log   |
-| `workspaceId` | 64 lower-case hex                                                                 | the unit it orders and retains                                                  |
-| `deviceId`   | 64 lower-case hex                                                                  | the sender and the signer; for a key package, the device asking to join         |
-| `epoch`      | the MLS epoch the sender was in; `0` for a key package                             | it refuses a frame older than the newest it holds                               |
-| `payload`    | base64 of the encoded MLS message                                                  | it stores and forwards the bytes without opening them                           |
-| `signature`  | base64 Ed25519 over the five header fields joined by `\n`                         | it checks the sender without decrypting anything                                |
-| `receivedAt` | ISO-8601, stamped by the relay                                                     | retention; never ordering                                                       |
+| Field         | Value                                                     | Why the relay may read it                                                     |
+| ------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `kind`        | `keypackage`, `commit`, `welcome` or `application`        | it must admit a key package from a device with no role, and it orders the log |
+| `workspaceId` | 64 lower-case hex                                         | the unit it orders and retains                                                |
+| `deviceId`    | 64 lower-case hex                                         | the sender and the signer; for a key package, the device asking to join       |
+| `epoch`       | the MLS epoch the sender was in; `0` for a key package    | it refuses a frame older than the newest it holds                             |
+| `payload`     | base64 of the encoded MLS message                         | it stores and forwards the bytes without opening them                         |
+| `signature`   | base64 Ed25519 over the five header fields joined by `\n` | it checks the sender without decrypting anything                              |
+| `receivedAt`  | ISO-8601, stamped by the relay                            | retention; never ordering                                                     |
 
 The protocol page lists the three frame kinds that carry group traffic. `keypackage` is the fourth,
 and it is the only kind a device with no role may send. `receivedAt` is excluded from the signature:
@@ -293,7 +293,7 @@ A wake is a routing hint, not a frame: not stored, not numbered, carrying nothin
   "kind": "wake",
   "workspaceId": "<opaque id>",
   "deviceId": "<device>",
-  "sentAt": "<timestamp>",
+  "sentAt": "<timestamp>"
 }
 ```
 
