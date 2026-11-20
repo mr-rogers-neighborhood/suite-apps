@@ -118,3 +118,8 @@ the Pages folder are what let all four resolve at once.
 `--publish` uploads and commits, and `--verify` reads the published feed back. Which file owns a
 version and which tag a release uses is [Version ownership](../how-to/package-and-release.md#version-ownership);
 this page does not repeat it.
+
+A release whose manifest names a feed host that no longer serves the file is retired rather than
+annotated: delete the release and its tag, so the artifact stops being a download that installs an app
+which cannot update itself. The successor release is then the only current download, and no feed file
+on `main` points at a tag that has been removed.
