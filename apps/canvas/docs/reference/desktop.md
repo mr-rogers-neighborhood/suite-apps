@@ -6,14 +6,13 @@ that is the renderer's business, and the shell never reads it.
 
 ## Two hosts, one renderer
 
-The renderer is one bundle in three deployments. What changes is not the UI but what the page can reach,
+The renderer is one bundle in two deployments. What changes is not the UI but what the page can reach,
 and the renderer asks rather than assumes.
 
 | | `src/host/bridge.ts` says | Local copy | Shape |
 | --- | --- | --- | --- |
-| Web, hosted | `hostKind()` is `"web"` | `LoroIndexeddbPersistence` | relay and sharing in parity |
-| Web, standalone | `hostKind()` is `"web"` | `LoroIndexeddbPersistence` | no relay, no account |
-| Desktop | `hostKind()` is `"desktop"` | `LoroDesktopPersistence` | one file, no relay, no account |
+| Web | `hostKind()` is `"web"` | `LoroIndexeddbPersistence` | a browser profile, one local document |
+| Desktop | `hostKind()` is `"desktop"` | `LoroDesktopPersistence` | one file, one local document |
 
 The host is **not** a build flag. A flag would say what was compiled; the renderer needs to know what
 actually loaded beside it, so `hostKind()` looks for the `suiteDesktop` object the preload publishes. A
@@ -73,7 +72,7 @@ Two roots, and the split is the decision:
 
 | Artefact | Location | Why |
 | --- | --- | --- |
-| Workspace files | `~/Documents/Suite/Canvas` (the suite convention, from `@suite/contracts`) | A person looks there, so it can be copied, backed up, or put in a folder their own cloud already syncs: local-first with no relay |
+| Workspace files | `~/Documents/Suite/Canvas` (the suite convention, from `@suite/contracts`) | A person looks there, so it can be copied, backed up, or put in a folder their own cloud already syncs: local-first without a service |
 | Backups | Beside the document, `<name>.<stamp>.bak` | "Recover with a file manager when the app is the thing that broke" is a promise the format makes |
 | Locks | The per-user data directory | A lock beside a synced file would carry another machine's pid, and every sync would look like a contended file |
 
@@ -106,16 +105,17 @@ verbatim, because re-exporting would mint a new version vector and change bytes 
 
 ## What the desktop build is not
 
-It is the `standalone` profile. There is no relay, no account and no sharing, and the page policy's
-`connect-src 'self'` makes that structural rather than a promise. Hosted sign-in and sync arrive with
-`@suite/identity`; until then a half-working sign-in would be worse than none, because a session cookie
-set for `app.suite.run` does not apply to an `app://` origin.
+It is the local profile. There is no account, no hosted build and no share link, and the page policy's
+`connect-src 'self'` keeps the renderer itself off the network. Sync does not break that rule: the main
+process owns the group keys and the socket, and the renderer hands it frames over IPC.
+[Decisions](decisions.md#sharing) records what replaced the hosted tier.
 
 ## Local sync
 
-There is none yet, and there is deliberately no half of one. The document lives in the renderer and
-the key schedule lives in the main process, so the transport that carries an encrypted update is main's
-to own; a renderer-side client would put a group secret in a sandboxed page to save one IPC hop.
+Sync is opt-in and belongs to the shell. The document lives in the renderer and the key schedule lives
+in the main process, so the transport that carries an encrypted update is main's to own; a
+renderer-side client would put a group secret in a sandboxed page to save one IPC hop. One device runs
+the workspace, a `suite-sync` host carries the sealed frames, and a second device joins with an invite.
 
 The plaintext dev transport was removed with the room it talked to. The page
 policy below makes that structural rather than a promise: `connect-src 'self'`, with no environment

@@ -39,14 +39,14 @@ distributed as signed AppImages that Suite Start installs and updates.
 ```sh
 pnpm install          # also installs the git hooks
 pnpm dev              # the canvas in a browser, on :5173
-pnpm check            # the edit loop: biome, tsc, changed Vitest files, billing tests, docs symbols, shape
+pnpm check            # the edit loop: biome, tsc, changed Vitest files, docs symbols, shape
 pnpm lint             # biome check
 pnpm typecheck        # tsc across the workspace
 pnpm test             # every Vitest project
 pnpm docs:check       # links, fences, prose, generated indexes, limits
 pnpm docs:symbols     # backticked paths, root scripts, ADR references
 pnpm shape            # file length, observe sites, raw Loro writes
-pnpm verify           # the local gate plus billing, stories and the build
+pnpm verify           # the local gate plus stories and the build
 pnpm build            # graph dist, then the canvas bundle
 pnpm storybook        # component workshop on :6006
 pnpm e2e:smoke        # the @smoke Playwright specs
@@ -66,10 +66,9 @@ The gate is local and it runs on every change:
 pnpm lint && pnpm typecheck && pnpm test && pnpm docs:check && pnpm docs:symbols && pnpm shape
 ```
 
-`pnpm check` runs Biome, `tsc`, `vitest run --changed`, the `node --test` billing suite,
-`pnpm docs:symbols` and `pnpm shape`, so it is the one to repeat after each edit batch; it leaves out
-`pnpm docs:check` and the full test run.
-`pnpm verify` adds the story suite, the billing tests and the build.
+`pnpm check` runs Biome, `tsc`, `vitest run --changed`, `pnpm docs:symbols` and `pnpm shape`, so it is
+the one to repeat after each edit batch; it leaves out `pnpm docs:check` and the full test run.
+`pnpm verify` adds the story suite, the build and the security scans.
 
 Playwright is not part of the gate. When the owner asks for a run, the area scripts (`pnpm e2e:smoke`,
 `pnpm e2e:canvas`, `pnpm e2e`, `pnpm e2e:views`) are narrower than `pnpm e2e`; [the how-to

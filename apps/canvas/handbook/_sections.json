@@ -45,12 +45,6 @@
     "id": "collaboration",
     "title": "People and sync",
     "order": 70,
-    "description": "Cursors, presence, saving, offline behaviour and what a share link shows."
-  },
-  {
-    "id": "account",
-    "title": "Account and plans",
-    "order": 80,
-    "description": "Signing in, membership, devices and the plan that keeps a workspace in an account."
+    "description": "Cursors, presence, saving, offline behaviour, invites and what a shared workspace shows."
   }
 ]

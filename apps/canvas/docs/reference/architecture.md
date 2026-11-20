@@ -1,7 +1,9 @@
 # Architecture
 
 Canvas is two processes and two packages. The renderer is a web app; the shell is Electron and owns
-the file. Nothing in either reaches a network.
+the file. The renderer reaches no network. The shell's main process is the only part that does, and
+only for the opt-in sync one workspace asks for: it holds the group keys and the socket to a
+`suite-sync` host, which carries sealed frames it cannot read.
 
 | Piece | Path | What it decides |
 | --- | --- | --- |
@@ -44,9 +46,9 @@ renderer says what to save, never where.
 
 ## What it does not have
 
-No account, no server, no telemetry, no hosted build. Sync will arrive as a separate service the user
-runs, and the document does not change shape for it. That is why there is one Loro document rather than
-a database.
+No account, no share link, no telemetry, no hosted build. Sync is a separate service one device runs,
+so the document does not change shape for it. That is why there is one Loro document rather than a
+database. [Decisions](decisions.md#sharing) records what replaced the hosted tier.
 
 [data-model.md](data-model.md) is the schema. [desktop.md](desktop.md) is the shell in detail.
 [the conventions](../explanation/suite-conventions.md) say what Canvas shares with Planner and Budget.

@@ -1,6 +1,6 @@
 # Design direction
 
-Suite is a local-first canvas over a workspace of typed cards. One Loro document holds the whole workspace, the browser edits it offline, and a relay syncs it when one is reachable. A card exists on its own, and a board is a context that shows some of those cards at chosen positions.
+Suite is a local-first canvas over a workspace of typed cards. One Loro document holds the whole workspace, the browser edits it offline, and an optional sync through a host one device runs keeps copies in step. A card exists on its own, and a board is a context that shows some of those cards at chosen positions.
 
 Two rules decide most questions here. The document is the only source of truth, and anything that can be recomputed from it is not stored.
 
@@ -10,13 +10,13 @@ Two rules decide most questions here. The document is the only source of truth, 
 
 Field granularity is what makes that merge useful. A property write sets one key in `card.properties`, a section move writes `x` and `y`, a tag add writes one key. A whole-record write would turn every unrelated concurrent edit into a last-write-wins conflict that nobody sees happen.
 
-Stored facts are the ones a reader authored: identity, types, property values, tags, body text, placement geometry, board and section names, style rules. Everything else is derived at read time. Home board, section membership, display titles, reference counts, view results and share projections are computed from those facts, and a stored copy would be a cache with an invalidation problem.
+Stored facts are the ones a reader authored: identity, types, property values, tags, body text, placement geometry, board and section names, style rules. Everything else is derived at read time. Home board, section membership, display titles, reference counts and view results are computed from those facts, and a stored copy would be a cache with an invalidation problem.
 
 Presence is separate from the document. Pointer, drag, marquee and connector movement travel over Loro `EphemeralStore` channels with a time to live, so a dropped connection cannot leave a ghost drag. A position is persisted on release, which is the moment the reader has decided.
 
 ## Projections
 
-A projection is a read: a function from document state to something a surface draws, with no write back. The board face is a projection of placements through the placement and section code. The outline rail is a projection of section containment. `referencesFor` is a projection of mention nodes and card-valued fields. A share link serves a projection built from an allowlist, so the index of every title stays private.
+A projection is a read: a function from document state to something a surface draws, with no write back. The board face is a projection of placements through the placement and section code. The outline rail is a projection of section containment. `referencesFor` is a projection of mention nodes and card-valued fields. A share link would have served a projection built from an allowlist, keeping the index of every title private; there is no share link, because sharing is an invite to the running workspace or the exported file. [Decisions](../reference/decisions.md#sharing) records what replaced the hosted tier.
 
 A projection may be cached only if it can be thrown away and rebuilt from the document. The reference index qualifies because it is recomputed from content. View results do not qualify and are not stored.
 
@@ -36,27 +36,26 @@ One board can be named by portals on several boards, and by more than one portal
 
 | Question | Decision |
 | --- | --- |
-| Where truth lives | One Loro document per workspace, observed and mutated by clients; the relay persists and authenticates |
+| Where truth lives | One Loro document per workspace, observed and mutated by clients; the host carries sealed frames it cannot read |
 | What a board is | A named context showing placements of cards it does not own; removing from a board is not deleting |
 | How a card is classified | One primary type plus supertags, with the other types unioning their fields |
 | How cards relate | References derived from `@` mentions and card-valued fields; edges carry no data |
 | How a section is defined | A named region whose membership is the smallest containing header anchor |
-| How sharing works | A live projection room over a redacted, self-contained copy, scoped to a board or a selection |
+| How sharing works | An invite into the workspace one device runs, or an exported file; no share link exists |
 | What owns the shell's colour | Style rules stored in the document and resolved through the contrast floor; the shell never holds a palette |
 | How many inspectors | One panel driven by the selection, opened from the canvas or a library row |
 | What a template is | A creation recipe duplicated on use; a type blueprint is itself a card |
 | What a tutorial is | A card whose body holds tour steps, presentable on the canvas |
 | Which field kinds compose | `rating`, `group` and `list` compose from the built-in kinds |
-| What a workspace with no session may do | Local-only: it edits and exports with no account and never joins a relay, because sync needs an owner to attribute updates |
+| What a workspace with no session may do | It edits and exports with no account; joining sync needs an invite from the device that runs the workspace, because the host cannot attribute updates otherwise |
 ## What is not settled
 
 | Question | Where it stands |
 | --- | --- |
 | Document split | Waiting on a benchmark: one index document plus per-card documents, with the crash and undo costs above |
-| External share semantics | Revocation, transitive visibility and whether a viewer sees the titles of unshared neighbours |
 | Search | An in-memory index over summaries first; body search would load card documents, because a central index conflicts with per-card access and offline use |
 | Card document retention | Trash retains content and purge tombstones first, while an offline client may still resurrect a purged record |
-| Publishing | A share draft publishes onto the workspace through a validated plan (`packages/graph/src/publish/`). Serving a workspace as a site, with routes, slugs and navigation, is not built |
+| Publishing | Serving a workspace as a site, with routes, slugs and navigation, is not built; the draft plan in `packages/graph/src/publish/` has no surface yet |
 
 ## Judging a proposal
 

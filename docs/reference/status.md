@@ -10,7 +10,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Hub: uninstall | Working | Versions, entry, icon and record removed; documents untouched |
 | Hub: routing | Working | `suite://` links and document files open the owning app |
 | Hub: Flatpak | Working | Lists, installs from the store, updates, launches and removes Flatpak installs |
-| Canvas | Alpha | Cards, boards, editor, library, views, sharing and sync; still changes shape |
+| Canvas | Alpha | Cards, boards, editor, library and views; opt-in sync through a host; no account or share link, and still changing shape |
 | Planner | Pre-alpha | Day view, inbox, capture, estimates; no sync transport |
 | Budget | Pre-alpha | Launcher, accounts, register, month grid, rollover, reconcile, backups; no network |
 | Sync | Phase 2 demo | Protocol, membership, room, WebSocket server and CLI work; plaintext, loopback-only |
