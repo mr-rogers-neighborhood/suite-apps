@@ -54,7 +54,7 @@
     "test:changed": "vitest run --changed",
     "test:stories": "pnpm --filter @suite/canvas test:stories",
     "test:watch": "vitest",
-    "typecheck": "pnpm --filter @suite/canvas --filter @suite/canvas-desktop --filter @suite/graph --filter @suite/import-obsidian run typecheck",
+    "typecheck": "pnpm --filter @suite/graph --filter @suite/import-obsidian --workspace-concurrency=1 run build && pnpm --filter @suite/canvas --filter @suite/canvas-desktop --filter @suite/graph --filter @suite/import-obsidian run typecheck",
     "verify": "node scripts/scratchpad.mjs --quiet && pnpm lint && pnpm typecheck && pnpm test && pnpm test:stories && pnpm build && pnpm docs:check && pnpm docs:symbols && pnpm shape && pnpm security:deps && pnpm security:secrets"
   },
   "devDependencies": {
