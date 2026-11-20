@@ -37,6 +37,7 @@ Run the owning app's `pnpm verify` first. Packaging does not run the gate.
 ```sh
 node scripts/flatpak.mjs              # package, build, publish, install
 node scripts/flatpak.mjs --no-build   # reuse release/linux-unpacked
+node scripts/flatpak.mjs --no-build --no-install   # publish, leave the client alone
 ```
 
 The script publishes to `~/suite-flatpak/repo` and adds it as the user remote `suite-local`. Run
@@ -44,6 +45,18 @@ The script publishes to `~/suite-flatpak/repo` and adds it as the user remote `s
 summary and adds the remote with the public key, so `flatpak update` verifies what it downloads. With
 no key the remote is added with `--no-gpg-verify` for local testing only, and the script says so. See
 [Packaging channels](../reference/packaging-channels.md).
+
+To watch Start update from the store, publish a second commit without installing it, then ask Start
+to look again (with `XDG_DATA_HOME` pointing at the real user installation):
+
+```sh
+printf 'update check\n' > apps/canvas/desktop/release/linux-unpacked/update-check
+node scripts/flatpak.mjs --no-build --no-install
+```
+
+The app's card says `update available` after **Check for updates**; **Update** asks Flatpak to
+replace the deployment. Remove the marker and run `node scripts/flatpak.mjs --no-build` again to
+publish the clean build and bring the client back to it.
 
 ## Release notes and versions
 

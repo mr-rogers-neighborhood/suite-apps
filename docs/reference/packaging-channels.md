@@ -69,8 +69,10 @@ script says so.
 
 Start lists Flatpak installs, launches them through `flatpak run`, asks Flatpak to remove one, and —
 when the store offers the app — asks Flatpak to install it or to replace a deployment whose commit is
-behind. Start reads the commits and never writes a deployment itself. The hub is still an AppImage and
-an Arch package; packaging it as a Flatpak is a separate decision.
+behind. Start reads the commits and never writes a deployment itself. The signed local store has been
+exercised end to end: a second published commit turns the card into `update available`, and **Update**
+returns it to `Flatpak` with the new commit deployed. The hub is still an AppImage and an Arch package;
+packaging it as a Flatpak is a separate decision.
 
 `XDG_DATA_HOME` decides which Flatpak installation is visible. A tool that points it at a per-session
 directory, such as Orca, hides the real user installation; run with

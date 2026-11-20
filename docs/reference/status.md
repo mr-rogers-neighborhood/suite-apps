@@ -19,7 +19,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Go | Shell only | Android debug build installs; no domain ships; iOS unbuilt; no sync transport |
 | Shared packages | Working | `@suite/contracts`, `files`, `desktop`, `theme`, `ui` are consumed as workspace packages |
 | Linux packaging | Working | AppImage and Arch package for the hub; app AppImages through Start |
-| Flatpak | Experimental | Local store built and installed on Canvas; signing available, no published remote |
+| Flatpak | Experimental | Local signed store: install and update proven end to end through Start; no published remote |
 | macOS and Windows | Not built | No signing identity, so nothing is published |
 | Accessibility | Partial | Contrast and start screens are machine-checked; no full manual pass recorded |
 | The gate | Working | Local, at the root; `--fresh` proves a commit rather than a working tree |
