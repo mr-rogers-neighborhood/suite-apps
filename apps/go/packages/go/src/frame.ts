@@ -59,6 +59,33 @@ export type FrameReply = FrameAnswer & {
   readonly id: number;
 };
 
+/**
+ * A control message the shell sends *into* a pack.
+ *
+ * `flush` is the only one, and it is deliberately not part of `FrameRequest`: that union is what a
+ * pack may ask the shell for, and a pack asking the shell to save its own document is not a
+ * capability the contract grants. The shell owns the lifecycle boundary (leaving, backgrounding,
+ * closing), so it is the side that says "write what you have now".
+ *
+ * `id` is negative for controls. The pack's own requests count up from 1, so a reply to a control
+ * cannot be mistaken for a reply to a request when both are in flight.
+ */
+export interface FrameControl {
+  readonly protocol: typeof FRAME_PROTOCOL;
+  readonly id: number;
+  readonly control: "flush";
+}
+
+export function isFrameControl(value: unknown): value is FrameControl {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.protocol === FRAME_PROTOCOL &&
+    typeof candidate.id === "number" &&
+    candidate.control === "flush"
+  );
+}
+
 export interface FrameTheme {
   readonly scheme: ColorScheme;
   readonly density: ThemeDensity;

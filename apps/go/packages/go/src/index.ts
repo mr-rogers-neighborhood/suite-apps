@@ -17,14 +17,21 @@ export type {
 } from "./capture.js";
 export type {
   FrameAnswer,
+  FrameControl,
   FrameDocument,
   FrameEnvelope,
   FrameReply,
   FrameRequest,
   FrameTheme,
 } from "./frame.js";
-export { FRAME_PROTOCOL, isFrameEnvelope, isFrameReply } from "./frame.js";
-export { createFrameHost, type FrameHostOptions } from "./frameClient.js";
+export {
+  FRAME_PROTOCOL,
+  isFrameControl,
+  isFrameEnvelope,
+  isFrameReply,
+} from "./frame.js";
+export { createFrameHost, type FrameHost, type FrameHostOptions } from "./frameClient.js";
+export { type FlushOptions, requestFrameFlush } from "./frameControl.js";
 export type {
   ColorScheme,
   CreateDocumentInput,

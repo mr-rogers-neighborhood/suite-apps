@@ -15,6 +15,7 @@ import {
   type FrameReply,
   type FrameRequest,
   type FrameTheme,
+  isFrameControl,
   isFrameReply,
 } from "./frame.js";
 import type { DocumentRecord, ModuleHost, ThemeTokens } from "./host.js";
@@ -57,19 +58,56 @@ export interface FrameHostOptions {
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 
-export function createFrameHost(
-  options: FrameHostOptions,
-): ModuleHost & { currentTheme(): Promise<ThemeTokens>; dispose(): void } {
+export type FrameHost = ModuleHost & {
+  currentTheme(): Promise<ThemeTokens>;
+  /**
+   * Run `listener` when the shell reaches a durability boundary.
+   *
+   * The pack owns its document, so the shell cannot write it. It can only ask, on the boundaries a
+   * phone gives us — foreground loss, leaving the module, closing the app — and wait for the answer
+   * before tearing the frame down. Returning `undefined` from `flush` is a valid "nothing pending".
+   */
+  onFlush(listener: () => void | Promise<void>): () => void;
+  dispose(): void;
+};
+
+export function createFrameHost(options: FrameHostOptions): FrameHost {
   const parent = options.parent ?? globalThis.parent;
   const timeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const pending = new Map<
     number,
     { resolve: (reply: FrameReply) => void; reject: (error: Error) => void }
   >();
+  const flushListeners = new Set<() => void | Promise<void>>();
   let nextId = 1;
   let queue: Promise<unknown> = Promise.resolve();
 
   const listener = (event: MessageEvent) => {
+    if (isFrameControl(event.data)) {
+      const control = event.data;
+      // Answered after every handler has settled. A shell that tears the frame down on a timer
+      // would otherwise race the write it asked for.
+      void (async () => {
+        try {
+          for (const flush of flushListeners) await flush();
+          parent.postMessage(
+            { protocol: FRAME_PROTOCOL, id: control.id, ok: true, value: null },
+            "*",
+          );
+        } catch (error) {
+          parent.postMessage(
+            {
+              protocol: FRAME_PROTOCOL,
+              id: control.id,
+              ok: false,
+              message: error instanceof Error ? error.message : String(error),
+            },
+            "*",
+          );
+        }
+      })();
+      return;
+    }
     if (!isFrameReply(event.data)) return;
     const waiting = pending.get(event.data.id);
     if (!waiting) return;
@@ -199,8 +237,15 @@ export function createFrameHost(
       const value = (await send({ method: "theme" })) as unknown as FrameTheme;
       return { scheme: value.scheme, density: value.density, cssVariables: value.variables };
     },
+    onFlush(listener) {
+      flushListeners.add(listener);
+      return () => {
+        flushListeners.delete(listener);
+      };
+    },
     dispose() {
       globalThis.removeEventListener("message", listener);
+      flushListeners.clear();
       // Reject rather than clear: a caller awaiting a request has to learn it will never be
       // answered, or it waits forever on a promise nobody holds any more.
       for (const [, waiting] of pending) {

@@ -39,6 +39,27 @@ function packAsModule(
   onExport?: (moduleId: string) => void,
 ): SuiteGoModule {
   const { id, name } = pack.manifest;
+  /**
+   * The frame's flush, once it exists.
+   *
+   * The shell cannot write a pack's document — that is the container's first rule — so leaving and
+   * backgrounding can only ask. `undefined` before the frame mounts is honest: there is nothing
+   * pending in a pack that has not started.
+   */
+  let flushFrame: () => Promise<void> = async () => undefined;
+  const acceptFlush = (flush: () => Promise<void>) => {
+    flushFrame = flush;
+  };
+  const flush = async () => {
+    try {
+      await flushFrame();
+    } catch (error) {
+      // A frame that is already gone has nothing to write. A failure the person can act on would
+      // have to be a storage error, and swallowing it would hide exactly that, so it is logged.
+      console.error(`Suite Go: ${name} did not flush its document`, error);
+    }
+  };
+
   return {
     id,
     name,
@@ -52,11 +73,13 @@ function packAsModule(
           entryUrl={pack.entryUrl}
           title={name}
           manifest={pack.manifest}
+          onFrameReady={acceptFlush}
           {...(onQuickCapture ? { onQuickCapture } : {})}
           {...(onExport ? { onExport: () => onExport(id) } : {})}
         />
       ),
-      dispose: () => undefined,
+      flush,
+      dispose: flush,
     }),
   };
 }

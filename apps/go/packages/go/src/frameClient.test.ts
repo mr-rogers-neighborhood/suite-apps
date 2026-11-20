@@ -140,3 +140,45 @@ describe("a request the shell never answers", () => {
     await expect(pendingCall).rejects.toThrow(/released this module/u);
   });
 });
+
+describe("the shell's flush boundary", () => {
+  it("runs every flush listener and answers the shell before tearing the frame down", async () => {
+    const host = frameHost();
+    const order: string[] = [];
+    host.onFlush(async () => {
+      await Promise.resolve();
+      order.push("first");
+    });
+    host.onFlush(() => {
+      order.push("second");
+    });
+
+    for (const listener of listeners) {
+      listener({ data: { protocol: FRAME_PROTOCOL, id: -3, control: "flush" } });
+    }
+    // Let both handlers settle before looking at the reply.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(order).toEqual(["first", "second"]);
+    expect(sent.at(-1)).toMatchObject({ protocol: FRAME_PROTOCOL, id: -3, ok: true });
+  });
+
+  it("answers a failure rather than leaving the shell waiting", async () => {
+    const host = frameHost();
+    host.onFlush(() => {
+      throw new Error("disk full");
+    });
+
+    for (const listener of listeners) {
+      listener({ data: { protocol: FRAME_PROTOCOL, id: -4, control: "flush" } });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(sent.at(-1)).toMatchObject({
+      protocol: FRAME_PROTOCOL,
+      id: -4,
+      ok: false,
+      message: "disk full",
+    });
+  });
+});

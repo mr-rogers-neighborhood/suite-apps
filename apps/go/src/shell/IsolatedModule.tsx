@@ -1,4 +1,4 @@
-import type { ModuleHost, PackManifest } from "@suite/go";
+import { type ModuleHost, type PackManifest, requestFrameFlush } from "@suite/go";
 import { useEffect, useRef } from "react";
 import { resolveTheme } from "../host/theme.js";
 import { serveFrame } from "./frameBridge.js";
@@ -24,6 +24,7 @@ export function IsolatedModule({
   manifest,
   onQuickCapture,
   onExport,
+  onFrameReady,
 }: {
   readonly host: ModuleHost;
   readonly entryUrl: string;
@@ -31,8 +32,23 @@ export function IsolatedModule({
   readonly manifest: PackManifest;
   readonly onQuickCapture?: () => void;
   readonly onExport?: () => void;
+  /**
+   * Hands the container a way to ask the frame to write its pending document.
+   *
+   * An isolated pack owns its document, so the container cannot save it. What it can do is ask at
+   * the boundaries a phone gives us and await the answer before removing the frame — which is why
+   * this is a function and not a flag.
+   */
+  readonly onFrameReady?: (flush: () => Promise<void>) => void;
 }) {
   const frame = useRef<HTMLIFrameElement | null>(null);
+  /**
+   * False until the frame has loaded its own document.
+   *
+   * A control posted before then reaches `about:blank`, where the pack's listener does not exist,
+   * and the shell would wait out the timeout on a module the person closed immediately.
+   */
+  const loaded = useRef(false);
 
   useEffect(() => {
     const stop = serveFrame({
@@ -44,8 +60,17 @@ export function IsolatedModule({
       },
       target: () => frame.current?.contentWindow ?? null,
     });
+
+    const flush = async () => {
+      if (!loaded.current) return;
+      const target = frame.current?.contentWindow;
+      if (!target) return;
+      await requestFrameFlush(target);
+    };
+    onFrameReady?.(flush);
+
     return stop;
-  }, [host, manifest]);
+  }, [host, manifest, onFrameReady]);
 
   return (
     <div className="module">
@@ -68,6 +93,9 @@ export function IsolatedModule({
           title={title}
           className="h-full w-full border-0"
           data-suite-frame={host.moduleId}
+          onLoad={() => {
+            loaded.current = true;
+          }}
         />
       </div>
     </div>
