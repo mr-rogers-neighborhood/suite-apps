@@ -20,12 +20,13 @@
  *   node scripts/gate.mjs
  *   node scripts/gate.mjs --fresh
  *   node scripts/gate.mjs --only suite-canvas
+ *   node scripts/gate.mjs --no-e2e
  *   node scripts/gate.mjs --dry
  *   node scripts/gate.mjs --json
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { delimiter, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -33,7 +34,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 /** Repository roots inside the monorepo, in the order their gates must run. */
 const PIPELINE = [
   { repo: "suite-sync", package: "suite-sync" },
-  { repo: "suite-start", package: "suite-start" },
+  { repo: "suite-start", package: "suite-start", e2e: true },
   { repo: "suite-canvas", package: "suite" },
   { repo: "suite-planner", package: "suite-planner" },
   { repo: "suite-budget", package: "suite-budget" },
@@ -44,6 +45,7 @@ const argv = process.argv.slice(2);
 const fresh = argv.includes("--fresh");
 const dry = argv.includes("--dry");
 const json = argv.includes("--json");
+const e2e = !argv.includes("--no-e2e") && !dry;
 const onlyIndex = argv.indexOf("--only");
 const only = onlyIndex < 0 ? null : argv[onlyIndex + 1];
 
@@ -60,6 +62,31 @@ function run(command, args, cwd) {
 function gitSha() {
   const result = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, encoding: "utf8" });
   return result.status === 0 ? result.stdout.trim() : "unknown";
+}
+
+/** Whether a command exists on PATH, without running it. */
+function onPath(name) {
+  const path = process.env.PATH ?? "";
+  return path
+    .split(delimiter)
+    .some((directory) => directory.length > 0 && existsSync(join(directory, name)));
+}
+
+/**
+ * Run a repository's browser/desktop tests.
+ *
+ * They need a display. A desktop session has one; a CI machine has Xvfb, which
+ * `xvfb-run` starts for exactly this. Refusing loudly is better than letting
+ * Playwright fail with "missing X server", which reads like a test failure.
+ */
+function runE2e(repoDir) {
+  const hasDisplay =
+    (process.env.DISPLAY ?? "").length > 0 || (process.env.WAYLAND_DISPLAY ?? "").length > 0;
+  const command = "pnpm";
+  const args = ["exec", "playwright", "test"];
+  if (hasDisplay) return run(command, args, repoDir);
+  if (onPath("xvfb-run")) return run("xvfb-run", ["-a", command, ...args], repoDir);
+  return { status: 1, signal: null };
 }
 
 /** A clean export of HEAD, with no node_modules, dist or untracked files. */
@@ -158,12 +185,35 @@ for (const entry of build.ok ? selected : []) {
   if (!ok) break;
 }
 
+// E2E after every repository's own gate: a UI spec failure should not hide whether
+// the other apps' checks passed. It only runs when the checks are green.
+if (e2e && results.length > 0 && results.every((row) => row.ok)) {
+  for (const entry of selected.filter((row) => row.e2e === true)) {
+    if (!json) process.stdout.write(`\n▶ ${entry.repo} · e2e\n`);
+    const suite = runE2e(join(workdir, "apps", entry.repo));
+    const ok = suite.status === 0;
+    const noDisplay =
+      (process.env.DISPLAY ?? "").length === 0 &&
+      (process.env.WAYLAND_DISPLAY ?? "").length === 0 &&
+      !onPath("xvfb-run");
+    results.push({
+      ...entry,
+      repo: `${entry.repo} e2e`,
+      ok,
+      detail: ok ? "passed" : noDisplay ? "no display and no xvfb-run" : `exit ${suite.status}`,
+    });
+    if (!ok) break;
+  }
+}
+
+const covered = selected.every((entry) => results.some((row) => row.repo === entry.repo));
 const status = {
-  ok: results.every((entry) => entry.ok) && results.length === selected.length,
+  ok: results.every((entry) => entry.ok) && covered,
   fresh,
   commit: gitSha(),
   at: new Date().toISOString(),
   build,
+  e2e,
   results,
 };
 const statusPath = join(ROOT, ".dev", "gate-status.json");

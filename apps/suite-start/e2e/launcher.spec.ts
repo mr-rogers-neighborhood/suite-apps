@@ -36,7 +36,8 @@ test("lists an installed app", async () => {
   const run = await launch(box);
   try {
     await expect(run.page.locator(".card-name")).toHaveText("Suite Canvas");
-    await expect(run.page.locator(".card-version")).toHaveText("0.1.0");
+    // The card states its version in the state line; the row under it is the hub's own.
+    await expect(run.page.locator(".card-state").first()).toContainText("0.1.0");
   } finally {
     await run.close();
   }
@@ -195,7 +196,8 @@ test("records a file it opened, so it appears in recents", async () => {
 test("reaches every section from the keyboard", async () => {
   const run = await launch(box);
   try {
-    const apps = run.page.getByRole("tab", { name: "Apps" });
+    // The rail's first tab is the hub's own name, "Start".
+    const apps = run.page.getByRole("tab", { name: "Start", exact: true });
     await apps.focus();
     await expect(run.page.locator("#panel-apps")).toBeVisible();
 
@@ -228,75 +230,28 @@ test("renders every section with nothing installed", async () => {
       await expect(run.page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
     }
 
-    // Sync says why it is off instead of offering a control that cannot work.
-    await expect(run.page.locator("#sync-toggle")).toBeDisabled();
-  } finally {
-    await run.close();
-  }
-});
-
-test("marks an app with an update from a catalog file", async () => {
-  const app = await fakeApp(box);
-  await install(box, { id: "canvas", executable: app.executable, manifestPath: app.manifestPath });
-
-  const catalogPath = join(box.root, "catalog.json");
-  await writeFile(
-    catalogPath,
-    JSON.stringify({
-      format: "suite.release.catalog",
-      formatVersion: 1,
-      generatedAt: "2026-11-05T09:00:00.000Z",
-      signature: "unsigned-in-this-build",
-      entries: [{ app: "canvas", version: "0.2.0" }],
-    }),
-  );
-
-  const run = await launch(box, [], { SUITE_START_CATALOG: catalogPath });
-  try {
-    await expect(run.page.locator(".card-update")).toHaveText("stable · Update available");
-
-    await run.page.getByRole("tab", { name: "Settings" }).click();
-    await expect(run.page.locator("#catalog-value")).toHaveText(
-      `Read from ${catalogPath}. Never fetched.`,
+    // The hub supervises the sync host and starts it on loopback, so the pane says
+    // what is true and the control offers the action that applies.
+    await expect(run.page.locator("#panel-sync .pane-note").first()).toHaveText(
+      "On. Other devices can reach this machine.",
     );
+    await expect(run.page.locator("#sync-toggle")).toHaveText("Turn sync off");
   } finally {
     await run.close();
   }
 });
 
-test("refuses a malformed catalog by field name", async () => {
-  const app = await fakeApp(box);
-  await install(box, { id: "canvas", executable: app.executable, manifestPath: app.manifestPath });
-
-  const catalogPath = join(box.root, "catalog.json");
-  await writeFile(
-    catalogPath,
-    JSON.stringify({ format: "suite.release.catalog", signature: "", entries: [] }),
-  );
-
-  const run = await launch(box, [], { SUITE_START_CATALOG: catalogPath });
-  try {
-    // The card cannot claim a state from a catalog it refused, and Settings says
-    // which field was wrong rather than "invalid catalog".
-    await expect(run.page.locator(".card-update")).toHaveText("stable · Update state unknown");
-    await run.page.getByRole("tab", { name: "Settings" }).click();
-    await expect(run.page.locator("#catalog-value")).toContainText("formatVersion");
-  } finally {
-    await run.close();
-  }
-});
-
-test("says the update state is unknown when no catalog is configured", async () => {
+test("says a copied install updates itself, not from the hub's feed", async () => {
   const app = await fakeApp(box);
   await install(box, { id: "canvas", executable: app.executable, manifestPath: app.manifestPath });
 
   const run = await launch(box);
   try {
-    await expect(run.page.locator(".card-update")).toHaveText("stable · Update state unknown");
-    await run.page.getByRole("tab", { name: "Settings" }).click();
-    await expect(run.page.locator("#catalog-value")).toHaveText(
-      "No catalog configured, so update states are unknown.",
-    );
+    // The signed feed is the only update source now. A copied install keeps its own
+    // updater, so the card says that rather than inventing a version.
+    const card = run.page.locator('.card[data-app-id="canvas"]');
+    await expect(card.locator(".card-state")).toContainText("0.1.0");
+    await expect(card.locator(".card-state")).toContainText("updates itself");
   } finally {
     await run.close();
   }
@@ -334,7 +289,7 @@ test("lists every app's files under the app that claims the extension", async ()
 
     // The card summarises the index rather than guessing.
     const canvasCard = run.page.locator('.card[data-app-id="canvas"]');
-    await run.page.getByRole("tab", { name: "Apps" }).click();
+    await run.page.getByRole("tab", { name: "Start", exact: true }).click();
     await expect(canvasCard.locator(".card-files")).toHaveText("2 files");
   } finally {
     await run.close();
