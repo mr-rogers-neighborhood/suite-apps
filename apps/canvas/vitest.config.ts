@@ -84,6 +84,16 @@ export default defineConfig({
           setupFiles: ["src/test/setup.ts"],
         },
       },
+      {
+        // The scripts are Node programs, and the doc-index generator is the one
+        // of them with a rule worth pinning: a page cannot be dated before the
+        // commit that carries it exists.
+        test: {
+          name: "scripts",
+          environment: "node",
+          include: ["scripts/**/*.test.ts"],
+        },
+      },
     ],
   },
 });
