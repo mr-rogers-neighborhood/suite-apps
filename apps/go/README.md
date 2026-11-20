@@ -3,9 +3,10 @@
 **One mobile app for the Suite domains.** A container that opens one domain at a time, hands it a
 document, and stays out of its way.
 
-> **v0: the shell only.** No domains ship in this build. What exists is the module contract, the home
-> surface, and one throwaway module that exists to prove the contract works. That is deliberate: a
-> container that has never hosted anything is a drawing, not a design.
+> **v0: the shell, two modules and an install path.** Scratch is the reference module that proves the
+> contract; Canvas is a placeholder that says its tablet layout is not built. A signed pack installs
+> and appears on the home surface through the same declaration path.
+> [Planner's state](docs/reference/planner.md) is where the first real domain stands.
 
 ## Why one app
 
@@ -32,7 +33,8 @@ module, hand it a document handle, and nothing else.
 | -------------------- | ------------------------------------------------------------------------------------------- |
 | `@suite/go` contract | Module declarations, capability routing, capture intents, host services, teardown isolation |
 | Shell                | Home surface: capture bar, pinned domains, recents; honest empty states                     |
-| Domain modules       | None. One reference module (Scratch) proves mount, document handoff and teardown            |
+| Domain modules       | Scratch proves mount, document handoff, capture and teardown; Canvas is a placeholder      |
+| Packs                | A signed pack installs and appears on home; [Planner's state](docs/reference/planner.md) records where the first real domain stands |
 | Android              | Debug APK installs and launches on a physical device over USB                               |
 | iOS                  | Wired by convention, unbuilt — Xcode needs macOS                                            |
 | Sync                 | Seam designed, no transport. `ModuleHost` is where it will arrive                           |

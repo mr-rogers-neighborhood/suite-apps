@@ -2,6 +2,12 @@
 
 What changed, in a person's words rather than commits.
 
+## Versioning
+
+[`package.json`](package.json) carries the current version, which is what `--version` reports and
+what the artifact ships. This prose record may lag it, so read the package for the current version
+rather than the newest heading below.
+
 ## [0.4.0] - 2026-11-18
 
 The first version that is a thing you install rather than a script you copy.

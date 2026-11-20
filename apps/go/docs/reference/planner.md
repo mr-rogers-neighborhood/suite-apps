@@ -1,6 +1,9 @@
 # Planner inside Suite Go
 
-Where this stands, what was proven, and the one decision that blocks wiring it.
+Where this stands, what was proven, and what remains before it ships.
+
+No Planner pack is committed here. The build that produces one and the bridge contract it needs are
+proven; the open items below are what remains.
 
 ## Proven: the renderer builds as a web bundle
 
@@ -33,18 +36,18 @@ bridge.onWorkspaceReplaced((snapshot) => replica.replace(snapshot));
 enough, and a bridge that hands one over produces an app that throws on first open.
 
 The obvious fix — import `@suite/planner-core` from the mobile app — is the wrong one. It would make
-`suite-go`'s typecheck and build depend on a sibling checkout, which the public repository's pipeline
-does not have. The mobile build would only work on a machine with all six repos cloned.
+this app's typecheck and build depend on a sibling checkout that the mobile build does not own. The
+mobile build would only work on a machine that also had Planner's source.
 
 ## The decision: `loadSnapshot()` may return `null` (this replaced the fixture)
 
 An earlier version of this page decided to **ship a seed snapshot as a fixture**, because the bridge
 had no way to say "there is no document yet". That is no longer necessary:
 
-- `suite-planner/packages/core/src/ports.ts` now declares `loadSnapshot(): Promise<Uint8Array | null>`.
+- `apps/planner/packages/core/src/ports.ts` now declares `loadSnapshot(): Promise<Uint8Array | null>`.
 - `bootDocument()` calls `WorkspaceDocument.create()` when it receives `null`.
-- `suite-dev/docs/reference/bridges.md` documents the nullable contract, and
-  [`loadsnapshot-proposal.md`](loadsnapshot-proposal.md) — the request that asked for it — is landed.
+- [The bridge reference](../../../../harness/docs/reference/bridges.md) documents the nullable contract,
+  and [`loadsnapshot-proposal.md`](loadsnapshot-proposal.md) — the request that asked for it — is landed.
 
 So the fixture is gone, and so is its cost. Points 1–3 of the old decision are withdrawn:
 
@@ -53,7 +56,7 @@ So the fixture is gone, and so is its cost. Points 1–3 of the old decision are
 2. There is no first-run special case. **`DocumentStore.create()` returns `bytes: new Uint8Array(0)`**
    (`src/host/documents.ts:101`), so the bridge's rule is exact and testable: an empty payload
    means `null`, and Planner creates its own schema-initialised document.
-3. `suite-go` still keeps no dependency on the sibling repo — by construction, not by carrying data.
+3. This app still keeps no dependency on Planner's source — by construction, not by carrying data.
 
 A second consequence, not visible when the fixture was decided: **the pack owns the document.**
 Planner's bridge only offers `commit(update)`, and desktop main is what applies updates and writes the
@@ -68,7 +71,7 @@ file would corrupt the document; writing per keystroke is the amplification the 
   as an isolated pack (`./planner/index.html` with a bridge prelude on `@suite/go`'s `createFrameHost`),
   which is also what makes the container stay domain-blind.
 - **Layout.** `Shell.tsx` is three fixed panes and `Sidebar` is `w-[228px]` with no breakpoints, so a
-  phone shows the sidebar before the calendar has room. `@suite/theme`'s density axis (v0.16.0) fixes
+  phone shows the sidebar before the calendar has room. `@suite/theme`'s density axis fixes
   control size, not layout. A breakpoint that collapses the sidebar is the minimum before this ships.
 - **Reminders.** `onReminder` has no notification plugin yet; the bridge returns a no-op unsubscriber
   and the UI says so rather than silently dropping them.

@@ -11,7 +11,7 @@ apps/
   budget/       @suite/budget desktop app; packages/core; docs
   start/        @suite/start hub; packaging/arch; docs, e2e
   sync/         @suite/sync-server; packages/protocol, packages/host; deploy, docs
-  go/           @suite/go-app shell; packages/go contract; docs
+  go/           @suite/go-app mobile container; packages/go contract; docs
 packages/       contracts, files, desktop, theme, ui
 docs/           Cross-cutting documentation
 harness/        The old orchestrator, kept as reference
@@ -39,7 +39,7 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/sync-server` | `apps/sync` | Sync server |
 | `@suite/sync` | `apps/sync/packages/protocol` | Sync protocol |
 | `@suite/host` | `apps/sync/packages/host` | Sync host |
-| `@suite/go-app` | `apps/go` | Go shell |
+| `@suite/go-app` | `apps/go` | Go container |
 | `@suite/go` | `apps/go/packages/go` | Go module contract |
 | `@suite/contracts` | `packages/contracts` | Shared app and deployment contracts |
 | `@suite/files` | `packages/files` | Shared file envelopes |

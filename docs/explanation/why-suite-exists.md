@@ -7,7 +7,9 @@ Suite is a set of local-first apps, a hub that installs and updates them, and sy
 - **Budget** is an envelope budget: accounts, register, month grid and backups.
 - **Start** installs, updates, opens and removes the apps. It never holds a document.
 - **Sync** is the protocol and the server a person runs on a device they control.
-- **Go** is the mobile container. It currently ships as a shell.
+- **Go** is the mobile container. Its home surface hosts a reference module and a Canvas placeholder,
+  and a domain arrives as an installed pack; [Planner's state](../../apps/go/docs/reference/planner.md)
+  records where the first one stands.
 
 Each app owns one domain and one document. The suite shares manifests, packages, a gate and a release
 process; it does not share a process or a database.

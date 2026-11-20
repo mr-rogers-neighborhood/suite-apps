@@ -16,7 +16,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Sync | Phase 2 demo | Protocol, membership, room, WebSocket server and CLI work; plaintext, loopback-only |
 | Sync: invite and join | Missing | Adding a device is still a CLI step |
 | Sync: blind relay | Target | The room stores plaintext today; ciphertext is the design |
-| Go | Shell only | Android debug build installs; no domain ships; iOS unbuilt; no sync transport |
+| Go | v0 container | Android debug build installs; Scratch proves capture and documents, Canvas is a placeholder, and an installed pack appears on home; [Planner's state](../../apps/go/docs/reference/planner.md); iOS unbuilt; no sync transport |
 | Shared packages | Working | `@suite/contracts`, `files`, `desktop`, `theme`, `ui` are consumed as workspace packages |
 | Linux packaging | Working | AppImage and Arch package for the hub; app AppImages through Start |
 | Flatpak | Experimental | Local signed store: install and update proven end to end through Start; no published remote |
