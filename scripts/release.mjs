@@ -46,6 +46,14 @@ export const RELEASE_REPO = "mr-rogers-neighborhood/suite-apps";
 export const FEED_FILE = "latest-linux.yml";
 
 /**
+ * The only tree publishing writes.
+ *
+ * A feed commit moves HEAD after every app, so the next app inherits the gate
+ * proof only when everything between the proven commit and HEAD stays here.
+ */
+export const FEED_ROOT = "feeds/";
+
+/**
  * Every app this repository publishes.
  *
  * `project` is the package whose `package.json` carries the version electron-builder
@@ -180,14 +188,92 @@ export function dirtyTreeProblem(porcelain) {
   );
 }
 
+/** True when this path is one a publish may commit. */
+export function isFeedPath(path) {
+  return path.startsWith(FEED_ROOT);
+}
+
+/**
+ * The stdout of a git command, for the range check.
+ *
+ * Kept behind a function so `feedOnlyRange` can be told the answer in a test
+ * rather than needing this repository.
+ */
+function gitQuery(args) {
+  const result = spawnSync("git", args, { cwd: ROOT, encoding: "utf8", env: process.env });
+  return {
+    ok: result.status === 0,
+    stdout: (result.stdout ?? "").trim(),
+    stderr: (result.stderr ?? "").trim(),
+  };
+}
+
+/**
+ * Why the commits in `from..to` do not inherit `from`'s gate proof, or null.
+ *
+ * Publishing commits `feeds/<app>/`, which moves HEAD. The next app should not
+ * need a second fresh gate, so a descendant is accepted when every commit
+ * between them changes only feed files. The proof is the trees: `git rev-list`
+ * lists the commits, and each commit's changed paths are read against its
+ * parent. A commit message is never consulted, since a prefix is forgeable.
+ *
+ * A merge has to account for every path it contributes: its diff against each
+ * parent must stay under `feeds/`. `git` is injected so a test can answer
+ * without a repository.
+ */
+export function feedOnlyRange(from, to, git = gitQuery) {
+  const shortTo = to.slice(0, 12);
+  if (!git(["merge-base", "--is-ancestor", from, to]).ok) {
+    return `${from} is not an ancestor of ${shortTo}`;
+  }
+
+  const listed = git(["rev-list", "--parents", `${from}..${to}`]);
+  if (!listed.ok) return `git could not list the commits between ${from} and ${shortTo}`;
+
+  for (const line of listed.stdout.split(/\r?\n/u)) {
+    const [commit, ...parents] = line.trim().split(/\s+/u);
+    if (commit === undefined || commit.length === 0) continue;
+
+    // `-m` gives a merge a diff against each parent; `--no-renames` keeps both
+    // sides of a moved file visible. A path outside `feeds/` refuses either way.
+    const diff = git([
+      "diff-tree",
+      "--no-commit-id",
+      "-r",
+      "--name-only",
+      "--no-renames",
+      ...(parents.length > 1 ? ["-m"] : []),
+      commit,
+    ]);
+    if (!diff.ok) return `git could not read the tree of ${commit.slice(0, 12)}`;
+
+    const outside = diff.stdout
+      .split(/\r?\n/u)
+      .map((path) => path.trim())
+      .filter((path) => path.length > 0 && !isFeedPath(path));
+    if (outside.length > 0) {
+      const shown = outside.slice(0, 5).join(", ");
+      const more = outside.length > 5 ? `, and ${outside.length - 5} more` : "";
+      return `${commit.slice(0, 12)} changes ${shown}${more}, outside ${FEED_ROOT}`;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Why the gate has not proven this commit, or null when it has.
  *
  * `.dev/gate-status.json` names the commit and whether the gate ran against a
  * clean export of it. A working-tree run proves the tree, not the commit, which
  * is why `fresh` matters here.
+ *
+ * `range(from, to)` is the feed-only check, passed in so this function needs no
+ * repository. It returns null when the commits between the two inherit the
+ * proof, or a sentence saying why they do not. Omitting it refuses the range:
+ * only an exact HEAD is accepted without an inspection.
  */
-export function gateProblems(status, head) {
+export function gateProblems(status, head, { range = null } = {}) {
   if (status === null || typeof status !== "object") {
     return ["no .dev/gate-status.json. Run the gate before releasing."];
   }
@@ -199,7 +285,14 @@ export function gateProblems(status, head) {
   if (typeof status.commit !== "string" || status.commit.length < 7) {
     problems.push("the gate status names no commit");
   } else if (!head.startsWith(status.commit)) {
-    problems.push(`the gate proved ${status.commit}, but HEAD is ${head.slice(0, 12)}`);
+    const inherited = range === null
+      ? "no feed-only check was supplied, so the commits since the gate were not inspected"
+      : range(status.commit, head);
+    if (inherited !== null) {
+      problems.push(
+        `the gate proved ${status.commit}, but HEAD is ${head.slice(0, 12)}: ${inherited}`,
+      );
+    }
   }
   return problems;
 }
@@ -659,7 +752,7 @@ async function release(app, options) {
   }
   const manifestMiss = manifestVersionProblem(manifestText, version);
   if (manifestMiss !== null) problems.push(manifestMiss);
-  problems.push(...gateProblems(gateStatus, head));
+  problems.push(...gateProblems(gateStatus, head, { range: feedOnlyRange }));
 
   const tag = options.tag ?? (version === null ? null : tagFor(app, version));
   if (tag === null) problems.push("no tag to release under");
@@ -780,7 +873,7 @@ async function release(app, options) {
 
     process.stdout.write(`\npublished ${tag}\n`);
     process.stdout.write(`feed ${manifestUrl(app)}\n`);
-    process.stdout.write("Push the feed commit when the gate has proven it.\n");
+    process.stdout.write("Push the feed commit; it inherits this gate while it only touches feeds/.\n");
   } finally {
     await rm(work, { recursive: true, force: true });
   }

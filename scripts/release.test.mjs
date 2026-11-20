@@ -8,6 +8,7 @@ import {
   changelogProblem,
   changelogSection,
   dirtyTreeProblem,
+  feedOnlyRange,
   feedPath,
   feedUrl,
   gateProblems,
@@ -58,7 +59,7 @@ describe("version and feed names", () => {
     assert.equal(feedPath(APPS.planner), "feeds/planner/latest-linux.yml");
     assert.equal(
       feedUrl(APPS.planner),
-      "https://mr-rogers-neighborhood.github.io/suite-apps/feeds/planner",
+      "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/planner",
     );
     assert.equal(tagFor(APPS.canvas, "0.1.9"), "canvas-v0.1.9");
     assert.equal(
@@ -136,6 +137,26 @@ describe("release refusals", () => {
     );
   });
 
+  it("still refuses a dirty tree, even when HEAD could inherit the gate", () => {
+    const problem = dirtyTreeProblem(" M feeds/planner/latest-linux.yml\n");
+    assert.match(problem, /uncommitted/u);
+    assert.match(problem, /feeds\/planner/u);
+  });
+
+  it("still refuses a gate that is not fresh, even when every commit since is feed-only", () => {
+    const problems = gateProblems(
+      { ok: true, fresh: false, commit: "abcdef1" },
+      "1234567890abcdef",
+      { range: () => null },
+    );
+    assert.match(problems.join(), /working tree/u);
+  });
+
+  it("refuses a descendant when no range check was supplied", () => {
+    const problems = gateProblems({ ok: true, fresh: true, commit: "abcdef1" }, "1234567890abcdef");
+    assert.match(problems.join(), /not inspected/u);
+  });
+
   it("refuses a manifest that names another version, or a file that is not there", () => {
     assert.match(
       manifestProblems({
@@ -173,6 +194,116 @@ describe("release refusals", () => {
       exists: () => true,
     });
     assert.match(problems.join(), /no artifact/u);
+  });
+});
+
+describe("feed-only gate inheritance", () => {
+  const proven = "1111111";
+  const head = "2222222abcdef";
+
+  /** A git that answers from the trees a test names, rather than a repository. */
+  function fakeGit({ ancestor = true, commits = [] } = {}) {
+    const calls = [];
+    const git = (args) => {
+      calls.push(args);
+      if (args[0] === "merge-base") return { ok: ancestor, stdout: "", stderr: "" };
+      if (args[0] === "rev-list") {
+        return {
+          ok: true,
+          stdout: commits.map((entry) => [entry.commit, ...entry.parents].join(" ")).join("\n"),
+          stderr: "",
+        };
+      }
+      if (args[0] === "diff-tree") {
+        const commit = commits.find((entry) => entry.commit === args.at(-1));
+        return { ok: true, stdout: (commit?.paths ?? []).join("\n"), stderr: "" };
+      }
+      return { ok: false, stdout: "", stderr: "unexpected git call" };
+    };
+    return { git, calls };
+  }
+
+  function gateWith(git) {
+    return gateProblems({ ok: true, fresh: true, commit: proven }, head, {
+      range: (from, to) => feedOnlyRange(from, to, git),
+    });
+  }
+
+  it("accepts a HEAD that descends from the proof through feeds/ alone", () => {
+    const { git } = fakeGit({
+      commits: [
+        {
+          commit: head,
+          parents: [proven],
+          paths: ["feeds/canvas/latest-linux.yml", "feeds/canvas/latest-linux.yml.sig"],
+        },
+      ],
+    });
+    assert.equal(feedOnlyRange(proven, head, git), null);
+    assert.deepEqual(gateWith(git), []);
+  });
+
+  it("refuses a descendant that changes code as well as a feed", () => {
+    const { git } = fakeGit({
+      commits: [
+        {
+          commit: head,
+          parents: [proven],
+          paths: ["feeds/planner/latest-linux.yml", "scripts/release.mjs"],
+        },
+      ],
+    });
+    assert.match(feedOnlyRange(proven, head, git), /scripts\/release\.mjs/u);
+    const problems = gateWith(git);
+    assert.match(problems.join(), /proved 1111111/u);
+    assert.match(problems.join(), /scripts\/release\.mjs/u);
+  });
+
+  it("refuses a merge commit that contributes a path outside feeds/", () => {
+    const { git, calls } = fakeGit({
+      commits: [
+        {
+          commit: head,
+          parents: [proven, "3333333"],
+          paths: ["feeds/planner/latest-linux.yml", "apps/planner/package.json"],
+        },
+      ],
+    });
+    assert.match(feedOnlyRange(proven, head, git), /apps\/planner\/package\.json/u);
+    assert.ok(calls.some((args) => args.includes("-m")), "a merge is read against each parent");
+  });
+
+  it("accepts a merge commit whose every contributed path is a feed", () => {
+    const { git } = fakeGit({
+      commits: [
+        {
+          commit: head,
+          parents: [proven, "3333333"],
+          paths: ["feeds/planner/latest-linux.yml", "feeds/planner/latest-linux.yml.sig"],
+        },
+      ],
+    });
+    assert.equal(feedOnlyRange(proven, head, git), null);
+    assert.deepEqual(gateWith(git), []);
+  });
+
+  it("does not treat a look-alike folder as a feed", () => {
+    const { git } = fakeGit({
+      commits: [
+        {
+          commit: head,
+          parents: [proven],
+          paths: ["feeds2/canvas/latest-linux.yml"],
+        },
+      ],
+    });
+    assert.match(feedOnlyRange(proven, head, git), /feeds2/u);
+  });
+
+  it("refuses a proof that is not an ancestor of HEAD", () => {
+    const { git } = fakeGit({ ancestor: false });
+    assert.match(feedOnlyRange(proven, head, git), /not an ancestor/u);
+    assert.match(gateWith(git).join(), /not an ancestor/u);
   });
 });
 

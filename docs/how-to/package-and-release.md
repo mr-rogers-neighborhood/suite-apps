@@ -61,14 +61,40 @@ Useful options:
 | `--no-build` | Reuse the last build in the app's `release/` folder. |
 | `--verify` | Check the published feed instead of building anything. |
 
+## Publishing several apps on one gate
+
+Publishing commits `feeds/<app>/`, so HEAD moves after every app. That does not cost another gate. A
+publish accepts a HEAD that descends from the commit `.dev/gate-status.json` names when every commit
+in between changes only paths under `feeds/`. The check reads the trees — `git rev-list` plus each
+commit's changed paths — and never the commit message, so a message prefix cannot claim the proof.
+
+The inheritance is narrow on purpose:
+
+- a commit touching any path outside `feeds/` does not inherit, and needs a `--fresh` gate;
+- a merge commit inherits only when every path it contributes, against each parent, is under `feeds/`;
+- the gate must still be `ok` and `fresh`, and the tree must still be clean.
+
+So four publishes need one fresh gate:
+
+```sh
+mise exec -- node scripts/gate.mjs --fresh
+node scripts/release.mjs canvas --publish
+node scripts/release.mjs planner --publish
+node scripts/release.mjs budget --publish
+node scripts/release.mjs start --publish
+```
+
+If anything outside `feeds/` changed since the gate, commit it, run `--fresh` again, and publish from
+that commit. Do not reset to the proven commit to get past the check.
+
 ## What the script refuses
 
 It stops before building when any of these is true, and prints every reason it found:
 
 1. The tree has uncommitted changes.
 2. The version in the app's `package.json` has no `## [version]` heading in its changelog.
-3. `.dev/gate-status.json` does not name this commit, does not say `ok`, or came from a working-tree
-   run rather than a clean export.
+3. `.dev/gate-status.json` does not name this commit or a feed-only descendant of it, does not say
+   `ok`, or came from a working-tree run rather than a clean export.
 4. The app's `suite.app.json` names a different version from its `package.json`.
 
 After packaging it also refuses a manifest whose version disagrees with `package.json`, or that names
@@ -84,6 +110,9 @@ node scripts/release.mjs <app>                # a clean dry run
 node scripts/release.mjs <app> --publish
 node scripts/release.mjs <app> --verify
 ```
+
+Later apps in the same batch reuse that gate as long as they only commit feeds; see
+[Publishing several apps on one gate](#publishing-several-apps-on-one-gate).
 
 Packaging is not proven until the built app runs. Install the artifact and open a document after the
 release, not before the gate.
