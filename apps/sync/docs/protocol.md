@@ -33,6 +33,13 @@ In v1, **each device is a member**. A person with a laptop and a desktop has two
 with its own key and role. This avoids delegated device keys while still giving the user a clean
 revocation story. Per-person members with device sub-keys can come later behind the same log.
 
+A workspace made under the blind relay also has an **identity root**: an Ed25519 key, held only by the
+device that founded the workspace and its recovery kit, that names the workspace
+(`workspaceId = SHA-256(root public key)`) and signs one record, the genesis. The genesis carries the
+workspace id, the creation time, the creating device and the relay address. A workspace shared before
+the root existed has an id that is not a root hash and no genesis; it is a workspace without an
+identity root, and nothing migrates it.
+
 ## Membership
 
 Membership is the MLS group ([Decisions](reference/decisions.md)). There is no second member
@@ -115,6 +122,10 @@ The commitment that takes a device out of the group is ciphertext, so the host i
 corrects the roster, and refuses it afterwards. The device is told `removed` before its socket closes,
 because a bare close reads as a bad connection and the app would offer a retry that can never work.
 
+The owner reports the revoke as done only when the host has numbered and echoed the commit. A removal
+record that landed without a commit closes the door but does not rotate the key, so a commit the host
+refuses as stale is sent again; a relay that goes away means the revoke did not complete.
+
 Spending a fresh invitation is what lets a removed device back in: an owner minting one is the
 permission, so "remove" is not a door that only opens one way. A removed device may say which
 invitation it holds when it joins (`inviteId` on `join`), which is how it explains itself at the door
@@ -126,20 +137,24 @@ The host stores one opaque record per message. It can read the header and nothin
 
 ```ts
 type Frame = {
-  kind: "commit" | "welcome" | "application"; // application = a document update
+  kind: "keypackage" | "commit" | "welcome" | "application"; // application = a document update
   workspaceId: string;
   deviceId: string; // who sent it, and whose signature it carries
-  epoch: number; // the MLS epoch the sender was in
+  epoch: number; // the MLS epoch the sender was in; 0 for a key package
   payload: string; // base64 of the encoded MLS message
   signature: string; // device key over the header and payload
   receivedAt: string; // stamped by the host
 };
 ```
 
-**A client ignores a frame whose epoch is not the one it is in.** The library does not do this: the
-spike showed a commit from an already-passed epoch is quietly absorbed as an application message
-rather than refused ([Decisions](reference/decisions.md)). The receiver holds the epoch
-comparison, and the host refuses to store a frame whose epoch is older than the workspace's.
+**A client reads a frame only at the epoch it is in, with one exception: a commit at its epoch plus
+one.** The library does not do this: the spike showed a commit from an already-passed epoch is quietly
+absorbed as an application message rather than refused ([Decisions](reference/decisions.md)). The
+receiver holds the epoch comparison, and a frame newer than its epoch is not something to open: it is a
+signal that a commit is missing, and the receiver asks for the frames after its last applied index
+before it opens anything. The host refuses to store a frame whose epoch is older than the workspace's,
+except a key package, which carries `0` because a device with no group has no epoch and is the join
+request rather than a message in the ordering.
 
 Sizes, measured rather than estimated: a commit is 0.5 kB, a welcome 0.8 kB, an application message
 0.3 kB, and a device's group state 1.6 kB.

@@ -26,7 +26,7 @@ from the workspace key; membership is what joins them.
 
 | Key           | What it is                                                                                           | Where it lives                                                                                                        | What it does                                                                                   |
 | ------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Root key      | Ed25519, one per workspace, made when the workspace is first shared                                  | the creating device and its recovery kit. The tree does not make one yet; S2 adds it beside `sync/identity.json`      | names the workspace and signs its genesis. Encrypts nothing.                                   |
+| Root key      | Ed25519, one per workspace, made when the workspace is first shared                                  | the creating device, beside `sync/identity.json`, and its recovery kit; never another device, never the relay         | names the workspace and signs its genesis. Encrypts nothing.                                   |
 | Workspace key | the MLS epoch's secrets, and the labels exported from them (`suite/workspace-key`, `suite/presence`) | every member device, in the group state at `dataDir/sync/groups/<workspaceId>.mls` (1.6 kB measured); never the relay | encrypts frame payloads and the content that travels outside a frame. A new value every epoch. |
 | Device key    | Ed25519, one per installation                                                                        | that device, in `sync/identity.json`, mode 0600; the public half is pinned by the relay                               | signs frames, role records, invites, removals and presence. Its SHA-256 is the device id.      |
 
@@ -46,6 +46,13 @@ from the workspace key; membership is what joins them.
 - A workspace shared before this record has an id that is not a root hash and no genesis. It is not
   invalid; it is a workspace without an identity root, and this record does not migrate it. Only new
   workspaces get one.
+
+Where the tree differs today: `share()` in Canvas's desktop service makes the root and writes the
+genesis beside it. A Canvas document owns its workspace id before it is shared, so the root signs the
+id in use rather than a hash of itself; `workspaceIdFromRootKey` and `genesisNamesItsRoot` are the
+derivation and the check for a workspace created root-first, and this record does not migrate a
+document id. The relay does not receive the genesis: the host has no stored record type for it, so it
+is the creating device's record and travels in that device's kit.
 
 ### Workspace
 
@@ -149,6 +156,9 @@ the sender does not get to say when its frame arrived.
   entries without renumbering the ones that remain. `joined` reports `oldestIndex`, the oldest position
   the log can still serve; a cursor below it is a gap, not an empty catch-up. A file written before S3
   has bare frame lines, which are read as consecutive positions from zero.
+- The client persists the last index it applied beside the group, so a reconnect asks
+  `since(cursor + 1)` from the relay's numbering rather than a count that starts at zero in each
+  process. With positions stored by S3, a cursor older than a compaction is now visible as a gap.
 - Signatures make attribution independent of the relay's order, but not causality: commits chain, so a
   client applies them in index order and does not skip to the newest.
 
@@ -208,13 +218,13 @@ The two halves exist and are wired in Canvas's desktop service:
 2. The `removal` record is the relay's half: signed by an owner, it makes the relay drop the socket,
    refuse the device and correct the roster (`server.ts`, `handleRemoval`). It is not a frame, and it
    does not change the relay's `newestEpoch`.
-3. `service.ts` sends the commit first and the removal record second. The relay stores the commit as a
-   frame, so `newestEpoch` moves when the relay has it. The service does not wait for the commit's
-   numbered echo before it returns, so a person can be told "removed" while the key rotation is still
-   only in flight.
+3. `service.ts` sends the commit first and the removal record second, then waits for the commit's
+   numbered echo before it resolves. A commit the relay refuses as `stale-epoch` is sent again; a
+   relay that goes away, or refuses it for another reason, means the revoke did not complete and the
+   app is told so. The echo is the relay saying it numbered the bytes.
 
-So a revoke does bump the epoch today, because the owner's client makes the commit. What is missing
-is the guarantee that both halves landed, and the rule a stale client follows.
+So a revoke does bump the epoch today, because the owner's client makes the commit, and the service
+waits for the relay's numbered echo before it calls the revoke done.
 
 ### What a revoke must do
 
@@ -268,22 +278,18 @@ Two consequences:
 
 - [The protocol as a session type](../protocol-sessions.md) states `epoch ≥ my epoch` for a conforming
   frame. This record sharpens that: a newer frame is not conforming either; it is a reason to catch
-  up. The service's current `frame.epoch < group.epoch` drop is the right shape, but it lets MLS
-  decide the rest and swallows the failure, which is why a missing commit can look like a quiet
-  workspace.
-- `frameRejection` in `frame.ts` returns `stale-epoch` for any epoch that is not exactly equal. It is
-  tested but not used by the service. Exact equality is right for an application frame and wrong for
-  the next commit. S2 either gives it the commit exception or retires it in favour of the service
-  rule.
+  up. The service applies `frameRejection` and, for a frame newer than its epoch that is not the next
+  commit, asks for `since(cursor)` instead of opening it.
+- `frameRejection` in `frame.ts` now carries the commit exception: exact equality for every kind, plus
+  a commit at the receiver's epoch plus one. It is the service's rule, not a second opinion beside it.
 
 ### The key package exception
 
 A device with no group has no epoch. Its key package carries `0`, and the relay must not measure it
-against `newestEpoch`. Today `admitFrame` exempts a key package from the role check but not from the
-epoch floor, so a key package at `0` is refused once the workspace has any stored frame. A device
-joining an active workspace would fail at the door. S2 exempts the kind from the epoch check, or the
-client uses `joined.newestEpoch`, which it already receives, in the header. The first is better: the
-relay should not require a joiner to know a number it cannot verify.
+against `newestEpoch`. `admitFrame` now exempts `keypackage` from the epoch floor while keeping the
+role and signature checks; every other kind is still measured against the newest stored epoch. The
+client handles a key package before its own epoch rule for the same reason, because a device joining a
+workspace that has already moved is asking to join, not posting an old frame.
 
 ## Wakes
 
@@ -398,12 +404,14 @@ the revoke, the wake and the demo exit true at once.
 
 S1 is this record. The four that follow are named by what changes; the tracker numbers them S2–S5.
 
-**S2 — keys and the group lifecycle.** Make the root key and the genesis. Make a revoke wait for the
-commit's numbered echo before the app says "removed". Exempt a key package from the epoch floor. Make a
-stale client catch up by index rather than by a count that is only right within one process. Give
-`frameRejection` the commit exception or retire it in favour of the service rule. Done when a revoked
-device fails to open a post-revoke frame, a member one commit behind catches up and writes again, and a
-second device joins a workspace that already has frames.
+**S2 — keys and the group lifecycle (landed).** The root key and its genesis are made when a workspace
+is first shared, and a workspace that predates them opens unchanged. A revoke waits for the commit's
+numbered echo before the app says "removed". `admitFrame` exempts a key package from the epoch floor
+and nothing else. A stale client keeps its last applied index beside the group and catches up from
+that index rather than from a count that only means anything within one process. `frameRejection`
+carries the commit exception, and the service uses it. Covered by a second device joining a workspace
+that already has frames, a revoked device failing to open a post-revoke frame, and a member one commit
+behind catching up and writing again.
 
 **S3 — the frame log.** Store the position with the frame so it survives compaction. Report the oldest
 index still held, so an old cursor reads as a gap rather than an empty catch-up. Keep the 1 MiB cap and
@@ -464,7 +472,7 @@ and S3. Done when a plaintext store is refused and two clients sync a document t
 - `mise exec -- node scripts/docs-check.mjs` — the root documentation check, which walks `docs/` and the
   root pages, not this page. Every relative link on this page was resolved against the tree by hand.
 - The behaviour described above is covered by `apps/sync/packages/protocol/src/group.test.ts`,
-  `apps/sync/packages/host/src/blindRoom.test.ts`,
+  `apps/sync/packages/protocol/src/genesis.test.ts`, `apps/sync/packages/host/src/blindRoom.test.ts`,
   `apps/sync/packages/host/src/server.test.ts` and
   `apps/canvas/desktop/src/main/sync/service.test.ts`.
-- `mise exec -- pnpm --filter @suite/sync-server test` — 134 tests, run against this tree.
+- `mise exec -- pnpm --filter @suite/sync-server test` — 146 tests, run against this tree.
