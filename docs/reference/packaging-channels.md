@@ -27,9 +27,10 @@ That is why the suite ships two different things:
 
 ## AppImage
 
-The AppImage is the default for every distribution except Arch. The release carries the image and
-`latest-linux.yml`, which names the file and its SHA-512. Start verifies the checksum against the
-manifest before placing an app.
+The AppImage is the default for every distribution except Arch. The release tag carries the image;
+the signed `latest-linux.yml` is committed under `feeds/<app>/` and served by Pages. The manifest
+names the image by absolute URL on that tag and records its SHA-512. Start verifies the manifest's
+signature first, then the checksum before placing an app.
 
 An AppImage needs FUSE 2; many distributions no longer install it. `--appimage-extract-and-run`
 works without FUSE, and an unpacked build keeps the Electron sandbox. The AppImage itself may need
@@ -89,6 +90,26 @@ Each app declares a feed. Start asks every feed what version it has and shows on
 installed, no release found, an update available, or up to date. The artifact is the one named by the
 verified manifest, and its sha512 is checked before installation.
 
-A single monorepo `releases/latest` cannot serve several different `latest-linux.yml` files. Per-app
-feeds need per-app tags or a static feed host; until then the app repositories' releases are the last
-published feed, not a live pipeline.
+The feeds are static files in this repository:
+
+```
+feeds/canvas/latest-linux.yml
+feeds/planner/latest-linux.yml
+feeds/budget/latest-linux.yml
+feeds/start/latest-linux.yml
+```
+
+GitHub Pages serves the repository root, so the base URL for an app is
+`https://mr-rogers-neighborhood.github.io/suite-apps/feeds/<app>`. A detached ed25519 signature sits
+beside each manifest as `latest-linux.yml.sig`; the same base URL is compiled into the app's
+`suite.app.json`, its electron-builder config and Start's catalogue.
+
+The manifest keeps the shape electron-builder writes, with one difference: its artifact URL is
+absolute, pointing at `https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/<app>-v<version>/<file>`.
+The bytes therefore stay a release asset while the manifest stays a small committed file. A single
+monorepo `releases/latest` cannot serve several different `latest-linux.yml` files; per-app tags and
+the Pages folder are what let all four resolve at once.
+
+`scripts/release.mjs` writes the pair and signs the exact bytes it commits. A dry run is the default;
+`--publish` uploads and commits, and `--verify` reads the published feed back. See
+[Package and release](../how-to/package-and-release.md).

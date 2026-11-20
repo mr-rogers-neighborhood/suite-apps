@@ -86,13 +86,17 @@ committed output has drifted. The root gate builds the same packages once before
 ## Releasing
 
 1. `pnpm check` — green, including the `dist` drift check.
-2. Build the AppImage and the Arch package; both are described in
-   [Packaging channels](../../docs/reference/packaging-channels.md).
-3. Sign the feed and upload the image, manifest and package.
+2. Run the root gate with `--fresh`, so `.dev/gate-status.json` proves the commit rather than the
+   working tree.
+3. `node scripts/release.mjs start --publish`. It builds the AppImage, writes the signed feed under
+   `feeds/start/`, builds the Arch package when `makepkg` is present, uploads them, and commits the
+   manifest.
 4. Keep the `start-` tag prefix: the shared packages' tags are a separate namespace, and a hub
    release must not land on one.
 
-The pre-monorepo `release.mjs` is in `harness/scripts/` for reference.
+[Package and release](../../docs/how-to/package-and-release.md) describes the script and what it
+refuses; [Packaging channels](../../docs/reference/packaging-channels.md) explains the two artifact
+forms.
 
 ## Working in the monorepo
 

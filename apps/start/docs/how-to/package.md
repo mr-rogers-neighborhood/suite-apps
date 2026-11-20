@@ -99,10 +99,11 @@ decision, and the one-writer rule is unchanged — only the writer changes.
 
 ## Cutting a release that includes the package
 
-`node scripts/release.mjs start --tag start-v<version> --publish` from `suite-dev`. It writes a
-PKGBUILD whose `pkgver` and `sha256sums` come from the artifact it just built — a stale checksum would
-fail makepkg, which is the point — builds the package, and uploads it with the AppImage, the feed and
-the signature.
+`node scripts/release.mjs start --publish` from the repository root. It writes a PKGBUILD whose
+`pkgver` and `sha256sums` come from the artifact it just built — a stale checksum would fail makepkg,
+which is the point — builds the package, and uploads it with the AppImage, the feed and the signature.
+Without `--publish` the same command is a dry run; `--verify` reads the published feed back. The tag
+defaults to `start-v<version>`, and `--tag` still overrides it.
 
 An app with no `packaging/arch/PKGBUILD`, or a machine without `makepkg`, skips the package with a
 note: only the hub has one.

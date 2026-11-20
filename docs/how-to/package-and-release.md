@@ -1,9 +1,92 @@
 # Package and release
 
 The suite has one repository and several artifacts. Each app keeps its own version and release notes;
-the root owns the gate and the packaging scripts.
+the root owns the gate, the feed host and `scripts/release.mjs`.
 
-## Build the hub
+## What a release is
+
+A release is three things that must describe the same commit:
+
+- an artifact attached to a release tag named `<app>-v<version>`;
+- a signed manifest committed at `feeds/<app>/latest-linux.yml`;
+- a changelog section for the version in the app's `CHANGELOG.md`.
+
+GitHub Pages serves the repository root, so the manifest is fetched from
+`https://mr-rogers-neighborhood.github.io/suite-apps/feeds/<app>/latest-linux.yml`. Its detached
+signature sits beside it as `latest-linux.yml.sig`. The artifact stays a release asset; the manifest
+names it by absolute URL on the app's tag, so the manifest can move while the bytes stay where a
+release put them.
+
+## One command per app
+
+Run a dry run first. It builds, verifies and prints what it would publish, and stops before every
+network write. A dry run is the default:
+
+```sh
+node scripts/release.mjs planner
+```
+
+Publish the same release. This uploads the artifact, manifest and signature, then commits the feed:
+
+```sh
+node scripts/release.mjs planner --publish
+```
+
+Re-read the published feed and prove it is signed by the key the apps pin, names the version in the
+tree, and points at an artifact that answers:
+
+```sh
+node scripts/release.mjs planner --verify
+```
+
+The hub has an Arch package as well as its AppImage. `start` builds it when `makepkg` is available and
+uploads it with the other files:
+
+```sh
+node scripts/release.mjs start --publish
+```
+
+Useful options:
+
+| Option | Effect |
+| --- | --- |
+| `--publish` | Upload and commit. Without it, the command is a dry run. |
+| `--tag <name>` | Release under another tag; the default is `<app>-v<version>`. |
+| `--notes-file <path>` | Use a file for the release notes instead of the changelog section. |
+| `--feed-dir <path>` | Copy the artifact, manifest and signature into a local folder. |
+| `--no-build` | Reuse the last build in the app's `release/` folder. |
+| `--verify` | Check the published feed instead of building anything. |
+
+## What the script refuses
+
+It stops before building when any of these is true, and prints every reason it found:
+
+1. The tree has uncommitted changes.
+2. The version in the app's `package.json` has no `## [version]` heading in its changelog.
+3. `.dev/gate-status.json` does not name this commit, does not say `ok`, or came from a working-tree
+   run rather than a clean export.
+4. The app's `suite.app.json` names a different version from its `package.json`.
+
+After packaging it also refuses a manifest whose version disagrees with `package.json`, or that names
+an artifact that is not in the release folder. It does not bump a version and it does not read tags to
+guess one.
+
+## Before you publish
+
+```sh
+mise exec -- node scripts/gate.mjs --fresh      # writes .dev/gate-status.json for this commit
+mise exec -- node scripts/docs-check.mjs       # if docs changed
+node scripts/release.mjs <app>                # a clean dry run
+node scripts/release.mjs <app> --publish
+node scripts/release.mjs <app> --verify
+```
+
+Packaging is not proven until the built app runs. Install the artifact and open a document after the
+release, not before the gate.
+
+## Build without publishing
+
+The release script is the publishing path. For a local build:
 
 ```sh
 pnpm --filter @suite/start run package:dir
@@ -14,23 +97,15 @@ The unpacked build keeps the Electron sandbox. The AppImage may need `--no-sandb
 `chrome-sandbox` cannot be setuid on a read-only mount. The Arch package repackages the published
 AppImage, so the package and the feed describe the same release.
 
-## Build an app
-
 Each app has its own packaging path:
 
 ```sh
-pnpm --filter @suite/canvas-desktop run package:dir   # unpacked Canvas
+pnpm --filter @suite/canvas-desktop run build   # then electron-builder in apps/canvas/desktop
 pnpm --filter @suite/planner run package
 pnpm --filter @suite/budget run package
 ```
 
-For a distributable Canvas build, run electron-builder from the shell package:
-
-```sh
-pnpm --filter @suite/canvas-desktop exec electron-builder --linux AppImage
-```
-
-Run the owning app's `pnpm verify` first. Packaging does not run the gate.
+Run the owning app's gate first. Packaging does not run it.
 
 ## Flatpak
 
@@ -61,25 +136,8 @@ publish the clean build and bring the client back to it.
 ## Release notes and versions
 
 - The version lives in the app's `package.json`. Do not restate it in a README or a doc page.
-- The app's `CHANGELOG.md` records what changed, in a person's words.
-- A release tag must not collide with another app's tag line. The hub's release tags and the shared
-  packages' tags are different namespaces.
-
-## The feed
-
-Start asks each app's feed for its current version and installs the artifact named by the verified
-manifest, after checking its sha512. A feed is therefore a signed manifest plus the artifact it names.
-
-A single monorepo `releases/latest` cannot serve several different `latest-linux.yml` files. Per-app
-feeds need per-app tags or a static feed host. Until that exists, the app repositories' releases remain
-the last published feed.
-
-## Before you publish
-
-1. `mise exec -- node scripts/gate.mjs --fresh`
-2. The owning app's `pnpm verify`.
-3. `mise exec -- node scripts/docs-check.mjs` if docs changed.
-4. Install the artifact and open a document. Packaging is not proven until the built app runs.
-
-App-specific release steps are in that app's docs, for example
-[Suite Start's packaging page](../../apps/start/docs/how-to/package.md).
+- The app's `CHANGELOG.md` records what changed, in a person's words. The release script reads the
+  section for the version rather than asking for a second copy.
+- Tags use the `<app>-v<version>` prefix, so several apps can share one repository without colliding.
+- The manifest's signature is made with the publisher key at `SUITE_UPDATE_KEY`, or
+  `~/.config/suite/update-key.pem` by default. The private half never enters this repository.
