@@ -1,0 +1,48 @@
+name: Bug
+description: Something the tree does that it should not
+title: "<Area>: <what happens>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report a vulnerability per the owning app's `SECURITY.md`, never in a public issue.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: The observed behaviour, including the exact message or the wrong value.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen
+      description: The behaviour the app or its docs promise.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered, starting from a clean state where possible. Say which app and version.
+      placeholder: |
+        1. Install Canvas from Start
+        2. Open a board
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and platform
+      description: The app's `package.json` version, the OS, and the channel (AppImage, Arch, Flatpak, dev).
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Logs, screenshots, a failing test, or the commit that introduced it. Redact tokens and paths that name you.
+    validations:
+      required: false

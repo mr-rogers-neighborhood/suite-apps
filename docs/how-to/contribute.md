@@ -23,6 +23,21 @@ from the other app. Do not change another app to make yours pass.
 Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`. Keep a commit to one
 intent. Do not commit a `dist/` directory, a lockfile from a nested app, or secrets.
 
+## Issues
+
+The tracker follows the shape of the work, not the other way round:
+
+- An **epic** states an outcome and why it is next. Its work is sub-issues, so progress rolls up.
+- A **task** is one shippable change: context, work, done-when, and the command that proves it.
+- A **bug** names what happens, what should happen, and how to reproduce it.
+
+Labels are `kind:epic` or `kind:task`, one `area:` (`delivery`, `sync`, `mobile`, `apps`, `hygiene`),
+and one `priority:` from `p0` to `p3`. The milestone names the phase, not the app; an app's state
+belongs in its README and changelog.
+
+A task that cannot name its verification command is not ready to start. A task that changes a product
+claim moves the owning doc in the same change.
+
 ## Documentation
 
 - A behaviour change updates the page that owns the fact in the same change.

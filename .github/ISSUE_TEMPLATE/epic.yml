@@ -1,0 +1,40 @@
+name: Epic
+description: An umbrella whose work lives in sub-issues
+title: "Epic: <area> — <outcome>"
+labels: ["kind:epic"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An epic states an outcome and the reason it is next. The work itself belongs in sub-issues:
+        open them separately and link them with GitHub's "Create sub-issue".
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: The outcome, in one or two sentences. What is true when this closes?
+      placeholder: Every app publishes its own feed and Start can resolve all of them at once.
+    validations:
+      required: true
+  - type: textarea
+    id: why-now
+    attributes:
+      label: Why now
+      description: What breaks, drifts or blocks if this waits? Name files or commands where you can.
+      placeholder: Four apps still publish from separate repositories; one `releases/latest` cannot serve two manifests.
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What a reader might expect here but will not find, and where it lives instead.
+    validations:
+      required: false
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: The conditions a reviewer can check, not a list of activities.
+    validations:
+      required: true

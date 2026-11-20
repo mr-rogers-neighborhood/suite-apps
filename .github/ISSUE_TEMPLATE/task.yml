@@ -1,0 +1,50 @@
+name: Task
+description: A shippable unit of work under an epic
+title: "<Area>: <what changes>"
+labels: ["kind:task"]
+body:
+  - type: input
+    id: epic
+    attributes:
+      label: Epic
+      description: The epic this belongs to. Prefer opening it as a sub-issue so progress rolls up.
+      placeholder: "#14 Epic: delivery"
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What the tree looks like today and why that is a problem. File paths and commands beat adjectives.
+      placeholder: "`apps/start/src/catalogue.ts` declares a feed per app, and the URL appears three times on purpose ..."
+    validations:
+      required: true
+  - type: textarea
+    id: work
+    attributes:
+      label: Work
+      description: The change, scoped to what one person can land and verify.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: Checkable conditions. Include what must stay true, not only what must become true.
+    validations:
+      required: true
+  - type: textarea
+    id: verify
+    attributes:
+      label: Verification
+      description: The exact command that proves it. A claim without a command is not a verification.
+      placeholder: "mise exec -- node scripts/gate.mjs --only start"
+    validations:
+      required: true
+  - type: textarea
+    id: not-doing
+    attributes:
+      label: Deliberately not doing
+      description: Adjacent work this task leaves alone, so a reviewer does not expect it.
+    validations:
+      required: false
