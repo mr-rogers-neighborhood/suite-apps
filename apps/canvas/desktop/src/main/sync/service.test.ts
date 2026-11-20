@@ -755,6 +755,8 @@ describe("a revoke waits for the commit's numbered echo", () => {
 
     await echoCommit(hostA, 0);
     await removal;
+    // The stale refusal had been published; a revoke that completed is not still refused.
+    expect(serviceA.status()).toMatchObject({ state: "syncing" });
   });
 
   it("says the removal did not complete when the host goes away", async () => {

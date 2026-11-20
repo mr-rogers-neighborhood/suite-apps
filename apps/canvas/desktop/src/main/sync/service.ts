@@ -820,6 +820,9 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
         if (attempt === 1) current.sendRemoval(removal);
         try {
           await echo;
+          // The refusal that prompted a retry had already been published; the revoke is now
+          // done, so the pill should not keep saying it was refused.
+          publishStatus({ state: "syncing", count: applied() });
           return;
         } catch (error) {
           lastError = error;
