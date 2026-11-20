@@ -22,13 +22,13 @@ import { spawn } from "node:child_process";
 import { existsSync, watch } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import appConfig from "../apps/go/app.config.json" with { type: "json" };
+import appConfig from "../app.config.json" with { type: "json" };
 import { resolveJdk, resolveSdkRoot } from "./preflight.mjs";
 
 const { appId } = appConfig;
 
-const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const APP_DIR = join(ROOT, "apps", "go");
+const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
+const ROOT = join(APP_DIR, "..", "..");
 const ANDROID_DIR = join(APP_DIR, "android");
 const APK = join(ANDROID_DIR, "app", "build", "outputs", "apk", "debug", "app-debug.apk");
 /** Where a change means the bundle is stale. Everything else in `apps/go` is config or native. */

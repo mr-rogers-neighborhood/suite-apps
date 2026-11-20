@@ -13,7 +13,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import config from "../apps/go/app.config.json" with { type: "json" };
+import config from "../app.config.json" with { type: "json" };
 import { resolveSdkRoot } from "./preflight.mjs";
 
 const { appId } = config;
