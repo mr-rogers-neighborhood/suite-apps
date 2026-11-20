@@ -96,7 +96,7 @@ took the desktop down. The layout and package ownership are in
 | [Reference](docs/reference/index.md)<br>Layout, commands, channels, formats, environment, status. | [Explanation](docs/explanation/index.md)<br>What Suite is, local-first, the mini-app model, architecture. |
 
 App-specific docs stay beside each app: `apps/<app>/docs/`. The current rules are in
-[Decisions](docs/reference/decisions.md); historical research is in [Archive](docs/archive/README.md).
+[Decisions](docs/reference/decisions.md).
 
 ## Contributing
 

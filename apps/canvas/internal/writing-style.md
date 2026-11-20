@@ -79,4 +79,4 @@ The second column is not a synonym swap. It replaces a claim with a mechanism.
 
 ## Scope
 
-These rules apply to `docs/tutorials/`, `docs/how-to/`, `docs/reference/`, `docs/explanation/`, and the root README, AGENTS, CONTRIBUTING and SECURITY files. `internal/` holds working notes and `docs/archive/` holds past work, so both are exempt.
+These rules apply to `docs/tutorials/`, `docs/how-to/`, `docs/reference/`, `docs/explanation/`, and the root README, AGENTS, CONTRIBUTING and SECURITY files. `internal/` holds working notes and is exempt.

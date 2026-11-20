@@ -16,7 +16,6 @@ Start with [What Suite is](explanation/why-suite-exists.md) for the product over
 
 Current rules are in [reference/decisions.md](reference/decisions.md). App-specific tutorials,
 how-tos, reference pages and decisions stay in `apps/<app>/docs/`; the app README is the way in.
-Historical research is in [archive/](archive/README.md).
 
 ## App documentation
 
@@ -63,8 +62,7 @@ Never restate a version in prose here. Link to the file that holds it.
   document updates the page that owns it in the same change.
 - **A shape change updates the rules.** Change [reference/decisions.md](reference/decisions.md) and
   the owning page; do not add a historical note.
-- **No history in the reading path.** Current pages describe today. Git history is the archive;
-  [archive/](archive/README.md) holds only material worth keeping for reference.
+- **No history in the reading path.** Current pages describe today. Git history is the archive.
 - **Plain Markdown only.** Relative links, no site-only shortcodes. The tree must render on GitHub
   and stay portable if a site is added later.
 - **Neutral voice.** State the fact. No first person, no marketing cadence, no section summary that

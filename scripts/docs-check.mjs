@@ -36,7 +36,6 @@ const BANNED = [
   {
     pattern: /(github\.com\/[^ )]*suite-dev|suite-dev\/scripts|cloned side by side)/,
     why: "the sibling-repository workflow is history; point at the root instead",
-    allow: ["docs/archive/"],
   },
 ];
 
@@ -73,8 +72,6 @@ for (const page of pages) {
       problems.push(`${pageRel}:${line}: ${allowed.why} (\`${match[0]}\`).`);
     }
   }
-
-  if (pageRel.startsWith("docs/archive/")) continue;
 
   for (const match of text.matchAll(/!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
     let target = match[1].replace(/^<|>$/g, "");
