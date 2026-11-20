@@ -9,9 +9,9 @@
   },
   "scripts": {
     "bench": "vitest bench --config vitest.bench.config.ts --reporter=verbose",
-    "build": "turbo run build",
+    "build": "pnpm --filter @suite/graph --filter @suite/import-obsidian --filter @suite/canvas --filter @suite/canvas-desktop --workspace-concurrency=1 run build",
     "build-storybook": "pnpm --filter @suite/canvas build-storybook",
-    "check": "biome check . && turbo run typecheck && vitest run --changed && pnpm docs:symbols && pnpm shape",
+    "check": "biome check . && pnpm typecheck && vitest run --changed && pnpm docs:symbols && pnpm shape",
     "check:full": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:stories && pnpm build && pnpm docs:check && pnpm docs:symbols && pnpm shape && pnpm security:secrets",
     "clean": "rm -rf apps/*/dist apps/*/storybook-static packages/*/dist .turbo apps/*/.turbo packages/*/.turbo",
     "coverage": "vitest run --coverage",
@@ -54,7 +54,7 @@
     "test:changed": "vitest run --changed",
     "test:stories": "pnpm --filter @suite/canvas test:stories",
     "test:watch": "vitest",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "pnpm --filter @suite/canvas --filter @suite/canvas-desktop --filter @suite/graph --filter @suite/import-obsidian run typecheck",
     "verify": "node scripts/scratchpad.mjs --quiet && pnpm lint && pnpm typecheck && pnpm test && pnpm test:stories && pnpm build && pnpm docs:check && pnpm docs:symbols && pnpm shape && pnpm security:deps && pnpm security:secrets"
   },
   "devDependencies": {

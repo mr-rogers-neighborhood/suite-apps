@@ -8,16 +8,16 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm -r --workspace-concurrency=1 run build",
+    "build": "pnpm --filter @suite/contracts --filter @suite/files --filter @suite/theme --filter @suite/ui --filter @suite/desktop --filter @suite/start --workspace-concurrency=1 run build",
     "check": "biome check . && pnpm build && pnpm typecheck && vitest run && node scripts/check-dist.mjs",
     "check:full": "pnpm check",
     "format": "biome format --write .",
     "lint": "biome check .",
     "publish:packages": "pnpm -r --filter './packages/*' publish --access restricted --tag next --no-git-checks",
     "test": "vitest run",
-    "typecheck": "pnpm -r --workspace-concurrency=1 run typecheck",
+    "typecheck": "pnpm --filter @suite/start --filter @suite/contracts --filter @suite/desktop --filter @suite/files --filter @suite/theme --filter @suite/ui run typecheck",
     "verify": "pnpm check",
-    "build:verify": "pnpm -r run build && git diff --exit-code -- packages",
+    "build:verify": "pnpm --filter @suite/contracts --filter @suite/files --filter @suite/theme --filter @suite/ui --filter @suite/desktop --filter @suite/start --workspace-concurrency=1 run build && git diff --exit-code -- packages",
     "e2e": "playwright test",
     "dev": "pnpm build && pnpm --filter @suite/start start",
     "prepare": "husky"

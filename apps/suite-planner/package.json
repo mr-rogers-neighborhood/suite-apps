@@ -12,7 +12,7 @@
     "build": "pnpm --filter @suite/planner build",
     "preview": "pnpm --filter @suite/planner preview",
     "package": "pnpm --filter @suite/planner package",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter @suite/planner --filter @suite/planner-core --filter @suite/planner-pack run typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",

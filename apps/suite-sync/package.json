@@ -8,13 +8,13 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm -r --workspace-concurrency=1 run build",
+    "build": "pnpm --filter @suite/sync --filter @suite/host --filter @suite/sync-server --workspace-concurrency=1 run build",
     "check": "biome check . && pnpm build && pnpm typecheck && vitest run && node scripts/check-dist.mjs",
     "check:full": "pnpm check",
     "format": "biome format --write .",
     "lint": "biome check .",
     "test": "vitest run",
-    "typecheck": "pnpm -r --workspace-concurrency=1 run typecheck",
+    "typecheck": "pnpm --filter @suite/sync-server --filter @suite/host --filter @suite/sync run typecheck",
     "verify": "pnpm check",
     "prepare": "husky",
     "release:relay": "node scripts/release.mjs",
