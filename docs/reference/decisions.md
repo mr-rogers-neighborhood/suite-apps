@@ -32,6 +32,8 @@ The rules that shape this repository. Each is current; the code follows it.
   run unless `--publish` is passed.
 - A version lives in one place and a tag names one app's release. [Version ownership](../how-to/package-and-release.md#version-ownership)
   states which file owns it and which prefix the tag uses.
+- An installed app verifies a feed with the update key it was built with. A key rotation therefore
+  ships a new Start first; a feed signed with the new key is published only after that build exists.
 - Linux is the published platform. macOS and Windows have no signing identity.
 
 ## Product boundary
