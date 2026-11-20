@@ -68,6 +68,45 @@ the `suite://` handler in `~/.config/mimeapps.list`. The AppImage needs
 mount; the unpacked build keeps the sandbox. A Flatpak build uses zypak and
 avoids that tradeoff.
 
+## The gate on the VM
+
+`suite-dev` is the independent machine. `scripts/ci/bootstrap-vm.sh` prepares it
+(idempotent), and from then on a push to `main` is the trigger:
+
+```sh
+node scripts/ci/bootstrap-vm.sh     # once, and safe to re-run
+git push vm main                    # queues one gate run for that commit
+
+ssh suite-dev cat ~/ci/status.json          # last result
+ssh suite-dev tail -f ~/ci/logs/<sha>.log   # one log per commit
+```
+
+The bare repository lives at `~/git/suite-apps.git`. Its `post-receive` hook
+starts a transient system unit that runs as `aurora` with `MemoryHigh=5G` and
+`MemoryMax=6G`; the runner takes a lock, so a second push waits rather than
+doubling memory. The run is `node scripts/gate.mjs --fresh`, so the tree under
+test is a `git archive` of the commit with a lockfile install.
+
+The VM has 4 vCPU, 8 GiB RAM, and a 4 GiB swapfile; Canvas's gate is the heavy
+one. Xvfb and Electron's GTK libraries are installed for the e2e phase, which is
+not wired into the gate yet.
+
+## Orca memory
+
+Orca keeps a headless terminal emulator with its own scrollback per PTY. On
+2026-11-19 a spike (the kernel log names `pacquet-startup`) plus 50,000-row
+scrollback took the desktop into OOM.
+
+- Scrollback is back at 5,000 rows (`terminalScrollbackRows`); Orca clamps it at
+  50,000 and the buffers are per pane.
+- `~/.local/bin/orca-capped` starts Orca in a scope capped at `MemoryHigh=10G`
+  and `MemoryMax=16G`, and `orca.desktop` now points at it. A leaked Orca is
+  reclaimed inside Orca instead of freezing the machine. The pre-cap entry is at
+  `orca.desktop.pre-cap`; an Orca update that rewrites its desktop entry will
+  drop the wrapper, so re-check `Exec=` after an update.
+- Run heavy checks under the same idea: `systemd-run --user --scope -p
+  MemoryMax=… mise exec -- …` rather than at the desktop's mercy.
+
 ## Orca
 
 Open `~/Projects/suite-apps` as the project. The old `~/Projects/suite` folder

@@ -15,6 +15,11 @@ each app:
 The full gate is `node scripts/gate.mjs`; `--fresh` proves the commit rather
 than the working tree. Use `mise exec --` so Node 22 and pnpm 12.17 resolve.
 
+The independent gate runs on `suite-dev`: pushing `main` to the `vm` remote
+queues the same gate there, in a memory-capped unit. Results are in
+`~/ci/status.json` on the VM and `ssh suite-dev cat ~/ci/status.json` from here.
+See `scripts/ci/` and the README.
+
 ## Monorepo rules
 
 - Shared packages are `workspace:*`. Never reintroduce a `git+https://…#vX`
