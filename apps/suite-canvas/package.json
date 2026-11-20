@@ -58,7 +58,7 @@
     "verify": "node scripts/scratchpad.mjs --quiet && pnpm lint && pnpm typecheck && pnpm test && pnpm test:stories && pnpm build && pnpm docs:check && pnpm docs:symbols && pnpm shape && pnpm security:deps && pnpm security:secrets"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.15",
+    "@biomejs/biome": "2.5.15",
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "@stryker-mutator/core": "10.0.0",
@@ -71,7 +71,7 @@
     "marked": "^18.1.2",
     "turbo": "^2.11.10",
     "typescript": "~5.9.3",
-    "vitest": "^5.0.5",
+    "vitest": "5.0.5",
     "yaml": "^2.9.1"
   },
   "lint-staged": {

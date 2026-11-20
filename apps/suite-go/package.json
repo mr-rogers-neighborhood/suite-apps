@@ -31,13 +31,13 @@
     "pack:build": "node scripts/pack.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.5",
+    "@biomejs/biome": "2.6.6",
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "fflate": "^0.8.3",
     "husky": "^9.1.7",
     "typescript": "~5.9.3",
-    "vitest": "^5.0.5"
+    "vitest": "5.1.0"
   },
   "author": {
     "name": "Suite contributors",
