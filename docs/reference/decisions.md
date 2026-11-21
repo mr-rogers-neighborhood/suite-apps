@@ -107,6 +107,47 @@ The rules that shape this repository. Each is current; the code follows it.
 - The W3C MiniApp model contributed the host, the manifest, declared capabilities and the lifecycle.
   Its packaging specification is retired, so there is no compliance target.
 
+## Widgets and the dashboard
+
+- A widget is host-rendered in phase 1: the app declares a descriptor, the host draws it with its own
+  components. No app bundle, script, style or document runs in the host. The white paper's widget is
+  a page a host mounts (§2.1.5, §3.1.5, §4.5); a host that never reads a document cannot mount that
+  page, so the contract is the declarative part the model implies.
+- The descriptor is `{ id, title, size, capabilities, action }`, in `suite.app.json` for desktop and
+  in a pack's `manifest.json` for Go, validated by `@suite/contracts`. `id` is app-local lower
+  kebab-case and the host registers it as `<app id>.<widget id>` — `planner.quick-task` — so an app
+  cannot claim a host id such as `start.apps`. `size` is one of `1x1`, `2x1`, `full`.
+- One action exists in phase 1: `capture`. Its fields are declared data — id, label, type (`text`,
+  `day`, `number`), whether it is required, a length ceiling — and the host renders inputs from them.
+  An unknown size, capability or action is refused when the manifest parses, not ignored.
+- A capture is typed. The host sends `{ widget, action: "capture", values }` with one string per
+  declared field; the app validates it against its own schema, writes through its own document layer
+  and answers `{ ok, message, open? }`. The host never reads or writes a document and never holds app
+  data. A malformed capture is refused with a sentence the host can show.
+- A widget opens the full app through the existing `suite://` link when the task needs more room. It
+  never embeds a second instance of the app; capture is the only write path phase 1 adds.
+- The layout is the host's document: an ordered list of `{ id, size }` in a local file, per host and
+  device. Start keeps `dashboard.json` under its own config directory. It is not synced, not stored
+  in an app document and not owned by an app.
+- The layout carries a format and a version. A corrupt file, or one written by a version this build
+  does not read, falls back to the default with a visible note. An entry naming an id the host cannot
+  resolve is dropped with a note that names it; showing less than the file says, silently, is the
+  failure this rule exists to prevent.
+- The default layout is Start's app grid at `full`: the same cards, installs, channels and launches
+  as before. The grid is a host-owned widget, so the contract is exercised before any app depends on
+  it.
+- The registry is the host's: its own widgets plus the widgets of installed apps whose manifests
+  parse. An app that is not installed contributes no widget, and its layout entry is the unknown-id
+  case rather than a crash.
+- Desktop first. Start proves the descriptor and the layout; Go then renders the same descriptors in
+  its launcher, and an Android home-screen widget is a native adapter over the same declaration, not
+  a third contract.
+- Composite layout is constrained: a row or carousel groups widgets under the same size classes. It
+  is not a page builder and cannot place content outside the grid.
+- Rejected: a general page builder; arbitrary app code, scripts or HTML in the host; synced or
+  app-owned layouts; host-held app data or a host-side document cache; a descriptor that needs the
+  app running to render; a widget bundle as a second packaging format.
+
 ## Product boundary
 
 - A document is a file the user owns. The hub returns a path or bytes; it never parses a document.

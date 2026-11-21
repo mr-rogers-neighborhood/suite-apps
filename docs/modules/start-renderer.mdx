@@ -14,6 +14,11 @@ rail and the keyboard model around them. It deliberately does not decide whether
 an app is installed, whether an update verifies, or what to execute. Main
 answers those questions and this directory renders the answer.
 
+The dashboard is painted here too: one widget shell per resolved entry, with the
+app grid's cards inside the `start.apps` one. The layout file, the registered ids
+and the fallback note all arrive in `LauncherState`; the rule for those ids lives
+in [Widgets and the dashboard](../reference/decisions.md#widgets-and-the-dashboard).
+
 The seam is the preload bridge. `globalThis.suiteStart` exposes `listApps`,
 actions and broadcasts; the page treats it as read-only input and re-reads
 after every action rather than predicting the result. A boundary test keeps
