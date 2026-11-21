@@ -8,8 +8,10 @@ targets:
 ---
 
 This is the handbook. It floats over the board, and it is written by the people who make the
-product; every article is a Markdown file in the repository, published here and in the
-documentation site from the same source.
+product; every article is a Markdown file in the repository, rendered here and on GitHub from the
+same source. The developer walkthrough for
+<a href="https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/docs/tours/open-a-document.mdx" target="_blank" rel="noreferrer">opening
+a document</a> follows the same files from the command line to the saved bytes.
 
 The list is sorted by what is on screen. A board with a card selected shows the articles about cards
 and about selection; the title bar is in the list because it is always there. The count on the
