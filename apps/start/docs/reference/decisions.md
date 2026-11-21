@@ -26,9 +26,16 @@ The rules that shape Start.
   update a copy a person placed. A Flatpak is Flatpak's to update: a pre-release Flatpak never offers
   an AppImage-style update.
 - Start manages the Suite Sync service; it is not a server. Start locates `suite-sync` (an explicit
-  `SUITE_SYNC_BIN`, a bundled copy, then `PATH`), starts and stops it, and reports its address and
-  store. The relay owns its frames and role records; Start keeps no listener and no frame store.
-  When there is no binary the Sync pane says what to install instead of showing a dead control.
+  `SUITE_SYNC_BIN`, a bundled copy, then `PATH`), starts and stops it, and reports its address, store
+  and fingerprint. It makes and keeps the relay's TLS pair under the store's `tls/` directory, mode
+  0600, reuses it, and refuses a half pair rather than rotating the fingerprint. Loopback serves
+  `ws://`; the network scope serves `wss://` with that pair. The relay owns its frames and role
+  records; Start keeps no listener and no frame store. When there is no binary the Sync pane says
+  what to install instead of showing a dead control.
+- The Sync tab opens the relay's console: a separate loopback-only listener with a token generated at
+  startup. The console and its relay code read metadata, never frames; a code carries the address,
+  pin and a live invitation when one exists, while Start's own code carries the address and pin. A
+  friend-code or contacts exchange is not built.
 - A relay may run on another machine. Start then manages none, and the apps reach that relay through
   the address entered in their Sync dialog; the local Sync pane describes only a relay Start started.
 - Start is not in the data path. It returns a path or a URL and launches a separate process. It never

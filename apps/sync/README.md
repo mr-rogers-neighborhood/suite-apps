@@ -36,6 +36,12 @@ and stays a launcher when the relay is absent or runs somewhere else.
 > refused unless `--allow-plaintext` makes that choice explicit, and that choice prints a warning. The
 > relay still sees the metadata the threat model accepts — workspace and device ids, epochs, kinds,
 > sizes and timing — though TLS hides it from a passive network attacker.
+>
+> **The console and the relay code.** `serve` also opens a read-only console on `127.0.0.1` and
+> prints its URL with a token generated at startup. The console shows the relay's metadata and draws
+> a `suite://relay` code carrying the address, the certificate pin and, when one is live, an
+> invitation. Start opens that console from its Sync tab. A friend-code or contacts exchange is not
+> built.
 
 ---
 
@@ -44,12 +50,12 @@ For the product story and the influences behind it, read
 
 ## What exists
 
-| Path                | What it is                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol` | `@suite/sync`: ids, roles, signed membership and role records, invites, sealed frames, relay messages. The root is pure and defines no document format. |
-| `packages/host`     | `@suite/host`: the relay — frame admission, the numbered frame log, the file store and the WebSocket server.                                            |
-| `src`               | `suite-sync`: the CLI over `@suite/host` (`serve`, `status`, `--version`).                                                                              |
-| `docs/`             | Protocol, threat model, and the decisions behind them.                                                                                                  |
+| Path                | What it is                                                                                                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol` | `@suite/sync`: ids, roles, signed membership and role records, invites, sealed frames, relay messages, relay codes and QR. The root is pure and defines no document format. |
+| `packages/host`     | `@suite/host`: the relay — frame admission, the numbered frame log, the file store, the WebSocket server and the loopback console.                                          |
+| `src`               | `suite-sync`: the CLI over `@suite/host` (`serve`, `status`, `--version`).                                                                                                  |
+| `docs/`             | Protocol, threat model, and the decisions behind them.                                                                                                                      |
 
 ## Commands
 
@@ -70,6 +76,10 @@ then `PATH`), runs `serve` as its own child process, and stops it when Start qui
 embed the relay and keeps no frames of its own. The store is a directory of
 `<workspaceId>.frames.jsonl` files; there is no `workspace init`, `membership.json` or
 `snapshot.loro`.
+
+When Start runs the relay, it also makes and keeps the TLS pair under the relay store's `tls/`
+directory, mode 0600, so the fingerprint survives a restart. The Sync tab shows that fingerprint and
+opens the console; a relay you run by hand uses `--tls-cert` and `--tls-key` as the guide describes.
 
 ## Run the relay on another machine
 

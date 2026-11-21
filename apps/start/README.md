@@ -16,13 +16,29 @@ download.
 ## What exists
 
 - **Built:** the shared packages (`@suite/contracts`, `@suite/files`), the Electron launcher shell with
-  discovery, install, routing and the sync-status surfaces, supervision of the separate `suite-sync`
-  server, and the invite/join flow in the apps' Sync dialogs.
+  discovery, install, routing and the Suite Help card, the sync-status surfaces, supervision of the
+  separate `suite-sync` server including its certificate, console and relay code, and the invite/join
+  flow in the apps' Sync dialogs.
 - **Later:** person keys and the shared sync protocol's remaining surface. There is no hosted web app,
   control plane or relay; sync is a server the user runs.
 
 Changes, in a person's words rather than commits: [CHANGELOG.md](CHANGELOG.md).
 Where accessibility stands, and what is checked by hand: [ACCESSIBILITY.md](ACCESSIBILITY.md).
+
+## Sync
+
+Start runs `suite-sync` as a child and owns the TLS pair for the relay it starts. The pair lives under
+the relay store's `tls/` directory, mode 0600, and is made once and reused; a half pair is refused
+rather than rotated. Loopback keeps `ws://`; **Other devices on this network** serves `wss://` with
+that pair. The Sync tab shows the SHA-256 fingerprint a device pins.
+
+The same tab can open the relay's console: a separate listener on `127.0.0.1` with a token generated
+at startup. It shows the relay's metadata and draws a `suite://relay` code with the address and pin;
+the console's code adds a live invitation when one exists, while Start's own code carries no
+invitation. Neither the console nor a code reads a frame.
+
+A friend-code or contacts exchange is not built. A device joins with an invitation, a relay code, or
+the relay address plus its fingerprint.
 
 ## Two rules
 

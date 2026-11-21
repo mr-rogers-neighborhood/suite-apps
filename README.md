@@ -15,7 +15,7 @@ document is a file you own. There is no account, no telemetry, and no server ope
 | <img src="apps/start/build/app-icons/canvas.png" width="20" height="20" alt=""> **Suite Canvas** | Thinking and research: cards, boards, writing, links and views in one document | Alpha |
 | <img src="apps/start/build/app-icons/planner.png" width="20" height="20" alt=""> **Suite Planner** | A daily planner: inbox, estimates, capacity and a local calendar | Pre-alpha |
 | <img src="apps/start/build/app-icons/budget.png" width="20" height="20" alt=""> **Suite Budget** | An envelope budget: give every dollar a job; [what it does](apps/budget/README.md) | Pre-alpha |
-| <img src="apps/start/build/app-icons/help.png" width="20" height="20" alt=""> **Suite Help** | The documentation app: the code explorer and the handbook, offline; [what it is](apps/help/README.md) | New |
+| <img src="apps/start/build/app-icons/help.png" width="20" height="20" alt=""> **Suite Help** | The documentation app: the code explorer and the handbook, offline; [what it is](apps/help/README.md); Start installs and opens it | Working |
 | **Suite Start** | The hub: installs, updates, opens and removes the other apps | Working |
 | **Suite Sync** | The sync protocol and a relay a person runs | Working |
 | **Suite Go** | One mobile container that hosts the domains as packs | Shell only |
@@ -54,7 +54,7 @@ met and which are still partial.
 | | |
 | --- | --- |
 | Platforms | Linux x86_64. AppImage and Flatpak for the apps and the hub; an Arch package for the hub; no macOS or Windows build. |
-| Sync | Canvas and Planner sync through a user-run relay. Budget has no network client. |
+| Sync | Canvas and Planner sync through a user-run relay; Start shows the relay's fingerprint and opens its console. Budget has no network client. |
 | Security | No account or telemetry. Document files are unencrypted; use disk encryption. The sync relay holds sealed frames; off loopback it uses `wss://` with a pinned self-signed certificate, and it is loopback by default. |
 | Mobile | Suite Go installs on Android as a debug build. No domain ships; iOS is unbuilt. |
 | Gate | Local, at the repository root. No CI service gates a pull request. |
@@ -78,12 +78,14 @@ took the desktop down. The layout and package ownership are in
 
 ## Documentation
 
-The primary reader is the explorer. Run `pnpm docs:dev` at the repository root and open
-<http://localhost:3001/explore>. It indexes every file and declaration and offers three views:
+The primary reader is Suite Help, the shipped documentation app. Run `pnpm docs:dev` at the
+repository root to open it: the explorer indexes every file and declaration and offers three views —
 **Browser** (the file tree), **Modules** (one narrative per module) and **Tours** (ordered paths
-through the code). Reference facts are derived; module notes and tours carry the prose.
+through the code). Reference facts are derived; module notes and tours carry the prose. `docs:dev`
+opens an Electron window, so headless checks use `docs:index`, `docs:index:check`, `docs:coverage`
+or `docs:build` instead.
 
-This is a development tool, not a hosted site. The older notes stay in [docs](docs/README.md):
+This is an offline app, not a hosted site. The older notes stay in [docs](docs/README.md):
 decisions, architecture, commands and the app-specific docs. They are a notes archive, not a
 separate reading path.
 

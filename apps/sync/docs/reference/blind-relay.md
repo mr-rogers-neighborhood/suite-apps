@@ -441,10 +441,20 @@ does not match the pin destroys the socket before the WebSocket opens, and there
 fallback. Loopback may stay `ws://`; a bind on any reachable address is refused without TLS unless
 `--allow-plaintext` makes the exposure explicit, and that choice prints a warning.
 
+When Start runs the relay it makes the pair itself, under the relay store's `tls/` directory with
+mode 0600, and reuses it, so the fingerprint a device pinned survives a restart. A half pair is
+refused rather than rotated.
+
 TLS is transport-only. Frames still protect content from the relay and from disk, and the relay still
 sees the metadata it needs to admit them. What the pin adds is protection for the header and timing
 from a passive network attacker, and refusal of an unpinned man in the middle; it does not stop an
 attacker from dropping traffic.
+
+The relay's console is a separate loopback listener with a token generated at startup. It reads the
+metadata the relay already holds — workspaces, roles, names, frame counts, epochs, connected devices
+and store size — and draws a `suite://relay` code with the address, the pin and, when the console
+holds a live invitation, that invitation. It never reads a frame. A friend-code or contacts exchange
+is not built.
 
 ## What this does not settle
 

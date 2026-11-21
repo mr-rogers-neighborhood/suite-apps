@@ -15,11 +15,12 @@ No changes yet.
 
 ### Added
 
-- **Suite Help is a card.** The documentation explorer ships as its own Flatpak app, opens from the
-  hub, and is installed and updated like the other apps.
-- **Sync has a certificate, a console and a QR code.** Start generates and keeps the relay's TLS pair,
-  shows the fingerprint, and opens a loopback-only relay console. An invitation can be shown as a QR
-  code carrying the relay, its pin and the invitation.
+- **Suite Help joins the hub.** The documentation explorer ships as its own Flatpak app, appears as a
+  card, and is installed, opened and updated like the other apps.
+- **Sync has a certificate, a console and a relay code.** Start makes and keeps the relay's TLS pair,
+  so the fingerprint in the Sync tab survives a restart, and opens the relay's loopback-only console
+  from the same pane. The pane draws a relay code with the address and pin; the console adds a live
+  invitation to its code when one is available.
 
 ## [0.4.1] - 2026-11-21
 

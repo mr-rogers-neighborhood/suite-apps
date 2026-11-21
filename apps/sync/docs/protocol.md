@@ -217,6 +217,13 @@ The transport is a WebSocket at `/sync` with a `/health` HTTP route.
 - The CLI's `serve` also requires `--trust-all` because it has no device-key verifier; Start runs that
   same CLI on loopback. A relay on a reachable address is run directly with its TLS pair and
   `--trust-all-remote`.
+- `serve` opens a read-only console on its own loopback port with a token generated at startup. The
+  console reads the relay's metadata and draws a `suite://relay` code; it never opens a frame.
+
+A relay code is `suite://relay?u=<url>&f=<fingerprint>&w=<workspaceId>&i=<inviteId>`. `u` and `f`
+are enough to meet and pin a relay; `w` and `i` are added together, and only when the console holds a
+live invitation. A `wss://` code without `f` is refused. A friend-code or contacts exchange is not
+built.
 
 The store is one append-only file per workspace for frames, and one each for roles, invites, pinned
 keys and removals. A frame file holds the sealed frame with the position the relay assigned, plus a
@@ -237,8 +244,8 @@ are in [the blind relay record](reference/blind-relay.md).
 The relay satisfies 1–7 for the frames it stores: it holds no group key, opens no payload, and keeps
 only the signed metadata it needs to admit or refuse a frame. A `wss://` relay changes the network
 exposure rather than the content boundary: the self-signed certificate is pinned by SHA-256, so a
-passive attacker no longer sees the header, timing or availability and a substituted certificate is
-refused, while frames keep the payload sealed from the relay itself.
+passive attacker no longer sees the header or timing and a substituted certificate is refused, while
+frames keep the payload sealed from the relay itself. An attacker can still drop traffic.
 
 ## Open questions
 

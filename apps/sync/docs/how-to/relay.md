@@ -122,6 +122,10 @@ Enter it in the app's **Relay certificate fingerprint** field when the address o
 `wss://`. The app stores the pin in its main process; a certificate that does not match is refused
 with no plaintext fallback.
 
+When Start runs the relay it makes and keeps this pair itself, under the relay store's `tls/`
+directory with mode 0600, and shows the fingerprint in its Sync tab. The manual pair above is for a
+relay you run by hand or on another machine.
+
 **Loopback may stay plaintext.** `ws://127.0.0.1:8787/sync` is the default and needs no certificate,
 because only this machine can connect. A reachable bind without TLS is refused unless
 `--allow-plaintext` says that is intended; the relay then prints a warning about the exposed metadata.
@@ -207,6 +211,25 @@ curl -sSk https://192.168.1.20:8787/health
 
 `workspaces` counts stores it has created; `clients` counts live connections. Neither names a
 document, an author or a change.
+
+## The relay console and the relay code
+
+`serve` starts a second, read-only listener on `127.0.0.1` and prints its URL:
+
+```text
+console: http://127.0.0.1:<port>/console?token=<token>
+```
+
+The token is made at startup and accepted as `?token=` or the `X-Suite-Console-Token` header; a
+request without it gets a 401. The console is loopback-only even when the relay binds `0.0.0.0`. It
+shows the relay's version, store size, workspaces, members and frame counts — metadata the relay
+already reads — and no frame payload. Start opens this URL from its **Sync** tab.
+
+The page draws a `suite://relay` QR code. `u` is the relay address, `f` the certificate fingerprint,
+and a live invitation adds `w` (workspace id) and `i` (invitation id), so the code is also a bearer
+invitation. Start's Sync tab draws a code with the address and pin; the console's code adds the
+invitation when one exists. A friend-code or contacts exchange is not built; the shipped ways to
+reach a relay are its address plus pin, an invitation, or one of these codes.
 
 ## 5. Point devices at it
 

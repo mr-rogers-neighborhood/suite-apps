@@ -4,8 +4,8 @@ The cross-cutting documentation for the Suite: the hub, the apps, the sync serve
 monorepo they live in. Each app keeps its own `docs/` beside its code; this tree owns what more than
 one app needs.
 
-The primary way into the code is the explorer: run `pnpm docs:dev` and open `/explore`. These pages
-are the durable notes that cannot be derived from the code.
+The primary way into the code is the explorer in Suite Help: run `pnpm docs:dev` to open the app.
+These pages are the durable notes that cannot be derived from the code.
 
 ## Notes archive
 
@@ -24,8 +24,9 @@ interface guide.
 
 ## Suite Help
 
-`pnpm docs:dev` starts Suite Help, the shipped documentation app. It is offline, has no telemetry,
-and updates through Flatpak.
+`pnpm docs:dev` launches Suite Help, the shipped documentation app. It is offline, has no telemetry,
+and updates through Flatpak. For a headless check, use `docs:index`, `docs:index:check`,
+`docs:coverage` or `docs:build`; `docs:dev` opens an Electron window.
 
 The explorer indexes every file and declaration and offers the three views above. The Handbook
 renders these pages with the Fumadocs look. The notes stay plain Markdown and remain readable on

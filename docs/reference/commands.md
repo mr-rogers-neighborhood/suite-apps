@@ -79,9 +79,9 @@ mise exec -- node scripts/docs-check.mjs
 Checks relative links, that each `docs/` section index lists its pages, and a short list of retired
 phrases. It is not part of the gate yet; run it with any documentation change.
 
-Suite Help (`apps/help`) is the documentation reader: one Vite + React renderer in an Electron
+Suite Help (`apps/help`) is the shipped documentation app: one Vite + React renderer in an Electron
 shell. It shows Browser, Modules and Tours over the code index, and renders the `docs/` pages as the
-**Handbook**. It is not deployed and it is offline; Flatpak owns updates.
+**Handbook**. It is offline; Flatpak owns updates.
 
 ```sh
 mise exec -- pnpm docs:index     # index every file and declaration into apps/help/public/data
@@ -106,9 +106,11 @@ the generated prose, file and symbol counts, and the largest modules with no pro
 `docs:explain <node-id>` appends a TODO section with the generated signature to the owning module
 MDX; it refuses to overwrite an existing note.
 
-Open the app for the three-mode explorer. The Handbook is the `/handbook` route; its source paths
-stay under `docs/`. Production is served from `suite-help://app/`, with SPA fallback to
-`index.html`; there is no `next start` and no loopback HTTP server.
+`docs:dev` launches the Electron app, so do not run it in a headless check or on someone else's
+desktop; use `docs:index`, `docs:index:check`, `docs:coverage` and `docs:build` instead. Suite Help
+opens to the three-mode explorer, and the Handbook is the `/handbook` route; its source paths stay
+under `docs/`. Production is served from `suite-help://app/`, with SPA fallback to `index.html`;
+there is no `next start` and no loopback HTTP server.
 
 ## The independent gate
 
