@@ -4,6 +4,7 @@ import type { CatalogueEntry } from "./catalogue.js";
 import {
   commitsMatch,
   FLATPAK_APP_PREFIX,
+  findFlatpak,
   flatpakIdFor,
   flatpakManifest,
   flatpakRunArgs,
@@ -13,15 +14,21 @@ import {
   parseCommitOutput,
   parseFlatpakList,
   parseRemoteList,
+  parseRemoteNames,
   parseVersionOutput,
   remoteListArgs,
+  remotesArgs,
+  STORE_REMOTES,
+  selfUpdateArgs,
   storeBranchArgs,
   storeInfoArgs,
   storeInstallArgs,
+  storeRemote,
   storeUpdateArgs,
   suiteFlatpakFor,
   withFlatpakInstalls,
 } from "./flatpak.js";
+import type { Host } from "./host.js";
 import type { DiscoveredApp, DiscoveryResult } from "./registry.js";
 
 /** The rows `flatpak list --app --json` writes, trimmed to two apps. */
@@ -336,5 +343,123 @@ describe("store commands", () => {
       "run.suite.canvas",
     ]);
     expect(installedInfoArgs(install)).toEqual(["--user", "info", "run.suite.canvas"]);
+  });
+});
+
+/** A Host with no process behind it: only the probe is exercised here. */
+function probeHost(which: (name: string) => Promise<string | null>): Host {
+  return {
+    sandboxed: false,
+    plan: (command) => command,
+    run: async () => "",
+    spawn: () => ({
+      pid: null,
+      onStderr: () => undefined,
+      onExit: () => undefined,
+      release: () => undefined,
+    }),
+    which,
+  };
+}
+
+describe("findFlatpak", () => {
+  function withOverride<T>(value: string | undefined, run: () => Promise<T>): Promise<T> {
+    const previous = process.env.SUITE_START_FLATPAK;
+    if (value === undefined) delete process.env.SUITE_START_FLATPAK;
+    else process.env.SUITE_START_FLATPAK = value;
+    return run().finally(() => {
+      if (previous === undefined) delete process.env.SUITE_START_FLATPAK;
+      else process.env.SUITE_START_FLATPAK = previous;
+    });
+  }
+
+  it("asks the seam for the binary and returns what it found", async () => {
+    await withOverride(undefined, async () => {
+      const asked: string[] = [];
+      const host = probeHost(async (name) => {
+        asked.push(name);
+        return `/usr/bin/${name}`;
+      });
+      expect(await findFlatpak(host)).toBe("/usr/bin/flatpak");
+      expect(asked).toEqual(["flatpak"]);
+    });
+  });
+
+  it("lets an explicit path win, and an empty one disable Flatpak", async () => {
+    await withOverride("/tmp/fake-flatpak", async () => {
+      expect(await findFlatpak(probeHost(async () => null))).toBe("/tmp/fake-flatpak");
+    });
+    await withOverride("", async () => {
+      expect(await findFlatpak(probeHost(async () => "/usr/bin/flatpak"))).toBeNull();
+    });
+  });
+});
+
+describe("the store's remote", () => {
+  function withRemote<T>(value: string | undefined, run: () => Promise<T>): Promise<T> {
+    const previous = process.env.SUITE_START_FLATPAK_REMOTE;
+    if (value === undefined) delete process.env.SUITE_START_FLATPAK_REMOTE;
+    else process.env.SUITE_START_FLATPAK_REMOTE = value;
+    return run().finally(() => {
+      if (previous === undefined) delete process.env.SUITE_START_FLATPAK_REMOTE;
+      else process.env.SUITE_START_FLATPAK_REMOTE = previous;
+    });
+  }
+
+  it("names the two remotes the suite publishes to, in preference order", () => {
+    expect([...STORE_REMOTES]).toEqual(["suite", "suite-local"]);
+  });
+
+  it("reads one remote name per line and ignores blank ones", () => {
+    expect(parseRemoteNames("flathub\n\nsuite-local\n  suite  \n")).toEqual([
+      "flathub",
+      "suite-local",
+      "suite",
+    ]);
+  });
+
+  it("asks for the name column of the user installation", () => {
+    expect(remotesArgs()).toEqual(["remotes", "--user", "--columns=name"]);
+  });
+
+  it("lets an explicit remote win without probing", async () => {
+    await withRemote("suite-dev", async () => {
+      let probed = false;
+      const remote = await storeRemote(async () => {
+        probed = true;
+        return "suite\n";
+      });
+      expect(remote).toBe("suite-dev");
+      expect(probed).toBe(false);
+    });
+  });
+
+  it("prefers suite over suite-local, wherever they appear in the list", async () => {
+    await withRemote(undefined, async () => {
+      expect(await storeRemote(async () => "flathub\nsuite-local\nsuite\n")).toBe("suite");
+    });
+  });
+
+  it("falls back to suite-local when that is the only one", async () => {
+    await withRemote(undefined, async () => {
+      expect(await storeRemote(async () => "flathub\nsuite-local\n")).toBe("suite-local");
+    });
+  });
+
+  it("has no store when neither is configured, or when Flatpak cannot answer", async () => {
+    await withRemote(undefined, async () => {
+      expect(await storeRemote(async () => "flathub\n")).toBeNull();
+      expect(
+        await storeRemote(async () => {
+          throw new Error("flatpak: not found");
+        }),
+      ).toBeNull();
+    });
+  });
+});
+
+describe("updating the hub through Flatpak", () => {
+  it("asks for the newest build of its own application id, non-interactively", () => {
+    expect(selfUpdateArgs()).toEqual(["update", "--user", "--noninteractive", "run.suite.start"]);
   });
 });

@@ -18,12 +18,13 @@ export function renderSettings(state, actions) {
   pair("Data directory", state.settings.dataDirectory);
   pair("Documents", state.settings.documentsRoot);
   // What a reader can act on, in one idea per sentence. The ruling on who owns an update lives
-  // in ADR-0001; a person only needs to know which apps update themselves and which wait for
-  // them to press something.
+  // in ADR-0001; a person only needs to know which apps Start replaces and which are a manual
+  // download.
   pair(
     "Updates",
     "Start updates the apps it installed, and only when you press Update. It checks for new " +
-      "versions when this window opens. An app you installed another way updates itself.",
+      "versions when this window opens. An app you installed another way is not managed here; " +
+      "a new build is a manual download.",
   );
   pair(
     "Network",

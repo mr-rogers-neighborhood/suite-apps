@@ -38,7 +38,18 @@ export function shortcutFilename(id: string): string {
 
 /** Where one app's entry lives under a user's data directory. */
 export function shortcutPath(platform: string, home: string, id: string): string {
-  return joinPath(platform, home, ".local", "share", "applications", shortcutFilename(id));
+  return shortcutPathIn(joinPath(platform, home, ".local", "share", "applications"), id, platform);
+}
+
+/**
+ * The same entry under an applications directory the host path table named.
+ *
+ * A Flatpak's `$XDG_DATA_HOME` is re-rooted, so Start must not ask it where the
+ * user's menu entries are; the table gives the host path and this joins the one
+ * file name onto it.
+ */
+export function shortcutPathIn(applications: string, id: string, platform = "linux"): string {
+  return joinPath(platform, applications, shortcutFilename(id));
 }
 
 /**
@@ -53,17 +64,22 @@ export function shortcutIconPath(
   iconName: string,
   size = 256,
 ): string {
-  return joinPath(
+  return shortcutIconPathIn(
+    joinPath(platform, home, ".local", "share", "icons"),
+    iconName,
+    size,
     platform,
-    home,
-    ".local",
-    "share",
-    "icons",
-    "hicolor",
-    `${size}x${size}`,
-    "apps",
-    `${iconName}.png`,
   );
+}
+
+/** The same icon under an icons directory the host path table named. */
+export function shortcutIconPathIn(
+  icons: string,
+  iconName: string,
+  size = 256,
+  platform = "linux",
+): string {
+  return joinPath(platform, icons, "hicolor", `${size}x${size}`, "apps", `${iconName}.png`);
 }
 
 /** `.desktop` quoting: a path with a space or a quote must survive a parser. */

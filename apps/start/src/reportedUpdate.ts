@@ -17,8 +17,8 @@ import {
  *
  * This is now a **second opinion**, not the hub's answer. The catalogue reads the same
  * signed feeds the apps read, because Start is what installs and replaces an app (D45).
- * The report is still worth reading: an app Start did not install updates itself, and its
- * card can say what that app found.
+ * The report is still worth reading: an app Start did not install may check its own
+ * feed, and its card can say what that app found.
  */
 export interface ReportedUpdate {
   /** Whether a newer version is known to exist. */

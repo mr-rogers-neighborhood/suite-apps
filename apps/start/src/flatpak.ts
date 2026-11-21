@@ -1,8 +1,6 @@
-import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import { delimiter, join } from "node:path";
 import { CONTRACT_VERSION, SUITE_PROTOCOL_PREFIX, type SuiteAppManifest } from "@suite/contracts";
 import type { CatalogueEntry } from "./catalogue.js";
+import { type Host, SELF_FLATPAK_ID } from "./host.js";
 import type { DiscoveredApp, DiscoveryResult, FlatpakInstall } from "./registry.js";
 
 /**
@@ -190,40 +188,36 @@ export function flatpakScopeArgs(installation: string): readonly string[] {
 }
 
 /**
- * The `flatpak` CLI, resolved from `PATH` the way a shell would.
+ * The `flatpak` CLI, as the host seam sees it.
+ *
+ * On the host that is a path from `PATH`; inside a Flatpak it is the name
+ * `flatpak`, which `flatpak-spawn --host` resolves on the other side. Either way
+ * the answer comes from the seam, and the probe is cached, so a listing does not
+ * pay for it on every redraw.
  *
  * `SUITE_START_FLATPAK` names a different binary — a test's stand-in — and an
- * explicit empty value disables Flatpak entirely, which is what a hermetic
- * test needs on a machine that has one installed. Null otherwise; a machine
- * without Flatpak is supported, because the AppImage path does not depend on it.
+ * explicit empty value disables Flatpak entirely, which is what a hermetic test
+ * needs on a machine that has one installed. Null otherwise; a machine without
+ * Flatpak is supported, because the AppImage path does not depend on it.
  */
-export function findFlatpak(): string | null {
+export async function findFlatpak(host: Host): Promise<string | null> {
   const named = process.env.SUITE_START_FLATPAK;
   if (named !== undefined) {
     const trimmed = named.trim();
     return trimmed.length === 0 ? null : trimmed;
   }
-  const name = process.platform === "win32" ? "flatpak.exe" : "flatpak";
-  for (const directory of (process.env.PATH ?? "").split(delimiter)) {
-    if (directory.length === 0) continue;
-    const candidate = join(directory, name);
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
+  return host.which("flatpak");
 }
 
-/** Run the CLI and collect its output. Rejects on a non-zero exit. */
-export function runFlatpak(
+/** Run the CLI through the host seam and collect its output. Rejects on a non-zero exit. */
+export async function runFlatpak(
+  host: Host,
   args: readonly string[],
-  binary: string = findFlatpak() ?? "flatpak",
+  binary?: string,
 ): Promise<string> {
-  return new Promise((resolvePromise, reject) => {
-    execFile(binary, [...args], { maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
-      // Flatpak's own words are what the card should show; "Command failed" is not.
-      if (error) reject(new Error(stderr.trim() || error.message));
-      else resolvePromise(stdout);
-    });
-  });
+  const executable = binary ?? (await findFlatpak(host));
+  if (executable === null) throw new Error("Flatpak is not available");
+  return host.run({ file: executable, args: [...args] });
 }
 
 /**
@@ -232,20 +226,20 @@ export function runFlatpak(
  * A broken Flatpak must not break the launcher, so a failed listing is an empty
  * list rather than an exception. The caller decides how loudly to say so.
  */
-export async function listFlatpaks(): Promise<readonly FlatpakApp[]> {
-  if (findFlatpak() === null) return [];
+export async function listFlatpaks(host: Host): Promise<readonly FlatpakApp[]> {
+  if ((await findFlatpak(host)) === null) return [];
   try {
-    return parseFlatpakList(await runFlatpak(["list", "--app", "--json"]));
+    return parseFlatpakList(await runFlatpak(host, ["list", "--app", "--json"]));
   } catch {
     return [];
   }
 }
 
 /** Where Flatpak deployed one app, for "Reveal". Null when it cannot say. */
-export async function flatpakLocation(install: FlatpakInstall): Promise<string | null> {
+export async function flatpakLocation(install: FlatpakInstall, host: Host): Promise<string | null> {
   try {
     const location = (
-      await runFlatpak([
+      await runFlatpak(host, [
         ...flatpakScopeArgs(install.installation),
         "info",
         "--show-location",
@@ -261,15 +255,41 @@ export async function flatpakLocation(install: FlatpakInstall): Promise<string |
 /**
  * The store this hub installs from.
  *
- * One named remote, because that is the one `scripts/flatpak.mjs` creates and
- * the one a person can inspect with `flatpak remotes`. An empty
- * `SUITE_START_FLATPAK_REMOTE` (or a machine with no Flatpak) means no store.
+ * `SUITE_START_FLATPAK_REMOTE` names one explicitly. Otherwise Start asks the
+ * machine: the shared store is `suite`, the local build remote is `suite-local`,
+ * and `suite` wins when both are there because it is the one other machines
+ * publish to. Neither present is not a failure — it is the honest "no store"
+ * state a fresh machine has before anything is set up.
  */
-export const STORE_REMOTE = "suite-local";
+export const STORE_REMOTES = ["suite", "suite-local"] as const;
 
-export function storeRemote(): string {
+/** Read the name column of `flatpak remotes`. */
+export function parseRemoteNames(text: string): readonly string[] {
+  return text
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+/** `flatpak remotes --user --columns=name`, which is one line per configured remote. */
+export function remotesArgs(): readonly string[] {
+  return ["remotes", "--user", "--columns=name"];
+}
+
+export type FlatpakRunner = (args: readonly string[]) => Promise<string>;
+
+export async function storeRemote(run: FlatpakRunner): Promise<string | null> {
   const named = process.env.SUITE_START_FLATPAK_REMOTE?.trim();
-  return named === undefined || named.length === 0 ? STORE_REMOTE : named;
+  if (named !== undefined && named.length > 0) return named;
+  try {
+    const names = parseRemoteNames(await run(remotesArgs()));
+    for (const candidate of STORE_REMOTES) {
+      if (names.includes(candidate)) return candidate;
+    }
+  } catch {
+    // No Flatpak, or one that cannot list its remotes: there is no store to offer.
+  }
+  return null;
 }
 
 const COMMIT_HASH = /^[0-9a-f]{64}$/u;
@@ -396,4 +416,17 @@ export function storeUpdateArgs(install: FlatpakInstall): readonly string[] {
     "--noninteractive",
     install.application,
   ];
+}
+
+/**
+ * The one update Start may run on itself.
+ *
+ * A Flatpak is Flatpak's to update, including this hub when it is installed as
+ * one. `--user` names the installation Start was installed into, and
+ * `--noninteractive` keeps a window from waiting on a terminal question nobody
+ * can answer. The new build starts on the next launch: replacing the deployment
+ * under a running Electron process does not swap its code.
+ */
+export function selfUpdateArgs(): readonly string[] {
+  return ["update", "--user", "--noninteractive", SELF_FLATPAK_ID];
 }

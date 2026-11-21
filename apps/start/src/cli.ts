@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { suiteApplicationsRoot } from "@suite/contracts";
 import { CATALOGUE_APPS } from "./catalogue.js";
+import { defaultHost } from "./host.js";
+import { hostPaths, registryPathFor } from "./hostPaths.js";
 import { registryAt } from "./installs.js";
 import { nativePackageBackend } from "./nativePackageBackend.js";
 import { defaultRoots } from "./nodeFileSystem.js";
@@ -17,7 +17,6 @@ import { describeRouteRejection, routeLaunch } from "./route.js";
  * Start do with this argument?".
  */
 
-const REGISTRY_FILENAME = "installs.json";
 const USAGE = `suite-start — Suite's launcher
 
   suite-start list                 installed apps and anything refused
@@ -25,16 +24,19 @@ const USAGE = `suite-start — Suite's launcher
   suite-start open --dry-run <t>   print the command instead of running it
 `;
 
-function registryPath(): string {
-  return process.env.SUITE_START_REGISTRY ?? join(homedir(), ".config", "suite", REGISTRY_FILENAME);
-}
-
 function backend() {
+  const home = homedir();
+  const paths = hostPaths({
+    platform: process.platform,
+    home,
+    appsRootOverride: process.env.SUITE_START_APPS_ROOT,
+  });
   return nativePackageBackend({
-    appsRoot: suiteApplicationsRoot(process.platform, homedir()),
-    roots: defaultRoots(homedir(), process.platform),
-    registry: registryAt(registryPath()),
+    appsRoot: paths.appsRoot,
+    roots: defaultRoots(home, process.platform),
+    registry: registryAt(registryPathFor(paths)),
     catalogue: CATALOGUE_APPS,
+    host: defaultHost(),
   });
 }
 
@@ -98,6 +100,9 @@ async function main(argv: readonly string[]): Promise<number> {
   process.stderr.write(`unknown command: ${command}\n${USAGE}`);
   return 2;
 }
+
+// The CLI is the same launcher, so the registry it reads is the same file and the
+// sandbox prefix is decided the same way: `defaultHost` reads `FLATPAK_ID` itself.
 
 main(process.argv.slice(2)).then(
   (code) => {

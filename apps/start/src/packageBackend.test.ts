@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { appCards } from "./cards.js";
 import { type CatalogueEntry, PRE_RELEASE_CATALOGUE_APPS } from "./catalogue.js";
+import { hostFor } from "./host.js";
 import type { Download } from "./install.js";
 import { registryStore } from "./installs.js";
 import { nativePackageBackend } from "./nativePackageBackend.js";
@@ -306,6 +307,10 @@ case "$1" in
     printf '[{"application_id":"run.suite.slop.canvas","branch":"slop","commit":"%s"},{"application_id":"run.suite.slop.canvas","branch":"canary","commit":"%s"}]\\n' "$(cat "$STATE-commit")" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     exit 0
     ;;
+  remotes)
+    printf 'suite-local\\n'
+    exit 0
+    ;;
 esac
 if [ "$1" = "--user" ] || [ "$1" = "--system" ]; then
   shift
@@ -358,6 +363,100 @@ exit 0
         expect.objectContaining({ tier: "canary", branch: "canary" }),
       ]);
       expect(listing.packages[0]?.app.flatpak?.branch).toBe("canary");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the native backend's host seam", () => {
+  it("plans a launch through flatpak-spawn when it is sandboxed", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "suite-seam-"));
+    try {
+      const backend = nativePackageBackend({
+        appsRoot: join(directory, "apps"),
+        roots: [join(directory, "installs")],
+        registry: registryStore(join(directory, "data")),
+        catalogue: [CANVAS],
+        flatpak: null,
+        host: hostFor(true),
+      });
+
+      expect(backend.command({ executable: "/opt/suite/canvas", argv: ["a"] })).toEqual({
+        command: "flatpak-spawn",
+        args: ["--host", "/opt/suite/canvas", "a"],
+      });
+      expect(
+        backend.command({
+          executable: "/usr/bin/flatpak",
+          argv: [],
+          flatpak: { application: "run.suite.canvas", installation: "user" },
+        }),
+      ).toEqual({
+        command: "flatpak-spawn",
+        args: ["--host", "/usr/bin/flatpak", "run", "run.suite.canvas"],
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("asks Flatpak to update its own deployment, and refuses for another id", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "suite-self-"));
+    const previous = process.env.FLATPAK_ID;
+    try {
+      const log = join(directory, "self.log");
+      const flatpak = join(directory, "flatpak");
+      await writeFile(flatpak, `#!/bin/sh\nprintf '%s\\n' "$@" >>"${log}"\n`, { mode: 0o755 });
+      const backend = nativePackageBackend({
+        appsRoot: join(directory, "apps"),
+        roots: [join(directory, "installs")],
+        registry: registryStore(join(directory, "data")),
+        catalogue: [CANVAS],
+        flatpak,
+        // The guard reads the id from the environment; the seam stays direct so the
+        // stand-in is what runs.
+        host: hostFor(false),
+      });
+
+      process.env.FLATPAK_ID = "run.suite.start";
+      await backend.updateSelf();
+      expect((await readFile(log, "utf8")).trim().split("\n")).toEqual([
+        "update",
+        "--user",
+        "--noninteractive",
+        "run.suite.start",
+      ]);
+
+      process.env.FLATPAK_ID = "org.example.not-start";
+      await expect(backend.updateSelf()).rejects.toThrow(/Flatpak/u);
+    } finally {
+      if (previous === undefined) delete process.env.FLATPAK_ID;
+      else process.env.FLATPAK_ID = previous;
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("closes a Flatpak by application id through the same binary", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "suite-stop-"));
+    try {
+      const log = join(directory, "stop.log");
+      const flatpak = join(directory, "flatpak");
+      await writeFile(flatpak, `#!/bin/sh\nprintf '%s\\n' "$@" >>"${log}"\n`, { mode: 0o755 });
+      const backend = nativePackageBackend({
+        appsRoot: join(directory, "apps"),
+        roots: [join(directory, "installs")],
+        registry: registryStore(join(directory, "data")),
+        catalogue: [CANVAS],
+        flatpak,
+        host: hostFor(false),
+      });
+
+      await backend.stopFlatpak("run.suite.canvas");
+      expect((await readFile(log, "utf8")).trim().split("\n")).toEqual([
+        "kill",
+        "run.suite.canvas",
+      ]);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

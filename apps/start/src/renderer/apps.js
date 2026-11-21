@@ -28,8 +28,10 @@ function stateLine(card) {
     return `${card.version} · newer version available${versions}${running}`;
   }
   if (card.state === "local") {
-    // A copy Start did not place manages itself; saying so is the whole rule.
-    return `${card.version} · from a folder · updates itself${versions}${running}`;
+    // A copy Start did not place is not Start's to replace. Nothing in the hub calls
+    // the app's updater, so saying it "updates itself" would promise a download that
+    // never happens; what is true is that its updates are somebody else's to make.
+    return `${card.version} · from a folder · Start does not update it${versions}${running}`;
   }
   return `${card.version} · up to date${versions}${running}`;
 }
@@ -208,7 +210,14 @@ function appCard(card, actions, progress, launchError) {
   return node;
 }
 
-/** The hub's own row: a fact, because it cannot replace its own running binary. */
+/**
+ * The hub's own row.
+ *
+ * An AppImage Start cannot replace its own running binary, so the row says what it is
+ * and links to the release page. A Flatpak Start has a writer: Flatpak owns the
+ * deployment, so the row can ask Flatpak for the newest build and say that the result
+ * appears at the next launch. It is still not an AppImage-style update.
+ */
 function selfRow(card) {
   const node = el("li", "card card-self");
   node.dataset.appId = card.id ?? "start";
@@ -218,17 +227,30 @@ function selfRow(card) {
 
   const why = card.reason ?? "no release found";
   const sentence = `${why.charAt(0).toUpperCase()}${why.slice(1)}.`;
-  const says =
-    card.state === "update-available" && card.available !== null
-      ? `${card.available} is published. Open the release page to update Start.`
-      : card.available !== null
-        ? `${card.available} is the newest release.`
-        : `${sentence} Start cannot replace its own running binary, so it updates itself.`;
+  const flatpak = card.source === "flatpak";
+  const canUpdate = flatpak && card.state === "update-available";
+
+  let says;
+  if (flatpak) {
+    says = canUpdate ? `${sentence} Update asks Flatpak for the newest build.` : sentence;
+  } else {
+    says =
+      card.state === "update-available" && card.available !== null
+        ? `${card.available} is published. Open the release page to replace this build.`
+        : card.available !== null
+          ? `${card.available} is the newest release.`
+          : `${sentence} Start cannot replace its own running binary.`;
+  }
   const note = el("p", "card-meta card-self-note", says);
 
-  // The one thing this row can offer. `target` sends it through the window's
-  // external-link handler, so the browser opens it and the page never leaves Start.
-  if (card.state === "update-available" && card.releases !== null) {
+  if (canUpdate) {
+    const update = el("button", "button primary", "Update Start");
+    update.type = "button";
+    update.addEventListener("click", () => actions.install(card.id ?? "start"));
+    note.append(" ", update);
+  } else if (!flatpak && card.state === "update-available" && card.releases !== null) {
+    // `target` sends it through the window's external-link handler, so the browser
+    // opens it and the page never leaves Start.
     const link = el("a", "card-self-link", "Open the release page…");
     link.href = card.releases;
     link.target = "_blank";

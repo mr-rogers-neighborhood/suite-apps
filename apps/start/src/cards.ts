@@ -192,8 +192,8 @@ export function appCards(input: CardInput): readonly AppCard[] {
               ? "update-available"
               : "current"
             : source === "folder"
-              ? // A copy a person placed updates itself. Reading the hub's feed into its
-                // state would offer an Update that installs a second copy in another format.
+              ? // A copy a person placed is not Start's to replace. Reading the hub's feed
+                // into its state would offer an Update that installs a second copy.
                 "local"
               : stateFor(found?.manifest.version ?? null, entry.available, installChannel),
           version: found?.manifest.version ?? null,
@@ -269,13 +269,72 @@ export function appCards(input: CardInput): readonly AppCard[] {
   return [...refused, ...offered, ...local];
 }
 
+/** How Flatpak, when it is the writer of this hub, is asked to replace it. */
+export interface SelfCardOptions {
+  /** True when Flatpak deployed this Start, so Flatpak is its update channel. */
+  readonly flatpak?: boolean;
+  /**
+   * Whether the update action exists.
+   *
+   * A Flatpak whose application id is Start's own may ask Flatpak for the newest
+   * build. Any other id has no deployment this process may name, so it keeps the
+   * fact and loses the button rather than offering one that would fail.
+   */
+  readonly canUpdate?: boolean;
+  /** True after Flatpak reported a successful update; the new build is not running yet. */
+  readonly updated?: boolean;
+  /** What Flatpak said when the update failed, when it did. */
+  readonly error?: string | null;
+}
+
 /**
  * The hub's own row: a fact rather than a button.
  *
  * Start cannot replace its own running binary, so the row says what version it is
- * running and what its feed offers, and offers nothing to press.
+ * running and what its feed offers, and offers nothing to press. The one exception
+ * is a Flatpak deployment: Flatpak is the writer there, so the row can ask it for
+ * the newest build and say that the result arrives at the next launch.
  */
-export function selfCard(entry: CatalogueApp, version: string): AppCard {
+export function selfCard(
+  entry: CatalogueApp,
+  version: string,
+  options: SelfCardOptions = {},
+): AppCard {
+  if (options.flatpak === true) {
+    const canUpdate = options.canUpdate === true;
+    return {
+      id: SELF_ID,
+      name: entry.name,
+      source: "flatpak",
+      installChannel: "flatpak",
+      icon: null,
+      // "update-available" is the renderer's word for "there is something to press",
+      // not a claim that a newer version was found: Flatpak was not asked.
+      state: canUpdate ? "update-available" : "no-release",
+      version,
+      available: null,
+      reason:
+        options.error ??
+        (options.updated === true
+          ? "Flatpak deployed the newest build; it starts next launch"
+          : "not checked (Flatpak)"),
+      versions: 1,
+      previousVersion: null,
+      running: false,
+      releases: null,
+      channel: entry.channel,
+      tier: "stable",
+      switchTier: null,
+      channelNotice: null,
+      update: UNREPORTED,
+      executable: null,
+      fileExtensions: [],
+      lastOpenedAt: null,
+      fileCount: 0,
+      health: { ok: true },
+    };
+  }
+
   return {
     id: SELF_ID,
     name: entry.name,

@@ -121,10 +121,12 @@ export async function install(box: Sandbox, record: unknown): Promise<void> {
 /**
  * A stand-in `flatpak` CLI, with enough state to test the store.
  *
- * Start asks one binary what is installed, what the remote offers, where a
- * deployment lives, and to install/update/run one. Files under the sandbox stand
- * in for Flatpak's database, so an install is visible to the next `list` and an
- * update changes the commit the next `info` reports.
+ * Start asks one binary what is installed, what the remotes and the store offer,
+ * where a deployment lives, and to install/update/run one. Files under the
+ * sandbox stand in for Flatpak's database, so an install is visible to the next
+ * `list` and an update changes the commit the next `info` reports. The remote
+ * commands answer the same shapes the real CLI does: one remote name per line
+ * for `remotes`, and a JSON array for `remote-ls`.
  */
 export async function fakeFlatpak(
   box: Sandbox,
@@ -186,6 +188,15 @@ if [ "$1" = "--user" ] || [ "$1" = "--system" ]; then
   shift
 fi
 case "$1" in
+  remotes)
+    # flatpak remotes --user --columns=name: one name per line, no header.
+    printf 'suite-local\\nflathub\\n'
+    ;;
+  remote-ls)
+    # flatpak remote-ls --user --app --json --columns=application,branch,commit:
+    # a JSON array of the refs this one-app store publishes.
+    printf '[{"application_id":"${application}","branch":"master","commit":"%s"}]\\n' "$(cat "$STATE/store-commit")"
+    ;;
   remote-info)
     printf '%s\\n' "$(cat "$STATE/store-commit")"
     ;;
@@ -207,6 +218,11 @@ case "$1" in
   update)
     cp "$STATE/store-commit" "$STATE/installed-commit"
     printf 'update\\n' >>"$LOG"
+    ;;
+  kill)
+    # The sandboxed close path names the application, not a pid.
+    shift
+    printf 'kill %s\\n' "$1" >>"$LOG"
     ;;
   run)
     shift
