@@ -1,0 +1,32 @@
+# Serve the Suite Flatpak OSTree repository on suite-dev.
+#
+# Installed as ~/.config/systemd/user/suite-flatpak-http.service on the host:
+#
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now suite-flatpak-http.service
+#   sudo loginctl enable-linger aurora
+#
+# The last line keeps the user manager, and this unit, alive between SSH
+# sessions; without lingering a user service stops when the last session closes.
+#
+# python3 -m http.server is a static file server: it reads the repository and
+# writes no state. Only /home/aurora/flatpak/repo is served, on port 8088, and
+# nothing else on the host uses that path or port.
+[Unit]
+Description=Serve the Suite Flatpak OSTree repository on port 8088
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m http.server 8088 --bind 0.0.0.0 --directory /home/aurora/flatpak/repo
+Restart=on-failure
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=default.target

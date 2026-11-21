@@ -100,6 +100,64 @@ downloads. A remote that an earlier run added unsigned is switched to verificati
 Without a key the remote is added with `--no-gpg-verify`, which is for local testing only, and the
 script says so.
 
+### The signed remote on suite-dev
+
+The same signed repository is published to `suite-dev`, so another machine installs and updates the
+apps without building them. The remote answers on the lab network at:
+
+```
+http://10.28.20.200:8088/
+```
+
+`node scripts/flatpak-remote.mjs` is a dry run. It prints the branch, the refs and the bytes it would
+copy, and refuses a dirty tree or a HEAD that `.dev/gate-status.json` does not prove, with the same
+rule `scripts/release.mjs` uses. With `--publish` it runs
+`flatpak build-update-repo --gpg-sign=<store key>` on `~/suite-flatpak/repo`, verifies the fresh
+summary in a throwaway Flatpak installation, writes `~/suite-flatpak/suite.flatpakrepo`, and rsyncs
+the repository to `suite-dev:/home/aurora/flatpak/repo`. It publishes the repository the local flow
+builds; it never builds a second one. Publication copies bytes and commits nothing, so the gate proof
+stays on HEAD.
+
+The host runs `suite-flatpak-http.service`, a systemd user unit whose source is
+[`scripts/suite-flatpak-http.service`](../../scripts/suite-flatpak-http.service). It serves only that
+directory, on port 8088, and nothing else on the host uses either. `loginctl enable-linger` keeps the
+user manager — and with it the unit — alive between SSH sessions. The gate's transient `suite-gate-*`
+units and `~/ci` are separate and untouched by a publication.
+
+Add the remote and install:
+
+```sh
+flatpak remote-add --user --if-not-exists --from suite \
+  http://10.28.20.200:8088/suite.flatpakrepo
+flatpak install --user suite run.suite.planner
+flatpak update --user
+```
+
+The `.flatpakrepo` file embeds the store's public key in `GPGKey=`, so `remote-add --from` imports it
+and `flatpak` verifies the summary from the first fetch. `flatpak remote-ls suite` lists the apps and
+branches the remote offers.
+
+The stable apps are on `master`, which the file names as `DefaultBranch`, so the command above needs
+no branch. A tier publishes its refs on its own branch and runs the script with `--branch <name>` to
+make that the default; install one explicitly with:
+
+```sh
+flatpak install --user suite run.suite.planner//<branch>
+```
+
+No tier branch exists yet. The script refuses a branch the repository does not carry instead of
+inventing one.
+
+The transport is plain HTTP because no certificate exists on `suite-dev`; adding one is separate
+work. The connection is readable, and a machine on the path can deny service or stall an update. It
+cannot substitute software: the summary is GPG-signed with the store key, and every object is named
+by a content hash inside the signed summary. The one unprotected step is the first fetch of
+`suite.flatpakrepo`, which carries the public key an attacker on the path could replace. That is the
+accepted boundary on the trusted lab network: treat the remote as a lab store, and compare its
+`GPGKey` with `~/suite-flatpak/suite-store.gpg` on the publisher when the network is not trusted.
+When a certificate does exist, replace the unit's `ExecStart` with a TLS-terminating static server;
+HTTP with a signed summary is the documented transport until then.
+
 Start lists Flatpak installs, launches them through `flatpak run`, asks Flatpak to remove one, and —
 when the store offers the app — asks Flatpak to install it or to replace a deployment whose commit is
 behind. Start reads the commits and never writes a deployment itself. The signed local store has been
