@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { encodeWorkspaceFile, SCHEMA_VERSION, WorkspaceDocument } from "@suite/planner-core";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkspacePaths } from "./paths";
 import { WorkspaceStore } from "./workspaceStore";
@@ -44,6 +44,26 @@ describe("WorkspaceStore", () => {
 
     const reopened = await WorkspaceStore.open(location);
     expect(reopened.document.getTask(id)?.title).toBe("Persisted task");
+  });
+
+  it("should write the same document state to the same bytes on every save", async () => {
+    const location = await paths();
+    const now = new Date("2026-01-01T12:00:00.000Z");
+    vi.useFakeTimers({ now });
+    try {
+      const store = await WorkspaceStore.open(location);
+      const expected = encodeWorkspaceFile(store.document, now);
+
+      await store.flush();
+      const first = await readFile(location.workspace, "utf8");
+      await store.flush();
+      const second = await readFile(location.workspace, "utf8");
+
+      expect(first).toBe(expected);
+      expect(second).toBe(first);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("should export and import into a fresh workspace", async () => {

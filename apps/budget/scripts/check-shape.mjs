@@ -20,7 +20,7 @@ const SKIP = new Set([
 ]);
 const SOURCE = /\.(ts|tsx|mjs|js)$/;
 const MAX_LINES = 900;
-const OBSERVE_ALLOWED = "src/renderer/src/store/snapshotStore.ts";
+const OBSERVE_OWNER = "packages/document-runtime/src/replica.ts";
 const LORO_ALLOWED = "packages/core/src/loro/";
 const MONEY_ALLOWED = "packages/core/src/money.ts";
 const FS_ALLOWED = ["src/main/", "scripts/"];
@@ -101,14 +101,16 @@ for (const file of files) {
   }
 }
 
-const unexpected = observeSites.filter((file) => file !== OBSERVE_ALLOWED);
-if (unexpected.length > 0) {
+if (observeSites.length > 0) {
   problems.push(
-    `observe() is owned by ${OBSERVE_ALLOWED}; also called in ${unexpected.join(", ")}`,
+    `observe() is owned by @suite/document-runtime; also called in ${observeSites.join(", ")}`,
   );
 }
-if (observeSites.length === 0) {
-  problems.push(`expected ${OBSERVE_ALLOWED} to own the single observe() call site`);
+const runtimeReplica = join(root, "../../packages/document-runtime/src/replica.ts");
+const runtimeText = await readFile(runtimeReplica, "utf8").catch(() => "");
+const ownedSites = runtimeText.match(/\.observe\(/gu)?.length ?? 0;
+if (ownedSites !== 1) {
+  problems.push(`expected ${OBSERVE_OWNER} to own the single observe() call site`);
 }
 
 if (problems.length > 0) {
