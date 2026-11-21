@@ -8,7 +8,13 @@ this file and there is no AppImage release tag.
 
 ## [Unreleased]
 
-No changes yet.
+### Fixed
+
+- **Handbook links stay in Help.** A link between two pages now opens the handbook route
+  (`/handbook/…`) instead of the retired `/docs/…` URL, including a link whose label wraps across
+  lines. Links that leave `docs/` open GitHub, as before.
+- **The app manifest reports the version it ships.** `suite.app.json` follows `package.json`, so
+  Start's card reads 0.1.1 rather than the stale 0.1.0. A unit test now compares the two.
 
 ## [0.1.1] - 2026-11-21
 
