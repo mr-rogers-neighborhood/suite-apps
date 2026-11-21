@@ -90,6 +90,7 @@ function stepTitle(step: TourStep, searchById: Map<string, SearchEntry>): string
 }
 
 function tourOutline(tour: Tour, searchById: Map<string, SearchEntry>) {
+  if (tour.source === "generated") return [];
   const chapters: Array<{ title: string; steps: Array<{ index: number; title: string }> }> = [];
   let current = { title: "Opening", steps: [] as Array<{ index: number; title: string }> };
   tour.steps.forEach((step, index) => {
@@ -352,9 +353,11 @@ function TourIntro({
       </button>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-fd-muted-foreground">
-          What it covers
-        </h2>
+        {chapters.length > 0 ? (
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-fd-muted-foreground">
+            What it covers
+          </h2>
+        ) : null}
         {chapters.map((chapter) => (
           <div key={chapter.title} className="space-y-1.5">
             <h3 className="text-sm font-medium">{chapter.title}</h3>
