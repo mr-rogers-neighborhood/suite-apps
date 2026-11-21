@@ -109,6 +109,9 @@ The apps, the hub and the sync server share one repository and one gate. Start w
 - **Frames survive a restart.** The relay writes the position with each frame, so compaction drops
   old entries without renumbering the survivors. Retention is 30 days by default; a device away
   longer needs a snapshot from a peer, because the relay has no document to hand back.
+- **Sync is a capability.** A host can offer status, the four doors and a sealed-frame channel to an
+  app or pack without holding a group key; [the sync capability](docs/reference/sync-capability.md)
+  states the boundary, the states a UI can act on and the failure shape.
 
 Read [the protocol](docs/protocol.md) and [the threat model](docs/threat-model.md).
 

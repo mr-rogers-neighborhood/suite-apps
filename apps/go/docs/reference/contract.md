@@ -58,6 +58,12 @@ nobody can reproduce.
 | `navigation`    | `setTitle`, `close`                   | Not a general stack: leaving a module returns to home, always          |
 | `theme`         | scheme, density, CSS variables        | Names no colour and no spacing value                                   |
 | `notifications` | permission, request, schedule, cancel | Carries a title and a time, stores nothing, and restarts nothing       |
+| `sync`          | **Reserved, not implemented.** status, enable, disable, invite, join, sealed frames | A future host moves sealed frames and readable membership only; keys and the document stay in the pack |
+
+`sync` is a reserved row, not a shipped service. No Go build implements it, no pack can call it
+through `ModuleHost` today, and it is not a claim that sync works on mobile. It is named here so the
+boundary can be reviewed before an implementation exists; [the sync capability](../../../sync/docs/reference/sync-capability.md)
+states the operations, states and failure shape a future host would have to honour.
 
 Two consequences follow from the document refusal, and both are load-bearing:
 
