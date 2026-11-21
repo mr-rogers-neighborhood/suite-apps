@@ -54,7 +54,7 @@ surface reads and writes these roots; see [task-detail.md](task-detail.md).
 | `order`                                 | number                         | position within that day                                 |
 | `dueAt`                                 | timestamp \| null              | an actual deadline, not a plan                           |
 | `remindAt`                              | timestamp \| null              | when main should notify                                  |
-| `remindedAt`                            | timestamp \| null              | set by the scheduler; stops repeats                      |
+| `remindedAt`                            | timestamp \| null              | set by the scheduler; cleared when `remindAt` changes    |
 | `recurrence`                            | rule \| null                   | frequency, interval, weekdays, until                     |
 | `recurrenceCompletions`                 | date key[]                     | occurrences already done                                 |
 | `priority`                              | 1..3 \| null                   | 1 is highest                                             |
