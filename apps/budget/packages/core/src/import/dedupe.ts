@@ -23,6 +23,19 @@ export function findDuplicateCandidates(
   const minimum = options.minimumScore ?? 0.6;
   const candidates: DuplicateCandidate[] = [];
 
+  const externalId = row.externalId?.trim() ?? "";
+  if (externalId.length > 0) {
+    const exact = existing.find(
+      (transaction) =>
+        transaction.accountId === accountId &&
+        transaction.parentId === null &&
+        transaction.imported?.externalId === externalId,
+    );
+    if (exact) {
+      return [{ transactionId: exact.id, score: 1, reasons: ["same import id"] }];
+    }
+  }
+
   for (const transaction of existing) {
     if (transaction.accountId !== accountId) continue;
     if (transaction.parentId !== null) continue;

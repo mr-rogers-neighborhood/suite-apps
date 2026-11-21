@@ -97,6 +97,36 @@ describe("BudgetDocument", () => {
     expect(doc.accountBalance(account.id)).toBe(96_500);
   });
 
+  it("should keep import metadata on a transaction and a split parent", () => {
+    const { doc, account, one, two } = base();
+    const imported = {
+      source: "qif" as const,
+      externalId: "REF-42",
+      importedAt: "2026-01-01T12:00:00.000Z",
+      originalPayee: "SHOP INC",
+    };
+    const transaction = doc.createTransaction({
+      accountId: account.id,
+      date: "2026-01-02",
+      amountMinor: -2_000,
+      payeeName: "Shop",
+      imported,
+    });
+    expect(doc.getTransaction(transaction.id)?.imported).toEqual(imported);
+
+    const parent = doc.createSplit({
+      accountId: account.id,
+      date: "2026-01-03",
+      payeeName: "Market",
+      imported: { ...imported, externalId: "REF-43" },
+      splits: [
+        { categoryId: one.id, amountMinor: -1_000 },
+        { categoryId: two.id, amountMinor: -2_000 },
+      ],
+    });
+    expect(doc.getTransaction(parent.id)?.imported?.externalId).toBe("REF-43");
+  });
+
   it("should pair a transfer and delete both sides", () => {
     const { doc, account } = base();
     const savings = doc.createAccount({ name: "Savings", type: "savings" });

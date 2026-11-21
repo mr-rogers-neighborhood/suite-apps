@@ -5,6 +5,7 @@ import {
   findDuplicateCandidates,
   formatMoney,
   type ImportBatch,
+  type ImportedMeta,
   parseCsv,
   parseCsvRows,
   parseQif,
@@ -148,6 +149,15 @@ export function ImportWizard() {
     const account = snapshot.accounts.find((candidate) => candidate.id === accountId);
     if (!account) return;
 
+    const importedAt = new Date().toISOString();
+    const importSource = format === "qif" ? "qif" : "csv";
+    const importedFor = (row: ImportBatch["rows"][number]): ImportedMeta => ({
+      source: importSource,
+      externalId: row.externalId,
+      importedAt,
+      originalPayee: row.payeeName,
+    });
+
     let imported = 0;
     let skipped = 0;
     let failed = 0;
@@ -214,6 +224,7 @@ export function ImportWizard() {
                 payeeName: ruled.payeeName,
                 memo: ruled.memo,
                 cleared: row.cleared,
+                imported: importedFor(row),
                 splits: row.splits.map((split) => ({
                   categoryId: ensureCategory(split.categoryName),
                   amountMinor: split.amountMinor,
@@ -244,6 +255,7 @@ export function ImportWizard() {
                   categoryId: ruled.categoryId,
                   memo: ruled.memo,
                   cleared: row.cleared,
+                  imported: importedFor(row),
                 });
               }
             } else {
@@ -256,6 +268,7 @@ export function ImportWizard() {
                 memo: ruled.memo,
                 cleared: ruled.cleared,
                 flag: ruled.flag,
+                imported: importedFor(row),
               });
             }
             imported += 1;
@@ -301,7 +314,7 @@ export function ImportWizard() {
       open={open}
       onOpenChange={setOpen}
       title="Import transactions"
-      description="CSV and QIF are read into the open budget. Rules run before the review, and the review can skip likely duplicates."
+      description="CSV and QIF are read into the open budget. The review can skip likely duplicates and rows; rules run when you import."
       width="xl"
       footer={
         <>
@@ -357,7 +370,7 @@ export function ImportWizard() {
 
           {format === "csv" ? (
             <div className="grid gap-3">
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 <Field label="Delimiter">
                   <TextInput
                     value={mapping.delimiter}
@@ -383,6 +396,21 @@ export function ImportWizard() {
                     <option value="yes">Yes</option>
                     <option value="no">No</option>
                   </select>
+                </Field>
+                <Field label="Skip rows" hint="Before the header">
+                  <TextInput
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={mapping.skipRows}
+                    onChange={(event) => {
+                      const parsed = Number.parseInt(event.target.value, 10);
+                      setMapping((current) => ({
+                        ...current,
+                        skipRows: Number.isNaN(parsed) ? 0 : Math.max(0, parsed),
+                      }));
+                    }}
+                  />
                 </Field>
                 <Field label="Date format">
                   <select

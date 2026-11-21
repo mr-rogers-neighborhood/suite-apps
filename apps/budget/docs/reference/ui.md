@@ -76,9 +76,10 @@ text) that can be added, removed, and reordered.
 
 ### Import
 
-Choose a CSV or QIF file. CSV maps the delimiter, header row, date format, and column roles; QIF picks
-a date format. Both preview, then review. The review can skip likely duplicates and create missing
-categories. Errors name the row; the good rows still import.
+Choose a CSV or QIF file. CSV maps the delimiter, header row, skipped leading rows, date format, and
+column roles; QIF picks a date format. Both preview, then review. The review can skip likely duplicates
+(including exact import-id matches) and rows, and create missing categories. Rules run at import, after
+the review. Errors name the row; the good rows still import.
 
 ## Keyboard
 

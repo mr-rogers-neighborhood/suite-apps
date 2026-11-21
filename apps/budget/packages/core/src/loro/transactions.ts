@@ -57,6 +57,7 @@ export type NewSplitInput = {
   memo?: string;
   cleared?: ClearedStatus;
   flag?: TransactionFlag | null;
+  imported?: ImportedMeta;
   splits: SplitInput[];
 };
 
@@ -325,6 +326,7 @@ export function createSplit(
     memo: input.memo ?? "",
     cleared: input.cleared ?? "uncleared",
     flag: input.flag ?? null,
+    imported: input.imported ?? null,
     createdAt: timestamp,
     updatedAt: timestamp,
   });

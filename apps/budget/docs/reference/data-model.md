@@ -126,7 +126,7 @@ Fields: `importedPayee`, `payee`, `account`, `category`, `date`, `memo`, `amount
 - Split parent total: sum of child records.
 - Target suggestion and funded state.
 - Upcoming entries: schedule expansion over `upcomingDays`.
-- Duplicates: fuzzy candidates at import time.
+- Duplicates: exact import-id matches and fuzzy candidates at import time.
 - Report series: net worth, spending, income vs expense, cash flow, budget vs actual, age of money.
 - Dashboard layout order.
 
@@ -225,18 +225,25 @@ There is no background auto-enter: the app does not create transactions while cl
 All parsers are pure and return `Result<ImportBatch, ImportError>`; the renderer presents the mapping,
 preview, and review.
 
-| Format       | v1       | Notes                                                                                                                            |
-| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| CSV          | Yes      | mapping wizard: delimiter, header row, date format, payee, memo, amount or inflow/outflow, category, sign flip; RFC 4180 quoting |
-| QIF          | Yes      | `!Type:Bank` records, splits (`S`/`E`/`$`), transfers (`[Account]`), cleared flag, category names                                |
-| Native JSON  | Yes      | `suite.budget.records`, Zod-validated, opens as a new budget                                                                     |
-| `.budget`    | Yes      | opens the snapshot as a new budget in the library                                                                                |
-| OFX/QFX/CAMT | Deferred | the adapter seam exists; no parser ships                                                                                         |
+| Format       | v1       | Notes                                                                                                                                                  |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CSV          | Yes      | mapping wizard: delimiter, header row, skipped leading rows, date format, payee, memo, amount or inflow/outflow, category, sign flip; RFC 4180 quoting |
+| QIF          | Yes      | `!Type:Bank` records, splits (`S`/`E`/`$`), transfers (`[Account]`), cleared flag, category names, `N` reference id                                    |
+| Native JSON  | Yes      | `suite.budget.records`, Zod-validated, opens as a new budget                                                                                           |
+| `.budget`    | Yes      | opens the snapshot as a new budget in the library                                                                                                      |
+| OFX/QFX/CAMT | Deferred | the adapter seam exists; no parser ships                                                                                                               |
 
-Dedupe: candidates in the same account with an equal amount, a date within ±3 days, and normalized
-payee similarity. The review list offers skip or import, per row and in bulk.
+Stored metadata: an imported transaction records `imported`: `source` (`csv` or `qif`),
+`externalId` (the QIF `N` reference, otherwise null), `importedAt`, and `originalPayee` (the payee text
+as read, before rules). Split parents carry it too; the two legs of a matched transfer do not.
 
-Import order: parse → map → dedupe → review → rules → commit as one document mutation.
+Dedupe: an import row with an `externalId` that matches an existing transaction's `imported.externalId`
+in the same account is an exact duplicate, whatever its date, amount, or payee. Otherwise candidates are
+transactions in the same account with an equal amount, a date within ±3 days, and normalized payee
+similarity. The review list offers skip or import, per row and in bulk.
+
+Import order: parse → map → dedupe → review → rules → commit as one document mutation. Rules run at
+commit, after the review, not before it.
 
 ## File formats
 

@@ -68,6 +68,16 @@ describe("parseCsv", () => {
     expect(result.value.errors).toHaveLength(1);
     expect(result.value.rows).toHaveLength(1);
   });
+
+  it("should skip leading rows before the header", () => {
+    const text = `Account export
+Date,Payee,Memo,Amount,Category
+01/05/2026,Shop,,-12.34,Food`;
+    const result = parseCsv(text, { ...mapping, skipRows: 1 }, "USD", 2);
+    if (result.isErr()) throw result.error;
+    expect(result.value.rows).toHaveLength(1);
+    expect(result.value.rows[0]?.payeeName).toBe("Shop");
+  });
 });
 
 describe("parseQif", () => {
@@ -173,5 +183,40 @@ describe("dedupe", () => {
       "acct_1",
     );
     expect(candidates).toHaveLength(0);
+  });
+
+  it("should treat a matching import id as an exact duplicate", () => {
+    const existing = [
+      {
+        id: "txn_1",
+        accountId: "acct_1",
+        date: "2025-12-31",
+        payeeName: "Completely Different",
+        amountMinor: 999,
+        parentId: null,
+        imported: {
+          source: "qif",
+          externalId: "REF-42",
+          importedAt: "2026-01-01T12:00:00.000Z",
+          originalPayee: "Shop Inc",
+        },
+      },
+    ];
+    const candidates = findDuplicateCandidates(
+      existing as never,
+      {
+        date: "2026-01-06",
+        amountMinor: -1234,
+        payeeName: "SHOP, INC.",
+        memo: "",
+        categoryName: null,
+        cleared: "uncleared",
+        externalId: "REF-42",
+        transferAccountName: null,
+        splits: [],
+      },
+      "acct_1",
+    );
+    expect(candidates).toEqual([{ transactionId: "txn_1", score: 1, reasons: ["same import id"] }]);
   });
 });
