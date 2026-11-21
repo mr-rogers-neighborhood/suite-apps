@@ -31,8 +31,16 @@ while read -r old new ref; do
   # does not have, so the hook asks the system manager for a transient unit and
   # hands it back to this user. One run at a time: run-gate.sh takes a lock, so
   # a second push waits its turn instead of doubling the memory footprint.
+  #
+  # The unit runs in the user's own SELinux domain. Without it the default
+  # `init_t` domain may not execute `run-gate.sh` or create the log under
+  # `$HOME` (both are `user_home_t`), and the unit dies with 203/EXEC or
+  # 209/STDOUT before the gate starts. A host that relabels `$HOME` — a VM
+  # reboot runs `restorecon` — reproduces that silently, so the domain is set
+  # here rather than left to file labels.
   sudo -n systemd-run --unit="$unit" --collect --quiet \
     --uid="$(id -u)" --gid="$(id -g)" \
+    --property=SELinuxContext=unconfined_u:unconfined_r:unconfined_t:s0 \
     --property=SupplementaryGroups=docker \
     --working-directory="$ROOT" \
     --property=MemoryHigh=5G \
