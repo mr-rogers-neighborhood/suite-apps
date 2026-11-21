@@ -15,6 +15,8 @@
     "docs:check": "node scripts/docs-check.mjs",
     "docs:index": "pnpm --dir tools/docs index",
     "docs:index:check": "pnpm --dir tools/docs index:check",
+    "docs:coverage": "pnpm --dir tools/docs coverage",
+    "docs:explain": "pnpm --dir tools/docs explain",
     "docs:dev": "pnpm --dir tools/docs dev",
     "docs:dev:bg": "pnpm --dir tools/docs dev:bg",
     "docs:stop": "pnpm --dir tools/docs stop",

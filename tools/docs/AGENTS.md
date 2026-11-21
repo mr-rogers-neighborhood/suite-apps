@@ -26,6 +26,8 @@ then `tools/docs/README.md` for the model and its limits.
 ```sh
 mise exec -- pnpm docs:index
 mise exec -- pnpm docs:index:check
+mise exec -- pnpm docs:coverage
+mise exec -- pnpm docs:explain <node-id>
 mise exec -- pnpm docs:dev
 mise exec -- pnpm docs:dev:bg
 mise exec -- pnpm docs:status

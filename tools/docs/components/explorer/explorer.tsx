@@ -102,6 +102,15 @@ export function Explorer() {
     setHydrated(true);
   }, []);
 
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setSidebarOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sidebarOpen]);
+
   const searchById = useMemo(
     () => new Map((data?.search ?? []).map((entry) => [entry.id, entry])),
     [data],
@@ -477,12 +486,20 @@ export function Explorer() {
 
   return (
     <div className="min-h-dvh bg-fd-background text-fd-foreground">
+      <a
+        href="#explorer-main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[60] focus:rounded focus:bg-fd-background focus:px-3 focus:py-2 focus:text-sm focus:shadow"
+      >
+        Skip to content
+      </a>
       <header className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-3 border-b border-fd-border bg-fd-background/95 px-3 backdrop-blur">
         <button
           type="button"
           onClick={() => setSidebarOpen((open) => !open)}
           className="rounded-lg p-1.5 text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground md:hidden"
           aria-label="Toggle navigator"
+          aria-controls="explorer-sidebar"
+          aria-expanded={sidebarOpen}
         >
           {sidebarOpen ? <X className="size-4" /> : <Menu className="size-4" />}
         </button>
@@ -540,6 +557,8 @@ export function Explorer() {
               />
             ) : null}
             <aside
+              id="explorer-sidebar"
+              aria-label="Code navigator"
               className={
                 sidebarOpen
                   ? "fixed inset-y-14 left-0 z-40 w-[20rem] border-r border-fd-border bg-fd-background shadow-xl md:static md:z-auto md:shadow-none"
@@ -575,7 +594,7 @@ export function Explorer() {
               />
             </aside>
 
-            <main className="flex min-h-0 min-w-0 flex-col">
+            <main id="explorer-main" className="flex min-h-0 min-w-0 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <DetailPane
                   view={view}

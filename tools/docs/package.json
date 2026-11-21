@@ -6,6 +6,8 @@
     "sync": "node scripts/sync-docs.mjs",
     "index": "node scripts/index-code.mjs",
     "index:check": "node scripts/index-code.mjs --check",
+    "coverage": "node scripts/coverage.mjs",
+    "explain": "node scripts/explain.mjs",
     "dev": "node scripts/index-code.mjs && node scripts/sync-docs.mjs && next dev --webpack -p ${DOCS_PORT:-3001}",
     "dev:bg": "node scripts/start-bg.mjs",
     "build": "node scripts/index-code.mjs && node scripts/sync-docs.mjs && next build --webpack",

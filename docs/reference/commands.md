@@ -84,6 +84,8 @@ the gate or a release.
 ```sh
 mise exec -- pnpm docs:index     # index every file and declaration into tools/docs/public/data
 mise exec -- pnpm docs:index:check # resolve notes, walks and tours; fail on stale generated data
+mise exec -- pnpm docs:coverage  # report authored coverage; never fails on a gap
+mise exec -- pnpm docs:explain <node-id> # scaffold one note section in its module MDX
 mise exec -- pnpm docs:dev       # index, sync docs/ and start the dev server (foreground)
 mise exec -- pnpm docs:dev:bg    # the same, detached; log in .dev/docs.log
 mise exec -- pnpm docs:status    # TCP check on the docs port
@@ -100,7 +102,9 @@ modules are package roots plus `src/` children, and config files become `config:
 step and composed-tour target and compares the generated files with the ones on disk; it exits
 nonzero on an unknown ID or stale data. `docs:dev` and `docs:build` also run
 `tools/docs/scripts/sync-docs.mjs`, which mirrors `docs/` into `.generated/docs/` with the frontmatter
-and sidebar Fumadocs expects.
+and sidebar Fumadocs expects. `docs:coverage` reports narrative, file and symbol coverage and the
+largest modules with no authored prose. `docs:explain <node-id>` appends a TODO section with the
+generated signature to the owning module MDX; it refuses to overwrite an existing note.
 
 Open `/explore` for the three-mode explorer. `/docs` remains the reference site. `docs:start` serves
 the last build; run `docs:build` first. `docs:stop` uses the docs port, so it also stops a server

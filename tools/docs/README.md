@@ -16,6 +16,8 @@ From the repository root:
 ```sh
 mise exec -- pnpm docs:index     # build tools/docs/public/data
 mise exec -- pnpm docs:index:check # validate notes, walks, tours and generated data
+mise exec -- pnpm docs:coverage  # report authored coverage; never fails on a gap
+mise exec -- pnpm docs:explain <node-id> # scaffold one note section in its module MDX
 mise exec -- pnpm docs:dev       # index, sync and start the dev server (foreground)
 mise exec -- pnpm docs:dev:bg    # the same, detached; log in .dev/docs.log
 mise exec -- pnpm docs:status    # TCP check on the docs port
@@ -94,6 +96,11 @@ The why, the invariant, and what breaks if it changes.
 The index parses the `##` headings, merges each note into its node, and warns when a heading names an
 unknown node. A module without an MDX still renders generated facts. Notes are optional; generated
 facts are honest and never invent prose.
+
+`pnpm docs:explain <node-id>` adds a section with the generated signature and a TODO, and refuses if
+the section already exists. `pnpm docs:coverage` reports narrative, file and symbol coverage plus the
+largest modules with no authored prose. Neither command gates a change; the walkthrough and note
+review does.
 
 A walkthrough is an MDX file whose headings are node IDs in step order:
 
