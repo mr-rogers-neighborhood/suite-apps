@@ -81,7 +81,7 @@ Flatpak is the only desktop distribution, so the OSTree summary is the app-side 
 
 A Flatpak client verifies the summary with the store key, and every object is named by a content hash
 inside that signed summary. [The signed
-remote](../reference/packaging-channels.md#the-signed-remote-on-suite-dev) describes the transport and
+remote](../reference/packaging-channels.md#the-signed-remote) describes the transport and
 its accepted limit.
 
 A tier adds no third signature scheme. It is another branch under the same signed summary. The relay

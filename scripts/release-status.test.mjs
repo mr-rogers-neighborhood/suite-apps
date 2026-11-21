@@ -3,13 +3,13 @@ import { describe, it } from "node:test";
 import {
   APPS,
   AGGREGATE_TABLE_HEADER,
-  REMOTE_URL,
   aggregateDate,
   aggregateReleaseBody,
   aggregateTag,
   appReleaseBody,
   changelogDate,
   changelogDateProblem,
+  flatpakrepoUrl,
   installCell,
   installCommand,
   isDate,
@@ -265,7 +265,7 @@ describe("release bodies", () => {
     const body = appReleaseBody(start, entries[0].section);
     assert.match(body, /^\s*### Changed/u);
     assert.match(body, /flatpak install --user suite run\.suite\.start/u);
-    assert.match(body, new RegExp(`${REMOTE_URL.replaceAll(".", "\\.")}/suite\\.flatpakrepo`, "u"));
+    assert.match(body, new RegExp(flatpakrepoUrl().replaceAll(".", "\\."), "u"));
     assert.match(body, /carries no app binaries/u);
   });
 

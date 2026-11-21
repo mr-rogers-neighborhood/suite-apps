@@ -42,8 +42,10 @@ here but no shell reads them; `SUITE_SYNC_BIN` is in the hub table because Start
 `SUITE_FLATPAK_REPO` and `SUITE_FLATPAK_XDG_DATA_HOME` move the output repository and the Flatpak
 data root for `scripts/flatpak.mjs`. `SUITE_FLATPAK_STATE` moves the store directory for
 `scripts/flatpak-remote.mjs`; `SUITE_FLATPAK_HOST`, `SUITE_FLATPAK_REMOTE_DIR` and `SUITE_FLATPAK_URL`
-change where it publishes and the URL it writes. `SUITE_STORE_KEY_ID` names the store's signing key
-when it is not the one recorded in `~/suite-flatpak/store-key.id`; `SUITE_STORE_STATE` and
+change where the lan target publishes and the URL it writes. `SUITE_FLATPAK_TARGET` picks `lan` or
+`s3`; `SUITE_FLATPAK_S3_BUCKET` and `SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION` name the bucket and the
+distribution an `s3` publish uploads to and invalidates. `SUITE_STORE_KEY_ID` names the store's
+signing key when it is not the one recorded in `~/suite-flatpak/store-key.id`; `SUITE_STORE_STATE` and
 `SUITE_STORE_IDENTITY` move where `scripts/store-key.sh` writes and whose name the key carries.
 `SUITE_GO_KEYSTORE`,
 `SUITE_GO_KEY_ALIAS`, `SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_PASSWORD` and `SUITE_GO_JAVA_HOME`

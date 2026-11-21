@@ -112,34 +112,59 @@ downloads. A remote that an earlier run added unsigned is switched to verificati
 Without a key the remote is added with `--no-gpg-verify`, which is for local testing only, and the
 script says so.
 
-### The signed remote on suite-dev
+### The signed remote
 
-The same signed repository is published to `suite-dev`, so another machine installs and updates the
-apps and the hub without building them. The remote answers on the lab network at:
+The same signed repository is published to the public store at
+<https://flatpak.suite.run/>, so another machine installs and updates the apps and the hub without
+building them. The store is a private S3 bucket read through CloudFront with an ACM certificate; DNS
+is at Cloudflare. [`scripts/lib/flatpakRemote.mjs`](../../scripts/lib/flatpakRemote.mjs) owns the URL,
+the S3 cache classes and the invalidation paths.
+
+`node scripts/flatpak-remote.mjs` is a dry run. It prints the branch, the refs and the bytes it would
+publish, and refuses a dirty tree or a HEAD that `.dev/gate-status.json` does not prove, with the same
+rule the gate uses. With `--publish` it runs `flatpak build-update-repo --gpg-sign=<store key>` on
+`~/suite-flatpak/repo`, verifies the fresh summary in a throwaway Flatpak installation, writes
+`~/suite-flatpak/suite.flatpakrepo`, and publishes the same bytes. It never builds a second
+repository. Publication copies bytes and commits nothing, so the gate proof stays on HEAD.
+
+The public store is the path a person installs from:
+
+```sh
+node scripts/flatpak-remote.mjs --target s3              # dry run: every aws command
+node scripts/flatpak-remote.mjs --target s3 --publish    # upload, then invalidate CloudFront
+```
+
+`--target s3` needs `SUITE_FLATPAK_S3_BUCKET` and `SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION` (or
+`--bucket` and `--distribution`), and `--publish` also needs the `aws` CLI on `PATH`; it refuses
+without them. The upload syncs `objects/` and `refs/` with
+`Cache-Control: public,max-age=31536000,immutable`, and copies `summary`, `summary.sig` and
+`suite.flatpakrepo` with `Cache-Control: no-cache`. The object trees never pass `--delete`: OSTree
+objects are content-addressed, so an old object is harmless and a client may still be fetching it.
+After the upload it invalidates only `/summary`, `/summary.sig` and `/suite.flatpakrepo`, because
+those are the only names that change between publications.
+
+`suite-dev` stays the local test remote, at:
 
 ```
 http://10.28.20.200:8088/
 ```
 
-`node scripts/flatpak-remote.mjs` is a dry run. It prints the branch, the refs and the bytes it would
-copy, and refuses a dirty tree or a HEAD that `.dev/gate-status.json` does not prove, with the same
-rule the gate uses. With `--publish` it runs `flatpak build-update-repo --gpg-sign=<store key>` on
-`~/suite-flatpak/repo`, verifies the fresh summary in a throwaway Flatpak installation, writes
-`~/suite-flatpak/suite.flatpakrepo`, and rsyncs the repository to `suite-dev:/home/aurora/flatpak/repo`.
-It publishes the repository the local flow builds; it never builds a second one. Publication copies
-bytes and commits nothing, so the gate proof stays on HEAD.
+```sh
+node scripts/flatpak-remote.mjs --target lan --publish
+```
 
-The host runs `suite-flatpak-http.service`, a systemd user unit whose source is
+That path rsyncs the repository to `suite-dev:/home/aurora/flatpak/repo`. The host runs
+`suite-flatpak-http.service`, a systemd user unit whose source is
 [`scripts/suite-flatpak-http.service`](../../scripts/suite-flatpak-http.service). It serves only that
 directory, on port 8088, and nothing else on the host uses either. `loginctl enable-linger` keeps the
 user manager — and with it the unit — alive between SSH sessions. The gate's transient `suite-gate-*`
 units and `~/ci` are separate and untouched by a publication.
 
-Add the remote and install:
+Add the public remote and install:
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite \
-  http://10.28.20.200:8088/suite.flatpakrepo
+  https://flatpak.suite.run/suite.flatpakrepo
 flatpak install --user suite run.suite.planner
 flatpak update --user
 ```
@@ -184,15 +209,15 @@ pre-release too; nothing writes that form any more. The packaging script also wr
 `suite.channel.json` beside it; no app reads that file yet, so the id is what carries the pre-release
 identity.
 
-The transport is plain HTTP because no certificate exists on `suite-dev`; adding one is separate
-work. The connection is readable, and a machine on the path can deny service or stall an update. It
-cannot substitute software: the summary is GPG-signed with the store key, and every object is named
-by a content hash inside the signed summary. The one unprotected step is the first fetch of
-`suite.flatpakrepo`, which carries the public key an attacker on the path could replace. That is the
-accepted boundary on the trusted lab network: treat the remote as a lab store, and compare its
-`GPGKey` with `~/suite-flatpak/suite-store.gpg` on the publisher when the network is not trusted.
-When a certificate does exist, replace the unit's `ExecStart` with a TLS-terminating static server;
-HTTP with a signed summary is the documented transport until then.
+The public store is HTTPS: CloudFront serves the private bucket through an ACM certificate, so the
+first fetch of `suite.flatpakrepo` and every later object is protected in transit. The local test
+remote is plain HTTP because no certificate exists on `suite-dev`; a machine on the lab network can
+read that traffic, deny service or stall an update. Neither transport can substitute software: the
+summary is GPG-signed with the store key, and every object is named by a content hash inside the
+signed summary. On the local test remote the first fetch of `suite.flatpakrepo` is the one unprotected
+step, because it carries the public key an attacker on the path could replace. Treat it as a lab
+store, and compare its `GPGKey` with `~/suite-flatpak/suite-store.gpg` on the publisher when the
+network is not trusted.
 
 Start lists Flatpak installs, including its own deployment, launches them through `flatpak run`, asks
 Flatpak to remove one, and — when the store offers the app — asks Flatpak to install it or to replace a

@@ -11,7 +11,7 @@ then install the hub:
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite \
-  http://10.28.20.200:8088/suite.flatpakrepo
+  https://flatpak.suite.run/suite.flatpakrepo
 flatpak install --user suite run.suite.start
 flatpak run run.suite.start
 ```

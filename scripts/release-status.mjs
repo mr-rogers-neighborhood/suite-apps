@@ -35,14 +35,19 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { changelogSection, versionFromPackage } from "./release.mjs";
+import {
+  DEFAULT_PUBLIC_URL,
+  REMOTE_NAME,
+  flatpakrepoUrl as remoteFlatpakrepoUrl,
+} from "./lib/flatpakRemote.mjs";
 
 /** The repository this page and these releases belong to. */
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 export const RELEASE_REPO = "mr-rogers-neighborhood/suite-apps";
 
 /** The Flatpak remote a person adds before installing; the signed update path. */
-export const REMOTE_NAME = "suite";
-export const REMOTE_URL = "http://10.28.20.200:8088";
+export { REMOTE_NAME };
+export const REMOTE_URL = DEFAULT_PUBLIC_URL;
 
 /** The generated human mirror of the Latest release, committed at the root. */
 export const RELEASES_FILE = "RELEASES.md";
@@ -143,7 +148,7 @@ export function blobUrl(path) {
 
 /** The `.flatpakrepo` a client adds; it embeds the store's public key. */
 export function flatpakrepoUrl() {
-  return `${REMOTE_URL}/${REMOTE_NAME}.flatpakrepo`;
+  return remoteFlatpakrepoUrl(REMOTE_URL);
 }
 
 /** The install command for a Flatpak app, or null for the relay. */

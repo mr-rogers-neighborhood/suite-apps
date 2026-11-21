@@ -20,11 +20,11 @@ binaries.
 ## Update
 
 ```sh
-flatpak remote-add --user --if-not-exists --from suite http://10.28.20.200:8088/suite.flatpakrepo
+flatpak remote-add --user --if-not-exists --from suite https://flatpak.suite.run/suite.flatpakrepo
 flatpak update --user
 ```
 
-Remote: [suite.flatpakrepo](http://10.28.20.200:8088/suite.flatpakrepo)
+Remote: [suite.flatpakrepo](https://flatpak.suite.run/suite.flatpakrepo)
 
 Suite Sync is a server tarball, not a Flatpak; install and verify it from its own release.
 GitHub Packages is not used for the Flatpaks.

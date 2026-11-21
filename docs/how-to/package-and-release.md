@@ -25,11 +25,29 @@ That builds the unpacked tree, exports it to `~/suite-flatpak/repo`, signs the r
 the store key, adds the remote and installs. `--no-build` reuses `release/linux-unpacked`;
 `--no-install` publishes without touching the client.
 
-Publish to the shared remote:
+Publish the same repository. The public store is the path people install from:
 
 ```sh
-node scripts/flatpak-remote.mjs                 # dry run: branch, refs and bytes
-node scripts/flatpak-remote.mjs --publish       # sign, verify and copy to suite-dev
+node scripts/flatpak-remote.mjs --target s3              # dry run: every aws command
+node scripts/flatpak-remote.mjs --target s3 --publish    # upload, then invalidate CloudFront
+```
+
+`--target s3` reads `SUITE_FLATPAK_S3_BUCKET` and `SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION` (or
+`--bucket` and `--distribution`), and refuses to publish without them or when `aws` is not on `PATH`.
+The dry run prints every `aws s3 sync`, `aws s3 cp` and `aws cloudfront create-invalidation` command
+and runs none of them. Publication signs the summary, verifies it, writes the `.flatpakrepo`, then
+uploads the same bytes; it never builds a second repository.
+
+The cache rule follows from the names. `objects/**` and `refs/**` are content-addressed, so they sync
+with `Cache-Control: public,max-age=31536000,immutable` and no `--delete`; an old object is harmless.
+`summary`, `summary.sig` and `suite.flatpakrepo` change on every publication, so they are copied with
+`Cache-Control: no-cache`, and CloudFront invalidates only `/summary`, `/summary.sig` and
+`/suite.flatpakrepo` afterwards.
+
+`suite-dev` remains the local test remote, at `http://10.28.20.200:8088/`:
+
+```sh
+node scripts/flatpak-remote.mjs --target lan --publish
 ```
 
 The publish refuses a dirty tree or a HEAD that `.dev/gate-status.json` does not prove. It publishes
@@ -45,7 +63,7 @@ the supported shape; moving tier replaces it.
 
 ```sh
 node scripts/flatpak.mjs --app planner --channel slop
-node scripts/flatpak-remote.mjs --channel slop --publish
+node scripts/flatpak-remote.mjs --target s3 --channel slop --publish
 ```
 
 The tier branch is published on the same signed remote; the stable refs are not rewritten. See
@@ -124,8 +142,8 @@ It does not bump a version and it does not read tags to guess one.
 mise exec -- node scripts/gate.mjs --fresh      # writes .dev/gate-status.json for this commit
 mise exec -- node scripts/docs-check.mjs       # if docs changed
 pnpm keys status                               # the publisher key matches the pin
-node scripts/flatpak-remote.mjs                # a clean dry run
-node scripts/flatpak-remote.mjs --publish
+node scripts/flatpak-remote.mjs --target s3     # a clean dry run
+node scripts/flatpak-remote.mjs --target s3 --publish
 ```
 
 Packaging is not proven until the built app runs. Install the Flatpak and open a document after the
