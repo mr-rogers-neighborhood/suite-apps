@@ -10,7 +10,9 @@ mise exec -- node scripts/gate.mjs --fresh
 ```
 
 The version comes from `apps/canvas/desktop/package.json`. `desktop/suite.app.json` carries the app's
-version and must agree with it. The gate proof is a commit, not a working tree.
+version and must agree with it. The release tag is `canvas-v<version>`, and the tag, the version in
+the tree and the Flatpak deployment describe one commit. The gate proof is a commit, not a working
+tree.
 
 ## Build and install locally
 
@@ -24,8 +26,8 @@ store key, adds the local remote and installs. `--no-build` reuses `desktop/rele
 ## Publish
 
 ```sh
-node scripts/flatpak-remote.mjs --app canvas            # dry run
-node scripts/flatpak-remote.mjs --app canvas --publish  # sign, verify and copy to suite-dev
+node scripts/flatpak-remote.mjs                       # dry run
+node scripts/flatpak-remote.mjs --publish             # sign, verify and copy to suite-dev
 ```
 
 The publish refuses a dirty tree or a HEAD the gate has not proven. It copies the repository the
@@ -35,7 +37,7 @@ A pre-release is a branch, not a second app:
 
 ```sh
 node scripts/flatpak.mjs --app canvas --channel slop
-node scripts/flatpak-remote.mjs --app canvas --channel slop --publish
+node scripts/flatpak-remote.mjs --channel slop --publish
 ```
 
 The stable id stays `run.suite.canvas`; the pre-release is `run.suite.slop.canvas` on branch `slop`,
