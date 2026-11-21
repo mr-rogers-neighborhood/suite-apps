@@ -1,6 +1,7 @@
 import { formatFriendCode, formatFriendLink, parseFriendCode } from "@suite/sync";
 import { useState } from "react";
-import type { SyncContact, SyncMember } from "../store/useCanvasStore";
+import { relativeTime } from "../history/historyFormat";
+import type { SyncContact, SyncMember, SyncSinceOpened } from "../store/useCanvasStore";
 import { FriendQr } from "./FriendQr";
 
 /**
@@ -26,6 +27,8 @@ export interface LocalFaceProps {
   onShare: () => Promise<void>;
   onJoin: () => Promise<void>;
   onRestore: () => Promise<void>;
+  /** When sync last completed here, so a stopped workspace still says what it missed. */
+  lastSyncedAt?: string | null;
 }
 
 /** Not shared with anyone yet: the two errands, and the door for a device that has a file. */
@@ -42,6 +45,7 @@ export function LocalFace({
   onShare,
   onJoin,
   onRestore,
+  lastSyncedAt = null,
 }: LocalFaceProps) {
   return (
     <div className="mt-4 space-y-4">
@@ -124,6 +128,13 @@ export function LocalFace({
       >
         I have a recovery file for this workspace
       </button>
+
+      {lastSyncedAt === null ? null : (
+        <p data-testid="sync-last-synced" className="text-[11px] text-[var(--ink-muted)]">
+          Last synced {relativeTime(Date.parse(lastSyncedAt), Date.now())}. Turn sync on to catch up
+          on what changed.
+        </p>
+      )}
     </div>
   );
 }
@@ -138,6 +149,8 @@ export interface SyncedFaceProps {
   offerKit: boolean;
   /** The device being removed, so its row can say so. */
   removing: string | null;
+  /** What arrived while this workspace was closed; null before any session record. */
+  sinceOpened?: SyncSinceOpened | null;
   onSaveKit: () => void;
   onInvite: () => Promise<void>;
   onRemove: (deviceId: string) => Promise<void>;
@@ -151,7 +164,51 @@ const ROLE_WORDS: Record<string, string> = {
   viewer: "can read",
 };
 
-/** Shared: the invitation to give away, who is here, and one way to leave. */
+/**
+ * What arrived while the workspace was closed.
+ *
+ * Counts, a time and the devices the host already lists. It never claims which card changed:
+ * the host holds ciphertext, and the app's own merge cannot attribute an update to a device.
+ */
+export function SinceOpenedSection({
+  updates,
+  lastSyncedAt,
+  peers,
+  nowMs = Date.now(),
+}: {
+  readonly updates: number;
+  readonly lastSyncedAt: string | null;
+  /** The other devices in the workspace, by the name the host reports. */
+  readonly peers: readonly string[];
+  /** Test seam: the clock the sentence is relative to. */
+  readonly nowMs?: number;
+}) {
+  return (
+    <section
+      data-testid="sync-since-opened"
+      className="rounded-md border border-[var(--hairline)] p-2"
+    >
+      <h3 className="text-xs font-semibold">Since you last opened</h3>
+      <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+        {updates === 0
+          ? "Nothing new has arrived on this device yet."
+          : `${updates} ${updates === 1 ? "update" : "updates"} arrived from the host.`}
+      </p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+        {peers.length === 0
+          ? "No other device is listed right now."
+          : `Other devices here: ${peers.join(", ")}.`}
+      </p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+        {lastSyncedAt === null
+          ? "This device has not completed a sync yet."
+          : `Last synced ${relativeTime(Date.parse(lastSyncedAt), nowMs)}.`}
+      </p>
+    </section>
+  );
+}
+
+/** Shared: what arrived, the invitation to give away, who is here, and one way to leave. */
 export function SyncedFace({
   members,
   deviceId,
@@ -160,14 +217,30 @@ export function SyncedFace({
   busy,
   offerKit,
   removing,
+  sinceOpened = null,
   onSaveKit,
   onInvite,
   onRemove,
   onStop,
   run,
 }: SyncedFaceProps) {
+  // Removal is the owner's decision. The host refuses a removal record anybody else signed,
+  // so offering the button to an editor would be a promise the relay has already broken.
+  const ownRole = members.find((member) => member.deviceId === deviceId)?.role ?? null;
+  const canRemove = ownRole === "owner";
+  const peers = members.filter((member) => member.deviceId !== deviceId);
+  const peerNames = peers.map((member) => member.name);
+
   return (
     <div className="mt-4 space-y-4">
+      {sinceOpened === null || sinceOpened === undefined ? null : (
+        <SinceOpenedSection
+          updates={sinceOpened.updates}
+          lastSyncedAt={sinceOpened.lastSyncedAt}
+          peers={peerNames}
+        />
+      )}
+
       <section>
         <h3 className="text-xs font-semibold">Invite someone</h3>
         <p className="mt-1 text-[11px] text-[var(--ink-muted)]">
@@ -198,16 +271,30 @@ export function SyncedFace({
             <li className="text-[11px] text-[var(--ink-muted)]">Just this device so far.</li>
           ) : null}
           {members.map((member) => (
-            <li key={member.deviceId} className="flex items-baseline justify-between gap-2 text-xs">
-              <span className="truncate">
-                {member.name}
-                {member.deviceId === deviceId ? " (this device)" : ""}
+            <li
+              key={member.deviceId}
+              className="flex items-start justify-between gap-2 text-xs"
+              data-testid="sync-member"
+              data-device-id={member.deviceId}
+            >
+              <span className="min-w-0">
+                <span className="block truncate">
+                  {member.name}
+                  {member.deviceId === deviceId ? " (this device)" : ""}
+                </span>
+                {/* The name is what a person weighs; the id is what a host pins. */}
+                <code
+                  className="block truncate font-mono text-[10px] text-[var(--ink-muted)]"
+                  title={member.deviceId}
+                >
+                  {member.deviceId.slice(0, 12)}…
+                </code>
               </span>
               <span className="flex shrink-0 items-baseline gap-2">
                 <span className="text-[11px] text-[var(--ink-muted)]">
                   {ROLE_WORDS[member.role] ?? member.role}
                 </span>
-                {member.deviceId !== deviceId ? (
+                {canRemove && member.deviceId !== deviceId ? (
                   <button
                     type="button"
                     disabled={busy}
@@ -221,6 +308,11 @@ export function SyncedFace({
             </li>
           ))}
         </ul>
+        {!canRemove && peers.length > 0 ? (
+          <p className="mt-1 text-[11px] text-[var(--ink-muted)]">
+            Only the owner can remove a device.
+          </p>
+        ) : null}
       </section>
 
       {fingerprint ? (

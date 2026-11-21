@@ -498,6 +498,16 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
       if (group === null || sync.client() === null) {
         throw new Error("This workspace is not shared yet.");
       }
+      // The host refuses a removal record an owner did not sign, but a commit from any member
+      // would still rotate the epoch for everybody. The decision is refused here, before a
+      // commit is written, so an editor is never one socket message away from that.
+      const own = sync.members().find((member) => member.deviceId === identity.deviceId);
+      if (own?.role !== "owner") {
+        throw new Error("Only the owner can remove a device.");
+      }
+      if (deviceId === identity.deviceId) {
+        throw new Error("This device cannot remove itself.");
+      }
       const name = sync.members().find((member) => member.deviceId === deviceId)?.name;
       // The device id first, because that is what a credential is now; the name is the fallback
       // for a group made before that was true, so an older workspace can still be tidied up.

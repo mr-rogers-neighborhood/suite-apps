@@ -273,6 +273,7 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
             busy={busy}
             offerKit={offerKit}
             removing={removing}
+            sinceOpened={sync?.sinceOpened ?? null}
             onSaveKit={() => setStep({ name: "kit" })}
             onInvite={async () => {
               const made = await inviteSomeone("editor");
@@ -315,6 +316,7 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
               )
             }
             onRestore={openKit}
+            lastSyncedAt={sync?.sinceOpened?.lastSyncedAt ?? null}
           />
         )}
 

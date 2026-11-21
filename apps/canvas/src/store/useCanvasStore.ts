@@ -27,6 +27,13 @@ export interface SyncContact {
   readonly trusted: boolean;
 }
 
+/** What sync did while the workspace was closed: counts and a time, never content. */
+export interface SyncSinceOpened {
+  readonly openedAt: string;
+  readonly updates: number;
+  readonly lastSyncedAt: string | null;
+}
+
 /**
  * What sync is doing, and who is here.
  *
@@ -48,6 +55,8 @@ export interface SyncInfo {
   readonly fingerprint?: string | null;
   /** What this device has said about its way back in; null until anybody asked. */
   readonly kit?: "made" | "declined" | null;
+  /** What arrived while the workspace was closed, or null before any session record. */
+  readonly sinceOpened?: SyncSinceOpened | null;
   /** What went wrong when something did, in the words of whatever refused. */
   readonly problem?: string;
 }

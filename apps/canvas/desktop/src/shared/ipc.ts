@@ -90,6 +90,23 @@ export type SyncState =
    */
   | { readonly state: "removed" };
 
+/**
+ * What sync did while this workspace was closed, as counts and a time.
+ *
+ * The relay holds ciphertext and the document belongs to the app, so this is deliberately
+ * not a list of what changed. A count of updates, the moment sync last completed and the
+ * roster the host already publishes are the whole of what can be said without opening
+ * frames — and opening them would still not attribute a change to a device.
+ */
+export interface SyncSinceOpened {
+  /** When this device opened the workspace in the run this summary describes. */
+  readonly openedAt: string;
+  /** Document updates handed to this workspace since then. */
+  readonly updates: number;
+  /** When sync last completed on this device, or null when it never has. */
+  readonly lastSyncedAt: string | null;
+}
+
 /** One device the workspace holds, as the host describes it. */
 export interface SyncMember {
   readonly deviceId: string;
@@ -154,6 +171,11 @@ export interface SyncInfo {
    * a declined kit is a decision, not an outstanding chore.
    */
   readonly kit: "made" | "declined" | null;
+  /**
+   * What arrived while the workspace was closed, or null before this device has ever
+   * opened it with a session record.
+   */
+  readonly sinceOpened: SyncSinceOpened | null;
 }
 
 /** What the hub on this machine reports about itself, for a share field's starting point. */
