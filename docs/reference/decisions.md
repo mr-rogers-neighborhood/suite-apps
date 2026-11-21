@@ -22,6 +22,9 @@ The rules that shape this repository. Each is current; the code follows it.
   frontmatter; until then it is generated, whoever wrote it. The old
   tutorials, how-to, reference and explanation pages remain a notes archive; new content goes to
   `docs/modules/` or `docs/tours/`.
+- The one planning page in the reference archive is [Ideas](ideas.md). It owns no fact: every row
+  links to the owning page or decision, and no other new reference or Diátaxis page is added without
+  an owner decision.
 - A tour is one concept with two authoring forms: `docs/tours/*.mdx` for a linear prose path and
   `docs/tours/*.tour.mjs` for a composed path that crosses modules, files, symbols, tours or docs.
   The MDX preamble is the intro; `## interlude: <title>` is a chapter; `### overlay: <title>` adds a

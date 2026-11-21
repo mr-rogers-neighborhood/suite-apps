@@ -1,0 +1,53 @@
+# Ideas
+
+The planning tracker: what the suite is considering, in three horizons. It is not a reference page and
+it does not own a fact. A row records an intention; the page or decision it links to owns the detail,
+and that owner wins if the two disagree. The repository otherwise does not add pages to the reference
+archive ([editing rules](../README.md#editing-rules)); this one is planning, not a new explanation.
+
+## Now
+
+| Idea | Why it matters | Owning app or package | State | Source |
+| --- | --- | --- | --- | --- |
+| Prove the friend-code trust loop across Canvas and Planner | A contact is a trust decision. If one app admits a stranger or refuses a known person, the failure is silent; both apps need the same check for add, forget, a signed invitation and an unknown code. | `@suite/sync`, Canvas and Planner main processes | Shipped in both apps; no cross-app check | [Sync decisions](../../apps/sync/docs/reference/decisions.md), [Planner's Sync](../../apps/planner/docs/reference/sync.md), [Status](status.md) |
+| Offer the friend link or QR in the Sync dialog | The protocol parses `suite://friend?c=…&k=…`, and only the text code is shown. A scan would carry the public key and complete a contact on the spot instead of waiting for the first invitation. | `@suite/sync`, Canvas and Planner Sync dialogs | Protocol built; UI open | [Sync decisions](../../apps/sync/docs/reference/decisions.md), [Protocol](../../apps/sync/docs/protocol.md#friend-codes-and-signed-invitations) |
+| Planner alpha hardening | The core loop works; the editing surfaces and rituals are still changing shape. Alpha needs the daily path to hold before the tier is promised. | `apps/planner` | Pre-alpha | [Planner](../../apps/planner/README.md), [Status](status.md), [Channels](../explanation/channels.md) |
+| Budget alpha hardening | The core loop, targets, rules, schedules, import and reports are in place, and the app still changes shape between releases. Alpha needs the envelope and register rules to stay fixed under load. | `apps/budget` | Pre-alpha | [Budget](../../apps/budget/README.md), [Status](status.md), [Channels](../explanation/channels.md) |
+| Keep the cross-app docs baseline current | No module has a person's review yet, and the largest unprose modules are Canvas and Help internals. The baseline makes the gap visible without closing app-owned pages from this lane. | `docs/`, `apps/help` | Baseline recorded below; review not started | [Help](../../apps/help/README.md), [Status](status.md) |
+| Reconcile the sync threat model with friend codes | The threat model still says a friend-code or contacts exchange is not built, while the protocol and both apps ship one. The sync lane owns that page. | `apps/sync` docs | Open, app-owned | [Threat model](../../apps/sync/docs/threat-model.md) |
+
+## Next
+
+| Idea | Why it matters | Owning app or package | State | Source |
+| --- | --- | --- | --- | --- |
+| Decide whether contacts should cross apps | Each app keeps its own `sync/contacts.json`, so the same person is added twice. A shared trust store would cut that friction, but it moves a trust decision across the per-app boundary. | `@suite/sync`, Canvas and Planner main processes | Decision open; one file per app today | [Sync decisions](../../apps/sync/docs/reference/decisions.md), [Planner's Sync](../../apps/planner/docs/reference/sync.md) |
+| Bring contact management to Planner's device list | An owner removes a device through Canvas or the relay's tools today; Planner's dialog only lets this copy leave. The friend list should make the same management reachable where the person is. | `apps/planner`, `apps/sync` | Open | [Planner's Sync](../../apps/planner/docs/reference/sync.md) |
+| Start the first human review pass on module prose | `docs:coverage` counts generated prose separately on purpose. A reviewed module is the first one a reader can trust without checking the code; the largest gaps are the natural starting points. | `docs/modules/`, `apps/help` | Not started (0/118 reviewed) | [Help](../../apps/help/README.md), [Coverage baseline](#coverage-baseline) |
+| Prepare Planner and Budget for the `canary` → `beta` boundary | `beta` promises a shape a person reviewed, docs and a decision record, and no irreversible step. That is the next promise worth earning for each app. | `apps/planner`, `apps/budget`, `docs/` | Open | [Channels](../explanation/channels.md), [Status](status.md) |
+
+## Someday
+
+| Idea | Why it matters | Owning app or package | State | Source |
+| --- | --- | --- | --- | --- |
+| Revisit the renderer split only if it stops paying | The bet is one sandboxed renderer per app, not one container window: separate crash, memory and accessibility boundaries. Sharing chrome is the gain that would test the bet, and it has not outweighed the boundaries yet. | `@suite/desktop`, `docs/explanation/architecture.md` | Decided; revisit on evidence | [Architecture](../explanation/architecture.md#why-not-one-container-window), [Decisions](decisions.md#desktop-host) |
+| Give every module a person's review | Generated facts are honest but thin. Reviews are the step that turns the explorer into prose a person can rely on; the baseline shows how far that is. | `docs/modules/`, `apps/help` | Not started | [Coverage baseline](#coverage-baseline) |
+| A person-run directory of friend codes? | Deliberately absent: a code resolves through each app's contacts file, never a lookup service. Reopening it would need a product decision, because it changes the trust model and adds a service to run. | `@suite/sync` | Rejected today; revisit only with a decision | [Sync decisions](../../apps/sync/docs/reference/decisions.md), [Local-first](../explanation/local-first.md) |
+
+## Coverage baseline
+
+Snapshot from `mise exec -- pnpm docs:coverage` after `mise exec -- pnpm docs:index` on 2026-11-21. The
+command reports and never fails on a gap; re-run it rather than trusting a stale number.
+
+| Measure | Baseline |
+| --- | --- |
+| Modules reviewed by a person | 0/118 |
+| Modules with generated prose | 36/118 |
+| Files with a note | 103/1822 (6%) |
+| Symbols with a note | 122/9916 (1%) |
+| Written tours reviewed by a person | 0/13 |
+| Generated tour steps with a note | 147/147 |
+
+The largest modules with no prose are `apps/canvas/packages/import-obsidian` (143 symbols), the Canvas
+graph publish package (125), `apps/help/src/renderer` (120), `apps/canvas/src/library` (114) and
+`apps/help` (113). The help and Canvas rows are the densest, but they are app-owned prose: this pass
+records them and does not write app module notes.

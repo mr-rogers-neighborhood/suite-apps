@@ -11,14 +11,19 @@ two Canvas clients to it. It proves the transport; it is not the shipped securit
 
 - This repository, with dependencies installed.
 - A built sync server.
-- Two Canvas clients: two browser tabs, or two desktop instances with separate data directories.
+- Two Canvas desktop instances: separate data directories, or two machines.
 
 ## The shape
 
 1. Start `suite-sync` — Start supervises one, or run the CLI against a store directory.
 2. Open the document in Canvas desktop and press **Share** in the Sync dialog.
 3. Give a second device a copy of the `.canvas` file and an invitation link from the first device.
-4. Press **Join** on the second device; the first device admits it from the invitation.
+   The link carries a signed envelope naming the inviter, and the joining app resolves that name
+   against its own contacts.
+4. Press **Join** on the second device. A known contact connects without a second certificate
+   question; an unknown code is refused with the code to add, so add it and press Join again. The
+   friend code and contact list are described in
+   [Canvas's Sync status](../../apps/canvas/handbook/chrome/sync-status.md).
 5. Edit a card in one; watch it arrive in the other.
 
 The exact steps, including the relay address and the invitation, are in
