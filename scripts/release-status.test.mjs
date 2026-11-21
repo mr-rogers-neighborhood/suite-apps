@@ -5,11 +5,16 @@ import {
   AGGREGATE_TABLE_HEADER,
   aggregateDate,
   aggregateReleaseBody,
+  aggregateSection,
   aggregateTag,
   appReleaseBody,
   changelogDate,
   changelogDateProblem,
+  currentAggregateTag,
+  entriesForSection,
   flatpakrepoUrl,
+  goApkName,
+  goApkUrl,
   installCell,
   installCommand,
   isDate,
@@ -25,6 +30,7 @@ import {
 } from "./release-status.mjs";
 
 const start = APPS.find((app) => app.id === "start");
+const go = APPS.find((app) => app.id === "go");
 const sync = APPS.find((app) => app.id === "sync");
 
 /** Three apps in the shape collect() builds, enough for a table. */
@@ -46,9 +52,19 @@ const entries = [
   { app: sync, version: "0.11.3", date: "2026-11-20", tag: "sync-v0.11.3", section: "### Added" },
 ];
 
+/** The mobile entry, added only where a test needs the second table. */
+const goEntry = {
+  app: go,
+  version: "0.1.0",
+  date: "2026-11-18",
+  tag: "go-v0.1.0",
+  section: "### Added\n\n- **The first version.** It exists.",
+};
+
 describe("tags and dates", () => {
   it("names an app tag from its prefix and version", () => {
     assert.equal(tagFor(start, "0.5.1"), "start-v0.5.1");
+    assert.equal(tagFor(go, "0.1.0"), "go-v0.1.0");
     assert.equal(tagFor(sync, "0.11.3"), "sync-v0.11.3");
   });
 
@@ -282,6 +298,25 @@ describe("release bodies", () => {
     assert.match(body, /SHA256SUMS/u);
   });
 
+  it("states whether the Go APK is attached in the per-app body", () => {
+    const live = appReleaseBody(go, goEntry.section, {
+      tag: "suite-2026.11.21",
+      apkLive: true,
+    });
+    assert.match(live, /is attached to \[the rolling Suite release\]/u);
+    assert.match(live, /releases\/tag\/suite-2026\.11\.21/u);
+    assert.doesNotMatch(live, /Mobile table says whether/u);
+
+    const pending = appReleaseBody(go, goEntry.section, { tag: "suite-2026.11.21" });
+    assert.match(pending, /Mobile table says whether this build is attached yet/u);
+    assert.doesNotMatch(pending, /is attached to/u);
+    assert.match(pending, /releases\/tag\/suite-2026\.11\.21/u);
+
+    const unknown = appReleaseBody(go, goEntry.section);
+    assert.match(unknown, /releases\/latest/u);
+    assert.match(unknown, /Mobile table says whether/u);
+  });
+
   it("builds one aggregate row per app with version, date, link and install", () => {
     const body = aggregateReleaseBody(entries, { date: "2026-11-21" });
     assert.match(body, /Latest/u);
@@ -335,6 +370,110 @@ describe("release bodies", () => {
     assert.doesNotMatch(page, /\(pending\)/u);
     for (const header of AGGREGATE_TABLE_HEADER) assert.ok(page.includes(header));
     assert.match(page, /GitHub Packages is not used for the Flatpaks/u);
+  });
+});
+
+describe("sections and the Suite Go APK", () => {
+  it("keeps the desktop rows in reading order and Go alone on mobile", () => {
+    assert.deepEqual(
+      APPS.filter((app) => app.section === "desktop").map((app) => app.id),
+      ["start", "canvas", "planner", "budget", "sync", "help"],
+    );
+    assert.deepEqual(
+      APPS.filter((app) => app.section === "mobile").map((app) => app.id),
+      ["go"],
+    );
+    assert.equal(go.packageJson, "apps/go/package.json");
+    assert.equal(go.changelog, "apps/go/CHANGELOG.md");
+    assert.equal(go.tagPrefix, "go-v");
+    assert.equal(go.kind, "apk");
+  });
+
+  it("renders a section as a title and its own rows", () => {
+    const section = aggregateSection("Mobile", [goEntry], { tag: "suite-2026.11.21" });
+    assert.equal(section[0], "## Mobile");
+    assert.equal(section[1], "");
+    assert.deepEqual(section.slice(2, 4), AGGREGATE_TABLE_HEADER);
+    assert.equal(section.length, 2 + AGGREGATE_TABLE_HEADER.length + 1);
+    assert.match(section.at(-1), /\| \[Suite Go\]/u);
+  });
+
+  it("renders each section only for the rows it is given", () => {
+    const desktopOnly = aggregateSection("Desktop", entries, { tag: "suite-2026.11.21" });
+    assert.deepEqual(
+      desktopOnly.filter((line) => line.startsWith("## ")),
+      ["## Desktop"],
+    );
+    const withGo = aggregateSection("Mobile", [goEntry], { tag: "suite-2026.11.21" });
+    assert.deepEqual(
+      withGo.filter((line) => line.startsWith("## ")),
+      ["## Mobile"],
+    );
+    assert.match(withGo.at(-1), /\| \[Suite Go\]/u);
+  });
+
+  it("links the APK only when the release actually carries it", () => {
+    const live = installCell(go, {
+      version: "0.1.0",
+      tag: "suite-2026.11.21",
+      apkLive: true,
+    });
+    assert.equal(live, `[suite-go-0.1.0.apk](${goApkUrl("suite-2026.11.21", "0.1.0")})`);
+    assert.match(live, /releases\/download\/suite-2026\.11\.21\/suite-go-0\.1\.0\.apk/u);
+    assert.equal(goApkName("0.1.0"), "suite-go-0.1.0.apk");
+
+    const missing = installCell(go, { version: "0.1.0", tag: "suite-2026.11.21" });
+    assert.match(missing, /suite-go-0\.1\.0\.apk/u);
+    assert.match(missing, /not uploaded yet/u);
+    assert.doesNotMatch(missing, /releases\/download/u);
+  });
+
+  it("puts the store instruction above the tables and Update below them", () => {
+    const body = aggregateReleaseBody(entries, {
+      date: "2026-11-21",
+      tag: "suite-2026.11.21",
+    });
+    const remote = body.indexOf("flatpak remote-add");
+    const desktop = body.indexOf("## Desktop");
+    const update = body.indexOf("## Update");
+    assert.ok(remote >= 0 && desktop > remote);
+    assert.ok(update > desktop);
+
+    const page = releasesPage(entries, { date: "2026-11-21", tag: "suite-2026.11.21" });
+    assert.ok(page.indexOf("flatpak remote-add") < page.indexOf("## Desktop"));
+    assert.ok(page.indexOf("## Update") > page.indexOf("## Desktop"));
+  });
+
+  it("says in the aggregate body whether the APK link is live", () => {
+    const withGo = [...entries, goEntry];
+    const live = aggregateReleaseBody(withGo, {
+      date: "2026-11-21",
+      tag: "suite-2026.11.21",
+      apkLive: true,
+    });
+    assert.match(live, /carries its debug-signed APK/u);
+    assert.match(live, /releases\/download\/suite-2026\.11\.21\/suite-go-0\.1\.0\.apk/u);
+    assert.match(live, /## Mobile/u);
+
+    const missing = aggregateReleaseBody(withGo, {
+      date: "2026-11-21",
+      tag: "suite-2026.11.21",
+    });
+    assert.match(missing, /not attached to this release yet/u);
+    assert.match(missing, /android-release\.mjs --publish/u);
+  });
+
+  it("names the aggregate tag from the newest changelog date", () => {
+    const files = {
+      "apps/start/package.json": '{"version":"0.5.1"}',
+      "apps/start/CHANGELOG.md": "## [0.5.1] - 2026-11-21\n",
+      "apps/go/package.json": '{"version":"0.1.0"}',
+      "apps/go/CHANGELOG.md": "## [0.1.0] - 2026-11-18\n",
+    };
+    assert.equal(
+      currentAggregateTag({ load: (path) => files[path] ?? "" }),
+      "suite-2026.11.21",
+    );
   });
 });
 

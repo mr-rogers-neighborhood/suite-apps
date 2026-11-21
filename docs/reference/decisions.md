@@ -66,7 +66,9 @@ The rules that shape this repository. Each is current; the code follows it.
   `pnpm keys status` proves the two agree. No secret is stored in a generated directory such as
   `.dev/`: a cleanup deletes it, and the pin is left with no key able to satisfy it.
   [Manage signing keys](../how-to/keys.md) owns the procedure.
-- Linux is the published platform. macOS and Windows have no signing identity.
+- Linux is the published desktop platform. macOS and Windows have no signing identity.
+- Android ships as a debug-signed APK attached to the rolling release; there is no signing key or
+  store channel yet.
 
 ## Desktop host
 

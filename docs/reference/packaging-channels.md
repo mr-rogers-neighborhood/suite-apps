@@ -1,15 +1,17 @@
 # Packaging channels
 
-Linux desktop apps in the suite ship as Flatpaks. The relay is a server tarball. The two forms differ
-in **who owns the installed files**, and that decides who may update them.
+Linux desktop apps in the suite ship as Flatpaks. Suite Go ships as a debug-signed Android APK. The
+relay is a server tarball. The forms differ in **who owns the installed files**, and that decides who
+may update them.
 
 | Form | Built for | Who owns the files | Updates arrive by | Root |
 | --- | --- | --- | --- | --- |
 | Flatpak | Canvas, Planner, Budget, Help and the hub | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
+| Debug APK | Suite Go | the person, through `adb` or the file manager | the person installs the next APK | no |
 | Relay tarball | `suite-sync` | the person, under `/opt` | the person replaces the tree | yes |
 
-There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, and the
-relay is not an app.
+There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, the relay
+is not an app, and Suite Go has no Play Store listing.
 
 The release tiers a build can carry, and what each promises, are [Channels](../explanation/channels.md).
 
@@ -241,6 +243,21 @@ Suite Start supervises a relay it finds through `SUITE_SYNC_BIN` or `PATH`; it n
 download, checksum and signature checks are in
 [Leave a relay running](../../apps/sync/docs/how-to/relay.md#1-install-the-relay).
 
+## Android APK
+
+Suite Go ships as `suite-go-<version>.apk` on the rolling `suite-YYYY.MM.DD` release, with
+`suite-go-<version>.apk.sha256` beside it. It is an `assembleDebug` build of the committed Android
+project: the debug keystore signs it, no release signing key exists, and there is no Play Store
+channel.
+
+The debug signature belongs to the machine that built it, so an APK from another machine is a
+different signer; changing machines means `adb uninstall run.suite.go` once before installing.
+`scripts/android-release.mjs` builds, names and checksums the artifact, and `--publish` attaches both
+files to the rolling release after `release-status.mjs --publish` has created it. It also uploads the
+same bytes as `suite-go.apk`, the stable name
+[Suite Go's README](../../apps/go/README.md#install-the-apk) links through `releases/latest`; the
+versioned asset stays canonical, and that README owns the sideload line and what debug-signed means.
+
 ## Pre-release documents
 
 A pre-release install is a second identity (`run.suite.slop.<app>`), not a second window on the
@@ -254,8 +271,9 @@ explicit, writes where the person chooses, and refuses the stable folder. The ru
 
 ## Platforms
 
-Linux is the only platform with published builds. macOS and Windows are configured but have no
-signing identity, so there is nothing to download.
+Linux is the only desktop platform with published builds. Android has a debug-signed APK on the
+rolling release. macOS and Windows are configured but have no signing identity, so there is nothing
+to download.
 
 ## Signing
 

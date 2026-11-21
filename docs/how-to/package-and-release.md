@@ -1,17 +1,18 @@
 # Package and release
 
-The suite has one repository and two artifact forms: Flatpaks for Linux desktop apps and a tarball
-for the relay. Each app keeps its own version and release notes; the root owns the gate and the two
-publishing paths.
+The suite has one repository and three artifact forms: Flatpaks for Linux desktop apps, a
+debug-signed APK for Suite Go, and a tarball for the relay. Each app keeps its own version and
+release notes; the root owns the gate and the publishing paths.
 
 ## What a release is
 
 A desktop release is a Flatpak deployment on the signed OSTree remote, built from a commit the gate
-has proven, with a changelog section for the version in the app's `CHANGELOG.md`. The relay release is
-a tarball on `sync-v<version>` with a signed `SHA256SUMS`.
+has proven, with a changelog section for the version in the app's `CHANGELOG.md`. Suite Go's release
+is a debug-signed APK attached to the rolling Suite release. The relay release is a tarball on
+`sync-v<version>` with a signed `SHA256SUMS`.
 
-There is no app update feed, AppImage, Arch package or second copy to roll back to. Flatpak owns the
-deployment and the remote is the update channel.
+There is no app update feed, AppImage, Arch package or second copy to roll back to. For the desktop
+apps, Flatpak owns the deployment and the remote is the update channel.
 
 ## Desktop apps
 
@@ -73,10 +74,11 @@ desktop-entry rule.
 ## GitHub releases
 
 GitHub shows one "Latest" release per repository, so this repository has one rolling Suite release
-tagged `suite-YYYY.MM.DD` and marked Latest. Its body is a table of every app's current version, its
-release date, a link to that app's own release and the install command. Per-app releases
-(`start-v<version>`, `canvas-v<version>`, `sync-v<version>`) stay as history and are not marked
-Latest.
+tagged `suite-YYYY.MM.DD` and marked Latest. Its body has a Desktop table and a Mobile table, each
+row naming the app's current version, its release date, a link to that app's own release and how it
+installs — a `flatpak install` command for desktop, the APK asset for Suite Go. Per-app releases
+(`start-v<version>`, `canvas-v<version>`, `go-v<version>`, `sync-v<version>`) stay as history and are
+not marked Latest.
 
 Both come from the versions already in the tree. The script reads `package.json` and the
 `## [version] - YYYY-MM-DD` section of the changelog, refuses a version with no section or a date
@@ -102,6 +104,31 @@ page that is not there; `--publish` rewrites the page with real links once the r
 
 The signed Flatpak remote above remains the update path. Per-app releases carry no app binaries, and
 GitHub Packages is not used for the Flatpaks.
+
+## Suite Go (Android)
+
+Suite Go's artifact is an APK on the rolling release, not on `go-v<version>`. It sits after the
+release that will carry it:
+
+```sh
+mise exec -- node scripts/release-status.mjs --publish   # creates the rolling release
+mise exec -- node scripts/android-release.mjs --publish  # builds and uploads the APK and .sha256
+mise exec -- node scripts/release-status.mjs --publish   # relinks the body and RELEASES.md
+```
+
+The first command creates the rolling release with empty assets. Until the APK is uploaded, the Go
+row names the file instead of linking it and the body says the asset is not attached; the release
+script prints a non-fatal warning naming the upload command. Run `release-status.mjs --publish`
+again after the upload so the GitHub body and `RELEASES.md` link the download instead of describing
+it as missing.
+
+The upload also carries the same bytes as `suite-go.apk`, so
+`https://github.com/mr-rogers-neighborhood/suite-apps/releases/latest/download/suite-go.apk` always
+names the newest debug build; the versioned asset stays canonical.
+
+Only the debug keystore signs this build — there is no release signing key and no Play channel. The
+APK is for sideloading and for the owner's phone, and the signature belongs to the machine that built
+it. [Suite Go's README](../../apps/go/README.md#install-the-apk) owns that install path.
 
 ## The relay
 
@@ -170,7 +197,7 @@ stamps it into the artifact.
 | Start, Planner, Budget, Help | `apps/<app>/package.json` | `<app>-v<version>` |
 | Canvas | `apps/canvas/desktop/package.json` | `canvas-v<version>` |
 | The relay (`suite-sync`) | `apps/sync/package.json` | `sync-v<version>` |
-| Suite Go | `apps/go/app.config.json` | none yet |
+| Suite Go | `apps/go/app.config.json` | `go-v<version>` |
 | A shared package (`@suite/*`) | `packages/<name>/package.json` | none; consumed as `workspace:*` |
 
 ## Signing
