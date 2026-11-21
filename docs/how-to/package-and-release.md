@@ -73,11 +73,14 @@ mise exec -- node scripts/release-status.mjs --publish   # create or update the 
 
 A missing tag is created at the commit that added its changelog section; an existing tag is never
 moved. The relay's release is the exception: `scripts/release.mjs sync --publish` owns its tarball,
-so this script only edits that release's body and refuses when no relay release exists.
+so this script only edits that release's body and refuses when no relay release exists, or when the
+existing release carries no tarball or checksum asset.
 
 [`RELEASES.md`](../../RELEASES.md) is the human mirror of the Latest release. It can be written
 before publication, so a row whose release does not exist yet says **pending** instead of linking a
 page that is not there; `--publish` rewrites the page with real links once the releases exist.
+`--write` needs no tag plan, so a row whose tag or release cannot be resolved yet is written as
+**pending** rather than stopping the refresh.
 
 The signed Flatpak remote above remains the update path. Per-app releases carry no app binaries, and
 GitHub Packages is not used for the Flatpaks.

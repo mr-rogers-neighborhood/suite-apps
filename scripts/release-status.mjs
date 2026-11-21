@@ -224,6 +224,36 @@ export function aggregateDate(entries, override = null) {
   return dates.reduce((newest, date) => (date > newest ? date : newest));
 }
 
+/** The one instruction a refused relay release always gives. */
+const RELAY_PUBLISH_SENTENCE =
+  "The relay's tarball and signature are published by `node scripts/release.mjs sync --publish`; " +
+  "run that first, then this edits its body.";
+
+/** True for an asset that makes a relay release installable or verifiable. */
+export function isRelayAsset(name) {
+  return /\.(?:tar|tar\.(?:gz|xz|zst)|tgz)$/iu.test(name) || /^SHA256SUMS$/u.test(name);
+}
+
+/**
+ * Why an existing relay release may not be edited, or null when it may.
+ *
+ * The release must already carry its tarball or checksums: an existing
+ * `sync-v<version>` with only a body would keep looking installable while
+ * `scripts/release.mjs sync --publish` has never put the bytes there. An
+ * unreadable asset list is refused too, because the guard cannot verify it.
+ */
+export function relayAssetProblem(tag, assets) {
+  if (!Array.isArray(assets)) {
+    return (
+      `could not read the assets of ${tag}, so it is unknown whether its tarball and checksums ` +
+      `are there. ${RELAY_PUBLISH_SENTENCE}`
+    );
+  }
+  const names = assets.map((asset) => asset?.name ?? "");
+  if (names.some(isRelayAsset)) return null;
+  return `the GitHub release ${tag} carries no tarball or checksum asset. ${RELAY_PUBLISH_SENTENCE}`;
+}
+
 /**
  * What a publish may do with one release, or why it must not.
  *
@@ -231,16 +261,20 @@ export function aggregateDate(entries, override = null) {
  * The relay may not: its tarball and signature belong to
  * `scripts/release.mjs sync --publish`, and an assetless `sync-v<version>`
  * release would look installable while carrying nothing. Its body is edited in
- * place, so the assets stay.
+ * place, so the assets stay; `assets` is read before this decides.
  */
-export function releaseAction({ app, tag, exists }) {
-  if (exists) return { action: "edit", problem: null };
+export function releaseAction({ app, tag, exists, assets }) {
+  if (exists) {
+    if (app.flatpakId !== null) return { action: "edit", problem: null };
+    const problem = relayAssetProblem(tag, assets);
+    return problem === null
+      ? { action: "edit", problem: null }
+      : { action: null, problem };
+  }
   if (app.flatpakId === null) {
     return {
       action: null,
-      problem:
-        `no GitHub release exists for ${tag}. The relay's tarball and signature are published by ` +
-        "`node scripts/release.mjs sync --publish`; run that first, then this edits its body.",
+      problem: `no GitHub release exists for ${tag}. ${RELAY_PUBLISH_SENTENCE}`,
     };
   }
   return { action: "create", problem: null };
@@ -295,20 +329,33 @@ export function planTag({ tag, version, changelog, localCommit, remoteCommit, ch
 }
 
 /**
+ * What a per-app tag-plan problem means in this mode.
+ *
+ * A page refresh writes a table and needs no tag, so the row is marked
+ * **pending** and the page is still written. `--publish` and the dry run print
+ * commands that would create a tag and a release, so they need a complete plan
+ * and refuse.
+ */
+export function tagPlanDisposition(problem, mode) {
+  if (problem === null) return { problem: null, pending: false };
+  if (mode === "write") return { problem: null, pending: true };
+  return { problem, pending: false };
+}
+
+/**
  * The shared table rows, used by the aggregate body and by RELEASES.md.
  *
  * The release body is written by `--publish`, after every per-app release
  * exists, so it always links. The page may be written before publication, so
- * with `markPending` it says a row is pending rather than linking a 404.
+ * with `markPending` it says a row is pending rather than linking a 404. An
+ * entry marked `pending` by a guard is pending in either row.
  */
 export function aggregateRows(entries, { markPending = false } = {}) {
   return entries.map((entry) => {
     const { app, version, date, tag } = entry;
     const released = date ?? "—";
-    const release =
-      markPending && entry.published !== true
-        ? `\`${tag}\` (pending)`
-        : `[\`${tag}\`](${releaseUrl(tag)})`;
+    const pending = entry.pending === true || (markPending && entry.published !== true);
+    const release = pending ? `\`${tag}\` (pending)` : `[\`${tag}\`](${releaseUrl(tag)})`;
     return (
       `| [${app.name}](${blobUrl(app.changelog)}) | ${version} | ${released} | ` +
       `${release} | ${installCell(app)} |`
@@ -322,6 +369,12 @@ export const AGGREGATE_TABLE_HEADER = [
   "| --- | --- | --- | --- | --- |",
 ];
 
+/** True when the relay's release is refused or not published yet. */
+function relayPending(entries) {
+  const relay = entries.find((entry) => entry.app.flatpakId === null) ?? null;
+  return relay !== null && relay.pending === true;
+}
+
 /**
  * The aggregate release body: every current version, one install path.
  *
@@ -329,6 +382,18 @@ export const AGGREGATE_TABLE_HEADER = [
  * repeat one; the release title says which day this snapshot is.
  */
 export function aggregateReleaseBody(entries, { date }) {
+  const relay = relayPending(entries)
+    ? [
+        "The Suite Sync relay release is pending; its tarball and `SHA256SUMS` are published by",
+        "`node scripts/release.mjs sync --publish`, and this release links it once they are.",
+        "",
+      ]
+    : [
+        "Suite Sync is a server tarball, not a Flatpak. It is installed and verified by hand from",
+        `[its guide](${blobUrl("apps/sync/docs/how-to/relay.md")}).`,
+        "",
+      ];
+
   return [
     `The current version of every Suite app on ${date}, in one place. GitHub shows one`,
     "\"Latest\" release per repository, so this is it; the per-app releases are history.",
@@ -347,9 +412,7 @@ export function aggregateReleaseBody(entries, { date }) {
     "",
     `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
     "",
-    "Suite Sync is a server tarball, not a Flatpak. It is installed and verified by hand from",
-    `[its guide](${blobUrl("apps/sync/docs/how-to/relay.md")}).`,
-    "",
+    ...relay,
   ].join("\n");
 }
 
@@ -420,6 +483,15 @@ export function releasesPage(entries, { date, tag, aggregatePublished = false })
         "per-app releases below stay as history and carry no app binaries.",
       ];
 
+  const relay = relayPending(entries)
+    ? [
+        "The Suite Sync relay release is pending; `node scripts/release.mjs sync --publish`",
+        "publishes its tarball and checksums, and this page links it after that.",
+      ]
+    : [
+        "Suite Sync is a server tarball, not a Flatpak; install and verify it from its own release.",
+      ];
+
   return [
     "# Suite releases",
     "",
@@ -440,7 +512,7 @@ export function releasesPage(entries, { date, tag, aggregatePublished = false })
     "",
     `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
     "",
-    "Suite Sync is a server tarball, not a Flatpak; install and verify it from its own release.",
+    ...relay,
     "GitHub Packages is not used for the Flatpaks.",
     "",
     "## Regenerate",
@@ -553,6 +625,22 @@ function existingReleases() {
   }
 }
 
+/** The assets on an existing release, or null when the read failed. */
+function releaseAssets(tag) {
+  const result = spawnSync("gh", ["release", "view", tag, "--json", "assets"], {
+    cwd: ROOT,
+    encoding: "utf8",
+    env: process.env,
+  });
+  if (result.error || result.status !== 0) return null;
+  try {
+    const parsed = JSON.parse(result.stdout);
+    return Array.isArray(parsed.assets) ? parsed.assets : null;
+  } catch {
+    return null;
+  }
+}
+
 function currentHead() {
   const result = git(["rev-parse", "HEAD"]);
   if (result.status !== 0) throw new Error("could not read HEAD");
@@ -564,10 +652,12 @@ function currentHead() {
  *
  * Everything that can refuse the run is collected before a single command is
  * printed, so a dry run shows the whole picture or names every reason it stops.
- * `strictTags` is false for `--write`, which refreshes the page and needs no
- * tag decision, so an offline origin lookup does not block it.
+ * `mode` is `"write"` for a page refresh, which needs no tag decision, so an
+ * offline origin lookup or a missing changelog commit marks that row pending
+ * instead of blocking the page.
  */
-function collect({ strictTags = true } = {}) {
+function collect({ mode = "dry-run" } = {}) {
+  const strictTags = mode !== "write";
   const problems = [];
   const entries = [];
 
@@ -620,7 +710,8 @@ function collect({ strictTags = true } = {}) {
         ? changelogCommit(app, version)
         : null,
     });
-    if (plan.problem !== null) problems.push(plan.problem);
+    const disposition = tagPlanDisposition(plan.problem, mode);
+    if (disposition.problem !== null) problems.push(disposition.problem);
 
     entries.push({
       app,
@@ -632,6 +723,7 @@ function collect({ strictTags = true } = {}) {
       localCommit,
       remoteKnown: remote.known,
       remoteCommit: remote.commit,
+      pending: disposition.pending,
       published: false,
     });
   }
@@ -654,16 +746,12 @@ function tagStatus(item, backfill) {
 
 function summarize(entry, releases) {
   const release = releases?.find((row) => row.tagName === entry.tag) ?? null;
-  const action =
-    releases === null
-      ? null
-      : releaseAction({ app: entry.app, tag: entry.tag, exists: release !== null });
   let releaseLine = "unknown (gh release list failed)";
-  if (action !== null) {
+  if (releases !== null) {
     releaseLine =
-      action.problem === null
-        ? `${action.action}${release?.isLatest === true ? " (currently Latest)" : ""}`
-        : `REFUSED: ${action.problem}`;
+      entry.actionProblem === null || entry.actionProblem === undefined
+        ? `${entry.action}${release?.isLatest === true ? " (currently Latest)" : ""}`
+        : `REFUSED: ${entry.actionProblem}`;
   }
   const lines = [`${entry.app.name} ${entry.version} · ${entry.tag} · ${entry.date ?? "undated"}`];
   lines.push(`  release    ${releaseLine}`);
@@ -793,8 +881,9 @@ async function main(argv) {
     return;
   }
 
+  const mode = options.publish ? "publish" : options.write ? "write" : "dry-run";
   const releases = existingReleases();
-  const { problems, entries } = collect({ strictTags: !options.write });
+  const { problems, entries } = collect({ mode });
 
   const knownReleases = releases ?? [];
   for (const entry of entries) {
@@ -805,10 +894,17 @@ async function main(argv) {
       entry.actionProblem = null;
       continue;
     }
-    const action = releaseAction({ app: entry.app, tag: entry.tag, exists });
+    // The relay's body is edited in place, so its assets are what make the
+    // release real; read them before deciding that "edit" is safe.
+    const assets =
+      exists && entry.app.flatpakId === null ? releaseAssets(entry.tag) : undefined;
+    const action = releaseAction({ app: entry.app, tag: entry.tag, exists, assets });
     entry.action = action.action;
     entry.actionProblem = action.problem;
-    if (action.problem !== null && !options.write) problems.push(action.problem);
+    if (action.problem !== null) {
+      entry.pending = true;
+      if (mode !== "write") problems.push(action.problem);
+    }
   }
 
   if (problems.length > 0) throw new Error(problems.join("\n\n"));
@@ -831,7 +927,7 @@ async function main(argv) {
   ];
 
   process.stdout.write(
-    `\nSuite releases · ${options.publish ? "publish" : options.write ? "write" : "dry run"}\n`,
+    `\nSuite releases · ${mode === "dry-run" ? "dry run" : mode}\n`,
   );
   if (releases === null) {
     process.stdout.write(
