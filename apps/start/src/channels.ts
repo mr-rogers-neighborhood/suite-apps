@@ -9,7 +9,7 @@ import type { SuiteReleaseChannel } from "@suite/contracts";
  * Start consumes it rather than inventing a second one:
  *
  * - stable is the id `run.suite.<app>` / `<app>`;
- * - every pre-release tier shares the id `run.suite.slop.<app>` / `slop.<app>`;
+ * - every pre-release tier shares the id `run.suite.slop.<app>` / `slop-<app>`;
  * - the Flatpak ref branch (`slop`, `canary`, `beta`) names the tier.
  *
  * One pre-release id means one pre-release install. Two cards never means two
@@ -24,25 +24,49 @@ export type ReleaseTier = (typeof RELEASE_TIERS)[number];
 export const PRE_RELEASE_TIERS = ["slop", "canary", "beta"] as const;
 export type PreReleaseTier = (typeof PRE_RELEASE_TIERS)[number];
 
-/** The pre-release id prefix. It is an id, not a label, so it is lower-case. */
-export const PRE_RELEASE_ID_PREFIX = "slop.";
+/**
+ * The pre-release id prefix. It is an id, not a label, so it is lower-case.
+ *
+ * The hyphen is canonical: it is the id the release script writes into a
+ * pre-release `suite.app.json`, and the form the manifest id schema accepts.
+ */
+export const PRE_RELEASE_ID_PREFIX = "slop-";
+
+/**
+ * The prefix earlier pre-release builds wrote: `slop.<app>`.
+ *
+ * It is still read because a manifest installed before the id became canonical
+ * is not rewritten in place. Classifying one as stable would hand that build the
+ * stable documents folder, which is exactly what the pre-release id exists to
+ * prevent. Nothing generates this form any more.
+ */
+export const LEGACY_PRE_RELEASE_ID_PREFIX = "slop.";
 
 /** The channel a package came from, as the package backend records it. */
 export type PackageChannel = SuiteReleaseChannel | PreReleaseTier;
 
-/** The pre-release id for one app: `slop.<app>`. */
+/** The pre-release id for one app: `slop-<app>`. */
 export function preReleaseIdFor(appId: string): string {
   return `${PRE_RELEASE_ID_PREFIX}${appId}`;
 }
 
-/** Whether an app id belongs to the one pre-release identity. */
+/** The matched prefix of a pre-release id, current or legacy, or null. */
+function preReleasePrefixOf(id: string): string | null {
+  for (const prefix of [PRE_RELEASE_ID_PREFIX, LEGACY_PRE_RELEASE_ID_PREFIX]) {
+    if (id.startsWith(prefix) && id.length > prefix.length) return prefix;
+  }
+  return null;
+}
+
+/** Whether an app id belongs to the one pre-release identity, in either form. */
 export function isPreReleaseId(id: string): boolean {
-  return id.startsWith(PRE_RELEASE_ID_PREFIX) && id.length > PRE_RELEASE_ID_PREFIX.length;
+  return preReleasePrefixOf(id) !== null;
 }
 
 /** The stable app id behind a pre-release id, or the id itself when it is stable. */
 export function appIdFor(id: string): string {
-  return isPreReleaseId(id) ? id.slice(PRE_RELEASE_ID_PREFIX.length) : id;
+  const prefix = preReleasePrefixOf(id);
+  return prefix === null ? id : id.slice(prefix.length);
 }
 
 /** Whether a Flatpak branch names a pre-release tier. */

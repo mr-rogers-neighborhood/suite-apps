@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import { suitePaths } from "@suite/contracts";
+import { currentChannel, type DocumentChannel } from "./channel.js";
 
 /**
  * Where a desktop canvas keeps its things.
@@ -14,9 +16,21 @@ import { suitePaths } from "@suite/contracts";
  *   live here, never beside the file: a synced folder would carry another
  *   machine's process id, and every sync would look like a contended file.
  *
+ * A pre-release can never write the stable documents folder: it gets
+ * `~/Documents/Suite Slop/Canvas`, the same shape Budget gives its budgets. The
+ * data directory stays where it is; only the library moves.
+ *
  * Backups stay beside the document, because "recover with a file manager when
  * the app is the thing that broke" is a promise the format already makes.
  */
+
+/** The folder a pre-release keeps documents in, a sibling of `Documents/Suite`. */
+const SLOP_DOCUMENTS_FOLDER = "Suite Slop";
+
+/** The pre-release folder for this app, given the person's documents root. */
+export function slopCanvasFolder(documentsRoot: string, app = "Canvas"): string {
+  return join(documentsRoot, SLOP_DOCUMENTS_FOLDER, app);
+}
 
 export interface DesktopPaths {
   /** Default directory for workspace files. */
@@ -34,10 +48,15 @@ export interface DesktopPaths {
  * canvas's own overrides: `SUITE_CANVAS_LIBRARY` and `SUITE_CANVAS_DATA`, which
  * exist for a test and a portable install. Neither is read from a document, so no
  * file can steer a write.
+ *
+ * `channel` defaults to the running build's identity. When it is a pre-release,
+ * the library is `Suite Slop/Canvas` under the documents root, so a stable
+ * workspace is never opened in place; the data root does not move.
  */
 export function desktopPaths(
   platform: NodeJS.Platform = process.platform,
   home: string = homedir(),
+  channel: DocumentChannel = currentChannel(),
 ): DesktopPaths {
   const paths = suitePaths("Canvas", {
     platform,
@@ -46,7 +65,11 @@ export function desktopPaths(
     dataOverride: process.env.SUITE_CANVAS_DATA,
     xdgDataHome: process.env.XDG_DATA_HOME,
   });
-  return { library: paths.documents, data: paths.data, locks: paths.locks };
+  const library =
+    channel === "slop"
+      ? slopCanvasFolder(process.env.SUITE_CANVAS_LIBRARY?.trim() || join(home, "Documents"))
+      : paths.documents;
+  return { library, data: paths.data, locks: paths.locks };
 }
 
 /**
