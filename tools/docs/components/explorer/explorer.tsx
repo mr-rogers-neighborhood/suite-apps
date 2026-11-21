@@ -167,7 +167,10 @@ export function Explorer() {
 
   useEffect(() => {
     if (!sidebarReady) return;
-    window.localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth));
+    const timer = window.setTimeout(() => {
+      window.localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth));
+    }, 150);
+    return () => window.clearTimeout(timer);
   }, [sidebarReady, sidebarWidth]);
 
   const beginResize = useCallback(
@@ -198,18 +201,22 @@ export function Explorer() {
     const step = event.shiftKey ? 48 : 16;
     if (event.key === "ArrowLeft") {
       event.preventDefault();
+      event.stopPropagation();
       setSidebarWidth((width) => clampWidth(width - step));
     }
     if (event.key === "ArrowRight") {
       event.preventDefault();
+      event.stopPropagation();
       setSidebarWidth((width) => clampWidth(width + step));
     }
     if (event.key === "Home") {
       event.preventDefault();
+      event.stopPropagation();
       setSidebarWidth(SIDEBAR_MIN);
     }
     if (event.key === "End") {
       event.preventDefault();
+      event.stopPropagation();
       setSidebarWidth(SIDEBAR_MAX);
     }
   }, []);
@@ -660,7 +667,7 @@ export function Explorer() {
                 tourIndex={tourIndex}
                 expanded={expanded}
                 internalOpen={internalOpen}
-                compact={sidebarWidth < SIDEBAR_COMPACT}
+                compact={!sidebarOpen && sidebarWidth < SIDEBAR_COMPACT}
                 onSelectNode={selectNode}
                 onSelectModule={selectModule}
                 onToggle={toggle}
