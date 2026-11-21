@@ -1,0 +1,100 @@
+---
+id: open-a-document
+title: Open a document
+summary: "A file, a link and a dialog become one workspace in a sandboxed renderer."
+order: 5
+---
+
+This path follows the desktop open: a path arrives from the command line, a
+dialog, a recent or the hub, becomes one open file in main, crosses the preload
+bridge as a snapshot, and is projected into the renderer. Each stop is a place
+where the path or the bytes are checked; the module notes own the rules.
+
+## apps/canvas/desktop/src/main/index.ts#attachFile
+
+A cold start queues a file only when its extension is one this app opens. The
+gate is narrower than the parser and runs before the app is ready, which is why
+the window can open on a known file without reading it twice. A `suite://`
+argument is resolved against the library first, so a link is never treated as a
+path.
+
+## apps/canvas/desktop/src/main/index.ts#openDocument
+
+Every way in ends here. A refusal is shown over the window that was already open,
+so a failed open does not look like a deleted file; a success adopts the store and
+reloads the renderer before it announces the document. The renderer never passes
+a destination back, only the identity main gave it.
+
+## apps/canvas/desktop/src/main/store.ts#DocumentStore.open
+
+Opening is an ordered set of refusals: take the lock, parse the envelope, convert
+a legacy file, then try the backups. A damaged file is never replaced with an
+empty one; when neither it nor a backup parses, the bytes stay exactly as they
+were. The store is constructed only through this path, so there is no half-open
+state to save from.
+
+## apps/canvas/desktop/src/main/index.ts#registerIpc
+
+The renderer's whole capability set crosses one registration. `loadDocument`
+hands over the open snapshot, `saveDocument` creates the file on first save, and
+`openDocument` accepts only a path main already reported. Every handler is wrapped
+by `onIpc`, which refuses a sender that is not the page this shell loaded.
+
+## apps/canvas/desktop/src/preload/index.cjs
+
+The preload is the allowlist, not a pass-through. It publishes the named methods
+and values the renderer may call and nothing else; a path is always an argument
+main re-validates, never a capability the page holds. Its channel names are
+checked against the main-process constants so the two sides cannot drift.
+
+## apps/canvas/src/host/bridge.ts#desktopBridge
+
+The bridge is the host signal. Its presence means the page is in the shell, not
+that a build flag was set, and the callable methods are checked because an old
+preload can publish the marker without the method the renderer needs. The
+interface deliberately takes no path on open or save: the page says what, main
+decides where.
+
+## apps/canvas/src/main.tsx#bootDesktop
+
+The desktop answer is the open file, not the address bar. The workspace id lives
+inside the file, so a second id in the URL would be a competing source of truth
+and is ignored. A missing method is refused before the store is imported, because
+a control that silently does nothing is worse than a clear version mismatch.
+
+## apps/canvas/src/App.tsx#App
+
+With a session but no workspace, the shell shows the launcher; with a workspace,
+it shows the canvas. The launcher stays reachable, which is what makes "Open…"
+work when the shell started without a file. The component reads the session and
+the store; it does not parse the file or decide which adapter backs it.
+
+## apps/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
+
+The adapter hydrates from the snapshot main already handed over, so a large
+document does not cross the boundary twice. It subscribes to local updates only:
+an update that arrived from sync must not be echoed back as a save. The pending
+flag is a "something changed" bit; the snapshot is taken at flush time, after the
+edits settle.
+
+## apps/canvas/src/store/useCanvasStore.ts#useCanvasStore
+
+The store owns the live document the adapter just hydrated. Its `ready` gate
+keeps the canvas from painting before local state is loaded, and its `flush`
+action is the one call that asks persistence to catch up before a publish or a
+close. It holds the document instance, not a copy of its records.
+
+## apps/canvas/packages/graph/src/workspaceFile.ts#tryParseWorkspaceFile
+
+Parsing answers with a `Result` because the person chose the file and needs a
+sentence they can act on. It never merges into an open document; the caller gives
+it a new workspace id. A missing image is reported as damaged while the rest of
+the document imports, because losing one picture must not cost the text beside
+it.
+
+## apps/canvas/packages/graph/src/workspaceFile.test.ts
+
+The reload contract is the end of the path: write an envelope, read it into a
+fresh document and assert that the board, card and tag survived. The other cases
+pin the refusals and the attachment bytes. An open path is only correct while
+this test still passes.

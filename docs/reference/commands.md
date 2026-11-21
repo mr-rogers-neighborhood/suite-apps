@@ -83,6 +83,7 @@ the gate or a release.
 
 ```sh
 mise exec -- pnpm docs:index     # index every file and declaration into tools/docs/public/data
+mise exec -- pnpm docs:index:check # resolve notes, walks and tours; fail on stale generated data
 mise exec -- pnpm docs:dev       # index, sync docs/ and start the dev server (foreground)
 mise exec -- pnpm docs:dev:bg    # the same, detached; log in .dev/docs.log
 mise exec -- pnpm docs:status    # TCP check on the docs port
@@ -95,7 +96,9 @@ mise exec -- pnpm docs:clean     # remove .next, .generated, .source and public/
 
 `docs:index` runs `tools/docs/scripts/index-code.mjs`: every file and declaration becomes a node,
 modules are package roots plus `src/` children, and config files become `config:*` modules. It writes
-`tools/docs/public/data/` and is not committed. `docs:dev` and `docs:build` also run
+`tools/docs/public/data/` and is not committed. `docs:index:check` resolves every note heading, walk
+step and composed-tour target and compares the generated files with the ones on disk; it exits
+nonzero on an unknown ID or stale data. `docs:dev` and `docs:build` also run
 `tools/docs/scripts/sync-docs.mjs`, which mirrors `docs/` into `.generated/docs/` with the frontmatter
 and sidebar Fumadocs expects.
 

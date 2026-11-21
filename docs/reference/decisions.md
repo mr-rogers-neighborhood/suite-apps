@@ -19,6 +19,9 @@ The rules that shape this repository. Each is current; the code follows it.
   one code index; reference facts are generated, and module MDX plus walks are the authored layer.
   The old tutorials, how-to, reference and explanation pages remain a notes archive; new content
   goes to `docs/modules/` or `docs/walkthroughs/`.
+- A normal walk is already a tour; `docs/walkthroughs/*.tour.mjs` exists only for a composed path
+  that crosses modules, files, symbols, walks or docs. The index resolves every target and
+  `docs:index:check` fails on an unknown one, so a tour cannot rot into a list of dead links.
 
 ## Layout
 

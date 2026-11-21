@@ -1,0 +1,90 @@
+---
+id: install-and-launch
+title: Install and launch
+summary: "From the signed manifest to an app process that owns its document."
+order: 1
+---
+
+This path follows one app from the shape it declares to the process Start
+starts for it. Each stop is a boundary where a value is either checked or
+deliberately not trusted, so the walk is also the order in which a failure
+should be read.
+
+## packages/contracts/src/appManifest.ts#suiteAppManifestSchema
+
+Start with the declaration both sides agree on. It is the first stop because
+every later step assumes a manifest that parsed: the schema is strict, pins the
+deep-link prefix to the app's own id, and has no field for a binary, so nothing
+downstream can be redirected by one.
+
+## packages/contracts/src/suiteApps.ts#SUITE_APPS
+
+The hub needs one table saying which app owns which folder and extension before
+it can list anything. This is the smallest version of that table, and it is the
+truth the catalogue is later checked against rather than a store of installs.
+
+## apps/start/src/catalogue.ts#CATALOGUE_APPS
+
+Only now does Start state what it offers. The catalogue adds the channel and the
+signed feed to each contract entry, which is what gives a new machine a card for
+an app that is not installed; its note owns why the feed is compiled in.
+
+## apps/start/src/catalogue.ts#catalogueMatchesContracts
+
+The next stop is the guard between those two tables, not a new fact.
+`catalogue.test.ts` states what it checks: when the shared table moves, the
+failure names the catalogue entry rather than producing a card for the wrong
+folder.
+
+## apps/start/src/install.ts
+
+Installation is the first step that writes bytes, which is why it follows the
+offer. Its file note owns the ordering invariant; the test worth knowing is the
+fingerprint mismatch, which must leave the install directory and the record
+exactly as they were.
+
+## apps/start/src/registry.ts#discoverApps
+
+Once an install exists, discovery decides whether it may be launched. It joins
+the manifest to the install record and refuses a missing record, a relative
+executable, an unparseable manifest or a build that expects a newer contract —
+the refusals are the reason a broken install still appears as a card.
+
+## apps/start/src/renderer/launcher.js#render
+
+What a person sees is one paint of what main reported: cards, files, recents,
+sync and theme. The page never infers an install state, which is why this is a
+stop after discovery rather than before it; its module note owns the rendering
+rules.
+
+## apps/start/src/route.ts#routeLaunch
+
+Pressing launch or opening a file hands over an untrusted string, so routing
+sits between the window and any process. `route.test.ts` proves the refusals,
+and the module note owns the rules that decide one plan.
+
+## apps/start/src/launchCommand.ts#launchCommand
+
+The accepted plan becomes an executable and arguments, with the Flatpak
+application id placed by the backend rather than by routing. This is the last
+step that still speaks in data; the managed environment is added here so an app
+can tell who started it.
+
+## apps/start/src/launch.ts
+
+Now the plan becomes a process, detached and released so it outlives the hub.
+The end-to-end proof is in the launcher spec, which starts an app with a
+document and a `suite://` link and checks the arguments the app received.
+
+## apps/canvas/desktop/src/main/index.ts#createWindow
+
+The receiving side begins at a sandboxed window: context isolation, sandbox on,
+no Node integration, and no navigation away from the app's own origin. The
+window also flushes a pending save before it closes, because the document
+outlives the process that was editing it.
+
+## apps/canvas/src/App.tsx#App
+
+The renderer boots without reading the file format. It asks the host for a
+workspace and renders the app surface, leaving the document layer to the graph
+package; that separation is what keeps a launch from becoming a second parser.

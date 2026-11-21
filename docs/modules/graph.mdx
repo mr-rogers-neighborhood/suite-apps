@@ -1,23 +1,99 @@
 ---
 module: apps/canvas/packages/graph
 title: Graph
-summary: Canvas's schema, typed Loro document and workspace file.
+summary: "The schema, file envelope and authored seeds Canvas reads and writes through."
 ---
 
-The graph package is the document layer Canvas calls. It owns the schema, the
-typed accessors and the file envelope. A component never reaches Loro directly.
+The graph package is the document layer Canvas calls. It exists so a component
+never constructs Loro values, and so a workspace file can outlive the build that
+wrote it. Its two seams are the public surface in `src/index.ts` and the
+`.canvas` envelope in `src/workspaceFile.ts`; the typed document itself is the
+child module Graph / Loro.
+
+It owns the record shapes, the pure derivations beside them (search, views,
+projection, layout planning) and the file format. It deliberately does not own UI
+state, where a document is persisted, the sync transport or the desktop file
+authority. Canvas keeps Zustand for UI state, the storage adapters decide between
+a browser profile and a file, and the Electron main process owns the file, the
+lock and the backup. Templates are data, so nothing here builds a starter by hand
+at boot.
+
+## file: apps/canvas/packages/graph/src/index.ts
+
+This file is the package boundary. A consumer outside the package sees schemas,
+types, pure functions and the `WorkspaceDocument` facade here, and does not reach
+into `src/loro/`. The composition pieces (`DocContext`, `createDocApi`, the
+per-domain method bags) are deliberately absent: exporting them would make the
+internal write protocol a second way in.
+
+## apps/canvas/packages/graph/src/schema.ts#cardSchema
+
+A card is the record most writes end on, and this schema is the only description
+of it. Every read parses through it, so a malformed value fails at the boundary
+that read it instead of reaching React. A field added later is additive first:
+older documents still parse, and the record readers backfill the field rather
+than a migration script rewriting every card.
 
 ## apps/canvas/packages/graph/src/workspaceFile.ts#workspaceFileSchema
 
-This is the shape on disk. It is versioned because a file outlives a build; a
-change here needs a migration, not a comment.
+This is the shape on disk. It carries a base64 Loro snapshot, a small manifest
+and the document's images inline; the payload is opaque to the envelope, which is
+why a future version can be refused by name before anything is imported. Both the
+current `suite.canvas` kind and the legacy `suite.workspace` kind are accepted,
+and that union is what made the rename a rename rather than a break.
 
 ## apps/canvas/packages/graph/src/workspaceFile.ts#WORKSPACE_FILE_VERSION
 
-The version is the contract for readers. Bump it only with a migration path and
-a test that opens the previous shape.
+The version is the contract for readers, and it is not the schema version: the
+envelope and the document shape move independently, and both are checked before a
+snapshot is opened. Bump this only with a reader that still accepts the previous
+shape, and a test that opens a file written before the bump.
+
+## apps/canvas/packages/graph/src/workspaceFile.ts#createWorkspaceFile
+
+The export and backup path. It takes a live document, exports the snapshot and
+counts the manifest from that same document, so the header cannot claim a
+different workspace than the payload holds. Compact export omits history for a
+template or a share; it is the same format and a smaller file, never a second
+reader.
+
+## apps/canvas/packages/graph/src/workspaceFile.ts#buildWorkspaceFile
+
+The desktop main process has the snapshot and the counts but no
+`WorkspaceDocument`, and this assembler is how it writes the envelope without
+holding a second copy of the document or re-encoding images that did not change.
+One function owns the base64 and versioning decisions, so the export path and the
+autosave path cannot drift into two formats.
+
+## apps/canvas/packages/graph/src/workspaceFile.ts#tryParseWorkspaceFile
+
+Import answers with a `Result`, because a person chose the file and needs a
+sentence they can act on. It never merges into an open document; the caller gives
+it a new workspace id. A referenced image whose bytes are absent or unreadable is
+reported as damaged while the rest of the document imports, because losing one
+picture must not cost the text beside it.
+
+## file: apps/canvas/packages/graph/src/workspaceFile.test.ts
+
+The first case is the reload contract: create an envelope, read it back into a
+fresh document, and assert that the board name, the card and the tag survived.
+The remaining cases pin the refusals (newer file, newer schema, corrupt payload)
+and the attachment path byte-for-byte. A change that makes this file pass by
+weakening one of those checks has changed the format's promise, not its tests.
 
 ## apps/canvas/packages/graph/src/workspaceTemplate.ts#STARTER_TEMPLATES
 
-A new workspace is a template, not a special constructor. The first save and
-the thousandth save use the same validated shape.
+A new workspace is a template, not a special constructor. The list is parsed
+through `workspaceTemplateSchema` at module load, so a broken authored key fails
+in the test suite rather than on someone's first board. The notebook is
+deliberately almost empty; the guide is labelled unfinished rather than dressed
+up as a finished reading path.
+
+## apps/canvas/packages/graph/src/workspaceTemplate.ts#applyWorkspaceTemplate
+
+A template is copied through the same facade a person uses: boards, sections,
+cards, portals, edges and pictures are written with the typed methods inside one
+outer batch. That is the invariant worth protecting: a template cannot write
+something the canvas could not have written, and one undo removes the whole
+template. References are written in dependency order, so a key resolves before
+anything points at it.

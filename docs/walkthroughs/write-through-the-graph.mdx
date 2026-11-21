@@ -1,0 +1,90 @@
+---
+id: write-through-the-graph
+title: Write through the graph
+summary: "One card, from its schema to the file on disk and back."
+order: 10
+---
+
+This walk follows one write rather than the whole repository: a record is shaped
+by the schema, seeded from authored data, written through the typed document,
+committed once, saved as a snapshot, and read back by the test that proves a
+reload. The store and the file authority are single stops; their module notes own
+their state and actions.
+
+## apps/canvas/packages/graph/src/schema.ts#cardSchema
+
+Every write below ends on a card, so the schema is the first stop: it is the only
+description of the record. A field that is not accepted here cannot survive a
+read, whatever a writer puts on the map.
+
+## apps/canvas/packages/graph/src/workspaceFile.ts#workspaceFileSchema
+
+A record only matters if it survives the file, and the envelope is the boundary
+between a document and the bytes on disk. The Graph module note owns the version
+rules; the stop is here because this is the contract a reload has to satisfy.
+
+## apps/canvas/packages/graph/src/workspaceTemplate.ts#STARTER_TEMPLATES
+
+A new workspace starts from authored data instead of a constructor, and the data
+parses at import time. Starting the walk from a template gives the rest of the
+path a real, valid first write rather than a hand-built fixture.
+
+## apps/canvas/packages/graph/src/workspaceTemplate.ts#applyWorkspaceTemplate
+
+The template reaches the document through the same facade a person uses: boards
+first, then sections and cards, then portals and edges, then pictures. The stop
+proves the write path is not privileged, and that the whole copy can leave one
+undo step.
+
+## apps/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument
+
+The typed entry point. From here a caller names a record and an operation; the
+facade decides which domain writes it. The Graph / Loro module note owns the
+facade's shape and its construction rule.
+
+## apps/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.createCard
+
+The first real write. It validates the record, creates the title and body
+containers, copies the type's template and places the card. A card built by hand
+instead is how a record ends up without containers or without its template
+content.
+
+## apps/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.setProperty
+
+A later edit is field-level rather than a whole-card replace. The invariant is
+that two people editing different properties keep both writes; the read-only
+refusal is a second rule on the same call, which is why the app and the reader go
+through one writer.
+
+## apps/canvas/packages/graph/src/loro/context.ts#DocContext.commit
+
+The write becomes one change. The commit's origin is also the change message, so
+one gesture is one undo step and one history point. A write that commits inside
+another gesture is what splits it in the panel.
+
+## apps/canvas/src/store/useCanvasStore.ts#useCanvasStore
+
+Canvas holds the live document the store created, so the write the reader makes
+is already on the document the rest of this path reads. The store's `flush` action
+is the one call that asks persistence to catch up, and the store module's note
+owns the state around it.
+
+## apps/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
+
+The adapter subscribes to local updates only, so a peer's synced edit is not
+echoed back as a save. It holds the invariant that a save is this window's edits,
+and it defers the snapshot until the edits have settled rather than writing per
+keystroke.
+
+## apps/canvas/desktop/src/main/store.ts#DocumentStore.save
+
+The file authority. It assembles the envelope, keeps the lock and writes
+atomically; the renderer never touches the path. This is where the document stops
+being a CRDT and becomes the bytes a backup can hold.
+
+## apps/canvas/packages/graph/src/workspaceFile.test.ts
+
+The reload contract. The test creates a file, reads it into a fresh document and
+checks that the board, card and tag still exist; the other cases pin the refusals
+and the attachment bytes. A save path is only correct while this test still
+passes.

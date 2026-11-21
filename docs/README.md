@@ -11,7 +11,8 @@ are the durable notes that cannot be derived from the code.
 
 The reader is not organized by Diátaxis. Its structure is **Browser / Modules / Walkthroughs** over
 one code index. Reference facts come from the compiler, module narratives live in
-`docs/modules/*.mdx`, and ordered paths live in `docs/walkthroughs/*.mdx`.
+`docs/modules/*.mdx`, ordered paths live in `docs/walkthroughs/*.mdx`, and a cross-module tour lives
+in `docs/walkthroughs/*.tour.mjs`.
 
 The older notes keep their historical grouping so links do not rot. Do not add new pages to them:
 [tutorials](tutorials/index.md), [how-to](how-to/index.md), [reference](reference/index.md),
@@ -86,8 +87,9 @@ Never restate a version in prose here. Link to the file that holds it.
 - **Reference is plain Markdown.** A `.md` page uses relative links and no site-only shortcodes, so
   it renders on GitHub and in the local reader.
 - **Walkthroughs are views, not copies.** A walkthrough is an ordered list of real node IDs with
-  optional prose. The code index does the linking; the walkthrough never restates a signature or
-  duplicates a source file.
+  optional prose. A composed tour may cross modules, files, symbols, walks or doc pages, but it points
+  at content and never restates it. The code index does the linking; the walkthrough never restates a
+  signature or duplicates a source file.
 - **One module MDX, not one file MDX.** A module's narrative and its `## <node-id>` notes live in one
   `docs/modules/*.mdx`. The explorer splits it by file and declaration at render time.
 - **The reader is local.** `tools/docs` is a development tool, not an app. It is excluded from the

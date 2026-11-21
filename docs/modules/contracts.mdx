@@ -5,14 +5,33 @@ summary: The manifests, versions and capabilities that cross an app boundary.
 ---
 
 The contracts package is the smallest shared language in the repository. It
-holds the shapes Start, the apps and the release tools agree on. It does not
-hold a document format or a UI component.
+holds the shapes Start, the apps, the sync server and the release tools agree
+on, and the parsers that decide whether a value actually has one of those
+shapes. It exists so that a boundary can be crossed without either side
+importing the other's implementation.
+
+It owns the `suite.app` manifest and its declared capabilities, contract
+version compatibility, the `suite://` link grammar, the path convention for
+documents, data and applications, and the wire shapes for artifacts,
+deployments, hub reports, updates and sync. It does not own any app's document
+schema, any filesystem access, or a UI. Nothing here reads a file, spawns a
+process or knows which app is installed.
+
+The seam is a package import: `@suite/contracts` is pure data plus zod
+parsers, so main processes, renderers and release scripts can load the same
+rules. A consumer that needs bytes or a path joins this vocabulary to its own
+I/O rather than growing a second copy of the shape.
 
 ## packages/contracts/src/appManifest.ts#suiteAppManifestSchema
 
 The manifest schema is the only place an app's declaration is validated. A
 field that a host needs at launch belongs here; a field that only the app reads
-does not.
+does not. The schema is strict and requires `deepLinkPrefix` to equal
+`suite://<id>/`, so a manifest cannot claim another app's links.
+
+It deliberately has no executable field. The binary path lives in Start's
+install record, which is why a stale or tampered manifest can only describe
+itself wrongly, not redirect a launch.
 
 ## packages/contracts/src/appManifest.ts#SuiteAppManifest
 
@@ -22,4 +41,44 @@ interface beside the schema: the two will disagree the first time a field moves.
 ## packages/contracts/src/appManifest.ts#SUITE_PROTOCOL_PREFIX
 
 The protocol prefix is shared because both the hub and the app have to recognize
-the same deep link. It is not a routing table.
+the same deep link. It is not a routing table; parsing and the decision about
+which installed app receives a link belong to Start.
+
+## packages/contracts/src/contractVersion.ts#CONTRACT_VERSION
+
+The version this build implements, and the value a manifest compares against.
+A change an older app cannot read is a major bump, and a major bump is a
+coordinated release: the hub refuses the pair instead of handing over a shape
+the app would silently misread.
+
+## packages/contracts/src/suiteApps.ts#SUITE_APPS
+
+The table of document apps: id, display name, documents folder and claimed
+extension. It is how Start lists a planner's files without importing Planner,
+and how `~/Documents/Suite/<folder>` and the catalogue stay in agreement.
+
+It is not a store and not a registry. An entry says where a kind of file lives,
+never that an app is installed or which version is present.
+
+## packages/contracts/src/paths.ts#suitePaths
+
+The three roots are the decision: documents under `~/Documents/Suite/<App>`,
+machine state in the per-user data directory, and applications under
+`~/Applications/Suite/<App>/<version>`. A lock never sits beside a document,
+because a synced lock carries another machine's process id.
+
+This is a convention, not shared storage. The module joins strings and imports
+no `node:path`, so a renderer can ask where its files belong without gaining
+filesystem access.
+
+## packages/contracts/src/deepLink.ts#parseDeepLink
+
+Parsing is paranoid because the input arrives from the operating system: a
+browser, a desktop file or a second copy of Start can hand over any string.
+It rejects a foreign scheme, credentials or a port in the authority, a
+fragment, a segment that climbs with `.` or `..`, and an app this hub does not
+know.
+
+The parser guarantees only that the result is a short, safe string. What a
+segment means is the receiving app's business, and a file segment is validated
+again against that app's own library.

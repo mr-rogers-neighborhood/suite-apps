@@ -1,0 +1,57 @@
+---
+module: apps/start/src/renderer
+title: Start / Renderer
+summary: "The hub window: plain DOM that paints the state main reports."
+---
+
+The renderer is the hub's window, written as plain DOM modules with no
+framework. Everything added here would be a dependency Start carries into a
+process whose job is to stay out of the apps, so the page has no bundler and no
+import of `@suite/theme` or a UI package.
+
+It owns painting: cards, files, recents, the sync pane, the settings pane, the
+rail and the keyboard model around them. It deliberately does not decide whether
+an app is installed, whether an update verifies, or what to execute. Main
+answers those questions and this directory renders the answer.
+
+The seam is the preload bridge. `globalThis.suiteStart` exposes `listApps`,
+actions and broadcasts; the page treats it as read-only input and re-reads
+after every action rather than predicting the result. A boundary test keeps
+`child_process`, the Flatpak module and any process spawn out of this directory.
+
+## apps/start/src/renderer/launcher.js#render
+
+One paint from one `LauncherState`. The page stores the last state so a
+progress event can redraw the cards alone, then renders every pane from the
+same answer.
+
+The theme is already resolved by main and arrives as custom properties, because
+this page cannot import the theme package. The rail badge counts only unhealthy
+installs and hides at zero, so a healthy hub stays quiet.
+
+## apps/start/src/renderer/launcher.js#applyTheme
+
+Every colour role is a CSS custom property, so the stylesheet never asks which
+preset is active. `data-theme` and `data-theme-mode` are set as well, because a
+preset can change a border or shadow rule rather than only a colour.
+
+Setting this from state rather than from the control is what makes a choice in
+one window correct in the next.
+
+## apps/start/src/renderer/apps.js#renderApps
+
+The apps pane draws the cards the catalogue and discovery produced, in the
+order main sent them, with the progress entry and launch error for each id. An
+empty list is a state with a message, not a blank region.
+
+A card is not composed here: the state, ownership, actions and refusal copy
+arrive in the card. This function chooses placement and redraw, not policy.
+
+## apps/start/src/renderer/rail.js#installRail
+
+The rail is a tab set, so it uses tab roles rather than listbox roles: arrow
+keys move and select together, Home and End reach the ends, and only the
+selected tab is in the tab order.
+
+Keeping selection and focus in one place is what lets the Cmd/Ctrl+1..4 shortcut
+and a pointer click agree on which pane is showing.

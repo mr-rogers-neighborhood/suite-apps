@@ -1,0 +1,39 @@
+---
+module: apps/canvas
+title: Canvas
+summary: "The renderer entry point and app shell: resolve the host, then the document."
+---
+
+This module is the renderer's entry point and outer shell. `main.tsx` decides
+which process is hosting the page and settles the session before `App` or the
+store is imported. `App.tsx` renders the launcher when there is no workspace and
+the canvas shell when there is. The rest of the canvas lives in the child modules
+under `src/`.
+
+It does not own the document format, the persistence adapter or the desktop
+shell. Its seam is the host question: a browser tab names its workspace in the
+URL, while a desktop window asks the shell which file is open. Both answers
+become a session, and the store reads that session exactly once.
+
+## apps/canvas/src/main.tsx#boot
+
+Boot order is the invariant. The store picks its room and persistence when it is
+imported, so the host and the session must be settled first; importing `App` or
+the store earlier would key the document to nothing. The dynamic imports are what
+make that ordering true rather than conventional.
+
+## apps/canvas/src/main.tsx#bootDesktop
+
+The desktop answer comes from the shell, not the address bar: the workspace id
+lives inside the file. A window whose preload is older than the renderer is
+refused by `bridgeMissing` before this point, because a missing method would
+otherwise become a control that silently does nothing. A share link in a
+desktop build gets the local-only notice instead of a fetch that can only fail.
+
+## apps/canvas/src/App.tsx#App
+
+One decision: a session with no workspace is the launcher, and a session with one
+is the canvas. On the desktop that id can only have come from the open file, so a
+second copy in the URL would be a competing source of truth. The launcher remains
+reachable, which is what makes "Open…" work when the shell started without a
+file.
