@@ -1,9 +1,12 @@
 import { type DayTask, WorkspaceDocument } from "@suite/planner-core";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const bridge = vi.hoisted(() => ({ commit: vi.fn(async () => undefined) }));
+
 vi.mock("../platform/bridge", () => ({
-  getBridge: () => ({ commit: async () => undefined }),
+  getBridge: () => ({ commit: bridge.commit }),
 }));
 
 const { DocumentReplica, WorkspaceContext } = await import("../store/snapshotStore");
@@ -37,6 +40,7 @@ function dayEntry(doc: WorkspaceDocument, taskId: string): DayTask {
 describe("TaskDetail", () => {
   beforeEach(() => {
     useUiStore.setState({ selectedTaskId: null });
+    bridge.commit.mockClear();
   });
 
   afterEach(cleanup);
@@ -60,9 +64,24 @@ describe("TaskDetail", () => {
 
     expect(screen.getByRole("dialog", { name: "Task details" })).toBeInTheDocument();
     expect(screen.getByLabelText("Title")).toHaveValue("A task");
-    expect(screen.getByLabelText("Notes")).toHaveValue("Remember the details");
+    expect(screen.getByRole("textbox", { name: "Notes" })).toHaveTextContent(
+      "Remember the details",
+    );
     expect(screen.getByText("Write the tests")).toBeInTheDocument();
     expect(screen.getByText(/Occurrence done/u)).toBeInTheDocument();
+  });
+
+  it("should open an old plain-text note with its lines and literal characters", async () => {
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    doc.setNote(task.id, "Line one\nLine two <&> `three`");
+    open(task.id);
+
+    renderDetail(replica);
+
+    const editor = await screen.findByRole("textbox", { name: "Notes" });
+    expect(editor).toHaveTextContent("Line oneLine two <&> `three`");
+    expect(editor.querySelector("br")).not.toBeNull();
   });
 
   it("should refuse an empty title in place and leave the record alone", () => {
@@ -116,15 +135,69 @@ describe("TaskDetail", () => {
     expect(doc.getTask(task.id)?.estimateMinutes).toBe(45);
   });
 
-  it("should write notes into the task's Loro text", () => {
+  it("should write a typed note into the Loro container through the bridge", async () => {
     const { doc, replica } = makeDocument();
     const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
     open(task.id);
     renderDetail(replica);
 
-    fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "A new note" } });
+    const editor = await screen.findByRole("textbox", { name: "Notes" });
+    await userEvent.click(editor);
+    await userEvent.keyboard("A new note");
 
+    await waitFor(() => expect(editor).toHaveTextContent("A new note"));
+    await waitFor(() => expect(doc.getNoteDoc(task.id).get("nodeName")).toBe("doc"));
+    expect(doc.getNoteDoc(task.id).size).toBeGreaterThan(0);
     expect(doc.getNote(task.id)).toBe("A new note");
+    expect(bridge.commit).toHaveBeenCalled();
+  });
+
+  it("should keep a formatted note when the dialog is closed and reopened", async () => {
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    open(task.id);
+    const first = renderDetail(replica);
+
+    const editor = await screen.findByRole("textbox", { name: "Notes" });
+    await userEvent.click(editor);
+    await userEvent.click(screen.getByRole("button", { name: "Bold" }));
+    await userEvent.keyboard("Bold note");
+
+    await waitFor(() => expect(editor.querySelector("strong")).not.toBeNull());
+    await waitFor(() => expect(doc.getNoteDoc(task.id).get("nodeName")).toBe("doc"));
+
+    first.unmount();
+    open(task.id);
+    renderDetail(replica);
+
+    const reopened = await screen.findByRole("textbox", { name: "Notes" });
+    expect(reopened.querySelector("strong")).not.toBeNull();
+    expect(reopened).toHaveTextContent("Bold note");
+  });
+
+  it("should keep <, & and backticks through a snapshot round-trip", async () => {
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    open(task.id);
+    renderDetail(replica);
+
+    const text = "a < b & c ` d";
+    const editor = await screen.findByRole("textbox", { name: "Notes" });
+    await userEvent.click(editor);
+    await userEvent.keyboard(text);
+
+    await waitFor(() => expect(editor).toHaveTextContent(text));
+    await waitFor(() => expect(doc.getNoteDoc(task.id).get("nodeName")).toBe("doc"));
+
+    const snapshotDocument = WorkspaceDocument.fromSnapshot(doc.snapshot());
+    expect(snapshotDocument.getNote(task.id)).toBe(text);
+    const restored = new DocumentReplica(snapshotDocument);
+    cleanup();
+    open(task.id);
+    renderDetail(restored);
+
+    const reopened = await screen.findByRole("textbox", { name: "Notes" });
+    await waitFor(() => expect(reopened).toHaveTextContent(text));
   });
 
   it("should add, toggle and remove a checklist item", () => {
@@ -225,6 +298,19 @@ describe("TaskDetail", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(opener).toHaveFocus();
+  });
+
+  it("should close on Escape while the notes editor has focus", async () => {
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    open(task.id);
+    renderDetail(replica);
+
+    const editor = await screen.findByRole("textbox", { name: "Notes" });
+    editor.focus();
+    fireEvent.keyDown(editor, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("should open from the row's actions menu", async () => {

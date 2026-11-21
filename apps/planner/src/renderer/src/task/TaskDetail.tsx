@@ -1,4 +1,4 @@
-import type { ChecklistItem, Project, Tag, Task } from "@suite/planner-core";
+import type { ChecklistItem, Project, Tag, Task, WorkspaceDocument } from "@suite/planner-core";
 import { createId } from "@suite/planner-core";
 import { Button, Field, IconButton, Modal } from "@suite/ui";
 import { Plus, Trash2, X } from "lucide-react";
@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { TaskCheckbox } from "../components/TaskCheckbox";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore } from "../store/uiStore";
+import { TaskNotesEditor } from "./TaskNotesEditor";
 import {
   formatHistoryDate,
   formatHistoryTimestamp,
@@ -47,10 +48,10 @@ export function TaskDetail() {
       key={task.id}
       task={task}
       note={replica.document.getNote(task.id)}
+      workspace={replica.document}
       projects={snapshot.projects}
       tags={snapshot.tags}
       onClose={() => selectTask(null)}
-      onNoteChange={(value) => replica.document.setNote(task.id, value)}
       onPatch={(patch) => replica.document.updateTask(task.id, patch)}
       onToggleChecklist={(itemId) => replica.document.toggleChecklistItem(task.id, itemId)}
     />
@@ -60,10 +61,10 @@ export function TaskDetail() {
 type TaskDetailDialogProps = {
   readonly task: Task;
   readonly note: string;
+  readonly workspace: WorkspaceDocument;
   readonly projects: Project[];
   readonly tags: Tag[];
   readonly onClose: () => void;
-  readonly onNoteChange: (value: string) => void;
   readonly onPatch: (patch: TaskPatch) => void;
   readonly onToggleChecklist: (itemId: string) => void;
 };
@@ -73,10 +74,10 @@ type FieldName = "title" | "estimate" | "dueAt" | "remindAt" | "checklist" | "re
 function TaskDetailDialog({
   task,
   note,
+  workspace,
   projects,
   tags,
   onClose,
-  onNoteChange,
   onPatch,
   onToggleChecklist,
 }: TaskDetailDialogProps) {
@@ -198,22 +199,7 @@ function TaskDetailDialog({
           }}
         />
 
-        <div>
-          <label htmlFor="task-detail-notes" className="text-[12px] font-medium text-[var(--ink)]">
-            Notes
-          </label>
-          <textarea
-            id="task-detail-notes"
-            value={note}
-            rows={4}
-            onChange={(event) => onNoteChange(event.target.value)}
-            className="mt-1.5 w-full resize-y rounded-lg border border-line bg-panel px-3 py-2 text-[13px] text-ink placeholder:text-faint focus:outline-none"
-            placeholder="Anything the title cannot hold"
-          />
-          <p className="mt-1 text-[11px] text-muted">
-            Notes are the task's Loro text, so an edit is saved as you type.
-          </p>
-        </div>
+        <TaskNotesEditor workspace={workspace} taskId={task.id} initialText={note} label="Notes" />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field

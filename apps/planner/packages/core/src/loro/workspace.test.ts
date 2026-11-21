@@ -1,3 +1,4 @@
+import { LoroList, LoroMap, LoroText } from "loro-crdt";
 import { describe, expect, it } from "vitest";
 
 import { WorkspaceDocument } from "./WorkspaceDocument";
@@ -91,6 +92,31 @@ describe("WorkspaceDocument", () => {
 
     workspace.setNote(task.id, "Second line");
     expect(workspace.getNote(task.id)).toBe("Second line");
+  });
+
+  it("should keep a rich note root beside the legacy plain-text note", () => {
+    const workspace = createWorkspace();
+    const task = workspace.createTask({ title: "Draft" }, now);
+    workspace.setNote(task.id, "Legacy line");
+
+    const containerId = workspace.getNoteContainerId(task.id);
+    const root = workspace.getNoteDoc(task.id);
+    root.set("nodeName", "doc");
+    const blocks = root.getOrCreateContainer("children", new LoroList());
+    const paragraph = blocks.insertContainer(0, new LoroMap()).getAttached();
+    if (paragraph === undefined) throw new Error("the note paragraph was not attached");
+    paragraph.set("nodeName", "paragraph");
+    const inline = paragraph.getOrCreateContainer("children", new LoroList());
+    const text = inline.insertContainer(0, new LoroText()).getAttached();
+    if (text === undefined) throw new Error("the note text was not attached");
+    text.insert(0, "Rich line");
+
+    const restored = WorkspaceDocument.fromSnapshot(workspace.snapshot());
+
+    expect(restored.getNoteText(task.id).toString()).toBe("Legacy line");
+    expect(restored.getNote(task.id)).toBe("Rich line");
+    expect(restored.getNoteDoc(task.id).get("nodeName")).toBe("doc");
+    expect(restored.getNoteContainerId(task.id)).toBe(containerId);
   });
 
   it("should survive a snapshot round trip", () => {
