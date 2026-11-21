@@ -318,7 +318,7 @@ halves have to agree: inside a build with the handbook, explain's context render
 it renders as a panel over the board. That second branch is why `false` is safe: `explain` still answers,
 just in the older surface.
 
-The articles in `handbook/` keep shipping to the docs site, because they document the interface and
+The articles in `handbook/` keep shipping in the repository, because they document the interface and
 documentation does not need the surface switched on. Turning the bubble back on is the flag.
 
 Feedback is the second pane. `feedback/FeedbackComposer.tsx` is the form the launcher already used,

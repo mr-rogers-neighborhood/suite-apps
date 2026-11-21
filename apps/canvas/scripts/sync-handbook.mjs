@@ -1,13 +1,10 @@
 /**
- * Turns `handbook/*.md` into the two things that read it.
+ * Turns `handbook/*.md` into the module the app reads.
  *
  * The articles are authored once, in Markdown, at the repository root, because the person who
- * writes them writes Markdown (ADR-0045 amendment). Two readers need different shapes:
- *
- *   - the app wants a typed module with the body already rendered, since shipping a Markdown
- *     parser into the canvas to render five paragraphs is a dependency the bundle never needs;
- *   - the docs site wants MDX in an Astro content collection, with the frontmatter Fumadocs
- *     reads.
+ * writes them writes Markdown (ADR-0045 amendment). The app wants a typed module with the body
+ * already rendered, since shipping a Markdown parser into the canvas to render five paragraphs is
+ * a dependency the bundle never needs. The same Markdown stays readable on GitHub.
  *
  * So this script is the adapter, and its output is a pure function of `handbook/`: the targets
  * are cleared first, files are walked in sorted order, and nothing is read from a previous run.

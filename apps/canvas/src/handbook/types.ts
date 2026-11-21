@@ -3,8 +3,8 @@
  *
  * The article is authored as Markdown in `handbook/` at the repository root and generated into
  * `articles.generated.ts` by `scripts/sync-handbook.mjs`, so this module describes the shape the
- * generator produces rather than a file anyone writes by hand in the app. The docs site reads
- * the same Markdown, which is the point: one source, two readers (ADR-0045 amendment).
+ * generator produces rather than a file anyone writes by hand in the app. GitHub renders the
+ * same Markdown, which is the point: one source, two readers (ADR-0045 amendment).
  */
 export type HandbookTargetKind = "ui" | "card" | "board" | "section";
 

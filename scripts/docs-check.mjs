@@ -64,7 +64,7 @@ const BANNED = [
   },
   {
     pattern: /\.local\/share\/suite\/start/,
-    why: "Start's records live in Electron userData until the registry move lands",
+    why: "Start's install records live under the suite config directory",
   },
 ];
 /** Repositories the monorepo replaced. A line that calls one archived is allowed. */

@@ -25,7 +25,7 @@ One definition per term, in the sense this repository uses it. The model behind 
 | portal | A card that opens another board and shows a live miniature of it | `PortalNode`, `board` field |
 | presence | Ephemeral signals about a peer: pointer, selection, gesture, caret | `EphemeralStore`, `presence.ts` |
 | target | The one shape for "the thing I mean", shared by focus, Follow, Goto, tours and the handbook; `ui` names a region of the shell | `Target`, `focusTarget`, `HandbookRegion` |
-| handbook article | One Markdown file in `handbook/`, rendered by the shell and by the docs site from the same source | `handbook/`, `HandbookArticle` |
+| handbook article | One Markdown file in `handbook/`, rendered by the shell from the file in the repository | `handbook/`, `HandbookArticle` |
 | tutorial | A card whose body holds step blocks | `tutorial.ts` |
 | tour | One tutorial's steps presented over the canvas | `TourOverlay` |
 | capability | One permission flag a session carries, such as `canPublish` | `sessionCapabilities` |
