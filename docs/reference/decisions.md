@@ -43,6 +43,22 @@ The rules that shape this repository. Each is current; the code follows it.
   [Manage signing keys](../how-to/keys.md) owns the procedure.
 - Linux is the published platform. macOS and Windows have no signing identity.
 
+## Desktop host
+
+- Desktop Suite is separate sandboxed apps plus Start as the shell. The shell owns the catalogue, the
+  channels, routing and updates; Flatpak is the host runtime; documents and keys stay app-owned.
+- One container window is rejected: it loses per-app isolation, crash boundaries and accessibility
+  boundaries.
+- A host agent is not built now: it would be a second package manager until it earns its keep. Start
+  stays native behind one [`PackageBackend`](../../apps/start/docs/reference/decisions.md); a Flatpak
+  Start can implement the same interface over D-Bus later.
+- No service owns sync membership or keys. One service owning them would collapse the sandbox
+  isolation; [sync is a capability](../../apps/sync/docs/reference/sync-capability.md) that moves
+  sealed frames and readable membership.
+- A signed pack form may be added inside Start later; domains do not move into it.
+- The W3C MiniApp model contributed the host, the manifest, declared capabilities and the lifecycle.
+  Its packaging specification is retired, so there is no compliance target.
+
 ## Product boundary
 
 - A document is a file the user owns. The hub returns a path or bytes; it never parses a document.

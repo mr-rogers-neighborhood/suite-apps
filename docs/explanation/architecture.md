@@ -59,6 +59,59 @@ and a server a person runs on a device they control. It never defines an app sch
 - The relay stores sealed frames it cannot read, plus the signed metadata it needs to admit them. It
   is loopback by default and has no TLS yet.
 
+## The desktop superapp boundary
+
+Desktop Suite is separate sandboxed apps plus Start as the shell. It is not one application that
+mounts domain code. Start owns the catalogue, the channels, routing and updates; Flatpak is the host
+runtime when an app is installed that way, and Start asks it to install, update or remove rather than
+writing a deployment itself. Documents and keys stay with the app: the shell hands over a path or
+bytes, never parses them, and sync keys never enter Start.
+
+A signed pack form may be added inside Start later. It would be a way to deliver a domain as a
+verified bundle without making the shell the domain's runtime: the app still owns its document and
+its keys, and the pack still declares its capabilities. Domains do not move into Start; a pack that
+needs the shell to understand its document is the container this section rejects.
+
+### Why not one container window
+
+The obvious alternative is one window that mounts every domain in the shell's process. It loses the
+boundaries the suite relies on. One crash takes the shell and every open domain with it; a renderer
+bug can read another app's memory; accessibility is per window and per document, so a container that
+draws its own chrome gives the platform one surface instead of each app's; and one release owns every
+domain's cadence. Mobile Go accepts a narrower version of this trade because it mounts a pack inside
+its own window and keeps a document boundary instead of a process boundary. Desktop keeps the process
+boundary.
+
+### Why not a host agent now
+
+A host agent that owns installations would let a Start packaged as a Flatpak reach the host. It is a
+second package manager until it earns its keep: install, update, remove and launch would exist twice,
+with its own trust boundary, and it would duplicate what Start already does natively. Start stays
+native behind one `PackageBackend`; a Flatpak Start can implement the same interface over D-Bus to an
+agent later without changing the window or the catalogue.
+
+### Why not one service owning sync keys
+
+A device-wide sync service that owned membership and group keys would be simpler to implement once,
+and it would collapse the sandbox isolation the apps depend on. A process that can open every
+workspace's frames is a single compromise of every document. The sync capability keeps the key and
+the document in the app; the host moves sealed frames and the metadata the threat model already
+accepts. Go reserves the same capability for a future host.
+
+### What the MiniApp model contributed
+
+The W3C MiniApp work supplied four mechanisms the suite's host model uses: a host that launches
+packaged apps, a manifest that declares what the app is, declared capabilities the host enforces,
+and a lifecycle that distinguishes a running app from a disposed one. It supplied no compliance
+target: the MiniApp Packaging specification is
+[retired](https://www.w3.org/standards/history/miniapp-packaging/), so no build is certified against
+it. The model is an influence, not a standard Suite conforms to;
+[The mini-app model](mini-app-model.md) owns the comparison.
+
+The two host seams are named rather than implied: [Start's decisions](../../apps/start/docs/reference/decisions.md)
+state the `PackageBackend` rule, and [the sync capability](../../apps/sync/docs/reference/sync-capability.md)
+states the sealed-frame contract.
+
 ## Shared packages
 
 Only code used by more than one app belongs in a shared package:
