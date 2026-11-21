@@ -93,6 +93,11 @@ The rules that shape this repository. Each is current; the code follows it.
 - No service owns sync membership or keys. One service owning them would collapse the sandbox
   isolation; [sync is a capability](../../apps/sync/docs/reference/sync-capability.md) that moves
   sealed frames and readable membership.
+- `@suite/sync-desktop` is shared mechanics, not shared trust. The group, relay pin, cursor, pending
+  join, frame queue and reconnect live once for Canvas and Planner; each app injects its own data
+  directory and identity, keeps its own `sync/contacts.json` decision, and keeps its capability and
+  IPC surface. A shared contacts file would move a per-app trust decision across the boundary and is
+  rejected here.
 - A signed pack form may be added inside Start later; domains do not move into it.
 - The W3C MiniApp model contributed the host, the manifest, declared capabilities and the lifecycle.
   Its packaging specification is retired, so there is no compliance target.
