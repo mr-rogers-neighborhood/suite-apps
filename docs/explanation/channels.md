@@ -38,7 +38,7 @@ carries its artifact and checksum. Unstable means the code may change or break, 
 are unaccounted for.
 
 Unstable does not mean shared. A pre-release runs under one pre-release id and profile, in its own
-tier's data folder, and cannot write a stable document. [Distribution](#distribution) states the
+pre-release data folder, and cannot write a stable document. [Distribution](#distribution) states the
 mapping.
 
 ## Distribution
@@ -49,22 +49,20 @@ branch and the data folder are what make a tier.
 | Build | Flatpak id | Branch | Data folder |
 | --- | --- | --- | --- |
 | stable | `run.suite.<app>` | the remote's default branch | `Documents/Suite/<App>` |
-| slop | `run.suite.slop.<app>` | `slop` | the pre-release tree, under `slop` |
-| canary | `run.suite.slop.<app>` | `canary` | the pre-release tree, under `canary` |
-| beta | `run.suite.slop.<app>` | `beta` | the pre-release tree, under `beta` |
+| pre-release (`slop`, `canary`, `beta`) | `run.suite.slop.<app>` | the tier's branch | `Documents/Suite Slop/<App>` |
 
 One pre-release id, three branches. A person has one pre-release install at a time; switching from
-`slop` to `canary` keeps the install and switches the data folder. Stable and pre-release are two
-ids, so they are two cards and can be installed side by side. A pre-release build cannot resolve the
-stable profile.
+`slop` to `canary` keeps the install and keeps the same pre-release data folder. Stable and
+pre-release are two ids, so they are two cards and can be installed side by side. A pre-release build
+cannot resolve the stable profile.
 
-Data is keyed by id, so the stable id and the pre-release id have separate trees; the tier is a
-subdirectory inside the pre-release tree, chosen by the build. A `slop` build cannot write the `beta`
-folder.
+Data is keyed by id, so the stable id and the pre-release id have separate trees. Every pre-release
+tier writes the one `Documents/Suite Slop/<App>` folder; the tiers are not separated from each other,
+only from stable. That is why one pre-release install at a time is the supported shape.
 
 Documents are copy-on-open. A pre-release opens a copy in its own folder rather than editing the
-stable file in place, and it does not migrate that file. Exporting back is explicit and overwrites
-the stable document; it is not a merge.
+stable file in place, and it does not migrate that file. Exporting back is explicit and refuses the
+stable folder rather than overwriting it; it is not a merge.
 
 A pre-release registers no stable MIME type and no `suite://` handler, so a double-clicked `.canvas`
 or a `suite://` link still reaches the stable app. A tier is opened from its card.
@@ -96,8 +94,9 @@ remote](../reference/packaging-channels.md#the-signed-remote-on-suite-dev) descr
 and its accepted limit.
 
 A tier adds no third signature scheme. It is another branch under the same signed summary. A
-pre-release AppImage has no feed manifest: its tag carries the artifact and checksum, and the
-AppImage is a manual download rather than an auto-updating install.
+pre-release AppImage carries its signed `latest-linux.yml` on its own `<tier>-<app>-v<version>` tag
+rather than under `feeds/<app>/`; the AppImage is a manual download rather than an auto-updating
+install.
 
 ## What a tier cannot undo
 
@@ -108,9 +107,9 @@ machine is where it was. These steps are not.
   refuses the file rather than downgrading it. [File formats](../reference/file-formats.md#opening-a-file-another-version-wrote)
   owns the rule.
 - **A copied document diverges once edited.** Copy-on-open makes the tier's copy its own document;
-  export back is an overwrite, not a merge.
-- **Removing a tier's data deletes that tier's documents.** Start removes the channel's data
-  directory only after a confirmation; another tier's folder is never in that path.
+  export back refuses the stable folder rather than overwriting it, and is not a merge.
+- **Removing the pre-release data deletes the pre-release documents.** Start removes the channel's
+  data directory only after a confirmation; the stable folder is never in that path.
 - **A key rotation does not reach an installed copy.** A build keeps verifying with the key it was
   built with, so a feed signed with a new key is invisible to it until a build carrying the new key
   is installed.
@@ -121,9 +120,9 @@ A tier badge is a promise, and it is persistent: a screenshot of the window show
 running, and a restart does not remove it. It commits to four things:
 
 - the build is that tier, not "newer than stable";
-- it writes that tier's data folder, separate from stable and from every other tier;
+- it writes the pre-release data folder, separate from stable;
 - an update moves within the tier and never across it;
-- removing it leaves every other tier's documents alone.
+- removing it leaves the stable documents alone.
 
 A first run names the risk and the removal path in words, because a badge is not a warning. A stable
 card has no badge: stable is the default and the baseline the others are compared to.

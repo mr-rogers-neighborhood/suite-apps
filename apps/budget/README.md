@@ -28,7 +28,9 @@ For the product story and the influences behind it, read
   is a pair of linked records; a split is a parent with child records.
 - **Nothing is trapped.** Export a `.budget` file, plain JSON records, transactions as CSV, or QIF.
   Import CSV, QIF, native JSON, or another `.budget`.
-- **Offline by design.** No network client, no updater, no analytics. Bank sync is deliberately absent.
+- **Offline by design.** No network client, no updater, no analytics. Bank sync is deliberately
+  absent; Start's catalogue is what checks Budget's feed.
+- **Two shipped forms.** Budget ships as an AppImage and as the Flatpak `run.suite.budget`.
 
 ## Run it
 

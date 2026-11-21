@@ -9,7 +9,7 @@ apps/
                 packages/graph, packages/import-obsidian; e2e, docs, handbook, internal
   planner/      @suite/planner desktop app; pack/; packages/core; docs
   budget/       @suite/budget desktop app; packages/core; docs
-  start/        @suite/start hub; packaging/arch; docs, e2e
+  start/        @suite/start hub; the PKGBUILD under apps/start/packaging/arch; docs, e2e
   sync/         @suite/sync-server; packages/protocol, packages/host; deploy, docs
   go/           @suite/go-app mobile container; packages/go contract; docs
 packages/       contracts, files, desktop, theme, ui

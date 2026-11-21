@@ -43,8 +43,8 @@ tree, and points at an artifact that answers:
 node scripts/release.mjs planner --verify
 ```
 
-The hub has an Arch package as well as its AppImage. `start` builds it when `makepkg` is available and
-uploads it with the other files:
+The hub has an Arch package as well as its AppImage, and a Flatpak built separately. `start` builds the
+Arch package when `makepkg` is available and uploads it with the other files:
 
 ```sh
 node scripts/release.mjs start --publish
@@ -190,6 +190,7 @@ Run the owning app's gate first. Packaging does not run it.
 
 ```sh
 node scripts/flatpak.mjs              # package, build, publish, install
+node scripts/flatpak.mjs --app start  # the hub, stable only
 node scripts/flatpak.mjs --no-build   # reuse release/linux-unpacked
 node scripts/flatpak.mjs --no-build --no-install   # publish, leave the client alone
 node scripts/flatpak.mjs --app planner --channel slop  # pre-release tier branch
@@ -202,16 +203,16 @@ no key the remote is added with `--no-gpg-verify` for local testing only, and th
 [Packaging channels](../reference/packaging-channels.md).
 
 To watch Start update from the store, publish a second commit without installing it, then ask Start
-to look again (with `XDG_DATA_HOME` pointing at the real user installation):
+to look again (with `XDG_DATA_HOME` pointing at the real user installation). A new commit needs a
+changed payload, so make a visible source change first and rebuild:
 
 ```sh
-printf 'update check\n' > apps/canvas/desktop/release/linux-unpacked/update-check
-node scripts/flatpak.mjs --no-build --no-install
+node scripts/flatpak.mjs --no-install
 ```
 
 The app's card says `update available` after **Check for updates**; **Update** asks Flatpak to
-replace the deployment. Remove the marker and run `node scripts/flatpak.mjs --no-build` again to
-publish the clean build and bring the client back to it.
+replace the deployment. Revert the change and run `node scripts/flatpak.mjs` again to publish the
+clean build and bring the client back to it.
 
 ## Version ownership
 
@@ -221,8 +222,9 @@ it, and stamps it into the artifact.
 
 | What | Where the version lives | Its tag |
 | --- | --- | --- |
-| Start, Canvas, Planner, Budget | `apps/<app>/package.json` | `<app>-v<version>` |
-| A pre-release of Canvas, Planner or Budget | the same `apps/<app>/package.json` | `<tier>-<app>-v<version>` |
+| Start, Planner, Budget | `apps/<app>/package.json` | `<app>-v<version>` |
+| Canvas | `apps/canvas/desktop/package.json` | `canvas-v<version>` |
+| A pre-release of Canvas, Planner or Budget | the same app entry above | `<tier>-<app>-v<version>` |
 | The relay (`suite-sync`) | `apps/sync/package.json` | `sync-v<version>` |
 | Suite Go | `apps/go/app.config.json` | none yet |
 | A shared package (`@suite/*`) | `packages/<name>/package.json` | none; consumed as `workspace:*` |

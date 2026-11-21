@@ -72,7 +72,7 @@ Two roots, and the split is the decision:
 
 | Artefact | Location | Why |
 | --- | --- | --- |
-| Workspace files | `~/Documents/Suite/Canvas` (the suite convention, from `@suite/contracts`) | A person looks there, so it can be copied, backed up, or put in a folder their own cloud already syncs: local-first without a service |
+| Workspace files | `~/Documents/Suite/Canvas` (the suite convention, from `@suite/contracts`); a pre-release build uses `~/Documents/Suite Slop/Canvas` | A person looks there, so it can be copied, backed up, or put in a folder their own cloud already syncs: local-first without a service |
 | Backups | Beside the document, `<name>.<stamp>.bak` | "Recover with a file manager when the app is the thing that broke" is a promise the format makes |
 | Locks | The per-user data directory | A lock beside a synced file would carry another machine's pid, and every sync would look like a contended file |
 
@@ -172,9 +172,8 @@ rather than leaving the order to whoever remembers.
 
 ## Packaging
 
-`electron-builder.yml`. The `deb` is the primary Linux target because it carries the `.canvas` MIME
-association, which lives in the desktop entry a package installs; the AppImage is the portable
-alternative and registers it at runtime.
+`electron-builder.yml`. The AppImage is the published Linux build; it registers the `.canvas` MIME
+association at runtime, so it works without an installer and without root.
 
 The app claims no URL scheme of its own. `suite://` belongs to Suite Start, which routes a link by
 launching this app with it, and a second scheme that nothing registers would be a promise the app does

@@ -22,10 +22,13 @@ The rules that shape this repository. Each is current; the code follows it.
 
 ## Packaging
 
-- Start replaces only a file it can write. It installs, updates and removes the apps it placed.
-- The hub is packaged; the apps are AppImages. A copy a person placed manages itself.
+- Start replaces only a file it can write. It installs, updates and removes the apps it placed, and
+  asks Flatpak to install or update a deployment. It does not update a copy a person placed.
+- The three apps and the hub ship as AppImage and Flatpak; the hub also ships an Arch package. `deb`
+  is not a configured target, and `rpm` and `snap` were never built.
 - Flatpak is a second channel: Start lists and launches installs, installs from the store, updates a
   deployment whose commit is behind, and removes through Flatpak. Flatpak is the writer, never Start.
+  The hub can be a Flatpak too, with its own `run.suite.start` deployment.
 - Signed manifests live at `feeds/<app>/latest-linux.yml` in this repository, served from the raw
   file host at `main` because GitHub Pages would need Actions. The artifact they name stays an asset
   on the app's `<app>-v<version>` release tag.
@@ -33,14 +36,17 @@ The rules that shape this repository. Each is current; the code follows it.
   (`slop`, `canary`, `beta`) is the Flatpak branch, not part of the id, so one pre-release install
   can move tier while stable stays installed. A pre-release is tagged
   `<tier>-<app>-v<version>` and never writes `feeds/<app>/`; the OSTree summary is signed with the
-  store key and the AppImage manifest with the update key.
+  store key and the AppImage manifest with the update key. The AppImage manifest id is `slop-<app>`;
+  the older `slop.<app>` id is still read for an installed build.
 - `scripts/release.mjs` is the release path. It refuses a dirty tree, a version with no changelog
   heading, a commit the gate has not proven, and a manifest whose artifact is missing. It is a dry
   run unless `--publish` is passed.
 - A version lives in one place and a tag names one app's release. [Version ownership](../how-to/package-and-release.md#version-ownership)
   states which file owns it and which prefix the tag uses.
-- An installed app verifies a feed with the update key it was built with. A key rotation therefore
-  ships a new Start first; a feed signed with the new key is published only after that build exists.
+- An installed AppImage verifies a feed with the update key it was built with; a Flatpak verifies the
+  OSTree summary with the store key. A key rotation therefore ships a new Start first — AppImage,
+  Arch package or Flatpak — and a feed signed with the new key is published only after that build
+  exists.
 - Private signing keys live outside the repository, in `~/.config/suite/keys/` or wherever
   `SUITE_KEYS_DIR` points. A public half is pinned in the source that verifies it, and
   `pnpm keys status` proves the two agree. No secret is stored in a generated directory such as
@@ -54,9 +60,11 @@ The rules that shape this repository. Each is current; the code follows it.
   channels, routing and updates; Flatpak is the host runtime; documents and keys stay app-owned.
 - One container window is rejected: it loses per-app isolation, crash boundaries and accessibility
   boundaries.
-- A host agent is not built now: it would be a second package manager until it earns its keep. Start
-  stays native behind one [`PackageBackend`](../../apps/start/docs/reference/decisions.md); a Flatpak
-  Start can implement the same interface over D-Bus later.
+- A host agent is not built now. The Flatpak session helper (`org.freedesktop.Flatpak` through
+  `flatpak-spawn --host`) is what the sandboxed hub uses behind the same
+  [`PackageBackend`](../../apps/start/docs/reference/decisions.md); that grant is effectively host
+  command execution. A D-Bus agent remains the alternative if the permission set grows, and it would
+  be a second package manager until it earns its keep.
 - No service owns sync membership or keys. One service owning them would collapse the sandbox
   isolation; [sync is a capability](../../apps/sync/docs/reference/sync-capability.md) that moves
   sealed frames and readable membership.

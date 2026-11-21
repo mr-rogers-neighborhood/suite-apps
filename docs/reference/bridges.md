@@ -10,8 +10,8 @@ to run all three has to know how. It is written from the code, not from intent.
 | App     | Global                | Declared in                      | Host marker       | Staleness check                     |
 | ------- | --------------------- | -------------------------------- | ----------------- | ----------------------------------- |
 | Canvas  | `window.suiteDesktop` | `apps/canvas/src/host/bridge.ts` | `host: "desktop"` | **Yes** — `REQUIRED_BRIDGE_METHODS` |
-| Planner | `window.suitePlanner` | `packages/core/src/ports.ts`     | none              | no                                  |
-| Budget  | `window.suiteBudget`  | `packages/core/src/ports.ts`     | none              | no                                  |
+| Planner | `window.suitePlanner` | `apps/planner/packages/core/src/ports.ts` | none     | no                                  |
+| Budget  | `window.suiteBudget`  | `apps/budget/packages/core/src/ports.ts`  | none     | no                                  |
 
 ## Canvas: `window.suiteDesktop`
 
@@ -92,7 +92,7 @@ A host that always has a file — the desktop shell always opens one — never r
 
 ## Budget: `window.suiteBudget`
 
-Seventeen methods, the widest surface of the three, because Budget owns a library of files rather
+Nineteen methods, the widest surface of the three, because Budget owns a library of files rather
 than one open document:
 
 ```ts
@@ -106,14 +106,16 @@ platform()
 ```
 
 `closeBudget()` is the one with no counterpart in the other two: Budget can hold no open document at
-all, which is what its start screen represents.
+all, which is what its start screen represents. Its `loadSnapshot()` never returns `null`: it returns
+bytes for the open budget or rejects because none is open.
 
 ## What a non-Electron host must supply
 
 Regardless of shape, every bridge assumes the same four things:
 
-1. **A snapshot in, updates out.** `loadSnapshot()` returns bytes, or `null` when there is no
-   document yet; `commit(update)` takes a CRDT update. The host never parses either.
+1. **A snapshot in, updates out.** Planner's `loadSnapshot()` returns bytes, or `null` when there is
+   no document yet; Budget's returns bytes and never `null`. `commit(update)` takes a CRDT update. The
+   host never parses either.
 2. **Replacement notification.** `onWorkspaceReplaced` / `onBudgetReplaced` fire when the host
    swaps the document underneath the renderer — an import, a sync arrival, a file reopened.
 3. **Commands.** `onCommand` carries menu and accelerator intents. A host without a menu may
@@ -168,4 +170,5 @@ Listed rather than fixed, because fixing them is a cross-repo change with no cur
 - **No shared version handshake.** Canvas compares methods; the others assume a match.
 - **Three different names.** `suiteDesktop`, `suitePlanner`, `suiteBudget`. Fine for Electron, more
   to document than necessary.
-- **`platform()` is a promise in all three**, though it never changes after boot.
+- **Platform arrives two ways.** Canvas exposes `platform` as a string property; Planner and Budget
+  expose `platform()` as a promise, though it never changes after boot.

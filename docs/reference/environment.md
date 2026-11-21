@@ -8,7 +8,7 @@ portable install; they are not configuration a normal user needs.
 | Variable | Replaces |
 | --- | --- |
 | `SUITE_START_DOCUMENTS` | the shared documents root, `~/Documents/Suite` |
-| `SUITE_START_DATA` | the hub's data directory |
+| `SUITE_START_DATA` | the hub's Electron data directory (recents, theme, sync store) |
 | `SUITE_START_USER_DATA` | Electron's `userData` for the hub |
 | `SUITE_START_SYNC_PORT` | the port the Suite Sync relay Start supervises listens on, `8787`; `0` asks for a free one |
 | `SUITE_SYNC_BIN` | the `suite-sync` binary Start runs; without it Start looks beside itself and on `PATH` |
@@ -33,22 +33,19 @@ portable install; they are not configuration a normal user needs.
 
 ## Sync
 
-These are read by the desktop shell and passed to the renderer, so one Start profile is one member.
-
-| Variable | Means |
-| --- | --- |
-| `SUITE_SYNC_URL` | the server URL, such as `ws://127.0.0.1:8787/sync` |
-| `SUITE_SYNC_MEMBER` | the 64-hex member id |
-| `SUITE_SYNC_WORKSPACE` | the 64-hex sync workspace id |
-| `SUITE_SYNC_EPOCH` | the group-key epoch |
-| `SUITE_SYNC_DEVICE` | the device id |
+The desktop apps take the relay address in their own Sync dialog. `SUITE_SYNC_URL`,
+`SUITE_SYNC_MEMBER`, `SUITE_SYNC_WORKSPACE`, `SUITE_SYNC_EPOCH` and `SUITE_SYNC_DEVICE` were listed
+here but no shell reads them; `SUITE_SYNC_BIN` is in the hub table because Start does read it.
 
 ## Packaging
 
 `SUITE_FLATPAK_REPO` and `SUITE_FLATPAK_XDG_DATA_HOME` move the output repository and the Flatpak
-data root for `scripts/flatpak.mjs`. `SUITE_STORE_KEY_ID` names the store's signing key when it is not
-the one recorded in `~/suite-flatpak/store-key.id`; `SUITE_STORE_STATE` and `SUITE_STORE_IDENTITY` move
-where `scripts/store-key.sh` writes and whose name the key carries. `SUITE_GO_KEYSTORE`,
+data root for `scripts/flatpak.mjs`. `SUITE_FLATPAK_STATE` moves the store directory for
+`scripts/flatpak-remote.mjs`; `SUITE_FLATPAK_HOST`, `SUITE_FLATPAK_REMOTE_DIR` and `SUITE_FLATPAK_URL`
+change where it publishes and the URL it writes. `SUITE_STORE_KEY_ID` names the store's signing key
+when it is not the one recorded in `~/suite-flatpak/store-key.id`; `SUITE_STORE_STATE` and
+`SUITE_STORE_IDENTITY` move where `scripts/store-key.sh` writes and whose name the key carries.
+`SUITE_GO_KEYSTORE`,
 `SUITE_GO_KEY_ALIAS`, `SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_PASSWORD` and `SUITE_GO_JAVA_HOME`
 are used when building and signing an Android pack.
 

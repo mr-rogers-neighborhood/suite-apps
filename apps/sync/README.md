@@ -73,11 +73,8 @@ embed the relay and keeps no frames of its own. The store is a directory of
 
 A relay does not have to live on the computer running Start. Install `suite-sync` on the always-on
 machine and leave it running under systemd — [Leave a relay running](docs/how-to/relay.md) has the
-binary, the address choice and the unit file. On each device, point the app at it:
-
-```sh
-SUITE_SYNC_URL=ws://192.168.1.20:8787/sync
-```
+binary, the address choice and the unit file. On each device, enter the relay address in the app's
+Sync dialog, for example `ws://192.168.1.20:8787/sync`.
 
 Nothing else changes: the apps keep their documents, and Start remains a launcher that manages no
 relay when the relay is elsewhere. The address must be one the device can route to; `127.0.0.1` is

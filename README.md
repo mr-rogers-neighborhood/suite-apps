@@ -25,24 +25,9 @@ in the data path. Sync carries a document between devices; it never defines its 
 ## Install
 
 Suite Start is the only piece you fetch by hand. Every other app arrives through it.
-
-**On Arch**, download the current package from the
-[latest release](https://github.com/mr-rogers-neighborhood/suite-start/releases/latest):
-
-```sh
-sudo pacman -U suite-start-bin-<version>-1-x86_64.pkg.tar.zst
-```
-
-**Everywhere else**, download `suite-start-<version>-x86_64.AppImage` from the same release:
-
-```sh
-chmod +x suite-start-<version>-x86_64.AppImage
-./suite-start-<version>-x86_64.AppImage
-```
-
-An AppImage needs FUSE 2; `--appimage-extract-and-run` works without it. Open Start, install Canvas,
-and start with [Make a first workspace](docs/tutorials/02-first-workspace.md). The full checksum and
-troubleshooting steps are in [Install Suite Start](docs/tutorials/01-install.md).
+[Installing Suite Start](apps/start/docs/how-to/install.md) owns the download, checksum and first
+launch, for Arch and every other distribution. Open Start, install Canvas, and start with
+[Make a first workspace](docs/tutorials/02-first-workspace.md).
 
 ## How it fits together
 
@@ -66,8 +51,8 @@ met and which are still partial.
 
 | | |
 | --- | --- |
-| Platforms | Linux x86_64. AppImage and Arch package for the hub; Flatpak experimental; no macOS or Windows build. |
-| Sync | Canvas syncs through a user-run server. Planner and Budget do not sync yet. |
+| Platforms | Linux x86_64. AppImage and Flatpak for the apps and the hub; an Arch package for the hub; no macOS or Windows build. |
+| Sync | Canvas and Planner sync through a user-run relay. Budget has no network client. |
 | Security | No account or telemetry. Document files are unencrypted; use disk encryption. The sync relay holds sealed frames, but has no TLS and is loopback by default. |
 | Mobile | Suite Go installs on Android as a debug build. No domain ships; iOS is unbuilt. |
 | Gate | Local, at the repository root. No CI service gates a pull request. |

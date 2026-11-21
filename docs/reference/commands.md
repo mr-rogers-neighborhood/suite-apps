@@ -14,7 +14,7 @@ mise exec -- node scripts/gate.mjs
 mise exec -- node scripts/gate.mjs                 # this working tree
 mise exec -- node scripts/gate.mjs --only canvas
 mise exec -- node scripts/gate.mjs --fresh         # this commit, clean install
-mise exec -- node scripts/gate.mjs --no-e2e        # skip the cross-app browser suite
+mise exec -- node scripts/gate.mjs --no-e2e        # skip Start's e2e suite
 ```
 
 The gate builds the workspace libraries (`packages/*` and `apps/*/packages/*`) once, then runs each
@@ -52,8 +52,9 @@ pnpm docs:symbols   # backticked paths, scripts, ADR references
 pnpm shape          # file length, observe sites, raw Loro writes
 ```
 
-Playwright is not part of any per-change gate. Run it when the owner asks for a run or names a
-milestone.
+The per-app gates do not run Playwright. The root gate runs Start's e2e suite after the checks, under
+`xvfb-run` when there is no display; `--no-e2e` skips it. Other Playwright suites run when the owner
+asks for a run or names a milestone.
 
 ## Signing keys
 
