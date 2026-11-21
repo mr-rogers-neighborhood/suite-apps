@@ -70,7 +70,9 @@ const notedFiles = moduleDetails.reduce((sum, module) => sum + module.notedFiles
 const notedSymbols = moduleDetails.reduce((sum, module) => sum + module.notedSymbols, 0);
 const authoredSymbols = symbolEntries.length;
 const authoredExported = exportedSymbols.length;
-const walkSteps = walks.flatMap((walk) => walk.steps ?? []);
+const authoredWalks = walks.filter((walk) => !walk.generated);
+const generatedWalk = walks.find((walk) => walk.generated);
+const walkSteps = authoredWalks.flatMap((walk) => walk.steps ?? []);
 const walkStepsWithNotes = walkSteps.filter((step) => step.note).length;
 
 const gaps = moduleDetails
@@ -90,7 +92,12 @@ const report = {
     exported: authoredExported,
     withNotes: notedSymbols,
   },
-  walks: { total: walks.length, steps: walkSteps.length, stepsWithNotes: walkStepsWithNotes },
+  walks: {
+    total: walks.length,
+    steps: walkSteps.length,
+    stepsWithNotes: walkStepsWithNotes,
+    generatedSteps: generatedWalk?.steps?.length ?? 0,
+  },
   gaps,
 };
 
@@ -103,7 +110,7 @@ if (asJson) {
       `modules  ${modulesWithNarrative}/${moduleDetails.length} narrative, ${modulesWithNotes}/${moduleDetails.length} any note`,
       `files    ${notedFiles}/${fileEntries.length} with a note (${percent(notedFiles, fileEntries.length)})`,
       `symbols  ${notedSymbols}/${authoredSymbols} with a note (${percent(notedSymbols, authoredSymbols)})`,
-      `walks    ${walkStepsWithNotes}/${walkSteps.length} steps with a note`,
+      `walks    ${walkStepsWithNotes}/${walkSteps.length} authored steps with a note; ${generatedWalk?.steps?.length ?? 0} generated`,
       "",
       "largest modules with no authored prose:",
       ...(gaps.length === 0
