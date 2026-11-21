@@ -38,6 +38,15 @@ Use it when uncommitted files could be hiding a dependency, or when you are abou
 `--no-e2e` skips the cross-app Playwright suite for a quick loop. It does not make the run equivalent
 to a full gate; say that the e2e suite was skipped.
 
+## Export retention
+
+A passing `--fresh` run keeps its own export and the previous proof under `.dev/gate/`; older export
+directories are deleted once `.dev/gate-status.json` has been written. The export in use is never
+removed, and tarballs or entries that do not look like a commit sha are left alone.
+
+A failed run keeps every export, because the tree it ran in is the evidence for the failure. A
+`--dry` run deletes nothing.
+
 ## Memory
 
 The first monorepo gate fanned out across every package and took the desktop down. Cap heavy runs:

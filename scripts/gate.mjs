@@ -28,6 +28,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { pruneGateExports } from "./lib/gateExports.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -234,6 +235,16 @@ else {
     process.stdout.write(`${entry.ok ? "ok  " : "FAIL"}  ${entry.repo}  ${entry.detail}\n`);
   }
   process.stdout.write(`\n${status.ok ? "gate passed" : "gate failed"} · ${statusPath}\n`);
+}
+
+// Only a passing `--fresh` run has a proof worth keeping, and only after the
+// status file names it. A failed run keeps every export: the tree it ran in is
+// the evidence for the failure. A dry run deletes nothing.
+if (fresh && status.ok && !dry) {
+  const removed = pruneGateExports(join(ROOT, ".dev", "gate"), workdir);
+  if (!json && removed.length > 0) {
+    process.stdout.write(`pruned ${removed.length} older gate export(s)\n`);
+  }
 }
 
 process.exit(status.ok ? 0 : 1);
