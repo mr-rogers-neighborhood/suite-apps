@@ -76,13 +76,14 @@ took the desktop down. The layout and package ownership are in
 
 ## Documentation
 
-| | |
-| --- | --- |
-| [Tutorials](docs/tutorials/index.md)<br>Install, first workspace, two devices. | [How-to](docs/how-to/index.md)<br>Update apps, back up, run the gate, package, contribute. |
-| [Reference](docs/reference/index.md)<br>Layout, commands, channels, formats, environment, status. | [Explanation](docs/explanation/index.md)<br>What Suite is, local-first, the mini-app model, architecture. |
+The primary reader is the explorer. Run `pnpm docs:dev` at the repository root and open
+<http://localhost:3001/explore>. It indexes every file and declaration and offers three views:
+**Browser** (the file tree), **Modules** (one narrative per module) and **Walkthroughs** (ordered
+paths through the code). Reference facts are derived; module notes and walks carry the prose.
 
-App-specific docs stay beside each app: `apps/<app>/docs/`. The current rules are in
-[Decisions](docs/reference/decisions.md).
+This is a development tool, not a hosted site. The older notes stay in [docs](docs/README.md):
+decisions, architecture, commands and the app-specific docs. They are a notes archive, not a
+separate reading path.
 
 ## Contributing
 

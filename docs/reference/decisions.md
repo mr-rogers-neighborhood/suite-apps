@@ -11,6 +11,14 @@ The rules that shape this repository. Each is current; the code follows it.
 - The gate is local. `--fresh` proves a commit, not the working tree. No CI service gates a pull
   request.
 - `@suite/desktop` is shared Electron policy. Canvas's shell is `@suite/canvas-desktop`.
+- `tools/docs` is the local documentation reader, not an app and not a shipped surface. It indexes
+  every file and declaration, generates its reference tree from `docs/`, and keeps module notes in
+  `docs/modules/` and ordered walkthroughs in `docs/walkthroughs/`. It is excluded from the root
+  build and release. `docs/` and each app's `docs/` remain the source of truth.
+- The reader is not organized by Diátaxis. Browser, Modules and Walkthroughs are the structure over
+  one code index; reference facts are generated, and module MDX plus walks are the authored layer.
+  The old tutorials, how-to, reference and explanation pages remain a notes archive; new content
+  goes to `docs/modules/` or `docs/walkthroughs/`.
 
 ## Layout
 

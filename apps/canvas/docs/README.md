@@ -2,7 +2,8 @@
 
 Canvas is a local-first, collaborative canvas. A workspace owns its cards; boards are views of those
 cards. The document is a Loro CRDT, every write is validated in `@suite/graph`, and the canvas works
-offline.
+offline. The cross-repository reader is the root `docs:dev` script; it renders `docs/` and the
+walkthroughs. The Canvas handbook remains the in-product interface guide.
 
 Canvas is alpha. `package.json` holds the current version and [CHANGELOG.md](../CHANGELOG.md) records
 what each version changes.

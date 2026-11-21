@@ -16,7 +16,11 @@ packages/       contracts, files, desktop, theme, ui
 docs/           Cross-cutting documentation
 packaging/      Flatpak manifests
 scripts/        gate.mjs, flatpak.mjs, ci/, docs-check.mjs
+tools/docs/     Local documentation reader; not an app, not shipped
 ```
+
+`tools/docs` renders `docs/` and the walkthroughs for development. It is not a workspace app, is
+excluded from the root build and release, and never owns a documentation fact.
 
 `pnpm-workspace.yaml` includes `apps/*`, `apps/*/*`, `apps/*/packages/*` and `packages/*`. It also
 owns the overrides, patches and build permissions the apps need.

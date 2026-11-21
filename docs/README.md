@@ -4,18 +4,32 @@ The cross-cutting documentation for the Suite: the hub, the apps, the sync serve
 monorepo they live in. Each app keeps its own `docs/` beside its code; this tree owns what more than
 one app needs.
 
-Start with [What Suite is](explanation/why-suite-exists.md) for the product overview, or
-[Install Suite Start](tutorials/01-install.md) if you want to run it.
+The primary way into the code is the explorer: run `pnpm docs:dev` and open `/explore`. These pages
+are the durable notes that cannot be derived from the code.
 
-## Four ways in
+## Notes archive
 
-| | |
-| --- | --- |
-| [Tutorials](tutorials/index.md)<br>Learn by doing. One guided path to a first result. | [How-to](how-to/index.md)<br>One job at a time: install, package, release, contribute. |
-| [Reference](reference/index.md)<br>Facts to look up: layout, commands, channels, file formats. | [Explanation](explanation/index.md)<br>Why the product and the code are shaped this way. |
+The reader is not organized by Diátaxis. Its structure is **Browser / Modules / Walkthroughs** over
+one code index. Reference facts come from the compiler, module narratives live in
+`docs/modules/*.mdx`, and ordered paths live in `docs/walkthroughs/*.mdx`.
 
-Current rules are in [reference/decisions.md](reference/decisions.md). App-specific tutorials,
-how-tos, reference pages and decisions stay in `apps/<app>/docs/`; the app README is the way in.
+The older notes keep their historical grouping so links do not rot. Do not add new pages to them:
+[tutorials](tutorials/index.md), [how-to](how-to/index.md), [reference](reference/index.md),
+[explanation](explanation/index.md). A new explanation belongs in a module MDX; a new guided path
+belongs in a walkthrough.
+
+Current rules are in [reference/decisions.md](reference/decisions.md). App-specific notes stay in
+`apps/<app>/docs/`; the app README is the way in. The Canvas handbook remains the user-facing
+interface guide.
+
+## Local reader
+
+`pnpm docs:dev` starts the reader at <http://localhost:3001>. It is a development tool: it is not
+deployed, has no telemetry, and is not part of a release.
+
+The explorer indexes every file and declaration and offers the three views above. The notes stay
+plain Markdown and remain readable on GitHub. The explorer is the primary interface; the notes are
+the fallback for facts that cannot be derived.
 
 ## App documentation
 
@@ -58,8 +72,10 @@ Never restate a version in prose here. Link to the file that holds it.
 
 ## Editing rules
 
-- **Write for one reader need per page.** A tutorial teaches, a how-to gets a job done, reference
-  states facts, explanation gives reasons. Do not mix them.
+- **The explorer is the structure.** Browser, Modules and Walkthroughs are the reading model.
+  Reference facts are generated; do not create a parallel section by hand.
+- **Do not add a new Diátaxis page.** The four old sections are a notes archive. A new explanation
+  goes in `docs/modules/`; a new guided path goes in `docs/walkthroughs/`.
 - **Link, do not copy.** Duplicated paragraphs drift, and the reader cannot tell which one is true.
 - **Name the local command.** Every verification claim names the command that produced it.
 - **Docs change with the code.** A change that alters behaviour, ownership or the shape of a
@@ -67,8 +83,15 @@ Never restate a version in prose here. Link to the file that holds it.
 - **A shape change updates the rules.** Change [reference/decisions.md](reference/decisions.md) and
   the owning page; do not add a historical note.
 - **No history in the reading path.** Current pages describe today. Git history is the archive.
-- **Plain Markdown only.** Relative links, no site-only shortcodes. The tree must render on GitHub
-  and stay portable if a site is added later.
+- **Reference is plain Markdown.** A `.md` page uses relative links and no site-only shortcodes, so
+  it renders on GitHub and in the local reader.
+- **Walkthroughs are views, not copies.** A walkthrough is an ordered list of real node IDs with
+  optional prose. The code index does the linking; the walkthrough never restates a signature or
+  duplicates a source file.
+- **One module MDX, not one file MDX.** A module's narrative and its `## <node-id>` notes live in one
+  `docs/modules/*.mdx`. The explorer splits it by file and declaration at render time.
+- **The reader is local.** `tools/docs` is a development tool, not an app. It is excluded from the
+  root build and release and never becomes the canonical copy of a page.
 - **Neutral voice.** State the fact. No first person, no marketing cadence, no section summary that
   repeats the heading.
 

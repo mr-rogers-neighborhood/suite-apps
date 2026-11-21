@@ -29,7 +29,10 @@ const ROOT_PAGES = [
   ...APPS.map((app) => `apps/${app}/README.md`),
 ];
 const BANNED = [
-  { pattern: /\bdocs:site\b/, why: "the documentation site does not exist" },
+  {
+    pattern: /\bdocs:site\b/,
+    why: "the hosted documentation site is gone; use docs:dev for the local reader",
+  },
   { pattern: /Developer note:/, why: "the origin story has one home in docs/explanation" },
   {
     pattern: /(github\.com\/[^ )]*suite-dev|suite-dev\/scripts|cloned side by side)/,

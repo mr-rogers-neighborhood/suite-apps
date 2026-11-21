@@ -78,6 +78,31 @@ mise exec -- node scripts/docs-check.mjs
 Checks relative links, that each `docs/` section index lists its pages, and a short list of retired
 phrases. It is not part of the gate yet; run it with any documentation change.
 
+The local reader renders `docs/` at <http://localhost:3001>. It is not deployed and is not part of
+the gate or a release.
+
+```sh
+mise exec -- pnpm docs:index     # index every file and declaration into tools/docs/public/data
+mise exec -- pnpm docs:dev       # index, sync docs/ and start the dev server (foreground)
+mise exec -- pnpm docs:dev:bg    # the same, detached; log in .dev/docs.log
+mise exec -- pnpm docs:status    # TCP check on the docs port
+mise exec -- pnpm docs:logs      # follow the background dev log
+mise exec -- pnpm docs:stop      # stop whatever listens on the docs port
+mise exec -- pnpm docs:build     # index, sync and build the static pages
+mise exec -- pnpm docs:start     # serve the last build
+mise exec -- pnpm docs:clean     # remove .next, .generated, .source and public/data
+```
+
+`docs:index` runs `tools/docs/scripts/index-code.mjs`: every file and declaration becomes a node,
+modules are package roots plus `src/` children, and config files become `config:*` modules. It writes
+`tools/docs/public/data/` and is not committed. `docs:dev` and `docs:build` also run
+`tools/docs/scripts/sync-docs.mjs`, which mirrors `docs/` into `.generated/docs/` with the frontmatter
+and sidebar Fumadocs expects.
+
+Open `/explore` for the three-mode explorer. `/docs` remains the reference site. `docs:start` serves
+the last build; run `docs:build` first. `docs:stop` uses the docs port, so it also stops a server
+started by `pnpm docs:dev` in another terminal.
+
 ## The independent gate
 
 `git push vm main` queues the same `--fresh` gate on the `suite-dev` machine, in a memory-capped
