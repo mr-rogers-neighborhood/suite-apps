@@ -33,6 +33,12 @@ files:
 
 asar: true
 
+# Only Chromium's US English locale ships. Nothing in the tree has an i18n
+# framework or a translated string, so every other `locales/*.pak` was dead
+# weight; `en-US.pak` stays because it is Chromium's fallback.
+electronLanguages:
+  - en-US
+
 # The window's own icon travels beside the asar: a desktop entry reads the hicolor theme,
 # but a running window's taskbar icon is `_NET_WM_ICON`, which Chromium fills only when
 # `BrowserWindow` is handed an image.
