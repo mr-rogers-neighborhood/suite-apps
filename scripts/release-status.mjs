@@ -527,7 +527,18 @@ export function aggregateReleaseBody(entries, { date, tag = null, apkLive = fals
  * truth is rather than claiming an attachment that may not exist yet.
  */
 export function appReleaseBody(app, section, { tag = null, apkLive = false } = {}) {
-  const lines = [section.trim(), "", "## Install", ""];
+  // The rolling release is the page a person should read; this one is the note
+  // for a version. Say so first, so a direct link from the table does not look
+  // like a second, competing install page.
+  const lines = [
+    `Current versions and the install table are on [the latest Suite release](${latestReleaseUrl()}).`,
+    "This page is the release note for this app.",
+    "",
+    section.trim(),
+    "",
+    "## Install",
+    "",
+  ];
 
   if (app.kind === "apk") {
     const releaseLink = tag === null ? latestReleaseUrl() : releaseUrl(tag);
