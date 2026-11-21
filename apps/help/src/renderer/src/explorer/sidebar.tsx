@@ -290,6 +290,7 @@ function ModuleList({
     (module) => Boolean(module.summary?.trim()) || module.noteCount > 0,
   ).length;
   const gaps = modules.filter((module) => !module.summary?.trim() && module.noteCount === 0).length;
+  const reviewed = modules.filter((module) => module.reviewed).length;
   const groups = useMemo(() => {
     const groups = new Map<string, ModuleSummary[]>();
     for (const module of modules) {
@@ -314,7 +315,7 @@ function ModuleList({
     <div className="py-2 text-[13px]">
       <div className="mb-2 flex items-center justify-between gap-2 border-b border-fd-border px-3 pb-2">
         <span className="text-[10px] uppercase tracking-widest text-fd-muted-foreground">
-          {withProse}/{modules.length} with prose
+          {reviewed} reviewed · {withProse}/{modules.length} prose
         </span>
         <button
           type="button"
