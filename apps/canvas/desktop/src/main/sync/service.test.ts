@@ -212,8 +212,9 @@ describe("the service", () => {
       },
     });
 
-    // The frame is decrypted by whichever microtask finishes first; give it one.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // The frame is decrypted by whichever microtask finishes first; wait for the
+    // result rather than guessing how long that takes under a loaded gate.
+    await vi.waitFor(() => expect(updates).toHaveLength(1), { timeout: 5000 });
 
     expect(updates).toHaveLength(1);
     expect(new TextDecoder().decode(updates[0])).toBe(plaintext);
@@ -632,7 +633,17 @@ describe("inviting someone in", () => {
         receivedAt: "2026-11-06T12:00:00.000Z",
       },
     });
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await vi.waitFor(
+      () => {
+        const kinds = fake.sent.map(
+          (message) => (message.frame as { kind?: string } | undefined)?.kind,
+        );
+        expect(kinds).toContain("commit");
+        expect(kinds).toContain("welcome");
+        expect(fake.sent.some((message) => message.type === "role")).toBe(true);
+      },
+      { timeout: 5000 },
+    );
 
     const kinds = fake.sent.map(
       (message) => (message.frame as { kind?: string } | undefined)?.kind,
