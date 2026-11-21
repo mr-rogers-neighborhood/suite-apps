@@ -1,0 +1,35 @@
+---
+module: apps/go/src/modules
+title: Go Modules
+summary: "The reference domains: a real Loro note and an honest Canvas placeholder."
+---
+
+A domain module lives here with its own document logic; the container only sees
+the declaration it exports. `scratch` is the reference module and is disposable:
+a real Loro snapshot, a debounced save and enough lifecycle to prove the
+contract. `canvas` is a registered placeholder that states what is missing
+rather than pretending to be a viewer.
+
+Both modules show the same boundary from different sides. Scratch owns a
+document the container cannot read; Canvas proves the launcher can host a module
+with no surface. Neither name appears in `packages/go` or in the shell.
+
+## apps/go/src/modules/scratch/controller.ts#createScratchController
+
+The controller keeps the document and the debounce, and the view keeps the
+caret. `start` is memoized because StrictMode mounts twice and a capture can
+arrive before the first render; a capture waits for that load rather than
+refusing the thing the person just did. Saves are batched at 300 ms, and the
+title is the first line of the note, supplied by the module because the
+container cannot read a snapshot to invent one.
+
+`dispose` flushes before it marks itself disposed, so the last edit survives
+leaving, then clears the timer, the subscription and the listeners. `flush` is
+the same write without the teardown, for the foreground boundary.
+
+## apps/go/src/modules/canvas/index.tsx#canvasModule
+
+Canvas is registered so the shell can host a module with no working surface and
+so the gap is visible instead of implied. It declares `documents` and no capture
+kinds, and its view says what the tablet layout still needs. A read-only Canvas
+would look finished; this placeholder does not.

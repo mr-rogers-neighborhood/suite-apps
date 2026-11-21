@@ -1,0 +1,42 @@
+---
+module: apps/go/packages/go
+title: Go Contract
+summary: "The declaration, routing and pack manifest that keep the container domain-blind."
+---
+
+`@suite/go` is the module contract. It is pure types and pure functions: no
+I/O, no React at runtime and no dependency on any domain. It owns the
+declaration a module exports, the registry that validates and routes it, the
+host surface a mounted module receives, the frame protocol for an isolated pack,
+and the pack manifest with its verification. The shell supplies the mutable
+services; this package never touches them.
+
+Two invariants live here. `DocumentStore` returns bytes and metadata, never a
+parsed document. No export names Planner, Budget or Canvas. A change that needs
+a domain name belongs in that domain's module.
+
+## apps/go/packages/go/src/module.ts#SuiteGoModule
+
+The declaration is the whole routing table. `accepts` is declared so a share can
+be matched without mounting every module; `capabilities` is coarse so the
+container can reason about a module without learning what it is for. `register`
+runs only when a person opens the module, and its `install`, `flush` and
+`dispose` members are the lifecycle the shell is allowed to drive.
+
+The id rule is the same lower kebab-case rule a suite app id uses, so an id can
+carry over. Keeping the two patterns equal is deliberate: a stricter module rule
+would break that promise.
+
+## apps/go/packages/go/src/pack.ts#verifyPackSignature
+
+A signature proves the manifest came from the holder of the pinned key; it says
+nothing about the files until `verifyPackFiles` has compared them. This function
+covers the canonical manifest bytes and returns `false` for anything it cannot
+parse, so a damaged pack is a rejected pack rather than an exception during
+install.
+
+Verification uses `@noble/ed25519` rather than WebCrypto. A WebView on a second
+device answered `Unrecognized name` for Ed25519, and the old code turned that
+into "signature does not match" — blaming the pack for the host. The pure
+implementation has no such gap and is the same family the sync protocol already
+uses.

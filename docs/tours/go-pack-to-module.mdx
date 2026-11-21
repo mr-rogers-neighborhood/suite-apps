@@ -1,0 +1,118 @@
+---
+id: go-pack-to-module
+title: Pack to module
+summary: "A signed pack becomes a mounted domain without the container reading a document or naming one."
+order: 20
+---
+
+A pack arrives as bytes. The container has to decide whether those bytes may run,
+then give the result a frame and a small set of services. This tour follows that
+order: the manifest and the two verifications, the policy a pack must satisfy
+for itself, the install, and the declaration the shell routes on. The last stops
+cross into an isolated pack's frame, where the same host vocabulary is carried by
+messages instead of objects.
+
+## apps/go/packages/go/src/pack.ts#PackManifest
+
+The manifest is the only description a pack gets to make. It names the entry,
+the contract it expects, the hosting mode, the capabilities it asks for and a
+hash for every file. The signature is added over the core rather than inside it,
+so the signed bytes and the stored manifest are not the same object.
+
+## apps/go/packages/go/src/pack.ts#verifyPackSignature
+
+This is the first of two checks. It proves the manifest came from the holder of
+the pinned key, and it answers `false` for a malformed import rather than
+throwing into the installer.
+
+### overlay: Why not JSON.stringify
+
+Two encoders can write the same object with different key order, and a signature
+over "whatever the local stringify produced" verifies only on the machine that
+made it. The signed bytes are rebuilt field by field in one fixed order for that
+reason, by the same code on both sides.
+
+## apps/go/packages/go/src/pack.ts#verifyPackFiles
+
+The second check is the one that covers the payload. The size is compared before
+the hash because it is free; a missing, resized or tampered file refuses the pack
+whole rather than installing the parts that matched.
+
+## apps/go/packages/go/src/pack.ts#checkNetworkPolicy
+
+A capability a host cannot enforce is a word with no meaning. `network` is
+enforced through the pack's own document: a pack that does not declare it must
+ship a Content-Security-Policy that closes egress, and the install refuses it
+otherwise. The browser enforces the policy; the host enforces that it exists.
+
+## apps/go/src/host/packs.ts#createPackStore
+
+The install order in this file is the security property: key present, archive
+parsed, signature, files, policy, host fit, then writes. The version directory is
+part of the design, because an upgrade can fall back to the version that last
+worked and an uninstall can remove all of them.
+
+## apps/go/src/host/packs.ts#PACK_PUBLIC_KEY
+
+The key is compiled into the build and never fetched. That single choice is what
+makes a pack feed worth trusting: a host that could be handed a new key could be
+handed a new app.
+
+## interlude: From bytes to a module
+
+A verified pack is still only an id, a name and an entry URL as far as the
+container is concerned. The next stops are the declaration that turns it into a
+route and the registry that decides which declaration wins.
+
+## apps/go/packages/go/src/module.ts#SuiteGoModule
+
+The declaration is what the container is allowed to know before any domain code
+runs. `accepts` is stated rather than discovered so a share can be routed without
+mounting every module; `capabilities` is coarse for the same reason. Nothing here
+names a product.
+
+## apps/go/packages/go/src/registry.ts#createModuleRegistry
+
+Registration is where a broken declaration is refused: an illegal or duplicate
+id, capture without accepted kinds, accepted kinds without capture. Capture
+routing has three honest answers, and the ambiguous one belongs to the person
+rather than to whichever module registered first.
+
+## interlude: Same host, two realms
+
+A module can render in the shell's document or in an isolated pack's own frame.
+The vocabulary is deliberately the same in both; the transport is not. What
+changes is where the capability check happens.
+
+## apps/go/packages/go/src/host.ts#ModuleHost
+
+Every service a module gets is declared here, and the document store is the one
+that carries bytes without a parser. Storage arrives already namespaced, and
+navigation can name the module and close it, not build a second stack.
+
+## apps/go/src/shell/frameBridge.ts#serveFrame
+
+The shell's half of the frame protocol is one listener and one switch. The
+capability is checked per request because the request is where data would move;
+the two methods that need no capability are the ones a pack needs just to
+render.
+
+## apps/go/src/shell/IsolatedModule.tsx#IsolatedModule
+
+The frame is same-origin. Its value is a separate document, realm and heap, not
+a process boundary; the contract and the message surface are what keep a domain
+out of the shell.
+
+### overlay: An iframe is not a process
+
+The frame's heap is separate, so a runaway allocation throws in the frame rather
+than starving the shell. The renderer process is shared, so total memory can
+still take both down. Document isolation covers the failure that has been
+measured, not every failure.
+
+## apps/go/packages/go/src/frameControl.ts#requestFrameFlush
+
+The pack owns its document, so the shell cannot save it. At a boundary it can
+only ask, wait for the handlers to settle, and then remove the frame. Negative
+control ids are what keep that reply from being mistaken for a reply to the
+pack's own request.

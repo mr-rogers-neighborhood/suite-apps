@@ -1,0 +1,28 @@
+---
+module: packages/desktop
+title: Desktop Policy
+summary: "The shared Electron policy: CSP, custom protocol, sender trust and signed feeds."
+---
+
+`@suite/desktop` is the shared Electron policy package, not an app and not a UI.
+Canvas's shell is `@suite/canvas-desktop`; every desktop main process that needs
+the same rules imports this one. It owns the renderer policy (`desktopCsp`), the
+custom protocol resolver that replaces `file://` (`resolveProtocolAsset`),
+sender validation for IPC (`isTrustedSender`) and the signed-feed reader and
+update-key verifier.
+
+The package is deliberately small. A rule that only one app needs stays in that
+app; a rule about what a renderer may load, what origin may send IPC, or what a
+feed must prove belongs here so two shells cannot drift.
+
+## packages/desktop/src/updateSignature.ts#verifyUpdateManifest
+
+The signature is over the manifest exactly as served, byte for byte. Normalising
+the text first would verify a document nobody was given, and a manifest is small
+enough that a rewrite is the attack this prevents. A malformed key or signature
+returns `false` rather than throwing.
+
+The public key is pinned in this file because a public key is public; the
+private half lives on the publisher's machine. Rotation is not a local edit: an
+installed build verifies with the key it was built with, so a new Start has to
+reach the machine before a feed signed with the new key is published.

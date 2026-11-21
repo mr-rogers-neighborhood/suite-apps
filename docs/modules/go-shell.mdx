@@ -1,0 +1,52 @@
+---
+module: apps/go/src/shell
+title: Go Shell
+summary: "The container: routes, mounts, frames and the one teardown path."
+---
+
+The shell is the container. `App.tsx` builds the registry from the built-in
+modules and every installed pack, holds the route, and owns the lifecycle: open,
+flush, leave, background. `Home.tsx` is the launcher; `MountedModule` and
+`IsolatedModule` are the two ways a module renders; `frameBridge.ts` serves an
+isolated pack's requests. `ModuleHeader` and `QuickCaptureSheet` are chrome, not
+contracts.
+
+There is no branch on a domain id in this module. A pack becomes a module
+through `packAsModule`, which uses only its id, name and entry URL. A change
+that needs a domain name belongs in that domain's pack.
+
+## apps/go/src/shell/mount.ts#mountModule
+
+Mounting has three failure stages and one cleanup. `register` can throw before a
+view exists; `install` can throw after the registration exists, in which case
+the registration is disposed rather than left holding a document behind an
+invisible view; and cleanup can run twice because React StrictMode mounts,
+unmounts and remounts in development. The returned cleanup is idempotent and
+runs the install cleanup before `dispose`, so leaving by any route settles to
+one teardown.
+
+## apps/go/src/shell/frameBridge.ts#serveFrame
+
+One listener, one switch, one reply per envelope. The capability for a request
+is checked when the request arrives, not when the pack was installed, because
+the request is where data would move. `ready` and `theme` need no capability: a
+pack that cannot ask what it is or how it looks cannot render, and neither
+answer reveals anything.
+
+A method this shell does not know answers an honest failure instead of
+`undefined`. The switch is exhaustive over `FrameRequest`, so a new request
+method is a compile error here rather than a domain failure on a device.
+
+## apps/go/src/shell/IsolatedModule.tsx#IsolatedModule
+
+An isolated pack gets its own document, its own JavaScript realm and its own
+heap. That is what keeps a pack's Tailwind preflight out of the launcher, keeps
+two React instances from meeting, and lets a runaway allocation exhaust the
+frame's isolate instead of the shell's. It is not a separate process and not a
+security boundary: the frame is same-origin, and the narrow message surface is
+what limits a pack.
+
+There is no `sandbox` attribute on the iframe. A sandbox without
+`allow-same-origin` cannot fetch the pack's own WebAssembly through Capacitor's
+file proxy, and one with it is not a boundary. The contract and the per-request
+capability check carry that job.

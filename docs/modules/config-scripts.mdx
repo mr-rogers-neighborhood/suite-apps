@@ -1,0 +1,39 @@
+---
+module: config:scripts
+title: Release Scripts
+summary: "The repository-level scripts that prove the gate and publish one app."
+---
+
+The repository-level scripts are not a shipped package. `gate.mjs` builds the
+shared libraries and runs each app's gate in dependency order; `release.mjs` is
+the only publishing path; `keys.mjs` reports whether a private key matches its
+pin; `lib/channel.mjs` and `lib/keys.mjs` hold the identities and key rules both
+release paths use; `flatpak.mjs` and `flatpak-remote.mjs` publish the store.
+
+A root script has to name its own packages: bare `pnpm -r` would recurse through
+every app. The scripts are plain Node with no build step, so the release path is
+inspectable without building the thing it releases.
+
+## scripts/release.mjs#publisherKeyProblem
+
+The check runs before the build, not after it. An installed app verifies a feed
+with the update key compiled into that build, so a manifest signed by any other
+key downloads nothing and reports no release; discovering that after upload and
+a feed commit is too late. The function derives the public half from the private
+key and compares it with the pin the apps trust.
+
+The pin is read from `packages/desktop/src/updateSignature.ts`, the same source
+the verifier uses. A mismatch prints both fingerprints and names the two ways
+out: pin the key in hand, or use the one the tree already trusts.
+
+## scripts/lib/channel.mjs#suiteAppId
+
+Stable and pre-release are two identities, and this function names the manifest
+one. Stable keeps `<app>`; a pre-release is `slop-<app>` with a hyphen. The
+Flatpak id is a different field and keeps its dots (`run.suite.slop.<app>`); the
+tier is the branch, so moving from slop to canary replaces the pre-release
+rather than adding a third install.
+
+The older dotted `slop.<app>` form is still read for an installed build and is
+never written. Keeping that distinction here is what lets the shell, the Flatpak
+manifest and the release script agree about which install a card describes.

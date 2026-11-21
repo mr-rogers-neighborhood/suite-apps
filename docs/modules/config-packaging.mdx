@@ -1,0 +1,31 @@
+---
+module: config:packaging
+title: Packaging Manifests
+summary: "The Flatpak manifests that package the same unpacked builds with their own sandbox grants."
+---
+
+These are build recipes, not a package. Each Flatpak manifest packages the
+unpacked tree `package:dir` produced, through `org.electronjs.Electron2.BaseApp`
+and zypak, so the Flatpak carries the same bytes as the AppImage and the sandbox
+gets Electron's sandbox without a setuid `chrome-sandbox`. The manifests live
+beside the wrapper, desktop entry, AppStream record and icons.
+
+The grants are the product boundary in another form. An app reaches one
+documents folder and, where it syncs, the network; the hub reaches the host's
+Flatpak service because it is the package manager. `scripts/flatpak.mjs` signs
+the repository summary with the store key and adds the remote with the public
+half.
+
+## file: packaging/flatpak/run.suite.start.yml
+
+The hub's manifest is the wide one because the hub installs, updates and removes
+other apps. `--talk-name=org.freedesktop.Flatpak` is the grant behind
+`flatpak-spawn --host`, which is effectively host command execution; it is the
+trade that lets a sandboxed package manager use the host's own Flatpak.
+Documents are mounted read-only: Start routes a file to its owner, it never
+writes one.
+
+The writable paths are the surface Start actually owns: `~/Applications/Suite`,
+the desktop entries and icons it installs, and its own records under
+`xdg-data/suite` and `xdg-config/suite`. An app's manifest grants one documents
+folder instead, which is the same split the package backends enforce.

@@ -1,0 +1,53 @@
+---
+module: apps/go/src/host
+title: Go Host
+summary: "The container's services: opaque documents, namespaced storage and verified packs."
+---
+
+This module implements the services `ModuleHost` promises. `documents.ts` is
+opaque storage in IndexedDB; `packs.ts` is the signed pack store; `storage.ts`
+namespaces small values per module; `recents.ts`, `pins.ts` and `theme.ts` hold
+the shell's own state. `files.ts` and `notifications.ts` are the two places that
+reach a platform API.
+
+The split is the point. A domain asks for a service through the contract; the
+implementation here decides how a phone supplies it. The document store never
+imports a domain, and the pack store never imports a pack to ask what it is.
+
+## apps/go/src/host/documents.ts#createDocumentStore
+
+The store keeps an id, a module id, a file name, a title, a timestamp and bytes.
+It has no member that returns anything else, which is the first rule in code.
+`create` writes an empty payload so a module can distinguish "no document yet"
+from a snapshot; `open` returns a copy so a module mutating its buffer cannot
+rewrite what is stored.
+
+IndexedDB stands in for the file a desktop app owns. When export and Android's
+document picker arrive, this file changes and `DocumentStore` stays the seam.
+The title is whatever the module saved; the store never derives one from bytes.
+
+## apps/go/src/host/packs.ts#createPackStore
+
+Install is an order, not a set of checks. It refuses a build with no pinned key,
+parses the archive, verifies the signature, verifies every file, applies the
+network policy, checks the host fit, and only then writes `manifest.json` and
+the payload into `packs/<id>/<version>/`. Writing the manifest is what makes the
+pack survive a restart; discovery reads it rather than trusting session memory.
+
+`discover` repeats the signature and network checks on what is on disk, because
+a rule that only applied to new arrivals would leave an older install offered
+forever. A version directory that no longer verifies is skipped, so an upgrade
+can fall back to the one that worked. `uninstall` removes every version so the
+space actually returns.
+
+## apps/go/src/host/packs.ts#PACK_PUBLIC_KEY
+
+This constant is the trust boundary. It is compiled into the build and never
+fetched: a feed that could hand over a new key would have handed over the app. An
+empty value refuses every pack, which is the right default for a build that has
+no key.
+
+Rotation is one change in the tree — generate a key, put its public half here,
+rebuild and re-sign every pack — and the private half stays outside the
+repository. `pnpm keys status` compares the key on the machine with this pin
+before a pack is built.
