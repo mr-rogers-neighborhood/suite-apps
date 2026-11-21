@@ -10,12 +10,12 @@ set; it states what may cross the capability and what may not.
 
 ## What stays, and what moves
 
-| Stays with the app or pack            | Moves through the host                                     |
-| ------------------------------------- | ---------------------------------------------------------- |
-| Document bytes, schema and snapshots  | The relay WebSocket and its address                        |
-| The group key, epochs and ratchets    | Sealed frames, in order, with the host's numbering         |
-| Sealing and opening a payload         | Device ids, names, roles, invitations and removals (signed metadata) |
-| The decision to invite or revoke      | Connection state, frame counts and refusals                |
+| Stays with the app or pack           | Moves through the host                                               |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| Document bytes, schema and snapshots | The relay WebSocket and its address                                  |
+| The group key, epochs and ratchets   | Sealed frames, in order, with the host's numbering                   |
+| Sealing and opening a payload        | Device ids, names, roles, invitations and removals (signed metadata) |
+| The decision to invite or revoke     | Connection state, frame counts and refusals                          |
 
 The host is not a member of the group. It orders and stores handshake and application frames, and
 it cannot open one, merge two, or answer a question about a document. The metadata it reads is the
@@ -26,17 +26,17 @@ frame kinds, sizes, timing, roles and invitations.
 
 The contract is `SuiteSyncCapability` in `@suite/contracts`.
 
-| Call                                | What it does                                                        | What crosses                     |
-| ----------------------------------- | ------------------------------------------------------------------- | -------------------------------- |
-| `status()`                          | Report what sync is doing now, without opening a socket             | State and, when relevant, a reason |
-| `enable(workspaceId, relayUrl)`     | Start syncing that workspace through that relay, or reconnect       | A workspace id and a `ws://` URL |
-| `disable()`                         | Stop this copy. The document, group and membership stay             | Nothing                          |
-| `invite(role)`                      | Write one single-use invitation and return its link                 | The promised role and the link   |
-| `join(link)`                        | Ask to join from a link somebody shared                             | The link                         |
-| `members()`                         | The roster the readable metadata last named                         | Device ids, names and roles      |
-| `send(frame)`                       | Hand one sealed frame to the host                                   | Opaque bytes                     |
-| `onFrame(listener)`                 | Take one sealed frame the host delivered                            | Opaque bytes                     |
-| `onMembership(listener)`            | Act on a roster change                                             | The new roster, nothing else     |
+| Call                            | What it does                                                  | What crosses                       |
+| ------------------------------- | ------------------------------------------------------------- | ---------------------------------- |
+| `status()`                      | Report what sync is doing now, without opening a socket       | State and, when relevant, a reason |
+| `enable(workspaceId, relayUrl)` | Start syncing that workspace through that relay, or reconnect | A workspace id and a `ws://` URL   |
+| `disable()`                     | Stop this copy. The document, group and membership stay       | Nothing                            |
+| `invite(role)`                  | Write one single-use invitation and return its link           | The promised role and the link     |
+| `join(link)`                    | Ask to join from a link somebody shared                       | The link                           |
+| `members()`                     | The roster the readable metadata last named                   | Device ids, names and roles        |
+| `send(frame)`                   | Hand one sealed frame to the host                             | Opaque bytes                       |
+| `onFrame(listener)`             | Take one sealed frame the host delivered                      | Opaque bytes                       |
+| `onMembership(listener)`        | Act on a roster change                                        | The new roster, nothing else       |
 
 `enable` takes the workspace id explicitly. A host serving a pack cannot read the pack's document,
 so it cannot derive the id from an open file; the app supplies the sync identity the document
@@ -46,15 +46,15 @@ already owns. The id is a fingerprint, never a key.
 
 A UI can act on every value without knowing the protocol's words.
 
-| State        | Meaning                                                          | What a person may do                 |
-| ------------ | ---------------------------------------------------------------- | ------------------------------------ |
-| `off`        | This copy is not syncing                                         | Enable it                            |
-| `connecting` | A connection is being made                                       | Wait                                 |
-| `syncing`    | Frames are moving; `count` is the host's frame count at join     | Invite, copy a link, leave           |
-| `asleep`     | The host is not answering, and a retry is reasonable             | Wait, retry, or check the host       |
-| `refused`    | The host or an invitation said no                                | Read the reason, correct it          |
-| `waiting`    | An invitation was spent and the welcome has not arrived          | Wait, or ask the owner               |
-| `removed`    | An owner took this device out of the workspace                   | Nothing automatic; a fresh invitation is needed |
+| State        | Meaning                                                      | What a person may do                            |
+| ------------ | ------------------------------------------------------------ | ----------------------------------------------- |
+| `off`        | This copy is not syncing                                     | Enable it                                       |
+| `connecting` | A connection is being made                                   | Wait                                            |
+| `syncing`    | Frames are moving; `count` is the host's frame count at join | Invite, copy a link, leave                      |
+| `asleep`     | The host is not answering, and a retry is reasonable         | Wait, retry, or check the host                  |
+| `refused`    | The host or an invitation said no                            | Read the reason, correct it                     |
+| `waiting`    | An invitation was spent and the welcome has not arrived      | Wait, or ask the owner                          |
+| `removed`    | An owner took this device out of the workspace               | Nothing automatic; a fresh invitation is needed |
 
 `removed` is not `asleep`: offering a retry for a decision somebody made would promise something
 that can never work. `syncing.count` is about the host's log, not a document version, so it is
@@ -111,9 +111,9 @@ to protect.
 Both desktop apps expose their existing sync through this contract, in the main process, without
 moving a key or a socket and without changing what the window sees:
 
-| App     | Adapter                                          |
-| ------- | ------------------------------------------------ |
-| Planner | `apps/planner/src/main/sync/capability.ts`       |
+| App     | Adapter                                           |
+| ------- | ------------------------------------------------- |
+| Planner | `apps/planner/src/main/sync/capability.ts`        |
 | Canvas  | `apps/canvas/desktop/src/main/sync/capability.ts` |
 
 The adapter is the seam, not a rewrite. The menu bar, the dialog, the file and the renderer behave
