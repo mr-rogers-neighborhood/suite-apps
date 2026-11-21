@@ -14,11 +14,12 @@ No changes yet.
 
 ### Added
 
-- **Plan the whole week on one page.** A seventh surface beside Today shows seven day columns that
-  start on the day your week starts, each with its scheduled tasks and a capacity meter that respects
-  the day's own override. Drag a task to another day, or focus it and press Alt+← / Alt+→; unfinished
-  work from before today waits in a labelled carry-over area until you move it, and no task is
-  rescheduled silently.
+- **Plan the whole week on one page.** A new surface beside Today shows seven day columns starting on
+  the first day of your week, each with its scheduled tasks and a capacity meter that respects the
+  day's own override. Drag a task to another day, or focus it and press Alt+← / Alt+→, with the row
+  menu offering the same moves in words. Unfinished non-recurring work from before today waits in a
+  labelled carry-over area until you move it, and nothing is rescheduled silently; a repeating task's
+  occurrence stays on its series anchor.
 
 ## [0.4.0] - 2026-11-21
 

@@ -26,6 +26,10 @@ The rules that shape Planner.
   the legacy `LoroText` at the same key, rather than a replacement for it: an older build keeps
   reading the text it wrote, and the editor prefers the map once it exists. The fallback is what makes
   the upgrade one-way instead of rewriting every note or breaking an older build.
+- Carry-over is a report, not a reschedule. `weekPlan` lists the unfinished, non-recurring tasks from
+  before today; nothing moves until a person presses **Move to today** or drags one.
+- A recurring task's day is its series anchor. `scheduledFor` anchors the series, so a projected
+  occurrence has no independent day to drag; the week view leaves it in place.
 - Sync is a relay a person runs, not a Suite service. A workspace is carried by sealed MLS frames
   over `@suite/sync`; the relay stores ciphertext and signed metadata and never reads a document.
   The main process holds the keys, the socket and the certificate pin, the renderer holds none of

@@ -1,8 +1,8 @@
 # Suite Planner
 
-**A local-first daily planner.** A day view that puts your task list beside a calendar, time
-estimates against daily capacity, quick capture, rituals and a focus timer — in one Electron app
-that opens without a network and keeps your plan in a file you own.
+**A local-first daily planner.** A day view that puts your task list beside a calendar, a week view
+across seven days, time estimates against daily capacity, quick capture, rituals and a focus timer —
+in one Electron app that opens without a network and keeps your plan in a file you own.
 
 There is no account, no server and no telemetry. Export a `.planner` file whenever you want a copy;
 the app keeps an autosaved workspace and one rolling backup on this machine.
@@ -50,6 +50,10 @@ The apps, the hub and the sync server share one repository and one gate. Start w
 
 - **A day is the unit.** Today opens to an ordered task list with a capacity meter and a local
   calendar beside it.
+- **The week at a glance.** Seven day columns share the same tasks and per-day capacity; move work by
+  dragging it or with `Alt` + `←` / `Alt` + `→`, and carry-over waits until you choose it. See
+  [Week](docs/reference/week.md).
+- **Every surface in the rail.** Today, Week, Inbox, Upcoming, Projects, Tags, Focus and Rituals.
 - **Estimates, not guesswork.** Every task carries an estimate; the meter says whether the day fits.
 - **Capture in one line.** `Draft the plan tomorrow ~45m #Planner @deep-work !1 9:30` becomes a
   scheduled task with a project, tag, estimate, priority and due time.

@@ -60,3 +60,19 @@ The shell holds no document state and makes no projection. A new surface is an
 entry in the registry and its component, not an edit here. The native menu is
 auto-hidden on Linux and Windows, so this in-app bar stays the visible menu
 rather than drawing a second copy beside it.
+
+## apps/planner/src/renderer/src/week/WeekView.tsx#WeekView
+
+The week surface renders `weekPlan` as seven columns. Each column is a labelled
+region with its own capacity meter and task list; the header marks today and the
+buttons move the selected date by seven days or return to this week. A drop
+writes the column's date through `scheduleTask`, and the title button offers the
+same move with Alt+Left and Alt+Right; the row menu repeats it in words and opens
+the day.
+
+Carry-over is a panel above the columns, not a column: it lists the overdue tasks
+with a **Move to today** button and writes only when that button is pressed. A
+recurring row is marked `movable={false}` because `scheduledFor` is the series
+anchor, so it has no drag, no arrow shortcut and no move item in its menu.
+`WeekView.test.tsx` covers the seven meters, a drag, the keyboard move and a
+carry-over that stays put until the button is used.

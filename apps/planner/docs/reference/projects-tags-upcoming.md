@@ -30,10 +30,10 @@ names the capture syntax that would put one there.
 
 ## Upcoming
 
-Upcoming is a list, not a week grid. It selects tasks that are not done and whose `scheduledFor` is
-after `todayKey()`, sorts the days with `compareDateKeys`, and labels each group with
-`humanDayLabel`. Selecting a task sets the day and opens Today through the same UI store the rail
-uses, so the view never invents its own navigation.
+Upcoming is a list, not a grid. It selects tasks that are not done and whose `scheduledFor` is after
+`todayKey()`, sorts the days with `compareDateKeys`, and labels each group with `humanDayLabel`.
+Selecting a task sets the day and opens Today through the same UI store the rail uses, so the view
+never invents its own navigation. The seven-day grid is a separate surface; [Week](week.md) owns it.
 
 An empty list names the two ways to fill it: give an inbox task a future day, or capture one with a
 date such as `tomorrow`.
@@ -41,5 +41,5 @@ date such as `tomorrow`.
 ## Registration
 
 All three are entries in `src/renderer/src/app/views.ts`. The rail renders the registry in order and
-the shell resolves the component, so neither file branches on a view id. Focus and Rituals are
-entries too; [Focus](focus.md) and [Rituals](rituals.md) own their pages.
+the shell resolves the component, so neither file branches on a view id. Week, Focus and Rituals are
+entries too; [Week](week.md), [Focus](focus.md) and [Rituals](rituals.md) own their pages.

@@ -72,8 +72,9 @@ gets `remindedAt` as a leaf write, which is what stops it repeating.
 entry. The rail renders the registry in order and the shell renders the resolved component, so a new
 surface is an entry and its component, not an edit to `Shell.tsx`, `Sidebar.tsx` and the store. The
 rail's "Soon" list stays for surfaces that do not exist yet. An id this build does not register — a
-store written by a different build — opens `today` rather than an empty pane. The Projects, Tags and
-Upcoming surfaces are described in [projects-tags-upcoming.md](projects-tags-upcoming.md).
+store written by a different build — opens `today` rather than an empty pane. The Week, Projects, Tags
+and Upcoming surfaces have their own pages: [Week](week.md),
+[projects-tags-upcoming.md](projects-tags-upcoming.md).
 
 ## Window chrome
 
@@ -103,17 +104,17 @@ reconnected is handed.
 
 ## Repo map
 
-| Path                          | Responsibility                                                        |
-| ----------------------------- | --------------------------------------------------------------------- |
-| `src/main`                    | Authority, file store, IPC, tray, scheduler, menu, window, sync       |
-| `src/preload`                 | Typed `PlannerBridge` over `contextBridge`                            |
-| `src/renderer`                | React shell, day view, inbox, capture, calendar, theme, sync dialog   |
-| `packages/core/src/schema.ts` | Zod records and `z.infer` types                                       |
-| `packages/core/src/loro`      | `WorkspaceDocument` and its domain modules                            |
-| `packages/core/src/plan`      | Pure projections: day plan, capacity, recurrence, inbox, search, sort |
-| `packages/core/src/capture`   | Pure one-line capture parser                                          |
-| `packages/core/src/file`      | `.planner` envelope, encode/decode, errors                            |
-| `scripts/check-shape.mjs`     | Mechanical rules: file length, observe sites, Loro confinement        |
+| Path                          | Responsibility                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| `src/main`                    | Authority, file store, IPC, tray, scheduler, menu, window, sync                 |
+| `src/preload`                 | Typed `PlannerBridge` over `contextBridge`                                      |
+| `src/renderer`                | React shell, day and week views, inbox, capture, calendar, theme, sync dialog   |
+| `packages/core/src/schema.ts` | Zod records and `z.infer` types                                                 |
+| `packages/core/src/loro`      | `WorkspaceDocument` and its domain modules                                      |
+| `packages/core/src/plan`      | Pure projections: day and week plans, capacity, recurrence, inbox, search, sort |
+| `packages/core/src/capture`   | Pure one-line capture parser                                                    |
+| `packages/core/src/file`      | `.planner` envelope, encode/decode, errors                                      |
+| `scripts/check-shape.mjs`     | Mechanical rules: file length, observe sites, Loro confinement                  |
 
 ## Layers
 
@@ -158,7 +159,6 @@ never imports React or Electron.
 
 - **Time blocking.** The model has estimates and a day calendar; placing a task on the grid needs a
   start time and a duration, and a conflict rule. It waits for a real request.
-- **Week view.** Upcoming is a list first. A week grid is a projection over the same tasks.
 - **External calendars.** Google/Outlook need OAuth and a server. `.ics` import/export fits the
   local model and can come first.
 - **Integrations.** A `source` field and an adapter seam exist; no adapter ships. Nothing in the

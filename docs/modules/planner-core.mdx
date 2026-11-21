@@ -89,3 +89,19 @@ sentence they can act on. The refusals are ordered and distinct, and none of
 them falls back to an empty workspace. `workspaceFile.test.ts` pins the reload
 contract and the refusals; `migration.test.ts` opens fixtures written by older
 builds.
+
+## apps/planner/packages/core/src/plan/weekPlan.ts#weekPlan
+
+A week is seven day plans sharing one start. `weekPlan` resolves the start with
+`startOfWeekKey(selected, settings.weekStartsOn)`, then walks seven dates and
+calls `dayPlan` for each, so recurring occurrences and the day's task rules are
+the same ones Today uses. Each day's capacity is its `capacityMinutesOverride` or
+the settings default, and `capacityFor` turns that into planned and remaining
+minutes.
+
+The one new rule is carry-over: it is `dayPlan(tasks, today).overdue`, the
+unfinished non-recurring tasks from before today, reported in their original
+order. The function returns them; it does not reschedule anything. The week total
+is seven days of capacity against the tasks they hold, but no total is stored.
+`weekPlan.test.ts` pins the start day for a Monday and a Sunday, a per-day
+override, and carry-over that leaves the tasks where they were.

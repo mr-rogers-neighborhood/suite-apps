@@ -23,7 +23,7 @@ Read [docs/reference/conventions.md](docs/reference/conventions.md) before writi
 | ----------------------------- | ------------------------------------------------------------------------- |
 | `src/main`                    | Document authority, atomic file store, IPC, tray, reminder scheduler      |
 | `src/preload`                 | The allowlisted `contextBridge` surface                                   |
-| `src/renderer/src`            | React app: shell, day view, inbox, capture, calendar                      |
+| `src/renderer/src`            | React app: shell, day and week views, inbox, capture, calendar            |
 | `packages/core`               | Schema, document layer, pure projections, capture parser, `.planner` file |
 | `docs/reference`              | Architecture, conventions, data model                                     |
 | `docs/reference/decisions.md` | The rules that shape Planner                                              |
@@ -77,8 +77,9 @@ All verification gates are local. Every gate claim names a local command.
 
 ## Code shape
 
-Pure core, imperative shell. Schema, projections (`dayPlan`, `capacityFor`, `occurrencesBetween`),
-sorting and the capture parser take data and return data: no DOM, no Loro, no `fetch`, no timers.
+Pure core, imperative shell. Schema, projections (`dayPlan`, `weekPlan`, `capacityFor`,
+`occurrencesBetween`), sorting and the capture parser take data and return data: no DOM, no Loro, no
+`fetch`, no timers.
 `WorkspaceDocument`, the file store, the scheduler, IPC handlers and React hosts own state and I/O.
 Dependencies point inward.
 
