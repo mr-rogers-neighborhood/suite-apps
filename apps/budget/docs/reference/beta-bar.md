@@ -94,7 +94,9 @@ do not replace it.
   line break read correctly ([import.test.ts](../../packages/core/src/import/import.test.ts)).
 - [x] The limits are stated rather than hidden: CSV carries transactions only and does not re-import
   cleared state or flag, a split is flattened to its child rows, and a QIF flattens a line break
-  in a name or memo to a space. The `.budget` and records formats are the lossless ones
+  in a name or memo to a space. A transfer that crosses the budget boundary needs a category, and
+  one QIF line cannot carry both that category and an `[Account]` target, so the import reports that
+  row. The `.budget` and records formats are the lossless ones
   ([data-model.md](data-model.md#file-formats)).
 
 ## 6. The interface is accessible, and the record says how far
