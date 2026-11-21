@@ -41,13 +41,13 @@ command reports and never fails on a gap; re-run it rather than trusting a stale
 | Measure | Baseline |
 | --- | --- |
 | Modules reviewed by a person | 0/118 |
-| Modules with generated prose | 36/118 |
-| Files with a note | 103/1822 (6%) |
-| Symbols with a note | 122/9916 (1%) |
+| Modules with generated prose | 46/118 |
+| Files with a note | 131/1838 (7%) |
+| Symbols with a note | 195/10094 (2%) |
 | Written tours reviewed by a person | 0/13 |
 | Generated tour steps with a note | 147/147 |
 
 The largest modules with no prose are `apps/canvas/packages/import-obsidian` (143 symbols), the Canvas
-graph publish package (125), `apps/help/src/renderer` (120), `apps/canvas/src/library` (114) and
-`apps/help` (113). The help and Canvas rows are the densest, but they are app-owned prose: this pass
-records them and does not write app module notes.
+graph publish package (125), `apps/help` (121), `apps/help/src/renderer` (120) and
+`apps/canvas/src/library` (114). The help and Canvas rows are the densest, but they are app-owned
+prose: this pass records them and does not write app module notes.
