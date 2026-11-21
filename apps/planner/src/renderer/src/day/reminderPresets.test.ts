@@ -61,12 +61,41 @@ describe("reminder presets", () => {
     expect(at.getDate()).toBe(21);
   });
 
+  it("should find the first of next month at 19:00 once the last evening has passed", () => {
+    const at = eveningReminder(new Date(2026, 0, 31, 21, 0, 0));
+
+    expect(at.getMonth()).toBe(1);
+    expect(at.getDate()).toBe(1);
+    expect(at.getHours()).toBe(19);
+  });
+
   it("should put tomorrow morning at 09:00 on the next day", () => {
     const at = tomorrowMorning(NOW);
 
     expect(at.getDate()).toBe(21);
     expect(at.getHours()).toBe(9);
     expect(at.getMinutes()).toBe(0);
+  });
+
+  it("should find the next month and the leap day at 09:00", () => {
+    const nextMonth = tomorrowMorning(new Date(2026, 0, 31, 18, 0, 0));
+    expect(nextMonth.getMonth()).toBe(1);
+    expect(nextMonth.getDate()).toBe(1);
+    expect(nextMonth.getHours()).toBe(9);
+
+    const leapDay = tomorrowMorning(new Date(2028, 1, 28, 18, 0, 0));
+    expect(leapDay.getMonth()).toBe(1);
+    expect(leapDay.getDate()).toBe(29);
+    expect(leapDay.getHours()).toBe(9);
+  });
+
+  it("should only call the following leap day tomorrow", () => {
+    const leapMorning = new Date(2028, 1, 29, 9, 0, 0);
+    const time = leapMorning.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+    expect(reminderLabel(leapMorning.toISOString(), new Date(2028, 1, 28, 18, 0, 0))).toBe(
+      `tomorrow ${time}`,
+    );
   });
 });
 

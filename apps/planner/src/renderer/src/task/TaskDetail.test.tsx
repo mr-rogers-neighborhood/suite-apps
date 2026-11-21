@@ -1,5 +1,5 @@
 import { type DayTask, WorkspaceDocument } from "@suite/planner-core";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -332,5 +332,120 @@ describe("TaskDetail", () => {
 
     expect(await screen.findByRole("dialog", { name: "Task details" })).toBeInTheDocument();
     expect(useUiStore.getState().selectedTaskId).toBe(task.id);
+  });
+
+  it("should keep focus inside the dialog when the actions menu opened it", async () => {
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    render(
+      <WorkspaceContext.Provider value={replica}>
+        <TaskRow entry={dayEntry(doc, task.id)} tags={[]} />
+        <TaskDetail />
+      </WorkspaceContext.Provider>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Actions for A task" });
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(await screen.findByText("Open details"));
+
+    const dialog = await screen.findByRole("dialog", { name: "Task details" });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("button", { name: "Open details for A task" })).toHaveFocus();
+  });
+
+  it("should name its dialog, heading and close control the same way", async () => {
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    open(task.id);
+    renderDetail(replica);
+
+    const dialog = await screen.findByRole("dialog", { name: "Task details" });
+    expect(within(dialog).getByRole("heading", { name: "Task details" })).toBeInTheDocument();
+
+    const close = screen.getByRole("button", { name: "Close task details" });
+    expect(close).toHaveAttribute("title", "Close task details");
+    expect(close).toHaveAccessibleName("Close task details");
+  });
+
+  it("should keep every note toolbar name and title together", async () => {
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    open(task.id);
+    renderDetail(replica);
+
+    const toolbar = await screen.findByRole("toolbar", { name: "Note formatting" });
+    for (const button of within(toolbar).getAllByRole("button")) {
+      const label = button.getAttribute("aria-label");
+      expect(label).not.toBeNull();
+      expect(button).toHaveAttribute("title", label ?? "");
+    }
+
+    const paragraph = within(toolbar).getByRole("button", { name: "Text" });
+    expect(paragraph).toHaveTextContent("Text");
+    expect(paragraph).toHaveAttribute("title", "Text");
+  });
+
+  it("should move focus into the dialog in visual order and keep Tab inside it", async () => {
+    const user = userEvent.setup();
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    render(
+      <WorkspaceContext.Provider value={replica}>
+        <TaskRow entry={dayEntry(doc, task.id)} tags={[]} />
+        <TaskDetail />
+      </WorkspaceContext.Provider>,
+    );
+
+    const opener = screen.getByRole("button", { name: "Open details for A task" });
+    opener.focus();
+    await user.click(opener);
+
+    const dialog = await screen.findByRole("dialog", { name: "Task details" });
+    const close = screen.getByRole("button", { name: "Close task details" });
+
+    expect(close).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByLabelText("Title")).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Bold" })).toHaveFocus();
+
+    // Walk the whole dialog: the trap must never let focus reach the page behind it.
+    for (let step = 0; step < 40; step += 1) {
+      await user.tab();
+      expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    }
+
+    await user.tab({ shift: true });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(opener).toHaveFocus();
+  });
+
+  it("should return focus to the opener from the close control", async () => {
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    render(
+      <WorkspaceContext.Provider value={replica}>
+        <TaskRow entry={dayEntry(doc, task.id)} tags={[]} />
+        <TaskDetail />
+      </WorkspaceContext.Provider>,
+    );
+
+    const opener = screen.getByRole("button", { name: "Open details for A task" });
+    fireEvent.click(opener);
+    expect(await screen.findByRole("dialog", { name: "Task details" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close task details" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(opener).toHaveFocus();
   });
 });

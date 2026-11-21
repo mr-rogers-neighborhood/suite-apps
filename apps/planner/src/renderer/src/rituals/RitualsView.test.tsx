@@ -1,5 +1,5 @@
 import type { DayRecord, Task, WorkspaceSnapshot } from "@suite/planner-core";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useUiStore } from "../store/uiStore";
@@ -204,5 +204,60 @@ describe("RitualsView", () => {
 
     expect(mocks.markDayShutdown).toHaveBeenCalledWith(DATE);
     expect(screen.getByText(/^Shutdown updated at /u)).toBeInTheDocument();
+  });
+
+  it("should name each ritual section for the step its controls perform", () => {
+    mocks.snapshot.current = snapshot({ tasks: [task()] });
+    render(<RitualsView />);
+
+    const plan = screen.getByRole("region", { name: "Plan the day" });
+    expect(within(plan).getByRole("button", { name: "Plan the day" })).toBeInTheDocument();
+    expect(within(plan).getByLabelText("Day intention")).toBeInTheDocument();
+
+    const shutdown = screen.getByRole("region", { name: "Shut down the day" });
+    expect(within(shutdown).getByRole("button", { name: "Shut down the day" })).toBeInTheDocument();
+    expect(within(shutdown).getByLabelText("Shutdown note")).toBeInTheDocument();
+    expect(
+      within(shutdown).getByRole("heading", { name: "Carry-over · moves to tomorrow" }),
+    ).toBeInTheDocument();
+
+    const move = within(shutdown).getByRole("button", {
+      name: "Move Write the docs to tomorrow",
+    });
+    expect(move).toHaveTextContent("Move to tomorrow");
+  });
+
+  it("should carry the last day of a month and a week into the next month", () => {
+    // 2027-01-31 is a Sunday and January's last day, so tomorrow is both a new week and a new month.
+    const lastDay = "2027-01-31";
+    useUiStore.setState({ selectedDate: lastDay, view: "rituals" });
+    mocks.snapshot.current = snapshot({
+      days: [dayRecord({ dateKey: lastDay })],
+      tasks: [task({ scheduledFor: lastDay })],
+    });
+    render(<RitualsView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan the day" }));
+    fireEvent.click(screen.getByRole("button", { name: "Shut down the day" }));
+    fireEvent.click(screen.getByRole("button", { name: "Move Write the docs to tomorrow" }));
+
+    expect(mocks.markDayPlanned).toHaveBeenCalledWith(lastDay);
+    expect(mocks.markDayShutdown).toHaveBeenCalledWith(lastDay);
+    expect(mocks.scheduleTask).toHaveBeenCalledWith("task-1", "2027-02-01");
+    expect(screen.getByText("Moved Write the docs to Tomorrow.")).toBeInTheDocument();
+  });
+
+  it("should carry a leap day into March", () => {
+    const leapDay = "2028-02-29";
+    useUiStore.setState({ selectedDate: leapDay, view: "rituals" });
+    mocks.snapshot.current = snapshot({
+      days: [dayRecord({ dateKey: leapDay })],
+      tasks: [task({ scheduledFor: leapDay })],
+    });
+    render(<RitualsView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move Write the docs to tomorrow" }));
+
+    expect(mocks.scheduleTask).toHaveBeenCalledWith("task-1", "2028-03-01");
   });
 });

@@ -14,3 +14,14 @@ Range.prototype.getClientRects = () => emptyRectList;
 Range.prototype.getBoundingClientRect = () => emptyRect;
 Element.prototype.getClientRects = () => emptyRectList;
 document.elementFromPoint = () => null;
+
+// jsdom has no layout engine, so `offsetParent` is null for every node. The shared Modal uses it
+// to skip controls hidden with `display:none` when it wraps Tab inside a dialog; without this the
+// trap sees no controls at all and a focus test would be testing jsdom, not the dialog. These
+// tests want the browser's answer.
+Object.defineProperty(HTMLElement.prototype, "offsetParent", {
+  configurable: true,
+  get() {
+    return this.parentElement;
+  },
+});
