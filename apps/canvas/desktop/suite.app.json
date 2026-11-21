@@ -5,17 +5,10 @@
   "version": "0.1.11",
   "contractVersion": "1.0.0",
   "deepLinkPrefix": "suite://canvas/",
-  "fileExtensions": [
-    "canvas"
-  ],
+  "fileExtensions": ["canvas"],
   "update": {
     "feed": "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/canvas",
     "channel": "alpha"
   },
-  "capabilities": [
-    "document.file",
-    "sync",
-    "attachments",
-    "publish"
-  ]
+  "capabilities": ["document.file", "sync", "attachments", "publish"]
 }
