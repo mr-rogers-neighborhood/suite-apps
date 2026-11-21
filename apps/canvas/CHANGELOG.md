@@ -6,7 +6,15 @@ a release is tagged `canvas-v<version>`. See
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.1.12] - 2026-11-21
+
 ### Changed
+
+- **A smaller install and faster updates.** The Flatpak ships one locale instead of 55,
+  production files drop source maps, declarations and test fixtures, and static deltas make
+  an update a delta instead of a full download.
 
 - **Canvas's documentation describes the app that ships.** The pages that sent a reader to the retired
   collab server, account service or billing service now describe a local document with optional sync,

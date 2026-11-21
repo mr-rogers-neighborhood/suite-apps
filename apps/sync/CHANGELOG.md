@@ -15,6 +15,16 @@ this file does not invent them; every release from here adds its section first.
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.12.0] - 2026-11-21
+
+### Changed
+
+- **A smaller install and faster updates.** The tray app builds outside the linked package,
+  so the Flatpak carries one Electron tree instead of two; it ships one locale, and static
+  deltas make the next update a delta instead of a full download.
+
 ### Added
 
 - **The relay as a desktop app.** `run.suite.sync` is a Flatpak with a tray and a small window. The

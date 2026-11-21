@@ -8,6 +8,10 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.5.1] - 2026-11-21
+
 ### Added
 
 - **A main landmark around the active screen.** A screen reader can jump to the plan, or to the
@@ -34,6 +38,10 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
   the day they act on.
 
 ### Changed
+
+- **A smaller install and faster updates.** The Flatpak ships one locale instead of 55,
+  production files drop source maps, declarations and test fixtures, and static deltas make
+  an update a delta instead of a full download.
 
 - **The app manifest reports the version the package already carries**, so the hub shows the
   current Planner version for the build it installed.

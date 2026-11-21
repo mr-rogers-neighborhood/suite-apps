@@ -9,7 +9,15 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.6.0] - 2026-11-21
+
 ### Changed
+
+- **A smaller install and faster updates.** The Flatpak ships one locale instead of 55,
+  production files drop source maps, declarations and test fixtures, and static deltas make
+  an update a delta instead of a full download.
 
 - **Sync is an app, not a supervised process.** Start detects the `run.suite.sync` Flatpak, installs
   it from the Suite store and opens it with `flatpak run`, exactly like any other app. The tray app

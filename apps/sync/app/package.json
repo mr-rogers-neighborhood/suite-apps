@@ -2,7 +2,7 @@
   "name": "@suite/sync-app",
   "productName": "Suite Sync",
   "desktopName": "run.suite.sync",
-  "version": "0.11.3",
+  "version": "0.12.0",
   "private": true,
   "type": "module",
   "description": "The Suite relay as a desktop app: the tray keeps one running, the window shows its address and code.",
