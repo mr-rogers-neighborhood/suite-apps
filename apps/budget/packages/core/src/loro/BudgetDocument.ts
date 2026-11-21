@@ -411,7 +411,10 @@ export class BudgetDocument {
         before.categoryId !== next.categoryId &&
         next.payeeName.length > 0
       ) {
-        upsertLearnedCategoryRule(this.#doc, next.payeeName, next.categoryId, now);
+        const payee = next.payeeId ? getPayee(this.#doc, next.payeeId) : undefined;
+        if (!payee || payee.learn) {
+          upsertLearnedCategoryRule(this.#doc, next.payeeName, next.categoryId, now);
+        }
       }
       return next;
     });

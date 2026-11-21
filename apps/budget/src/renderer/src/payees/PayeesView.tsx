@@ -237,11 +237,17 @@ function PayeeDialog({
                     defaultCategoryId,
                   });
                 } else if (record) {
-                  replica.document.updatePayee(record.id, {
-                    name: name.trim(),
-                    defaultCategoryId,
-                    learn,
-                    archivedAt: archived ? (record.archivedAt ?? new Date().toISOString()) : null,
+                  const nextName = name.trim();
+                  replica.document.batch(() => {
+                    replica.document.updatePayee(record.id, {
+                      name: nextName,
+                      defaultCategoryId,
+                      learn,
+                      archivedAt: archived ? (record.archivedAt ?? new Date().toISOString()) : null,
+                    });
+                    if (nextName !== record.name) {
+                      replica.document.learnPayeeName(record.name, nextName);
+                    }
                   });
                 }
                 onClose();

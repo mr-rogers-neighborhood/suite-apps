@@ -118,4 +118,36 @@ describe("learned rules", () => {
     );
     expect(result.draft.categoryId).toBe(fun.id);
   });
+
+  it("should not learn a category when the payee pauses learning", () => {
+    const doc = BudgetDocument.create({ now: new Date("2026-01-01T12:00:00.000Z") });
+    const group = doc.createCategoryGroup({ name: "Group" });
+    const food = doc.createCategory({ groupId: group.id, name: "Food" });
+    const fun = doc.createCategory({ groupId: group.id, name: "Fun" });
+    const account = doc.createAccount({ name: "Checking", type: "checking" });
+    const transaction = doc.createTransaction({
+      accountId: account.id,
+      date: "2026-01-02",
+      amountMinor: -2_000,
+      categoryId: food.id,
+      payeeName: "Shop",
+    });
+    const payee = doc.listPayees().find((candidate) => candidate.name === "Shop");
+    if (!payee) throw new Error("Expected a payee");
+    doc.updatePayee(payee.id, { learn: false });
+
+    doc.updateTransaction(transaction.id, { categoryId: fun.id });
+    expect(doc.listRules().filter((candidate) => candidate.source === "learned")).toHaveLength(0);
+  });
+
+  it("should learn an imported-payee rename rule", () => {
+    const doc = BudgetDocument.create({ now: new Date("2026-01-01T12:00:00.000Z") });
+    doc.learnPayeeName("AMZN Mktp US*2H4L", "Amazon", new Date("2026-01-01T12:00:00.000Z"));
+
+    const learned = doc.listRules().find((candidate) => candidate.source === "learned");
+    expect(learned?.conditions).toEqual([
+      { field: "importedPayee", op: "contains", value: "AMZN Mktp US*2H4L" },
+    ]);
+    expect(learned?.actions).toEqual([{ field: "setPayee", value: "Amazon" }]);
+  });
 });

@@ -86,6 +86,10 @@ has no record, which is different from a record with zero.
 `id`, `name`, `defaultCategoryId` (nullable), `lastCategoryId` (nullable), `learn`, `archivedAt`
 (nullable), `createdAt`.
 
+`learn` gates the learned category rule: with it off, changing a transaction's category records
+`lastCategoryId` but writes no `payee is <name> → set category` rule. Renaming a payee always writes
+an `importedPayee contains <old name> → set payee <new name>` rule.
+
 ### rule
 
 `id`, `stage` (`pre` \| `default` \| `post`), `enabled`, `conditions` (`{ field, op, value }[]`),
@@ -209,9 +213,11 @@ conditions scoring higher, then by creation time, then by id, so the result is d
 rules run first; the last matching action for a field wins. Rules run on import and when the user
 chooses "Run rules" on the document.
 
-Learned rules: when the user sets a category on a transaction with a known payee, a learned
-`payee is <name> → set category` rule is created or updated. A learned rule is a normal record the user
-can edit or disable.
+Learned rules: when the user sets a category on a transaction with a known payee whose `learn` toggle
+is on, a learned `payee is <name> → set category` rule is created or updated. A payee with learning off
+still records its last category, but no rule. Renaming a payee creates or updates a learned
+`importedPayee contains <old name> → set payee <new name>` rule, so the next import maps the bank's
+payee text to the chosen name. A learned rule is a normal record the user can edit or disable.
 
 ## Schedules
 
