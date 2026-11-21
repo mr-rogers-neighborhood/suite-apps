@@ -97,8 +97,8 @@ tags from the same snapshot. An empty query returns an empty list rather than
 every task, and the default limit is 25.
 
 The result is tasks, not matches. The score is not exposed, so a view cannot
-reorder by it; search stays a filter over records and leaves ranking to the one
-library that produced it.
+reorder by it; search is a ranked search over records and leaves the score to the
+one library that produced it.
 
 ## apps/planner/packages/core/src/plan/reminders.ts#pendingReminders
 

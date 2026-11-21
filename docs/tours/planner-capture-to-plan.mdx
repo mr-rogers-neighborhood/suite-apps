@@ -65,9 +65,8 @@ imported Loro instead would be a second writer with none of those rules.
 
 The file envelope is a small JSON object around an opaque base64 snapshot, and
 decoding answers with a `Result` because the person chose the file. The refusals
-are ordered and named: not JSON, not this format, a newer file version, a newer
-schema, then a snapshot that will not decode. Decoding does not open a document
-or merge anything; the caller decides what to do with the bytes.
+are ordered and named, and decoding does not open a document or merge anything;
+the caller decides what to do with the bytes.
 
 ### overlay: A newer file is not a damaged file
 
@@ -88,7 +87,7 @@ display the path but never chooses where to write.
 ## apps/planner/src/main/ipc.ts#registerIpc
 
 The whole capability set crosses one registration. `workspace:snapshot` hands
-over the current document, `workspace:commit` accepts only a binary CRDT update,
+over the current snapshot, `workspace:commit` accepts only a binary CRDT update,
 and import and export own their native dialogs. Every handler refuses a sender
 that is not the page this shell loaded, and every payload is parsed before it
 reaches the store. The commit delta is also what sync publishes, so an edit does
@@ -102,8 +101,8 @@ selected date never becomes a second copy of the plan.
 
 ## apps/planner/src/renderer/src/store/snapshotStore.ts#DocumentReplica
 
-This class is the renderer's single observe call site. A local edit is merged
-into the replica, forwarded to main as a CRDT delta, and turned into a rebuilt
+This class is the renderer's single observe call site. A local edit commits on
+the replica's document, is forwarded to main as a CRDT delta, and rebuilds the
 snapshot that React reads through `useSyncExternalStore`. An import or a synced
 replacement detaches the old subscription and subscribes the new document, so a
 stale observer cannot keep forwarding edits from a closed workspace.

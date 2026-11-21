@@ -7,8 +7,9 @@ summary: "The typed, validated writer over one Loro document: roots, field-level
 This module is the typed layer over the one Loro document a workspace owns.
 `WorkspaceDocument` is the only writer; the domain files behind it (`tasks`,
 `projects`, `tags`, `days`, `events`, `focus`, `notes`, `settings`, `meta`) each
-own one root and one set of records. Every read parses through a Zod schema and
-every write touches the keys that changed, then commits once.
+own one root and one set of records. Every record read parses through a Zod
+schema; the note containers are the exception, because they return Loro maps or
+text. Every write touches the keys that changed, then commits once.
 
 It does not own the file, the renderer replica or the projections. Main calls the
 same facade and keeps the authoritative instance; the renderer calls it through a
