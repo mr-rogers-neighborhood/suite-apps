@@ -6,7 +6,15 @@ import {
   sign,
   X509Certificate,
 } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { formatFingerprint } from "@suite/sync";
 
@@ -63,8 +71,16 @@ export function ensureRelayCertificate(directory: string): RelayCertificate {
   }
 
   const generated = generate();
-  writePrivate(certPath, generated.certPem);
-  writePrivate(keyPath, generated.keyPem);
+  try {
+    writePrivate(certPath, generated.certPem);
+    writePrivate(keyPath, generated.keyPem);
+  } catch (error) {
+    // A half-written pair would make the next start refuse forever. A partial
+    // write is not a rotation anybody asked for, so remove what was attempted.
+    rmSync(certPath, { force: true });
+    rmSync(keyPath, { force: true });
+    throw error;
+  }
   return { certPath, keyPath, fingerprint: fingerprintOf(generated.cert) };
 }
 
