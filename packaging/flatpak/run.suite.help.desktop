@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Suite Help
+Comment=The code explorer and handbook, offline
+Exec=run.suite.help %U
+Icon=run.suite.help
+Terminal=false
+Type=Application
+Categories=Utility;Documentation;
+StartupWMClass=run.suite.help

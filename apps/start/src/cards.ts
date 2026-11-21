@@ -146,8 +146,11 @@ export function appCards(input: CardInput): readonly AppCard[] {
       // "newer version available" from a feed this install cannot read would
       // offer an Update button that installs a second copy in another format.
       const fromFlatpak = found?.flatpak !== undefined;
+      const flatpakOnly = entry.flatpakOnly === true;
       const installChannel: "appimage" | "flatpak" =
-        fromFlatpak || storeCommit !== null || storeChannels.length > 0 ? "flatpak" : "appimage";
+        flatpakOnly || fromFlatpak || storeCommit !== null || storeChannels.length > 0
+          ? "flatpak"
+          : "appimage";
       const source = found === null ? "managed" : packageSource(found, input.appsRoot);
 
       const installedBranch = tierFromBranch(found?.flatpak?.branch);
@@ -195,10 +198,14 @@ export function appCards(input: CardInput): readonly AppCard[] {
               ? // A copy a person placed is not Start's to replace. Reading the hub's feed
                 // into its state would offer an Update that installs a second copy.
                 "local"
-              : stateFor(found?.manifest.version ?? null, entry.available, installChannel),
+              : stateFor(
+                  found?.manifest.version ?? null,
+                  flatpakOnly ? null : entry.available,
+                  installChannel,
+                ),
           version: found?.manifest.version ?? null,
-          available: fromFlatpak ? null : entry.available,
-          reason: fromFlatpak ? null : entry.reason,
+          available: flatpakOnly ? null : fromFlatpak ? null : entry.available,
+          reason: flatpakOnly ? null : fromFlatpak ? null : entry.reason,
           versions: fromFlatpak ? 1 : (input.versions.get(entry.id) ?? (found === null ? 0 : 1)),
           previousVersion: fromFlatpak ? null : (input.previous?.get(entry.id) ?? null),
           running: input.running.has(entry.id),

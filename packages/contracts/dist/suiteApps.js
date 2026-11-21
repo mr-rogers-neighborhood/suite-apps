@@ -3,6 +3,7 @@ export const SUITE_APPS = [
     { id: "canvas", name: "Canvas", folder: "Canvas", extension: "canvas" },
     { id: "planner", name: "Planner", folder: "Planner", extension: "planner" },
     { id: "budget", name: "Budget", folder: "Budget", extension: "budget" },
+    { id: "help", name: "Suite Help", folder: "Help", extension: null },
 ];
 /**
  * The root every app's documents folder sits under.

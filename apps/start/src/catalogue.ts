@@ -13,8 +13,8 @@ import { preReleaseIdFor } from "./channels.js";
  * What the suite offers, whether or not it is on this machine.
  *
  * Start used to list what it found. A list of what is found is empty on a new machine,
- * and empty is the one answer the front door cannot give. So the catalogue names the
- * three apps the suite has, compiles in the feed each one declares, and asks each feed
+ * and empty is the one answer the front door cannot give. So the catalogue names every
+ * app the suite has, compiles in the feed each document app declares, and asks each feed
  * what version it offers. A card then has something true to say either way.
  *
  * **The feed URL appears three times on purpose, and this is the third.** The app's own
@@ -63,6 +63,13 @@ export interface CatalogueEntry {
    * hub cannot replace its own running binary.
    */
   readonly releases?: string | undefined;
+  /**
+   * Whether Flatpak is the only install channel for this app.
+   *
+   * Help ships no AppImage feed: Flatpak installs it, updates it and owns the
+   * deployment. A card still offers Install before the store has been read.
+   */
+  readonly flatpakOnly?: boolean;
 }
 
 /** The hub's own id. It is not one of the apps the hub lists. */
@@ -129,10 +136,31 @@ export const PRE_RELEASE_CATALOGUE_APPS = CATALOGUE_APPS.map(
   }),
 );
 
-/** Stable first, then the pre-release identity of each app. */
+/**
+ * The one app with no AppImage feed.
+ *
+ * Help is Flatpak-only. It is listed with the stable apps so the hub has a card
+ * before the store answers, and it never enters the pre-release table: there is
+ * no AppImage identity for a tier to replace.
+ */
+export const FLATPAK_CATALOGUE_APPS = [
+  {
+    id: "help",
+    name: "Suite Help",
+    folder: "Help",
+    extensions: [],
+    capabilities: [],
+    feed: "",
+    channel: "alpha",
+    flatpakOnly: true,
+  },
+] as const satisfies readonly CatalogueEntry[];
+
+/** Stable apps, the pre-release identity of each, then the Flatpak-only app. */
 export const ALL_CATALOGUE_APPS: readonly CatalogueEntry[] = [
   ...CATALOGUE_APPS,
   ...PRE_RELEASE_CATALOGUE_APPS,
+  ...FLATPAK_CATALOGUE_APPS,
 ];
 
 /** The folder under the applications root where this entry's AppImage is placed. */
@@ -142,12 +170,14 @@ export function installFolderFor(entry: Pick<CatalogueEntry, "folder" | "install
 
 /** Whether the catalogue still says the same thing `SUITE_APPS` does. */
 export function catalogueMatchesContracts(): readonly string[] {
-  return CATALOGUE_APPS.flatMap((entry) => {
+  return [...CATALOGUE_APPS, ...FLATPAK_CATALOGUE_APPS].flatMap((entry) => {
     const contract = SUITE_APPS.find((app) => app.id === entry.id);
     if (contract === undefined) return [`${entry.id} is not in SUITE_APPS`];
     const problems: string[] = [];
     if (contract.folder !== entry.folder) problems.push(`${entry.id} folder`);
-    if (contract.extension !== entry.extensions[0]) problems.push(`${entry.id} extension`);
+    if ((contract.extension ?? null) !== (entry.extensions[0] ?? null)) {
+      problems.push(`${entry.id} extension`);
+    }
     return problems;
   });
 }
@@ -211,8 +241,9 @@ export interface CatalogueOptions {
  */
 export function feedFor(entry: CatalogueEntry, feedBase?: string | undefined): string | null {
   // A pre-release has no AppImage feed by design: its update path is its Flatpak
-  // branch. A local release folder must not quietly invent one.
-  if (entry.preRelease === true) return null;
+  // branch. A local release folder must not quietly invent one. Help is
+  // Flatpak-only for the same reason.
+  if (entry.preRelease === true || entry.flatpakOnly === true) return null;
   const base = feedBase?.trim().replace(/\/+$/u, "");
   if (base !== undefined && base.length > 0) return `${base}/${entry.id}`;
   return entry.feed.length > 0 ? entry.feed : null;
@@ -238,9 +269,11 @@ async function readEntry(entry: CatalogueEntry, options: CatalogueOptions): Prom
       feed: "",
       available: null,
       reason:
-        entry.preRelease === true
-          ? "a pre-release updates through its Flatpak branch, not an AppImage feed"
-          : "this build was packaged without a feed",
+        entry.flatpakOnly === true
+          ? "Flatpak owns updates"
+          : entry.preRelease === true
+            ? "a pre-release updates through its Flatpak branch, not an AppImage feed"
+            : "this build was packaged without a feed",
       installed,
       newer: false,
       artifact: null,

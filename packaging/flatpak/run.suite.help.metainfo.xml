@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The AppStream record is what a store reads: name, summary, categories, icon.
+  Start's marketplace reads it from the same OSTree repo, so it is written once
+  here rather than in two places.
+-->
+<component type="desktop-application">
+  <id>run.suite.help</id>
+  <name>Suite Help</name>
+  <summary>The code explorer and handbook, offline</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://github.com/mr-rogers-neighborhood/suite-apps</url>
+  <description>
+    <p>
+      Suite Help is the documentation reader for the Suite: a Browser, Modules and
+      Tours explorer over a generated code index, plus the handbook built from the
+      repository's Markdown. It works offline and owns no document.
+    </p>
+    <p>
+      This flatpak is the same build as the other artifact forms; Flatpak is a
+      second way to install it, not a different application. Flatpak owns updates.
+    </p>
+  </description>
+  <launchable type="desktop-id">run.suite.help.desktop</launchable>
+  <provides>
+    <binary>suite-help</binary>
+  </provides>
+  <releases>
+    <release version="0.1.0" date="2026-11-21"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

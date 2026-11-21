@@ -5,13 +5,14 @@ owns the installed files**, and that decides who may update them.
 
 | Form | Built for | Who owns the files | Updates arrive by | Root |
 | --- | --- | --- | --- | --- |
-| AppImage | the three apps and the hub | the user, under `~/Applications` | Start for the apps it placed; the release page for the hub | no |
+| AppImage | the three document apps and the hub | the user, under `~/Applications` | Start for the apps it placed; the release page for the hub | no |
 | Arch package | the hub | root, under `/opt` | the package manager | yes |
-| Flatpak | the three apps and the hub | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
+| Flatpak | the three document apps, Help and the hub | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
 | Relay tarball | the relay | the person, under `/opt` | the person replaces the tree | yes |
 
-The three apps and the hub ship as AppImage and Flatpak; the hub also has the Arch package. `deb` is
-not a configured target any more, and `rpm` and `snap` were never built.
+The three document apps and the hub ship as AppImage and Flatpak; the hub also has the Arch package.
+Help is Flatpak-only. `deb` is not a configured target any more, and `rpm` and `snap` were never
+built.
 
 The release tiers a build can carry, and what each promises, are [Channels](../explanation/channels.md).
 
@@ -71,13 +72,14 @@ The download, checksum and signature checks are in
 
 ## Flatpak
 
-Flatpak is a second channel for Canvas, Planner, Budget and the hub. Each has a manifest beside the
-others:
+Flatpak is a second channel for Canvas, Planner, Budget, Help and the hub. Each has a manifest
+beside the others:
 
 ```
 packaging/flatpak/run.suite.canvas.yml
 packaging/flatpak/run.suite.planner.yml
 packaging/flatpak/run.suite.budget.yml
+packaging/flatpak/run.suite.help.yml
 packaging/flatpak/run.suite.start.yml
 ```
 
@@ -90,6 +92,7 @@ node scripts/flatpak.mjs                       # Canvas: package, build, publish
 node scripts/flatpak.mjs --app planner         # Planner, same path
 node scripts/flatpak.mjs --app budget          # Budget, same path
 node scripts/flatpak.mjs --app start           # the hub, same path
+node scripts/flatpak.mjs --app help             # Help, Flatpak-only
 node scripts/flatpak.mjs --app planner --no-build   # reuse release/linux-unpacked
 node scripts/flatpak.mjs --app planner --channel slop  # pre-release id on branch slop
 flatpak run run.suite.planner

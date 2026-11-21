@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   CATALOGUE_APPS,
   catalogueMatchesContracts,
+  FLATPAK_CATALOGUE_APPS,
   feedFor,
   isNewer,
   readCatalogue,
@@ -123,6 +124,15 @@ describe("feed declarations", () => {
   });
 });
 
+describe("feedFor Help", () => {
+  it("never invents an AppImage feed, even from a local release folder", () => {
+    const help = FLATPAK_CATALOGUE_APPS[0];
+    expect(feedFor(help)).toBeNull();
+    expect(feedFor(help, base)).toBeNull();
+    expect(CATALOGUE_APPS.map((entry) => entry.id)).not.toContain("help");
+  });
+});
+
 describe("catalogueMatchesContracts", () => {
   it("says the same thing about each app that SUITE_APPS does", () => {
     // The table repeats what each app's own manifest declares; this is the half of
@@ -173,16 +183,25 @@ describe("readCatalogue", () => {
       "slop-canvas",
       "slop-planner",
       "slop-budget",
+      "help",
       SELF_ID,
     ]);
-    // Stable reads a feed; the pre-release entries have none by design.
-    const stable = catalogue.filter((entry) => entry.preRelease !== true);
+    // Stable document apps read a feed; the pre-release entries have none by design.
+    const stable = catalogue.filter((entry) => entry.preRelease !== true && entry.id !== "help");
     expect(stable.every((entry) => entry.available !== null)).toBe(true);
     expect(stable.every((entry) => entry.installed === null)).toBe(true);
     expect(stable.every((entry) => entry.newer === false)).toBe(true);
     const preRelease = catalogue.filter((entry) => entry.preRelease === true);
     expect(preRelease.every((entry) => entry.feed === "")).toBe(true);
     expect(preRelease.every((entry) => entry.available === null)).toBe(true);
+    // Help is Flatpak-only, so there is no feed to read even when one is offered locally.
+    const help = catalogue.find((entry) => entry.id === "help");
+    expect(help).toMatchObject({
+      feed: "",
+      available: null,
+      reason: "Flatpak owns updates",
+      flatpakOnly: true,
+    });
   });
 
   it("says which installed app the feed is ahead of", async () => {

@@ -18,18 +18,23 @@ export interface SuiteAppEntry {
   readonly name: string;
   /** The folder under the documents root: `~/Documents/Suite/<folder>`. */
   readonly folder: SuiteAppName;
-  /** The file extension the app claims, lower-case and without the dot. */
-  readonly extension: string;
+  /**
+   * The file extension the app claims, lower-case and without the dot.
+   *
+   * Null for an app that owns no document, such as Suite Help.
+   */
+  readonly extension: string | null;
 }
 
 export const SUITE_APPS = [
   { id: "canvas", name: "Canvas", folder: "Canvas", extension: "canvas" },
   { id: "planner", name: "Planner", folder: "Planner", extension: "planner" },
   { id: "budget", name: "Budget", folder: "Budget", extension: "budget" },
+  { id: "help", name: "Suite Help", folder: "Help", extension: null },
 ] as const satisfies readonly SuiteAppEntry[];
 
-/** One app id from the table. */
-export type SuiteDocumentAppId = (typeof SUITE_APPS)[number]["id"];
+/** One app id from the table that claims a document extension. */
+export type SuiteDocumentAppId = Exclude<(typeof SUITE_APPS)[number]["id"], "help">;
 
 /**
  * The root every app's documents folder sits under.

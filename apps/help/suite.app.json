@@ -1,0 +1,10 @@
+{
+  "format": "suite.app",
+  "id": "help",
+  "name": "Suite Help",
+  "version": "0.1.0",
+  "contractVersion": "1.0.0",
+  "deepLinkPrefix": "suite://help/",
+  "fileExtensions": [],
+  "capabilities": []
+}

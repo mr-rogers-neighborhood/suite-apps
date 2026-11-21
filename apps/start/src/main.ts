@@ -457,15 +457,21 @@ function documentFolders(): readonly DocumentsFolder[] {
   const platform = process.platform;
   const home = app.getPath("home");
   const rootOverride = process.env.SUITE_START_DOCUMENTS;
-  return SUITE_APPS.map((entry: SuiteAppEntry) => ({
-    app: entry,
-    path: appDocumentsFolder(entry, {
-      platform,
-      home,
-      rootOverride,
-      xdgDataHome: dataHome(),
-    }),
-  }));
+  return SUITE_APPS.flatMap((entry: SuiteAppEntry) =>
+    entry.extension === null
+      ? []
+      : [
+          {
+            app: entry,
+            path: appDocumentsFolder(entry, {
+              platform,
+              home,
+              rootOverride,
+              xdgDataHome: dataHome(),
+            }),
+          },
+        ],
+  );
 }
 
 /**

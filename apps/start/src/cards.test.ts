@@ -454,6 +454,40 @@ describe("appCards", () => {
     expect(cards[1]).toMatchObject({ id: "canvas", name: "canvas", state: "refused" });
   });
 
+  it("offers Help through Flatpak with no AppImage feed", () => {
+    const [card] = appCards({
+      apps: [],
+      rejected: [],
+      files: [],
+      recents: [],
+      updates: NO_UPDATES,
+      catalogue: [
+        offered({
+          id: "help",
+          name: "Suite Help",
+          folder: "Help",
+          extensions: [],
+          capabilities: [],
+          feed: "",
+          flatpakOnly: true,
+        }),
+      ],
+      versions: NO_VERSIONS,
+      running: NO_RUNNING,
+      appsRoot: APPS_ROOT,
+    });
+    expect(card).toMatchObject({
+      id: "help",
+      name: "Suite Help",
+      state: "not-installed",
+      installChannel: "flatpak",
+      available: null,
+      version: null,
+    });
+    // The card keeps the app's own mark, so Help is recognisable before it is installed.
+    expect(card?.icon).toMatch(/^data:image\/png;base64,/u);
+  });
+
   it("counts only the cards that need attention", () => {
     const cards = appCards({
       apps: [discovered(), discovered({ id: "planner" })],

@@ -29,13 +29,16 @@ which is the one answer a front door cannot leave empty.
 Each entry names a contract id, a folder and a feed. It does not name a local
 binary; the version and artifact come from the signed feed, and the executable
 comes from the install record. The feed URL is repeated here on purpose because
-an app that is not installed has no manifest to read it from.
+an app that is not installed has no manifest to read it from. Suite Help is the
+one entry with no feed: Flatpak installs and updates it, so its card says
+`Flatpak` before the store has answered.
 
 ## apps/start/src/catalogue.ts#catalogueMatchesContracts
 
 This is the guard that keeps the catalogue honest when a shared contract moves.
 It compares the ids, folders and first extensions against `SUITE_APPS`; a
-failure names the stale catalogue entry. The fix is the entry, not a looser
+null extension is a fact (Help owns no document), not a mismatch. A failure
+names the stale catalogue entry. The fix is the entry, not a looser
 check, because the two tables describe the same install to a person and to
 discovery.
 

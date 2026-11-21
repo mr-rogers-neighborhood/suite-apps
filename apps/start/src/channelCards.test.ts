@@ -91,7 +91,7 @@ function cards(
 describe("channel-aware cards", () => {
   it("shows the stable card when a machine has neither id", () => {
     const cardsFor = cards([]);
-    expect(cardsFor.map((card) => card.id)).toEqual(["canvas", "planner", "budget"]);
+    expect(cardsFor.map((card) => card.id)).toEqual(["canvas", "planner", "budget", "help"]);
     expect(cardsFor.find((card) => card.id === "slop-canvas")).toBeUndefined();
     expect(cardsFor[0]?.tier).toBe("stable");
     expect(cardsFor[0]?.channelNotice).toBeNull();

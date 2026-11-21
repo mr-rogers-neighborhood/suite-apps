@@ -41,8 +41,9 @@ The rules that shape this repository. Each is current; the code follows it.
 
 - Start replaces only a file it can write. It installs, updates and removes the apps it placed, and
   asks Flatpak to install or update a deployment. It does not update a copy a person placed.
-- The three apps and the hub ship as AppImage and Flatpak; the hub also ships an Arch package. `deb`
-  is not a configured target, and `rpm` and `snap` were never built.
+- The three document apps and the hub ship as AppImage and Flatpak; the hub also ships an Arch
+  package. Help ships only as a Flatpak, with no AppImage feed. `deb` is not a configured target,
+  and `rpm` and `snap` were never built.
 - Flatpak is a second channel: Start lists and launches installs, installs from the store, updates a
   deployment whose commit is behind, and removes through Flatpak. Flatpak is the writer, never Start.
   The hub can be a Flatpak too, with its own `run.suite.start` deployment.

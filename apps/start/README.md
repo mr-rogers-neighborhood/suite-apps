@@ -125,9 +125,9 @@ are yours to make. Two copies of one app share a profile and its single-instance
 run. When discovery finds both an AppImage and a Flatpak deployment, the Flatpak is the one Start
 shows; the AppImage is listed as a duplicate to remove. A per-app switch is not built yet.
 
-**Install** is Start's own job. `catalogue.ts` names the three apps the suite offers and the feed each
-one declares, and asks every feed what version it has when the window opens or when you press _Check for
-updates_. When a Flatpak store (`suite` or `suite-local`) offers an app, Install asks Flatpak instead,
+**Install** is Start's own job. `catalogue.ts` names the document apps and Suite Help, and the feed
+each document app declares, then asks every feed what version it has when the window opens or when
+you press _Check for updates_. Help has no feed: Flatpak is its only channel. When a Flatpak store (`suite` or `suite-local`) offers an app, Install asks Flatpak instead,
 and the card says `from the store` before you press anything; a deployment whose commit is behind the
 store's says `update available`. A card is then in one of four honest states: not installed, no
 release found, an update available, or up to date. Pressing the button downloads the artifact named by

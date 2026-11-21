@@ -300,7 +300,7 @@ function HandbookArticle({ page }: { page: NonNullable<ReturnType<typeof source.
           <p className="text-sm leading-6 text-fd-muted-foreground">{page.data.description}</p>
         ) : null}
         <a
-          href={`https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/${sourcePathFor(page.url)}`}
+          href={`https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/${sourcePathFor(page.path)}`}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 rounded-lg border border-fd-border px-2.5 py-1 text-xs text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
@@ -316,9 +316,13 @@ function HandbookArticle({ page }: { page: NonNullable<ReturnType<typeof source.
   );
 }
 
-function sourcePathFor(url: string): string {
-  const slug = url.replace(/^\/handbook\/?/u, "").replace(/\/$/u, "");
-  return slug === "" ? "docs/README.md" : `docs/${slug}.md`;
+/** Map a generated page path back to the Markdown file that owns it. */
+function sourcePathFor(path: string): string {
+  if (path === "index.mdx") return "docs/README.md";
+  if (path.endsWith("/index.mdx")) {
+    return `docs/${path.replace(/\/index\.mdx$/u, "/README.md")}`;
+  }
+  return `docs/${path.replace(/\.mdx$/u, ".md")}`;
 }
 
 function MdxLink({ href = "", children, ...props }: ComponentPropsWithoutRef<"a">) {
