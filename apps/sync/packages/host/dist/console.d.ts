@@ -72,6 +72,8 @@ export interface ConsoleState {
     };
     readonly fingerprint: string | null;
     readonly workspaces: readonly ConsoleWorkspace[];
+    /** `suite://relay?...` for a scanning client, including a live invitation when one exists. */
+    readonly relayLink: string;
     /** When the page's numbers were read. */
     readonly checkedAt: string;
 }

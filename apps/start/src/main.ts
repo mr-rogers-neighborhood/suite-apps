@@ -96,6 +96,7 @@ import {
   shortcutPathIn,
   shortcutText,
 } from "./shortcuts.js";
+import { relayCode } from "./syncCode.js";
 import { isAddressInUse, SuiteSyncRelay } from "./syncRelay.js";
 import {
   isThemeChoice,
@@ -529,6 +530,7 @@ async function syncState(): Promise<SyncState> {
     binary: current?.binary ?? null,
     fingerprint: current?.fingerprint ?? null,
     consoleUrl: current?.consoleUrl ?? null,
+    qr: relayCode(current?.address ?? null, current?.fingerprint ?? null),
     problem: current?.problem ?? null,
     workspaces: (current?.workspaces ?? []).map((workspace) => ({
       ...workspace,

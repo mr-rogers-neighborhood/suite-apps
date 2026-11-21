@@ -100,6 +100,8 @@ describe("the relay console", () => {
       expect(text).toContain("Studio laptop");
       expect(text).toContain("owner");
       expect(text).toContain("2 connections");
+      expect(text).toContain("suite://relay?");
+      expect(text).toContain("<svg");
       expect(text).not.toContain("payload");
       expect(text).not.toContain("publicKey");
       expect(text).not.toContain("ciphertext");
@@ -124,6 +126,10 @@ describe("the relay console", () => {
         fingerprint,
       });
       expect(state.store.bytes).toBe(2048);
+      expect(state.relayLink).toMatch(
+        /^suite:\/\/relay\?u=wss%3A%2F%2F192\.168\.1\.20%3A8787%2Fsync&f=/u,
+      );
+      expect(state.relayLink).not.toContain("&w=");
       expect(state.workspaces).toEqual([
         {
           workspaceId,
@@ -155,6 +161,58 @@ describe("the relay console", () => {
       expect(empty.workspaces).toEqual([]);
     } finally {
       await console.close();
+    }
+  });
+
+  it("puts a live invitation in the QR, but not a spent or expired one", async () => {
+    const inviteId = "c".repeat(64);
+    const expiring = "d".repeat(64);
+    const record = {
+      workspaceId,
+      inviteId,
+      role: "editor" as const,
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      signerId: deviceId,
+      signature: "signed",
+    };
+    const older = { ...record, inviteId: expiring, expiresAt: "2020-01-01T00:00:00.000Z" };
+
+    const { console } = await consoleWith({
+      rooms: [
+        room({
+          invites: {
+            workspaceId,
+            invites: { [inviteId]: record, [expiring]: older },
+            spent: {},
+          },
+        }),
+      ],
+    });
+    try {
+      const state = (await (await fetch(stateUrl(console))).json()) as ConsoleState;
+      expect(state.relayLink).toContain(`w=${workspaceId}`);
+      expect(state.relayLink).toContain(`i=${inviteId}`);
+      expect(state.relayLink).not.toContain(expiring);
+    } finally {
+      await console.close();
+    }
+
+    const spent = await consoleWith({
+      rooms: [
+        room({
+          invites: {
+            workspaceId,
+            invites: { [inviteId]: record },
+            spent: { [inviteId]: true },
+          },
+        }),
+      ],
+    });
+    try {
+      const state = (await (await fetch(stateUrl(spent.console))).json()) as ConsoleState;
+      expect(state.relayLink).not.toContain("&w=");
+    } finally {
+      await spent.console.close();
     }
   });
 

@@ -622,3 +622,11 @@ select:disabled {
   font-family: var(--font-mono, ui-monospace, monospace);
   word-break: break-all;
 }
+
+/* The code is square and never wider than the pane. */
+.sync-qr canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.5rem 0;
+}

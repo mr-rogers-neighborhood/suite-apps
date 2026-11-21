@@ -293,9 +293,18 @@ export interface SyncState {
   readonly fingerprint: string | null;
   /** The loopback console's one-time URL, or null while the relay is stopped. */
   readonly consoleUrl: string | null;
+  /** The `suite://relay` code a phone could scan, or null while the relay is stopped. */
+  readonly qr: SyncQr | null;
   /** Why the relay is not installed or why its last start failed. Null when all is well. */
   readonly problem: string | null;
   readonly workspaces: readonly SyncWorkspace[];
+}
+
+/** A QR matrix small enough to cross IPC: one string of `1`s and `0`s per row. */
+export interface SyncQr {
+  readonly payload: string;
+  readonly size: number;
+  readonly rows: readonly string[];
 }
 
 export interface SyncWorkspace {

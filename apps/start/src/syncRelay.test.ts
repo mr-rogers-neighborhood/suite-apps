@@ -219,6 +219,10 @@ describe("starting and stopping the relay", () => {
     expect(args()).toContain("--trust-all-remote");
     expect(args()).toContain("--tls-cert");
     expect(args()).toContain("--tls-key");
+    expect(args()[args().indexOf("--tls-cert") + 1]).toBe(
+      join(relay.store, "tls", "relay-cert.pem"),
+    );
+    expect(args()[args().indexOf("--tls-key") + 1]).toBe(join(relay.store, "tls", "relay-key.pem"));
     expect(args()).not.toContain("--allow-plaintext");
     await relay.stop();
   });

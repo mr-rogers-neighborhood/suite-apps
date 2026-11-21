@@ -88,6 +88,13 @@ export {
   parseInvite,
 } from "./inviteLink.js";
 export {
+  type QrErrorCorrection,
+  type QrMatrix,
+  type QrSvgOptions,
+  qrMatrix,
+  qrSvg,
+} from "./qr.js";
+export {
   type EphemeralBody,
   type EphemeralMessage,
   encodeRelayMessage,
@@ -119,6 +126,14 @@ export {
   type RelayWebSocketFactory,
   signFrame,
 } from "./relayClient.js";
+export {
+  formatRelayLink,
+  parseRelayLink,
+  RELAY_LINK_HOST,
+  RELAY_LINK_SCHEME,
+  type RelayLinkDetails,
+  type RelayLinkParse,
+} from "./relayLink.js";
 export {
   applyRemovalRecord,
   createRemovalState,

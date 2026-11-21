@@ -3,6 +3,7 @@ import { readdir, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
+import { formatRelayLink, qrSvg } from "@suite/sync";
 import { isLoopbackHost } from "./tls.js";
 export async function createRelayConsole(options) {
     const token = randomBytes(24).toString("base64url");
@@ -71,6 +72,7 @@ export async function createRelayConsole(options) {
                 .sort((left, right) => left.name.localeCompare(right.name)),
         }))
             .sort((left, right) => left.workspaceId.localeCompare(right.workspaceId));
+        const invitation = liveInvitation(options.rooms(), now());
         return {
             status: "running",
             version: options.version,
@@ -81,6 +83,12 @@ export async function createRelayConsole(options) {
             store: { path: options.store, bytes: storeBytes },
             fingerprint: options.fingerprint,
             workspaces,
+            relayLink: formatRelayLink({
+                url: options.relayUrl,
+                fingerprint: options.fingerprint,
+                workspaceId: invitation?.workspaceId ?? null,
+                inviteId: invitation?.inviteId ?? null,
+            }),
             checkedAt: now().toISOString(),
         };
     }
@@ -115,6 +123,8 @@ export async function createRelayConsole(options) {
   dd { margin: 0; }
   .quiet { color: color-mix(in srgb, currentColor 65%, transparent); }
   .workspace { border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: .5rem; padding: .75rem 1rem; margin: .5rem 0; }
+  .qr { width: min(100%, 16rem); margin: .5rem 0; }
+  .qr svg { display: block; width: 100%; height: auto; }
   ul { margin: .35rem 0 0; padding-left: 1.2rem; }
   footer { margin-top: 3rem; color: color-mix(in srgb, currentColor 65%, transparent); }
 </style>
@@ -136,6 +146,13 @@ export async function createRelayConsole(options) {
             : `<code>${escapeHtml(state.fingerprint)}</code>`}</dd>
     <dt>Store</dt><dd><code>${escapeHtml(state.store.path)}</code> · ${formatBytes(state.store.bytes)}</dd>
   </dl>
+</section>
+
+<section>
+  <h2>Join code</h2>
+  <div class="qr">${qrSvg(state.relayLink, { label: "Suite relay code" })}</div>
+  <p><code>${escapeHtml(state.relayLink)}</code></p>
+  <p class="quiet">The code carries the relay address and its certificate fingerprint. When an invitation is live, it carries that token too; a phone scans it, a desktop copies the invitation link from the app.</p>
 </section>
 
 <section>
@@ -198,6 +215,36 @@ function firstLanAddress() {
         }
     }
     return null;
+}
+/**
+ * The live invitation that travels in the QR, when there is one.
+ *
+ * An invitation is a bearer token, so the console puts it in the code rather than
+ * in a list of secrets on the page: a scanner needs it, a person reading the page
+ * does not. When several are live the one that lasts longest is chosen, so the
+ * code does not stop working while an older one expires.
+ */
+function liveInvitation(rooms, now) {
+    const cutoff = now.toISOString();
+    let best = null;
+    for (const room of rooms) {
+        for (const record of Object.values(room.invites.invites)) {
+            if (record.workspaceId !== room.workspaceId)
+                continue;
+            if (room.invites.spent[record.inviteId] === true)
+                continue;
+            if (record.expiresAt <= cutoff)
+                continue;
+            if (best === null || record.expiresAt > best.expiresAt) {
+                best = {
+                    workspaceId: record.workspaceId,
+                    inviteId: record.inviteId,
+                    expiresAt: record.expiresAt,
+                };
+            }
+        }
+    }
+    return best === null ? null : { workspaceId: best.workspaceId, inviteId: best.inviteId };
 }
 function authorised(request, url, expected) {
     const header = request.headers["x-suite-console-token"];

@@ -314,7 +314,10 @@ export class SuiteSyncRelay {
         if (listeningPort === null) return;
         this.port = listeningPort;
         this.problem = null;
-        finish();
+        // The relay prints `listening on` before the console URL. Resolve a tick
+        // later so a chunk boundary between the two lines does not hide the
+        // console button until the next state push.
+        setTimeout(finish, 25);
       });
 
       child.stderr?.setEncoding("utf8");

@@ -958,6 +958,9 @@ importers:
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
+      qrcode-generator:
+        specifier: ^2.0.4
+        version: 2.0.4
       ts-mls:
         specifier: 1.6.4
         version: 1.6.4(@noble/ciphers@2.4.0)
@@ -7471,6 +7474,9 @@ packages:
 
   pwacompat@2.0.17:
     resolution: {integrity: sha512-6Du7IZdIy7cHiv7AhtDy4X2QRM8IAD5DII69mt5qWibC2d15ZU8DmBG1WdZKekG11cChSu4zkSUGPF9sweOl6w==}
+
+  qrcode-generator@2.0.4:
+    resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
 
   qs@6.17.1:
     resolution: {integrity: sha512-jd3COkaKVgGUW+ZHyEHCG9bH7RoaaiWuMgzsIBjUMVjLAaWGWpoUAVwljVvBHxRu/2qEHnadLGZrkutYUBPQJA==}
@@ -15326,6 +15332,8 @@ snapshots:
   pvutils@1.2.0: {}
 
   pwacompat@2.0.17: {}
+
+  qrcode-generator@2.0.4: {}
 
   qs@6.17.1:
     dependencies:
