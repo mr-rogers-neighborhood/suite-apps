@@ -66,20 +66,19 @@ const actions = {
    * call, the page is a secure origin, and a channel that writes the system
    * clipboard in main would be a capability for nothing.
    */
-  async startSync() {
-    await bridge.startSync();
+  /**
+   * Install Suite Sync, or open it.
+   *
+   * The tray app keeps the relay, so the pane's whole job is the deployment: ask
+   * Flatpak for it when it is absent, and start it when it is there.
+   */
+  async installSync() {
+    await bridge.installSync();
     await refresh();
   },
-  async stopSync() {
-    await bridge.stopSync();
+  async openSync() {
+    await bridge.openSync();
     await refresh();
-  },
-  async setSyncScope(scope) {
-    await bridge.setSyncScope(scope);
-    await refresh();
-  },
-  async openSyncConsole() {
-    await bridge.openSyncConsole();
   },
   async copyLink(link) {
     try {

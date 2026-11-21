@@ -965,9 +965,6 @@ importers:
       '@suite/desktop':
         specifier: workspace:*
         version: link:../../packages/desktop
-      '@suite/sync':
-        specifier: workspace:*
-        version: link:../sync/packages/protocol
       '@suite/theme':
         specifier: workspace:*
         version: link:../../packages/theme

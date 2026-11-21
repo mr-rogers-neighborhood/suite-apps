@@ -22,10 +22,8 @@ export const START_IPC = {
   forgetRecent: "suite:start:forget",
   openFile: "suite:start:open-file",
   checkUpdates: "suite:start:check-updates",
-  startSync: "suite:start:sync-start",
-  stopSync: "suite:start:sync-stop",
-  setSyncScope: "suite:start:sync-scope",
-  openSyncConsole: "suite:start:sync-console",
+  installSync: "suite:start:sync-install",
+  openSync: "suite:start:sync-open",
   info: "suite:start:info",
 } as const;
 
@@ -243,52 +241,24 @@ export interface LauncherState {
   readonly self: AppCard | null;
 }
 
-/** What the Sync pane shows. No document content, because the relay has none. */
+/**
+ * What the Sync pane shows.
+ *
+ * Suite Sync is a Flatpak like the other apps: Start installs it from the store and
+ * opens it with `flatpak run`. The relay lives inside that app, which shows its own
+ * address, relay code and fingerprint, so the pane describes a deployment rather
+ * than a process Start supervises.
+ */
 export interface SyncState {
-  /** Whether a `suite-sync` binary was found. False is a state the pane explains. */
-  readonly installed: boolean;
-  readonly running: boolean;
-  readonly scope: "loopback" | "network";
-  readonly address: string | null;
-  readonly port: number;
-  /** Where the relay keeps its frames and role records. */
-  readonly store: string;
-  /** The binary Start runs, or null when none was found. */
-  readonly binary: string | null;
-  /** The relay's certificate, which other devices pin. Null when Start could not make one. */
-  readonly fingerprint: string | null;
-  /** The loopback console's one-time URL, or null while the relay is stopped. */
-  readonly consoleUrl: string | null;
-  /** The `suite://relay` code a phone could scan, or null while the relay is stopped. */
-  readonly qr: SyncQr | null;
-  /** Why the relay is not installed or why its last start failed. Null when all is well. */
-  readonly problem: string | null;
-  readonly workspaces: readonly SyncWorkspace[];
-}
-
-/** A QR matrix small enough to cross IPC: one string of `1`s and `0`s per row. */
-export interface SyncQr {
-  readonly payload: string;
-  readonly size: number;
-  readonly rows: readonly string[];
-}
-
-export interface SyncWorkspace {
-  readonly workspaceId: string;
-  readonly frames: number;
-  readonly newestEpoch: number | null;
-  readonly members: readonly SyncMember[];
   /**
-   * Whether any app on this machine kept a way back in for this workspace.
-   *
-   * Read from the apps' own reports, not from the relay: the relay carries frames and cannot
-   * know what a device saved, and a pane that guessed would be worse than one that is quiet.
+   * `not-installed` offers Install, `installed` offers Open, and `problem` says why
+   * neither is possible. A problem is never drawn as a dead button.
    */
-  readonly recovery: "made" | "declined" | "none";
-}
-
-export interface SyncMember {
-  readonly deviceId: string;
-  readonly name: string;
-  readonly role: "owner" | "editor" | "viewer" | null;
+  readonly state: "not-installed" | "installed" | "problem";
+  /** The version Flatpak reports, when there is a deployment. */
+  readonly version: string | null;
+  /** The deployed commit, when Flatpak resolved one. */
+  readonly commit: string | null;
+  /** Why the deployment cannot be read, installed or opened. Null when all is well. */
+  readonly problem: string | null;
 }

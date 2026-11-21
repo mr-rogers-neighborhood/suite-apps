@@ -4,11 +4,9 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   appDocumentsFolder,
-  hubReportPath,
   parseDeepLink,
   SUITE_APPS,
   type SuiteAppEntry,
-  type SuiteHub,
   suiteDocumentsRoot,
   suitePaths,
 } from "@suite/contracts";
@@ -43,7 +41,7 @@ import {
   tierForInstall,
 } from "./channels.js";
 import { type DocumentsFolder, indexDocuments, isInsideDocuments } from "./fileIndex.js";
-
+import { SYNC_APPLICATION } from "./flatpak.js";
 import { defaultHost, SELF_FLATPAK_ID, sandboxId } from "./host.js";
 import {
   adoptLegacyRegistry,
@@ -55,14 +53,12 @@ import {
   removePreReleaseTree,
   takeHubLock,
 } from "./hostPaths.js";
-import { writeHubReport } from "./hubReport.js";
 import { REGISTRY_FILENAME, type RegistryStore, registryAt } from "./installs.js";
 import { stopApproach } from "./launchCommand.js";
 import { type NativePackageBackend, nativePackageBackend } from "./nativePackageBackend.js";
 import { defaultRoots, nodeRegistryFileSystem } from "./nodeFileSystem.js";
 import type { PackageLaunchObserver, PackageListing } from "./packageBackend.js";
 import { RECENT_LIMIT, type RecentsFile, recentsFile } from "./recents.js";
-import { type RecoveryLookup, readRecoveryReports, recoveryFor } from "./recovery.js";
 import type { DiscoveredApp } from "./registry.js";
 import { describeRouteRejection, routeLaunch } from "./route.js";
 import {
@@ -78,8 +74,6 @@ import {
   type ThemeChoice,
 } from "./shared.js";
 import { isIconOf, shortcutIconPathIn, shortcutPathIn } from "./shortcuts.js";
-import { relayCode } from "./syncCode.js";
-import { isAddressInUse, SuiteSyncRelay } from "./syncRelay.js";
 import {
   isThemeChoice,
   loadThemeChoice,
@@ -197,9 +191,13 @@ function resolvedTheme(): ResolvedTheme {
     values: cssVariables(preset, mode),
   };
 }
-let syncRelay: SuiteSyncRelay | null = null;
-/** The report already on disk, so a restart is visible as a new `startedAt` rather than a new one. */
-let previousHub: SuiteHub | null = null;
+/**
+ * The last Sync operation that failed, so the pane can show it without a card.
+ *
+ * Cleared by a successful install or open, and never persisted: a failure that
+ * outlived the session would describe something nobody just pressed.
+ */
+let syncFailure: string | null = null;
 
 /** Files and links handed over before the window exists. */
 const pendingTargets: string[] = [];
@@ -380,90 +378,23 @@ function installedApp(listing: PackageListing, id: string): DiscoveredApp | null
 }
 
 /**
- * The port the relay listens on.
+ * The Sync pane's state.
  *
- * 8787 unless something says otherwise: a test needs a free port, and two relays on one
- * machine would otherwise take turns failing to bind.
- */
-function syncPort(): number {
-  const raw = process.env.SUITE_START_SYNC_PORT?.trim();
-  const parsed = raw === undefined ? Number.NaN : Number.parseInt(raw, 10);
-  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 65535 ? parsed : 8787;
-}
-
-/** The relay Start supervises, created once the data directory is known. */
-function relay(port = syncPort()): SuiteSyncRelay {
-  syncRelay ??= new SuiteSyncRelay({
-    dataDir: dataDirectory,
-    port,
-    onExit: () => void broadcast(),
-  });
-  return syncRelay;
-}
-
-/**
- * The sync pane's state, with the one thing the relay cannot know.
- *
- * The relay carries frames and knows who may write; whether anybody kept a way back in is
- * a fact about the apps on this machine, so it is read from their own reports and folded
- * in here rather than pretended to by the mailbox.
+ * Suite Sync is a Flatpak deployment, not a process Start owns: the backend reads it
+ * from `flatpak list`, installs it from the Suite store, and opens it with `flatpak
+ * run`. The app's tray keeps the relay and shows the address, code and fingerprint, so
+ * this pane never repeats them.
  */
 async function syncState(): Promise<SyncState> {
-  const current = syncRelay === null ? null : await syncRelay.snapshot();
-  const reports = await readRecoveryReports(recoveryLookup(), nodeRegistryFileSystem());
+  const deployment = await backend.deployment(SYNC_APPLICATION);
+  if (deployment.installed) syncFailure = null;
+  const problem = deployment.installed ? deployment.problem : (syncFailure ?? deployment.problem);
   return {
-    installed: current?.installed ?? false,
-    running: current?.running ?? false,
-    scope: current?.scope ?? "loopback",
-    address: current?.address ?? null,
-    port: current?.port ?? syncPort(),
-    store: current?.store ?? join(dataDirectory, "sync"),
-    binary: current?.binary ?? null,
-    fingerprint: current?.fingerprint ?? null,
-    consoleUrl: current?.consoleUrl ?? null,
-    qr: relayCode(current?.address ?? null, current?.fingerprint ?? null),
-    problem: current?.problem ?? null,
-    workspaces: (current?.workspaces ?? []).map((workspace) => ({
-      ...workspace,
-      recovery: recoveryFor(reports, workspace.workspaceId),
-    })),
+    state: problem !== null ? "problem" : deployment.installed ? "installed" : "not-installed",
+    version: deployment.version,
+    commit: deployment.commit,
+    problem,
   };
-}
-
-function recoveryLookup(): RecoveryLookup {
-  return {
-    platform: process.platform,
-    home: app.getPath("home"),
-    xdgDataHome: dataHome(),
-  };
-}
-
-/**
- * Tell the other apps where this machine listens, in the one place they can read it.
- *
- * Written whenever the relay changes, because a stale address is worse than none: an app
- * that prefilled a share field from a relay that has since stopped would hand out a link
- * to nothing.
- */
-async function reportHub(): Promise<void> {
-  const current = syncRelay === null ? null : await syncRelay.snapshot();
-  const now = new Date().toISOString();
-  const port = current !== null && current.port > 0 ? current.port : syncPort() || 8787;
-  const report: SuiteHub = {
-    format: "suite.hub",
-    running: current?.running ?? false,
-    scope: current?.scope ?? "loopback",
-    port,
-    address: current?.address ?? null,
-    startedAt: current?.running
-      ? previousHub?.running === true
-        ? (previousHub.startedAt ?? now)
-        : now
-      : null,
-    updatedAt: now,
-  };
-  previousHub = report;
-  await writeHubReport(hubReportPath(recoveryLookup()), report);
 }
 
 async function state(): Promise<LauncherState> {
@@ -908,51 +839,6 @@ async function installOne(id: string, channel?: unknown): Promise<void> {
   }
 }
 
-/**
- * Bring the sync relay up, off the startup path, and say so if it cannot.
- *
- * The port is the interesting part: only one process can hold 8787, so a second relay
- * would otherwise make this one fail. A later port is as good as the first, because the
- * address is written into the hub's report and apps read it from there rather than
- * assuming. Only a real collision is retried; a missing binary or a broken one is a
- * sentence for the pane, not ten failed processes.
- */
-const SYNC_PORT_ATTEMPTS = 10;
-
-async function startRefreshRelay(): Promise<void> {
-  const configured = syncPort();
-  const attempts = configured === 0 ? 1 : SYNC_PORT_ATTEMPTS;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const candidate = new SuiteSyncRelay({
-      dataDir: dataDirectory,
-      port: configured + attempt,
-      onExit: () => void broadcast(),
-    });
-    syncRelay = candidate;
-    const started = await candidate.start();
-    if (
-      started.running ||
-      !started.installed ||
-      !isAddressInUse(started.problem) ||
-      attempt === attempts - 1
-    ) {
-      break;
-    }
-  }
-
-  const state = syncRelay === null ? null : await syncRelay.snapshot();
-  if (state !== null && !state.running && state.installed) {
-    console.warn(`[sync] the relay is not running: ${state.problem ?? "no reason given"}`);
-  }
-
-  // An app that reads this at launch should find today's answer.
-  await reportHub().catch((error: unknown) => {
-    console.warn("[sync] could not report the hub's address", error);
-  });
-  await broadcast();
-}
-
 /** Read the store again and redraw, which is what the menu item and the button both do. */
 async function refreshAndBroadcast(): Promise<void> {
   for (const [id, progress] of installProgress) {
@@ -1227,54 +1113,37 @@ function registerIpc(): void {
   });
 
   /**
-   * Re-read the store, on demand: the answer is a reading, and installing remains
-   * the person's decision.
+   * Install Suite Sync, or open it, through the same backend as an app card.
+   *
+   * The tray app owns the relay: Start installs the deployment Flatpak manages and
+   * starts it, and the app shows its own address, relay code and fingerprint. A
+   * failure is a sentence on the pane, never a dead control.
    */
-  onIpc(START_IPC.startSync, async () => {
-    await relay().start();
-    await reportHub().catch((error: unknown) => {
-      console.warn("[sync] could not report the hub's address", error);
-    });
-    await broadcast();
-    return syncState();
-  });
-
-  onIpc(START_IPC.stopSync, async () => {
-    await syncRelay?.stop();
-    await reportHub().catch((error: unknown) => {
-      console.warn("[sync] could not report the hub's address", error);
-    });
-    await broadcast();
-    return syncState();
-  });
-
-  onIpc(START_IPC.setSyncScope, async (_event, scope: unknown) => {
-    if (scope !== "loopback" && scope !== "network") return syncState();
-    await relay().setScope(scope);
-    await reportHub().catch((error: unknown) => {
-      console.warn("[sync] could not report the hub's address", error);
-    });
-    await broadcast();
-    return syncState();
-  });
-
-  // The console's token is in the URL Start already holds. The renderer names no
-  // URL, so this remains a capability over the relay's own loopback page rather
-  // than a browser launcher for anything a page asks for.
-  onIpc(START_IPC.openSyncConsole, async () => {
-    const current = syncRelay === null ? null : await syncRelay.snapshot();
-    if (current?.consoleUrl === null || current?.consoleUrl === undefined) return false;
-    // The line came from a child process. Open it only if it is the loopback HTTP
-    // console this feature is for, never an arbitrary URL a relay printed.
-    let consoleUrl: URL;
+  onIpc(START_IPC.installSync, async () => {
     try {
-      consoleUrl = new URL(current.consoleUrl);
-    } catch {
-      return false;
+      await backend.installDeployment(SYNC_APPLICATION);
+      syncFailure = null;
+    } catch (error) {
+      syncFailure = describeInstallFailure(error);
     }
-    if (consoleUrl.protocol !== "http:" || consoleUrl.hostname !== "127.0.0.1") return false;
-    await shell.openExternal(consoleUrl.href);
-    return true;
+    await broadcast();
+    return syncState();
+  });
+
+  onIpc(START_IPC.openSync, async () => {
+    try {
+      await backend.openDeployment(SYNC_APPLICATION, {
+        failed: (reason) => {
+          syncFailure = reason;
+          void broadcast();
+        },
+      });
+      syncFailure = null;
+    } catch (error) {
+      syncFailure = describeInstallFailure(error);
+    }
+    await broadcast();
+    return syncState();
   });
 
   onIpc(START_IPC.checkUpdates, () => refreshAndBroadcast());
@@ -1436,17 +1305,8 @@ if (!gotLock) {
       ]),
     );
 
-    // Locate the relay before the first state is drawn, so "not installed" is a fact
-    // rather than the empty gap before a search.
-    relay();
-
-    // The window first, the relay second. A relay that cannot start — a missing binary,
-    // or a port already taken — used to stop startup dead: no window, no error, just a
-    // launcher that never appeared.
     window = createWindow();
     await show();
-
-    void startRefreshRelay();
 
     // The window is up before the store is read, so a slow remote delays a card rather
     // than the launcher. What arrives is broadcast, and the cards redraw.
@@ -1469,11 +1329,6 @@ if (!gotLock) {
   });
 
   app.on("before-quit", () => {
-    // Best effort: a report that says the relay is still up would be a lie a reader acts on.
-    void syncRelay
-      ?.stop()
-      .then(() => reportHub())
-      .catch(() => undefined);
     void releaseHubLock(hubLockPath(hostPathTable()), process.pid).catch(() => undefined);
   });
 
