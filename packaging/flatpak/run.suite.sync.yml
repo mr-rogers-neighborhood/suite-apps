@@ -66,7 +66,7 @@ modules:
       - install -Dm644 icons/run.suite.sync-512.png /app/share/icons/hicolor/512x512/apps/run.suite.sync.png
     sources:
       - type: dir
-        path: ../../apps/sync/app/release/linux-unpacked
+        path: ../../.artifacts/sync-app/linux-unpacked
         dest: app
       - type: file
         path: run.suite.sync

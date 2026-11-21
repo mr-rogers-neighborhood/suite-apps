@@ -36,6 +36,15 @@ this file does not invent them; every release from here adds its section first.
   relay keeps one fingerprint across restarts. A bind that fails now rejects with the listen error
   instead of surfacing as an uncaught exception from the WebSocket server.
 
+### Fixed
+
+- **The Flatpak no longer ships a copy of its own build.** The app depends on `@suite/sync-server`,
+  whose package root is `apps/sync`, and electron-builder copied that whole directory into the
+  asar — including `app/release`, the Electron distribution being built. A nested 224 MB `electron`
+  made the install 878.5 MB. The unpacked build now lives outside the package at
+  `.artifacts/sync-app`, the asar carries only the server's `dist`, and `package:dir` fails if a
+  second Electron, a nested `linux-unpacked` or an oversized tree comes back.
+
 ### Removed
 
 - **The relay tarball release.** `scripts/release.mjs` no longer builds, signs or uploads a

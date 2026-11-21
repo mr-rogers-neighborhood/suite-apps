@@ -117,7 +117,10 @@ const APPS = {
     manifest: join(ROOT, "packaging", "flatpak", "run.suite.sync.yml"),
     desktop: join(ROOT, "packaging", "flatpak", "run.suite.sync.desktop"),
     metainfo: join(ROOT, "packaging", "flatpak", "run.suite.sync.metainfo.xml"),
-    unpacked: join(ROOT, "apps", "sync", "app", "release", "linux-unpacked"),
+    // Outside apps/sync: the app depends on @suite/sync-server, whose package root that is, so
+    // an output inside it would be copied into the app as a dependency.
+    unpacked: join(ROOT, ".artifacts", "sync-app", "linux-unpacked"),
+    verify: join(ROOT, "apps", "sync", "app", "scripts", "check-package.mjs"),
   },
 };
 
@@ -389,6 +392,9 @@ if (!existsSync(app.unpacked)) {
   process.stderr.write(`missing ${app.unpacked}; run without --no-build\n`);
   process.exit(1);
 }
+
+// `--no-build` reuses a tree this run did not produce, so check it before it becomes a Flatpak.
+if (app.verify) run(process.execPath, [app.verify, app.unpacked]);
 
 const manifestPath = preRelease ? generatePreReleaseManifest() : app.manifest;
 mkdirSync(buildDir, { recursive: true });

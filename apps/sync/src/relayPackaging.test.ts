@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parseServeOptions } from "./cli.js";
@@ -29,6 +29,22 @@ function withoutComment(line: string): string {
 }
 
 describe("relay packaging", () => {
+  it("keeps electron-builder's output out of the package it copies", () => {
+    // @suite/sync-server's package root is `apps/sync`, and the app depends on it, so an output
+    // inside that tree is packaged back into the app as a second Electron. The script checks the
+    // built tree; this checks the decision that makes it true, before a package is built.
+    const config = read("app/electron-builder.yml");
+    const output = /^directories:\n(?:.*\n)*? {2}output: (\S+)$/mu.exec(config)?.[1];
+    expect(output).toBeDefined();
+    expect(relative(ROOT, resolve(ROOT, "app", output ?? "")).startsWith("..")).toBe(true);
+    expect(config).toContain(
+      "!node_modules/@suite/sync-server/{app,docs,deploy,packages,scripts,src}/**",
+    );
+
+    const appPackage = JSON.parse(read("app/package.json")) as { scripts?: Record<string, string> };
+    expect(appPackage.scripts?.["package:dir"]).toContain("node scripts/check-package.mjs");
+  });
+
   it("every `serve` line in the how-to is a command this CLI accepts", () => {
     // The page wraps long commands with a trailing backslash. Join those lines
     // before splitting flags, or the parser sees the backslash as an argument.

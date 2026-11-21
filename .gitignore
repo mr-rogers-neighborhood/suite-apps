@@ -8,3 +8,5 @@ dist/
 *.log
 .DS_Store
 packaging/flatpak/.build/
+# Sync's unpacked build, outside apps/sync so electron-builder cannot package it back in.
+.artifacts/

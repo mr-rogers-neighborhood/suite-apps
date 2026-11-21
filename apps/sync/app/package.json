@@ -10,7 +10,7 @@
   "scripts": {
     "build:deps": "pnpm --filter @suite/sync --filter @suite/host --filter @suite/sync-server --workspace-concurrency=1 run build",
     "build": "pnpm run build:deps && tsc -p tsconfig.build.json && node scripts/stage.mjs",
-    "package:dir": "pnpm build && electron-builder --dir",
+    "package:dir": "pnpm build && electron-builder --dir && node scripts/check-package.mjs",
     "start": "electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
