@@ -258,7 +258,6 @@ directory, such as Orca, hides the real user installation; run with
 
 `run.suite.sync` is the install path for the relay. It is a Flatpak like the apps, and it has two
 entry points:
-
 - **The tray app.** `flatpak run run.suite.sync` keeps an embedded relay serving while its window is
   hidden. It shows the address, the relay code and the certificate fingerprint, starts and stops the
   relay, and can write the one autostart entry that starts it at login. The store lives in the app's
@@ -268,6 +267,12 @@ entry points:
   `ELECTRON_RUN_AS_NODE=1`, because the Flatpak base carries no Node runtime.
 
 [Leave a relay running](../../apps/sync/docs/how-to/relay.md) is the install and operation guide.
+
+Today it is installed from a checkout: `node scripts/flatpak.mjs --app sync` publishes it to
+`suite-local` and installs it. The public store does not carry `run.suite.sync` yet — it joins the
+store with the release that publishes the app — so `flatpak install --user suite run.suite.sync` is
+the command from that release on, not before. Every other sentence here about how the relay is
+installed, run and updated is true of the local build now.
 
 `suite-sync-<version>-<arch>.tar.gz` on `sync-v<version>` still exists: a tarball with the CLI, its
 JavaScript dependencies and a launcher, but not a Node runtime, plus a `SHA256SUMS` list signed by the

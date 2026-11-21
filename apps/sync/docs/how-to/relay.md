@@ -10,8 +10,9 @@ network that you did not put there.
 ## What you need
 
 - A machine on the same network as the devices you want to sync (or reachable over a VPN).
-- Flatpak, and the `run.suite.sync` install. The relay ships in the same app as the desktop tray, so
-  there is no separate runtime to install: the Flatpak carries its own.
+- Flatpak, and a way to get `run.suite.sync`: this checkout, through the build script, while the public
+  store does not carry the app yet, or the store once it does. The relay ships in the same app as the
+  desktop tray, so there is no separate runtime to install: the Flatpak carries its own.
 - A user session for the tray form; none for the headless form.
 
 Both forms are one build. The **tray app** is what a person with a desktop wants: it keeps the relay
@@ -20,7 +21,19 @@ binary runs the same CLI and prints the same startup lines.
 
 ## 1. Install the relay
 
-Add the store and install the app:
+Build it from this checkout:
+
+```sh
+node scripts/flatpak.mjs --app sync
+```
+
+That packages the unpacked build `apps/sync/app/release/linux-unpacked`, signs the repository summary
+with the store key, publishes it to `~/suite-flatpak/repo` and installs `run.suite.sync` from
+`suite-local`. The manifest is `packaging/flatpak/run.suite.sync.yml`; `--no-build` reuses an unpacked
+tree that already exists.
+
+The public store does not carry `run.suite.sync` yet. It arrives with the release that publishes the
+app, and from then on the ordinary store install is the shorter path:
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite \
@@ -28,9 +41,12 @@ flatpak remote-add --user --if-not-exists --from suite \
 flatpak install --user suite run.suite.sync
 ```
 
-A local build instead of the public store uses `node scripts/flatpak.mjs --app sync` (the manifest is
-`packaging/flatpak/run.suite.sync.yml`), which installs from `suite-local`. Either way `flatpak update
---user` is the update path; the app has no updater of its own.
+Until the store carries it, the local build above is the install path. A machine with no checkout to
+build from can still run the relay from the tarball the release script builds — a host install rather
+than a Flatpak, described in
+[Building and publishing a release](#building-and-publishing-a-release).
+
+Either install updates with `flatpak update --user`; the app has no updater of its own.
 
 Check what arrived:
 

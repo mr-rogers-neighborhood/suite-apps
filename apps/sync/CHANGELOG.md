@@ -21,7 +21,8 @@ this file does not invent them; every release from here adds its section first.
   relay runs in the app's own main process, so closing the window hides it to the tray and the relay
   keeps serving; the window shows the address, the relay code, the certificate fingerprint and the
   console, and can start or stop the relay. The same Flatpak is the headless relay:
-  `flatpak run --command=suite-sync run.suite.sync serve`.
+  `flatpak run --command=suite-sync run.suite.sync serve`. It is installed from a checkout with
+  `node scripts/flatpak.mjs --app sync` until the release that publishes the app to the store lands.
 - **Starting at login** writes one XDG autostart entry and nothing else outside the sandbox. The
   manifest grants exactly `--filesystem=xdg-config/autostart:create` for it.
 - **`@suite/host` can make the TLS pair it serves** (`ensureSelfSignedPair`), so an app that embeds a

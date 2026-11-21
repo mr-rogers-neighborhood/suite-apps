@@ -84,8 +84,13 @@ opens the console; a relay you run by hand uses `--tls-cert` and `--tls-key` as 
 
 ## Run the relay
 
-The relay ships as a Flatpak, `run.suite.sync`. [Leave a relay running](docs/how-to/relay.md) is the
-guide; the two ways to use the same build are:
+The relay ships as a Flatpak, `run.suite.sync`. Install it from this checkout with
+`node scripts/flatpak.mjs --app sync`, which publishes it to the local `suite-local` repository and
+installs it; the manifest is `packaging/flatpak/run.suite.sync.yml`. The public store does not carry it
+yet: it arrives with the release that publishes the app, and from then on `flatpak install --user
+suite run.suite.sync` is the shorter path. [Leave a relay running](docs/how-to/relay.md) is the guide.
+
+The two ways to use the same build are:
 
 - **A desktop app.** `flatpak run run.suite.sync` starts a tray item and a small window. The relay runs
   in the app's own main process, so closing the window hides it to the tray and the relay keeps
