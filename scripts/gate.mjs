@@ -19,7 +19,7 @@
  * Usage:
  *   node scripts/gate.mjs
  *   node scripts/gate.mjs --fresh
- *   node scripts/gate.mjs --only suite-canvas
+ *   node scripts/gate.mjs --only canvas
  *   node scripts/gate.mjs --no-e2e
  *   node scripts/gate.mjs --e2e
  *   node scripts/gate.mjs --dry
