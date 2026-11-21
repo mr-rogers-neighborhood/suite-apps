@@ -1,15 +1,15 @@
 import { type DateKey, todayKey } from "@suite/planner-core";
 import { create } from "zustand";
 
-type View = "today" | "inbox";
+import type { ViewId } from "../app/views";
 
 type UiState = {
-  view: View;
+  view: ViewId;
   selectedDate: DateKey;
   selectedTaskId: string | null;
   captureSignal: number;
   notice: string | null;
-  setView: (view: View) => void;
+  setView: (view: ViewId) => void;
   setSelectedDate: (date: DateKey) => void;
   selectTask: (id: string | null) => void;
   focusCapture: () => void;

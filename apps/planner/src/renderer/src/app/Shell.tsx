@@ -2,15 +2,15 @@ import { IconButton } from "@suite/ui";
 import { Menu } from "lucide-react";
 import { useState } from "react";
 import { DayCalendar } from "../calendar/DayCalendar";
-import { DayView } from "../day/DayView";
-import { InboxView } from "../inbox/InboxView";
 import { useUiStore } from "../store/uiStore";
 import { PlannerMark } from "./PlannerMark";
 import { Sidebar, SidebarDrawer } from "./Sidebar";
+import { resolveView, views } from "./views";
 
 export function Shell() {
   const view = useUiStore((state) => state.view);
   const [navOpen, setNavOpen] = useState(false);
+  const View = resolveView(views, view).component;
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
@@ -25,7 +25,7 @@ export function Shell() {
           <PlannerMark size="sm" />
           <span className="text-[15px] font-semibold tracking-tight">Suite Planner</span>
         </header>
-        {view === "today" ? <DayView /> : <InboxView />}
+        <View />
       </div>
       <DayCalendar />
     </div>

@@ -1,11 +1,12 @@
 import { todayKey } from "@suite/planner-core";
 import { Button, IconButton, Modal, PrivacyLine } from "@suite/ui";
-import { Download, Inbox, Sun, Upload, X } from "lucide-react";
+import { Download, Upload, X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { getBridge } from "../platform/bridge";
 import { useUiStore } from "../store/uiStore";
 import { ThemePicker } from "../theme/ThemePicker";
 import { PlannerMark } from "./PlannerMark";
+import { views } from "./views";
 
 /**
  * The desktop rail.
@@ -95,25 +96,22 @@ function SidebarContent({
       </div>
 
       <nav aria-label="Primary" className="flex flex-col gap-1 px-3">
-        <NavItem
-          active={view === "today"}
-          icon={<Sun size={15} />}
-          label="Today"
-          onClick={() => {
-            setView("today");
-            setSelectedDate(todayKey());
-            onNavigate?.();
-          }}
-        />
-        <NavItem
-          active={view === "inbox"}
-          icon={<Inbox size={15} />}
-          label="Inbox"
-          onClick={() => {
-            setView("inbox");
-            onNavigate?.();
-          }}
-        />
+        {Object.values(views).map((destination) => {
+          const Icon = destination.icon;
+          return (
+            <NavItem
+              key={destination.id}
+              active={view === destination.id}
+              icon={<Icon size={15} />}
+              label={destination.label}
+              onClick={() => {
+                setView(destination.id);
+                if (destination.id === "today") setSelectedDate(todayKey());
+                onNavigate?.();
+              }}
+            />
+          );
+        })}
       </nav>
 
       <div className="mt-6 px-5">

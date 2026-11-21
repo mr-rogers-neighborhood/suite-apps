@@ -18,6 +18,7 @@ The rules that shape Planner.
   one is refused with a sentence naming Planner and both versions, and is never rewritten by an
   older build. Schema 2 added `settings.notificationsAskedAt`.
 - Capture is one line: project, tag, estimate, priority and time are parsed from the text.
+- Navigation renders from one view registry. An id the build does not register opens today.
 - UI uses Tailwind v4 with Radix primitives. There is no Turborepo.
 - The gate is local: `pnpm check` to edit, `pnpm verify` for the full gate.
 - Sync is a designed seam with no transport yet.

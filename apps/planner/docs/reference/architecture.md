@@ -54,6 +54,14 @@ replaces its replica and re-subscribes.
 **Reminders.** Main keeps its own document, so the scheduler ticks with no window open. A due task
 gets `remindedAt` as a leaf write, which is what stops it repeating.
 
+## Navigation
+
+`src/renderer/src/app/views.ts` is the one registry of surfaces: an id, label, icon and component per
+entry. The rail renders the registry in order and the shell renders the resolved component, so a new
+surface is an entry and its component, not an edit to `Shell.tsx`, `Sidebar.tsx` and the store. The
+rail's "Soon" list stays for surfaces that do not exist yet. An id this build does not register — a
+store written by a different build — opens `today` rather than an empty pane.
+
 ## Why main is the authority
 
 The renderer is sandboxed and its lifetime is a window. The scheduler has to outlive the window, and
