@@ -31,13 +31,32 @@ export const IMMUTABLE_CACHE_CONTROL = "public,max-age=31536000,immutable";
 export const NO_CACHE_CONTROL = "no-cache";
 
 /** Directories whose files are immutable. */
-export const IMMUTABLE_PREFIXES = ["objects/", "refs/"];
+export const IMMUTABLE_PREFIXES = ["objects/", "refs/", "summaries/"];
 
-/** The files that change on every publication and are re-fetched each time. */
-export const MUTABLE_FILES = ["summary", "summary.sig", `${REMOTE_NAME}.flatpakrepo`];
+/**
+ * The files that change on every publication and are re-fetched each time.
+ *
+ * `summary.idx` is not optional: an OSTree client asks for it first and uses it
+ * to fetch a smaller cached summary under `summaries/`. Publishing the summary
+ * without its index (or without the `summaries/` tree the index names) leaves a
+ * client on the previous ref set or fails it outright.
+ */
+export const MUTABLE_FILES = [
+  "summary",
+  "summary.sig",
+  "summary.idx",
+  "summary.idx.sig",
+  `${REMOTE_NAME}.flatpakrepo`,
+];
 
 /** The only CloudFront paths a publication invalidates, in this order. */
-export const INVALIDATION_PATHS = [`/summary`, `/summary.sig`, `/${REMOTE_NAME}.flatpakrepo`];
+export const INVALIDATION_PATHS = [
+  `/summary`,
+  `/summary.sig`,
+  `/summary.idx`,
+  `/summary.idx.sig`,
+  `/${REMOTE_NAME}.flatpakrepo`,
+];
 
 /**
  * One base URL, with exactly one trailing slash.
@@ -135,8 +154,10 @@ function s3Url(bucket, key) {
  *
  * - The content-addressed trees are synced without `--delete`: an old object is
  *   harmless, and deleting one would break a client mid-update.
- * - Only `summary`, `summary.sig` and the `.flatpakrepo` change from one
- *   publication to the next, so only they are no-cache.
+ * - Only the summary names (`summary`, `summary.sig`, `summary.idx`,
+ *   `summary.idx.sig`) and the `.flatpakrepo` change from one publication to the
+ *   next, so only they are no-cache. `summaries/` holds content-addressed cache
+ *   entries, so it is immutable.
  * - The `.flatpakrepo` is read from the generated file beside the state
  *   directory, not from the repository, because the repository holds the bytes
  *   every remote shares while the file embeds this publication's URL.
@@ -169,6 +190,15 @@ export function s3UploadCommands({ repo, flatpakrepoPath, bucket }) {
     ]),
     aws([
       "s3",
+      "sync",
+      `${repo}/summaries`,
+      s3Url(bucket, "summaries"),
+      "--cache-control",
+      cache("summaries/"),
+      "--no-progress",
+    ]),
+    aws([
+      "s3",
       "cp",
       `${repo}/summary`,
       s3Url(bucket, "summary"),
@@ -182,6 +212,22 @@ export function s3UploadCommands({ repo, flatpakrepoPath, bucket }) {
       s3Url(bucket, "summary.sig"),
       "--cache-control",
       cache("summary.sig"),
+    ]),
+    aws([
+      "s3",
+      "cp",
+      `${repo}/summary.idx`,
+      s3Url(bucket, "summary.idx"),
+      "--cache-control",
+      cache("summary.idx"),
+    ]),
+    aws([
+      "s3",
+      "cp",
+      `${repo}/summary.idx.sig`,
+      s3Url(bucket, "summary.idx.sig"),
+      "--cache-control",
+      cache("summary.idx.sig"),
     ]),
     aws([
       "s3",

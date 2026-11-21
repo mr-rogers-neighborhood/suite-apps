@@ -102,8 +102,8 @@ describe("S3 preconditions", () => {
 describe("the S3 upload commands", () => {
   const steps = s3UploadCommands({ repo, flatpakrepoPath, bucket });
 
-  it("syncs the two immutable trees without deleting anything", () => {
-    assert.equal(steps.length, 5);
+  it("syncs the three immutable trees without deleting anything", () => {
+    assert.equal(steps.length, 8);
     assert.deepEqual(steps[0].args.slice(0, 4), [
       "s3",
       "sync",
@@ -116,22 +116,31 @@ describe("the S3 upload commands", () => {
       `${repo}/refs`,
       `s3://${bucket}/refs`,
     ]);
+    assert.deepEqual(steps[2].args.slice(0, 4), [
+      "s3",
+      "sync",
+      `${repo}/summaries`,
+      `s3://${bucket}/summaries`,
+    ]);
     for (const step of steps) assert.ok(!step.args.includes("--delete"));
   });
 
-  it("gives objects and refs the immutable cache header", () => {
+  it("gives objects, refs and the summary cache the immutable header", () => {
     assert.equal(cacheControlOf(steps[0]), IMMUTABLE_CACHE_CONTROL);
     assert.equal(cacheControlOf(steps[1]), IMMUTABLE_CACHE_CONTROL);
+    assert.equal(cacheControlOf(steps[2]), IMMUTABLE_CACHE_CONTROL);
   });
 
-  it("copies the mutable files with no-cache", () => {
-    const copies = steps.slice(2).map((step) => step.args.slice(0, 4));
+  it("copies the mutable files, including the summary index, with no-cache", () => {
+    const copies = steps.slice(3).map((step) => step.args.slice(0, 4));
     assert.deepEqual(copies, [
       ["s3", "cp", `${repo}/summary`, `s3://${bucket}/summary`],
       ["s3", "cp", `${repo}/summary.sig`, `s3://${bucket}/summary.sig`],
+      ["s3", "cp", `${repo}/summary.idx`, `s3://${bucket}/summary.idx`],
+      ["s3", "cp", `${repo}/summary.idx.sig`, `s3://${bucket}/summary.idx.sig`],
       ["s3", "cp", flatpakrepoPath, `s3://${bucket}/suite.flatpakrepo`],
     ]);
-    for (const step of steps.slice(2)) assert.equal(cacheControlOf(step), NO_CACHE_CONTROL);
+    for (const step of steps.slice(3)) assert.equal(cacheControlOf(step), NO_CACHE_CONTROL);
   });
 });
 
@@ -146,7 +155,13 @@ describe("the CloudFront invalidation", () => {
       "--paths",
     ]);
     assert.deepEqual(step.args.slice(5), INVALIDATION_PATHS);
-    assert.deepEqual(INVALIDATION_PATHS, ["/summary", "/summary.sig", "/suite.flatpakrepo"]);
+    assert.deepEqual(INVALIDATION_PATHS, [
+      "/summary",
+      "/summary.sig",
+      "/summary.idx",
+      "/summary.idx.sig",
+      "/suite.flatpakrepo",
+    ]);
   });
 });
 
