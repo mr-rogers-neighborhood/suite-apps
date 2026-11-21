@@ -6,5 +6,6 @@ coverage/
 # The host store a local `serve` writes.
 .suite-sync/
 
-# Release artifacts: built by scripts/release.mjs, never committed.
+# Build output: `pnpm --filter @suite/sync-app package:dir`, or the Flatpak
+# script that runs it, writes the unpacked app elsewhere. Never committed.
 /dist/
