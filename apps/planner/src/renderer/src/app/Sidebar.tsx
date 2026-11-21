@@ -114,13 +114,6 @@ function SidebarContent({
         })}
       </nav>
 
-      <div className="mt-6 px-5">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-faint">Soon</p>
-        <ul className="mt-2 space-y-1.5 text-[13px] text-faint">
-          <li>Rituals</li>
-        </ul>
-      </div>
-
       <div className="mt-auto space-y-3 border-t border-line p-4">
         <div className="flex gap-2">
           <Button size="sm" className="flex-1" onClick={() => void exportWorkspace()}>

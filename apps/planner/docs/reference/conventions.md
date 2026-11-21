@@ -121,7 +121,7 @@ Document data is owned by the Loro document.
 A reminder is document data (`remindAt`, `remindedAt`), not a UI timer. A focus countdown derives from
 a persisted session, so a reload resumes it.
 
-The Focus surface is described in [focus.md](focus.md).
+The Focus surface is described in [focus.md](focus.md) and the plan and shutdown rituals in [rituals.md](rituals.md).
 
 ## Accessibility
 
