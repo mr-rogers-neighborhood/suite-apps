@@ -70,6 +70,7 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
     status,
     members: service === null ? [] : service.members(),
     friendCode: service === null ? "" : service.friendCode(),
+    friendLink: service === null ? "" : service.friendLink(),
     contacts: (service === null ? [] : service.contacts()).map((contact) => ({
       code: contact.code,
       name: contact.name,

@@ -1,10 +1,16 @@
 import type { SyncInfo } from "@suite/planner-core";
-import { formatFriendCode, parseFriendCode } from "@suite/sync";
+import {
+  formatFriendCode,
+  formatFriendLink,
+  parseContactInput,
+  parseFriendCode,
+} from "@suite/sync";
 import { Button, Field, IconButton, Modal, SyncPill } from "@suite/ui";
 import { Check, Copy, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getBridge } from "../platform/bridge";
+import { FriendQr } from "./FriendQr";
 import { roleLabel, syncLabel, syncPeople, syncSentence, syncSituation } from "./syncState";
 
 const LOCAL_RELAY = "ws://127.0.0.1:8787/sync";
@@ -65,6 +71,7 @@ function SyncDialog({
   const [friendCode, setFriendCode] = useState("");
   const [friendName, setFriendName] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -74,6 +81,7 @@ function SyncDialog({
     setProblem(null);
     setCopied(false);
     setCodeCopied(false);
+    setLinkCopied(false);
   }, [open]);
 
   const status = info?.status ?? { state: "off" as const };
@@ -155,11 +163,32 @@ function SyncDialog({
       .catch(() => setProblem("That code could not be copied. Select it and copy it by hand."));
   }
 
+  function copyFriendLink(): void {
+    const shown = friendLinkFor(info?.friendLink ?? null, info?.friendCode ?? "");
+    const clipboard = navigator.clipboard;
+    if (clipboard === undefined) {
+      setProblem("That link could not be copied. Select it and copy it by hand.");
+      return;
+    }
+    void clipboard
+      .writeText(shown)
+      .then(() => setLinkCopied(true))
+      .catch(() => setProblem("That link could not be copied. Select it and copy it by hand."));
+  }
+
   function addFriend(): void {
     void run(async () => {
+      // A link and a code are two forms of one value; the protocol reads whichever arrived.
+      // A refusal is its own sentence, and nothing reaches main.
+      const contact = parseContactInput(friendCode);
+      if (!contact.ok) {
+        setProblem(contact.reason);
+        return;
+      }
       const next = await getBridge().syncAddContact?.({
-        code: friendCode.trim(),
+        code: contact.value.code,
         name: friendName.trim(),
+        ...(contact.value.publicKey !== null ? { publicKey: contact.value.publicKey } : {}),
       });
       if (next !== undefined) onInfo(next);
       setFriendCode("");
@@ -190,11 +219,13 @@ function SyncDialog({
         code={friendCode}
         name={friendName}
         copied={codeCopied}
+        linkCopied={linkCopied}
         busy={busy}
         onCode={setFriendCode}
         onName={setFriendName}
         onAdd={addFriend}
         onCopy={copyFriendCode}
+        onCopyLink={copyFriendLink}
         onForget={forgetFriend}
       />
 
@@ -440,26 +471,31 @@ function FriendsSection({
   code,
   name,
   copied,
+  linkCopied,
   busy,
   onCode,
   onName,
   onAdd,
   onCopy,
+  onCopyLink,
   onForget,
 }: {
   readonly info: SyncInfo | null;
   readonly code: string;
   readonly name: string;
   readonly copied: boolean;
+  readonly linkCopied: boolean;
   readonly busy: boolean;
   readonly onCode: (value: string) => void;
   readonly onName: (value: string) => void;
   readonly onAdd: () => void;
   readonly onCopy: () => void;
+  readonly onCopyLink: () => void;
   readonly onForget: (code: string) => void;
 }) {
   const contacts = info?.contacts ?? [];
   const ownCode = friendCodeDisplay(info?.friendCode ?? "");
+  const ownLink = friendLinkFor(info?.friendLink ?? null, info?.friendCode ?? "");
 
   return (
     <section className="mt-4 rounded-lg border border-line bg-panel p-3">
@@ -484,6 +520,28 @@ function FriendsSection({
           </Button>
         </div>
       </div>
+
+      {ownLink === "" ? null : (
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] leading-relaxed text-muted">
+              Or send this link. A scan adds you in one step; the code above is the same value typed
+              by hand.
+            </p>
+            <code
+              data-testid="friend-link"
+              className="mt-1 block truncate rounded-md border border-line bg-panel px-2 py-1 font-mono text-[10px] text-ink"
+            >
+              {ownLink}
+            </code>
+            <Button size="sm" variant="secondary" disabled={busy} onClick={onCopyLink}>
+              {linkCopied ? <Check size={13} /> : <Copy size={13} />}
+              {linkCopied ? "Link copied" : "Copy link"}
+            </Button>
+          </div>
+          <FriendQr payload={ownLink} />
+        </div>
+      )}
 
       <div className="mt-3 border-t border-line pt-3">
         <p className="text-[12px] font-medium text-ink">People you know</p>
@@ -521,9 +579,9 @@ function FriendsSection({
       <div className="mt-3 border-t border-line pt-3">
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <Field
-            label="Friend code"
+            label="Friend code or link"
             value={code}
-            hint="Sixteen symbols, four groups of four."
+            hint="Sixteen symbols, or a suite://friend link from a scan."
             onChange={(event) => onCode(event.target.value)}
           />
           <Field
@@ -550,4 +608,17 @@ function FriendsSection({
 function friendCodeDisplay(code: string): string {
   const parsed = parseFriendCode(code);
   return parsed.ok ? formatFriendCode(parsed.code) : code;
+}
+
+/**
+ * The link main built, or the code alone when no key reached the renderer.
+ *
+ * Main includes the install key so a scan completes a contact; a host that only knows
+ * the code still gets a link that names the installation, and the QR shows exactly the
+ * link beside it either way.
+ */
+function friendLinkFor(link: string | null, code: string): string {
+  if (link !== null && link.trim() !== "") return link;
+  const parsed = parseFriendCode(code);
+  return parsed.ok ? formatFriendLink({ code: parsed.code, publicKey: null }) : "";
 }

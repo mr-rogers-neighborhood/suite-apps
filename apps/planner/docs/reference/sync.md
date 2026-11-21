@@ -23,8 +23,8 @@ This page is the seam. The protocol is owned by
 4. The joining machine pastes it under **Join with an invitation**. A code in **People you know** is
    the explicit trust act: an invitation from a contact connects without a second certificate
    question, while an invitation from a code that is not listed is refused with the code to add. A
-   person with no invitation can still add the code from **Your friend code** and be ready for the
-   next one.
+   person with no invitation can still add a friend code or the `suite://friend` link from **Your
+   friend code** — the dialog draws that same link as a QR — and be ready for the next one.
 5. **Leave** stops the connection. The file, the group and the membership stay; sharing again
    reconnects.
 

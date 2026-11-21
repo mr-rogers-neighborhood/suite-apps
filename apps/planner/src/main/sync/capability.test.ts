@@ -33,6 +33,7 @@ function fakeService() {
     status: () => state,
     identity: async () => ({ deviceId, publicKey: "public-key" }),
     friendCode: () => "0123456789ABCDEF",
+    friendLink: () => "suite://friend?c=0123456789ABCDEF",
     contacts: () => [],
     async addContact() {
       return [];

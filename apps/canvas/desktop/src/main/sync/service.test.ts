@@ -10,6 +10,7 @@ import {
   encodeBase64,
   encodeKeyPackageBytes,
   joinWorkspaceGroup,
+  parseContactInput,
   parseInvite,
   type RelayWebSocket,
   seal,
@@ -532,6 +533,10 @@ describe("inviting someone in", () => {
     const identity = await service.identity();
 
     expect(service.friendCode()).toBe(deriveFriendCode(identity.publicKey));
+    expect(parseContactInput(service.friendLink())).toEqual({
+      ok: true,
+      value: { code: service.friendCode(), publicKey: identity.publicKey },
+    });
     await service.addContact({
       code: service.friendCode(),
       name: "Ada",

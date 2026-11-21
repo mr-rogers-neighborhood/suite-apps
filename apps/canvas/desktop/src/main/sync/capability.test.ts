@@ -40,6 +40,7 @@ function fakeService() {
       calls.publish.push(update);
     },
     friendCode: () => "0123456789ABCDEF",
+    friendLink: () => "suite://friend?c=0123456789ABCDEF",
     contacts: () => [],
     async addContact() {
       return [];

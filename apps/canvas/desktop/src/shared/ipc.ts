@@ -123,6 +123,14 @@ export interface SyncInfo {
   readonly members: readonly SyncMember[];
   /** The code this installation shows another person who wants to add it. */
   readonly friendCode: string;
+  /**
+   * The same code as a `suite://friend` link, with the install key a scan would carry.
+   *
+   * Absent when there is no identity yet. Main builds it because the key lives there; a
+   * renderer that only holds the code can still show the code, but not complete a contact
+   * on the spot.
+   */
+  readonly friendLink?: string;
   /** The people this installation knows, whichever workspace is open. */
   readonly contacts: readonly SyncContact[];
   /**

@@ -86,6 +86,13 @@ export type SyncInfo = {
   readonly members: readonly SyncMember[];
   /** The code this installation shows another person who wants to add it. */
   readonly friendCode: string;
+  /**
+   * The same code as a `suite://friend` link, with the install key a scan would carry.
+   *
+   * Built by main, because the key lives there. A host without an identity omits it; the
+   * dialog then shows the code alone.
+   */
+  readonly friendLink?: string;
   /** The people this installation knows, whichever workspace is open. */
   readonly contacts: readonly SyncContact[];
 };

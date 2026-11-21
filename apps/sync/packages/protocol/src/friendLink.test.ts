@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { deriveFriendCode } from "./friendCode.js";
-import { formatFriendLink, parseFriendLink } from "./friendLink.js";
+import { deriveFriendCode, formatFriendCode, parseFriendCode } from "./friendCode.js";
+import { formatFriendLink, parseContactInput, parseFriendLink } from "./friendLink.js";
 
 function publicKey(): string {
   const { publicKey: key } = generateKeyPairSync("ed25519");
@@ -40,6 +40,33 @@ describe("a friend link", () => {
     expect(parseFriendLink(link)).toEqual({
       ok: false,
       reason: "That friend link does not match its own code.",
+    });
+  });
+
+  it("reads a link and a bare code as the same contact value", () => {
+    const key = publicKey();
+    const code = deriveFriendCode(key);
+    const link = formatFriendLink({ code, publicKey: key });
+    const fromLink = parseContactInput(link);
+    const fromCode = parseContactInput(formatFriendCode(code));
+    expect(fromLink).toEqual({ ok: true, value: { code, publicKey: key } });
+    expect(fromCode).toEqual({ ok: true, value: { code, publicKey: null } });
+    // Round trip: the parsed value writes the same link a scan would carry.
+    if (!fromLink.ok) throw new Error(fromLink.reason);
+    expect(formatFriendLink(fromLink.value)).toBe(link);
+    if (!fromCode.ok) throw new Error(fromCode.reason);
+    expect(formatFriendLink(fromCode.value)).toBe(formatFriendLink({ code, publicKey: null }));
+  });
+
+  it("refuses a malformed link with the reason a malformed code gets", () => {
+    const short = parseFriendCode("ABC");
+    if (short.ok) throw new Error("ABC is not a friend code");
+    expect(parseContactInput("suite://friend?c=ABC")).toEqual({ ok: false, reason: short.reason });
+    expect(parseContactInput("ABC")).toEqual({ ok: false, reason: short.reason });
+    expect(parseContactInput("https://example.com/friend")).toMatchObject({ ok: false });
+    expect(parseContactInput("   ")).toEqual({
+      ok: false,
+      reason: "Paste or type a friend code first.",
     });
   });
 

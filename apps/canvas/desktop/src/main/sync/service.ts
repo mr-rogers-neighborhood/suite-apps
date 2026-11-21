@@ -17,6 +17,7 @@ import {
   type FriendInviteBody,
   type FriendInviteRejection,
   formatFriendCode,
+  formatFriendLink,
   formatInvite,
   frameRejection,
   friendInvitePayload,
@@ -111,6 +112,8 @@ export interface SyncService {
   identity(): Promise<Pick<DeviceIdentity, "deviceId" | "publicKey">>;
   /** The code this installation shows a person when they want to be added. */
   friendCode(): string;
+  /** The same code as `suite://friend`, including the key a scan would carry. */
+  friendLink(): string;
   /** The people this installation has chosen to know, as the file holds them. */
   contacts(): readonly SyncContact[];
   /** Add a person by code, or complete one whose key arrived with the code. */
@@ -768,6 +771,8 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
     identity: async () => ({ deviceId: identity.deviceId, publicKey: identity.publicKey }),
 
     friendCode: () => ownFriendCode(),
+
+    friendLink: () => formatFriendLink({ code: ownFriendCode(), publicKey: identity.publicKey }),
 
     contacts: () => contacts,
 

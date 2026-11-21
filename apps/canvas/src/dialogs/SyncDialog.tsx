@@ -1,10 +1,17 @@
-import { friendCodeLabel } from "@suite/sync";
+import { friendCodeLabel, parseContactInput } from "@suite/sync";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { syncPresentation } from "../feedback/syncState";
 import { useEscapeLayer } from "../shell/escapeLayers";
 import { useCanvasStore } from "../store/useCanvasStore";
-import { FriendsSection, KitStep, LocalFace, SyncedFace, UnlockStep } from "./SyncFaces";
+import {
+  FriendsSection,
+  friendLinkFor,
+  KitStep,
+  LocalFace,
+  SyncedFace,
+  UnlockStep,
+} from "./SyncFaces";
 import { useFocusTrap } from "./useFocusTrap";
 
 /**
@@ -57,6 +64,7 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
   const [friendCode, setFriendCode] = useState("");
   const [friendName, setFriendName] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEscapeLayer(onClose, open);
   useFocusTrap(panel, open);
@@ -66,6 +74,7 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
     setProblem(null);
     setStep({ name: "main" });
     setCodeCopied(false);
+    setLinkCopied(false);
     // The hub reports where it listens, so sharing does not begin with copying an address out
     // of another window. A hub that is not running leaves the default in place and editable.
     void refreshHub().then(() => {
@@ -113,7 +122,18 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
 
   const addFriend = () =>
     run(async () => {
-      await addContact({ code: friendCode.trim(), name: friendName.trim() });
+      // A link and a code are two forms of one value, so the protocol reads whichever the
+      // person pasted. A refusal is the protocol's own sentence, not a second guess here.
+      const contact = parseContactInput(friendCode);
+      if (!contact.ok) {
+        setProblem(contact.reason);
+        return;
+      }
+      await addContact({
+        code: contact.value.code,
+        name: friendName.trim(),
+        ...(contact.value.publicKey !== null ? { publicKey: contact.value.publicKey } : {}),
+      });
       setFriendCode("");
       setFriendName("");
     });
@@ -129,6 +149,19 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
       .writeText(shown)
       .then(() => setCodeCopied(true))
       .catch(() => setProblem("That code could not be copied. Select it and copy it by hand."));
+  };
+
+  const copyFriendLink = () => {
+    const shown = friendLinkFor(sync?.friendLink ?? null, sync?.friendCode ?? "");
+    const clipboard = navigator.clipboard;
+    if (clipboard === undefined) {
+      setProblem("That link could not be copied. Select it and copy it by hand.");
+      return;
+    }
+    void clipboard
+      .writeText(shown)
+      .then(() => setLinkCopied(true))
+      .catch(() => setProblem("That link could not be copied. Select it and copy it by hand."));
   };
 
   const face =
@@ -180,15 +213,18 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
         {step.name === "main" ? (
           <FriendsSection
             friendCode={sync?.friendCode ?? ""}
+            friendLink={friendLinkFor(sync?.friendLink ?? null, sync?.friendCode ?? "")}
             contacts={sync?.contacts ?? []}
             code={friendCode}
             name={friendName}
             copied={codeCopied}
+            linkCopied={linkCopied}
             busy={busy}
             onCode={setFriendCode}
             onName={setFriendName}
             onAdd={addFriend}
             onCopy={copyFriendCode}
+            onCopyLink={copyFriendLink}
             onForget={(code) =>
               void run(async () => {
                 await forgetContact(code);
