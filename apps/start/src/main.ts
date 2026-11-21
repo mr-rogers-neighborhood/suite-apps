@@ -1434,7 +1434,19 @@ function registerIpc(): void {
     // closest true answer, and it is the one the backend asks `flatpak info` for.
     if (found.app.flatpak !== undefined) {
       const location = await backend.location(found);
-      if (location !== null) await shell.openPath(location);
+      if (location === null) return;
+      // The deployment is outside the hub's sandbox. A Flatpak Start asks the
+      // host's file manager, which is the only process that can see it.
+      if (host.sandboxed) {
+        try {
+          await host.run({ file: "xdg-open", args: [location] });
+        } catch {
+          // No file manager, or no handler for a directory: there is nothing
+          // else honest to do, and the card stays as it was.
+        }
+      } else {
+        await shell.openPath(location);
+      }
       return;
     }
     shell.showItemInFolder(found.app.executable);

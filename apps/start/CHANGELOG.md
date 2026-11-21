@@ -9,11 +9,20 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.4.1] - 2026-11-21
+
 ### Changed
 
 - **Flatpak is the default when both forms are installed.** A Flatpak deployment now wins over an
   AppImage copy of the same app; the copy is listed as a duplicate to remove instead of being shown
   as the installed app. A per-app switch between the two is not built yet.
+
+### Fixed
+
+- **Reveal works for a Flatpak app.** The deployment lives outside Start's sandbox, so a sandboxed
+  hub asks the host's file manager to open it instead of failing silently.
 
 ## [0.4.0] - 2026-11-21
 
