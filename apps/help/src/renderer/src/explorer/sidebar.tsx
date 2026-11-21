@@ -1,5 +1,5 @@
 import { Boxes, ChevronRight, FolderTree, Route, Search, X } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserTree } from "@/explorer/tree";
 import type {
   FolderNode,
@@ -285,6 +285,11 @@ function ModuleList({
   selectedModule: string | null;
   onSelect: (id: string) => void;
 }) {
+  const [gapsOnly, setGapsOnly] = useState(false);
+  const withProse = modules.filter(
+    (module) => Boolean(module.summary?.trim()) || module.noteCount > 0,
+  ).length;
+  const gaps = modules.filter((module) => !module.summary?.trim() && module.noteCount === 0).length;
   const groups = useMemo(() => {
     const groups = new Map<string, ModuleSummary[]>();
     for (const module of modules) {
@@ -307,8 +312,27 @@ function ModuleList({
 
   return (
     <div className="py-2 text-[13px]">
+      <div className="mb-2 flex items-center justify-between gap-2 border-b border-fd-border px-3 pb-2">
+        <span className="text-[10px] uppercase tracking-widest text-fd-muted-foreground">
+          {withProse}/{modules.length} with prose
+        </span>
+        <button
+          type="button"
+          onClick={() => setGapsOnly((value) => !value)}
+          className={`rounded border px-1.5 py-0.5 text-[10px] ${
+            gapsOnly
+              ? "border-amber-500/50 bg-amber-500/10 text-amber-600"
+              : "border-fd-border text-fd-muted-foreground hover:text-fd-foreground"
+          }`}
+          aria-pressed={gapsOnly}
+        >
+          needs prose {gaps}
+        </button>
+      </div>
       {["Apps", "Packages", "Tools", "Config"].map((group) => {
-        const items = groups.get(group);
+        const items = groups
+          .get(group)
+          ?.filter((module) => !gapsOnly || (!module.summary?.trim() && module.noteCount === 0));
         if (!items || items.length === 0) return null;
         return (
           <section key={group} className="mb-2">

@@ -24,7 +24,7 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "check": "biome check . && pnpm typecheck && vitest run",
-    "check:full": "pnpm check && pnpm build"
+    "check:full": "pnpm check && pnpm build && pnpm index:check"
   },
   "dependencies": {
     "@suite/desktop": "workspace:*",

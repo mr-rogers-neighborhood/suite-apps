@@ -18,6 +18,7 @@ owns its rules and its gate; this skill routes you there.
 | `suite-go` | `apps/go/AGENTS.md` | `node scripts/gate.mjs --only go` |
 | `suite-sync` | `apps/sync/README.md`, `docs/` | `node scripts/gate.mjs --only sync` |
 | `suite-start` | `apps/start/README.md`, `docs/` | `node scripts/gate.mjs --only start` |
+| `suite-help` | `apps/help/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only help` |
 
 If a change needs a sibling app edited, stop and coordinate.
 
@@ -43,14 +44,26 @@ runs the same `--fresh` gate there in a capped unit. Results are in
 
 ## Documentation
 
-Cross-app docs are in `docs/`: tutorials, how-to, reference and explanation. Each app keeps its own
-`apps/<app>/docs/` beside its code.
+Suite Help is the reader: Browser, Modules and Tours over one generated index of every file and
+declaration. Module narratives live in `docs/modules/`; tours in `docs/tours/`; the older pages under
+`docs/` are the handbook and notes archive. Each app keeps its own `apps/<app>/docs/` beside its
+code.
 
+- One module MDX, not one file MDX. A module narrative plus `## <node-id>` sections.
+- A tour is an ordered list of real node IDs. A composed `.tour.mjs` exists only when a path
+  crosses targets or needs an overlay.
+- Run `pnpm docs:index:check` with any docs change; `pnpm docs:coverage` reports gaps without
+  failing. `pnpm docs:explain <node-id>` scaffolds one note.
+- Prose is generated until a person reviews it. Only a person adds `reviewed: human`; an agent must
+  never add that marker to its own prose.
+- Do not launch `pnpm docs:dev`, Electron or Playwright in a headless session. Build and the
+  `index:check` are headless.
 - One fact has one home. Fix the owning page, link from the rest, and never restate a version.
-- Run `node scripts/docs-check.mjs` with any docs change; Canvas also runs `pnpm docs:check`,
-  `docs:symbols` and `shape`.
 - Current rules are in `docs/reference/decisions.md`, with one page per app. There is no ADR archive
   in the reading path.
+
+Every change lands through a branch or worktree and a pull request; a direct push to `main` is an
+explicit owner checkpoint.
 
 ## Cross-app flow
 
