@@ -1,9 +1,9 @@
-version: 0.2.4
+version: 0.3.0
 files:
-  - url: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/planner-v0.2.4/suite-planner-0.2.4-x86_64.AppImage
-    sha512: WqREfQkvEf4D0tDGSr2dC+V9yEBIujfq/VwOGBwiJFJ4LGGIOvFSKatfyaoTpjJa3SMwICpHdS5k/AQKZ5vY0w==
-    size: 143001594
-    blockMapSize: 149518
-path: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/planner-v0.2.4/suite-planner-0.2.4-x86_64.AppImage
-sha512: WqREfQkvEf4D0tDGSr2dC+V9yEBIujfq/VwOGBwiJFJ4LGGIOvFSKatfyaoTpjJa3SMwICpHdS5k/AQKZ5vY0w==
-releaseDate: '2026-11-20T11:00:21.204Z'
+  - url: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/planner-v0.3.0/suite-planner-0.3.0-x86_64.AppImage
+    sha512: KQRwY/0A4luXMzzmugDsIi2iDm6hT6Bey3nOcqiLgDR7umS3I1y8U+yOxqFMk70GVr9g8QnnbssInvoQelKpVw==
+    size: 143645213
+    blockMapSize: 150065
+path: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/planner-v0.3.0/suite-planner-0.3.0-x86_64.AppImage
+sha512: KQRwY/0A4luXMzzmugDsIi2iDm6hT6Bey3nOcqiLgDR7umS3I1y8U+yOxqFMk70GVr9g8QnnbssInvoQelKpVw==
+releaseDate: '2026-11-21T04:01:57.329Z'
