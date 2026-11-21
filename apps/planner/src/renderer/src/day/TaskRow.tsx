@@ -85,6 +85,7 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
         {editing ? (
           <input
             ref={inputRef}
+            aria-label={`Edit title for ${entry.task.title}`}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={commitTitle}
@@ -161,7 +162,7 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
         <DropdownMenu.Trigger asChild>
           <IconButton
             label={`Actions for ${entry.task.title}`}
-            className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
+            className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
           >
             <MoreHorizontal size={15} />
           </IconButton>

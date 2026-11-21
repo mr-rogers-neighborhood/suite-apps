@@ -34,7 +34,10 @@ export function PlannerLauncher({ onBegin }: { onBegin: () => void }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas px-6 py-10">
+    <main
+      aria-label="Planner start"
+      className="flex min-h-screen items-center justify-center bg-canvas px-6 py-10"
+    >
       <Launch
         mark={<PlannerMark size="md" />}
         title="Suite Planner"
@@ -72,6 +75,6 @@ export function PlannerLauncher({ onBegin }: { onBegin: () => void }) {
           </>
         }
       />
-    </div>
+    </main>
   );
 }

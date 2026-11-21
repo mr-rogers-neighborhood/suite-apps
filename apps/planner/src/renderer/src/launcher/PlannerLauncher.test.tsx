@@ -26,6 +26,9 @@ describe("PlannerLauncher", () => {
     render(<PlannerLauncher onBegin={() => {}} />);
     expect(screen.getByRole("heading", { level: 1, name: "Suite Planner" })).toBeInTheDocument();
     expect(screen.getByText(/lives in a file on this machine/u)).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "Planner start" })).toContainElement(
+      screen.getByRole("heading", { level: 1, name: "Suite Planner" }),
+    );
   });
 
   it("begins on New planner", () => {

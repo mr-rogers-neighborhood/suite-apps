@@ -46,6 +46,25 @@ function openMenu(title = "A task"): void {
   });
 }
 
+describe("TaskRow title editing", () => {
+  beforeEach(() => {
+    mocks.updateTask.mockReset();
+  });
+
+  afterEach(cleanup);
+
+  it("should rename the task in a labelled field", () => {
+    render(<TaskRow entry={entry()} tags={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "A task" }));
+    const field = screen.getByRole("textbox", { name: "Edit title for A task" });
+    fireEvent.change(field, { target: { value: "Renamed task" } });
+    fireEvent.blur(field);
+
+    expect(mocks.updateTask).toHaveBeenCalledWith("task-1", { title: "Renamed task" });
+  });
+});
+
 describe("TaskRow reminders", () => {
   beforeEach(() => {
     mocks.updateTask.mockReset();

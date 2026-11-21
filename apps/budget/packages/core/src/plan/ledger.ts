@@ -76,6 +76,10 @@ export function buildLedger(
     if (transaction.categoryId === READY_TO_ASSIGN) {
       incomeByMonth.set(month, (incomeByMonth.get(month) ?? 0) + transaction.amountMinor);
     } else if (transaction.categoryId === null) {
+      // A transfer between two on-budget accounts carries no category on either side. It moves
+      // money rather than spending it, so it is not a row that needs a category. Anything that
+      // crosses the budget boundary keeps the category the person chose and lands above.
+      if (transaction.transferId !== null) continue;
       const current = uncategorizedByMonth.get(month) ?? { count: 0, amountMinor: 0 };
       uncategorizedByMonth.set(month, {
         count: current.count + 1,

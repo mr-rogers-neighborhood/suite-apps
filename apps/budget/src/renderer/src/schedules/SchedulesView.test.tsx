@@ -60,6 +60,39 @@ describe("schedule auto-enter UI", () => {
     await waitFor(() => expect(commit).toHaveBeenCalled());
   });
 
+  it("should keep a due next date when only the payee changes", async () => {
+    const fixture = setup();
+    replica = fixture.replica;
+    const schedule = fixture.doc.createSchedule(
+      {
+        accountId: fixture.account.id,
+        categoryId: fixture.category.id,
+        payeeName: "Landlord",
+        amountMinor: -100_000,
+        frequency: "monthly",
+        anchorDate: "2026-01-15",
+      },
+      NOW,
+    );
+    fixture.doc.updateSchedule(schedule.id, { nextDate: "2026-02-15" }, NOW);
+
+    render(
+      <WorkspaceContext.Provider value={fixture.replica}>
+        <SchedulesView />
+      </WorkspaceContext.Provider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Landlord" }));
+    fireEvent.change(screen.getByLabelText("Payee"), { target: { value: "Landlord Inc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    await waitFor(() => {
+      expect(fixture.doc.listSchedules()[0]?.payeeName).toBe("Landlord Inc");
+    });
+    // Editing a name must not skip the occurrence that is already due.
+    expect(fixture.doc.listSchedules()[0]?.nextDate).toBe("2026-02-15");
+  });
+
   it("should show the batch total and undo it", async () => {
     const fixture = setup();
     replica = fixture.replica;
