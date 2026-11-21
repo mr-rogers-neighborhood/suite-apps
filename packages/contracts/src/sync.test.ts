@@ -137,18 +137,23 @@ describe("the sync capability", () => {
   it("carries only sealed frames and readable membership to the host side", async () => {
     const key = await newKey();
     const keyBytes = new Uint8Array(await crypto.subtle.exportKey("raw", key));
+    const keyHex = Array.from(keyBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const keyBase64 = btoa(String.fromCharCode(...keyBytes));
     const host = fakeHost([device]);
 
     await host.capability.send(await seal(key, documentText));
     await host.capability.send(await seal(key, '{"another":"private update"}'));
 
     expect(host.received).toHaveLength(2);
+    const hostText = host.received.map((frame) => decoder.decode(frame)).join(" ");
     for (const frame of host.received) {
       expect(containsBytes(frame, encoder.encode(documentText))).toBe(false);
       expect(containsBytes(frame, encoder.encode("unannounced acquisition"))).toBe(false);
       expect(containsBytes(frame, keyBytes)).toBe(false);
-      expect(decoder.decode(frame)).not.toContain("Quarterly board");
     }
+    expect(hostText).not.toContain("Quarterly board");
+    expect(hostText).not.toContain(keyHex);
+    expect(hostText).not.toContain(keyBase64);
 
     const notices: string[] = [];
     host.capability.onMembership((notice) => notices.push(JSON.stringify(notice)));
@@ -157,7 +162,8 @@ describe("the sync capability", () => {
     expect(notices).toHaveLength(1);
     expect(notices[0] ?? "").toContain(device.deviceId);
     expect(notices[0] ?? "").not.toContain("Quarterly board");
-    expect(notices[0] ?? "").not.toContain(keyBytes.toString());
+    expect(notices[0] ?? "").not.toContain(keyHex);
+    expect(notices[0] ?? "").not.toContain(keyBase64);
   });
 
   it("hands a sealed frame to the app, which is the only side that can open it", async () => {
