@@ -1,0 +1,25 @@
+---
+module: packages/contracts
+title: Contracts
+summary: The manifests, versions and capabilities that cross an app boundary.
+---
+
+The contracts package is the smallest shared language in the repository. It
+holds the shapes Start, the apps and the release tools agree on. It does not
+hold a document format or a UI component.
+
+## packages/contracts/src/appManifest.ts#suiteAppManifestSchema
+
+The manifest schema is the only place an app's declaration is validated. A
+field that a host needs at launch belongs here; a field that only the app reads
+does not.
+
+## packages/contracts/src/appManifest.ts#SuiteAppManifest
+
+The inferred type is what a consumer imports. Do not hand-write a second
+interface beside the schema: the two will disagree the first time a field moves.
+
+## packages/contracts/src/appManifest.ts#SUITE_PROTOCOL_PREFIX
+
+The protocol prefix is shared because both the hub and the app have to recognize
+the same deep link. It is not a routing table.

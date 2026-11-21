@@ -1,13 +1,37 @@
-# Fumadocs
+# tools/docs
 
-This site is built with [Fumadocs](https://fumadocs.dev) on Next.js. The APIs and conventions of Fumadocs may differ from your training data, so check its docs for the task at hand:
+The local documentation reader and code explorer, not an app. Read the repository `AGENTS.md` first,
+then `tools/docs/README.md` for the model and its limits.
 
-- Writing pages: https://fumadocs.dev/docs/next/markdown.md
-- Organizing pages and folders: https://fumadocs.dev/docs/next/page-conventions.md
-- Customizing the UI: https://fumadocs.dev/docs/next/guides/customize-ui.md
-- Changing the theme and colors: https://fumadocs.dev/docs/ui/theme.md
-- Upgrading Fumadocs: https://fumadocs.dev/docs/next/upgrade.md
-- Other tasks: https://fumadocs.dev/llms.txt lists every docs page.
+## Rules for this directory
+
+- The code, `docs/` and each app's `docs/` are the source of truth. Never edit `public/data/` or
+  `.generated/docs/`; run `pnpm docs:index` / `pnpm docs:dev` to regenerate.
+- Do not add a new Diátaxis page. The explorer is the structure; new explanations go in
+  `docs/modules/`, new guided paths in `docs/walkthroughs/`. `docs/` keeps the older notes archive.
+- One authored MDX per module, not per file. `docs/modules/<module>.mdx` holds the narrative and
+  `## <node-id>` notes. The explorer splits by file and declaration at render time.
+- A walkthrough is an ordered list of node IDs, not a copy of the code. Authored walks live in
+  `docs/walkthroughs/`; the full descent is generated.
+- Do not generate prose for every symbol. Compiler facts and optional notes; generated entries say
+  so.
+- Do not add `tools/docs` to `pnpm build`, the release path, or a shipped package.
+- Keep the explorer shell below the 3.5rem header. Both panes scroll independently; no page-level
+  sticky.
+
+## Commands
+
+```sh
+mise exec -- pnpm docs:index
+mise exec -- pnpm docs:dev
+mise exec -- pnpm docs:dev:bg
+mise exec -- pnpm docs:status
+mise exec -- pnpm docs:logs
+mise exec -- pnpm docs:stop
+mise exec -- pnpm docs:build
+mise exec -- pnpm docs:start
+mise exec -- pnpm docs:clean
+```
 
 <!-- BEGIN:nextjs-agent-rules -->
 

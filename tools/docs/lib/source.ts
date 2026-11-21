@@ -1,13 +1,16 @@
-import { llms, loader } from 'fumadocs-core/source';
-import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons';
-import { docsRoute } from './shared';
-import { defineDocs } from 'fumadocs-mdx/macro';
-import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
+import { llms, loader } from "fumadocs-core/source";
+import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons";
+import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
+import { defineDocs } from "fumadocs-mdx/macro";
+import { docsRoute } from "./shared";
 
 const docs = defineDocs({
-  dir: 'content/docs',
+  dir: ".generated/docs",
   docs: {
     schema: pageSchema,
+    postprocess: {
+      includeProcessedMarkdown: true,
+    },
   },
   meta: {
     schema: metaSchema,
@@ -21,10 +24,8 @@ export const source = loader({
   plugins: [lucideIconsPlugin()],
 });
 
-// Code Hike's JSX and Fumadocs' `includeProcessedMarkdown` currently disagree
-// (see README). The spike keeps the index but renders the summary only.
 export const docsLlms = llms(source, {
   renderPage: async (page) => `# ${page.data.title} (${page.url})
 
-${page.data.description ?? ""}`,
+${await page.data.getText("processed")}`,
 });

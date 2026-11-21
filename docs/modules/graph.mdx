@@ -1,0 +1,23 @@
+---
+module: apps/canvas/packages/graph
+title: Graph
+summary: Canvas's schema, typed Loro document and workspace file.
+---
+
+The graph package is the document layer Canvas calls. It owns the schema, the
+typed accessors and the file envelope. A component never reaches Loro directly.
+
+## apps/canvas/packages/graph/src/workspaceFile.ts#workspaceFileSchema
+
+This is the shape on disk. It is versioned because a file outlives a build; a
+change here needs a migration, not a comment.
+
+## apps/canvas/packages/graph/src/workspaceFile.ts#WORKSPACE_FILE_VERSION
+
+The version is the contract for readers. Bump it only with a migration path and
+a test that opens the previous shape.
+
+## apps/canvas/packages/graph/src/workspaceTemplate.ts#STARTER_TEMPLATES
+
+A new workspace is a template, not a special constructor. The first save and
+the thousandth save use the same validated shape.

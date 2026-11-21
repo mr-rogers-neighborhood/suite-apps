@@ -1,45 +1,129 @@
-# docs-spike
+# Suite docs reader
 
-This is a Next.js application generated with
-[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
+A local reader over the repository. **This is a development tool**, not a shipped app: it is
+excluded from the root build and release, has no deployment and no telemetry.
 
-Run development server:
+The reader is **not organized by Diátaxis**. Its structure is the explorer: Browser, Modules and
+Walkthroughs over one generated index of every file and declaration. Reference facts are derived;
+module MDX and walks are the authored layer.
 
-```bash
-npm run dev
-# or
-pnpm dev
-# or
-yarn dev
+`/docs` is the older notes archive. It stays readable, but it is not the primary interface.
+
+## Commands
+
+From the repository root:
+
+```sh
+mise exec -- pnpm docs:index     # build tools/docs/public/data
+mise exec -- pnpm docs:dev       # index, sync and start the dev server (foreground)
+mise exec -- pnpm docs:dev:bg    # the same, detached; log in .dev/docs.log
+mise exec -- pnpm docs:status    # TCP check on the docs port
+mise exec -- pnpm docs:logs      # follow the background dev log
+mise exec -- pnpm docs:stop      # stop whatever listens on the docs port
+mise exec -- pnpm docs:build     # index, sync and build the static pages
+mise exec -- pnpm docs:start     # serve the last build
+mise exec -- pnpm docs:clean     # remove .next, .generated, .source and public/data
 ```
 
-Open http://localhost:3000 with your browser to see the result.
+Open <http://localhost:3001/explore>. `docs:start` needs a preceding `docs:build`.
 
-## Explore
+From this directory: `pnpm index`, `pnpm dev`, `pnpm build`, `pnpm start`, `pnpm stop`,
+`pnpm status`, `pnpm logs`, `pnpm clean`.
 
-In the project, you can see:
+## The explorer
 
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
+One index, three views:
 
-| Route                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
+| View             | Sidebar                                                                                | Detail                                          |
+| ---------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| **Browser**      | Filesystem tree with module markers. Config files sit under a synthetic `config` root. | File or symbol, with code, notes and relations. |
+| **Modules**      | Semantic module list with coverage counts.                                             | Module narrative, file map and child modules.   |
+| **Walkthroughs** | Walks and their ordered steps.                                                         | The current step’s note and code.               |
 
-### Fumadocs MDX
+`Start here` is a curated walk; `Full descent` is generated over every node. The selected node is
+the anchor when switching views.
 
-Collections are defined with the [Macro API](https://fumadocs.dev/docs/mdx/macro) in `lib/source.ts`.
+## What is where
 
-Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
+| Path                                | Purpose                                                                                              |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `scripts/index-code.mjs`            | TypeScript compiler index: files, declarations, imports, tests, modules. Writes `public/data/`.      |
+| `public/data/`                      | Generated `tree.json`, `search.json`, `modules.json`, `modules/*.json`, `walks.json`. Not committed. |
+| `components/explorer/`              | The three-mode shell, tree, detail pane, search and code view.                                       |
+| `app/explore/page.tsx`              | The explorer route.                                                                                  |
+| `scripts/sync-docs.mjs`             | Mirrors `docs/` into `.generated/docs/` for Fumadocs.                                                |
+| `app/docs/`                         | Reference pages generated from `docs/`.                                                              |
+| `docs/modules/*.mdx`                | One authored narrative per module, with `## <node-id>` notes.                                        |
+| `docs/walkthroughs/*.mdx`           | Curated ordered paths; headings are node IDs.                                                        |
+| `app/llms.txt`, `app/llms-full.txt` | Agent-readable reference exports.                                                                    |
 
-## Learn More
+## Index rules
 
-To learn more about Next.js and Fumadocs, take a look at the following
-resources:
+- Every file in the indexed extensions becomes a file node.
+- Every declaration becomes a symbol node: functions, classes, methods, consts, types, interfaces,
+  enums. `export` nodes are visible; `internal` and `private` nodes are collapsed.
+- Node IDs are stable: `path#Name`, `path#Class.method`, overloads with `~2`.
+- Modules are package roots plus direct children of `src/`, with `docs/modules.json` able to add or
+  split. Files without a natural module join a `config:*` virtual module.
+- Imports resolve relative files and `.js` specifiers back to `.ts`. Test files mark the files they
+  import.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
+## Authoring
+
+One MDX per module, not per file:
+
+```mdx
+---
+module: packages/contracts
+title: Contracts
+summary: "The manifests and capabilities that cross an app boundary."
+---
+
+A short narrative.
+
+## packages/contracts/src/appManifest.ts#suiteAppManifestSchema
+
+The why, the invariant, and what breaks if it changes.
+```
+
+The index parses the `##` headings, merges each note into its node, and warns when a heading names an
+unknown node. A module without an MDX still renders generated facts. Notes are optional; generated
+facts are honest and never invent prose.
+
+A walkthrough is an MDX file whose headings are node IDs in step order:
+
+```mdx
+---
+id: start
+title: Start here
+start: true
+---
+
+## packages/contracts/src/appManifest.ts#suiteAppManifestSchema
+
+Why this is the first stop.
+```
+
+`Full descent` is generated from the index; it is not a file.
+
+## Constraints
+
+- Do not edit `.generated/` or `public/data/`; run `pnpm docs:index` or `pnpm docs:dev`.
+- Do not add one MDX per file. One module narrative, many nodes.
+- Do not generate prose for every symbol. Use compiler facts plus authored notes.
+- Do not add `tools/docs` to `pnpm build`, the release path, or a shipped package.
+- The code index is data, not truth: the code and the authored MDX win.
+
+## Pins
+
+| Package               | Version                         |
+| --------------------- | ------------------------------- |
+| `next`                | 16.4.6                          |
+| `fumadocs-core`       | 16.19.5                         |
+| `fumadocs-mdx`        | 15.6.4                          |
+| `fumadocs-ui`         | `npm:@fumadocs/base-ui@16.19.5` |
+| `react` / `react-dom` | 19.2.0                          |
+| `ts-morph`            | 28.0.0                          |
+| `typescript`          | 7.0.2                           |
+
+Tracked by the docs epic #97.

@@ -1,4 +1,3 @@
-import { source } from '@/lib/source';
 import {
   DocsBody,
   DocsDescription,
@@ -6,14 +5,22 @@ import {
   DocsTitle,
   MarkdownCopyButton,
   ViewOptionsPopover,
-} from 'fumadocs-ui/layouts/docs/page';
-import { notFound } from 'next/navigation';
-import { getMDXComponents } from '@/components/mdx';
-import type { Metadata } from 'next';
-import { createRelativeLink } from 'fumadocs-ui/mdx';
-import { getPageImageUrl, gitConfig } from '@/lib/shared';
+} from "fumadocs-ui/layouts/docs/page";
+import { createRelativeLink } from "fumadocs-ui/mdx";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { getMDXComponents } from "@/components/mdx";
+import { getPageImageUrl, gitConfig } from "@/lib/shared";
+import { source } from "@/lib/source";
 
-export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
+/** Map a generated page path back to the Markdown file that owns it. */
+function sourcePath(path: string): string {
+  if (path === "index.mdx") return "docs/README.md";
+  if (path.endsWith("/index.mdx")) return `docs/${path.replace(/\/index\.mdx$/, "/index.md")}`;
+  return `docs/${path.replace(/\.mdx$/, ".md")}`;
+}
+
+export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const params = await props.params;
   const page = source.getPage(params.slug);
   if (!page) notFound();
@@ -29,7 +36,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
           markdownUrl={markdownUrl}
-          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${encodeURI(page.path)}`}
+          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/${encodeURI(sourcePath(page.path))}`}
         />
       </div>
       <DocsBody>
@@ -48,7 +55,7 @@ export async function generateStaticParams() {
   return source.generateParams();
 }
 
-export async function generateMetadata(props: PageProps<'/docs/[[...slug]]'>): Promise<Metadata> {
+export async function generateMetadata(props: PageProps<"/docs/[[...slug]]">): Promise<Metadata> {
   const params = await props.params;
   const page = source.getPage(params.slug);
   if (!page) notFound();

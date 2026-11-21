@@ -1,0 +1,29 @@
+---
+module: apps/start
+title: Start
+summary: "The hub: catalogue, install records, channels and launch."
+---
+
+Start is a package manager with a small UI. It owns the catalogue, the install
+records, the channel a card points at, and the launch command. It never reads a
+document.
+
+## apps/start/src/catalogue.ts#CATALOGUE_APPS
+
+The catalogue is the list of apps Start can offer. Each entry names a contract,
+a folder and a feed; it does not name a local binary.
+
+## apps/start/src/catalogue.ts#catalogueMatchesContracts
+
+This is the guard that keeps the catalogue honest when a shared contract moves.
+If it fails, the fix is the catalogue entry, not a looser check.
+
+## apps/start/src/launchCommand.ts#launchCommand
+
+The launch command is data: an executable, arguments and an environment. Keeping
+it data is what lets Start stay out of the app's process.
+
+## apps/start/src/launchCommand.ts#stopApproach
+
+A stop is a strategy, not a signal name. Flatpak, a managed child and a manual
+stop do not share one mechanism.

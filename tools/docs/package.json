@@ -3,16 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack -p 3001",
-    "build": "next build --webpack",
-    "start": "next start -p 3001",
+    "sync": "node scripts/sync-docs.mjs",
+    "index": "node scripts/index-code.mjs",
+    "dev": "node scripts/index-code.mjs && node scripts/sync-docs.mjs && next dev --webpack -p ${DOCS_PORT:-3001}",
+    "dev:bg": "node scripts/start-bg.mjs",
+    "build": "node scripts/index-code.mjs && node scripts/sync-docs.mjs && next build --webpack",
+    "start": "next start -p ${DOCS_PORT:-3001}",
+    "stop": "node scripts/stop.mjs",
+    "status": "node scripts/status.mjs",
+    "logs": "node scripts/logs.mjs",
+    "clean": "node scripts/clean.mjs",
     "types:check": "next typegen && tsc --noEmit",
     "lint": "biome check",
     "format": "biome format --write"
   },
   "dependencies": {
     "cn": "^0.5.2",
-    "codehike": "1.1.0",
     "fumadocs-core": "16.19.5",
     "fumadocs-mdx": "15.6.4",
     "fumadocs-ui": "npm:@fumadocs/base-ui@16.19.5",
@@ -20,11 +26,13 @@
     "next": "16.4.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "zod": "^3.25.76"
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "shiki": "^4.6.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",
-    "@mdx-js/mdx": "^3.1.1",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/mdx": "^2.0.14",
     "@types/node": "^26.6.6",
@@ -32,7 +40,7 @@
     "@types/react-dom": "^19.3.0",
     "postcss": "^8.5.32",
     "tailwindcss": "^4.3.5",
-    "typescript": "^7.0.2",
-    "vfile": "^6.0.3"
+    "ts-morph": "^28.0.0",
+    "typescript": "^7.0.2"
   }
 }

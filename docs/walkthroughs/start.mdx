@@ -1,0 +1,47 @@
+---
+id: start
+title: Start here
+summary: From the shared contracts to a Canvas document that opens and saves.
+start: true
+order: 0
+---
+
+This is the shortest path through the suite. It follows one seam: the contracts
+that describe an app, Start launching it, the desktop shell handing over a path,
+and Canvas loading the document. Each stop opens the real file.
+
+## packages/contracts/src/appManifest.ts#suiteAppManifestSchema
+
+The manifest is the contract between Start and an app. It says what the app is
+and which capabilities it declares. It deliberately cannot name a binary, so a
+tampered manifest cannot redirect a launch.
+
+## apps/start/src/catalogue.ts#CATALOGUE_APPS
+
+The catalogue is Start's opinion about the apps it can install. It maps a
+contract id to a folder, a channel and a release feed.
+
+## apps/start/src/launchCommand.ts#launchCommand
+
+A launch is a command and an environment, not a document read. Start writes the
+install record and starts a separate process.
+
+## apps/canvas/desktop/src/main/index.ts
+
+The desktop shell creates the window, owns the single-instance lock and hands
+the renderer a path. It is the last place that knows both the OS and the app.
+
+## apps/canvas/src/App.tsx#App
+
+The renderer boots without reading the document format. It asks the host for a
+workspace and renders the app surface.
+
+## apps/canvas/packages/graph/src/workspaceFile.ts#workspaceFileSchema
+
+The graph owns the file shape. Every write goes through this schema and the
+typed document, never through raw Loro in a component.
+
+## apps/canvas/packages/graph/src/workspaceTemplate.ts#STARTER_TEMPLATES
+
+A new workspace starts from a template. The template is data, validated by the
+same schema, so the first save is not a special case.
