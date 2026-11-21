@@ -21,6 +21,10 @@ what it finds without failing a build.
   so a story opened in the workshop runs axe and reports its violations. It is the author's check,
   not the gate: a violation is visible but does not fail `pnpm verify`, and only the two stories
   (`Button`, `Charts`) exist so far.
+- **The register and plan controls, on every change.** Component tests assert that a register row's
+  cleared control and split expand control keep focus after they act, that Enter in an assigned
+  amount moves focus to the next envelope, and that each cleared control names its own row rather
+  than repeating one label.
 
 There is no axe run against the running application. The end-to-end suite covers the launcher and
 the phone widths (360, 390 and 430 CSS pixels), not an accessibility rule set.
@@ -56,7 +60,8 @@ These are the deliberate choices a manual pass will check, not claims that it pa
   controls name the widget and its position, so several widgets do not produce identical controls in
   a screen reader's list.
 - The register's cleared control is a pressed state ("Cleared", pressed or not) rather than a colour
-  swatch, and a reconciled row says it is locked in its title. The row itself is keyboard-activatable;
+  swatch, its accessible name adds the row's payee and date so rows do not share one control name,
+  and a reconciled row says it is locked in its title. The row itself is keyboard-activatable;
   its own Enter and Space are handled only on the row, so the controls inside it do not also open the
   editor.
 - Report tabs carry their selected state, the closed-account group says whether it is expanded, and

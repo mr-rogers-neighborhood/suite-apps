@@ -88,8 +88,11 @@ has no record, which is different from a record with zero.
 (nullable), `createdAt`.
 
 `learn` gates the learned category rule: with it off, changing a transaction's category records
-`lastCategoryId` but writes no `payee is <name> → set category` rule. Renaming a payee always writes
-an `importedPayee contains <old name> → set payee <new name>` rule.
+`lastCategoryId` but writes no `payee is <name> → set category` rule. Renaming a payee moves the name
+on every transaction that carries its id, retargets its learned category rule, and writes an
+`importedPayee contains <old name> → set payee <new name>` rule for the next import. Renaming does not
+change a transaction's category, and a name another payee already holds is refused rather than making
+name-typed rules ambiguous.
 
 ### rule
 
@@ -99,6 +102,11 @@ an `importedPayee contains <old name> → set payee <new name>` rule.
 Fields: `importedPayee`, `payee`, `account`, `category`, `date`, `memo`, `amount`, `cleared`. Operators:
 `is`, `isNot`, `contains`, `doesNotContain`, `matches`, `oneOf`, `notOneOf`. Actions: `setPayee`,
 `setCategory`, `setMemo`, `setFlag`, `setCleared`.
+
+`category` and `account` conditions compare both the record id and the name a person typed, so a
+condition written before the editor offered a picker keeps working. An `amount` condition parses to
+minor units; `oneOf`/`notOneOf` take a `|`-separated list. `importedPayee` is the bank's original text
+and is empty for a row that was never imported, so a learned rename rule cannot rewrite history.
 
 ### schedule
 
@@ -129,6 +137,8 @@ being applied twice.
 ### settings
 
 `currency`, `currencyScale`, `firstDayOfWeek`, `upcomingDays`, `theme`, `privacyAmounts` (reserved).
+The scale follows the currency: creating a budget in JPY starts at zero decimals and KWD at three,
+unless the caller states a scale. Changing the currency later moves the scale with it.
 
 ## Derived, never stored
 
@@ -233,10 +243,12 @@ rules run first; the last matching action for a field wins. Rules run on import 
 chooses "Run rules" on the document.
 
 Learned rules: when the user sets a category on a transaction with a known payee whose `learn` toggle
-is on, a learned `payee is <name> → set category` rule is created or updated. A payee with learning off
-still records its last category, but no rule. Renaming a payee creates or updates a learned
-`importedPayee contains <old name> → set payee <new name>` rule, so the next import maps the bank's
-payee text to the chosen name. A learned rule is a normal record the user can edit or disable.
+is on, a learned `payee is <name> → set category` rule is created or updated. The comparison is
+case-insensitive, so one payee has one learned rule. A payee with learning off still records its last
+category, but no rule. Renaming a payee retargets that rule and updates the transaction rows; it does
+not change a category. A learned `importedPayee contains <old name> → set payee <new name>` rule maps
+the bank's text on the next import. A learned rule is a normal record the user can edit or disable.
+"When you ask" runs rules over the document, but never over a reconciled row or an internal transfer.
 
 ## Schedules
 
@@ -249,7 +261,8 @@ transaction**. With it on, the app catches up from `nextDate` through today on o
 open. The catch-up covers at most the last 90 days per schedule (`AUTO_ENTER_HORIZON_DAYS`); an older
 occurrence advances `nextDate` without posting, rather than filling the budget with years of history.
 Each occurrence goes through the same entry path as the Enter button and becomes its own transaction,
-with the schedule's category, payee, memo and `scheduledId`.
+with the schedule's category, payee, memo and `scheduledId`. A manual entry past the end date is
+refused, so a stale window cannot post beyond the plan.
 
 One pass that posts anything writes a `scheduleBatch` record with the transaction ids, the total and
 one run per schedule (`nextDateBefore`, `postedCount`). Undo deletes exactly those transactions and
