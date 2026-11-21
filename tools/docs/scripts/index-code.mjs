@@ -12,9 +12,10 @@
  *   public/data/search.json
  *   public/data/modules.json
  *   public/data/modules/<slug>.json
- *   public/data/walks.json
+ *   public/data/tours.json
+ *   public/data/tour-membership.json
  *
- * Authored notes come from `docs/modules/`; walks from `docs/walkthroughs/`.
+ * Authored notes come from `docs/modules/`; tours from `docs/tours/`.
  * The generator never overwrites either.
  *
  * Usage: node tools/docs/scripts/index-code.mjs
@@ -29,7 +30,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const outDir = join(root, "tools/docs/public/data");
 const check = process.argv.includes("--check");
 const modulesDir = join(root, "docs/modules");
-const walksDir = join(root, "docs/walkthroughs");
+const toursDir = join(root, "docs/tours");
 const modulesConfigPath = join(root, "docs/modules.json");
 
 const CODE_EXT = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
@@ -268,13 +269,30 @@ function sections(body) {
   return { preamble: preamble.join("\n").trim(), sections: out };
 }
 
+function splitOverlay(text) {
+  const lines = text.split("\n");
+  const index = lines.findIndex((line) => /^###\s+overlay:\s*\S/.test(line));
+  if (index === -1) return { body: text.trim(), overlay: undefined };
+  const title = /^###\s+overlay:\s*(.+?)\s*$/.exec(lines[index])?.[1] ?? "Note";
+  return {
+    body: lines.slice(0, index).join("\n").trim(),
+    overlay: {
+      title,
+      body: lines
+        .slice(index + 1)
+        .join("\n")
+        .trim(),
+    },
+  };
+}
+
 async function collectNotes(problems) {
   const moduleNotes = new Map();
   const moduleSummaries = new Map();
   const nodeNotes = new Map();
   const fileNotes = new Map();
   const moduleOwners = new Map();
-  const walks = [];
+  const tours = [];
 
   const moduleFiles = await walkFiles(modulesDir);
   for (const file of moduleFiles) {
@@ -311,42 +329,63 @@ async function collectNotes(problems) {
     }
   }
 
-  const walkEntries = await walkFiles(walksDir);
-  const walkIds = new Map();
-  for (const file of walkEntries) {
+  const tourEntries = await walkFiles(toursDir);
+  const tourIds = new Map();
+  for (const file of tourEntries) {
     if (!file.endsWith(".mdx")) continue;
     const source = relative(root, file);
     const { data, body } = frontmatter(await readFile(file, "utf8"));
     const parsed = sections(body);
-    const steps = parsed.sections
-      .map((section) => ({
-        node: section.heading.replaceAll("`", "").trim(),
-        note: section.text.join("\n").trim() || undefined,
-      }))
-      .filter((step) => step.node !== "");
+    const steps = [];
+    for (const section of parsed.sections) {
+      const heading = section.heading.replaceAll("`", "").trim();
+      if (!heading) continue;
+      const { body: text, overlay } = splitOverlay(section.text.join("\n"));
+      if (/^interlude:/i.test(heading)) {
+        const title = heading.replace(/^interlude:\s*/i, "").trim();
+        steps.push({
+          kind: "interlude",
+          title: title || "Interlude",
+          body: text,
+          ...(overlay ? { overlay } : {}),
+        });
+        continue;
+      }
+      steps.push({
+        kind: "node",
+        target: { kind: "node", id: heading },
+        ...(text ? { note: text } : {}),
+        ...(overlay ? { overlay } : {}),
+      });
+    }
     if (steps.length === 0) continue;
     const id = typeof data.id === "string" ? data.id : posix.basename(file, ".mdx");
-    if (walkIds.has(id)) {
+    if (tourIds.has(id)) {
       problems.push({
         level: "warning",
-        message: `${source}: walk id ${id} is already used by ${walkIds.get(id)}`,
+        message: `${source}: tour id ${id} is already used by ${tourIds.get(id)}`,
       });
     } else {
-      walkIds.set(id, source);
+      tourIds.set(id, source);
     }
-    walks.push({
+    const intro = parsed.preamble.trim();
+    if (!intro) {
+      problems.push({ level: "warning", message: `${source}: tour has no intro` });
+    }
+    tours.push({
       id,
       title: typeof data.title === "string" ? data.title : titleCase(posix.basename(file, ".mdx")),
       summary: typeof data.summary === "string" ? data.summary : "",
+      intro,
       start: data.start === true,
       order: typeof data.order === "number" ? data.order : 100,
-      kind: "path",
+      source: "mdx",
       steps,
-      source,
+      file: source,
     });
   }
 
-  return { moduleNotes, moduleSummaries, nodeNotes, fileNotes, walks };
+  return { moduleNotes, moduleSummaries, nodeNotes, fileNotes, tours };
 }
 
 async function walkFiles(dir) {
@@ -361,9 +400,11 @@ async function walkFiles(dir) {
   return out.sort();
 }
 
-function targetProblem(target, { nodeIds, moduleIds, walkIds }) {
+function targetProblem(target, { nodeIds, moduleIds, tourIds }) {
   if (!target || typeof target !== "object") return "step has no target";
   switch (target.kind) {
+    case "node":
+      return nodeIds.has(target.id) ? null : `unknown node: ${target.id}`;
     case "module":
       return moduleIds.has(target.id) ? null : `unknown module: ${target.id}`;
     case "file":
@@ -379,8 +420,9 @@ function targetProblem(target, { nodeIds, moduleIds, walkIds }) {
       }
       return null;
     }
+    case "tour":
     case "walk":
-      return walkIds.has(target.id) ? null : `unknown walk: ${target.id}`;
+      return tourIds.has(target.id) ? null : `unknown tour: ${target.id}`;
     case "doc":
       return typeof target.path === "string" && target.path.startsWith("docs/")
         ? null
@@ -390,15 +432,24 @@ function targetProblem(target, { nodeIds, moduleIds, walkIds }) {
   }
 }
 
+function normalizeOverlay(overlay) {
+  if (!overlay || typeof overlay !== "object") return undefined;
+  if (typeof overlay.title !== "string" || typeof overlay.body !== "string") return undefined;
+  return {
+    title: overlay.title,
+    body: overlay.body,
+    ...(overlay.tone === "warning" ? { tone: "warning" } : {}),
+  };
+}
+
 async function collectTours(problems, scope) {
-  const tours = [];
-  const seen = new Map();
-  const files = (await walkFiles(walksDir)).filter((file) => file.endsWith(".tour.mjs"));
+  const loaded = [];
+  const files = (await walkFiles(toursDir)).filter((file) => file.endsWith(".tour.mjs"));
   for (const file of files) {
     const source = relative(root, file);
-    let loaded;
+    let module;
     try {
-      loaded = await import(pathToFileURL(file).href);
+      module = await import(pathToFileURL(file).href);
     } catch (reason) {
       problems.push({
         level: "warning",
@@ -408,46 +459,94 @@ async function collectTours(problems, scope) {
       });
       continue;
     }
-    const tour = loaded.default;
+    const tour = module.default;
     if (!tour || typeof tour !== "object") {
       problems.push({ level: "warning", message: `${source}: tour has no default export` });
       continue;
     }
     const id = typeof tour.id === "string" ? tour.id : posix.basename(file, ".tour.mjs");
-    if (seen.has(id)) {
-      problems.push({
-        level: "warning",
-        message: `${source}: tour id ${id} is already used by ${seen.get(id)}`,
-      });
-    } else {
-      seen.set(id, source);
+    if (scope.tourIds.has(id)) {
+      problems.push({ level: "warning", message: `${source}: tour id ${id} is already used` });
+      continue;
     }
+    scope.tourIds.add(id);
     if (!Array.isArray(tour.steps) || tour.steps.length === 0) {
       problems.push({ level: "warning", message: `${source}: tour has no steps` });
       continue;
     }
     const steps = [];
     for (const step of tour.steps) {
-      const problem = targetProblem(step?.target, scope);
-      if (problem) {
-        problems.push({ level: "warning", message: `${source}: ${problem}` });
+      if (step?.kind === "interlude") {
+        if (typeof step.title !== "string" || typeof step.body !== "string") {
+          problems.push({
+            level: "warning",
+            message: `${source}: interlude needs a title and body`,
+          });
+          continue;
+        }
+        const overlay = normalizeOverlay(step.overlay);
+        steps.push({
+          kind: "interlude",
+          title: step.title,
+          body: step.body,
+          ...(overlay ? { overlay } : {}),
+        });
         continue;
       }
+      const rawTarget = step?.target ?? step;
+      if (!rawTarget || typeof rawTarget !== "object") {
+        problems.push({ level: "warning", message: `${source}: step has no target` });
+        continue;
+      }
+      const target = rawTarget.kind === "walk" ? { ...rawTarget, kind: "tour" } : rawTarget;
+      const overlay = normalizeOverlay(step.overlay);
       steps.push({
-        target: step.target,
-        callout: typeof step.callout === "string" ? step.callout : undefined,
+        kind: "node",
+        target,
+        ...(typeof step.note === "string"
+          ? { note: step.note }
+          : typeof step.callout === "string"
+            ? { note: step.callout }
+            : {}),
+        ...(overlay ? { overlay } : {}),
       });
     }
-    tours.push({
+    const intro = typeof tour.intro === "string" ? tour.intro.trim() : "";
+    if (!intro) problems.push({ level: "warning", message: `${source}: tour has no intro` });
+    loaded.push({
       id,
       title: typeof tour.title === "string" ? tour.title : titleCase(id),
       summary: typeof tour.summary === "string" ? tour.summary : "",
+      intro,
       order: typeof tour.order === "number" ? tour.order : 100,
       start: tour.start === true,
+      source: "composed",
       steps,
+      file: source,
     });
   }
-  return tours.sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+
+  for (const tour of loaded) {
+    const valid = [];
+    for (const step of tour.steps) {
+      if (step.kind !== "node") {
+        valid.push(step);
+        continue;
+      }
+      const problem = targetProblem(step.target, scope);
+      if (problem) {
+        problems.push({ level: "warning", message: `${tour.file}: ${problem}` });
+        continue;
+      }
+      valid.push(step);
+    }
+    tour.steps = valid;
+    if (tour.steps.length === 0) {
+      problems.push({ level: "warning", message: `${tour.file}: tour has no valid steps` });
+    }
+  }
+
+  return loaded;
 }
 
 function jsdocFor(node) {
@@ -707,7 +806,7 @@ async function main() {
     module.slug = module.id.replaceAll("/", "__").replaceAll(":", "-");
   }
 
-  // Authored walks plus the generated full descent.
+  // Authored and composed tours plus the generated full descent.
   const MODULE_ORDER = [
     "packages/contracts",
     "packages/files",
@@ -737,41 +836,85 @@ async function main() {
     if (delta !== 0) return delta;
     return left.id.localeCompare(right.id);
   });
-  const fullSteps = [];
-  for (const module of modulesSorted) {
-    for (const file of module.files) {
-      fullSteps.push({ node: file.id });
-      const exported = file.symbols.filter((symbol) => symbol.exported);
-      const internal = file.symbols.filter((symbol) => !symbol.exported);
-      for (const symbol of [...exported, ...internal]) fullSteps.push({ node: symbol.id });
-    }
-  }
-  const walks = [
-    ...notes.walks.sort((left, right) => left.order - right.order),
-    {
-      id: "full-descent",
-      title: "Full descent",
-      summary: "Every module, file and declaration, in order.",
-      start: false,
-      order: 999,
-      kind: "generated",
-      generated: true,
-      steps: fullSteps,
-    },
-  ];
-  if (!walks.some((walk) => walk.start) && walks.length > 0) walks[0].start = true;
-
-  // Unresolved notes and walks are warnings in a normal run; --check fails.
   const nodeIds = new Set();
   for (const file of files) {
     nodeIds.add(file);
     for (const symbol of fileNodes.get(file).symbols) nodeIds.add(symbol.id);
   }
-  const tours = await collectTours(problems, {
+
+  const fullSteps = [];
+  for (const module of modulesSorted) {
+    for (const file of module.files) {
+      fullSteps.push({ kind: "node", target: { kind: "node", id: file.id } });
+      const exported = file.symbols.filter((symbol) => symbol.exported);
+      const internal = file.symbols.filter((symbol) => !symbol.exported);
+      for (const symbol of [...exported, ...internal]) {
+        fullSteps.push({ kind: "node", target: { kind: "node", id: symbol.id } });
+      }
+    }
+  }
+
+  if (notes.tours.some((tour) => tour.id === "full-descent")) {
+    problems.push({ level: "warning", message: "tour id full-descent is reserved" });
+  }
+  const authoredTours = notes.tours.sort((left, right) => left.order - right.order);
+  const tourIds = new Set([...authoredTours.map((tour) => tour.id), "full-descent"]);
+  const composedTours = await collectTours(problems, {
     nodeIds,
     moduleIds: new Set(moduleMap.keys()),
-    walkIds: new Set(walks.map((walk) => walk.id)),
+    tourIds,
   });
+  const tours = [
+    ...authoredTours,
+    ...composedTours,
+    {
+      id: "full-descent",
+      title: "Full descent",
+      summary: "Every module, file and declaration, in order.",
+      intro: "Every module, file and declaration, in order.",
+      start: false,
+      order: 999,
+      source: "generated",
+      steps: fullSteps,
+    },
+  ].sort((left, right) => left.order - right.order || left.title.localeCompare(right.title));
+  if (!tours.some((tour) => tour.start) && tours.length > 0) tours[0].start = true;
+
+  const membership = {};
+  for (const tour of tours) {
+    if (tour.source === "generated") continue;
+    const seen = new Set();
+    tour.steps.forEach((step, index) => {
+      if (step.kind !== "node") return;
+      const target = step.target;
+      if (
+        target.kind !== "node" &&
+        target.kind !== "module" &&
+        target.kind !== "file" &&
+        target.kind !== "symbol"
+      ) {
+        return;
+      }
+      if (seen.has(target.id)) return;
+      seen.add(target.id);
+      membership[target.id] ??= [];
+      membership[target.id].push({ tourId: tour.id, title: tour.title, step: index });
+    });
+  }
+
+  const moduleTours = new Map();
+  for (const [id, entries] of Object.entries(membership)) {
+    const moduleId = moduleMap.has(id) ? id : fileModule.get(id.split("#")[0])?.id;
+    if (!moduleId) continue;
+    const set = moduleTours.get(moduleId) ?? new Set();
+    for (const entry of entries) set.add(entry.tourId);
+    moduleTours.set(moduleId, set);
+  }
+  for (const module of moduleMap.values()) {
+    module.tourCount = moduleTours.get(module.id)?.size ?? 0;
+  }
+
+  // Unresolved notes and tours are warnings in a normal run; --check fails.
   for (const [id] of notes.moduleNotes) {
     if (!moduleMap.has(id)) {
       problems.push({ level: "warning", message: `note names an unknown module: ${id}` });
@@ -787,21 +930,36 @@ async function main() {
       problems.push({ level: "warning", message: `note names an unknown node: ${id}` });
     }
   }
-  for (const walk of notes.walks) {
-    for (const step of walk.steps) {
-      if (!nodeIds.has(step.node)) {
-        problems.push({
-          level: "warning",
-          message: `${walk.source}: step names an unknown node: ${step.node}`,
+  for (const tour of tours) {
+    const where = tour.file ?? tour.id;
+    if (tour.source !== "generated" && !tour.intro) {
+      problems.push({ level: "warning", message: `${where}: tour has no intro` });
+    }
+    for (const [index, step] of tour.steps.entries()) {
+      if (step.kind === "interlude") {
+        if (!step.body) {
+          problems.push({
+            level: "warning",
+            message: `${where}: interlude ${index + 1} has no body`,
+          });
+        }
+      } else {
+        const problem = targetProblem(step.target, {
+          nodeIds,
+          moduleIds: new Set(moduleMap.keys()),
+          tourIds,
         });
+        if (problem) problems.push({ level: "warning", message: `${where}: ${problem}` });
+      }
+      if (step.overlay) {
+        if (!step.overlay.title || !step.overlay.body) {
+          problems.push({
+            level: "warning",
+            message: `${where}: step ${index + 1} has an incomplete overlay`,
+          });
+        }
       }
     }
-  }
-  if (notes.walks.some((walk) => walk.id === "full-descent")) {
-    problems.push({
-      level: "warning",
-      message: "walk id full-descent is reserved for the generated walk",
-    });
   }
 
   // Tree: the real filesystem, then a synthetic Config root for virtual modules.
@@ -893,6 +1051,7 @@ async function main() {
     symbolCount: module.symbolCount,
     testCount: module.testCount,
     noteCount: module.noteCount,
+    tourCount: module.tourCount,
     summary: module.summary,
   }));
 
@@ -926,13 +1085,13 @@ async function main() {
       });
     }
   }
-  for (const walk of walks) {
+  for (const tour of tours) {
     search.push({
-      id: `walk:${walk.id}`,
-      label: walk.title,
-      kind: "walk",
+      id: `tour:${tour.id}`,
+      label: tour.title,
+      kind: "tour",
       moduleId: undefined,
-      path: `walk:${walk.id}`,
+      path: `tour:${tour.id}`,
     });
   }
 
@@ -954,17 +1113,17 @@ async function main() {
   output.set("tree.json", JSON.stringify(treeRoot));
   output.set("modules.json", JSON.stringify(modules, null, 2));
   output.set("search.json", JSON.stringify(search));
-  output.set("tours.json", JSON.stringify(tours));
   output.set(
-    "walks.json",
+    "tours.json",
     JSON.stringify(
-      walks.map((walk) => {
-        const copy = { ...walk };
-        delete copy.source;
+      tours.map((tour) => {
+        const copy = { ...tour };
+        delete copy.file;
         return copy;
       }),
     ),
   );
+  output.set("tour-membership.json", JSON.stringify(membership));
 
   if (check) {
     const stale = [];
@@ -1011,7 +1170,7 @@ async function main() {
   }
 
   process.stdout.write(
-    `indexed ${files.length} files, ${search.filter((entry) => entry.kind !== "file" && entry.kind !== "module" && entry.kind !== "walk").length} symbols, ${modules.length} modules, ${walks.length} walks, ${tours.length} tours\n`,
+    `indexed ${files.length} files, ${search.filter((entry) => entry.kind !== "file" && entry.kind !== "module" && entry.kind !== "tour").length} symbols, ${modules.length} modules, ${tours.length} tours\n`,
   );
 }
 

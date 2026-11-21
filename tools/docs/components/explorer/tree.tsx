@@ -7,6 +7,7 @@ import {
   Folder,
   FolderOpen,
   type LucideIcon,
+  Route,
 } from "lucide-react";
 import type { FolderNode, TreeNode } from "@/lib/explorer-types";
 
@@ -15,6 +16,7 @@ type Props = {
   selectedId: string | null;
   expanded: Set<string>;
   internalOpen: Set<string>;
+  tourNodes: Set<string>;
   onSelect: (id: string) => void;
   onToggle: (path: string) => void;
   onToggleInternal: (fileId: string) => void;
@@ -45,6 +47,7 @@ export function BrowserTree({
   selectedId,
   expanded,
   internalOpen,
+  tourNodes,
   onSelect,
   onToggle,
   onToggleInternal,
@@ -57,6 +60,7 @@ export function BrowserTree({
         selectedId={selectedId}
         expanded={expanded}
         internalOpen={internalOpen}
+        tourNodes={tourNodes}
         onSelect={onSelect}
         onToggle={onToggle}
         onToggleInternal={onToggleInternal}
@@ -71,10 +75,11 @@ function FolderRows({
   selectedId,
   expanded,
   internalOpen,
+  tourNodes,
   onSelect,
   onToggle,
   onToggleInternal,
-}: Common & { node: TreeNode; depth: number }) {
+}: Common & { node: TreeNode; depth: number; tourNodes: Set<string> }) {
   if (node.type === "file") {
     const open = expanded.has(node.id);
     const exported = node.symbols.filter(
@@ -110,6 +115,9 @@ function FolderRows({
           )}
           <Icon className="size-3.5 shrink-0 text-fd-muted-foreground" />
           <span className="truncate">{node.name}</span>
+          {tourNodes.has(node.id) ? (
+            <Route className="size-3 shrink-0 text-fd-primary/70" aria-label="In a tour" />
+          ) : null}
         </button>
 
         {open && node.symbols.length > 0 ? (
@@ -128,6 +136,9 @@ function FolderRows({
                   {kindBadge(symbol.kind)}
                 </span>
                 <span className="truncate">{symbol.name}</span>
+                {tourNodes.has(symbol.id) ? (
+                  <Route className="size-3 shrink-0 text-fd-primary/70" aria-label="In a tour" />
+                ) : null}
               </button>
             ))}
             {internal.length > 0 ? (
@@ -155,6 +166,12 @@ function FolderRows({
                       {kindBadge(symbol.kind)}
                     </span>
                     <span className="truncate">{symbol.name}</span>
+                    {tourNodes.has(symbol.id) ? (
+                      <Route
+                        className="size-3 shrink-0 text-fd-primary/70"
+                        aria-label="In a tour"
+                      />
+                    ) : null}
                   </button>
                 ))
               : null}
@@ -203,6 +220,7 @@ function FolderRows({
               selectedId={selectedId}
               expanded={expanded}
               internalOpen={internalOpen}
+              tourNodes={tourNodes}
               onSelect={onSelect}
               onToggle={onToggle}
               onToggleInternal={onToggleInternal}

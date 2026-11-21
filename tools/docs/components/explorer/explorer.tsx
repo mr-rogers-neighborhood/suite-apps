@@ -4,6 +4,7 @@ import { GitBranch, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DetailPane } from "@/components/explorer/detail";
+import { Note } from "@/components/explorer/note";
 import { ExplorerSidebar } from "@/components/explorer/sidebar";
 import type {
   BaseData,
@@ -11,39 +12,67 @@ import type {
   ModuleSummary,
   SearchEntry,
   Tour,
+  TourStep,
   TourTarget,
   View,
-  Walk,
 } from "@/lib/explorer-types";
 
 type UrlState = {
   view?: View;
   node?: string;
   module?: string;
-  walk?: string;
-  step?: number;
   tour?: string;
-  tourStep?: number;
+  step?: number;
   level?: "file" | "symbol";
 };
 
 function readUrl(): UrlState {
   if (typeof window === "undefined") return {};
   const params = new URLSearchParams(window.location.search);
-  const view = params.get("view");
-  const step = Number(params.get("step"));
-  const tourStep = Number(params.get("tstep"));
+  const rawView = params.get("view");
+  const view =
+    rawView === "walkthroughs"
+      ? "tours"
+      : rawView === "browser" || rawView === "modules" || rawView === "tours"
+        ? rawView
+        : undefined;
+  const rawStep = params.get("step") ?? params.get("tstep");
+  const step = rawStep === null ? undefined : Number(rawStep);
   const level = params.get("level");
   return {
-    view: view === "browser" || view === "modules" || view === "walkthroughs" ? view : undefined,
+    view,
     node: params.get("node") ?? undefined,
     module: params.get("module") ?? undefined,
-    walk: params.get("walk") ?? undefined,
+    tour: params.get("tour") ?? params.get("walk") ?? undefined,
     step: Number.isFinite(step) ? step : undefined,
-    tour: params.get("tour") ?? undefined,
-    tourStep: Number.isFinite(tourStep) ? tourStep : undefined,
     level: level === "file" || level === "symbol" ? level : undefined,
   };
+}
+
+function targetNodeId(target: TourTarget): string | null {
+  if (
+    target.kind === "node" ||
+    target.kind === "module" ||
+    target.kind === "file" ||
+    target.kind === "symbol"
+  ) {
+    return target.id;
+  }
+  return null;
+}
+
+function stepLevel(step: TourStep | undefined): "file" | "symbol" | null {
+  if (step?.kind !== "node") return null;
+  if (step.target.kind !== "symbol") return null;
+  return step.target.level === "file" ? "file" : "symbol";
+}
+
+function docPath(path: string): string {
+  const relative = path
+    .replace(/^docs\//, "")
+    .replace(/\.mdx?$/, "")
+    .replace(/^README$/, "");
+  return `/docs${relative ? `/${relative}` : ""}`;
 }
 
 const START_EXPANDED = new Set(["", "apps", "packages", "tools"]);
@@ -51,22 +80,20 @@ const START_EXPANDED = new Set(["", "apps", "packages", "tools"]);
 export function Explorer() {
   const [data, setData] = useState<BaseData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<View>("walkthroughs");
+  const [view, setView] = useState<View>("tours");
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
-  const [walkId, setWalkId] = useState<string | null>(null);
-  const [stepIndex, setStepIndex] = useState(0);
+  const [tourId, setTourId] = useState<string | null>(null);
+  const [tourIndex, setTourIndex] = useState(-1);
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(START_EXPANDED);
   const [internalOpen, setInternalOpen] = useState<Set<string>>(new Set());
   const [modules, setModules] = useState<Record<string, ModuleData>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTourId, setActiveTourId] = useState<string | null>(null);
-  const [tourIndex, setTourIndex] = useState(0);
   const [detailLevel, setDetailLevel] = useState<"file" | "symbol" | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [overlayDismissed, setOverlayDismissed] = useState(false);
   const requestedModules = useRef(new Set<string>());
-  const appliedTour = useRef("");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -75,11 +102,11 @@ export function Explorer() {
       fetch("/data/tree.json").then((response) => response.json()),
       fetch("/data/modules.json").then((response) => response.json()),
       fetch("/data/search.json").then((response) => response.json()),
-      fetch("/data/walks.json").then((response) => response.json()),
       fetch("/data/tours.json").then((response) => response.json()),
+      fetch("/data/tour-membership.json").then((response) => response.json()),
     ])
-      .then(([tree, modules, search, walks, tours]) => {
-        if (!cancelled) setData({ tree, modules, search, walks, tours });
+      .then(([tree, modules, search, tours, membership]) => {
+        if (!cancelled) setData({ tree, modules, search, tours, membership });
       })
       .catch((reason: unknown) => {
         if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
@@ -94,10 +121,12 @@ export function Explorer() {
     if (state.view) setView(state.view);
     if (state.node) setSelectedNode(state.node);
     if (state.module) setSelectedModule(state.module);
-    if (state.walk) setWalkId(state.walk);
-    if (state.step !== undefined) setStepIndex(state.step);
-    if (state.tour) setActiveTourId(state.tour);
-    if (state.tourStep !== undefined) setTourIndex(state.tourStep);
+    if (state.tour) {
+      setTourId(state.tour);
+      setTourIndex(state.step ?? -1);
+    } else if (state.step !== undefined) {
+      setTourIndex(state.step);
+    }
     if (state.level) setDetailLevel(state.level);
     setHydrated(true);
   }, []);
@@ -115,31 +144,40 @@ export function Explorer() {
     () => new Map((data?.search ?? []).map((entry) => [entry.id, entry])),
     [data],
   );
+  const tourNodes = useMemo(() => new Set(Object.keys(data?.membership ?? {})), [data?.membership]);
   const moduleById = useMemo(
     () => new Map((data?.modules ?? []).map((module) => [module.id, module])),
     [data],
   );
 
-  const walk = useMemo(
-    () => data?.walks.find((candidate) => candidate.id === walkId) ?? null,
-    [data, walkId],
+  const tour = useMemo(
+    () => data?.tours.find((candidate) => candidate.id === tourId) ?? null,
+    [data, tourId],
   );
-  const activeTour = useMemo(
-    () => data?.tours.find((candidate) => candidate.id === activeTourId) ?? null,
-    [activeTourId, data],
-  );
-  const tourStep = activeTour?.steps[tourIndex];
+  const currentStep = tour && tourIndex >= 0 ? tour.steps[tourIndex] : undefined;
 
   useEffect(() => {
-    if (!data || walkId) return;
-    const start = data.walks.find((candidate) => candidate.start) ?? data.walks[0];
-    if (start) setWalkId(start.id);
-  }, [data, walkId]);
+    if (!data || tourId) return;
+    const start = data.tours.find((candidate) => candidate.start) ?? data.tours[0];
+    if (start) {
+      setTourId(start.id);
+      setTourIndex(-1);
+    }
+  }, [data, tourId]);
 
-  const step = walk?.steps[stepIndex];
-  const currentNodeId = view === "walkthroughs" ? (step?.node ?? null) : selectedNode;
+  const currentNodeId =
+    view === "tours"
+      ? currentStep?.kind === "node"
+        ? targetNodeId(currentStep.target)
+        : null
+      : selectedNode;
   const currentEntry = currentNodeId ? searchById.get(currentNodeId) : undefined;
-  const activeModuleId = view === "modules" ? selectedModule : (currentEntry?.moduleId ?? null);
+  const activeModuleId =
+    view === "modules"
+      ? selectedModule
+      : view === "tours" && currentStep?.kind === "node" && currentStep.target.kind === "module"
+        ? currentStep.target.id
+        : (currentEntry?.moduleId ?? null);
 
   useEffect(() => {
     if (!activeModuleId) return;
@@ -166,28 +204,15 @@ export function Explorer() {
     params.set("view", view);
     if (view === "browser" && selectedNode) params.set("node", selectedNode);
     if (view === "modules" && selectedModule) params.set("module", selectedModule);
-    if (view === "walkthroughs" && walkId) {
-      params.set("walk", walkId);
-      params.set("step", String(stepIndex));
+    if (view === "tours" && tourId) {
+      params.set("tour", tourId);
+      if (tourIndex >= 0) params.set("step", String(tourIndex));
     }
-    if (activeTourId) {
-      params.set("tour", activeTourId);
-      params.set("tstep", String(tourIndex));
-    }
-    if (detailLevel === "file") params.set("level", "file");
+    const level = view === "tours" ? stepLevel(currentStep) : detailLevel;
+    if (level === "file") params.set("level", "file");
     const queryString = params.toString();
     window.history.replaceState(null, "", `/explore${queryString ? `?${queryString}` : ""}`);
-  }, [
-    activeTourId,
-    detailLevel,
-    hydrated,
-    stepIndex,
-    tourIndex,
-    view,
-    selectedNode,
-    selectedModule,
-    walkId,
-  ]);
+  }, [currentStep, detailLevel, hydrated, selectedModule, selectedNode, tourId, tourIndex, view]);
 
   const expandFor = useCallback(
     (id: string) => {
@@ -205,12 +230,16 @@ export function Explorer() {
     [searchById],
   );
 
+  useEffect(() => {
+    if (currentNodeId) expandFor(currentNodeId);
+  }, [currentNodeId, expandFor]);
+
   const selectNode = useCallback(
     (id: string, nextView?: View) => {
       setSelectedNode(id);
       setDetailLevel(null);
       expandFor(id);
-      setView(nextView ?? (view === "walkthroughs" ? "browser" : view));
+      setView(nextView ?? (view === "tours" ? "browser" : view));
       setSidebarOpen(false);
     },
     [expandFor, view],
@@ -224,146 +253,93 @@ export function Explorer() {
     setSidebarOpen(false);
   }, []);
 
-  const selectWalk = useCallback((id: string) => {
-    setWalkId(id);
-    setStepIndex(0);
+  const goToTourStep = useCallback(
+    (index: number, options?: { auto?: boolean }) => {
+      if (!tour) return;
+      const next = Math.max(-1, Math.min(tour.steps.length - 1, index));
+      const step = next >= 0 ? tour.steps[next] : undefined;
+      if (step?.kind === "node" && step.target.kind === "tour") {
+        setTourId(step.target.id);
+        setTourIndex(step.target.step ?? 0);
+        setSelectedNode(null);
+        setDetailLevel(null);
+        setOverlayDismissed(false);
+        setPlaying(false);
+        setView("tours");
+        setSidebarOpen(false);
+        return;
+      }
+      if (step?.kind === "node" && step.target.kind === "doc") {
+        setPlaying(false);
+        window.location.assign(docPath(step.target.path));
+        return;
+      }
+      setTourIndex(next);
+      setOverlayDismissed(false);
+      if (!options?.auto) setPlaying(false);
+      setSelectedNode(null);
+      setDetailLevel(stepLevel(step));
+      setView("tours");
+      setSidebarOpen(false);
+    },
+    [tour],
+  );
+
+  const selectTour = useCallback((id: string) => {
+    setTourId(id);
+    setTourIndex(-1);
     setSelectedNode(null);
     setDetailLevel(null);
-    setView("walkthroughs");
+    setOverlayDismissed(false);
+    setPlaying(false);
+    setView("tours");
     setSidebarOpen(false);
   }, []);
 
-  const selectStep = useCallback(
-    (index: number) => {
-      if (!walk) return;
-      const next = Math.max(0, Math.min(walk.steps.length - 1, index));
-      setStepIndex(next);
-      setSelectedNode(null);
-      setDetailLevel(null);
-      setView("walkthroughs");
-      setSidebarOpen(false);
-    },
-    [walk],
-  );
-
-  const applyTarget = useCallback(
-    (target: TourTarget | undefined) => {
-      if (!target) return;
-      switch (target.kind) {
-        case "module":
-          setSelectedModule(target.id);
-          setSelectedNode(null);
-          setDetailLevel(null);
-          setView("modules");
-          setSidebarOpen(false);
-          break;
-        case "file":
-          setSelectedNode(target.id);
-          setDetailLevel(null);
-          setView("browser");
-          expandFor(target.id);
-          setSidebarOpen(false);
-          break;
-        case "symbol":
-          setSelectedNode(target.id);
-          setDetailLevel(target.level === "file" ? "file" : "symbol");
-          setView("browser");
-          expandFor(target.id);
-          setSidebarOpen(false);
-          break;
-        case "walk":
-          setWalkId(target.id);
-          setStepIndex(Math.max(0, target.step ?? 0));
-          setSelectedNode(null);
-          setDetailLevel(null);
-          setView("walkthroughs");
-          setSidebarOpen(false);
-          break;
-        case "doc": {
-          const path = target.path
-            .replace(/^docs\//, "")
-            .replace(/\.mdx?$/, "")
-            .replace(/^README$/, "");
-          window.location.assign(`/docs${path ? `/${path}` : ""}`);
-          break;
-        }
-      }
-    },
-    [expandFor],
-  );
-
-  const startTour = useCallback(
-    (tour: Tour) => {
-      appliedTour.current = `${tour.id}:0`;
-      setActiveTourId(tour.id);
-      setTourIndex(0);
-      setPlaying(false);
-      applyTarget(tour.steps[0]?.target);
-    },
-    [applyTarget],
-  );
-
-  const stopTour = useCallback(() => {
-    appliedTour.current = "";
-    setActiveTourId(null);
-    setPlaying(false);
-    setDetailLevel(null);
-  }, []);
-
-  const goTour = useCallback(
-    (index: number) => {
-      if (!activeTour) return;
-      const next = Math.max(0, Math.min(activeTour.steps.length - 1, index));
-      appliedTour.current = `${activeTour.id}:${next}`;
-      setTourIndex(next);
-      applyTarget(activeTour.steps[next]?.target);
-    },
-    [activeTour, applyTarget],
-  );
-
-  useEffect(() => {
-    if (!activeTour) return;
-    const key = `${activeTour.id}:${tourIndex}`;
-    if (appliedTour.current === key) return;
-    appliedTour.current = key;
-    applyTarget(activeTour.steps[tourIndex]?.target);
-  }, [activeTour, applyTarget, tourIndex]);
-
-  useEffect(() => {
-    if (!playing) return;
-    if (activeTour) {
-      if (tourIndex >= activeTour.steps.length - 1) {
-        setPlaying(false);
-        return;
-      }
-    } else if (view !== "walkthroughs" || !walk || stepIndex >= walk.steps.length - 1) {
-      setPlaying(false);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      if (activeTour) goTour(tourIndex + 1);
-      else selectStep(stepIndex + 1);
-    }, 6000);
-    return () => window.clearTimeout(timer);
-  }, [activeTour, goTour, playing, selectStep, stepIndex, tourIndex, view, walk]);
-
   const changeView = useCallback(
     (nextView: View) => {
-      if (activeTourId) stopTour();
-      if (nextView === "browser" && view === "walkthroughs" && step) {
-        setSelectedNode(step.node);
-        expandFor(step.node);
+      setPlaying(false);
+      if (nextView === "browser" && view === "tours" && currentStep?.kind === "node") {
+        const id = targetNodeId(currentStep.target);
+        if (id) {
+          setSelectedNode(id);
+          expandFor(id);
+        }
       }
-      if (nextView === "modules" && currentEntry?.moduleId) {
-        setSelectedModule(currentEntry.moduleId);
+      if (nextView === "modules" && view === "tours" && currentStep?.kind === "node") {
+        if (currentStep.target.kind === "module") setSelectedModule(currentStep.target.id);
+        else if (currentEntry?.moduleId) setSelectedModule(currentEntry.moduleId);
       }
-      if (nextView === "walkthroughs" && selectedNode && walk) {
-        const index = walk.steps.findIndex((candidate) => candidate.node === selectedNode);
-        if (index >= 0) setStepIndex(index);
+      if (nextView === "tours" && view === "browser" && selectedNode && data) {
+        for (const candidate of data.tours) {
+          const index = candidate.steps.findIndex(
+            (step) => step.kind === "node" && targetNodeId(step.target) === selectedNode,
+          );
+          if (index >= 0) {
+            setTourId(candidate.id);
+            setTourIndex(index);
+            break;
+          }
+        }
+      }
+      if (nextView === "tours" && view === "modules" && selectedModule && data) {
+        for (const candidate of data.tours) {
+          const index = candidate.steps.findIndex(
+            (step) =>
+              step.kind === "node" &&
+              step.target.kind === "module" &&
+              step.target.id === selectedModule,
+          );
+          if (index >= 0) {
+            setTourId(candidate.id);
+            setTourIndex(index);
+            break;
+          }
+        }
       }
       setView(nextView);
     },
-    [activeTourId, currentEntry?.moduleId, expandFor, selectedNode, step, stopTour, view, walk],
+    [currentEntry?.moduleId, currentStep, data, expandFor, selectedModule, selectedNode, view],
   );
 
   const selectSearch = useCallback(
@@ -373,8 +349,8 @@ export function Explorer() {
         selectModule(entry.id);
         return;
       }
-      if (entry.kind === "walk") {
-        selectWalk(entry.id.replace(/^walk:/, ""));
+      if (entry.kind === "tour") {
+        selectTour(entry.id.replace(/^tour:/, ""));
         return;
       }
       setSelectedNode(entry.id);
@@ -383,7 +359,7 @@ export function Explorer() {
       setView("browser");
       setSidebarOpen(false);
     },
-    [expandFor, selectModule, selectWalk],
+    [expandFor, selectModule, selectTour],
   );
 
   const zoomOut = useCallback(() => {
@@ -415,6 +391,24 @@ export function Explorer() {
     if (symbol) selectNode(symbol.id, "browser");
   }, [currentNodeId, modules, searchById, selectNode, selectedModule, view]);
 
+  const toggle = useCallback((path: string) => {
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const toggleInternal = useCallback((fileId: string) => {
+    setInternalOpen((previous) => {
+      const next = new Set(previous);
+      if (next.has(fileId)) next.delete(fileId);
+      else next.add(fileId);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
@@ -436,63 +430,60 @@ export function Explorer() {
         return;
       }
       if (event.key === "Escape") {
-        if (activeTour || playing) stopTour();
+        if (overlayDismissed === false && currentStep?.overlay) {
+          setOverlayDismissed(true);
+          return;
+        }
+        if (playing) setPlaying(false);
         return;
       }
-      if (activeTour) {
-        if (event.key === "ArrowRight" || event.key === "j") {
-          event.preventDefault();
-          goTour(tourIndex + 1);
-        }
-        if (event.key === "ArrowLeft" || event.key === "k") {
-          event.preventDefault();
-          goTour(tourIndex - 1);
-        }
-        return;
-      }
-      if (view !== "walkthroughs" || !walk) return;
+      if (view !== "tours" || !tour) return;
       if (event.key === "ArrowRight" || event.key === "j") {
         event.preventDefault();
-        selectStep(stepIndex + 1);
+        goToTourStep(tourIndex + 1);
       }
       if (event.key === "ArrowLeft" || event.key === "k") {
         event.preventDefault();
-        selectStep(stepIndex - 1);
+        goToTourStep(tourIndex - 1);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
-    activeTour,
-    goTour,
+    currentStep?.overlay,
+    goToTourStep,
+    overlayDismissed,
     playing,
-    selectStep,
-    stepIndex,
-    stopTour,
+    tour,
     tourIndex,
     view,
-    walk,
     zoomIn,
     zoomOut,
   ]);
 
-  const toggle = useCallback((path: string) => {
-    setExpanded((previous) => {
-      const next = new Set(previous);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  }, []);
+  useEffect(() => {
+    if (!playing || view !== "tours" || !tour || tourIndex < 0) return;
+    const step = tour.steps[tourIndex];
+    if (!step || step.kind === "interlude" || (step.overlay && !overlayDismissed)) {
+      setPlaying(false);
+      return;
+    }
+    if (tourIndex >= tour.steps.length - 1) {
+      setPlaying(false);
+      return;
+    }
+    const timer = window.setTimeout(() => goToTourStep(tourIndex + 1, { auto: true }), 6000);
+    return () => window.clearTimeout(timer);
+  }, [goToTourStep, overlayDismissed, playing, tour, tourIndex, view]);
 
-  const toggleInternal = useCallback((fileId: string) => {
-    setInternalOpen((previous) => {
-      const next = new Set(previous);
-      if (next.has(fileId)) next.delete(fileId);
-      else next.add(fileId);
-      return next;
-    });
-  }, []);
+  const overlayVisible = Boolean(currentStep?.overlay) && !overlayDismissed;
+  const canPlay =
+    view === "tours" &&
+    tour !== null &&
+    currentStep?.kind === "node" &&
+    !overlayVisible &&
+    tourIndex >= 0 &&
+    tourIndex < tour.steps.length - 1;
 
   return (
     <div className="min-h-dvh bg-fd-background text-fd-foreground">
@@ -530,16 +521,16 @@ export function Explorer() {
             Reference
           </Link>
           <Link
-            href="/explore?view=walkthroughs"
+            href="/explore?view=tours"
             className="rounded-lg bg-fd-accent px-2 py-1.5 font-medium text-fd-accent-foreground"
           >
-            Walkthroughs
+            Tours
           </Link>
           <a
             href="https://github.com/mr-rogers-neighborhood/suite-apps"
             target="_blank"
             rel="noreferrer"
-            className="rounded-lg p-1.5 hover:bg-fd-accent hover:text-fd-foreground"
+            className="rounded-lg p-1.5 hover:bg-fd-accent"
             aria-label="GitHub"
           >
             <GitBranch className="size-4" />
@@ -585,64 +576,67 @@ export function Explorer() {
                 moduleById={moduleById}
                 modules={data.modules}
                 tree={data.tree}
-                walks={data.walks}
                 tours={data.tours}
+                tourNodes={tourNodes}
                 selectedNode={currentNodeId}
                 selectedModule={selectedModule}
-                walkId={walkId}
-                stepIndex={stepIndex}
+                tourId={tourId}
+                tourIndex={tourIndex}
                 expanded={expanded}
                 internalOpen={internalOpen}
                 onSelectNode={selectNode}
                 onSelectModule={selectModule}
                 onToggle={toggle}
                 onToggleInternal={toggleInternal}
-                onSelectWalk={selectWalk}
-                onSelectStep={selectStep}
-                onStartTour={startTour}
+                onSelectTour={selectTour}
+                onSelectTourStep={goToTourStep}
                 onSearchSelect={selectSearch}
               />
             </aside>
 
-            <main id="explorer-main" className="flex min-h-0 min-w-0 flex-col">
+            <main id="explorer-main" className="relative flex min-h-0 min-w-0 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <DetailPane
                   view={view}
                   currentNodeId={currentNodeId}
                   selectedModule={selectedModule}
-                  walk={walk}
-                  stepIndex={stepIndex}
+                  tour={tour}
+                  tourIndex={tourIndex}
+                  detailLevel={view === "tours" ? stepLevel(currentStep) : detailLevel}
                   moduleData={modules}
                   searchById={searchById}
                   moduleById={moduleById}
-                  detailLevel={detailLevel}
+                  membership={data.membership}
                   onSelectNode={selectNode}
                   onSelectModule={selectModule}
                   onOpenBrowser={(id) => selectNode(id, "browser")}
-                  onSelectWalkStep={selectStep}
+                  onSelectTourStep={goToTourStep}
+                  onStartTour={() => goToTourStep(0)}
+                  onOpenTour={(id, step) => {
+                    setTourId(id);
+                    setTourIndex(step);
+                    setView("tours");
+                    setOverlayDismissed(false);
+                    setPlaying(false);
+                  }}
                 />
               </div>
-              {activeTour && tourStep ? (
-                <TourPanel
-                  tour={activeTour}
-                  index={tourIndex}
-                  step={tourStep}
-                  playing={playing}
-                  onPrev={() => goTour(tourIndex - 1)}
-                  onNext={() => goTour(tourIndex + 1)}
-                  onTogglePlay={() => setPlaying((value) => !value)}
-                  onStop={stopTour}
+              {overlayVisible && currentStep?.overlay ? (
+                <OverlayCard
+                  overlay={currentStep.overlay}
+                  onClose={() => setOverlayDismissed(true)}
                 />
               ) : null}
               <StatusBar
                 view={view}
                 entry={currentEntry}
                 module={activeModuleId ? moduleById.get(activeModuleId) : undefined}
-                walk={walk}
-                stepIndex={stepIndex}
+                tour={tour}
+                tourIndex={tourIndex}
                 playing={playing}
-                onPrev={() => selectStep(stepIndex - 1)}
-                onNext={() => selectStep(stepIndex + 1)}
+                canPlay={canPlay}
+                onPrev={() => goToTourStep(tourIndex - 1)}
+                onNext={() => goToTourStep(tourIndex + 1)}
                 onTogglePlay={() => setPlaying((value) => !value)}
               />
             </main>
@@ -653,79 +647,40 @@ export function Explorer() {
   );
 }
 
-function TourPanel({
-  tour,
-  index,
-  step,
-  playing,
-  onPrev,
-  onNext,
-  onTogglePlay,
-  onStop,
+function OverlayCard({
+  overlay,
+  onClose,
 }: {
-  tour: Tour;
-  index: number;
-  step: Tour["steps"][number];
-  playing: boolean;
-  onPrev: () => void;
-  onNext: () => void;
-  onTogglePlay: () => void;
-  onStop: () => void;
+  overlay: NonNullable<TourStep["overlay"]>;
+  onClose: () => void;
 }) {
   return (
-    <div className="shrink-0 border-t border-fd-border bg-fd-muted/40 px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded bg-fd-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-fd-primary">
-          Tour
-        </span>
-        <span className="font-medium">{tour.title}</span>
-        <span className="text-fd-muted-foreground">
-          {index + 1} of {tour.steps.length}
-        </span>
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onPrev}
-            disabled={index === 0}
-            className="rounded border border-fd-border px-2 py-0.5 disabled:opacity-40"
-          >
-            Prev
-          </button>
-          <button
-            type="button"
-            onClick={onTogglePlay}
-            disabled={index >= tour.steps.length - 1}
-            className="rounded border border-fd-border px-2 py-0.5 disabled:opacity-40"
-          >
-            {playing ? "Pause" : "Play"}
-          </button>
-          <button
-            type="button"
-            onClick={onNext}
-            disabled={index >= tour.steps.length - 1}
-            className="rounded border border-fd-border px-2 py-0.5 disabled:opacity-40"
-          >
-            Next
-          </button>
-          <button
-            type="button"
-            onClick={onStop}
-            className="rounded border border-fd-border px-2 py-0.5 text-fd-muted-foreground hover:text-fd-foreground"
-          >
-            Stop
-          </button>
+    <aside
+      role="status"
+      aria-live="polite"
+      className={`absolute bottom-3 left-3 right-3 z-20 max-h-[45%] overflow-y-auto rounded-xl border p-3 shadow-lg sm:left-auto sm:w-96 ${
+        overlay.tone === "warning"
+          ? "border-amber-500/40 bg-amber-500/10"
+          : "border-fd-border bg-fd-background"
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">{overlay.title}</p>
+          <div className="mt-1">
+            <Note>{overlay.body}</Note>
+          </div>
         </div>
-      </div>
-      {step.callout ? (
-        <p
-          className="mt-1 text-xs leading-5 text-fd-muted-foreground"
-          role="status"
-          aria-live="polite"
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
+          aria-label="Dismiss overlay"
         >
-          {step.callout}
-        </p>
-      ) : null}
-    </div>
+          <X className="size-3.5" />
+        </button>
+      </div>
+    </aside>
   );
 }
 
@@ -733,9 +688,10 @@ function StatusBar({
   view,
   entry,
   module,
-  walk,
-  stepIndex,
+  tour,
+  tourIndex,
   playing,
+  canPlay,
   onPrev,
   onNext,
   onTogglePlay,
@@ -743,9 +699,10 @@ function StatusBar({
   view: View;
   entry?: SearchEntry;
   module?: ModuleSummary;
-  walk: Walk | null;
-  stepIndex: number;
+  tour: Tour | null;
+  tourIndex: number;
   playing: boolean;
+  canPlay: boolean;
   onPrev: () => void;
   onNext: () => void;
   onTogglePlay: () => void;
@@ -764,31 +721,29 @@ function StatusBar({
       ) : module ? (
         <span className="truncate">{module.title}</span>
       ) : null}
-      {view === "walkthroughs" && walk ? (
+      {view === "tours" && tour ? (
         <div className="ml-auto flex items-center gap-2">
-          <span>
-            {stepIndex + 1} / {walk.steps.length}
-          </span>
-          <button
-            type="button"
-            onClick={onTogglePlay}
-            disabled={stepIndex >= walk.steps.length - 1}
-            className="rounded border border-fd-border px-2 py-0.5 disabled:opacity-40"
-          >
-            {playing ? "Pause" : "Play"}
-          </button>
+          <span>{tourIndex < 0 ? "intro" : `${tourIndex + 1} / ${tour.steps.length}`}</span>
           <button
             type="button"
             onClick={onPrev}
-            disabled={stepIndex === 0}
+            disabled={tourIndex < 0}
             className="rounded border border-fd-border px-2 py-0.5 disabled:opacity-40"
           >
             Prev
           </button>
           <button
             type="button"
+            onClick={onTogglePlay}
+            disabled={!canPlay}
+            className="rounded border border-fd-border px-2 py-0.5 disabled:opacity-40"
+          >
+            {playing ? "Pause" : "Play"}
+          </button>
+          <button
+            type="button"
             onClick={onNext}
-            disabled={stepIndex >= walk.steps.length - 1}
+            disabled={tourIndex >= tour.steps.length - 1}
             className="rounded border border-fd-border px-2 py-0.5 disabled:opacity-40"
           >
             Next

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function ToursPage() {
-  redirect("/explore?view=walkthroughs");
+  redirect("/explore?view=tours");
 }

@@ -1,4 +1,4 @@
-export type View = "browser" | "modules" | "walkthroughs";
+export type View = "browser" | "modules" | "tours";
 
 export type SearchEntry = {
   id: string;
@@ -21,6 +21,7 @@ export type ModuleSummary = {
   testCount: number;
   noteCount: number;
   summary: string;
+  tourCount: number;
 };
 
 export type SymbolSummary = {
@@ -61,42 +62,56 @@ export type ModuleData = ModuleSummary & {
   files: ModuleFile[];
 };
 
-export type WalkStep = {
-  node: string;
-  note?: string;
-};
-
-export type Walk = {
-  id: string;
-  title: string;
-  summary: string;
-  start: boolean;
-  order: number;
-  kind: "path" | "generated";
-  generated?: boolean;
-  steps: WalkStep[];
-};
-
 export type TourTarget =
+  | { kind: "node"; id: string }
   | { kind: "module"; id: string }
   | { kind: "file"; id: string }
   | { kind: "symbol"; id: string; level?: "symbol" | "file" }
-  | { kind: "walk"; id: string; step?: number }
+  | { kind: "tour"; id: string; step?: number }
   | { kind: "doc"; path: string };
 
-export type TourStep = {
-  target: TourTarget;
-  callout?: string;
+export type TourOverlay = {
+  title: string;
+  body: string;
+  tone?: "note" | "warning";
 };
+
+export type TourNodeStep = {
+  kind: "node";
+  target: TourTarget;
+  note?: string;
+  overlay?: TourOverlay;
+};
+
+export type TourInterlude = {
+  kind: "interlude";
+  title: string;
+  body: string;
+  overlay?: TourOverlay;
+};
+
+export type TourStep = TourNodeStep | TourInterlude;
+
+export type TourSource = "mdx" | "composed" | "generated";
 
 export type Tour = {
   id: string;
   title: string;
   summary: string;
+  intro: string;
   order: number;
   start: boolean;
+  source: TourSource;
   steps: TourStep[];
 };
+
+export type TourMembershipEntry = {
+  tourId: string;
+  title: string;
+  step: number;
+};
+
+export type TourMembership = Record<string, TourMembershipEntry[]>;
 
 export type FolderNode = {
   type: "folder";
@@ -123,6 +138,6 @@ export type BaseData = {
   tree: FolderNode;
   modules: ModuleSummary[];
   search: SearchEntry[];
-  walks: Walk[];
   tours: Tour[];
+  membership: TourMembership;
 };

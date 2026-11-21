@@ -8,13 +8,15 @@ then `tools/docs/README.md` for the model and its limits.
 - The code, `docs/` and each app's `docs/` are the source of truth. Never edit `public/data/` or
   `.generated/docs/`; run `pnpm docs:index` / `pnpm docs:dev` to regenerate.
 - Do not add a new Diátaxis page. The explorer is the structure; new explanations go in
-  `docs/modules/`, new guided paths in `docs/walkthroughs/`. `docs/` keeps the older notes archive.
+  `docs/modules/`, new guided paths in `docs/tours/`. `docs/` keeps the older notes archive.
 - One authored MDX per module, not per file. `docs/modules/<module>.mdx` holds the narrative and
   `## <node-id>` notes. The explorer splits by file and declaration at render time.
-- A walkthrough is an ordered list of node IDs, not a copy of the code. Authored walks live in
-  `docs/walkthroughs/`; the full descent is generated. A composed tour lives in
-  `docs/walkthroughs/*.tour.mjs` and only exists when it crosses targets or needs a callout; a normal
-  walk derives its tour from its steps.
+- A tour is one concept with two authoring forms. A linear tour lives in `docs/tours/*.mdx` and its
+  headings are node IDs. A composed tour lives in `docs/tours/*.tour.mjs` and only exists when it
+  crosses targets or needs a step that is not prose. Both appear in one Tours list.
+- The MDX preamble is the tour intro. `## interlude: <title>` is a chapter and pauses Play.
+  `### overlay: <title>` inside a step adds a dismissible commentary card. Do not write a
+  "What this does not do" section; state the subject positively and let "What it covers" be generated.
 - Do not generate prose for every symbol. Compiler facts and optional notes; generated entries say
   so.
 - Do not add `tools/docs` to `pnpm build`, the release path, or a shipped package.

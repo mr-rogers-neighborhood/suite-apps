@@ -8,8 +8,8 @@ import type {
   ModuleSummary,
   SearchEntry,
   Tour,
+  TourStep,
   View,
-  Walk,
 } from "@/lib/explorer-types";
 
 type Props = {
@@ -22,29 +22,57 @@ type Props = {
   moduleById: Map<string, ModuleSummary>;
   modules: ModuleSummary[];
   tree: FolderNode;
-  walks: Walk[];
   tours: Tour[];
+  tourNodes: Set<string>;
   selectedNode: string | null;
   selectedModule: string | null;
-  walkId: string | null;
-  stepIndex: number;
+  tourId: string | null;
+  tourIndex: number;
   expanded: Set<string>;
   internalOpen: Set<string>;
   onSelectNode: (id: string) => void;
   onSelectModule: (id: string) => void;
   onToggle: (path: string) => void;
   onToggleInternal: (fileId: string) => void;
-  onSelectWalk: (id: string) => void;
-  onSelectStep: (index: number) => void;
-  onStartTour: (tour: Tour) => void;
+  onSelectTour: (id: string) => void;
+  onSelectTourStep: (index: number) => void;
   onSearchSelect: (entry: SearchEntry) => void;
 };
 
 const viewItems: { id: View; label: string; icon: typeof FolderTree }[] = [
   { id: "browser", label: "Browser", icon: FolderTree },
   { id: "modules", label: "Modules", icon: Boxes },
-  { id: "walkthroughs", label: "Walkthroughs", icon: Route },
+  { id: "tours", label: "Tours", icon: Route },
 ];
+
+function stepLabel(
+  step: TourStep,
+  searchById: Map<string, SearchEntry>,
+  moduleById: Map<string, ModuleSummary>,
+) {
+  if (step.kind === "interlude") return step.title;
+  const target = step.target;
+  if (target.kind === "module") return moduleById.get(target.id)?.title ?? target.id;
+  if (target.kind === "tour") return `Tour: ${target.id}`;
+  if (target.kind === "doc") return target.path.split("/").at(-1) ?? target.path;
+  return searchById.get(target.id)?.label ?? target.id;
+}
+
+function stepModule(
+  step: TourStep,
+  searchById: Map<string, SearchEntry>,
+  moduleById: Map<string, ModuleSummary>,
+) {
+  if (step.kind === "interlude") return "chapter";
+  const target = step.target;
+  if (target.kind === "module") return target.id;
+  if (target.kind === "tour") return "another tour";
+  if (target.kind === "doc") return "reference";
+  const entry = searchById.get(target.id);
+  return entry?.moduleId
+    ? (moduleById.get(entry.moduleId)?.title ?? entry.moduleId)
+    : (entry?.path ?? target.id);
+}
 
 export function ExplorerSidebar({
   view,
@@ -56,21 +84,20 @@ export function ExplorerSidebar({
   moduleById,
   modules,
   tree,
-  walks,
   tours,
+  tourNodes,
   selectedNode,
   selectedModule,
-  walkId,
-  stepIndex,
+  tourId,
+  tourIndex,
   expanded,
   internalOpen,
   onSelectNode,
   onSelectModule,
   onToggle,
   onToggleInternal,
-  onSelectWalk,
-  onSelectStep,
-  onStartTour,
+  onSelectTour,
+  onSelectTourStep,
   onSearchSelect,
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
@@ -131,7 +158,7 @@ export function ExplorerSidebar({
             ref={input}
             value={query}
             onChange={(event) => onChangeQuery(event.target.value)}
-            placeholder="Search files and symbols…"
+            placeholder="Search files, symbols and tours…"
             className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-fd-muted-foreground"
             spellCheck={false}
           />
@@ -166,6 +193,7 @@ export function ExplorerSidebar({
             selectedId={selectedNode}
             expanded={expanded}
             internalOpen={internalOpen}
+            tourNodes={tourNodes}
             onSelect={onSelectNode}
             onToggle={onToggle}
             onToggleInternal={onToggleInternal}
@@ -173,16 +201,14 @@ export function ExplorerSidebar({
         ) : view === "modules" ? (
           <ModuleList modules={modules} selectedModule={selectedModule} onSelect={onSelectModule} />
         ) : (
-          <WalkList
-            walks={walks}
+          <TourList
             tours={tours}
-            walkId={walkId}
-            stepIndex={stepIndex}
+            tourId={tourId}
+            tourIndex={tourIndex}
             searchById={searchById}
             moduleById={moduleById}
-            onSelectWalk={onSelectWalk}
-            onSelectStep={onSelectStep}
-            onStartTour={onStartTour}
+            onSelectTour={onSelectTour}
+            onSelectTourStep={onSelectTourStep}
           />
         )}
       </div>
@@ -303,6 +329,14 @@ function ModuleList({
                   <span className="mt-0.5 shrink-0 text-[10px] text-fd-muted-foreground">
                     {module.fileCount}f
                   </span>
+                  {module.tourCount > 0 ? (
+                    <span
+                      title={`${module.tourCount} tours`}
+                      className="mt-0.5 shrink-0 rounded bg-fd-primary/10 px-1 text-[9px] text-fd-primary"
+                    >
+                      {module.tourCount} tour{module.tourCount === 1 ? "" : "s"}
+                    </span>
+                  ) : null}
                   {module.noteCount > 0 ? (
                     <span className="mt-0.5 shrink-0 rounded bg-amber-500/10 px-1 text-[9px] text-amber-500">
                       {module.noteCount}
@@ -323,68 +357,35 @@ function ModuleList({
   );
 }
 
-function WalkList({
-  walks,
+function TourList({
   tours,
-  walkId,
-  stepIndex,
+  tourId,
+  tourIndex,
   searchById,
   moduleById,
-  onSelectWalk,
-  onSelectStep,
-  onStartTour,
+  onSelectTour,
+  onSelectTourStep,
 }: {
-  walks: Walk[];
   tours: Tour[];
-  walkId: string | null;
-  stepIndex: number;
+  tourId: string | null;
+  tourIndex: number;
   searchById: Map<string, SearchEntry>;
   moduleById: Map<string, ModuleSummary>;
-  onSelectWalk: (id: string) => void;
-  onSelectStep: (index: number) => void;
-  onStartTour: (tour: Tour) => void;
+  onSelectTour: (id: string) => void;
+  onSelectTourStep: (index: number) => void;
 }) {
-  const walk = walks.find((candidate) => candidate.id === walkId) ?? null;
+  const tour = tours.find((candidate) => candidate.id === tourId) ?? null;
 
   return (
     <div className="text-[13px]">
-      {tours.length > 0 ? (
-        <div className="border-b border-fd-border py-1">
-          <h2 className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-fd-muted-foreground">
-            Composed tours
-          </h2>
-          {tours.map((tour) => (
-            <button
-              key={tour.id}
-              type="button"
-              onClick={() => onStartTour(tour)}
-              className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-fd-accent"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5">
-                  <span className="truncate text-xs font-medium">{tour.title}</span>
-                  <span className="rounded bg-fd-primary/10 px-1 text-[9px] uppercase text-fd-primary">
-                    tour
-                  </span>
-                </span>
-                <span className="mt-0.5 block text-[10px] text-fd-muted-foreground">
-                  {tour.steps.length} stops · crosses views
-                </span>
-              </span>
-              <ChevronRight className="mt-1 size-3.5 shrink-0 text-fd-muted-foreground" />
-            </button>
-          ))}
-        </div>
-      ) : null}
-
       <div className="py-1">
-        {walks.map((candidate) => (
+        {tours.map((candidate) => (
           <button
             key={candidate.id}
             type="button"
-            onClick={() => onSelectWalk(candidate.id)}
+            onClick={() => onSelectTour(candidate.id)}
             className={`flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-fd-accent ${
-              walkId === candidate.id ? "bg-fd-accent" : ""
+              tourId === candidate.id ? "bg-fd-accent" : ""
             }`}
           >
             <span className="min-w-0 flex-1">
@@ -395,28 +396,33 @@ function WalkList({
                     start
                   </span>
                 ) : null}
+                {candidate.source === "generated" ? (
+                  <span className="rounded bg-fd-muted px-1 text-[9px] uppercase text-fd-muted-foreground">
+                    generated
+                  </span>
+                ) : null}
               </span>
               <span className="mt-0.5 block text-[10px] text-fd-muted-foreground">
-                {candidate.steps.length} steps · {candidate.generated ? "generated" : "curated"}
+                {candidate.steps.length} steps
               </span>
             </span>
             <ChevronRight
               className={`mt-1 size-3.5 shrink-0 text-fd-muted-foreground transition-transform ${
-                walkId === candidate.id ? "rotate-90" : ""
+                tourId === candidate.id ? "rotate-90" : ""
               }`}
             />
           </button>
         ))}
       </div>
 
-      {walk ? (
+      {tour ? (
         <div className="border-t border-fd-border pb-4">
-          <WalkSteps
-            walk={walk}
-            stepIndex={stepIndex}
+          <TourSteps
+            tour={tour}
+            tourIndex={tourIndex}
             searchById={searchById}
             moduleById={moduleById}
-            onSelectStep={onSelectStep}
+            onSelectStep={onSelectTourStep}
           />
         </div>
       ) : null}
@@ -424,46 +430,80 @@ function WalkList({
   );
 }
 
-function WalkSteps({
-  walk,
-  stepIndex,
+function TourSteps({
+  tour,
+  tourIndex,
   searchById,
   moduleById,
   onSelectStep,
 }: {
-  walk: Walk;
-  stepIndex: number;
+  tour: Tour;
+  tourIndex: number;
   searchById: Map<string, SearchEntry>;
   moduleById: Map<string, ModuleSummary>;
   onSelectStep: (index: number) => void;
 }) {
-  const total = walk.steps.length;
-  const windowSize = walk.generated ? 44 : total;
-  const start = walk.generated ? Math.max(0, Math.min(stepIndex - 10, total - windowSize)) : 0;
+  const total = tour.steps.length;
+  const generated = tour.source === "generated";
+  const windowSize = generated ? 44 : total;
+  const start = generated ? Math.max(0, Math.min(tourIndex - 10, total - windowSize)) : 0;
   const end = Math.min(total, start + windowSize);
 
   return (
     <div className="py-1">
       <div className="px-3 pb-1 pt-2 text-[10px] uppercase tracking-widest text-fd-muted-foreground">
-        {walk.title}
-        {walk.generated ? ` · step ${stepIndex + 1} of ${total}` : ""}
+        {tour.title}
+        {generated ? ` · step ${Math.max(1, tourIndex + 1)} of ${total}` : ""}
       </div>
+      <button
+        type="button"
+        onClick={() => onSelectStep(-1)}
+        className={`flex w-full items-center gap-2 py-1.5 pr-3 text-left text-xs hover:bg-fd-accent ${
+          tourIndex < 0 ? "bg-fd-accent text-fd-accent-foreground" : ""
+        }`}
+        style={{ paddingLeft: 12 }}
+      >
+        <span className="w-7 shrink-0 text-right font-mono text-[10px] text-fd-muted-foreground">
+          0
+        </span>
+        <span>Intro</span>
+      </button>
       {start > 0 ? (
         <p className="px-3 py-1 text-[10px] text-fd-muted-foreground">
           {start} earlier step{start === 1 ? "" : "s"}
         </p>
       ) : null}
-      {walk.steps.slice(start, end).map((step, offset) => {
+      {tour.steps.slice(start, end).map((step, offset) => {
         const index = start + offset;
-        const entry = searchById.get(step.node);
-        const module = entry?.moduleId ? moduleById.get(entry.moduleId) : undefined;
+        const active = index === tourIndex;
+        if (step.kind === "interlude") {
+          return (
+            <button
+              key={`interlude-${index}`}
+              type="button"
+              onClick={() => onSelectStep(index)}
+              className={`flex w-full items-start gap-2 py-2 pr-3 text-left hover:bg-fd-accent ${
+                active ? "bg-fd-accent text-fd-accent-foreground" : ""
+              }`}
+              style={{ paddingLeft: 12 }}
+            >
+              <Route className="mt-0.5 size-3.5 shrink-0 text-fd-primary/70" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-semibold">{step.title}</span>
+                <span className="block text-[10px] uppercase tracking-wide text-fd-muted-foreground">
+                  chapter
+                </span>
+              </span>
+            </button>
+          );
+        }
         return (
           <button
-            key={`${step.node}-${index}`}
+            key={`${index}-${stepLabel(step, searchById, moduleById)}`}
             type="button"
             onClick={() => onSelectStep(index)}
             className={`flex w-full items-start gap-2 py-1.5 pr-3 text-left hover:bg-fd-accent ${
-              index === stepIndex ? "bg-fd-accent text-fd-accent-foreground" : ""
+              active ? "bg-fd-accent text-fd-accent-foreground" : ""
             }`}
             style={{ paddingLeft: 12 }}
           >
@@ -471,9 +511,11 @@ function WalkSteps({
               {index + 1}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs">{entry?.label ?? step.node}</span>
+              <span className="block truncate text-xs">
+                {stepLabel(step, searchById, moduleById)}
+              </span>
               <span className="block truncate text-[10px] text-fd-muted-foreground">
-                {module?.title ?? entry?.path ?? "unknown"}
+                {stepModule(step, searchById, moduleById)}
               </span>
             </span>
           </button>

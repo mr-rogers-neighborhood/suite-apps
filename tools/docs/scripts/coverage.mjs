@@ -24,15 +24,15 @@ function percent(part, total) {
   return `${Math.round((part / total) * 100)}%`;
 }
 
-const [modules, search, walks] = await Promise.all([
+const [modules, search, tours] = await Promise.all([
   readJson(join(dataDir, "modules.json")),
   readJson(join(dataDir, "search.json")),
-  readJson(join(dataDir, "walks.json")),
+  readJson(join(dataDir, "tours.json")),
 ]);
 
 const fileEntries = search.filter((entry) => entry.kind === "file");
 const symbolEntries = search.filter(
-  (entry) => entry.kind !== "file" && entry.kind !== "module" && entry.kind !== "walk",
+  (entry) => entry.kind !== "file" && entry.kind !== "module" && entry.kind !== "tour",
 );
 const exportedSymbols = symbolEntries.filter((entry) => entry.visibility === "export");
 
@@ -70,10 +70,13 @@ const notedFiles = moduleDetails.reduce((sum, module) => sum + module.notedFiles
 const notedSymbols = moduleDetails.reduce((sum, module) => sum + module.notedSymbols, 0);
 const authoredSymbols = symbolEntries.length;
 const authoredExported = exportedSymbols.length;
-const authoredWalks = walks.filter((walk) => !walk.generated);
-const generatedWalk = walks.find((walk) => walk.generated);
-const walkSteps = authoredWalks.flatMap((walk) => walk.steps ?? []);
-const walkStepsWithNotes = walkSteps.filter((step) => step.note).length;
+const authoredTours = tours.filter((tour) => tour.source !== "generated");
+const generatedTour = tours.find((tour) => tour.source === "generated");
+const steps = authoredTours.flatMap((tour) => tour.steps ?? []);
+const nodeSteps = steps.filter((step) => step.kind === "node");
+const noteSteps = nodeSteps.filter((step) => step.note);
+const interludes = steps.filter((step) => step.kind === "interlude");
+const toursWithIntro = authoredTours.filter((tour) => tour.intro?.trim()).length;
 
 const gaps = moduleDetails
   .filter((module) => !module.narrative && module.notedFiles === 0 && module.notedSymbols === 0)
@@ -92,11 +95,14 @@ const report = {
     exported: authoredExported,
     withNotes: notedSymbols,
   },
-  walks: {
-    total: walks.length,
-    steps: walkSteps.length,
-    stepsWithNotes: walkStepsWithNotes,
-    generatedSteps: generatedWalk?.steps?.length ?? 0,
+  tours: {
+    total: tours.length,
+    authored: authoredTours.length,
+    withIntro: toursWithIntro,
+    steps: nodeSteps.length,
+    stepsWithNotes: noteSteps.length,
+    interludes: interludes.length,
+    generatedSteps: generatedTour?.steps?.length ?? 0,
   },
   gaps,
 };
@@ -110,7 +116,7 @@ if (asJson) {
       `modules  ${modulesWithNarrative}/${moduleDetails.length} narrative, ${modulesWithNotes}/${moduleDetails.length} any note`,
       `files    ${notedFiles}/${fileEntries.length} with a note (${percent(notedFiles, fileEntries.length)})`,
       `symbols  ${notedSymbols}/${authoredSymbols} with a note (${percent(notedSymbols, authoredSymbols)})`,
-      `walks    ${walkStepsWithNotes}/${walkSteps.length} authored steps with a note; ${generatedWalk?.steps?.length ?? 0} generated`,
+      `tours    ${toursWithIntro}/${authoredTours.length} intros; ${noteSteps.length}/${nodeSteps.length} steps with a note; ${interludes.length} interludes; ${generatedTour?.steps?.length ?? 0} generated`,
       "",
       "largest modules with no authored prose:",
       ...(gaps.length === 0
