@@ -21,7 +21,9 @@ from the other app. Do not change another app to make yours pass.
 ## Branch and commits
 
 Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`. Keep a commit to one
-intent. Do not commit a `dist/` directory, a lockfile from a nested app, or secrets.
+intent. Do not commit a lockfile from a nested app or secrets. The shared packages under `packages/*`
+commit their `dist/` output on purpose, and the Start package's `build:verify` proves it has not
+drifted; other `dist/` directories stay out of git.
 
 ## Issues
 
@@ -59,8 +61,9 @@ Then the root gate when the change crosses an app or a shared package:
 mise exec -- node scripts/gate.mjs
 ```
 
-Playwright runs on request, not by default. If you ran it, say which command. If you did not, say that
-too; a claim without a command is not a verification.
+The per-app gates do not run Playwright. The root gate runs Start's e2e suite after the checks, under
+`xvfb-run` when there is no display; `--no-e2e` skips it. Other Playwright suites run on request. If
+you ran one, say which command; a claim without a command is not a verification.
 
 ## Records
 

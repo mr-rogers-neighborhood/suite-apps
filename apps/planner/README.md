@@ -37,6 +37,9 @@ pnpm e2e:smoke  # Playwright smoke journey; on request, not part of the gate
 pnpm package    # electron-builder targets for this platform
 ```
 
+On Linux, Planner ships as an AppImage and as the Flatpak `run.suite.planner`, and syncs through the
+relay a person runs. A pre-release build keeps its workspace in `~/Documents/Suite Slop/Planner`.
+
 ## Working in the monorepo
 
 The apps, the hub and the sync server share one repository and one gate. Start with the

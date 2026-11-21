@@ -53,16 +53,18 @@ Canvas is the reference implementation: `apps/canvas/src/chrome/TitleBar.tsx` re
 Planner and Budget adopt the bar too, each with only the material it has:
 
 - Planner's `Shell.tsx` fills `mark` and the home anchor (back to today), a workspace context, a
-  `navigation` takeover built from its `views.ts` registry, export and import in `actions`, and the
-  theme picker in `controls`. It has no command palette, so `search` stays empty.
+  `navigation` takeover built from its `views.ts` registry, export and import in `actions`, the theme
+  picker in `controls`, and its `SyncPill` in `peers` and `sync`. It has no command palette, so
+  `search` stays empty.
 - Budget's `Shell.tsx` fills `mark` (back to all budgets), the budget name in `context`, a
   Plan/Accounts/Reports takeover in `navigation`, its existing Save status, undo, redo, import and Add
   transaction in `actions`, the command palette trigger in `search`, and the theme picker in
   `controls`.
 
-Empty zones stay empty. Neither app has peers or a sync pill, so those zones render nothing. Each app
-keeps its rail or sidebar as the full navigation; the takeover is the compact one. Below `md` the wide
-zones hide rather than scroll, so the bar adds no horizontal overflow at phone widths.
+Empty zones stay empty. Planner fills `peers` and `sync` with its `SyncPill` and peer count; Budget
+has neither, so those zones render nothing. Each app keeps its rail or sidebar as the full navigation;
+the takeover is the compact one. Below `md` the wide zones hide rather than scroll, so the bar adds no
+horizontal overflow at phone widths.
 
 Both Planner and Budget auto-hide the native menu on Linux and Windows (`autoHideMenuBar`). The bar is
 the visible menu in that case; the native accelerators still fire, and the two do not show two copies

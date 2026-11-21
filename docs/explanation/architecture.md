@@ -2,7 +2,7 @@
 
 Suite is six applications in one repository. They share packages, a gate and a release process, but
 they do not share a process, a document or a trust boundary. This page describes those boundaries;
-each app's own `docs/reference/architecture.md` describes its internals.
+each app's own `docs/reference/` architecture page describes its internals.
 
 ## Three roles
 
@@ -39,8 +39,8 @@ Suite Start and Suite Go enforce the same separation in different places:
   manifest (`suite.app.json`) says what an app is; the install record says where the executable is. A
   manifest may not name a binary, so a tampered manifest cannot redirect a launch.
 - **Start owns only what it installed.** A copy Start placed is Start's to update and remove. A copy
-  a person placed manages itself. Two copies of one app cannot run at once because they share a
-  profile and its single-instance lock.
+  a person placed is not Start's to update. Two copies of one app cannot run at once because they
+  share a profile and its single-instance lock.
 - **Go never learns a domain.** It routes on what a module declares. There is no
   `if (module.id === "planner")` in the shell, and a change that needs one belongs in that domain's
   module.
@@ -64,8 +64,9 @@ and a server a person runs on a device they control. It never defines an app sch
 Desktop Suite is separate sandboxed apps plus Start as the shell. It is not one application that
 mounts domain code. Start owns the catalogue, the channels, routing and updates; Flatpak is the host
 runtime when an app is installed that way, and Start asks it to install, update or remove rather than
-writing a deployment itself. Documents and keys stay with the app: the shell hands over a path or
-bytes, never parses them, and sync keys never enter Start.
+writing a deployment itself. The hub ships as a Flatpak too: inside that sandbox it reaches the host's
+Flatpak service through the Flatpak session helper. Documents and keys stay with the app: the shell
+hands over a path or bytes, never parses them, and sync keys never enter Start.
 
 A signed pack form may be added inside Start later. It would be a way to deliver a domain as a
 verified bundle without making the shell the domain's runtime: the app still owns its document and
@@ -84,11 +85,14 @@ boundary.
 
 ### Why not a host agent now
 
-A host agent that owns installations would let a Start packaged as a Flatpak reach the host. It is a
-second package manager until it earns its keep: install, update, remove and launch would exist twice,
-with its own trust boundary, and it would duplicate what Start already does natively. Start stays
-native behind one `PackageBackend`; a Flatpak Start can implement the same interface over D-Bus to an
-agent later without changing the window or the catalogue.
+A host agent that owns installations is not built now. A sandboxed Start reaches the host's own
+Flatpak through the Flatpak session helper (`org.freedesktop.Flatpak`, used with
+`flatpak-spawn --host`), behind the same `PackageBackend` the native build implements. That grant is
+effectively host command execution; it is the trade that lets a Flatpak hub manage deployments.
+
+A D-Bus agent remains the alternative if the permission set grows. It would be a second package
+manager until it earns its keep: install, update, remove and launch would exist twice, with its own
+trust boundary, and it would duplicate what Start already does through the seam.
 
 ### Why not one service owning sync keys
 

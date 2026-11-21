@@ -16,12 +16,11 @@ a commit the gate has not proven stops it there.
 ## The tag
 
 Tags name one app, because four apps share this repository: Canvas releases are `canvas-v<version>`.
-The current release is `canvas-v0.1.10`. [Version ownership](../../../../docs/how-to/package-and-release.md#version-ownership)
-names the file that owns the number and the prefix each app uses.
+[Version ownership](../../../../docs/how-to/package-and-release.md#version-ownership) names the file
+that owns the number and the prefix each app uses.
 
-The version comes from `package.json`. `desktop/package.json` and `desktop/suite.app.json`
-carry the **app's** version and must agree with it: the tag, the manifest and the package describe one
-commit.
+The version comes from `apps/canvas/desktop/package.json`. `desktop/suite.app.json` carries the
+**app's** version and must agree with it: the tag, the manifest and the package describe one commit.
 
 ## The package
 

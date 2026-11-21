@@ -1,41 +1,44 @@
-# Packaging: four forms, and which one is for what
+# Packaging: the forms, and which one is for what
 
 A note for anyone arriving from web development, where "deploy" means one thing. On the desktop it
-means four, and they differ in **who owns the file on disk** — which decides everything else, including
-who is allowed to update it.
+means several, and they differ in **who owns the file on disk** — which decides everything else,
+including who is allowed to update it.
 
-| Form                   | Closest web analogy                             | Who owns the installed files               | Updates arrive by           | Root needed                         |
-| ---------------------- | ----------------------------------------------- | ------------------------------------------ | --------------------------- | ----------------------------------- |
-| **AppImage**           | a self-contained static build you run with `./` | the user, in `~/Applications`              | Start, from the signed feed | no                                  |
-| **pacman / deb / rpm** | deploying into the host's package registry      | **root**, under `/opt` or `/usr`           | the package manager         | yes                                 |
-| **Flatpak**            | a container runtime for desktop apps            | Flatpak (user or system), inside a sandbox | an OSTree remote            | no for `--user`, yes for `--system` |
-| **snap**               | same shape, Canonical's runtime                 | root, sandboxed                            | the Snap Store              | yes                                 |
+| Form | Closest web analogy | Who owns the installed files | Updates arrive by | Root needed |
+| --- | --- | --- | --- | --- |
+| **AppImage** | a self-contained static build you run with `./` | the user, in `~/Applications` | Start, from the signed feed | no |
+| **Arch package** | deploying into the host's package registry | **root**, under `/opt` | the package manager | yes |
+| **Flatpak** | a container runtime for desktop apps | Flatpak (user or system), inside a sandbox | an OSTree remote | no for `--user`, yes for `--system` |
+
+The three apps and the hub ship as AppImage and Flatpak; only the hub has the Arch package. `deb` is
+no longer a configured target, and `rpm` and `snap` were never built.
 
 ## The rule this repository is built on
 
-**Start can only replace a file it can write.**
+**Start can only replace a file it can write, or ask the writer that owns it.**
 
 An AppImage in `~/Applications/Suite/<App>/<version>/` is owned by the person who ran the installer, so
 Start — running as that person — can download the next version and put it there. That is the whole
 update model: one process decides, and it is the window you are looking at.
 
 A distro package is root-owned. Start cannot write to `/usr`, so it cannot update what the package
-manager installed. That is not a limitation to work around; it is why the suite ships two different
-things:
+manager installed. A Flatpak deployment belongs to Flatpak, so Start asks it. That is not a limitation
+to work around; it is why each form has one writer:
 
-- **The hub is packaged.** It never updates itself anyway (its own row links to the release page), so
-  root ownership costs nothing, and it buys a menu entry, a registered `suite://` handler, and no FUSE.
-- **The apps stay AppImages.** That is what makes Start their updater, and what makes the update path
-  something a person can rehearse rather than read about.
+- **The hub is packaged.** An AppImage hub does not update itself (its row links to the release page),
+  and an Arch hub belongs to the package manager; a Flatpak hub is updated by Flatpak. Packaging buys
+  a menu entry, a registered `suite://` handler and no FUSE.
+- **The apps are installed by a writer Start can ask.** Start updates the AppImages it placed and asks
+  Flatpak to update a deployment. Either way the update path is something a person can rehearse.
 
 ## The Arch package
 
-`packaging/arch/PKGBUILD` builds `suite-start-bin`. It **repackages the published
+`apps/start/packaging/arch/PKGBUILD` builds `suite-start-bin`. It **repackages the published
 AppImage** rather than rebuilding the app, so the package and the signed feed can never describe
 different releases.
 
 ```sh
-cd packaging/arch
+cd apps/start/packaging/arch
 makepkg --nocheck --nodeps            # downloads the pinned AppImage, verifies its sha256, builds
 sudo pacman -U suite-start-bin-<version>-1-x86_64.pkg.tar.zst
 ```
@@ -75,35 +78,35 @@ produced here:
 `fpm` is a good general packager; it is not an Arch packager. Forty lines of PKGBUILD is the honest
 answer, and `makepkg` is the tool an Arch user already trusts.
 
-### Why not Flatpak for the hub
+### Flatpak for the hub
 
-Flatpak is the right answer to "ship one self-contained app to every distro". The hub is the wrong app
-for it:
+The hub ships as `run.suite.start` too, built from the same unpacked tree with
+`node scripts/flatpak.mjs --app start`. It uses the same zypak wrapper as the apps, and its exported
+desktop entry registers `x-scheme-handler/suite`.
 
-- **Its job is to exec host binaries** from `~/Applications/Suite` and write there. Inside a sandbox
-  that needs `--filesystem=home` and `flatpak-spawn` — the sandbox is opened wide to do precisely what
-  it already does unsandboxed.
-- **It would gain a second update channel.** Flatpak updates come from an OSTree remote; the suite's
-  trust story is a signed yml and a sha512. Two ways to receive bytes is one way too many.
-- **Heavier to build:** `flatpak-builder` plus an `org.freedesktop.Sdk` runtime.
+A sandboxed package manager needs a wider door. The manifest grants the host Flatpak service
+(`org.freedesktop.Flatpak`, used with `flatpak-spawn --host`) and the folders Start owns: the
+applications root, menu entries, icons, suite data and config, and the documents tree read-only. The
+host service is effectively host command execution, and it is the trade that lets the hub manage
+Flatpaks from a sandbox. The one-writer rule is unchanged: Flatpak writes the hub's own deployment.
 
-Where Flatpak fits: each app can ship as a Flatpak beside its AppImage (Canvas first; see
-`packaging/flatpak/`). Start treats an installed Flatpak as a first-class app: it reads `flatpak list`,
-starts it with `flatpak run`, reveals the deployment, asks Flatpak to remove it, and — when the local
-store offers the app — asks Flatpak to install it or to replace a deployment whose commit is behind
-(`src/flatpak.ts`). Flatpak stays the writer; Start reads the deployed commit and the published one and
-never swaps a deployment itself.
-
-The hub is still packaged as an AppImage and an Arch package. Packaging it as a Flatpak is a separate
-decision, and the one-writer rule is unchanged — only the writer changes.
+Each app can ship as a Flatpak beside its AppImage (Canvas first; see `packaging/flatpak/`). Start
+treats an installed Flatpak as a first-class app: it reads `flatpak list`, starts it with `flatpak
+run`, reveals the deployment, asks Flatpak to remove it, and — when the store offers the app — asks
+Flatpak to install it or to replace a deployment whose commit is behind (`src/flatpak.ts`). Flatpak
+stays the writer; Start reads the deployed commit and the published one and never swaps a deployment
+itself. [Packaging channels](../../../../docs/reference/packaging-channels.md#flatpak) owns the full
+permission list and the remote.
 
 ## Cutting a release that includes the package
 
 `node scripts/release.mjs start --publish` from the repository root. It writes a PKGBUILD whose
-`pkgver` and `sha256sums` come from the artifact it just built — a stale checksum would fail makepkg,
-which is the point — builds the package, and uploads it with the AppImage, the feed and the signature.
+`pkgver`, `source` line and `sha256sums` come from the artifact it just built — a stale checksum would
+fail makepkg, which is the point — builds the package, and uploads it with the AppImage, the feed and
+the signature.
 Without `--publish` the same command is a dry run; `--verify` reads the published feed back. The tag
-defaults to `start-v<version>`, and `--tag` still overrides it.
+defaults to `start-v<version>`, and `--tag` still overrides it. The Flatpak is a separate build:
+`node scripts/flatpak.mjs --app start` publishes it to the store.
 
-An app with no `packaging/arch/PKGBUILD`, or a machine without `makepkg`, skips the package with a
-note: only the hub has one.
+An app without an Arch package, or a machine without `makepkg`, skips the package with a note: only
+the hub has one.

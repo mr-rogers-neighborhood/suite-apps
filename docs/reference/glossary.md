@@ -12,7 +12,7 @@ belong to it; Canvas's is [here](../../apps/canvas/docs/reference/glossary.md).
 | **Host** | The process that launches an app and routes to it: Suite Start on the desktop, Suite Go on mobile. A host never reads a document. |
 | **Hub** | Suite Start specifically: install, update, remove, launch, route. |
 | **Manifest** | `suite.app.json`, shipped beside an app's executable. It says what the app is and may not name a binary. |
-| **Install record** | `installs.json` in the hub's data directory. It is the only place an executable path lives. |
+| **Install record** | `installs.json` under `~/.config/suite/start`. It is the only place an executable path lives. |
 | **Capability** | A permission a pack declares in its manifest, which the host enforces. A declaration is not a user authorisation. |
 | **Document** | One Loro CRDT per app workspace, stored in a file the app owns: `.canvas`, `.planner` or `.budget`. |
 | **Workspace** | The unit a document belongs to. In Canvas it is also the collaboration and storage boundary. |

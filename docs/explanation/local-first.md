@@ -12,7 +12,7 @@ slogan.
 | Ideal | Where Suite stands |
 | --- | --- |
 | **1. No spinners** | Met. Documents are local CRDTs; an edit does not wait for a server. |
-| **2. Not trapped on one device** | Partial. Canvas syncs through a relay the user runs, and a second device joins with a single-use invitation from the Sync dialog. Planner and Budget have no sync transport yet. |
+| **2. Not trapped on one device** | Partial. Canvas and Planner sync through a relay the user runs, and a second device joins with a single-use invitation from the Sync dialog. Budget has no network client. |
 | **3. The network is optional** | Met. The apps open and edit offline. Budget has no network client at all. |
 | **4. Seamless collaboration** | Partial. Canvas has live presence and collaborative editing. Collaboration is a foreground session; a sleeping device is not woken. |
 | **5. The Long Now** | Met. Files are plain and exportable, the licence is MIT, and the project operates no service that can be shut down. An older file opens and is migrated; a newer one is refused by name instead of being corrupted ([the policy](../reference/file-formats.md#opening-a-file-another-version-wrote)). |
@@ -23,9 +23,10 @@ slogan.
 
 The limits are deliberate and recorded, not marketing gaps:
 
-- **Sync is one app deep.** The protocol and server exist, and two Canvas clients can converge through
-  them; a second device joins with a single-use invitation the owner mints in the Sync dialog. Planner
-  and Budget still open one file on one machine. See [Status](../reference/status.md).
+- **Sync is per app.** The protocol and server exist, and Canvas and Planner clients can converge
+  through them; a second device joins with a single-use invitation the owner mints in the Sync dialog.
+  Budget still opens one file on one machine. [Planner's Sync](../../apps/planner/docs/reference/sync.md)
+  owns the Planner detail; [Status](../reference/status.md) has the per-subsystem picture.
 - **No background delivery.** A sleeping device is not woken. See
   `apps/go/docs/reference/decisions.md`.
 - **The sync relay is not the shipped security model.** It stores sealed frames it cannot read, but
