@@ -15,6 +15,15 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 ### Fixed
 
+- **A completed row's checkbox is named for what it does.** On a done row it said "Complete …"
+  while checking it reopened the task; it now says "Mark … not done".
+- **Opening details from a row's actions menu keeps the keyboard in the dialog.** The menu returned
+  focus to its trigger after the dialog opened, leaving the dialog open with focus behind it. Focus
+  now moves into the dialog and returns to the row's open-details control when it closes.
+- **The note toolbar's paragraph control has one name.** Its accessible name said "Text" and its
+  tooltip said "Paragraph"; both say "Text" now.
+- **An icon-only open-details control shows the name it announces.** The day row and inbox controls
+  had an `aria-label` but no tooltip; their `title` now says the same thing.
 - **A row action stays visible when the keyboard reaches it.** The inbox's Schedule button and a
   task row's actions menu were invisible until a pointer hovered them, so a keyboard user could
   focus a control they could not see. They now appear on focus too.

@@ -103,6 +103,33 @@ describe("weekPlan", () => {
     expect(plan.capacity.remainingMinutes).toBe(1770);
   });
 
+  it("should span the end of a year without skipping or repeating a day", () => {
+    const plan = weekPlan([], "2026-12-31", { ...base, today: "2026-12-31" });
+
+    expect(plan.startDateKey).toBe("2026-12-28");
+    expect(plan.endDateKey).toBe("2027-01-03");
+    expect(plan.days.map((day) => day.dateKey)).toEqual([
+      "2026-12-28",
+      "2026-12-29",
+      "2026-12-30",
+      "2026-12-31",
+      "2027-01-01",
+      "2027-01-02",
+      "2027-01-03",
+    ]);
+    expect(plan.days[3]?.isToday).toBe(true);
+  });
+
+  it("should put a leap day in the middle of its week", () => {
+    const plan = weekPlan([], "2028-02-29", { ...base, today: "2028-02-29" });
+
+    expect(plan.startDateKey).toBe("2028-02-28");
+    expect(plan.endDateKey).toBe("2028-03-05");
+    expect(plan.days.map((day) => day.dateKey)).toContain("2028-02-29");
+    expect(plan.days[1]?.isToday).toBe(true);
+    expect(plan.days).toHaveLength(7);
+  });
+
   it("should report unfinished work before today as carry-over without moving it", () => {
     const older = task({ id: "task_older", scheduledFor: "2026-11-10" });
     const recent = task({ id: "task_recent", scheduledFor: "2026-11-15" });

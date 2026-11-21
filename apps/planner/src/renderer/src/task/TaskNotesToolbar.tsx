@@ -142,7 +142,7 @@ export function TaskNotesToolbar({ editor }: TaskNotesToolbarProps) {
         <button
           type="button"
           aria-label="Text"
-          title="Paragraph"
+          title="Text"
           aria-pressed={active?.paragraph === true}
           disabled={editor === null}
           className={buttonClass(active?.paragraph === true)}

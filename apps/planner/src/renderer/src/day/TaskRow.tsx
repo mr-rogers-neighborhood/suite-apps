@@ -21,6 +21,11 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
   const [draft, setDraft] = useState(entry.task.title);
   const inputRef = useRef<HTMLInputElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
+  // The action the row menu chose, run once the menu has actually closed. Radix returns focus to
+  // its trigger in a deferred callback; opening the dialog any earlier lets that callback pull
+  // focus back out of it. `onCloseAutoFocus` is the point where the menu is gone and we can keep
+  // the focus the dialog is about to take.
+  const openDetailsOnClose = useRef(false);
 
   useEffect(() => {
     setDraft(entry.task.title);
@@ -78,7 +83,7 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
       <TaskCheckbox
         checked={entry.done}
         onCheckedChange={toggle}
-        label={`Complete ${entry.task.title}`}
+        label={entry.done ? `Mark ${entry.task.title} not done` : `Complete ${entry.task.title}`}
       />
 
       <div className="min-w-0 flex-1">
@@ -152,6 +157,7 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
         ref={detailsRef}
         type="button"
         aria-label={`Open details for ${entry.task.title}`}
+        title={`Open details for ${entry.task.title}`}
         onClick={openDetails}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent bg-transparent text-muted opacity-0 transition-colors hover:bg-raised hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
       >
@@ -171,10 +177,19 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
           <DropdownMenu.Content
             align="end"
             sideOffset={4}
+            onCloseAutoFocus={(event) => {
+              if (!openDetailsOnClose.current) return;
+              openDetailsOnClose.current = false;
+              // Do not return focus to the trigger; the dialog opens next and takes it.
+              event.preventDefault();
+              openDetails();
+            }}
             className="z-50 min-w-[180px] rounded-lg border border-line bg-panel p-1 shadow-2xl"
           >
             <DropdownMenu.Item
-              onSelect={openDetails}
+              onSelect={() => {
+                openDetailsOnClose.current = true;
+              }}
               className="cursor-default rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised"
             >
               Open details

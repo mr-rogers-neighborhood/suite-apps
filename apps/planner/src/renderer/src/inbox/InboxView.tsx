@@ -95,7 +95,12 @@ export function InboxView() {
                   <button
                     type="button"
                     aria-label={`Open details for ${task.title}`}
-                    onClick={() => selectTask(task.id)}
+                    title={`Open details for ${task.title}`}
+                    onClick={(event) => {
+                      // Close returns focus to whatever had it, so point that at this row.
+                      event.currentTarget.focus();
+                      selectTask(task.id);
+                    }}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-muted opacity-0 transition-colors hover:bg-raised hover:text-ink focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
                   >
                     <Maximize2 size={14} />

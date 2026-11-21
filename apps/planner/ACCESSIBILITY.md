@@ -14,15 +14,15 @@ breakdown is in
   component boundaries. This checks the palette, not the pixels in a running Planner window.
 - **Structure, types and behaviour.** The gate runs Biome, strict TypeScript, Vitest, the shape
   check, knip and the production build. The shared `Button`, `IconButton`, `Field` and `Modal`
-  primitives use native elements or Radix, and their component tests cover labels, focus return and
-  the dialog's focus trap.
+  primitives use native elements or Radix. Planner's task-detail and drawer tests cover focus order,
+  the dialog's focus trap and returning focus to the opener.
 - **One visible focus ring.** The renderer defines `*:focus-visible` once in
   [`theme/styles.css`](src/renderer/src/theme/styles.css), and the shared primitives reuse the same
   ring token.
 
 **There is no axe run in Planner's gate.** The suite's manual-testing page describes an automated
 start-screen audit, but Planner has no axe or Playwright accessibility sweep configured. The checks
-above do not cover painted contrast, focus order or screen-reader output, and should not be read as
+above do not cover painted contrast or what a screen reader actually says, and should not be read as
 if they did.
 
 ## What is verified by hand

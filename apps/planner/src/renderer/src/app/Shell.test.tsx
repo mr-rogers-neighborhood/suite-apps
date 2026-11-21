@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useUiStore } from "../store/uiStore";
@@ -96,5 +97,46 @@ describe("Shell navigation", () => {
 
     expect(await screen.findByRole("region", { name: "Probe view" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Probe" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("should trap focus in the drawer and give it back to the opener", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+
+    const opener = screen.getByRole("button", { name: "Open navigation" });
+    opener.focus();
+    await user.click(opener);
+
+    const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+    const close = within(drawer).getByRole("button", { name: "Close navigation" });
+
+    expect(close).toHaveFocus();
+
+    await user.tab({ shift: true });
+    expect(within(drawer).getByRole("button", { name: "Import" })).toHaveFocus();
+
+    await user.tab();
+    expect(close).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull());
+    expect(opener).toHaveFocus();
+  });
+
+  it("should close the drawer after a destination and return focus to the opener", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+
+    const opener = screen.getByRole("button", { name: "Open navigation" });
+    opener.focus();
+    await user.click(opener);
+
+    const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+    await user.click(within(drawer).getByRole("button", { name: "Probe" }));
+
+    expect(await screen.findByRole("region", { name: "Probe view" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull();
+    expect(opener).toHaveFocus();
   });
 });
