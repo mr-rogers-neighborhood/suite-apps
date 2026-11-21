@@ -50,9 +50,15 @@ export function useBookSearch(book: OpenedBook | null): BookSearchHost {
       (path) => book.readChapter(path),
       (xml, path) => sanitiseChapter(xml, path),
       (path) => titles.get(path) ?? null,
-    ).then((built) => {
-      if (!cancelled) setIndex(built);
-    });
+    )
+      .then((built) => {
+        if (!cancelled) setIndex(built);
+      })
+      .catch(() => {
+        // A closed book — or a test environment that tore down mid-index — must
+        // not leave an unhandled rejection behind.
+        if (!cancelled) setIndex(null);
+      });
     return () => {
       cancelled = true;
     };
