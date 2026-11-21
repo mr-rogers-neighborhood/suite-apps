@@ -144,9 +144,13 @@ export type PlannerBridge = {
    * Absent on the desktop app, whose main process runs the scheduler itself and can notify while
    * the window is hidden. A container-hosted pack implements it by asking the container's
    * notification service, and returns the permission it ended with so the UI can say when
-   * reminders are blocked instead of going quiet.
+   * reminders are blocked instead of going quiet. `failure` is set when permission was granted
+   * but the platform refused a schedule, so the UI can distinguish "blocked" from "could not
+   * schedule this one".
    */
-  syncReminders?(reminders: readonly ReminderSchedule[]): Promise<{ permission: string }>;
+  syncReminders?(
+    reminders: readonly ReminderSchedule[],
+  ): Promise<{ permission: string; failure?: "schedule" }>;
   /**
    * Ask the platform for notification permission, once, when the first reminder needs it.
    *

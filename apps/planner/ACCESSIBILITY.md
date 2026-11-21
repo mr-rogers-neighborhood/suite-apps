@@ -16,6 +16,8 @@ breakdown is in
   check, knip and the production build. The shared `Button`, `IconButton`, `Field` and `Modal`
   primitives use native elements or Radix. Planner's task-detail and drawer tests cover focus order,
   the dialog's focus trap and returning focus to the opener.
+- **Focus after an inline edit.** A task title committed with Enter or cancelled with Escape returns
+  focus to the row, and **Back to today** moves focus to the new day's heading instead of dropping it.
 - **One visible focus ring.** The renderer defines `*:focus-visible` once in
   [`theme/styles.css`](src/renderer/src/theme/styles.css), and the shared primitives reuse the same
   ring token.

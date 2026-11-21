@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Planner as an isolated Suite Go pack: a bridge prelude around Planner's own renderer.",
   "scripts": {
-    "build": "vite build",
+    "build:deps": "pnpm --filter @suite/ui --filter @suite/theme --filter @suite/document-runtime --filter @suite/sync --filter @suite/go --workspace-concurrency=1 run build",
+    "build": "pnpm run build:deps && vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

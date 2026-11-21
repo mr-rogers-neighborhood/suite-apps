@@ -20,7 +20,10 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.task.title);
   const inputRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLButtonElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
+  // A keyboard commit or cancel unmounts the editor; focus would otherwise fall to the page.
+  const restoreTitleFocus = useRef(false);
   // The action the row menu chose, run once the menu has actually closed. Radix returns focus to
   // its trigger in a deferred callback; opening the dialog any earlier lets that callback pull
   // focus back out of it. `onCloseAutoFocus` is the point where the menu is gone and we can keep
@@ -32,7 +35,13 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
   }, [entry.task.title]);
 
   useEffect(() => {
-    if (editing) inputRef.current?.select();
+    if (editing) {
+      inputRef.current?.select();
+      return;
+    }
+    if (!restoreTitleFocus.current) return;
+    restoreTitleFocus.current = false;
+    titleRef.current?.focus();
   }, [editing]);
 
   function toggle(): void {
@@ -47,14 +56,21 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
     }
   }
 
-  function commitTitle(): void {
+  function commitTitle({ returnFocus = false }: { returnFocus?: boolean } = {}): void {
     const next = draft.trim();
+    if (returnFocus) restoreTitleFocus.current = true;
     setEditing(false);
     if (next.length === 0 || next === entry.task.title) {
       setDraft(entry.task.title);
       return;
     }
     replica.document.updateTask(entry.task.id, { title: next });
+  }
+
+  function cancelTitle(): void {
+    restoreTitleFocus.current = true;
+    setDraft(entry.task.title);
+    setEditing(false);
   }
 
   function setReminderTo(at: Date): void {
@@ -93,18 +109,16 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
             aria-label={`Edit title for ${entry.task.title}`}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            onBlur={commitTitle}
+            onBlur={() => commitTitle()}
             onKeyDown={(event) => {
-              if (event.key === "Enter") commitTitle();
-              if (event.key === "Escape") {
-                setDraft(entry.task.title);
-                setEditing(false);
-              }
+              if (event.key === "Enter") commitTitle({ returnFocus: true });
+              if (event.key === "Escape") cancelTitle();
             }}
             className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-sm text-ink focus:outline-none"
           />
         ) : (
           <button
+            ref={titleRef}
             type="button"
             onClick={() => setEditing(true)}
             className={`block w-full truncate text-left text-sm ${

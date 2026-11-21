@@ -7,11 +7,11 @@ bundles into a plain web bundle and why a different host can run it.
 This document exists because **the three bridges disagree with each other**, and a host that wants
 to run all three has to know how. It is written from the code, not from intent.
 
-| App     | Global                | Declared in                      | Host marker       | Staleness check                     |
-| ------- | --------------------- | -------------------------------- | ----------------- | ----------------------------------- |
-| Canvas  | `window.suiteDesktop` | `apps/canvas/src/host/bridge.ts` | `host: "desktop"` | **Yes** — `REQUIRED_BRIDGE_METHODS` |
-| Planner | `window.suitePlanner` | `apps/planner/packages/core/src/ports.ts` | none     | no                                  |
-| Budget  | `window.suiteBudget`  | `apps/budget/packages/core/src/ports.ts`  | none     | no                                  |
+| App     | Global                | Declared in                               | Host marker       | Staleness check                     |
+| ------- | --------------------- | ----------------------------------------- | ----------------- | ----------------------------------- |
+| Canvas  | `window.suiteDesktop` | `apps/canvas/src/host/bridge.ts`          | `host: "desktop"` | **Yes** — `REQUIRED_BRIDGE_METHODS` |
+| Planner | `window.suitePlanner` | `apps/planner/packages/core/src/ports.ts` | none              | no                                  |
+| Budget  | `window.suiteBudget`  | `apps/budget/packages/core/src/ports.ts`  | none              | no                                  |
 
 ## Canvas: `window.suiteDesktop`
 
@@ -53,7 +53,7 @@ wasCreated?(): Promise<boolean>;   // optional; absent means false
 commit(update: Uint8Array): Promise<void>;
 onWorkspaceReplaced(listener): () => void;
 onReminder(listener): () => void;
-syncReminders?(reminders): Promise<{ permission: string }>; // optional; a host that schedules itself omits it
+syncReminders?(reminders): Promise<{ permission: string; failure?: "schedule" }>; // optional; a host that schedules itself omits it
 requestNotifications?(): Promise<string>; // optional; asks the platform once
 onCommand(listener): () => void;
 exportWorkspace(): Promise<ExportResult>;
@@ -77,7 +77,10 @@ would make the host own a domain's schema. `null` means "there is none", and the
 schedule because it owns the schema; the pack passes each pending reminder to the container's
 `notifications` service, which hands it to the platform alarm. The desktop preload omits the member,
 because the main process already schedules and can notify from the tray. A denial comes back as
-`permission: "denied"`, and the renderer says reminders are blocked instead of going quiet.
+`permission: "denied"`, and the renderer says reminders are blocked instead of going quiet. When
+permission was granted but the platform refused an alarm, the result carries
+`failure: "schedule"`, which the renderer reports as "could not be scheduled" rather than as a
+blocked permission.
 
 **`adopt` is what closes the loop, and it is not a convenience.** `commit(update)` carries what
 happens _after_ creation. Measured: 98 bytes, and a replica rebuilt from it alone has

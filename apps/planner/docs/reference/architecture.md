@@ -68,7 +68,10 @@ authority and writes it, then broadcasts `workspace:replaced` with a new snapsho
 replaces its replica and re-subscribes.
 
 **Reminders.** Main keeps its own document, so the scheduler ticks with no window open. A due task
-gets `remindedAt` as a leaf write, which is what stops it repeating.
+gets `remindedAt` as a leaf write, which is what stops it repeating. Changing or clearing
+`remindAt` resets `remindedAt`, so a new time is a new reminder rather than one the app believes it
+already delivered. A pack has no main process scheduler: the renderer hands the pending set over
+`syncReminders` and the host cancels any id that is no longer in it.
 
 ## Navigation
 

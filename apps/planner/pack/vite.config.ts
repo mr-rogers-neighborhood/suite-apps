@@ -8,7 +8,7 @@ import wasm from "vite-plugin-wasm";
 /**
  * Builds Planner as a Suite Go pack: one HTML page, one bundle, its own everything.
  *
- * The renderer is imported, not copied. `apps/desktop/src/renderer` is already a plain Vite app —
+ * The renderer is imported, not copied. `apps/planner/src/renderer` is already a plain Vite app —
  * no Node builtins, no Electron import — and the only machine access it has is `window.suitePlanner`,
  * which the prelude in `src/main.ts` installs before importing it.
  *
@@ -24,7 +24,7 @@ export default defineConfig({
       "@suite/planner-core": fileURLToPath(
         new URL("../packages/core/src/index.ts", import.meta.url),
       ),
-      "@renderer": fileURLToPath(new URL("../desktop/src/renderer/src", import.meta.url)),
+      "@renderer": fileURLToPath(new URL("../src/renderer/src", import.meta.url)),
     },
   },
   optimizeDeps: {

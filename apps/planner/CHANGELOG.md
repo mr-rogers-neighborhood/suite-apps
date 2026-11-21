@@ -8,7 +8,29 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 ## [Unreleased]
 
-No changes yet.
+### Fixed
+
+- **A reminder given a new time rings again.** The app remembered that an earlier reminder had
+  already fired, so moving or clearing a reminder and choosing a new time left it silent. Changing
+  the time now starts the reminder over.
+- **The phone pack delivers and cancels reminders.** The pack asked for no alarms, so a reminder in
+  the Android build went nowhere and a completed or cleared task kept ringing. It now schedules
+  through the container, cancels what is no longer pending, and reports a denied permission.
+- **The blocked notice names Planner.** It said notifications were blocked for Suite Go, which is
+  the container, not the app in front of the person.
+- **A reminder the platform refuses to schedule says so.** A granted permission with a failed
+  schedule looked like success, so the reminder went quiet; the app now reports that it could not
+  schedule on this device.
+- **A keyboard rename keeps focus on the row.** Pressing Enter to save a title, or Escape to cancel
+  it, removed the field and dropped focus on the page; focus returns to the task title.
+- **Back to today keeps focus on the day.** The button removed itself and left focus nowhere; the
+  new day's heading now takes it.
+- **The calendar no longer puts an out-of-hours event at 7:00.** An event entirely before 07:00 or
+  after 21:00 was clamped to the edge and looked like it happened there; it is left out, and an
+  event that straddles an edge is clipped. The empty state also says "this day" when the selected
+  day is not today.
+- **Blurring an unchanged due or reminder time leaves the record alone.** The field shows minutes,
+  so a stored timestamp with seconds was rewritten shorter just by leaving the field.
 
 ## [0.5.1] - 2026-11-21
 

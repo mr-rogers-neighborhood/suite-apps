@@ -135,12 +135,18 @@ function TaskDetailDialog({
       return;
     }
     clearError(field);
+    // Compare what the field can show, not the stored instant: a timestamp with seconds the
+    // input cannot display is unchanged, and blurring it must not write a truncated value.
     if (field === "dueAt") {
       setDueAt(toDateTimeInput(parsed.value));
-      if (parsed.value !== task.dueAt) onPatch({ dueAt: parsed.value });
+      if (toDateTimeInput(parsed.value) !== toDateTimeInput(task.dueAt)) {
+        onPatch({ dueAt: parsed.value });
+      }
     } else {
       setRemindAt(toDateTimeInput(parsed.value));
-      if (parsed.value !== task.remindAt) onPatch({ remindAt: parsed.value });
+      if (toDateTimeInput(parsed.value) !== toDateTimeInput(task.remindAt)) {
+        onPatch({ remindAt: parsed.value });
+      }
     }
   }
 

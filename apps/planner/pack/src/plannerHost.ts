@@ -3,6 +3,7 @@ import {
   type ExportResult,
   type ImportResult,
   type PlannerBridge,
+  type ReminderSchedule,
   WorkspaceDocument,
   type WorkspaceInfo,
 } from "@suite/planner-core";
@@ -47,6 +48,8 @@ export function createPlannerHost(host: ModuleHost): PlannerHost {
   let dirty = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let opening: Promise<void> | null = null;
+  /** The reminder ids this pack has handed to the container's notification service. */
+  const scheduledReminders = new Set<string>();
 
   const cancelTimer = () => {
     if (timer !== null) clearTimeout(timer);
@@ -145,6 +148,44 @@ export function createPlannerHost(host: ModuleHost): PlannerHost {
     document.addEventListener("visibilitychange", onHidden);
   }
 
+  /**
+   * Deliver Planner's reminders through the container's notification service.
+   *
+   * The renderer owns the schedule because it owns the schema; this side only moves a task id, a
+   * title and a time across the bridge. Cancelling what is no longer pending before scheduling is
+   * what keeps a completed, deleted or cleared task from still ringing; asking is the renderer's
+   * decision, so this only reports the permission the platform currently allows.
+   */
+  async function syncReminders(
+    reminders: readonly ReminderSchedule[],
+  ): Promise<{ permission: string; failure?: "schedule" }> {
+    if (!host.notifications) return { permission: "unsupported" };
+    const wanted = new Map(reminders.map((reminder) => [reminder.id, reminder]));
+
+    for (const id of [...scheduledReminders]) {
+      if (wanted.has(id)) continue;
+      await host.notifications.cancel(id);
+      scheduledReminders.delete(id);
+    }
+
+    const permission = await host.notifications.permission();
+    if (permission !== "granted") return { permission };
+
+    let failed = false;
+    for (const reminder of wanted.values()) {
+      const outcome = await host.notifications.schedule(reminder);
+      if (outcome.ok) scheduledReminders.add(reminder.id);
+      else failed = true;
+    }
+
+    return failed ? { permission, failure: "schedule" } : { permission };
+  }
+
+  async function requestNotifications(): Promise<string> {
+    if (!host.notifications) return "unsupported";
+    return host.notifications.request();
+  }
+
   return {
     async loadSnapshot() {
       await ensure();
@@ -177,11 +218,14 @@ export function createPlannerHost(host: ModuleHost): PlannerHost {
       return () => undefined;
     },
 
-    // No notification plugin and no command channel from the shell. Both return an unsubscriber so
-    // a caller does not have to special-case a host that cannot deliver either.
+    // The OS shows the notification, so there is no in-app event to deliver. The unsubscriber
+    // shape stays because the renderer expects one; permission is reported through syncReminders.
     onReminder() {
       return () => undefined;
     },
+
+    syncReminders,
+    requestNotifications,
 
     onCommand() {
       return () => undefined;

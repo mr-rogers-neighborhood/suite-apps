@@ -7,7 +7,7 @@ import {
 } from "@suite/planner-core";
 import { IconButton } from "@suite/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore } from "../store/uiStore";
 
@@ -17,17 +17,26 @@ export function DayHeader({ date }: { date: DateKey }) {
   const setSelectedDate = useUiStore((state) => state.setSelectedDate);
   const day = snapshot.days.find((record) => record.dateKey === date);
   const [intention, setIntention] = useState(day?.intention ?? "");
+  const today = todayKey();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // Back to today removes the button that had focus; move it to the day the person asked for.
+  const restoreHeadingFocus = useRef(false);
 
   useEffect(() => {
     setIntention(day?.intention ?? "");
   }, [day?.intention]);
+
+  useEffect(() => {
+    if (!restoreHeadingFocus.current || date !== today) return;
+    restoreHeadingFocus.current = false;
+    headingRef.current?.focus();
+  }, [date, today]);
 
   function saveIntention(): void {
     if (intention === (day?.intention ?? "")) return;
     replica.document.updateDay(date, { intention });
   }
 
-  const today = todayKey();
   const dayLabel = humanDayLabel(date, today);
   const fullDate = fromDateKey(date).toLocaleDateString(undefined, {
     weekday: "long",
@@ -45,13 +54,18 @@ export function DayHeader({ date }: { date: DateKey }) {
           <ChevronRight size={16} />
         </IconButton>
         <div className="ml-1 flex items-baseline gap-2.5">
-          <h1 className="text-xl font-semibold tracking-tight">{dayLabel}</h1>
+          <h1 ref={headingRef} tabIndex={-1} className="text-xl font-semibold tracking-tight">
+            {dayLabel}
+          </h1>
           <span className="text-xs text-faint">{fullDate}</span>
         </div>
         {date !== today && (
           <button
             type="button"
-            onClick={() => setSelectedDate(today)}
+            onClick={() => {
+              restoreHeadingFocus.current = true;
+              setSelectedDate(today);
+            }}
             className="ml-auto rounded-md border border-line px-2.5 py-1 text-xs text-muted transition-colors hover:bg-raised hover:text-ink"
           >
             Back to today

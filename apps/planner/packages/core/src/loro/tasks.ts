@@ -92,10 +92,18 @@ export function updateTask(
 ): Task {
   const current = requireTask(doc, id);
   const changes = Object.fromEntries(definedEntries(patch)) as Partial<Task>;
-  const next = taskSchema.parse({ ...current, ...changes, updatedAt: now.toISOString() });
+  // A new time is a new reminder. Keeping the old `remindedAt` would make the app treat the
+  // replacement as already delivered, so changing (or clearing) `remindAt` resets it.
+  const reminderChanged = changes.remindAt !== undefined && changes.remindAt !== current.remindAt;
+  const next = taskSchema.parse({
+    ...current,
+    ...changes,
+    ...(reminderChanged ? { remindedAt: null } : {}),
+    updatedAt: now.toISOString(),
+  });
   const map = asMap(doc.getMap(ROOTS.tasks).get(id));
   if (!map) throw new TaskNotFoundError(id);
-  const keys = [...Object.keys(changes), "updatedAt"];
+  const keys = [...Object.keys(changes), ...(reminderChanged ? ["remindedAt"] : []), "updatedAt"];
   writeFields(map, next, keys);
   doc.commit();
   return next;

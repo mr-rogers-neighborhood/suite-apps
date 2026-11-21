@@ -10,7 +10,8 @@ the app keeps an autosaved workspace and one rolling backup on this machine.
 Suite Planner is the planning app in the Suite family, alongside
 [Suite Canvas](../canvas/README.md) and [Suite Budget](../budget/README.md).
 
-> Suite Planner is pre-alpha. The core loop works; editing surfaces and rituals are being built.
+> Suite Planner is pre-alpha. The core loop works; editing surfaces and rituals are being built. The
+> closing conditions for leaving pre-alpha are the [alpha checklist](docs/reference/alpha.md).
 
 ---
 
@@ -77,6 +78,7 @@ renderer keeps a replica and streams CRDT deltas over a narrow, validated IPC br
 | `packages/core`               | Schema, `WorkspaceDocument`, pure projections, capture parser, file format |
 | `docs/reference`              | Architecture, conventions, data model                                      |
 | `docs/reference/decisions.md` | The rules that shape Planner                                               |
+| `docs/reference/alpha.md`     | The closing checklist for the pre-alpha promise                            |
 
 Read [AGENTS.md](AGENTS.md) before contributing (human or agent), and
 [docs/reference/architecture.md](docs/reference/architecture.md) for the longer version.

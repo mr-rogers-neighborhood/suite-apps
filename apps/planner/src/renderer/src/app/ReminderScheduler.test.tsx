@@ -82,6 +82,20 @@ describe("ReminderScheduler", () => {
     expect(mocks.setNotice).not.toHaveBeenCalled();
   });
 
+  it("should hand a cleared reminder to the bridge so the platform cancels it", async () => {
+    mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
+    mocks.syncReminders.mockResolvedValue({ permission: "granted" });
+
+    const { rerender } = render(<ReminderScheduler />);
+    await waitFor(() => expect(mocks.syncReminders).toHaveBeenCalledTimes(1));
+
+    mocks.tasks = [];
+    rerender(<ReminderScheduler />);
+
+    await waitFor(() => expect(mocks.syncReminders).toHaveBeenCalledTimes(2));
+    expect(mocks.syncReminders).toHaveBeenLastCalledWith([]);
+  });
+
   it("should ask once, record the ask, and schedule after a grant", async () => {
     mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
     mocks.syncReminders
@@ -119,6 +133,36 @@ describe("ReminderScheduler", () => {
     await waitFor(() => expect(mocks.setNotice).toHaveBeenCalledWith(BLOCKED_MESSAGE));
   });
 
+  it("should say when this device has no notification channel", async () => {
+    mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
+    mocks.syncReminders.mockResolvedValue({ permission: "unsupported" });
+
+    render(<ReminderScheduler />);
+
+    await waitFor(() => expect(mocks.setNotice).toHaveBeenCalledWith(UNAVAILABLE_MESSAGE));
+  });
+
+  it("should say when a granted schedule was refused", async () => {
+    mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
+    mocks.syncReminders.mockResolvedValue({ permission: "granted", failure: "schedule" });
+
+    render(<ReminderScheduler />);
+
+    await waitFor(() => expect(mocks.setNotice).toHaveBeenCalledWith(SCHEDULE_FAILED_MESSAGE));
+  });
+
+  it("should say when the retry after a grant was refused", async () => {
+    mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
+    mocks.syncReminders
+      .mockResolvedValueOnce({ permission: "prompt" })
+      .mockResolvedValueOnce({ permission: "granted", failure: "schedule" });
+    mocks.requestNotifications.mockResolvedValue("granted");
+
+    render(<ReminderScheduler />);
+
+    await waitFor(() => expect(mocks.setNotice).toHaveBeenCalledWith(SCHEDULE_FAILED_MESSAGE));
+  });
+
   it("should not mention reminders when there are none to deliver", async () => {
     mocks.syncReminders.mockResolvedValue({ permission: "denied" });
 
@@ -130,4 +174,6 @@ describe("ReminderScheduler", () => {
 });
 
 const BLOCKED_MESSAGE =
-  "Reminders are off: notifications are blocked for Suite Go in system settings.";
+  "Reminders are off: notifications are blocked for Suite Planner in system settings.";
+const UNAVAILABLE_MESSAGE = "Reminders are not available on this device.";
+const SCHEDULE_FAILED_MESSAGE = "Reminders could not be scheduled on this device.";
