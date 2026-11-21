@@ -29,7 +29,7 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 | Planner | `@suite/theme` contrast (suite-level); lint, types, unit tests, shape, knip and build | No axe in the gate; no manual pass recorded |
 | Budget | `@suite/theme` contrast (suite-level) | Storybook's a11y panel reports without failing the build; no axe against the running app; no manual pass recorded |
 | Start | `@suite/theme` contrast (suite-level); lint, types and unit tests | No axe run; no manual pass recorded |
-| Sync | — | A loopback console page: no axe, no manual pass, and it reloads every five seconds |
+| Sync | — | No desktop app UI. The relay serves a loopback console page: no axe, no manual pass, and it reloads every five seconds |
 
 The `@suite/theme` contrast test is one suite-level check, not five per-app ones: it lives in
 `packages/theme/src/presets.test.ts` and runs inside Start's Vitest project, so the root gate runs it
@@ -152,11 +152,11 @@ These are the honest list. Each is tracked, and none is claimed as working in `A
 
 | SC     | What is missing                                                |
 | ------ | -------------------------------------------------------------- |
-| 1.4.10 | Start's rail and card minimum overflow a 320 CSS px viewport.  |
+| 1.4.10 | Start's rail and card minimum overflow a 320 CSS px viewport ([statement](../../../apps/start/ACCESSIBILITY.md)). |
 | 2.1.4  | Canvas single-key shortcuts are not remappable.                |
 | 2.4.12 | AAA. Sticky regions may overlap focused content in edge cases. |
 | 2.5.5  | AAA. Targets are 24px, not 44px.                               |
-| 4.1.3  | Start's install failures, launch errors and update result are plain text with no live region. |
+| 4.1.3  | Start's install failures, launch errors and update result are plain text with no live region ([statement](../../../apps/start/ACCESSIBILITY.md)). |
 
 Order of work: **2.1.4 first** (A, and the only gap that is unambiguously real), then the three
 2.5.7 items above, then the AAA rows.
