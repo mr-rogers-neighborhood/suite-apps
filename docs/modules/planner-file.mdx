@@ -1,0 +1,93 @@
+---
+module: apps/planner/packages/core/src/file
+title: Planner / File
+summary: "The .planner envelope, its two versions and the refusals that come before a document is opened."
+---
+
+This module is the `.planner` envelope and nothing else. It turns a document's
+snapshot into JSON a person can keep and back into bytes, and it names every
+refusal before a document is opened. The payload is opaque here: the module does
+not parse tasks, merge documents or decide where the file lives.
+
+That split is why a build can recognise a file it must not open. The envelope
+carries a format name and two independent versions, one for the container and
+one for the records, so a newer file is refused by name instead of being treated
+as damage. Encoding and decoding are string and byte operations. The store in
+main owns the path, the backup and the write, and the caller owns what to do with
+the decoded bytes.
+
+## apps/planner/packages/core/src/file/workspaceFile.ts#decodeWorkspaceFile
+
+Decoding is the ordered gate. It answers with a `Result` and refuses in this
+order: not JSON, not this format, a newer format version, a newer schema
+version, then a payload that will not decode. The order matters because each
+refusal has a different owner. The first two mean "this is not ours", the next
+two mean "this build is too old", and the last means "these bytes are damaged".
+A caller can branch on the code rather than parse the sentence.
+
+Nothing is opened or merged here. The bytes leave as a `Uint8Array`, and the
+caller decides whether to make a document, keep the current one, or show the
+error. That is what lets the store treat a version refusal as terminal and a
+damaged candidate as skippable.
+
+## apps/planner/packages/core/src/file/workspaceFile.ts#encodeWorkspaceFile
+
+Encoding writes the envelope around a full snapshot: the schema version from the
+document's own meta, an export time and the base64 bytes. The export time is for
+a person reading the file; nothing in the app orders or merges by it.
+`doc.snapshot()` commits pending operations, so an export is also a flush point.
+
+The output is pretty-printed JSON with a trailing newline. The header is
+deliberately readable while the payload is not, so a diff shows a version change
+without exposing CRDT internals. `now` is a parameter so a test can pin
+`exportedAt` instead of matching a moving timestamp.
+
+## apps/planner/packages/core/src/file/workspaceFile.ts#WorkspaceFileEnvelope
+
+The envelope is five named fields: `format`, `formatVersion`, `schemaVersion`,
+`exportedAt` and `snapshot`. `format` is the discriminator that keeps another
+app's JSON out, the two versions answer different questions, and `snapshot` is
+an opaque base64 string. The guard checks the shape and the field types, not the
+bytes, so a well-formed envelope with a damaged payload still reaches the
+snapshot step and is refused there.
+
+## apps/planner/packages/core/src/file/workspaceFile.ts#WorkspaceFileErrorCode
+
+The five codes are the vocabulary a caller may branch on: `not-json`,
+`wrong-format`, `unsupported-version`, `unsupported-schema` and `bad-snapshot`.
+Only the two `unsupported-*` codes are terminal for the store, because falling
+through to a backup would let this build write an older schema over a newer
+document. The other three describe a candidate that can be skipped.
+
+## apps/planner/packages/core/src/file/workspaceFile.ts#WorkspaceFileError
+
+The error carries the code and the sentence the person sees.
+`decodeWorkspaceFile` returns it inside a `Result`; `WorkspaceStore.importFrom`
+is the boundary that turns it into a thrown error, because an explicit import is
+a command rather than a startup probe. When the refusal is about a version, the
+message names both versions, so "open it in a newer Planner" is actionable.
+
+## apps/planner/packages/core/src/file/workspaceFile.ts#WORKSPACE_FILE_FORMAT
+
+`suite.planner` is a discriminator, not a file extension. It is what makes a JSON
+document from another app a `wrong-format` refusal instead of a workspace that
+fails later. Changing it would make every existing file unreadable by name, so
+it is a last resort; a new field or a new record belongs in the schema version.
+
+## apps/planner/packages/core/src/file/workspaceFile.ts#WORKSPACE_FILE_VERSION
+
+The envelope version tracks the container, not the records. A build refuses a
+higher number before it looks at the snapshot, which is the only safe response
+when the header itself may mean something this build does not understand.
+`SCHEMA_VERSION` is the other axis: an older schema is upgraded on open, while an
+older envelope version is read with the current rules.
+
+## file: apps/planner/packages/core/src/file/migration.test.ts
+
+This test is the cross-build contract, exercised with real files rather than
+mocks. `workspace-v1.planner` opens, keeps its records, and arrives at the
+current schema with the field version 2 added; re-encoding writes the upgrade.
+`workspace-v3.planner` is refused twice: at the envelope with
+`unsupported-schema`, and at `fromSnapshot` with `WorkspaceSchemaError`. The two
+refusals are the point. A file must not be openable through a path that skips the
+version check.

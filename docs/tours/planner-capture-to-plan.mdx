@@ -11,7 +11,9 @@ project and tag ids, written as a task through the one document writer, carried
 to the main process as a CRDT delta, and read back by pure projections. The core
 package owns the record, the file envelope and the projections; the renderer owns
 the form, the replica and the view state. Neither needs a network to do any of
-it, and sync is an optional transport over the same deltas.
+it, and sync is an optional transport over the same deltas. The module notes
+under the core package hold the rules behind each stop: capture, file, Loro and
+plan.
 
 ## apps/planner/src/renderer/src/capture/CaptureBar.tsx#CaptureBar
 
@@ -53,11 +55,11 @@ either one directly.
 
 ## apps/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument
 
-The typed facade is the only writer of a workspace. Every mutation validates
-through Zod, sets the leaf keys that changed, and commits once. Opening a
-snapshot assigns a fresh peer id and upgrades or refuses an older or newer
-schema before any caller can read a record. A component that imported Loro
-instead would be a second writer with none of those rules.
+The typed facade is the only writer of a workspace. Every write that carries a
+record validates through Zod, touches only the keys that changed, and commits
+once. Opening a snapshot assigns a fresh peer id and upgrades an older schema or
+refuses a newer one before any caller can read a record. A component that
+imported Loro instead would be a second writer with none of those rules.
 
 ## apps/planner/packages/core/src/file/workspaceFile.ts#decodeWorkspaceFile
 
@@ -77,10 +79,11 @@ version they need instead.
 ## apps/planner/src/main/workspaceStore.ts#WorkspaceStore
 
 Main owns the authoritative document. A renderer edit arrives as an update and
-is applied, then a debounced write assembles the envelope, copies the current
-file to the backup, writes a temporary file and renames it into place. The flush
-chain is serialised, so two saves cannot interleave, and a failed write is logged
-without stopping every later save. The renderer never receives the path.
+is applied, then a debounced write assembles the envelope, writes a temporary
+file, copies the current file to the backup, and renames the temporary file into
+place. The flush chain is serialised, so two saves cannot interleave, and a
+failed write is logged without stopping every later save. The renderer can
+display the path but never chooses where to write.
 
 ## apps/planner/src/main/ipc.ts#registerIpc
 

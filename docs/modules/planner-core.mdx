@@ -19,6 +19,10 @@ The public surface is `src/index.ts`. A consumer outside the package sees
 schemas, pure functions, the `WorkspaceDocument` facade and the file helpers
 there, and does not reach into a domain module for a write.
 
+The package's child modules carry their own notes: capture for the one-line
+grammar, file for the `.planner` envelope, Loro for the writer, and plan for the
+projections. This page stays with the record schema those modules share.
+
 ## apps/planner/packages/core/src/schema.ts#taskSchema
 
 A task is the record every other projection starts from, and this schema is the
@@ -31,77 +35,3 @@ The task owns `scheduledFor` and `order`; a day is a date that tasks point at,
 not a container. `estimateMinutes` is a positive integer or null, and a date is
 a `yyyy-MM-dd` key rather than an instant, which is why the same task means the
 same day without a timezone conversion.
-
-## apps/planner/packages/core/src/capture/parse.ts#parseCapture
-
-Capture is a pure one-line parser: input, today and an optional implied date go
-in, a draft comes out. It removes the tokens it recognises and leaves everything
-else in the title, so a mistyped token is visible rather than silently lost. A
-clock time with no date borrows the implied date; a day with no time schedules
-the task on that day.
-
-The parser deliberately returns names, not ids. Resolving a project or tag may
-create a record, and that write belongs to the caller with a document in hand.
-A test for this function needs no workspace, which is the property that keeps
-the capture grammar cheap to change.
-
-## apps/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument
-
-The facade is the only writer of a workspace. Each mutation validates its input
-through Zod, sets the leaf keys that changed and lets its domain module commit
-once, so two people editing different fields of one task keep both writes
-instead of replacing the record.
-
-`fromSnapshot` assigns a fresh peer id, because reusing the id baked into a
-snapshot makes the first local edit collide with the document that produced it.
-It also upgrades or refuses the schema before any caller can read a record;
-`migratedFrom` is how a host learns that the upgrade was a local commit which
-would otherwise never travel to the renderer as an update.
-
-## apps/planner/packages/core/src/loro/notes.ts#getNote
-
-A note is not a task field. It is a root keyed `note:<taskId>`, and the key
-can hold two container types at once: the rich note is a `LoroMap` tree that
-`loro-prosemirror` writes, and the legacy note is a `LoroText` that an older
-build still reads. Loro separates roots by container type, which is what lets
-the upgrade sit beside the old value instead of rewriting it.
-
-`getNote` prefers the map once it has a `nodeName` and flattens its children
-back to words, one line per block, so a caller that only needs text does not
-learn the tree. Without a map it reads the legacy text. `plainTextToContent`
-turns an old note's newlines into hard breaks before the editor opens it, so the
-words and lines survive the first rich edit. The compatibility is one-way: an
-older build reads the text and does not see the rich note.
-
-The map is a CRDT tree, so an edit is a set of node writes rather than a
-whole-note replacement. The test in `workspace.test.ts` keeps both roots in one
-snapshot and proves `getNote` prefers the rich one.
-
-## apps/planner/packages/core/src/file/workspaceFile.ts#decodeWorkspaceFile
-
-The `.planner` file is a small JSON envelope around an opaque base64 CRDT
-snapshot. The envelope carries a format name, a format version, a schema version
-and an export time, so a build can refuse a file by name before it opens
-anything. The payload stays opaque here: only the document layer interprets it.
-
-Decoding answers with a `Result` because the person chose the file and needs a
-sentence they can act on. The refusals are ordered and distinct, and none of
-them falls back to an empty workspace. `workspaceFile.test.ts` pins the reload
-contract and the refusals; `migration.test.ts` opens fixtures written by older
-builds.
-
-## apps/planner/packages/core/src/plan/weekPlan.ts#weekPlan
-
-A week is seven day plans sharing one start. `weekPlan` resolves the start with
-`startOfWeekKey(selected, settings.weekStartsOn)`, then walks seven dates and
-calls `dayPlan` for each, so recurring occurrences and the day's task rules are
-the same ones Today uses. Each day's capacity is its `capacityMinutesOverride` or
-the settings default, and `capacityFor` turns that into planned and remaining
-minutes.
-
-The one new rule is carry-over: it is `dayPlan(tasks, today).overdue`, the
-unfinished non-recurring tasks from before today, reported in their original
-order. The function returns them; it does not reschedule anything. The week total
-is seven days of capacity against the tasks they hold, but no total is stored.
-`weekPlan.test.ts` pins the start day for a Monday and a Sunday, a per-day
-override, and carry-over that leaves the tasks where they were.
