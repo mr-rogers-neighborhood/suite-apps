@@ -47,9 +47,10 @@ fileAssociations:
 
 linux:
   syncDesktopName: true
+  # Only the AppImage is built and uploaded. The Flatpak is a second channel over
+  # the same unpacked build, not a second target here.
   target:
     - AppImage
-    - deb
   category: Office
 
 mac:

@@ -46,9 +46,11 @@ electronFuses:
   grantFileProtocolExtraPrivileges: false
 
 linux:
+  # One Linux artifact per release: this image is what the feed names, what Start
+  # replaces, and what the Arch PKGBUILD repackages. A deb target was configured
+  # here but never built or uploaded.
   target:
     - AppImage
-    - deb
   # The package declares its own desktop entry, so the shell must agree with it about
   # WM_CLASS or a panel draws a second, generic icon for the same window.
   syncDesktopName: true

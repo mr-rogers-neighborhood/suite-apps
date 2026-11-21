@@ -72,7 +72,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mr-rogers-neighborhood/suite-start.git",
+    "url": "git+https://github.com/mr-rogers-neighborhood/suite-apps.git",
     "directory": "packages/contracts"
   }
 }
