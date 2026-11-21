@@ -53,15 +53,15 @@ with an unrelated one.
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Path                                       | Responsibility                                                          |
-| ------------------------------------------ | ----------------------------------------------------------------------- |
-| `src/main/sync/service.ts`                 | Planner's identity, contacts decision, invitations and lifecycle wiring |
-| `src/main/sync/identity.ts`                | This install's Ed25519 key; its fingerprint is the device id            |
-| `@suite/sync-desktop`                      | The group, relay pin, cursor, pending join, frame queue and reconnect   |
-| `src/main/sync/workspaceId.ts`             | The 64-hex sync name derived from the document's own id                 |
-| `src/main/sync/ipc.ts`                     | The controller: one service per open workspace, snapshots to the window |
-| `src/main/ipc.ts`                          | The validated `sync:*` channels and the commit that publishes a delta   |
-| `src/renderer/src/sync`                    | The pill, the dialog and their wording                                  |
+| Path                           | Responsibility                                                          |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| `src/main/sync/service.ts`     | Planner's identity, contacts decision, invitations and lifecycle wiring |
+| `src/main/sync/identity.ts`    | This install's Ed25519 key; its fingerprint is the device id            |
+| `@suite/sync-desktop`          | The group, relay pin, cursor, pending join, frame queue and reconnect   |
+| `src/main/sync/workspaceId.ts` | The 64-hex sync name derived from the document's own id                 |
+| `src/main/sync/ipc.ts`         | The controller: one service per open workspace, snapshots to the window |
+| `src/main/ipc.ts`              | The validated `sync:*` channels and the commit that publishes a delta   |
+| `src/renderer/src/sync`        | The pill, the dialog and their wording                                  |
 
 The on-disk mechanics and the connection lifecycle come from `@suite/sync-desktop`. Planner injects
 its own data directory, its identity and its events; the package writes the same files under `sync/`
