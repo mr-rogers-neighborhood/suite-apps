@@ -10,6 +10,7 @@ export const ROOTS = {
   payees: "payees",
   rules: "rules",
   schedules: "schedules",
+  scheduleBatches: "scheduleBatches",
   reconciliations: "reconciliations",
   dashboards: "dashboards",
   widgets: "widgets",

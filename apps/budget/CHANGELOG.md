@@ -10,6 +10,24 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 No changes yet.
 
+## [0.4.0] - 2026-11-21
+
+### Added
+
+- **A schedule can add its own transaction.** Each schedule now has an _Automatically add
+  transaction_ checkbox, off by default. When it is on, due occurrences post themselves through
+  the same path as the Enter button, so rules, category, payee learning and `scheduledId` behave
+  identically. Missed occurrences catch up when the budget opens or while it stays open, ninety
+  days deep; older ones are skipped rather than posting years of history in one go.
+- **Automatic entries come with one undo.** A notice names how many entries posted and their
+  total. Undo removes exactly that batch and puts each schedule's next date back. The batch is a
+  record in the budget, so the notice and its undo survive a restart.
+
+### Changed
+
+- **The Schedules page no longer promises that nothing enters itself.** It explains the
+  per-schedule choice: a schedule with the box off stays advisory and waits for you to enter it.
+
 ## [0.3.0] - 2026-11-21
 
 ### Added

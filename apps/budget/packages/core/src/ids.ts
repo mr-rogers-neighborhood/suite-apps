@@ -7,6 +7,7 @@ export type IdPrefix =
   | "payee"
   | "rule"
   | "sched"
+  | "batch"
   | "recon"
   | "dash"
   | "widget"

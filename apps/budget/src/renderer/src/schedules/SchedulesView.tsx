@@ -52,8 +52,9 @@ export function SchedulesView() {
         <div>
           <h1 className="text-[16px] font-semibold text-ink">Schedules</h1>
           <p className="mt-0.5 text-[11px] text-faint">
-            Upcoming entries for the next {snapshot.settings.upcomingDays} days. Nothing enters
-            itself.
+            Upcoming entries for the next {snapshot.settings.upcomingDays} days. A schedule adds its
+            transaction automatically only when Automatically add transaction is on; otherwise it
+            waits for you to enter it here.
           </p>
         </div>
         <Button size="sm" variant="primary" className="ml-auto" onClick={() => setEditing("new")}>
@@ -202,6 +203,7 @@ function ScheduleDialog({
   const [anchorDate, setAnchorDate] = useState(todayKey());
   const [endDate, setEndDate] = useState("");
   const [memo, setMemo] = useState("");
+  const [autoEnter, setAutoEnter] = useState(false);
   const seeded = useRef<string | null>(null);
 
   const currentKey = record?.id ?? (isNew ? "new" : null);
@@ -226,6 +228,7 @@ function ScheduleDialog({
     setAnchorDate(record?.anchorDate ?? todayKey());
     setEndDate(record?.endDate ?? "");
     setMemo(record?.memo ?? "");
+    setAutoEnter(record?.autoEnter ?? false);
   }, [schedule, currentKey, record, scale, snapshot.accounts]);
 
   if (!schedule) return null;
@@ -259,6 +262,7 @@ function ScheduleDialog({
           interval,
           anchorDate,
           endDate: endDate || null,
+          autoEnter,
         });
       } else if (record) {
         replica.document.updateSchedule(record.id, {
@@ -272,6 +276,7 @@ function ScheduleDialog({
           anchorDate,
           nextDate,
           endDate: endDate || null,
+          autoEnter,
         });
       }
       onClose();
@@ -388,6 +393,21 @@ function ScheduleDialog({
         <Field label="Memo">
           <TextInput value={memo} onChange={(event) => setMemo(event.target.value)} />
         </Field>
+        <div className="grid gap-1">
+          <label className="flex items-center gap-2 text-[12px] text-muted">
+            <input
+              type="checkbox"
+              checked={autoEnter}
+              onChange={(event) => setAutoEnter(event.target.checked)}
+              className="accent-[var(--accent)]"
+            />
+            Automatically add transaction
+          </label>
+          <p className="text-[11px] text-faint">
+            Off by default. When on, this schedule posts each due occurrence itself; the batch
+            appears at the top of the window with one Undo.
+          </p>
+        </div>
       </div>
     </Modal>
   );

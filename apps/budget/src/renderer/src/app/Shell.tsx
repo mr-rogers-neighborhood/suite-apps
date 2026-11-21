@@ -14,6 +14,7 @@ import { TargetDialog } from "../plan/TargetDialog";
 import { getBridge } from "../platform/bridge";
 import { ReportsView } from "../reports/ReportsView";
 import { RulesView } from "../rules/RulesView";
+import { ScheduleAutoEnterNotice } from "../schedules/ScheduleAutoEnterNotice";
 import { SchedulesView } from "../schedules/SchedulesView";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore } from "../store/uiStore";
@@ -144,6 +145,8 @@ export function Shell({
             </div>
           }
         />
+
+        <ScheduleAutoEnterNotice />
 
         <main className="scroll min-h-0 flex-1 overflow-y-auto">
           {view === "plan" ? <PlanView /> : null}
