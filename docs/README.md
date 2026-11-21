@@ -38,6 +38,7 @@ one copy is already wrong.
 | The apps and what they own | [What Suite is](explanation/why-suite-exists.md) |
 | Local-first goals and what is met today | [Local-first](explanation/local-first.md) |
 | Host, packs and the MiniApp model | [The mini-app model](explanation/mini-app-model.md) |
+| Release tiers and their promises | [Channels](explanation/channels.md) |
 | App and process boundaries | [Architecture](explanation/architecture.md) |
 | The rules that shape the repository | [Decisions](reference/decisions.md) |
 | Directories and packages | [Repository layout](reference/repo-layout.md) |

@@ -11,6 +11,8 @@ owns the installed files**, and that decides who may update them.
 | Relay tarball | the person, under `/opt` | the person replaces the tree | yes |
 | deb / rpm / snap | root, or the store | the package manager or store | yes |
 
+The release tiers a build can carry, and what each promises, are [Channels](../explanation/channels.md).
+
 ## The rule
 
 **Suite Start can only replace a file it can write.**
