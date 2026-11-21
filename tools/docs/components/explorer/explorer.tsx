@@ -754,7 +754,7 @@ function OverlayCard({
     <aside
       role="status"
       aria-live="polite"
-      className={`absolute bottom-3 left-3 right-3 z-20 max-h-[45%] overflow-y-auto rounded-xl border p-3 shadow-lg sm:left-auto sm:w-96 ${
+      className={`absolute bottom-12 left-3 right-3 z-20 max-h-[45%] overflow-y-auto rounded-xl border p-3 shadow-lg sm:left-auto sm:w-96 ${
         overlay.tone === "warning"
           ? "border-amber-500/40 bg-amber-500/10"
           : "border-fd-border bg-fd-background"
