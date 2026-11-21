@@ -145,6 +145,16 @@ export function parseQif(
   if (batch.rows.length === 0 && batch.errors.length === 0) {
     return err(new ImportError("empty", "No QIF transactions were found"));
   }
+  if (batch.rows.length === 0) {
+    const first = batch.errors[0];
+    return err(
+      new ImportError(
+        "unreadable",
+        `No QIF record could be read: record ${first?.row ?? 1}, ` +
+          `${first?.message ?? "unknown problem"}`,
+      ),
+    );
+  }
   return ok(batch);
 }
 

@@ -19,6 +19,12 @@ The rules that shape Budget.
   on open and while the app stays open, each occurrence as its own transaction. One batch record
   covers the run; its Undo removes exactly those transactions and restores each schedule's `nextDate`.
 - There is no bank sync, no network client, no updater and no analytics.
+- An export re-imports as the same money. `Ready to Assign` is reserved and maps back to `rta`; a QIF
+  transfer's direction comes from the importing register's amount sign, and the opposite leg is
+  dropped; a QIF line break in a name or memo becomes a space. Import uses the destination budget's
+  currency and scale, and a `.budget` or records import keeps the one it was written with.
+- A separator is not a number. An amount with no digit (`.`, `,`, `(,)`) is refused rather than read
+  as zero, and rounding happens once at parse time at the currency scale.
 - Accounting is cash basis.
 - A damaged file is never overwritten. Saves are atomic, the previous copy is kept, and seven daily
   backups sit beside the document.

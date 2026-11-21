@@ -10,6 +10,8 @@ import {
   parseCsvRows,
   parseQif,
   type RuleDraft,
+  reservedCategoryId,
+  transferDirection,
 } from "@suite/budget-core";
 import { Button } from "@suite/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -176,6 +178,8 @@ export function ImportWizard() {
         };
         const ensureCategory = (categoryName: string | null): string | null => {
           if (!categoryName) return null;
+          const reserved = reservedCategoryId(categoryName);
+          if (reserved) return reserved;
           const existing = categoryByName.get(categoryName.toLowerCase());
           if (existing) return existing;
           if (!createCategories) return null;
@@ -232,14 +236,22 @@ export function ImportWizard() {
                 })),
               });
             } else if (row.transferAccountName) {
+              const direction = transferDirection(row, account.name);
+              if (direction === "other-leg") {
+                // The QIF export writes both legs of a transfer. This row names the account being
+                // imported into, so it belongs to the other account's register.
+                skipped += 1;
+                return;
+              }
               const other = snapshot.accounts.find(
                 (candidate) =>
                   candidate.name.toLowerCase() === row.transferAccountName?.toLowerCase(),
               );
               if (other) {
+                const outbound = direction !== "inbound";
                 replica.document.createTransfer({
-                  fromAccount: account,
-                  toAccount: other,
+                  fromAccount: outbound ? account : other,
+                  toAccount: outbound ? other : account,
                   date: row.date,
                   amountMinor: Math.abs(row.amountMinor),
                   categoryId: ruled.categoryId,

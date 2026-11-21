@@ -98,6 +98,17 @@ export function parseCsv(
   if (batch.rows.length === 0 && batch.errors.length === 0) {
     return err(new ImportError("empty", "No rows could be read"));
   }
+  if (batch.rows.length === 0) {
+    // A batch with no readable row is not a preview with problems; it is a file this build could
+    // not import. Saying so stops the review step from offering an import of zero rows.
+    const first = batch.errors[0];
+    return err(
+      new ImportError(
+        "unreadable",
+        `No row could be read: row ${first?.row ?? 1}, ${first?.message ?? "unknown problem"}`,
+      ),
+    );
+  }
   return ok(batch);
 }
 

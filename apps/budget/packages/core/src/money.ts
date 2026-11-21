@@ -35,8 +35,10 @@ export function currencyScale(currency: string): number {
 
 /**
  * Parses a human amount into signed minor units. Accepts `1,234.56`, `1.234,56`,
- * `(12.00)`, `-12`, and currency symbols. Exactly one separator is treated as the decimal
- * unless it splits three digits off a non-zero whole (`1,234` is 1234, `0.500` is 0.5).
+ * `(12.00)`, `-12`, and currency symbols. A single dot is the decimal separator; a single
+ * comma is the decimal separator unless it splits exactly three digits off a non-zero whole,
+ * which reads as thousands (`1,234` is 1234 in every currency, `0,500` is 0.5). An input with
+ * no digit is an error rather than a zero.
  */
 export function parseMoney(
   input: string,
@@ -52,7 +54,9 @@ export function parseMoney(
   // A minus is a sign only in the leading position. `1-2`, `--5` and `(12-00)` are typos,
   // not amounts, and must not be read as if the stray sign were not there.
   const unsigned = cleaned.startsWith("-") ? cleaned.slice(1) : cleaned;
-  if (unsigned.length === 0 || unsigned.includes("-")) {
+  // Separators alone (`.`, `,`, `(,)`) are typos, not zero. Without this check the fraction is
+  // empty, the integer defaults to `0`, and a malformed import row would quietly post 0.00.
+  if (unsigned.length === 0 || unsigned.includes("-") || !/\d/.test(unsigned)) {
     return err(new MoneyError("not-a-number", `"${input}" is not an amount`));
   }
 
