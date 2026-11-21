@@ -7,6 +7,7 @@ import { useUiStore } from "../store/uiStore";
 const BLOCKED =
   "Reminders are off: notifications are blocked for Suite Planner in system settings.";
 const UNAVAILABLE = "Reminders are not available on this device.";
+const SCHEDULE_FAILED = "Reminders could not be scheduled on this device.";
 
 /**
  * Hands the pending reminders to a host that can deliver them, and says when it cannot.
@@ -44,19 +45,25 @@ export function ReminderScheduler(): null {
     if (syncReminders === undefined) return;
     let alive = true;
 
-    const report = (permission: string): void => {
+    const report = (permission: string, failure?: "schedule"): void => {
       // Nothing to deliver is not a reason to nag.
       if (!alive || latest.current.length === 0) return;
+      if (failure === "schedule") {
+        setNotice(SCHEDULE_FAILED);
+        return;
+      }
       setNotice(permission === "unsupported" ? UNAVAILABLE : BLOCKED);
     };
 
     void (async () => {
       const result = await syncReminders(latest.current);
-      if (!alive || result.permission === "granted") return;
+      if (!alive) return;
+      // A grant with no failure is the quiet success case.
+      if (result.permission === "granted" && result.failure === undefined) return;
       if (latest.current.length === 0) return;
 
       if (result.permission !== "prompt") {
-        report(result.permission);
+        report(result.permission, result.failure);
         return;
       }
 
@@ -73,7 +80,10 @@ export function ReminderScheduler(): null {
       replica.document.updateSettings({ notificationsAskedAt: new Date().toISOString() });
 
       if (permission === "granted" && latest.current.length > 0) {
-        await syncReminders(latest.current);
+        const retry = await syncReminders(latest.current);
+        if (!alive) return;
+        if (retry.permission === "granted" && retry.failure === undefined) return;
+        report(retry.permission, retry.failure);
         return;
       }
       report(permission);

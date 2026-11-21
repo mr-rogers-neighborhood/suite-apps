@@ -73,6 +73,16 @@ describe("DayCalendar", () => {
     expect(screen.queryByText("Early flight")).toBeNull();
   });
 
+  it("should not draw an event that lies entirely after the visible day", () => {
+    mocks.events = [
+      event({ id: "late-only", title: "After close", startTime: "21:30", endTime: "22:00" }),
+    ];
+
+    render(<DayCalendar />);
+
+    expect(screen.queryByText("After close")).toBeNull();
+  });
+
   it("should clip an event that starts before the window to the top edge", () => {
     mocks.events = [
       event({ id: "straddle", title: "Before seven", startTime: "06:30", endTime: "07:30" }),

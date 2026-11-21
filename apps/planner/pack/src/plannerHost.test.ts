@@ -21,13 +21,19 @@ type Permission = "granted" | "denied" | "prompt" | "unsupported";
 function fakeNotifications(initial: Permission = "granted") {
   const scheduled = new Map<string, { id: string; title: string; at: number }>();
   const cancelled: string[] = [];
+  const scheduleCalls: string[] = [];
   let permission = initial;
+  let failSchedules = false;
 
   return {
     scheduled,
     cancelled,
+    scheduleCalls,
     setPermission(next: Permission) {
       permission = next;
+    },
+    setFailSchedules(next: boolean) {
+      failSchedules = next;
     },
     async permission() {
       return permission;
@@ -36,8 +42,12 @@ function fakeNotifications(initial: Permission = "granted") {
       return permission;
     },
     async schedule(notification: { id: string; title: string; at: number }) {
+      scheduleCalls.push(notification.id);
       if (permission !== "granted") {
         return { ok: false as const, permission, reason: "denied" as const };
+      }
+      if (failSchedules) {
+        return { ok: false as const, permission, reason: "failed" as const };
       }
       scheduled.set(notification.id, notification);
       return { ok: true as const, permission };
@@ -235,7 +245,9 @@ describe("the pack's Planner bridge", () => {
     bridge.dispose();
   });
 
-  it("schedules a pending reminder and replaces a moved one rather than stacking", async () => {
+  it("asks the host to schedule the same id again when its time moves", async () => {
+    // The bridge does not own replacement: it calls the host with the same id and no cancel, which
+    // is the contract `NotificationService.schedule` documents. The fake's map only records that.
     const notifications = fakeNotifications();
     const bridge = createPlannerHost(fakeHost(new Map(), notifications));
 
@@ -244,11 +256,10 @@ describe("the pack's Planner bridge", () => {
         permission: "granted",
       },
     );
-    expect(notifications.scheduled.get("a")?.at).toBe(1_000);
 
     await bridge.syncReminders?.([{ id: "a", title: "Send the draft", at: 2_000 }]);
 
-    expect(notifications.scheduled.size).toBe(1);
+    expect(notifications.scheduleCalls).toEqual(["a", "a"]);
     expect(notifications.scheduled.get("a")?.at).toBe(2_000);
     expect(notifications.cancelled).toEqual([]);
     bridge.dispose();
@@ -276,6 +287,21 @@ describe("the pack's Planner bridge", () => {
     expect(await bridge.syncReminders?.([{ id: "a", title: "Send the draft", at: 1_000 }])).toEqual(
       {
         permission: "denied",
+      },
+    );
+    expect(notifications.scheduled.size).toBe(0);
+    bridge.dispose();
+  });
+
+  it("reports a granted schedule the host refused", async () => {
+    const notifications = fakeNotifications("granted");
+    notifications.setFailSchedules(true);
+    const bridge = createPlannerHost(fakeHost(new Map(), notifications));
+
+    expect(await bridge.syncReminders?.([{ id: "a", title: "Send the draft", at: 1_000 }])).toEqual(
+      {
+        permission: "granted",
+        failure: "schedule",
       },
     );
     expect(notifications.scheduled.size).toBe(0);

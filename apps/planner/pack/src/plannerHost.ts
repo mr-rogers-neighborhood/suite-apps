@@ -158,7 +158,7 @@ export function createPlannerHost(host: ModuleHost): PlannerHost {
    */
   async function syncReminders(
     reminders: readonly ReminderSchedule[],
-  ): Promise<{ permission: string }> {
+  ): Promise<{ permission: string; failure?: "schedule" }> {
     if (!host.notifications) return { permission: "unsupported" };
     const wanted = new Map(reminders.map((reminder) => [reminder.id, reminder]));
 
@@ -171,12 +171,14 @@ export function createPlannerHost(host: ModuleHost): PlannerHost {
     const permission = await host.notifications.permission();
     if (permission !== "granted") return { permission };
 
+    let failed = false;
     for (const reminder of wanted.values()) {
       const outcome = await host.notifications.schedule(reminder);
       if (outcome.ok) scheduledReminders.add(reminder.id);
+      else failed = true;
     }
 
-    return { permission };
+    return failed ? { permission, failure: "schedule" } : { permission };
   }
 
   async function requestNotifications(): Promise<string> {

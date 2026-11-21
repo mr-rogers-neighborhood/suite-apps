@@ -301,6 +301,26 @@ describe("TaskDetail", () => {
     expect(doc.getTask(task.id)?.updatedAt).toBe(now.toISOString());
   });
 
+  it("should leave an unchanged reminder timestamp alone", () => {
+    const { doc, replica } = makeDocument();
+    const now = new Date("2026-11-01T09:00:00.000Z");
+    const task = doc.createTask(
+      {
+        title: "A task",
+        scheduledFor: "2026-11-20",
+        remindAt: "2026-11-20T16:00:30.000Z",
+      },
+      now,
+    );
+    open(task.id);
+    renderDetail(replica);
+
+    fireEvent.blur(screen.getByLabelText("Remind me"));
+
+    expect(doc.getTask(task.id)?.remindAt).toBe("2026-11-20T16:00:30.000Z");
+    expect(doc.getTask(task.id)?.updatedAt).toBe(now.toISOString());
+  });
+
   it("should return focus to the row when it closes", async () => {
     const { doc, replica } = makeDocument();
     const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
