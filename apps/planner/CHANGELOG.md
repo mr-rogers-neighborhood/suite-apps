@@ -8,7 +8,12 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 ## [Unreleased]
 
-No changes yet.
+### Added
+
+- **Share a workspace through a relay you run.** The sync pill opens a dialog that shares the open
+  `.planner` file, makes a single-use invitation, joins from one, and leaves. The relay stores
+  sealed frames it cannot read; the file, the keys and the document stay on the two machines. There
+  is no TLS yet and the default address is loopback.
 
 ## [0.2.4] - 2026-11-20
 

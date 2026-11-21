@@ -52,6 +52,10 @@ export type {
   PlannerBridge,
   ReminderEvent,
   ReminderSchedule,
+  SyncInfo,
+  SyncMember,
+  SyncMemberRole,
+  SyncState,
   WorkspaceInfo,
 } from "./ports";
 export {

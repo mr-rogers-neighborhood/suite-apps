@@ -11,7 +11,8 @@ The rules that shape Planner.
 - Checklist items are subtasks of one task, not separate tasks.
 - Recurrence is a projection over the stored series; occurrences are not copied into the document.
 - Estimates are compared with daily capacity. The app does not time-block the calendar.
-- The calendar is local. There is no calendar account and no network client.
+- The calendar is local. There is no calendar account and no calendar feed; sync carries the
+  workspace file, not an external calendar.
 - The workspace is one `.planner` file, written atomically with a temp-file rename and one rolling
   backup.
 - A schema bump is additive or it migrates. An older file opens and is upgraded on open; a newer
@@ -21,4 +22,7 @@ The rules that shape Planner.
 - Navigation renders from one view registry. An id the build does not register opens today.
 - UI uses Tailwind v4 with Radix primitives. There is no Turborepo.
 - The gate is local: `pnpm check` to edit, `pnpm verify` for the full gate.
-- Sync is a designed seam with no transport yet.
+- Sync is a relay a person runs, not a Suite service. A workspace is carried by sealed MLS frames
+  over `@suite/sync`; the relay stores ciphertext and signed metadata and never reads a document.
+  The main process holds the keys and the socket, the renderer holds neither, and the file stays the
+  only document. There is no TLS and the default is loopback. See [sync.md](sync.md).

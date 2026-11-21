@@ -29,6 +29,47 @@ export type ExportResult = { canceled: boolean; path?: string };
 export type ImportResult = { canceled: boolean };
 
 /**
+ * What this device is doing with the workspace's other copies.
+ *
+ * The words are the ones a person can act on, not the protocol's: a frame, an epoch or a key
+ * package never reaches the screen. `count` is the relay's frame count when this device joined,
+ * carried to show that something is happening without pretending it is a document version.
+ */
+export type SyncState =
+  | { readonly state: "off" }
+  | { readonly state: "connecting" }
+  | { readonly state: "syncing"; readonly count: number }
+  | { readonly state: "asleep"; readonly reason: string }
+  | { readonly state: "refused"; readonly reason: string }
+  /** An invitation has been used, and this device is waiting to be let in. */
+  | { readonly state: "waiting" }
+  /** Somebody who owns this workspace took this device out of it. */
+  | { readonly state: "removed" };
+
+export type SyncMemberRole = "owner" | "editor" | "viewer";
+
+/** One device the relay knows, as it last described the room. */
+export type SyncMember = {
+  readonly deviceId: string;
+  readonly name: string;
+  readonly role: SyncMemberRole;
+};
+
+/**
+ * Everything the sync dialog needs, in one value.
+ *
+ * Pushed by main whenever it changes, so the pill and the dialog read one source rather than
+ * asking twice and drifting. `workspaceId` is the sync identity of the open workspace: a
+ * fingerprint of the id the document already carries, never a secret.
+ */
+export type SyncInfo = {
+  readonly workspaceId: string | null;
+  readonly deviceId: string;
+  readonly status: SyncState;
+  readonly members: readonly SyncMember[];
+};
+
+/**
  * The only surface the renderer has on the machine. Main implements it; preload exposes it through
  * contextBridge; tests and Storybook use an in-memory implementation.
  */
@@ -91,4 +132,21 @@ export type PlannerBridge = {
   importWorkspace(): Promise<ImportResult>;
   info(): Promise<WorkspaceInfo>;
   platform(): Promise<string>;
+  /**
+   * Sync is opt-in and lives in main: the renderer never holds a key and never opens a
+   * socket. It asks for a state, starts or stops a connection, writes an invitation and
+   * hands a pasted one back. Every method is optional so a host without sync can still
+   * implement `PlannerBridge`; the desktop shell provides all of them.
+   */
+  syncStatus?(): Promise<SyncInfo>;
+  /** Share this workspace through a relay at `url`, or reconnect to one it already knows. */
+  syncEnable?(url: string): Promise<SyncInfo>;
+  /** Stop syncing this copy. The workspace keeps its file and its membership. */
+  syncDisable?(): Promise<SyncInfo>;
+  /** Write a single-use invitation and hand back the link to give someone. */
+  syncInvite?(role: "editor" | "viewer"): Promise<string | null>;
+  /** Ask to join from a link somebody shared. Resolves once this device has asked. */
+  syncJoin?(link: string): Promise<SyncInfo>;
+  /** Main pushes every change of state, so one subscription feeds the pill and the dialog. */
+  onSyncChanged?(listener: (info: SyncInfo) => void): () => void;
 };

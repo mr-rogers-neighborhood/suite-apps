@@ -34,6 +34,7 @@
     "@suite/contracts": "workspace:*",
     "@suite/desktop": "workspace:*",
     "@suite/planner-core": "workspace:*",
+    "@suite/sync": "workspace:*",
     "@suite/theme": "workspace:*",
     "@suite/ui": "workspace:*",
     "electron-updater": "^6.6.2",
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",
+    "@suite/host": "workspace:*",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.10.0",

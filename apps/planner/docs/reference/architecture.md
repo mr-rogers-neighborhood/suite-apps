@@ -9,8 +9,8 @@ This page is the map. The rules are in [conventions.md](conventions.md), the rec
 
 ## Three rules
 
-1. **Offline works.** The network is not required to open, edit or export a workspace. There is no
-   network call in v1 at all.
+1. **Offline works.** The network is not required to open, edit or export a workspace. Sync is
+   opt-in, runs through a relay a person hosts, and the file stays the document either way.
 2. **Loro owns the document.** The UI reads through `@suite/planner-core` and writes through
    `WorkspaceDocument`, never raw Loro.
 3. **Every write is validated.** Zod schemas in `packages/core/src/schema.ts` parse at the boundary
@@ -23,7 +23,8 @@ This page is the map. The rules are in [conventions.md](conventions.md), the rec
 │  WorkspaceDocument (Loro)  ──►  file store (.planner, atomic write)          │
 │         │                                                                     │
 │         ├──► reminder scheduler ──► native Notification                      │
-│         └──► IPC: snapshot / commit / export / import / info                  │
+│         ├──► sync service ──► sealed frames ──► user-run relay (opt-in)       │
+│         └──► IPC: snapshot / commit / export / import / info / sync           │
 └───────────────────────────────────────────────────────────────────────────────┘
                                     │ contextBridge, allowlisted channels
 ┌───────────────────────────────────▼───────────────────────────────────────────┐
@@ -44,8 +45,10 @@ asks for a snapshot and builds a replica.
 
 **Edits.** The renderer mutates its replica. `subscribeLocalUpdates` emits the CRDT delta; the
 snapshot store forwards it over `workspace:commit`, refreshes its derived snapshot, and the UI
-re-renders. Main imports the delta and debounces an atomic write (400 ms). The same delta channel is
-what a relay would carry later, so document code does not change when sync arrives.
+re-renders. Main imports the delta and debounces an atomic write (400 ms). The same delta is sealed
+into a relay frame when sync is on, so document code did not change when sync arrived. Incoming
+frames are applied to the authority and reach the renderer through `workspace:replaced`, the same
+replacement path an import uses; [sync.md](sync.md) is the seam.
 
 **Import.** Main decodes the file, builds a fresh document, validates every record, replaces the
 authority and writes it, then broadcasts `workspace:replaced` with a new snapshot. The renderer
@@ -67,10 +70,10 @@ Upcoming surfaces are described in [projects-tags-upcoming.md](projects-tags-upc
 
 `Shell.tsx` renders the shared `@suite/ui` `MenuBar` above the active view. Its zones carry the material
 this app has: the Planner mark as a link back to today, the workspace file's name as context, a compact
-view switcher over the same `views` registry, export and import in the actions, and the theme picker in
-the controls. The rail stays the full navigation, and the bar's switcher is the compact one. Planner has
-no command palette and no sync, so the search, peers and sync zones stay empty rather than holding a
-control that does nothing.
+view switcher over the same `views` registry, export and import in the actions, the sync pill, and the
+theme picker in the controls. The rail stays the full navigation, and the bar's switcher is the compact
+one. Planner has no command palette and no presence, so the search and peers zones stay empty rather
+than holding a control that does nothing.
 
 Below `md` the rail is not rendered: the bar's navigation button opens `SidebarDrawer`, which carries the
 same navigation, theme and export/import, and the bar hides its wide zones so the day view keeps the
@@ -85,16 +88,17 @@ The renderer is sandboxed and its lifetime is a window. The scheduler has to out
 autosave has to survive a renderer crash. Putting the document in main gives both, and it keeps the
 file and notification APIs in the process that is allowed to use them.
 
-The cost is a delta channel and a full-snapshot fallback. Both are small, and both are what a future
-relay needs anyway.
+The cost is a delta channel and a full-snapshot fallback. Both are small, and both are what the
+relay uses: the delta becomes a sealed frame, and a snapshot is what a device that joined late or
+reconnected is handed.
 
 ## Repo map
 
 | Path                          | Responsibility                                                        |
 | ----------------------------- | --------------------------------------------------------------------- |
-| `src/main`                    | Authority, file store, IPC, tray, scheduler, menu, window             |
+| `src/main`                    | Authority, file store, IPC, tray, scheduler, menu, window, sync       |
 | `src/preload`                 | Typed `PlannerBridge` over `contextBridge`                            |
-| `src/renderer`                | React shell, day view, inbox, capture, calendar, theme                |
+| `src/renderer`                | React shell, day view, inbox, capture, calendar, theme, sync dialog   |
 | `packages/core/src/schema.ts` | Zod records and `z.infer` types                                       |
 | `packages/core/src/loro`      | `WorkspaceDocument` and its domain modules                            |
 | `packages/core/src/plan`      | Pure projections: day plan, capacity, recurrence, inbox, search, sort |
@@ -121,7 +125,8 @@ never imports React or Electron.
 - A Content-Security-Policy is set on responses and repeated in `index.html`.
 - Every IPC payload is parsed with Zod in main. Only `Uint8Array` updates cross the commit channel.
 - File paths are app-owned except for paths the user picks in a native dialog.
-- No telemetry, no analytics, no network client in the bundle.
+- No telemetry, no analytics, and no network client in the renderer bundle. Main opens a WebSocket
+  only when somebody turns sync on, and the payload it carries is sealed before it leaves.
 
 ## Decisions
 
@@ -132,7 +137,7 @@ never imports React or Electron.
 | Who owns a task's day      | The task owns `scheduledFor` and `order`         |
 | What a subtask is          | A checklist item on the task                     |
 | How recurrence works       | A pure projection plus per-occurrence completion |
-| What sync is               | An interface, no relay shipped                   |
+| What sync is               | Sealed frames through a user-run relay           |
 | What the calendar holds    | Local events only                                |
 | What the UI primitives are | Radix + Tailwind                                 |
 | Where the file lives       | App-managed autosave plus export/import          |

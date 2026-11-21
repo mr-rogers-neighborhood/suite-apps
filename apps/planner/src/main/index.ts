@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { hostname } from "node:os";
 import { join } from "node:path";
 
 import { suitePaths } from "@suite/contracts";
@@ -11,6 +12,7 @@ import { findNewerInstall } from "./newerInstall";
 import { workspacePaths } from "./paths";
 import { registerAppScheme, serveRenderer } from "./protocol";
 import { ReminderScheduler } from "./scheduler";
+import { createPlannerSyncController, type PlannerSyncController } from "./sync/ipc";
 import { createTray } from "./tray";
 import { checkForUpdates } from "./updateCheck";
 import { applyContentSecurityPolicy, createMainWindow, pageCsp } from "./window";
@@ -30,6 +32,7 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let store: WorkspaceStore | null = null;
 let scheduler: ReminderScheduler | null = null;
+let sync: PlannerSyncController | null = null;
 let quitting = false;
 let cleanedUp = false;
 
@@ -157,10 +160,22 @@ async function bootstrap(initialFile: string | null): Promise<void> {
   if (copied.length > 0) console.info(`Suite Planner: copied the workspace from ${legacyDir}`);
 
   store = await WorkspaceStore.open(paths);
+  sync = createPlannerSyncController({
+    getStore: () => store,
+    webContents: () => mainWindow?.webContents ?? null,
+    publishReplaced: (snapshot) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send("workspace:replaced", snapshot);
+      }
+    },
+    // What the other person's screen calls this device. "Planner on harbour-laptop" is
+    // something a person can weigh; a fingerprint is not.
+    deviceName: `Planner on ${hostname()}`,
+  });
   registerIpc(() => {
     if (!store) throw new Error("Suite Planner: no workspace is open");
     return store;
-  });
+  }, sync);
 
   scheduler = new ReminderScheduler(store, notifyReminder);
   scheduler.start();
@@ -218,6 +233,10 @@ async function openWorkspaceFile(file: string): Promise<void> {
   scheduler = new ReminderScheduler(next, notifyReminder);
   scheduler.start();
 
+  // The previous workspace's keys and socket belong to the file that just closed, not to
+  // this one. Stop before any window is told what it is now looking at.
+  await sync?.workspaceChanged();
+
   const snapshot = next.snapshot();
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send("workspace:replaced", snapshot);
@@ -253,6 +272,7 @@ function showWindow(): void {
 async function shutdown(): Promise<void> {
   quitting = true;
   scheduler?.stop();
+  await sync?.stop();
   await store?.close();
   cleanedUp = true;
   tray?.destroy();

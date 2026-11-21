@@ -5,11 +5,21 @@ import { todayKey } from "@suite/planner-core";
 import { app, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
 import { z } from "zod";
 import { pageOrigins } from "./protocol";
+import type { PlannerSyncController } from "./sync/ipc";
 import type { WorkspaceStore } from "./workspaceStore";
 
 const updateSchema = z.custom<Uint8Array>((value) => value instanceof Uint8Array, {
   message: "Expected a binary CRDT update",
 });
+
+const relayUrlSchema = z
+  .string()
+  .trim()
+  .regex(/^wss?:\/\/\S+$/u, { message: "Expected a ws:// or wss:// relay address" });
+
+const inviteRoleSchema = z.enum(["editor", "viewer"]);
+
+const inviteLinkSchema = z.string().trim().min(1);
 
 /**
  * Register a channel, but only answer the page this app loaded.
@@ -32,11 +42,15 @@ function onIpc(
  * The getter rather than the store itself: a file handed over by the hub replaces the workspace, and
  * `ipcMain.handle` refuses a second registration for the same channel.
  */
-export function registerIpc(getStore: () => WorkspaceStore): void {
+export function registerIpc(getStore: () => WorkspaceStore, sync: PlannerSyncController): void {
   onIpc("workspace:snapshot", () => getStore().snapshot());
 
   onIpc("workspace:commit", (_event, payload: unknown) => {
-    getStore().commit(updateSchema.parse(payload));
+    const update = updateSchema.parse(payload);
+    getStore().commit(update);
+    // The same delta a local edit produced is what a relay carries later. Publishing is
+    // ordered inside the service, so a quick second edit cannot race the first seal.
+    sync.publish(update);
   });
 
   onIpc("workspace:created", () => getStore().created);
@@ -75,6 +89,9 @@ export function registerIpc(getStore: () => WorkspaceStore): void {
     if (result.canceled || !filePath) return { canceled: true };
 
     await getStore().importFrom(filePath);
+    // An imported file may carry a different workspace id, which names a different relay
+    // room. Drop the old connection before the window is told what it is holding now.
+    await sync.workspaceChanged();
     const snapshot = getStore().snapshot();
     for (const openWindow of BrowserWindow.getAllWindows()) {
       openWindow.webContents.send("workspace:replaced", snapshot);
@@ -83,4 +100,16 @@ export function registerIpc(getStore: () => WorkspaceStore): void {
   });
 
   onIpc("app:platform", () => process.platform);
+
+  // Sync: the renderer asks for state and hands over a link; it never holds a key and never
+  // opens a socket. Every payload is parsed here before it reaches the service.
+  onIpc("sync:status", () => sync.status());
+
+  onIpc("sync:enable", (_event, url: unknown) => sync.enable(relayUrlSchema.parse(url)));
+
+  onIpc("sync:disable", () => sync.disable());
+
+  onIpc("sync:invite", (_event, role: unknown) => sync.invite(inviteRoleSchema.parse(role)));
+
+  onIpc("sync:join", (_event, link: unknown) => sync.join(inviteLinkSchema.parse(link)));
 }

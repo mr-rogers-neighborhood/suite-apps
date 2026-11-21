@@ -1,4 +1,4 @@
-import type { AppCommand, PlannerBridge, ReminderEvent } from "@suite/planner-core";
+import type { AppCommand, PlannerBridge, ReminderEvent, SyncInfo } from "@suite/planner-core";
 import { contextBridge, ipcRenderer } from "electron";
 
 function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
@@ -21,6 +21,15 @@ const bridge: PlannerBridge = {
   importWorkspace: () => ipcRenderer.invoke("workspace:import"),
   info: () => ipcRenderer.invoke("workspace:info"),
   platform: () => ipcRenderer.invoke("app:platform"),
+  // Sync crosses this bridge as state and links, never as a key or a socket. Main applies a
+  // frame to the authority and tells the page through the same replacement path as an
+  // import, so the renderer has no second way to change the document.
+  syncStatus: () => ipcRenderer.invoke("sync:status"),
+  syncEnable: (url) => ipcRenderer.invoke("sync:enable", url),
+  syncDisable: () => ipcRenderer.invoke("sync:disable"),
+  syncInvite: (role) => ipcRenderer.invoke("sync:invite", role),
+  syncJoin: (link) => ipcRenderer.invoke("sync:join", link),
+  onSyncChanged: (listener) => subscribe<SyncInfo>("sync:changed", listener),
 };
 
 contextBridge.exposeInMainWorld("suitePlanner", bridge);

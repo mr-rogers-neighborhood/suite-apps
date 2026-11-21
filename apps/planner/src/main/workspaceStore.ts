@@ -52,6 +52,11 @@ export class WorkspaceStore {
     return this.#paths.workspace;
   }
 
+  /** The folder the workspace lives in. Sync keeps its identity and group state here. */
+  get directory(): string {
+    return this.#paths.dir;
+  }
+
   snapshot(): Uint8Array {
     return this.#doc.snapshot();
   }

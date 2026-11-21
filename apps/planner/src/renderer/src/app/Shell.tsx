@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { DayCalendar } from "../calendar/DayCalendar";
 import { getBridge } from "../platform/bridge";
 import { useUiStore } from "../store/uiStore";
+import { SyncControl } from "../sync/SyncControl";
 import { ThemePicker } from "../theme/ThemePicker";
 import { PlannerMark } from "./PlannerMark";
 import { Sidebar, SidebarDrawer } from "./Sidebar";
@@ -75,6 +76,7 @@ export function Shell() {
           actions={
             <WorkspaceActions className="hidden items-center gap-2 md:flex" variant="ghost" />
           }
+          sync={<SyncControl />}
           controls={
             <div className="hidden lg:block">
               <ThemePicker layout="inline" />

@@ -6,10 +6,12 @@ Suite operates no server. A person runs `suite-sync` on a device they control â€
 an always-on computer, a laptop â€” and their other devices sync with it. The document stays a file the
 app owns; this repository owns the wire protocol, the membership model and the headless server.
 
-> **Status: working, one app deep.** The protocol, the MLS group and frame types, the membership state machine,
+> **Status: working, two apps deep.** The protocol, the MLS group and frame types, the membership state machine,
 > the blind relay with its file store, and the relay client are here. Two Canvas clients can sync one
-> workspace through a relay on a machine a person controls; `pnpm check` covers the protocol, the
-> membership state machine, the relay and the transport.
+> workspace, and two Planner clients can sync one `.planner` file, through a relay on a machine a
+> person controls; `pnpm check` covers the protocol, the membership state machine, the relay and the
+> transport. `@suite/planner` adds the second app in `apps/planner/src/main/sync`; its
+> [sync page](../planner/docs/reference/sync.md) is the app-side seam.
 >
 > **Try it:** [Run the Canvas sync demo](docs/how-to/canvas-sync-demo.md).
 >
