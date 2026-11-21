@@ -60,7 +60,8 @@ gets `remindedAt` as a leaf write, which is what stops it repeating.
 entry. The rail renders the registry in order and the shell renders the resolved component, so a new
 surface is an entry and its component, not an edit to `Shell.tsx`, `Sidebar.tsx` and the store. The
 rail's "Soon" list stays for surfaces that do not exist yet. An id this build does not register — a
-store written by a different build — opens `today` rather than an empty pane.
+store written by a different build — opens `today` rather than an empty pane. The Projects, Tags and
+Upcoming surfaces are described in [projects-tags-upcoming.md](projects-tags-upcoming.md).
 
 ## Why main is the authority
 

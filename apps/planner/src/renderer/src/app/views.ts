@@ -1,9 +1,12 @@
 import type { LucideIcon } from "lucide-react";
-import { Inbox, Sun } from "lucide-react";
+import { CalendarDays, Folder, Inbox, Sun, Tag } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { DayView } from "../day/DayView";
 import { InboxView } from "../inbox/InboxView";
+import { ProjectsView } from "../projects/ProjectsView";
+import { TagsView } from "../tags/TagsView";
+import { UpcomingView } from "../upcoming/UpcomingView";
 
 /**
  * The one registry of surfaces the shell can render.
@@ -24,6 +27,9 @@ type ViewRegistry = Readonly<Record<string, ViewDefinition>>;
 export const views = {
   today: { id: "today", label: "Today", icon: Sun, component: DayView },
   inbox: { id: "inbox", label: "Inbox", icon: Inbox, component: InboxView },
+  upcoming: { id: "upcoming", label: "Upcoming", icon: CalendarDays, component: UpcomingView },
+  projects: { id: "projects", label: "Projects", icon: Folder, component: ProjectsView },
+  tags: { id: "tags", label: "Tags", icon: Tag, component: TagsView },
 } as const satisfies ViewRegistry;
 
 export type ViewId = keyof typeof views;
