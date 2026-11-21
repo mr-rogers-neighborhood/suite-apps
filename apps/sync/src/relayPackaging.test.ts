@@ -18,13 +18,25 @@ const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
 
 describe("relay packaging", () => {
   it("every `suite-sync serve` line in the how-to is a command this CLI accepts", () => {
+    // The page wraps long commands with a trailing backslash. Join those lines
+    // before splitting flags, or the parser sees the backslash as an argument.
     const lines = read("docs/how-to/relay.md")
       .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith("suite-sync serve"));
+      .map((line) => line.trim());
+    const commands: string[] = [];
+    for (let index = 0; index < lines.length; index += 1) {
+      const first = lines[index];
+      if (first === undefined || !first.startsWith("suite-sync serve")) continue;
+      let command = first;
+      while (command.endsWith("\\")) {
+        index += 1;
+        command = `${command.slice(0, -1).trim()} ${lines[index] ?? ""}`.trim();
+      }
+      commands.push(command);
+    }
 
-    expect(lines.length).toBeGreaterThan(0);
-    for (const line of lines) {
+    expect(commands.length).toBeGreaterThan(0);
+    for (const line of commands) {
       const args = line
         .replace(/^suite-sync serve\s*/u, "")
         .split(/\s+/u)
