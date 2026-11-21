@@ -11,6 +11,16 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 No changes yet.
 
+## [0.4.2] - 2026-11-21
+
+### Added
+
+- **Suite Help is a card.** The documentation explorer ships as its own Flatpak app, opens from the
+  hub, and is installed and updated like the other apps.
+- **Sync has a certificate, a console and a QR code.** Start generates and keeps the relay's TLS pair,
+  shows the fingerprint, and opens a loopback-only relay console. An invitation can be shown as a QR
+  code carrying the relay, its pin and the invitation.
+
 ## [0.4.1] - 2026-11-21
 
 ### Changed
