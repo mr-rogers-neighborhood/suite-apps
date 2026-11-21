@@ -1,0 +1,127 @@
+---
+module: apps/budget/packages/core/src/loro
+title: Budget Loro document
+summary: "The typed writer around Loro, the record helpers and the merge rules that keep records composable."
+---
+
+The Loro module is the typed document and the only code allowed to import
+`loro-crdt`. It owns the root layout, the record helpers, the `BudgetDocument`
+facade, undo, peer identity, snapshot import and the per-record mutations. It
+does not own the file, the library index, the save schedule, IPC or any view;
+main owns the open document, and the pure projections read a snapshot.
+
+The design goal is merge behaviour. A record is a mergeable map, and a write
+sets only the leaf keys that changed, so two replicas editing different fields
+of one transaction both survive. Every write is built through a Zod schema
+first, which means a bad patch fails before it becomes a CRDT value. The commit
+depth is the other half: an outer call commits once, so one user action is one
+undo step and one delta.
+
+The honest failure modes are worth stating. A mutation that throws after some
+writes is not rolled back by the facade, imported updates are applied without
+schema validation, and a reused peer id would collide with the document that
+produced a snapshot. The tests target the merge promises directly: two replicas
+editing different categories, concurrent field edits on one transaction, splits
+and transfers staying paired, and undo/redo around one mutation.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument
+
+The class is the facade the renderer sees and the only writer of a budget. It
+owns a `LoroDoc`, an undo manager limited to 100 steps, and a commit depth. The
+record roots are maps keyed by record id, except monthly budgets, keyed by
+`month:categoryId`; meta and settings are singletons. The rules in one place are
+the point: callers validate, write leaves and commit through here rather than
+constructing Loro values, and the raw `loro` getter is an escape hatch, not a
+second API.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument.create
+
+Creating a budget is not just an empty map: it seeds settings, meta with a new
+budget id and schema version, and a default dashboard in one commit. Options can
+set the name, currency, scale and first day of week up front, which avoids a
+second write that would produce an extra undo step. The result is a document
+whose snapshot a caller can write immediately.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument.fromSnapshot
+
+Opening a snapshot restores the CRDT state and then replaces the peer id. The
+snapshot carries the peer id of the document that produced it; reusing it would
+make the next edit collide with the original document's history. A fresh random
+id, never zero, is what makes two copies of one file safe to edit separately.
+This step does not validate the records; `validate()` is a separate read.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument.fromRecords
+
+`fromRecords` is the rebuild path for imports and records files: it creates a
+fresh document and inserts every record under its original id, preserving ids
+while discarding CRDT history. Defaults in the schemas fill fields an older
+export lacks, and a missing dashboard gets the default one. Because it writes
+each root through the same validated helpers, a records file cannot introduce an
+unvalidated record through this door.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument.snapshot
+
+A snapshot is taken after an explicit commit, then exported by Loro. The commit
+matters because a caller that just mutated through the facade expects the export
+to include it. The returned bytes are the envelope payload, not the `.budget`
+JSON; the file module adds format and version around them. Taking a snapshot is
+a read of the whole document, so it is not a per-keystroke operation.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument.observe
+
+`observe` subscribes to local updates only, then hands each CRDT delta to the
+caller. That is the seam the renderer uses: it merges locally, forwards the
+delta to main, and refreshes its snapshot once. Imported remote updates do not
+re-enter this listener, which prevents an echo loop between the two processes.
+The returned function detaches the listener.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument.applyUpdate
+
+Applying an update imports a delta from another replica without parsing it
+first. That is deliberate: Loro needs the update to merge history, and schema
+validation happens when records are read. The cost is that a malformed update
+can throw at import time; callers treat that as a failed import, not as a record
+that can be repaired. The document is not replaced, so an already-open snapshot
+stays usable.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument.batch
+
+Batch is not a second transaction system; it increments the same depth counter
+used by every mutation. The outer call commits once, and the undo manager
+therefore sees one step, while each inner mutation still validates its own
+record. A failure inside the batch leaves earlier writes in the document,
+because there is no rollback; callers that need all-or-nothing must validate
+before they start.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument.updateTransaction
+
+Updating a transaction adds two policies that a raw patch would miss. A
+reconciled row is refused, and a category change on a named payee teaches a
+learned rule unless the payee has learning off or the caller passes
+`learn: false`. The write itself still goes through the record helper, so only
+the changed leaves move and concurrent edits on other fields survive.
+
+## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument.undo
+
+Undo is a document mutation, not a UI history stack. It calls the Loro undo
+manager, which emits an ordinary local delta; the renderer's observer forwards
+that delta to main exactly like a typed edit. With a merge interval of zero and
+a 100-step cap, one facade call is one undo step, and redo has the same shape.
+Nothing in main keeps a parallel undo log.
+
+## apps/budget/packages/core/src/loro/records.ts#insertRecord
+
+`insertRecord` is the insert path for every root: it parses the record with its
+Zod schema, then writes it into a mergeable map keyed by the record id. The map
+is mergeable so two replicas adding different records keep both. Because the
+parsed record is what is written, defaults and refinements are applied once, at
+the door.
+
+## apps/budget/packages/core/src/loro/records.ts#updateRecord
+
+`updateRecord` is the patch path: read the current record, merge the defined
+patch fields and the optional timestamp, validate the merged result, then write
+only the keys that changed. Validating the merged whole catches a patch that
+would create an invalid record, while writing leaves is what lets a concurrent
+edit to a different field survive. An undefined patch value means "leave it",
+not "clear it"; clear with null.
