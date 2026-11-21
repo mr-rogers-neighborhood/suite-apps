@@ -11,8 +11,9 @@
  *   2. A missing `title` comes from the page's `# ` heading, which is then
  *      removed from the body so the page does not render two H1s. A missing
  *      `description` comes from the first prose paragraph.
- *   3. Relative links that leave `docs/` point at GitHub instead, because the
- *      site has no page for them.
+ *   3. A link between pages becomes its `/handbook/...` route, so it stays inside
+ *      the app. A relative link that leaves `docs/` points at GitHub instead,
+ *      because the site has no page for it.
  *   4. HTML comments are dropped; they carry no published meaning.
  *   5. `<br>` is the one HTML tag the docs use in prose, and is preserved. Other
  *      `<` and `{}` are escaped because MDX treats them as JSX.
@@ -30,13 +31,12 @@ import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promi
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { rewriteLinks } from "./lib/docs-links.mjs";
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const sourceDir = join(root, "docs");
 const contentDir = join(root, "apps", "help", ".generated", "docs");
 const dataDir = join(root, "apps", "help", "public", "data");
-
-const GITHUB_BLOB = "https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/";
-const GITHUB_TREE = "https://github.com/mr-rogers-neighborhood/suite-apps/tree/main/";
 
 const DESCRIPTION_LIMIT = 160;
 
@@ -166,79 +166,6 @@ function mdxSafe(body) {
                 .replaceAll(BR, "<br />"),
         )
         .join("");
-    })
-    .join("\n");
-}
-
-/**
- * Rewrite one link target. Relative links inside `docs/` stay relative (the
- * renderer resolves them against the page's source file), everything else
- * becomes a GitHub URL so the site never points at a 404.
- */
-function rewriteHref(href, rel, files, dirs) {
-  if (
-    href === "" ||
-    href.startsWith("#") ||
-    href.startsWith("/") ||
-    /^[a-zA-Z][\w+.-]*:/.test(href)
-  ) {
-    return href;
-  }
-  const hashIndex = href.indexOf("#");
-  const path = hashIndex === -1 ? href : href.slice(0, hashIndex);
-  const hash = hashIndex === -1 ? "" : href.slice(hashIndex);
-
-  const baseDir = posix.dirname(rel);
-  const resolved = posix.normalize(posix.join(baseDir, path));
-  const repoPath = posix.normalize(posix.join("docs", resolved));
-  if (repoPath.startsWith("..")) return href;
-
-  if (repoPath !== "docs" && !repoPath.startsWith("docs/")) {
-    const url = path.endsWith("/")
-      ? `${GITHUB_TREE}${repoPath.replace(/\/$/, "")}/`
-      : `${GITHUB_BLOB}${repoPath}`;
-    return `${url}${hash}`;
-  }
-
-  const internal = repoPath === "docs" ? "" : repoPath.slice("docs/".length);
-  const isDirectory = path.endsWith("/") || internal === "" || dirs.has(internal);
-  if (isDirectory) {
-    const folder = internal.replace(/\/$/, "");
-    const prefix = folder === "" ? "" : `${folder}/`;
-    if (files.has(`${prefix}README.md`) || files.has(`${prefix}index.md`)) {
-      return `${folder === "" ? "/docs/" : `/docs/${folder}/`}${hash}`;
-    }
-    const target = folder === "" ? "docs" : `docs/${folder}`;
-    return `${GITHUB_TREE}${target}${hash}`;
-  }
-
-  if (internal.endsWith(".md")) {
-    if (!files.has(internal)) return href;
-    const slug =
-      posix.basename(internal) === "README.md"
-        ? posix.dirname(internal)
-        : internal.replace(/\.md$/, "").replace(/\/index$/, "");
-    return `${slug === "" ? "/docs/" : `/docs/${slug}/`}${hash}`;
-  }
-
-  return href;
-}
-
-/** Rewrite links outside fenced code blocks (a literal `[x](y)` is not a link). */
-function rewriteLinks(body, rel, files, dirs) {
-  let fenced = false;
-  return body
-    .split("\n")
-    .map((line) => {
-      if (/^\s*```/.test(line)) {
-        fenced = !fenced;
-        return line;
-      }
-      if (fenced) return line;
-      return line.replaceAll(
-        /(!?\[[^\]]*\]\()([^)\s]+)((?:\s+"[^"]*")?\))/g,
-        (_match, open, href, close) => `${open}${rewriteHref(href, rel, files, dirs)}${close}`,
-      );
     })
     .join("\n");
 }
