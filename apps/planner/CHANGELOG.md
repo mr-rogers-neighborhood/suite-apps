@@ -18,6 +18,10 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
   through the container, cancels what is no longer pending, and reports a denied permission.
 - **The blocked notice names Planner.** It said notifications were blocked for Suite Go, which is
   the container, not the app in front of the person.
+- **A keyboard rename keeps focus on the row.** Pressing Enter to save a title, or Escape to cancel
+  it, removed the field and dropped focus on the page; focus returns to the task title.
+- **Back to today keeps focus on the day.** The button removed itself and left focus nowhere; the
+  new day's heading now takes it.
 
 ## [0.5.1] - 2026-11-21
 

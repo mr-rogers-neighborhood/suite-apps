@@ -300,6 +300,43 @@ describe("TaskDetail", () => {
     expect(opener).toHaveFocus();
   });
 
+  it("should keep focus on the row title after a keyboard rename", async () => {
+    const user = userEvent.setup();
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    render(
+      <WorkspaceContext.Provider value={replica}>
+        <TaskRow entry={dayEntry(doc, task.id)} tags={[]} />
+      </WorkspaceContext.Provider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "A task" }));
+    const field = screen.getByRole("textbox", { name: "Edit title for A task" });
+    fireEvent.change(field, { target: { value: "Renamed task" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+
+    expect(doc.getTask(task.id)?.title).toBe("Renamed task");
+    await waitFor(() => expect(screen.getByRole("button", { name: "A task" })).toHaveFocus());
+  });
+
+  it("should keep focus on the row title after Escape cancels the rename", async () => {
+    const user = userEvent.setup();
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    render(
+      <WorkspaceContext.Provider value={replica}>
+        <TaskRow entry={dayEntry(doc, task.id)} tags={[]} />
+      </WorkspaceContext.Provider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "A task" }));
+    const field = screen.getByRole("textbox", { name: "Edit title for A task" });
+    await user.type(field, "Do not save{Escape}");
+
+    expect(doc.getTask(task.id)?.title).toBe("A task");
+    await waitFor(() => expect(screen.getByRole("button", { name: "A task" })).toHaveFocus());
+  });
+
   it("should close on Escape while the notes editor has focus", async () => {
     const { doc, replica } = makeDocument();
     const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
