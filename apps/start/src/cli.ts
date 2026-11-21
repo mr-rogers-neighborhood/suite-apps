@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { homedir } from "node:os";
-import { CATALOGUE_APPS } from "./catalogue.js";
+import { ALL_CATALOGUE_APPS } from "./catalogue.js";
 import { defaultHost } from "./host.js";
 import { hostPaths, registryPathFor } from "./hostPaths.js";
 import { registryAt } from "./installs.js";
@@ -32,10 +32,9 @@ function backend() {
     appsRootOverride: process.env.SUITE_START_APPS_ROOT,
   });
   return nativePackageBackend({
-    appsRoot: paths.appsRoot,
     roots: defaultRoots(home, process.platform),
     registry: registryAt(registryPathFor(paths)),
-    catalogue: CATALOGUE_APPS,
+    catalogue: ALL_CATALOGUE_APPS,
     host: defaultHost(),
   });
 }

@@ -14,18 +14,14 @@ contextBridge.exposeInMainWorld("suiteStart", {
   launch: (id) => ipcRenderer.invoke("suite:start:launch", id),
   addApp: () => ipcRenderer.invoke("suite:start:add"),
   removeApp: (id) => ipcRenderer.invoke("suite:start:remove", id),
-  // Deletes what Start installed; the confirmation happens in main, where the paths are.
+  // Asks Flatpak to remove a deployment; the confirmation happens in main.
   uninstallApp: (id) => ipcRenderer.invoke("suite:start:uninstall", id),
-  // Back to the version this hub replaced. It names an app, never a version: main
-  // decides what "previous" means from what is on disk.
-  rollbackApp: (id) => ipcRenderer.invoke("suite:start:rollback", id),
   // One of "system", "light", "dark". Main validates it before it is applied or stored.
   setTheme: (source) => ipcRenderer.invoke("suite:start:theme", source),
   // An app id, never a path: main resolves it against its own records.
   revealApp: (id) => ipcRenderer.invoke("suite:start:reveal", id),
-  // Install or update one app from its signed feed, or switch one pre-release
-  // install to another tier. The bar arrives on its own channel below, because a
-  // download moves far more often than a window redraws.
+  // Install from the store or update a deployment, or switch one pre-release
+  // install to another tier. Progress arrives on its own channel below.
   installApp: (id, channel) => ipcRenderer.invoke("suite:start:install", id, channel),
   recents: () => ipcRenderer.invoke("suite:start:recents"),
   forgetRecent: (path) => ipcRenderer.invoke("suite:start:forget", path),

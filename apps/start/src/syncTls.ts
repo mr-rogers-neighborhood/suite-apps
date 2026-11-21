@@ -28,9 +28,9 @@ import { formatFingerprint } from "@suite/sync";
  * unpin every app.
  *
  * The pair is made here rather than by shelling out to `openssl`, because Start
- * ships as an AppImage and a Flatpak on machines that may not have it. Node's
- * crypto can make the key; the small DER writer below makes the one certificate
- * shape a self-signed TLS server needs.
+ * ships to machines that may not have it. Node's crypto can make the key; the
+ * small DER writer below makes the one certificate shape a self-signed TLS server
+ * needs.
  */
 
 export interface RelayCertificate {

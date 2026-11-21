@@ -4,17 +4,6 @@ export {
   type ProtocolAssetOptions,
   resolveProtocolAsset,
 } from "./protocol.js";
-export {
-  artifactFromFeed,
-  checkSignedFeed,
-  type FeedArtifact,
-  type FeedCheck,
-  type FeedFetch,
-  type FeedResponse,
-  feedFileFor,
-  feedUrlFromAppUpdateYml,
-  versionFromFeed,
-} from "./releaseFeed.js";
 export { isTrustedSender, originKey } from "./trust.js";
 export {
   decodeSignature,

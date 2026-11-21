@@ -190,20 +190,3 @@ export function preReleaseRemovalCopy(input: {
     buttons: ["Cancel", "Uninstall, keep data", "Uninstall and delete data"],
   };
 }
-
-/** Removal copy for a stable install: it never mentions or touches channel data. */
-export function stableRemovalCopy(input: {
-  readonly name: string;
-  readonly versions: number;
-  readonly folder: string;
-}): RemovalCopy {
-  return {
-    message: `Uninstall ${input.name}?`,
-    detail:
-      input.versions === 0
-        ? "No files are installed here; this only forgets the app."
-        : `This deletes ${input.versions} version${input.versions === 1 ? "" : "s"} ` +
-          `from ${input.folder}, its menu entry, and its install record. Documents are not touched.`,
-    buttons: ["Cancel", "Uninstall"],
-  };
-}

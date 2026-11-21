@@ -18,18 +18,16 @@ export function renderSettings(state, actions) {
   pair("Data directory", state.settings.dataDirectory);
   pair("Documents", state.settings.documentsRoot);
   // What a reader can act on, in one idea per sentence. The ruling on who owns an update lives
-  // in ADR-0001; a person only needs to know which apps Start replaces and which are a manual
-  // download.
+  // in ADR-0001; a person only needs to know that Flatpak owns every deployment.
   pair(
     "Updates",
-    "Start updates the apps it installed, and only when you press Update. It checks for new " +
-      "versions when this window opens. An app you installed another way is not managed here; " +
-      "a new build is a manual download.",
+    "Start asks Flatpak to install or update an app, and only when you press the button. " +
+      "It reads the store when this window opens. A copy you placed in a folder is yours: " +
+      "Start opens it, reveals it and forgets it, but does not replace it.",
   );
   pair(
     "Network",
-    "Start goes online to check for new versions and to download the ones you ask for. Nothing " +
-      "else leaves this machine.",
+    "Start reads the Flatpak store over the host service. Nothing else leaves this machine.",
   );
   pair("Version", state.version);
 

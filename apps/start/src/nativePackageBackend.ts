@@ -1,7 +1,5 @@
-import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { type CatalogueEntry, installFolderFor } from "./catalogue.js";
+import type { CatalogueEntry } from "./catalogue.js";
 import {
   isPreReleaseId,
   isPreReleaseTier,
@@ -35,14 +33,6 @@ import {
   withFlatpakInstalls,
 } from "./flatpak.js";
 import { defaultHost, type Host, SELF_FLATPAK_ID, sandboxId } from "./host.js";
-import {
-  type Download,
-  executableInVersion,
-  type InstalledApp,
-  installApp,
-  installedVersions,
-  repairableInstalls,
-} from "./install.js";
 import type { RegistryStore } from "./installs.js";
 import { launchVerdict } from "./launchCheck.js";
 import { launchIntent, MANAGED_BY_ENV } from "./launchCommand.js";
@@ -51,7 +41,6 @@ import type {
   InstalledPackage,
   PackageBackend,
   PackageCommand,
-  PackageInstallRequest,
   PackageInstallResult,
   PackageLaunchObserver,
   PackageLaunchRequest,
@@ -66,7 +55,6 @@ import {
   type DiscoveredApp,
   discoverApps,
   type FlatpakInstall,
-  type InstallRecord,
   packageSource,
 } from "./registry.js";
 
@@ -74,25 +62,19 @@ import {
  * The backend Start ships with.
  *
  * It is the same work the window used to do inline: `discoverApps` over the install
- * roots, `flatpak list` for what Flatpak owns, the managed AppImage writer for what
- * Start placed, and one detached launch. Nothing here invents a channel or a second
- * way to write a binary; it is the native side of the seam, and `host.ts` is the one
- * module that decides whether a process runs here or on the host.
+ * roots, `flatpak list` for what Flatpak owns, and one detached launch. Nothing here
+ * downloads a binary or writes an update feed: the store owns every deployment, and
+ * a copy a person placed is theirs. `host.ts` is the one module that decides whether
+ * a process runs here or on the host.
  */
 
 export interface NativePackageBackendOptions {
-  /** The applications root Start writes into. */
-  readonly appsRoot: string;
   /** Directories whose children each carry a `suite.app.json`. */
   readonly roots: readonly string[];
   /** Start's own install records. */
   readonly registry: RegistryStore;
   /** The apps the catalogue knows, so Flatpak deployments can be named. */
   readonly catalogue: readonly CatalogueEntry[];
-  /** Overrides the download a test uses; `fetch` is its source otherwise. */
-  readonly download?: Download;
-  /** The fetch an AppImage download uses. Electron's is the one that reads `file:`. */
-  readonly fetch?: typeof globalThis.fetch;
   readonly now?: () => Date;
   /**
    * The `flatpak` binary. `undefined` discovers it; `null` disables Flatpak, which is
@@ -113,10 +95,9 @@ const NO_STORE: ReadonlyMap<string, string> = new Map();
 /**
  * The native backend, plus the one operation only a Flatpak deployment has.
  *
- * Kept off `PackageBackend` because it is not a general package operation: an
- * AppImage cannot replace its own running binary, and a backend without Flatpak
- * has no deployment to name. Main asks this concrete backend, which owns the seam,
- * so the window still never learns a second way to run `flatpak`.
+ * Kept off `PackageBackend` because it is not a general package operation: a backend
+ * without Flatpak has no deployment to name. Main asks this concrete backend, which
+ * owns the seam, so the window still never learns a second way to run `flatpak`.
  */
 export interface NativePackageBackend extends PackageBackend {
   /** Ask Flatpak to replace this hub. Throws when this build is not that deployment. */
@@ -136,8 +117,8 @@ export interface NativePackageBackend extends PackageBackend {
  * The channel an install belongs to.
  *
  * A Flatpak's ref branch is the tier and wins; an install record or the manifest
- * is the fallback for an AppImage. A stable build stays stable whatever its feed
- * channel says.
+ * is the fallback for a copy a person placed. A stable build stays stable whatever
+ * its channel field says.
  */
 function channelOf(app: DiscoveredApp): PackageChannel {
   if (isPreReleaseId(app.manifest.id)) {
@@ -147,7 +128,7 @@ function channelOf(app: DiscoveredApp): PackageChannel {
 }
 
 export function nativePackageBackend(options: NativePackageBackendOptions): NativePackageBackend {
-  const { appsRoot, roots, registry, catalogue } = options;
+  const { roots, registry, catalogue } = options;
   const host = options.host ?? defaultHost();
 
   /** The Flatpak CLI, resolved once through the seam's cached probe. */
@@ -157,10 +138,9 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
   /**
    * What Flatpak has installed, cached for a moment.
    *
-   * `state()` runs on every broadcast, including once per download chunk. The listing
-   * changes only when Flatpak does something, so a short cache keeps the window honest
-   * without spawning a process per redraw. An operation this backend performs clears
-   * it, because then the answer really did change.
+   * `state()` runs on every broadcast. The listing changes only when Flatpak does
+   * something, so a short cache keeps the window honest without spawning a process
+   * per redraw. An operation this backend performs clears it.
    */
   let flatpakCache: { readonly at: number; readonly apps: readonly FlatpakApp[] } | null = null;
 
@@ -205,7 +185,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     return apps;
   }
 
-  /** The store remote, probed once per cache window; null when the machine has none. */
+  /** The store remote a fresh install probes: `suite` first, then `suite-local`. */
   let remoteCache: { readonly at: number; readonly remote: string | null } | null = null;
 
   async function remote(): Promise<string | null> {
@@ -218,11 +198,20 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     return found;
   }
 
-  /** What the store offers, by catalogue app id. Empty when the store is not there. */
+  /**
+   * What the store offers, by catalogue app id.
+   *
+   * An installed app is compared with **its own origin** — a deployment from
+   * `suite-local` must not be measured against `suite`. Only an app that is not
+   * installed asks the store a fresh install would use.
+   */
   let storeCache: { readonly at: number; readonly commits: ReadonlyMap<string, string> } | null =
     null;
 
-  async function storeCommits(force = false): Promise<ReadonlyMap<string, string>> {
+  async function storeCommits(
+    apps: readonly DiscoveredApp[],
+    force = false,
+  ): Promise<ReadonlyMap<string, string>> {
     const executable = await binary();
     if (executable === null) return NO_STORE;
     const now = Date.now();
@@ -230,23 +219,36 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
       return storeCache.commits;
     }
 
-    const remoteName = await remote();
-    if (remoteName === null) {
-      storeCache = { at: now, commits: NO_STORE };
-      return NO_STORE;
-    }
+    const installed = new Map(
+      apps.flatMap((app): [string, FlatpakInstall][] =>
+        app.flatpak === undefined ? [] : [[app.manifest.id, app.flatpak]],
+      ),
+    );
+    const freshRemote = await remote();
     const commits = new Map<string, string>();
     await Promise.all(
       catalogue
         .filter((entry) => !isPreReleaseId(entry.id))
         .map(async (entry) => {
+          const install = installed.get(entry.id);
+          const origin = install?.origin?.trim();
+          const from = origin !== undefined && origin.length > 0 ? origin : freshRemote;
+          if (from === null) return;
           try {
             const commit = parseCommitOutput(
-              await runFlatpak(host, storeInfoArgs(remoteName, flatpakIdFor(entry.id)), executable),
+              await runFlatpak(
+                host,
+                storeInfoArgs(
+                  from,
+                  install?.application ?? flatpakIdFor(entry.id),
+                  install?.installation ?? "user",
+                ),
+                executable,
+              ),
             );
             if (commit !== null) commits.set(entry.id, commit);
           } catch {
-            // Not in this store is the ordinary answer for an app nobody published.
+            // Not in this remote is the ordinary answer for an app nobody published.
           }
         }),
     );
@@ -307,35 +309,21 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     return channels;
   }
 
-  async function versionsFor(): Promise<ReadonlyMap<string, readonly string[]>> {
-    const versions = new Map<string, readonly string[]>();
-    await Promise.all(
-      catalogue.map(async (entry) => {
-        versions.set(entry.id, await installedVersions(appsRoot, entry));
-      }),
-    );
-    return versions;
-  }
-
   async function listing(forceOffers = false): Promise<PackageListing> {
-    const [result, installs, offers, versions] = await Promise.all([
-      (async () =>
-        discoverApps({
-          roots,
-          records: await registry.list(),
-          fileSystem: nodeRegistryFileSystem(),
-        }))(),
-      flatpakInstalls(),
-      storeCommits(forceOffers),
-      versionsFor(),
-    ]);
+    const result = await discoverApps({
+      roots,
+      records: await registry.list(),
+      fileSystem: nodeRegistryFileSystem(),
+    });
+    const installs = await flatpakInstalls();
     const executable = await binary();
     const discovery =
       executable === null ? result : withFlatpakInstalls(result, installs, catalogue, executable);
+    const offers = await storeCommits(discovery.apps, forceOffers);
 
     const packages = discovery.apps.map((app) => ({
       app,
-      ownership: packageSource(app, appsRoot),
+      ownership: packageSource(app),
       channel: channelOf(app),
     }));
 
@@ -359,7 +347,6 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     return {
       packages,
       rejected: discovery.rejected,
-      versions,
       offers: offered,
       channels,
     };
@@ -396,9 +383,23 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
   async function finishFlatpak(install: FlatpakInstall): Promise<string | null> {
     flatpakCache = null;
     channelCache = null;
+    storeCache = null;
     const version = await flatpakVersionOf(install);
-    await storeCommits(true);
+    await storeCommits(await listingApps());
     return version;
+  }
+
+  /** The packages discovery would report, without re-reading the store. */
+  async function listingApps(): Promise<readonly DiscoveredApp[]> {
+    const result = await discoverApps({
+      roots,
+      records: await registry.list(),
+      fileSystem: nodeRegistryFileSystem(),
+    });
+    const installs = await flatpakInstalls();
+    const executable = await binary();
+    if (executable === null) return result.apps;
+    return withFlatpakInstalls(result, installs, catalogue, executable).apps;
   }
 
   /** The first tier the store publishes for a pre-release id, in promotion order. */
@@ -448,65 +449,12 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     tier: PreReleaseTier,
   ): Promise<PackageInstallResult> {
     const application = install.application;
-    const remoteName = await remote();
+    const remoteName = install.origin?.trim() || (await remote());
     if (remoteName === null) throw new Error("this machine has no Suite Flatpak remote");
     await flatpak(storeBranchArgs(remoteName, application, tier, true));
     return {
       id,
       version: await finishFlatpak({ ...install, branch: tier }),
-    };
-  }
-
-  async function installAppImage(
-    request: PackageInstallRequest,
-    prune: boolean,
-  ): Promise<PackageInstallResult> {
-    const { entry, version, artifact, feed } = request;
-    if (version === undefined || artifact === undefined || feed === undefined) {
-      throw new Error("an AppImage install needs a version, an artifact and a feed");
-    }
-    const installed = await installApp({
-      entry,
-      version,
-      artifact,
-      feed,
-      appsRoot,
-      registry,
-      ...(request.channel === undefined ? {} : { channel: request.channel }),
-      ...(options.download === undefined ? {} : { download: options.download }),
-      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-      ...(request.onProgress === undefined ? {} : { onProgress: request.onProgress }),
-      ...(options.now === undefined ? {} : { now: options.now }),
-      prune,
-    });
-    return { id: installed.id, version: installed.version, installed };
-  }
-
-  async function rollback(entry: CatalogueEntry): Promise<InstalledApp | null> {
-    const list = await listing();
-    const current = findPackage(list, entry.id)?.app ?? null;
-    const target = (list.versions.get(entry.id) ?? []).find(
-      (version) => version !== current?.manifest.version,
-    );
-    if (target === undefined) return null;
-
-    const executable = await executableInVersion(appsRoot, entry, target);
-    if (executable === null) {
-      console.warn(`[rollback] no executable in ${entry.name} ${target}`);
-      return null;
-    }
-
-    await registry.add({
-      id: entry.id,
-      executable,
-      manifestPath: join(dirname(executable), APP_MANIFEST_FILENAME),
-      installedAt: (options.now ?? (() => new Date()))().toISOString(),
-    });
-    return {
-      id: entry.id,
-      version: target,
-      executable,
-      manifestPath: join(dirname(executable), APP_MANIFEST_FILENAME),
     };
   }
 
@@ -527,37 +475,39 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
         }
         return updateFlatpak(request.entry.id, found.app.flatpak);
       }
-      // The store is also the install channel for an app it offers, which is what makes
-      // a fresh machine's Install button work without an AppImage feed.
-      if (
-        found === null &&
-        (list.offers.has(request.entry.id) || list.channels.has(request.entry.id))
-      ) {
+      if (found !== null) {
+        throw new Error(
+          "this app is a copy in a folder, not a Flatpak deployment: Start opens and forgets it, but replaces neither",
+        );
+      }
+      // The store is the install channel for an app it offers.
+      if (list.offers.has(request.entry.id) || list.channels.has(request.entry.id)) {
         return installFromStore(request.entry.id, request.channel);
       }
-      return installAppImage(request, false);
+      throw new Error("the store does not offer this app");
     },
 
     async update(request: PackageUpdateRequest) {
       const chosen =
         request.flatpak ?? findPackage(await listing(), request.entry.id)?.app.flatpak ?? null;
-      if (chosen !== null) {
-        const requested = isPreReleaseTier(request.channel) ? request.channel : null;
-        const current = tierFromBranch(chosen.branch);
-        if (requested !== null && current !== null && requested !== current) {
-          return switchFlatpak(request.entry.id, chosen, requested);
-        }
-        return updateFlatpak(request.entry.id, chosen);
+      if (chosen === null) {
+        throw new Error(
+          "this app is a copy in a folder, not a Flatpak deployment: Start does not replace it",
+        );
       }
-      return installAppImage(request, true);
+      const requested = isPreReleaseTier(request.channel) ? request.channel : null;
+      const current = tierFromBranch(chosen.branch);
+      if (requested !== null && current !== null && requested !== current) {
+        return switchFlatpak(request.entry.id, chosen, requested);
+      }
+      return updateFlatpak(request.entry.id, chosen);
     },
 
     async remove(request: PackageRemoveRequest) {
       const owned = request.package?.app.flatpak;
       if (owned !== undefined) {
         // Flatpak owns these files, so Start asks Flatpak to remove them. Nothing under
-        // the applications root is touched: there may be an AppImage there that is
-        // somebody else's.
+        // an applications root is touched: that copy, if any, belongs to the person.
         await flatpak([
           ...flatpakScopeArgs(owned.installation),
           "uninstall",
@@ -566,9 +516,10 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
         ]);
         flatpakCache = null;
         channelCache = null;
+        storeCache = null;
         return;
       }
-      await rm(join(appsRoot, installFolderFor(request.entry)), { recursive: true, force: true });
+      // A copy in a folder is forgotten, never deleted.
       await registry.remove(request.entry.id);
     },
 
@@ -640,9 +591,9 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     /**
      * Ask Flatpak to replace this hub.
      *
-     * Only the Flatpak form has one: an AppImage Start cannot replace its own running
-     * binary, and the CLI never reaches here. The id check is the guard — a build
-     * running under some other application id has no deployment this may name.
+     * Only the Flatpak form has one: a copy in a folder cannot replace its own
+     * running binary, and the CLI never reaches here. The id check is the guard — a
+     * build running under some other application id has no deployment this may name.
      */
     async updateSelf() {
       if (sandboxId() !== SELF_FLATPAK_ID) {
@@ -688,11 +639,5 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     async forget(id) {
       await registry.remove(id);
     },
-
-    async repairable(): Promise<readonly InstallRecord[]> {
-      return repairableInstalls(await registry.list(), appsRoot, (path) => existsSync(path));
-    },
-
-    rollback,
   };
 }

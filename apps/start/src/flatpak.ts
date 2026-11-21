@@ -12,11 +12,10 @@ import type {
 /**
  * Flatpak as a second writer, and what Start may say about it.
  *
- * ADR-0001 says one process writes a binary path. Start writes AppImages it
- * installed; Flatpak writes Flatpaks. Start's part is the same either way: it
- * discovers what is installed, launches it, and says where the update comes
- * from. It never writes into a Flatpak install tree, so it never becomes the
- * second writer.
+ * ADR-0001 says one process writes a binary path. Flatpak owns every Linux
+ * desktop deployment; Start discovers what is installed, launches it, and asks
+ * Flatpak to change the deployment. It never writes into a Flatpak install tree,
+ * so it never becomes the second writer.
  *
  * The top half is the rules: the shape of `flatpak list --json`, which of those
  * apps are suite apps, and the launch line, so each is a test rather than a
@@ -130,13 +129,12 @@ export function suiteFlatpakFor(
  *
  * A Flatpak carries the app's own `suite.app.json` inside its sandbox, where
  * nothing outside can read it without unpacking the deployment. The catalogue
- * already mirrors that manifest for the AppImage path — it is what the install
- * button writes beside a downloaded binary — so the same table supplies the
- * identity here and Flatpak's own deployment metadata supplies the version.
+ * mirrors that manifest, so the same table supplies the identity here and
+ * Flatpak's own deployment metadata supplies the version.
  *
  * `update` is deliberately absent: an app inside a Flatpak cannot replace its
- * own installation, so advertising the AppImage feed would describe an update
- * path that does not exist. Flatpak's remote is the update channel.
+ * own installation, so a feed would describe an update path that does not exist.
+ * Flatpak's remote is the update channel.
  */
 export function flatpakManifest(entry: CatalogueEntry, version: string): SuiteAppManifest {
   return {
@@ -159,8 +157,8 @@ export function flatpakManifest(entry: CatalogueEntry, version: string): SuiteAp
  * which is exactly right for what Start placed and wrong for what Flatpak
  * placed: Flatpak has its own database, its own signatures and its own writer.
  * So a Flatpak becomes a `DiscoveredApp` here, and a copy Start or a person
- * already made wins — two copies of one app share a profile, and the AppImage
- * is the one with a path Start is allowed to replace.
+ * already made wins — two copies of one app share a profile, and the folder
+ * copy is the one its owner replaces.
  *
  * `executable` is the `flatpak` CLI itself; `flatpak.application` is what makes
  * `spawnCommand` put `run <id>` in front of the app's own arguments.
@@ -192,7 +190,7 @@ export function withFlatpakInstalls(
       rejected.push({
         path: existing.manifestPath.length > 0 ? existing.manifestPath : existing.executable,
         reason:
-          "a Flatpak deployment of this app is preferred; remove this AppImage copy or the Flatpak to choose the other",
+          "a Flatpak deployment of this app is preferred; remove this folder copy or the Flatpak to choose the other",
         id: entry.id,
       });
       apps.splice(existingIndex, 1);
@@ -209,6 +207,7 @@ export function withFlatpakInstalls(
         application: install.applicationId,
         installation: install.installation,
         ...(install.branch.length === 0 ? {} : { branch: install.branch }),
+        ...(install.origin.length === 0 ? {} : { origin: install.origin }),
         ...(install.commit === undefined ? {} : { commit: install.commit }),
       },
     });
@@ -246,7 +245,7 @@ export function flatpakScopeArgs(installation: string): readonly string[] {
  * `SUITE_START_FLATPAK` names a different binary — a test's stand-in — and an
  * explicit empty value disables Flatpak entirely, which is what a hermetic test
  * needs on a machine that has one installed. Null otherwise; a machine without
- * Flatpak is supported, because the AppImage path does not depend on it.
+ * Flatpak still opens a copy a person placed in a folder.
  */
 export async function findFlatpak(host: Host): Promise<string | null> {
   const named = process.env.SUITE_START_FLATPAK;
@@ -358,9 +357,18 @@ export function parseVersionOutput(text: string): string | null {
   return null;
 }
 
-/** What the store says it offers for one catalogue app. */
-export function storeInfoArgs(remote: string, application: string): readonly string[] {
-  return ["remote-info", "--user", "--show-commit", remote, application];
+/**
+ * What one remote says it offers for one catalogue app.
+ *
+ * The scope follows the deployment being compared, so a system install is read
+ * from the system remote set rather than the user's.
+ */
+export function storeInfoArgs(
+  remote: string,
+  application: string,
+  installation = "user",
+): readonly string[] {
+  return [...flatpakScopeArgs(installation), "remote-info", "--show-commit", remote, application];
 }
 
 /** One app ref the store publishes. */

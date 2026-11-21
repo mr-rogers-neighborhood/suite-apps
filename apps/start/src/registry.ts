@@ -74,6 +74,13 @@ export interface FlatpakInstall {
   readonly installation: string;
   /** The ref branch. A pre-release names its tier here: `slop`, `canary` or `beta`. */
   readonly branch?: string;
+  /**
+   * The remote this deployment came from, as `flatpak list` reports it.
+   *
+   * It is the origin an update must consult: a `suite-local` install that is
+   * compared with the public `suite` store would show a bogus update.
+   */
+  readonly origin?: string;
   /** The deployed commit, when Start resolved it. */
   readonly commit?: string;
 }
@@ -258,13 +265,11 @@ export function appById(apps: readonly DiscoveredApp[], id: string): DiscoveredA
 /**
  * Who owns this install, which is also who may replace it.
  *
- * The path is the proof for a copy Start placed: only installs land under the
- * applications root. A Flatpak deployment is owned by Flatpak's own database even
- * though the executable discovery records is the `flatpak` CLI. Kept here so the
- * cards and the package backend cannot disagree about ownership.
+ * Flatpak owns a deployment; every other copy was placed by the person, and
+ * Start opens, reveals and forgets it but never downloads or replaces it. The
+ * `appsRoot` argument stays for callers that already have the host table, but no
+ * path under it is Start-managed any more.
  */
-export function packageSource(app: DiscoveredApp, appsRoot: string): AppSource {
-  if (app.flatpak !== undefined) return "flatpak";
-  const root = appsRoot.endsWith("/") ? appsRoot : `${appsRoot}/`;
-  return app.executable.startsWith(root) ? "managed" : "folder";
+export function packageSource(app: DiscoveredApp): AppSource {
+  return app.flatpak !== undefined ? "flatpak" : "folder";
 }

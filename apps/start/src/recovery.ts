@@ -12,8 +12,7 @@ import {
  *
  * A recovery file is the only thing that survives losing every device, and it is made by one
  * app on one machine — so the hub is the only surface that can see all of them. Each app
- * writes `sync-kits.json` into its own data directory and this reads them, the way
- * `reportedUpdate.ts` reads the update reports. A file that is absent, unreadable or about
+ * writes `sync-kits.json` into its own data directory and this reads them. A file that is absent, unreadable or about
  * another format is *not reported*, which is different from *declined*: one is a person who
  * has never been asked, the other is a person who said no.
  */

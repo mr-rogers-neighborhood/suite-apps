@@ -31,7 +31,7 @@ export interface HostPaths {
   readonly suiteData: string;
   /** `~/.config/suite`: Start's records, shared with the command-line launcher. */
   readonly suiteConfig: string;
-  /** `~/Applications/Suite`: every AppImage Start places. */
+  /** `~/Applications/Suite`: where older copies may live and Start still looks. */
   readonly appsRoot: string;
 }
 
@@ -94,7 +94,7 @@ export function registryPathFor(paths: HostPaths, env: NodeJS.ProcessEnv = proce
     : join(startStateRoot(paths), REGISTRY_FILENAME);
 }
 
-/** The lock that keeps an AppImage Start and a Flatpak Start from both opening. */
+/** The lock that keeps two Start forms from both opening. */
 export function hubLockPath(paths: HostPaths): string {
   return join(startStateRoot(paths), "hub.lock");
 }
@@ -216,7 +216,7 @@ export type HubLockOutcome =
  * Whether this process may take the lock.
  *
  * Electron's own single-instance lock lives in `userData`, which differs between
- * the AppImage and a Flatpak install, so the two forms could otherwise both open.
+ * a dev run and a Flatpak install, so the two forms could otherwise both open.
  * A stale pid — the usual case after a crash — is taken over rather than left to
  * block every later launch.
  */

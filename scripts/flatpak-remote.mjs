@@ -50,7 +50,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { branchFor, channelProblem } from "./lib/channel.mjs";
-import { dirtyTreeProblem, feedOnlyRange, gateProblems } from "./release.mjs";
+import { dirtyTreeProblem, gateProblems } from "./release.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -327,7 +327,7 @@ function checkGitProof() {
     status = null;
   }
 
-  const problems = gateProblems(status, head, { range: feedOnlyRange });
+  const problems = gateProblems(status, head);
   if (problems.length > 0) {
     throw new Error(
       `${problems.join("\n\n")}\n\n` +

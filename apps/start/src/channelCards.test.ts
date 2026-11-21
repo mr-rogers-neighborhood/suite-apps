@@ -57,17 +57,12 @@ function discovered(
 }
 
 function catalogue(installed: ReadonlyMap<string, string>): readonly CatalogueApp[] {
-  return ALL_CATALOGUE_APPS.map((entry) => {
-    const preRelease = entry.preRelease === true;
-    return {
+  return ALL_CATALOGUE_APPS.map(
+    (entry): CatalogueApp => ({
       ...entry,
-      available: preRelease ? null : "0.1.0",
-      reason: preRelease ? "a pre-release updates through its Flatpak branch" : null,
       installed: installed.get(entry.id) ?? null,
-      newer: false,
-      artifact: null,
-    } satisfies CatalogueApp;
-  });
+    }),
+  );
 }
 
 function cards(
@@ -79,11 +74,8 @@ function cards(
     rejected: [],
     files: [],
     recents: [],
-    updates: new Map(),
     catalogue: catalogue(new Map(apps.map((entry) => [entry.manifest.id, entry.manifest.version]))),
-    versions: new Map(),
     running: new Set(),
-    appsRoot: APPS_ROOT,
     storeChannels: channels,
   });
 }
@@ -108,14 +100,13 @@ describe("channel-aware cards", () => {
 
     const stable = cardsFor.find((card) => card.id === "canvas");
     const preRelease = cardsFor.find((card) => card.id === "slop-canvas");
-    expect(stable).toMatchObject({ tier: "stable", channelNotice: null, source: "managed" });
+    expect(stable).toMatchObject({ tier: "stable", channelNotice: null, source: "folder" });
     expect(preRelease).toMatchObject({
       id: "slop-canvas",
       name: "Suite Canvas (pre-release)",
       tier: "canary",
       source: "flatpak",
       state: "current",
-      installChannel: "flatpak",
       switchTier: null,
     });
     expect(preRelease?.channelNotice).toContain("Canary");

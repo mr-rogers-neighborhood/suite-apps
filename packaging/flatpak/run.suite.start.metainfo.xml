@@ -17,14 +17,15 @@
   <description>
     <p>
       Start is the Suite hub: it discovers the apps you have installed, opens
-      their documents, routes suite:// links and updates a copy it placed. The
-      apps and their documents are ordinary files on your machine; there is no
-      account and no suite-operated server.
+      their documents, routes suite:// links and asks Flatpak to install or
+      update a deployment. The apps and their documents are ordinary files on
+      your machine; there is no account and no suite-operated server.
     </p>
     <p>
       Start never holds a document. It hands the path or bytes to the app that
-      owns it, and on Flatpak it asks Flatpak to install, update or remove a
-      deployment rather than writing the installation itself.
+      owns it, and it asks Flatpak to install, update or remove a deployment
+      rather than writing the installation itself. A copy you place in a folder
+      opens, reveals and forgets; Start does not replace it.
     </p>
   </description>
   <launchable type="desktop-id">run.suite.start.desktop</launchable>
@@ -36,6 +37,7 @@
   </categories>
   <icon type="stock">run.suite.start</icon>
   <releases>
+    <release version="0.5.0" date="2026-11-21"/>
     <release version="0.4.2" date="2026-11-21"/>
   </releases>
   <content_rating type="oars-1.1"/>

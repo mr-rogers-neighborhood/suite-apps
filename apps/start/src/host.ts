@@ -5,13 +5,13 @@ import { delimiter, join } from "node:path";
 /**
  * Where a process runs, and how a packaged Start reaches it.
  *
- * The AppImage and the Arch package are the host: `execFile` and `spawn` do what
- * they say. A Start packaged as a Flatpak is not the host. Its sandbox has no
- * writable applications root and no `flatpak` binary, and the manifest grants one
- * door out: `--talk-name=org.freedesktop.Flatpak`, which `flatpak-spawn --host`
- * uses. So every process Start starts goes through this seam rather than through
- * `child_process` directly, and the difference between the two forms is one argv
- * prefix rather than a second implementation of the backend.
+ * A dev run is the host: `execFile` and `spawn` do what they say. A Start packaged
+ * as a Flatpak is not the host. Its sandbox has no `flatpak` binary, and the
+ * manifest grants one door out: `--talk-name=org.freedesktop.Flatpak`, which
+ * `flatpak-spawn --host` uses. So every process Start starts goes through this
+ * seam rather than through `child_process` directly, and the difference between
+ * the two forms is one argv prefix rather than a second implementation of the
+ * backend.
  *
  * Nothing here builds a shell string. A command is a file and an argument list,
  * and a sandboxed one adds `--host` and one `--env=KEY=VALUE` per variable. A

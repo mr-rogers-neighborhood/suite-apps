@@ -2,20 +2,17 @@ import { existsSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 
-import { suitePaths } from "@suite/contracts";
 import type { ReminderEvent } from "@suite/planner-core";
 import { app, BrowserWindow, dialog, Notification, type Tray } from "electron";
 
 import { currentChannel } from "./channel";
 import { registerIpc } from "./ipc";
 import { installMenu } from "./menu";
-import { findNewerInstall } from "./newerInstall";
 import { workspaceFolder, workspacePaths } from "./paths";
 import { registerAppScheme, serveRenderer } from "./protocol";
 import { ReminderScheduler } from "./scheduler";
 import { createPlannerSyncController, type PlannerSyncController } from "./sync/ipc";
 import { createTray } from "./tray";
-import { checkForUpdates } from "./updateCheck";
 import { applyContentSecurityPolicy, createMainWindow, pageCsp } from "./window";
 import {
   adoptChannelWorkspace,
@@ -44,33 +41,6 @@ let cleanedUp = false;
 /** Files handed over before a window existed. */
 const pendingFiles: string[] = [];
 
-/**
- * A newer Planner installed by Suite Start, if there is one.
- *
- * Start installs into `<applications>/Planner/<version>/` and launches the new binary. Before
- * this check, that binary lost the single-instance lock to whatever was already running and
- * exited, so the old version raised its own window and the update looked like a no-op. Planner
- * is the only app that keeps a tray, so it is the only app where closing the window leaves a
- * process behind to lose that race.
- */
-function newerInstall(): { version: string; execPath: string } | null {
-  try {
-    return findNewerInstall({
-      running: app.getVersion(),
-      applicationsRoot: suitePaths("Planner", {
-        platform: process.platform,
-        home: app.getPath("home"),
-        xdgDataHome: process.env.XDG_DATA_HOME,
-      }).applications,
-      appDir: "Planner",
-      binaryPrefix: "suite-planner",
-    });
-  } catch {
-    // Telling a person about an update must never be a reason the app fails to start.
-    return null;
-  }
-}
-
 /** The workspace the command line names, whether a path or a link the hub routed here. */
 function workspaceFromCommandLine(argv: readonly string[]): string | null {
   return workspaceFromArgv(argv, workspaceFolder(), existsSync);
@@ -92,16 +62,6 @@ if (!gotLock) {
 } else {
   app.on("second-instance", (_event, argv) => {
     const file = workspaceFromCommandLine(argv);
-
-    // Someone double-clicked Planner while a newer one was installed. Starting this one would
-    // only prove it is out of date, so start the new one instead.
-    const newer = newerInstall();
-    if (newer !== null) {
-      if (file) app.relaunch({ execPath: newer.execPath, args: [file] });
-      else app.relaunch({ execPath: newer.execPath });
-      app.exit(0);
-      return;
-    }
 
     if (file) {
       void openWorkspaceFile(file);
@@ -141,15 +101,7 @@ if (!gotLock) {
   app.on("window-all-closed", () => {
     // The tray keeps the reminder scheduler alive; quitting happens from the tray or the menu.
     // Without a tray there is no way back, so closing the last window quits.
-    if (!tray) {
-      app.quit();
-      return;
-    }
-
-    // A tray that outlives an update is a trap: the person believes they closed Planner, the
-    // old process keeps running, and the version they installed is the one that never starts.
-    // Closing is treated as "done with this copy" whenever a newer one is waiting.
-    if (newerInstall() !== null) app.quit();
+    if (!tray) app.quit();
   });
 }
 
@@ -194,23 +146,8 @@ async function bootstrap(initialFile: string | null): Promise<void> {
   installMenu();
   openWindow();
 
-  // One check per launch, in the background: it writes the report the hub reads.
-  // A dev run has no feed, so it does not ask, and a Flatpak launch leaves its
-  // bytes to OSTree rather than checking at all.
-  void checkForUpdates({
-    // Start reads the report beside the app's other data, as `@suite/contracts` defines it.
-    // `app.getPath("userData")` is a different directory on Linux, so the report went unseen.
-    dataDir: suitePaths("Planner", {
-      platform: process.platform,
-      home: app.getPath("home"),
-      xdgDataHome: process.env.XDG_DATA_HOME,
-    }).data,
-    version: app.getVersion(),
-    channel: "alpha",
-    packaged: app.isPackaged,
-  }).then(({ error }) => {
-    if (error !== null && app.isPackaged) console.warn(`[update] ${error}`);
-  });
+  // Flatpak owns this deployment's bytes: `flatpak update` is the one update
+  // path, so the app asks no feed of its own.
 
   try {
     tray = createTray(showWindow, () => app.quit());

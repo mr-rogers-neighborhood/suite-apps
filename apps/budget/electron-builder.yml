@@ -1,7 +1,6 @@
 appId: run.suite.budget
 productName: Suite Budget
 executableName: suite-budget
-artifactName: suite-budget-${version}-${arch}.${ext}
 copyright: Copyright © Suite contributors
 
 directories:
@@ -47,10 +46,10 @@ fileAssociations:
 
 linux:
   syncDesktopName: true
-  # Only the AppImage is built and uploaded. The Flatpak is a second channel over
-  # the same unpacked build, not a second target here.
+  # Linux ships as a Flatpak. `scripts/flatpak.mjs` packages this unpacked build,
+  # so `dir` is the only target configured here.
   target:
-    - AppImage
+    - dir
   category: Office
 
 mac:
@@ -61,11 +60,3 @@ mac:
 win:
   target:
     - nsis
-
-# The feed the app's updater reads, and the one the hub reads when a person asks.
-# The release script writes the signed manifest under `feeds/budget/`, which Pages
-# serves from this repository. The manifest names the AppImage on this app's release
-# tag, so the manifest can move while the artifact stays a release asset.
-publish:
-  provider: generic
-  url: https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/budget

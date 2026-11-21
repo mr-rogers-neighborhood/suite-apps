@@ -6,9 +6,5 @@
   "contractVersion": "1.0.0",
   "deepLinkPrefix": "suite://budget/",
   "fileExtensions": ["budget"],
-  "update": {
-    "feed": "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/budget",
-    "channel": "alpha"
-  },
   "capabilities": ["document.file"]
 }

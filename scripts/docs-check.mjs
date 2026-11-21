@@ -38,18 +38,12 @@ const BANNED = [
     pattern: /(github\.com\/[^ )]*suite-dev|suite-dev\/scripts|cloned side by side)/,
     why: "the sibling-repository workflow is history; point at the root instead",
   },
-  { pattern: /served by Pages/i, why: "the feed is served from the raw GitHub host" },
   {
     pattern: /no published remote/i,
     why: "the signed suite-dev remote is published; Packaging channels owns it",
   },
-  {
-    pattern: /\bno feed manifest\b/i,
-    why: "a pre-release AppImage attaches its signed manifest to its tag",
-  },
   { pattern: /\bSeventeen methods\b/, why: "Budget's bridge has nineteen methods" },
   { pattern: /\bis a promise in all three\b/, why: "Canvas's platform is a property" },
-  { pattern: /\bmakes no network request\b/i, why: "Start reads each signed feed" },
   { pattern: /\bNeither app has peers or a sync pill\b/i, why: "Planner renders a SyncPill" },
   {
     pattern: /\bPlanner and Budget (?:have no sync transport|do not sync)\b/i,
@@ -71,17 +65,13 @@ const BANNED = [
     pattern: /\.local\/share\/suite\/start/,
     why: "Start's records live in Electron userData until the registry move lands",
   },
-  {
-    pattern: /(?<!apps\/start\/)packaging\/arch\/PKGBUILD/,
-    why: "the PKGBUILD is apps/start/packaging/arch/PKGBUILD",
-  },
 ];
 /** Repositories the monorepo replaced. A line that calls one archived is allowed. */
 const REPLACED_REPO =
   /https?:\/\/github\.com\/mr-rogers-neighborhood\/suite-(?:start|canvas|planner|budget|go)(?=[/\s)>"']|$)/gi;
 /** Inline code is checked only when it looks like a path from a known repository root. */
 const REPO_PATH = /^(?:[\w.@+-]+\/)+[\w.@+.-]+\.[A-Za-z0-9]{1,8}$/;
-const REPO_PATH_ROOTS = /^(apps|docs|packages|scripts|packaging|feeds|legacy)\//;
+const REPO_PATH_ROOTS = /^(apps|docs|packages|scripts|packaging|legacy)\//;
 
 const problems = [];
 

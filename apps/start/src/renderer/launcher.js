@@ -39,17 +39,6 @@ const actions = {
     await refresh();
   },
   /**
-   * Back to the version the last update replaced.
-   *
-   * No confirmation dialog: nothing is deleted, and the version it leaves stays on disk, so
-   * the undo is the same button again. A prompt in front of a reversible action teaches
-   * people to dismiss prompts.
-   */
-  async rollback(id) {
-    await bridge.rollbackApp(id);
-    await refresh();
-  },
-  /**
    * Which palette to draw.
    *
    * The next state arrives carrying the answer, so the select keeps whatever was chosen
