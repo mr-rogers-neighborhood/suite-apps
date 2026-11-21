@@ -23,8 +23,10 @@ node scripts/flatpak.mjs --app planner
 ```
 
 That builds the unpacked tree, exports it to `~/suite-flatpak/repo`, signs the repository summary with
-the store key, adds the remote and installs. `--no-build` reuses `release/linux-unpacked`;
-`--no-install` publishes without touching the client.
+the store key, adds the remote and installs. The export also writes static deltas
+(`--generate-static-deltas`), so an update from the previous build fetches the objects that changed
+rather than the whole ref. `--no-build` reuses `release/linux-unpacked`; `--no-install` publishes
+without touching the client.
 
 Publish the same repository. The public store is the path people install from:
 
@@ -39,11 +41,13 @@ The dry run prints every `aws s3 sync`, `aws s3 cp` and `aws cloudfront create-i
 and runs none of them. Publication signs the summary, verifies it, writes the `.flatpakrepo`, then
 uploads the same bytes; it never builds a second repository.
 
-The cache rule follows from the names. `objects/**` and `refs/**` are content-addressed, so they sync
-with `Cache-Control: public,max-age=31536000,immutable` and no `--delete`; an old object is harmless.
-`summary`, `summary.sig` and `suite.flatpakrepo` change on every publication, so they are copied with
-`Cache-Control: no-cache`, and CloudFront invalidates only `/summary`, `/summary.sig` and
-`/suite.flatpakrepo` afterwards.
+The cache rule follows from the names. The content-addressed trees (`objects/**`, `refs/**`,
+`summaries/**`, `deltas/**`, `delta-indexes/**`) sync with
+`Cache-Control: public,max-age=31536000,immutable` and no `--delete`, because an old object or delta
+is harmless. The summary and the `.flatpakrepo` change on every publication, so they are copied with
+`Cache-Control: no-cache` and CloudFront invalidates only those paths afterwards.
+[`packaging-channels.md`](../reference/packaging-channels.md) names the files and the exact
+invalidation paths.
 
 `suite-dev` remains the local test remote, at `http://10.28.20.200:8088/`:
 

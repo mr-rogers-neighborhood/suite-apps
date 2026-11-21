@@ -60,6 +60,7 @@ import {
   DEFAULT_PUBLIC_URL,
   DEFAULT_TARGET,
   REMOTE_NAME,
+  STATIC_DELTA_ARGUMENTS,
   commandText,
   flatpakrepoUrl,
   invalidationCommand,
@@ -207,6 +208,33 @@ function treeStats(directory) {
 
 function mib(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+}
+
+/**
+ * The static deltas and their indexes a publication would upload.
+ *
+ * `deltas/` is what makes an update fetch only the objects that changed, and
+ * `delta-indexes/` is what the client reads first to find the delta. A
+ * repository built before the flags existed has neither, and a first build has
+ * no parent commit to diff against, so this reports zero rather than failing:
+ * the summary still installs and updates, they just download in full.
+ */
+function staticDeltas() {
+  const dirs = ["deltas", "delta-indexes"].map((name) => join(repo, name));
+  if (!dirs.some((dir) => existsSync(dir))) return { files: 0, bytes: 0, deltas: 0 };
+  let files = 0;
+  let bytes = 0;
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    const stats = treeStats(dir);
+    files += stats.files;
+    bytes += stats.bytes;
+  }
+  const listed = spawnSync("ostree", [`--repo=${repo}`, "static-delta", "list"], {
+    encoding: "utf8",
+  });
+  const deltas = (listed.stdout ?? "").split(/\r?\n/u).filter((line) => line.trim().length > 0).length;
+  return { files, bytes, deltas };
 }
 
 const stateDir = process.env.SUITE_FLATPAK_STATE?.trim() || join(homedir(), "suite-flatpak");
@@ -483,6 +511,7 @@ async function main() {
   const onBranch = branchRefs(appRefs, branch);
   const { head, proven } = checkGitProof();
   const { files, bytes } = treeStats(repo);
+  const deltas = staticDeltas();
 
   const targetLine =
     target === "s3" ? `s3 s3://${bucketForCommands}/` : `${host}:${remoteDir}`;
@@ -497,6 +526,11 @@ async function main() {
   process.stdout.write(`  target      ${targetLine}\n`);
   process.stdout.write(`  url         ${url}\n`);
   process.stdout.write(`  upload      ${files} files, ${mib(bytes)}\n`);
+  process.stdout.write(
+    deltas.deltas > 0
+      ? `  deltas      ${deltas.deltas} deltas, ${deltas.files} files, ${mib(deltas.bytes)}\n`
+      : "  deltas      none yet; an update will download the whole ref\n",
+  );
   process.stdout.write("  refs\n");
   for (const ref of refs) {
     if (ref.startsWith("app/") && !onBranch.includes(ref)) continue;
@@ -548,8 +582,14 @@ async function main() {
   }
 
   process.stdout.write("\n=== sign summary ===\n");
-  run("flatpak", ["build-update-repo", `--gpg-sign=${keyId}`, repo]);
+  // A repository built by an older `scripts/flatpak.mjs` has no deltas yet;
+  // regenerating here costs CPU once and gives the publication its `deltas/`.
+  run("flatpak", ["build-update-repo", ...STATIC_DELTA_ARGUMENTS, `--gpg-sign=${keyId}`, repo]);
   verifySignedSummary();
+  // The upload syncs `deltas/` and `delta-indexes/`; empty trees upload nothing
+  // and keep a first publication (no parent commit to diff) working.
+  mkdirSync(join(repo, "deltas"), { recursive: true });
+  mkdirSync(join(repo, "delta-indexes"), { recursive: true });
 
   const flatpakrepo = flatpakrepoText({ publicKey, branch: defaultBranch, url });
   writeFileSync(flatpakrepoPath, flatpakrepo);

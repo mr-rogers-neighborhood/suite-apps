@@ -6,6 +6,7 @@ import {
   INVALIDATION_PATHS,
   NO_CACHE_CONTROL,
   REMOTE_NAME,
+  STATIC_DELTA_ARGUMENTS,
   cacheControlFor,
   cacheControlProblem,
   commandText,
@@ -62,8 +63,15 @@ describe("publication targets", () => {
 });
 
 describe("the S3 cache classes", () => {
-  it("caches content-addressed objects and refs for a year", () => {
-    for (const path of ["objects/ab/cdef", "/objects/ab/cdef", "refs/heads/master", "refs/"]) {
+  it("caches content-addressed objects, refs, summaries and deltas for a year", () => {
+    for (const path of [
+      "objects/ab/cdef",
+      "/objects/ab/cdef",
+      "refs/heads/master",
+      "refs/",
+      "deltas/ab/abcdef-123456.superblock",
+      "delta-indexes/ab/abcdef.index",
+    ]) {
       assert.equal(cacheControlFor(path), IMMUTABLE_CACHE_CONTROL, path);
     }
     assert.equal(IMMUTABLE_CACHE_CONTROL, "public,max-age=31536000,immutable");
@@ -79,6 +87,15 @@ describe("the S3 cache classes", () => {
   it("refuses a path whose cache class nobody chose", () => {
     assert.equal(cacheControlFor("config"), null);
     assert.match(cacheControlProblem("config"), /has no S3 cache class/u);
+  });
+});
+
+describe("static deltas", () => {
+  it("generates deltas and skips the debug runtime nobody downloads", () => {
+    assert.deepEqual(STATIC_DELTA_ARGUMENTS, [
+      "--generate-static-deltas",
+      "--static-delta-ignore-ref=run.suite.*.Debug",
+    ]);
   });
 });
 
@@ -102,8 +119,8 @@ describe("S3 preconditions", () => {
 describe("the S3 upload commands", () => {
   const steps = s3UploadCommands({ repo, flatpakrepoPath, bucket });
 
-  it("syncs the three immutable trees without deleting anything", () => {
-    assert.equal(steps.length, 8);
+  it("syncs the five immutable trees without deleting anything", () => {
+    assert.equal(steps.length, 10);
     assert.deepEqual(steps[0].args.slice(0, 4), [
       "s3",
       "sync",
@@ -122,17 +139,31 @@ describe("the S3 upload commands", () => {
       `${repo}/summaries`,
       `s3://${bucket}/summaries`,
     ]);
+    assert.deepEqual(steps[3].args.slice(0, 4), [
+      "s3",
+      "sync",
+      `${repo}/deltas`,
+      `s3://${bucket}/deltas`,
+    ]);
+    assert.deepEqual(steps[4].args.slice(0, 4), [
+      "s3",
+      "sync",
+      `${repo}/delta-indexes`,
+      `s3://${bucket}/delta-indexes`,
+    ]);
     for (const step of steps) assert.ok(!step.args.includes("--delete"));
   });
 
-  it("gives objects, refs and the summary cache the immutable header", () => {
+  it("gives objects, refs, the summary cache, deltas and indexes the immutable header", () => {
     assert.equal(cacheControlOf(steps[0]), IMMUTABLE_CACHE_CONTROL);
     assert.equal(cacheControlOf(steps[1]), IMMUTABLE_CACHE_CONTROL);
     assert.equal(cacheControlOf(steps[2]), IMMUTABLE_CACHE_CONTROL);
+    assert.equal(cacheControlOf(steps[3]), IMMUTABLE_CACHE_CONTROL);
+    assert.equal(cacheControlOf(steps[4]), IMMUTABLE_CACHE_CONTROL);
   });
 
   it("copies the mutable files, including the summary index, with no-cache", () => {
-    const copies = steps.slice(3).map((step) => step.args.slice(0, 4));
+    const copies = steps.slice(5).map((step) => step.args.slice(0, 4));
     assert.deepEqual(copies, [
       ["s3", "cp", `${repo}/summary`, `s3://${bucket}/summary`],
       ["s3", "cp", `${repo}/summary.sig`, `s3://${bucket}/summary.sig`],
@@ -140,7 +171,13 @@ describe("the S3 upload commands", () => {
       ["s3", "cp", `${repo}/summary.idx.sig`, `s3://${bucket}/summary.idx.sig`],
       ["s3", "cp", flatpakrepoPath, `s3://${bucket}/suite.flatpakrepo`],
     ]);
-    for (const step of steps.slice(3)) assert.equal(cacheControlOf(step), NO_CACHE_CONTROL);
+    for (const step of steps.slice(5)) assert.equal(cacheControlOf(step), NO_CACHE_CONTROL);
+  });
+
+  it("uploads deltas before the summary that advertises them", () => {
+    const deltas = steps.findIndex((step) => step.args.includes(`${repo}/deltas`));
+    const summary = steps.findIndex((step) => step.args.includes(`${repo}/summary`));
+    assert.ok(deltas >= 0 && summary > deltas);
   });
 });
 

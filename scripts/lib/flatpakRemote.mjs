@@ -30,8 +30,39 @@ export const IMMUTABLE_CACHE_CONTROL = "public,max-age=31536000,immutable";
 /** The summary changes on every publication; a client must not keep it. */
 export const NO_CACHE_CONTROL = "no-cache";
 
-/** Directories whose files are immutable. */
-export const IMMUTABLE_PREFIXES = ["objects/", "refs/", "summaries/"];
+/**
+ * Directories whose files are immutable.
+ *
+ * `deltas/` and `delta-indexes/` belong here: a static delta is named by the two
+ * commits it joins (`<from>-<to>.superblock` and its parts) and an index by the
+ * commit it describes, so a given name never describes different bytes. A new
+ * publication adds new names and never rewrites an old one, which is also why
+ * neither needs an invalidation.
+ */
+export const IMMUTABLE_PREFIXES = [
+  "objects/",
+  "refs/",
+  "summaries/",
+  "deltas/",
+  "delta-indexes/",
+];
+
+/**
+ * The `flatpak build-update-repo` arguments that make a delta-based update.
+ *
+ * `--generate-static-deltas` writes `deltas/` beside `objects/`: an update then
+ * downloads the objects that changed between two commits instead of the whole
+ * ref. It costs CPU and repository bytes once, at build and publish time.
+ *
+ * The Debug runtime is an `autodelete`, `no-autodownload` extension, so a client
+ * never fetches its delta; generating one only makes the repository bigger.
+ * Flatpak matches the ignore pattern against the ref's id (`<kind>/<id>/<arch>/
+ * <branch>`), not the whole ref, so this names the id, not `runtime/…`.
+ */
+export const STATIC_DELTA_ARGUMENTS = [
+  "--generate-static-deltas",
+  "--static-delta-ignore-ref=run.suite.*.Debug",
+];
 
 /**
  * The files that change on every publication and are re-fetched each time.
@@ -152,8 +183,10 @@ function s3Url(bucket, key) {
  *
  * Three rules shape it:
  *
- * - The content-addressed trees are synced without `--delete`: an old object is
- *   harmless, and deleting one would break a client mid-update.
+ * - The content-addressed trees are synced without `--delete`: an old object or
+ *   delta is harmless, and deleting one would break a client mid-update. A
+ *   delta is named for the commit pair it joins, so an update reads a name this
+ *   publication adds and never modifies.
  * - Only the summary names (`summary`, `summary.sig`, `summary.idx`,
  *   `summary.idx.sig`) and the `.flatpakrepo` change from one publication to the
  *   next, so only they are no-cache. `summaries/` holds content-addressed cache
@@ -195,6 +228,27 @@ export function s3UploadCommands({ repo, flatpakrepoPath, bucket }) {
       s3Url(bucket, "summaries"),
       "--cache-control",
       cache("summaries/"),
+      "--no-progress",
+    ]),
+    // After the objects they name and before the summary that advertises them.
+    aws([
+      "s3",
+      "sync",
+      `${repo}/deltas`,
+      s3Url(bucket, "deltas"),
+      "--cache-control",
+      cache("deltas/"),
+      "--no-progress",
+    ]),
+    // A client asks for the delta index before the superblock, so it travels
+    // with the delta it describes.
+    aws([
+      "s3",
+      "sync",
+      `${repo}/delta-indexes`,
+      s3Url(bucket, "delta-indexes"),
+      "--cache-control",
+      cache("delta-indexes/"),
       "--no-progress",
     ]),
     aws([

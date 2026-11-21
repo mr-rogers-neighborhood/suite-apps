@@ -43,6 +43,7 @@ import {
   preReleaseMetainfo,
   channelRecord,
 } from "./lib/channel.mjs";
+import { STATIC_DELTA_ARGUMENTS } from "./lib/flatpakRemote.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -418,6 +419,9 @@ if (keyId.length === 0) {
 run("flatpak", [
   "build-update-repo",
   "--prune",
+  // Write `deltas/` for this commit: an update from the previous build then
+  // fetches the changed objects, not the whole ~230 MiB ref again.
+  ...STATIC_DELTA_ARGUMENTS,
   ...(keyId.length > 0 ? [`--gpg-sign=${keyId}`] : []),
   repo,
 ]);
