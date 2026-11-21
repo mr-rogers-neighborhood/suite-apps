@@ -27,6 +27,7 @@ function fakeService() {
     join: vi.fn(async () => ({ state: "off" as const })),
     resume: vi.fn(async () => ({ state: "off" as const })),
     members: vi.fn(() => []),
+    relayFingerprint: vi.fn(() => null),
     presence: vi.fn(async () => undefined),
     onPresence: vi.fn(),
     removeDevice: vi.fn(async () => undefined),

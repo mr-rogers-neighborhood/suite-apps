@@ -44,6 +44,7 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
   const declineKit = useCanvasStore((state) => state.declineKit);
 
   const [host, setHost] = useState(defaultHost);
+  const [fingerprint, setFingerprint] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [pasted, setPasted] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,6 +77,9 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
   // Offered once, right after a workspace becomes shared, and never again once answered: a
   // decline is a decision, not an outstanding chore.
   const offerKit = shared && !waiting && !removed && (sync?.kit ?? null) === null;
+  // Only a wss:// relay has a certificate to pin. Reading it from either field keeps one
+  // fingerprint input for both errands instead of two boxes that can disagree.
+  const secureTarget = /^wss:\/\//iu.test(host.trim()) || /wss(%3A|:)/iu.test(pasted);
 
   const run = async (work: () => Promise<void>) => {
     setBusy(true);
@@ -181,6 +185,7 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
           <SyncedFace
             members={sync?.members ?? []}
             deviceId={sync?.deviceId ?? ""}
+            fingerprint={sync?.fingerprint ?? null}
             link={link}
             busy={busy}
             offerKit={offerKit}
@@ -208,11 +213,24 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
             host={host}
             hubRunning={hub?.running ?? false}
             pasted={pasted}
+            fingerprint={fingerprint}
+            showFingerprint={secureTarget}
             busy={busy}
             onHost={setHost}
             onPasted={setPasted}
-            onShare={() => run(() => enableSync(host))}
-            onJoin={() => run(() => joinWorkspace(pasted))}
+            onFingerprint={setFingerprint}
+            onShare={() =>
+              run(() =>
+                fingerprint.trim() === "" ? enableSync(host) : enableSync(host, fingerprint.trim()),
+              )
+            }
+            onJoin={() =>
+              run(() =>
+                fingerprint.trim() === ""
+                  ? joinWorkspace(pasted)
+                  : joinWorkspace(pasted, fingerprint.trim()),
+              )
+            }
             onRestore={openKit}
           />
         )}

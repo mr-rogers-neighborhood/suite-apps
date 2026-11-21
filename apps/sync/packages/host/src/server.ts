@@ -1,4 +1,9 @@
-import { createServer } from "node:http";
+import {
+  createServer as createHttpServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import {
   addInvite,
   applyRemovalRecord,
@@ -30,6 +35,7 @@ import {
 import { type RawData, WebSocket, WebSocketServer } from "ws";
 import { admitFrame, FrameLog, type FrameVerifier } from "./blindRoom.js";
 import { FileHostStore, type HostStore, type PinnedKey } from "./store.js";
+import { certificateFingerprint, isLoopbackHost, type TlsMaterial } from "./tls.js";
 
 /**
  * The host: a mailbox with an opinion about who may post.
@@ -96,13 +102,30 @@ export interface SyncServerOptions {
   /** How long a frame is kept. A device away longer needs a snapshot from a peer. */
   readonly retentionDays?: number;
   readonly now?: () => Date;
+  /**
+   * Serve `wss://` with this certificate and key.
+   *
+   * Required on any address other than loopback. The certificate is normally self-signed:
+   * clients pin its SHA-256 rather than trusting a chain, so there is no authority to ask.
+   */
+  readonly tls?: TlsMaterial;
+  /**
+   * Accept a plaintext bind on a reachable address.
+   *
+   * Off by default and never inferred. A relay that faces a network without TLS is a
+   * deliberate choice, and the CLI is where a person makes it explicitly.
+   */
+  readonly allowPlaintext?: boolean;
 }
 
 export interface SyncServer {
   readonly host: string;
   readonly port: number;
-  /** `ws://host:port/sync` */
+  /** `ws://host:port/sync` or `wss://host:port/sync`. */
   readonly url: string;
+  /** SHA-256 of the serving certificate, when there is one. */
+  readonly fingerprint: string | null;
+  readonly secure: boolean;
   close(): Promise<void>;
 }
 
@@ -120,8 +143,19 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
   const now = options.now ?? (() => new Date());
   const retentionDays = options.retentionDays ?? DEFAULT_RETENTION_DAYS;
   const registry = options.registry;
+  const tls = options.tls;
+  const secure = tls !== undefined;
 
-  const httpServer = createServer((request, response) => {
+  if (!secure && !isLoopbackHost(host) && options.allowPlaintext !== true) {
+    // The host is the last place this can be caught. A relay embedded in another process
+    // must not expose a plaintext mailbox just because it forgot to pass a CLI flag.
+    throw new Error(
+      `refusing to serve ws:// on ${host}: an address other machines can reach needs TLS. ` +
+        "Pass --tls-cert and --tls-key, or --allow-plaintext to accept a plaintext relay.",
+    );
+  }
+
+  const handleRequest = (request: IncomingMessage, response: ServerResponse) => {
     if (request.url === "/health") {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(
@@ -135,7 +169,12 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
     }
     response.writeHead(404, { "content-type": "text/plain" });
     response.end("not found\n");
-  });
+  };
+
+  const httpServer =
+    tls === undefined
+      ? createHttpServer(handleRequest)
+      : createHttpsServer({ cert: tls.cert, key: tls.key }, handleRequest);
 
   const wss = new WebSocketServer({ server: httpServer, path: "/sync" });
   const contexts = new WeakMap<WebSocket, SocketContext>();
@@ -654,7 +693,9 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
   return {
     host,
     port: boundPort,
-    url: `ws://${host}:${boundPort}/sync`,
+    url: `${secure ? "wss" : "ws"}://${host}:${boundPort}/sync`,
+    fingerprint: tls === undefined ? null : certificateFingerprint(tls.cert),
+    secure,
     async close() {
       for (const socket of wss.clients) socket.terminate();
       await new Promise<void>((resolve) => wss.close(() => resolve()));

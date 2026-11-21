@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { loadGroup, saveGroup } from "./groupStore";
 import { loadOrCreateIdentity } from "./identity";
+import { loadRelayConfig } from "./relayConfig";
 import { createPlannerSyncService } from "./service";
 
 const workspaceId = "a".repeat(64);
@@ -164,5 +165,38 @@ describe("the Planner sync service", () => {
     expect(sockets[1]?.sent[0]).toMatchObject({ type: "join", workspaceId });
 
     await service.disconnect();
+  });
+});
+
+describe("pinning a relay certificate", () => {
+  it("refuses a wss relay until a fingerprint is entered", async () => {
+    const service = await createPlannerSyncService({ dataDir: await folder(), workspaceId });
+
+    const status = await service.connect("wss://192.168.1.20:8787/sync");
+
+    expect(status).toMatchObject({ state: "refused" });
+    expect(status.state === "refused" ? status.reason : "").toMatch(/fingerprint is required/u);
+  });
+
+  it("keeps the pin in main-process configuration, beside the group", async () => {
+    const dataDir = await folder();
+    const fake = fakeRelay();
+    const service = await createPlannerSyncService({
+      dataDir,
+      workspaceId,
+      webSocket: () => fake.socket,
+    });
+
+    const connecting = service.connect(
+      "wss://192.168.1.20:8787/sync",
+      "ab:cd:ef:01:23:45:67:89:ab:cd:ef:01:23:45:67:89:ab:cd:ef:01:23:45:67:89:ab:cd:ef:01:23:45:67:89",
+    );
+    fake.open();
+    await connecting;
+
+    const stored = await loadRelayConfig(dataDir, workspaceId);
+    expect(stored?.fingerprint).toBe(
+      "AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89",
+    );
   });
 });

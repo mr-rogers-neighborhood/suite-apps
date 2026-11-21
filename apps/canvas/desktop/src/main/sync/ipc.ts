@@ -69,6 +69,7 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
     deviceId: service === null ? "" : deviceIdCache,
     status,
     members: service === null ? [] : service.members(),
+    fingerprint: service === null ? null : service.relayFingerprint(),
     kit: kitState,
   });
 
@@ -121,11 +122,13 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
     return info(current.status());
   });
 
-  options.onIpc(IPC.syncEnable, async (_event, url: unknown) => {
+  options.onIpc(IPC.syncEnable, async (_event, url: unknown, fingerprint: unknown) => {
     if (typeof url !== "string" || !/^wss?:\/\//u.test(url)) return info({ state: "off" });
     const current = await ensureService();
     if (current === null) return info({ state: "off" });
-    return info(await current.connect(url));
+    return info(
+      await current.connect(url, typeof fingerprint === "string" ? fingerprint : undefined),
+    );
   });
 
   options.onIpc(IPC.syncDisable, async () => {
@@ -142,11 +145,13 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
     return current.createInvite(chosen);
   });
 
-  options.onIpc(IPC.syncJoin, async (_event, link: unknown) => {
+  options.onIpc(IPC.syncJoin, async (_event, link: unknown, fingerprint: unknown) => {
     if (typeof link !== "string") return info({ state: "off" });
     const current = await ensureService();
     if (current === null) return info({ state: "off" });
-    return info(await current.join(link));
+    return info(
+      await current.join(link, typeof fingerprint === "string" ? fingerprint : undefined),
+    );
   });
 
   options.onIpc(IPC.syncPublish, async (_event, update: unknown) => {

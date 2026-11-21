@@ -15,10 +15,10 @@ import { toSyncWorkspaceId } from "./workspaceId";
  */
 export interface PlannerSyncController {
   status(): Promise<SyncInfo>;
-  enable(url: string): Promise<SyncInfo>;
+  enable(url: string, fingerprint?: string): Promise<SyncInfo>;
   disable(): Promise<SyncInfo>;
   invite(role: "editor" | "viewer"): Promise<string | null>;
-  join(link: string): Promise<SyncInfo>;
+  join(link: string, fingerprint?: string): Promise<SyncInfo>;
   /** A local commit the renderer sent. Never creates a connection. */
   publish(update: Uint8Array): void;
   /** The workspace behind the controller changed: drop the old connection. */
@@ -127,10 +127,10 @@ export function createPlannerSyncController(
       return info(current?.status() ?? off);
     },
 
-    async enable(url) {
+    async enable(url, fingerprint) {
       const current = await ensureService();
       if (current === null) return info(off);
-      return info(await current.connect(url));
+      return info(await current.connect(url, fingerprint));
     },
 
     async disable() {
@@ -145,10 +145,10 @@ export function createPlannerSyncController(
       return current.createInvite(role);
     },
 
-    async join(link) {
+    async join(link, fingerprint) {
       const current = await ensureService();
       if (current === null) return info(off);
-      return info(await current.join(link));
+      return info(await current.join(link, fingerprint));
     },
 
     publish(update) {

@@ -946,10 +946,19 @@ importers:
       ts-mls:
         specifier: 1.6.4
         version: 1.6.4(@noble/ciphers@2.4.0)
+      ws:
+        specifier: ^8.22.1
+        version: 8.23.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      '@types/ws':
+        specifier: ^8.18.2
+        version: 8.18.2
       typescript:
         specifier: ~5.9.3
         version: 5.9.3

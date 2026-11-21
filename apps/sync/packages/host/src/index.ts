@@ -21,3 +21,9 @@ export {
   type PinnedKey,
   type StoredFrame,
 } from "./store.js";
+export {
+  certificateFingerprint,
+  fingerprintLine,
+  isLoopbackHost,
+  type TlsMaterial,
+} from "./tls.js";

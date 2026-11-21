@@ -28,7 +28,14 @@ export interface RelayWebSocket {
   addEventListener(type: "open", listener: () => void): void;
   addEventListener(type: "message", listener: (event: { data: unknown }) => void): void;
   addEventListener(type: "close", listener: () => void): void;
-  addEventListener(type: "error", listener: () => void): void;
+  /**
+   * `error` carries the cause when the transport has one.
+   *
+   * A TLS pin refusal is decided below this interface, where the certificate is visible, and
+   * the sentence it produces has to reach the person. A browser error event has no detail,
+   * so the cause is optional.
+   */
+  addEventListener(type: "error", listener: (event: { error?: Error }) => void): void;
 }
 
 export type RelayWebSocketFactory = (url: string) => RelayWebSocket;
@@ -105,12 +112,36 @@ export function createRelayClient(
     dispatch(message, handlers);
   });
   socket.addEventListener("close", () => handlers.onClosed());
-  socket.addEventListener("error", () => handlers.onClosed());
 
   return new Promise<RelayClient>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("the host did not answer")), 15_000);
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("the host did not answer"));
+    }, 15_000);
+
+    const fail = (error: Error): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    };
+
+    socket.addEventListener("error", (event) => {
+      // A pin refusal is decided before `open`; waiting out the timeout would turn a clear
+      // certificate error into "the host did not answer".
+      fail(event?.error ?? new Error("the connection failed"));
+      handlers.onClosed();
+    });
+    socket.addEventListener("close", () => {
+      fail(new Error("the connection closed before the host answered"));
+      handlers.onClosed();
+    });
 
     socket.addEventListener("open", () => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       send({
         type: "join",

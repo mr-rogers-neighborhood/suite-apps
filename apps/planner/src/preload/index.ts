@@ -25,10 +25,10 @@ const bridge: PlannerBridge = {
   // frame to the authority and tells the page through the same replacement path as an
   // import, so the renderer has no second way to change the document.
   syncStatus: () => ipcRenderer.invoke("sync:status"),
-  syncEnable: (url) => ipcRenderer.invoke("sync:enable", url),
+  syncEnable: (url, fingerprint) => ipcRenderer.invoke("sync:enable", url, fingerprint),
   syncDisable: () => ipcRenderer.invoke("sync:disable"),
   syncInvite: (role) => ipcRenderer.invoke("sync:invite", role),
-  syncJoin: (link) => ipcRenderer.invoke("sync:join", link),
+  syncJoin: (link, fingerprint) => ipcRenderer.invoke("sync:join", link, fingerprint),
   onSyncChanged: (listener) => subscribe<SyncInfo>("sync:changed", listener),
 };
 

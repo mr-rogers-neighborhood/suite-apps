@@ -1,8 +1,18 @@
 #!/usr/bin/env node
+import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { createSyncServer, FileHostStore, HostRegistry } from "@suite/host";
+import {
+  createSyncServer,
+  FileHostStore,
+  fingerprintLine,
+  HostRegistry,
+  isLoopbackHost,
+  type TlsMaterial,
+} from "@suite/host";
 import { RELAY_PROTOCOL_VERSION } from "@suite/sync";
+
+export { isLoopbackHost };
 
 export const SERVER_NAME = "suite-sync";
 
@@ -58,6 +68,16 @@ export interface ServeOptions {
    * running on a home network would be an open mailbox nobody chose to open.
    */
   readonly trustAllRemote: boolean;
+  /**
+   * A self-signed certificate and its key, for `wss://`.
+   *
+   * Both or neither. Loopback may stay plaintext; any reachable address must use this unless
+   * the person also passes `--allow-plaintext`.
+   */
+  readonly tlsCert: string | null;
+  readonly tlsKey: string | null;
+  /** Say out loud that a reachable address is being served without TLS. */
+  readonly allowPlaintext: boolean;
 }
 
 export type ServeOptionsParse =
@@ -70,7 +90,8 @@ Usage:
   suite-sync --version                   print the server and protocol versions
   suite-sync status                      report how a serve would be configured
   suite-sync serve [--host <host>] [--port <port>] [--store <dir>] [--trust-all]
-                   [--trust-all-remote]
+                   [--trust-all-remote] [--tls-cert <pem> --tls-key <pem>]
+                   [--allow-plaintext]
 
 The store holds one append-only file of encrypted frames per workspace. The host
 cannot read a frame, merge two, or answer a question about a document.
@@ -79,23 +100,26 @@ cannot read a frame, merge two, or answer a question about a document.
 On loopback that is the only caller on the machine. On any other address it admits
 every device that can reach the port, so it is refused until --trust-all-remote says
 that is intended.
+
+--tls-cert and --tls-key serve wss://. On startup the host prints the certificate's
+SHA-256 fingerprint; each app pins that line. A self-signed pair is enough:
+
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \\
+    -keyout relay-key.pem -out relay-cert.pem -days 825 \\
+    -subj "/CN=suite-sync relay"
+
+Loopback may serve ws://. Any other address needs TLS and refuses to start without
+it unless --allow-plaintext is passed; that choice prints a warning and is never
+made silently.
 `;
 
 /**
- * Would binding this address expose the process beyond the machine?
+ * Read the flags `serve` and `status` share.
  *
- * `0.0.0.0` and `::` are wildcards, not loopback: they listen everywhere, which is exactly the case
- * that needs saying out loud. Everything unrecognised is treated as reachable, because the failure
- * of guessing wrong in that direction is an open relay.
+ * The loopback rule that decides whether those flags are sufficient lives in `@suite/host`,
+ * because the embedded host enforces the same decision; `isLoopbackHost` is re-exported above
+ * for the CLI's own callers and tests.
  */
-export function isLoopbackHost(host: string): boolean {
-  const normalized = host.trim().toLowerCase().replace(/^\[/u, "").replace(/\]$/u, "");
-  if (normalized === "localhost" || normalized === "::1") return true;
-  const octets = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/u.exec(normalized);
-  if (octets === null) return false;
-  return octets.slice(1).every((part) => Number(part) <= 255);
-}
-
 export function parseServeOptions(argv: readonly string[]): ServeOptionsParse {
   const options: {
     host: string;
@@ -103,12 +127,18 @@ export function parseServeOptions(argv: readonly string[]): ServeOptionsParse {
     store: string;
     trustAll: boolean;
     trustAllRemote: boolean;
+    tlsCert: string | null;
+    tlsKey: string | null;
+    allowPlaintext: boolean;
   } = {
     host: DEFAULT_HOST,
     port: DEFAULT_PORT,
     store: DEFAULT_STORE,
     trustAll: false,
     trustAllRemote: false,
+    tlsCert: null,
+    tlsKey: null,
+    allowPlaintext: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -138,6 +168,17 @@ export function parseServeOptions(argv: readonly string[]): ServeOptionsParse {
       case "--trust-all-remote":
         options.trustAllRemote = true;
         break;
+      case "--tls-cert":
+        options.tlsCert = argv[index + 1] ?? "";
+        index += 1;
+        break;
+      case "--tls-key":
+        options.tlsKey = argv[index + 1] ?? "";
+        index += 1;
+        break;
+      case "--allow-plaintext":
+        options.allowPlaintext = true;
+        break;
       default:
         return { ok: false, error: `unknown argument: ${argument ?? ""}` };
     }
@@ -145,6 +186,15 @@ export function parseServeOptions(argv: readonly string[]): ServeOptionsParse {
 
   if (options.host.length === 0) return { ok: false, error: "--host needs a value" };
   if (options.store.length === 0) return { ok: false, error: "--store needs a value" };
+  if (options.tlsCert !== null && options.tlsCert.length === 0) {
+    return { ok: false, error: "--tls-cert needs a value" };
+  }
+  if (options.tlsKey !== null && options.tlsKey.length === 0) {
+    return { ok: false, error: "--tls-key needs a value" };
+  }
+  if ((options.tlsCert === null) !== (options.tlsKey === null)) {
+    return { ok: false, error: "--tls-cert and --tls-key go together" };
+  }
   if (options.trustAllRemote && !options.trustAll) {
     return { ok: false, error: "--trust-all-remote only means something with --trust-all" };
   }
@@ -153,13 +203,23 @@ export function parseServeOptions(argv: readonly string[]): ServeOptionsParse {
 }
 
 export function formatStatus(options: ServeOptions): string {
+  const secure = options.tlsCert !== null;
+  const plaintextReachable = !secure && !isLoopbackHost(options.host);
   return [
     `${SERVER_NAME} ${SERVER_VERSION} (relay protocol ${RELAY_PROTOCOL_VERSION})`,
     `address:  ${options.host}:${options.port}`,
     `store:    ${options.store}`,
+    `transport: ${secure ? `wss (certificate pinned) — ${options.tlsCert}` : "ws (plaintext)"}`,
     `signatures: ${options.trustAll ? "not checked (--trust-all)" : "checked"}`,
     ...(options.trustAll && !isLoopbackHost(options.host)
       ? [`reachable: every device that can route to this address (--trust-all-remote)`]
+      : []),
+    ...(plaintextReachable
+      ? [
+          options.allowPlaintext
+            ? "warning:  plaintext on a reachable address (--allow-plaintext); anyone who can route here can read the metadata and drop or replay traffic"
+            : "refused:  a reachable address needs TLS; add --tls-cert and --tls-key, or --allow-plaintext",
+        ]
       : []),
   ].join("\n");
 }
@@ -202,18 +262,52 @@ export async function runCli(argv: readonly string[]): Promise<CliResult> {
           "Add --trust-all-remote if that is the relay you mean to run, or bind 127.0.0.1.\n",
       };
     }
-    const server = await createSyncServer({
-      registry: new HostRegistry(),
-      host: parsed.value.host,
-      port: parsed.value.port,
-      store: new FileHostStore(parsed.value.store),
-      verifyFrame: () => true,
-      verifyRole: () => true,
+    const server = await (async () => {
+      let tls: TlsMaterial | undefined;
+      if (parsed.value.tlsCert !== null && parsed.value.tlsKey !== null) {
+        try {
+          tls = {
+            cert: await readFile(parsed.value.tlsCert, "utf8"),
+            key: await readFile(parsed.value.tlsKey, "utf8"),
+          };
+        } catch (error) {
+          throw new Error(
+            `could not read the TLS certificate or key: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+      }
+      return createSyncServer({
+        registry: new HostRegistry(),
+        host: parsed.value.host,
+        port: parsed.value.port,
+        store: new FileHostStore(parsed.value.store),
+        verifyFrame: () => true,
+        verifyRole: () => true,
+        ...(tls === undefined ? {} : { tls }),
+        allowPlaintext: parsed.value.allowPlaintext,
+      });
+    })().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      return { error: message };
     });
+
+    if ("error" in server) {
+      return { code: 1, stdout: "", stderr: `${server.error}\n` };
+    }
+
+    const warning =
+      !server.secure && !isLoopbackHost(parsed.value.host)
+        ? "warning: serving ws:// on a reachable address without TLS. Anyone who can route here can read the metadata and drop or replay traffic.\n"
+        : "";
+    const fingerprint = server.fingerprint === null ? [] : [fingerprintLine(server.fingerprint)];
     return {
       code: 0,
-      stdout: `${formatStatus(parsed.value)}\nlistening on ${server.url}\n`,
-      stderr: "",
+      stdout: `${formatStatus(parsed.value)}\nlistening on ${server.url}\n${fingerprint.join("\n")}${
+        fingerprint.length === 0 ? "" : "\n"
+      }`,
+      stderr: warning,
     };
   }
 

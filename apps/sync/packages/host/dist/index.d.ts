@@ -2,4 +2,5 @@ export { admitFrame, FrameLog, type FrameVerifier, type HostRejection, type Host
 export { deviceIdFromPublicKey, ed25519Verifier } from "./crypto.js";
 export { createSyncServer, type HostedRoom, HostRegistry, type SyncServer, type SyncServerOptions, } from "./server.js";
 export { FileHostStore, type HostStore, MemoryHostStore, type PinnedKey, type StoredFrame, } from "./store.js";
+export { certificateFingerprint, fingerprintLine, isLoopbackHost, type TlsMaterial, } from "./tls.js";
 //# sourceMappingURL=index.d.ts.map

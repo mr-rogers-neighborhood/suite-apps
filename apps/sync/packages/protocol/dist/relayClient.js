@@ -13,10 +13,35 @@ export function createRelayClient(options, handlers) {
         dispatch(message, handlers);
     });
     socket.addEventListener("close", () => handlers.onClosed());
-    socket.addEventListener("error", () => handlers.onClosed());
     return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("the host did not answer")), 15_000);
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (settled)
+                return;
+            settled = true;
+            reject(new Error("the host did not answer"));
+        }, 15_000);
+        const fail = (error) => {
+            if (settled)
+                return;
+            settled = true;
+            clearTimeout(timer);
+            reject(error);
+        };
+        socket.addEventListener("error", (event) => {
+            // A pin refusal is decided before `open`; waiting out the timeout would turn a clear
+            // certificate error into "the host did not answer".
+            fail(event?.error ?? new Error("the connection failed"));
+            handlers.onClosed();
+        });
+        socket.addEventListener("close", () => {
+            fail(new Error("the connection closed before the host answered"));
+            handlers.onClosed();
+        });
         socket.addEventListener("open", () => {
+            if (settled)
+                return;
+            settled = true;
             clearTimeout(timer);
             send({
                 type: "join",

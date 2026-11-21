@@ -140,13 +140,13 @@ export type PlannerBridge = {
    */
   syncStatus?(): Promise<SyncInfo>;
   /** Share this workspace through a relay at `url`, or reconnect to one it already knows. */
-  syncEnable?(url: string): Promise<SyncInfo>;
+  syncEnable?(url: string, fingerprint?: string): Promise<SyncInfo>;
   /** Stop syncing this copy. The workspace keeps its file and its membership. */
   syncDisable?(): Promise<SyncInfo>;
   /** Write a single-use invitation and hand back the link to give someone. */
   syncInvite?(role: "editor" | "viewer"): Promise<string | null>;
   /** Ask to join from a link somebody shared. Resolves once this device has asked. */
-  syncJoin?(link: string): Promise<SyncInfo>;
+  syncJoin?(link: string, fingerprint?: string): Promise<SyncInfo>;
   /** Main pushes every change of state, so one subscription feeds the pill and the dialog. */
   onSyncChanged?(listener: (info: SyncInfo) => void): () => void;
 };

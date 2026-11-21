@@ -67,6 +67,38 @@ describe("the sync dialog", () => {
     expect(joinWorkspace).toHaveBeenCalledWith("suite://join?h=x&w=y&i=z");
   });
 
+  it("asks for the certificate fingerprint on a wss relay and hands it to main", async () => {
+    const enableSync = vi.fn(async () => {});
+    useCanvasStore.setState({ enableSync });
+    open({ status: { state: "off" } });
+
+    fireEvent.change(screen.getByLabelText(/this machine/i), {
+      target: { value: "wss://192.168.1.9:8787/sync" },
+    });
+    fireEvent.change(screen.getByLabelText("Relay certificate fingerprint"), {
+      target: { value: "AB:CD:EF" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+
+    expect(enableSync).toHaveBeenCalledWith("wss://192.168.1.9:8787/sync", "AB:CD:EF");
+  });
+
+  it("shows the certificate it pinned while shared", () => {
+    useCanvasStore.setState({
+      sync: {
+        workspaceId,
+        deviceId: thisDevice.deviceId,
+        status: { state: "syncing", count: 1 },
+        members: [thisDevice],
+        kit: null,
+        fingerprint: "AB:CD:EF",
+      },
+    });
+    render(<SyncDialog open onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("sync-fingerprint-pinned")).toHaveTextContent("AB:CD:EF");
+  });
+
   it("says only that it is waiting, and keeps saying it when reopened", () => {
     open({ status: { state: "waiting" }, members: [] });
     expect(screen.getByTestId("sync-dialog")).toHaveAttribute("data-face", "waiting");
