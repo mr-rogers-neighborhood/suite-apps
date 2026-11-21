@@ -7,6 +7,7 @@ export { hubReportPath, parseHubState, SUITE_HUB_FILE, SUITE_HUB_FORMAT, suiteHu
 export { describeIssues, parseWith, } from "./parse.js";
 export { joinPath, suiteApplicationsRoot, suitePaths, } from "./paths.js";
 export { appDocumentsFolder, SUITE_APPS, suiteDocumentsRoot, } from "./suiteApps.js";
+export { SUITE_SYNC_STATUSES, SuiteSyncCapabilityError, suiteSyncErrorCodeSchema, suiteSyncErrorSchema, suiteSyncInviteRoleSchema, suiteSyncMemberSchema, suiteSyncMembershipChangeSchema, suiteSyncMembershipNoticeSchema, suiteSyncOperationSchema, suiteSyncRoleSchema, suiteSyncStatusSchema, } from "./sync.js";
 export { mergeKitReports, parseSyncKits, SUITE_SYNC_KITS_FILE, SUITE_SYNC_KITS_FORMAT, suiteSyncKitsSchema, syncKitReportSchema, syncKitStateSchema, syncKitsReportPath, } from "./syncKits.js";
 export { parseUpdateState, SUITE_UPDATE_STATE_FILE, SUITE_UPDATE_STATE_FORMAT, suiteUpdateStateSchema, updateAvailable, } from "./updateState.js";
 //# sourceMappingURL=index.js.map

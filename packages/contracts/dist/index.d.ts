@@ -7,6 +7,7 @@ export { hubReportPath, parseHubState, SUITE_HUB_FILE, SUITE_HUB_FORMAT, type Su
 export { type ContractIssue, type ContractParse, describeIssues, parseWith, } from "./parse.js";
 export { joinPath, type SuiteAppName, type SuitePathOptions, type SuitePaths, type SuitePlatform, suiteApplicationsRoot, suitePaths, } from "./paths.js";
 export { appDocumentsFolder, SUITE_APPS, type SuiteAppDocumentsOptions, type SuiteAppEntry, type SuiteDocumentAppId, suiteDocumentsRoot, } from "./suiteApps.js";
+export { SUITE_SYNC_STATUSES, type SuiteSyncCapability, SuiteSyncCapabilityError, type SuiteSyncError, type SuiteSyncErrorCode, type SuiteSyncFrame, type SuiteSyncInviteRole, type SuiteSyncMember, type SuiteSyncMembershipChange, type SuiteSyncMembershipNotice, type SuiteSyncOperation, type SuiteSyncRole, type SuiteSyncStatus, suiteSyncErrorCodeSchema, suiteSyncErrorSchema, suiteSyncInviteRoleSchema, suiteSyncMemberSchema, suiteSyncMembershipChangeSchema, suiteSyncMembershipNoticeSchema, suiteSyncOperationSchema, suiteSyncRoleSchema, suiteSyncStatusSchema, } from "./sync.js";
 export { mergeKitReports, parseSyncKits, SUITE_SYNC_KITS_FILE, SUITE_SYNC_KITS_FORMAT, type SuiteSyncKits, type SyncKitReport, type SyncKitState, suiteSyncKitsSchema, syncKitReportSchema, syncKitStateSchema, syncKitsReportPath, } from "./syncKits.js";
 export { parseUpdateState, SUITE_UPDATE_STATE_FILE, SUITE_UPDATE_STATE_FORMAT, type SuiteUpdateState, suiteUpdateStateSchema, updateAvailable, } from "./updateState.js";
 //# sourceMappingURL=index.d.ts.map
