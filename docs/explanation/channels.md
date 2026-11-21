@@ -123,4 +123,6 @@ card has no badge: stable is the default and the baseline the others are compare
   the signed remote.
 - [File formats](../reference/file-formats.md) for how a newer document is refused.
 - [Status](../reference/status.md) for what the tree ships today.
+- [Budget's beta bar](../../apps/budget/docs/reference/beta-bar.md) for the `canary` → `beta`
+  boundary written as checks, with the evidence and the boxes a person still has to tick.
 - [Architecture](architecture.md) for why the desktop shell is separate apps.
