@@ -41,6 +41,7 @@ short version.
 | Planner | `pnpm check`, `pnpm verify` |
 | Budget | `pnpm check`, `pnpm verify` |
 | Start | `pnpm check` |
+| Help | `pnpm check` |
 | Sync | `pnpm check` |
 | Go | `pnpm check` |
 
@@ -78,39 +79,36 @@ mise exec -- node scripts/docs-check.mjs
 Checks relative links, that each `docs/` section index lists its pages, and a short list of retired
 phrases. It is not part of the gate yet; run it with any documentation change.
 
-The local reader renders `docs/` at <http://localhost:3001>. It is not deployed and is not part of
-the gate or a release.
+Suite Help (`apps/help`) is the documentation reader: one Vite + React renderer in an Electron
+shell. It shows Browser, Modules and Tours over the code index, and renders the `docs/` pages as the
+**Handbook**. It is not deployed and it is offline; Flatpak owns updates.
 
 ```sh
-mise exec -- pnpm docs:index     # index every file and declaration into tools/docs/public/data
+mise exec -- pnpm docs:index     # index every file and declaration into apps/help/public/data
 mise exec -- pnpm docs:index:check # resolve notes, tours and generated data
 mise exec -- pnpm docs:coverage  # report authored vs generated prose; never fails on a gap
 mise exec -- pnpm docs:explain <node-id> # scaffold one note section in its module MDX
-mise exec -- pnpm docs:dev       # index, sync docs/ and start the dev server (foreground)
-mise exec -- pnpm docs:dev:bg    # the same, detached; log in .dev/docs.log
-mise exec -- pnpm docs:status    # TCP check on the docs port
-mise exec -- pnpm docs:logs      # follow the background dev log
-mise exec -- pnpm docs:stop      # stop whatever listens on the docs port
-mise exec -- pnpm docs:build     # index, sync and build the static pages
-mise exec -- pnpm docs:start     # serve the last build
-mise exec -- pnpm docs:clean     # remove .next, .generated, .source and public/data
+mise exec -- pnpm docs:dev       # index, sync docs/ and start Vite + Electron (foreground)
+mise exec -- pnpm docs:build     # index, sync and build the app
+mise exec -- pnpm docs:clean     # remove out, release, .generated and public/data
 ```
 
-`docs:index` runs `tools/docs/scripts/index-code.mjs`: every file and declaration becomes a node,
+`docs:index` runs `apps/help/scripts/index-code.mjs`: every file and declaration becomes a node,
 modules are package roots plus `src/` children, and config files become `config:*` modules. It writes
-`tools/docs/public/data/` and is not committed. `docs:index:check` resolves every note heading, tour
+`apps/help/public/data/` and is not committed. `docs:index:check` resolves every note heading, tour
 step and composed-tour target and compares the generated files with the ones on disk; it exits
 nonzero on an unknown ID or stale data. It also checks that prose tours have an intro and that
 interludes and overlays have content. `docs:dev` and `docs:build` also run
-`tools/docs/scripts/sync-docs.mjs`, which mirrors `docs/` into `.generated/docs/` with the frontmatter
-and sidebar Fumadocs expects. `docs:coverage` reports how many modules and tours a person has
-reviewed (`reviewed: human`) against the generated prose, file and symbol counts, and the largest
-modules with no prose. `docs:explain <node-id>` appends a TODO section with
-the generated signature to the owning module MDX; it refuses to overwrite an existing note.
+`apps/help/scripts/sync-docs.mjs`, which mirrors `docs/` into `apps/help/.generated/docs/` with the
+frontmatter and sidebar Fumadocs expects, and writes the offline handbook search index.
+`docs:coverage` reports how many modules and tours a person has reviewed (`reviewed: human`) against
+the generated prose, file and symbol counts, and the largest modules with no prose.
+`docs:explain <node-id>` appends a TODO section with the generated signature to the owning module
+MDX; it refuses to overwrite an existing note.
 
-Open `/explore` for the three-mode explorer. `/docs` remains the reference site. `docs:start` serves
-the last build; run `docs:build` first. `docs:stop` uses the docs port, so it also stops a server
-started by `pnpm docs:dev` in another terminal.
+Open the app for the three-mode explorer. The Handbook is the `/handbook` route; its source paths
+stay under `docs/`. Production is served from `suite-help://app/`, with SPA fallback to
+`index.html`; there is no `next start` and no loopback HTTP server.
 
 ## The independent gate
 

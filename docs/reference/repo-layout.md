@@ -1,6 +1,6 @@
 # Repository layout
 
-One pnpm workspace at the root. Six apps under `apps/`, shared packages under `packages/`, and one
+One pnpm workspace at the root. Seven apps under `apps/`, shared packages under `packages/`, and one
 lockfile for all of them.
 
 ```
@@ -10,18 +10,18 @@ apps/
   planner/      @suite/planner desktop app; pack/; packages/core; docs
   budget/       @suite/budget desktop app; packages/core; docs
   start/        @suite/start hub; the PKGBUILD under apps/start/packaging/arch; docs, e2e
+  help/         @suite/help documentation app: explorer and handbook
   sync/         @suite/sync-server; packages/protocol, packages/host; deploy, docs
   go/           @suite/go-app mobile container; packages/go contract; docs
 packages/       contracts, files, desktop, theme, ui
 docs/           Cross-cutting documentation
 packaging/      Flatpak manifests
 scripts/        gate.mjs, flatpak.mjs, ci/, docs-check.mjs
-tools/docs/     Local documentation reader; not an app, not shipped
 ```
 
-`tools/docs` renders the explorer over `docs/modules/`, `docs/tours/` and the generated index for
-development. It is not a workspace app, is excluded from the root build and release, and never owns a
-documentation fact.
+`apps/help` renders the explorer over `docs/modules/`, `docs/tours/` and the generated index, and
+renders `docs/` as the handbook. It is offline, ships through Flatpak, and never owns a documentation
+fact: the code and `docs/` are the source of truth.
 
 `pnpm-workspace.yaml` includes `apps/*`, `apps/*/*`, `apps/*/packages/*` and `packages/*`. It also
 owns the overrides, patches and build permissions the apps need.
@@ -40,6 +40,7 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/budget` | `apps/budget` | Budget |
 | `@suite/budget-core` | `apps/budget/packages/core` | Budget schema and document layer |
 | `@suite/start` | `apps/start` | Hub |
+| `@suite/help` | `apps/help` | Documentation app: explorer and handbook |
 | `@suite/sync-server` | `apps/sync` | Sync server |
 | `@suite/sync` | `apps/sync/packages/protocol` | Sync protocol |
 | `@suite/host` | `apps/sync/packages/host` | Sync host |

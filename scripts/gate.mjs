@@ -36,6 +36,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PIPELINE = [
   { repo: "sync", package: "@suite/sync-server" },
   { repo: "start", package: "@suite/start", e2e: true },
+  { repo: "help", package: "@suite/help" },
   { repo: "canvas", package: "@suite/canvas" },
   { repo: "planner", package: "@suite/planner" },
   { repo: "budget", package: "@suite/budget" },

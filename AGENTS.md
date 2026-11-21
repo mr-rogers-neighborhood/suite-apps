@@ -1,6 +1,6 @@
 # suite-apps
 
-This is one workspace, not six repositories. The product rules still belong to
+This is one workspace, not seven repositories. The product rules still belong to
 each app:
 
 | Before editing | Read | Gate |
@@ -11,6 +11,7 @@ each app:
 | `apps/go` | `apps/go/AGENTS.md` | `node scripts/gate.mjs --only go` |
 | `apps/sync` | `apps/sync/README.md` and `docs/` | `node scripts/gate.mjs --only sync` |
 | `apps/start` | `apps/start/README.md` and `docs/` | `node scripts/gate.mjs --only start` |
+| `apps/help` | `apps/help/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only help` |
 
 The full gate is `node scripts/gate.mjs`; `--fresh` proves the commit rather
 than the working tree. Use `mise exec --` so the Node and pnpm versions pinned

@@ -15,6 +15,7 @@ document is a file you own. There is no account, no telemetry, and no server ope
 | <img src="apps/start/build/app-icons/canvas.png" width="20" height="20" alt=""> **Suite Canvas** | Thinking and research: cards, boards, writing, links and views in one document | Alpha |
 | <img src="apps/start/build/app-icons/planner.png" width="20" height="20" alt=""> **Suite Planner** | A daily planner: inbox, estimates, capacity and a local calendar | Pre-alpha |
 | <img src="apps/start/build/app-icons/budget.png" width="20" height="20" alt=""> **Suite Budget** | An envelope budget: give every dollar a job; [what it does](apps/budget/README.md) | Pre-alpha |
+| <img src="apps/start/build/app-icons/help.png" width="20" height="20" alt=""> **Suite Help** | The documentation app: the code explorer and the handbook, offline; [what it is](apps/help/README.md) | New |
 | **Suite Start** | The hub: installs, updates, opens and removes the other apps | Working |
 | **Suite Sync** | The sync protocol and a relay a person runs | Working |
 | **Suite Go** | One mobile container that hosts the domains as packs | Shell only |
