@@ -8,6 +8,16 @@ this file and there is no AppImage release tag.
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.1.2] - 2026-11-21
+
+### Changed
+
+- **A smaller install and faster updates.** The Flatpak ships one locale instead of 55,
+  production files drop source maps, declarations and test fixtures, and static deltas make
+  an update a delta instead of a full download.
+
 ### Fixed
 
 - **Handbook links stay in Help.** A link between two pages now opens the handbook route

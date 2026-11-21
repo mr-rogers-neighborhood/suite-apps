@@ -26,6 +26,7 @@
     <binary>suite-canvas</binary>
   </provides>
   <releases>
+    <release version="0.1.12" date="2026-11-21"/>
     <release version="0.1.11" date="2026-11-21"/>
   </releases>
   <content_rating type="oars-1.1"/>

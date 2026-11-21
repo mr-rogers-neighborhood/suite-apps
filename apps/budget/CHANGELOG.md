@@ -8,6 +8,10 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.4.1] - 2026-11-21
+
 ### Fixed
 
 - **A transfer's unlocked side cannot rewrite a reconciled one.** Editing or deleting the other leg
@@ -40,6 +44,10 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
   unless the repeat itself changed.
 
 ### Changed
+
+- **A smaller install and faster updates.** The Flatpak ships one locale instead of 55,
+  production files drop source maps, declarations and test fixtures, and static deltas make
+  an update a delta instead of a full download.
 
 - **The reports and register say their state out loud.** Report tabs expose which one is selected,
   the closed-account group says whether it is open, and a register row's cleared control is a

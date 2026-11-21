@@ -27,6 +27,7 @@
     <binary>suite-budget</binary>
   </provides>
   <releases>
+    <release version="0.4.1" date="2026-11-21"/>
     <release version="0.4.0" date="2026-11-21"/>
   </releases>
   <content_rating type="oars-1.1"/>
