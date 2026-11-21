@@ -31,6 +31,7 @@ function fakeService() {
       state = { state: "off" };
     },
     status: () => state,
+    relayFingerprint: () => null,
     identity: async (): Promise<Pick<DeviceIdentity, "deviceId" | "publicKey">> => ({
       deviceId,
       publicKey: "public-key",
