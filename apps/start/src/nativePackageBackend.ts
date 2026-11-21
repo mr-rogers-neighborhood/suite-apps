@@ -39,6 +39,7 @@ import { launchVerdict } from "./launchCheck.js";
 import { launchIntent, MANAGED_BY_ENV } from "./launchCommand.js";
 import { nodeRegistryFileSystem } from "./nodeFileSystem.js";
 import type {
+  DeploymentState,
   InstalledPackage,
   PackageBackend,
   PackageCommand,
@@ -572,6 +573,153 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     };
   }
 
+  /**
+   * Read one deployment Start does not list as a card.
+   *
+   * The Flatpak listing is the authority, exactly as it is for an app card. A
+   * `suite-sync` binary on `PATH` is not the app a person installed: the tray app
+   * carries the relay, and Flatpak owns its files.
+   */
+  async function deploymentState(application: string): Promise<DeploymentState> {
+    const executable = await binary();
+    if (executable === null) {
+      return {
+        installed: false,
+        version: null,
+        commit: null,
+        canInstall: false,
+        problem: "Flatpak is not available, so Suite Sync cannot be installed or opened here.",
+      };
+    }
+
+    const install =
+      (await flatpakInstalls()).find((candidate) => candidate.applicationId === application) ??
+      null;
+    if (install !== null) {
+      return {
+        installed: true,
+        version: install.version.length > 0 ? install.version : null,
+        commit: install.commit ?? null,
+        canInstall: false,
+        problem: null,
+      };
+    }
+
+    const remoteName = await remote();
+    if (remoteName === null) {
+      return {
+        installed: false,
+        version: null,
+        commit: null,
+        canInstall: false,
+        problem:
+          "Flatpak is available, but no Suite remote is configured, so Suite Sync cannot be installed.",
+      };
+    }
+    return { installed: false, version: null, commit: null, canInstall: true, problem: null };
+  }
+
+  /** Ask Flatpak for one deployment from the Suite store. */
+  async function installDeployment(application: string): Promise<string | null> {
+    const remoteName = await remote();
+    if (remoteName === null) throw new Error("this machine has no Suite Flatpak remote");
+    await flatpak(storeInstallArgs(remoteName, application));
+    // The listing and the store both moved; the next read must not answer from before.
+    flatpakCache = null;
+    channelCache = null;
+    storeCache = null;
+    selfCheckCache = null;
+    return flatpakVersionOf({ application, installation: "user" });
+  }
+
+  /**
+   * Start one deployment with `flatpak run`.
+   *
+   * The same launch path as a card, so a sandboxed Start still prefixes the command
+   * through the host seam and nothing here learns a second way to spawn.
+   */
+  async function openDeployment(
+    application: string,
+    observer: PackageLaunchObserver = {},
+  ): Promise<void> {
+    const executable = await binary();
+    if (executable === null) throw new Error("Flatpak is not available");
+    const install =
+      (await flatpakInstalls()).find((candidate) => candidate.applicationId === application) ??
+      null;
+    if (install === null) throw new Error(`${application} is not installed`);
+    startLaunch(
+      {
+        executable,
+        argv: [],
+        flatpak: {
+          application,
+          installation: install.installation,
+          ...(install.branch.length === 0 ? {} : { branch: install.branch }),
+          ...(install.origin.length === 0 ? {} : { origin: install.origin }),
+          ...(install.commit === undefined ? {} : { commit: install.commit }),
+        },
+      },
+      observer,
+    );
+  }
+
+  /** The one launch body: a card and a deployment both reach a process through it. */
+  function startLaunch(request: PackageLaunchRequest, observer: PackageLaunchObserver = {}): void {
+    const appId = request.appId;
+    // The app is being started by the thing that also updates it. Only a launch
+    // Start performs carries this; a desktop entry or a shell run does not.
+    const intent = launchIntent(request, request.argv, { managed: appId !== undefined });
+    const child = host.spawn(intent);
+
+    let stderr = "";
+    child.onStderr((chunk) => {
+      if (stderr.length < 8192) stderr += chunk;
+    });
+
+    const pid = child.pid;
+    observer.started?.(pid);
+
+    let settled = false;
+    const settle = (): void => {
+      settled = true;
+      child.release();
+      observer.settled?.();
+    };
+    setTimeout(settle, 1_500);
+
+    // Always: a window that closes is news even if it opened fine, because the card
+    // says "running" and nobody else is going to redraw it.
+    child.onExit((code) => {
+      observer.exited?.(pid);
+      if (settled) return;
+      settled = true;
+      const verdict = launchVerdict({ executable: intent.file, exitCode: code, stderr });
+
+      if (verdict.kind === "retry-without-fuse") {
+        console.warn(`[launch] ${intent.file}: ${verdict.reason}; retrying without FUSE 2`);
+        const retry = host.spawn({
+          ...intent,
+          env: {
+            ...(intent.env ?? {}),
+            APPIMAGE_EXTRACT_AND_RUN: "1",
+            ...(appId === undefined ? {} : { [MANAGED_BY_ENV]: "start" }),
+          },
+        });
+        retry.release();
+        child.release();
+        return;
+      }
+
+      child.release();
+      // The observer decides what a failure means: a card draws a sentence, and the
+      // Sync pane records why the app did not open. A caller without one is quiet.
+      if (verdict.kind === "ok") return;
+      console.warn(`[launch] ${intent.file}: ${verdict.reason}`);
+      observer.failed?.(verdict.reason);
+    });
+  }
+
   return {
     list: (listOptions?: PackageListOptions) => listing(listOptions?.refresh === true),
     checkSelfUpdate,
@@ -647,57 +795,12 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     },
 
     launch(request: PackageLaunchRequest, observer: PackageLaunchObserver = {}) {
-      const appId = request.appId;
-      // The app is being started by the thing that also updates it. Only a launch
-      // Start performs carries this; a desktop entry or a shell run does not.
-      const intent = launchIntent(request, request.argv, { managed: appId !== undefined });
-      const child = host.spawn(intent);
-
-      let stderr = "";
-      child.onStderr((chunk) => {
-        if (stderr.length < 8192) stderr += chunk;
-      });
-
-      const pid = child.pid;
-      observer.started?.(pid);
-
-      let settled = false;
-      const settle = (): void => {
-        settled = true;
-        child.release();
-        observer.settled?.();
-      };
-      setTimeout(settle, 1_500);
-
-      // Always: a window that closes is news even if it opened fine, because the card
-      // says "running" and nobody else is going to redraw it.
-      child.onExit((code) => {
-        observer.exited?.(pid);
-        if (settled) return;
-        settled = true;
-        const verdict = launchVerdict({ executable: intent.file, exitCode: code, stderr });
-
-        if (verdict.kind === "retry-without-fuse") {
-          console.warn(`[launch] ${intent.file}: ${verdict.reason}; retrying without FUSE 2`);
-          const retry = host.spawn({
-            ...intent,
-            env: {
-              ...(intent.env ?? {}),
-              APPIMAGE_EXTRACT_AND_RUN: "1",
-              ...(appId === undefined ? {} : { [MANAGED_BY_ENV]: "start" }),
-            },
-          });
-          retry.release();
-          child.release();
-          return;
-        }
-
-        child.release();
-        if (appId === undefined || verdict.kind === "ok") return;
-        console.warn(`[launch] ${intent.file}: ${verdict.reason}`);
-        observer.failed?.(verdict.reason);
-      });
+      startLaunch(request, observer);
     },
+
+    deployment: deploymentState,
+    installDeployment,
+    openDeployment,
 
     async location(package_: InstalledPackage) {
       if (package_.app.flatpak === undefined) return null;
