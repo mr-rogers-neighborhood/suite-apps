@@ -7,6 +7,7 @@ import {
   addDevice,
   createDeviceIdentity,
   createWorkspaceGroup,
+  type DeviceGroup,
   deriveFriendCode,
   encodeBase64,
   type FriendInvite,
@@ -19,15 +20,21 @@ import {
   seal,
   verifyFriendInvite,
 } from "@suite/sync";
+import { createSyncStores } from "@suite/sync-desktop";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadGroup, saveGroup } from "./groupStore";
 import { loadOrCreateIdentity, verifyEd25519 } from "./identity";
-import { loadRelayConfig } from "./relayConfig";
 import { createPlannerSyncService } from "./service";
 
 const workspaceId = "a".repeat(64);
 const cleanups: string[] = [];
+
+/** The shared store, rooted where this app keeps its files. */
+const storesFor = (dataDir: string, id: string) => createSyncStores({ dataDir, workspaceId: id });
+const loadGroup = (dataDir: string, id: string) => storesFor(dataDir, id).group.load();
+const saveGroup = (dataDir: string, id: string, group: DeviceGroup) =>
+  storesFor(dataDir, id).group.save(group);
+const loadRelayConfig = (dataDir: string, id: string) => storesFor(dataDir, id).relay.load();
 
 async function folder(): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "suite-planner-sync-"));

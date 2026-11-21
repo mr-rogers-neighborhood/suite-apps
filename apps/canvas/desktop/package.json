@@ -20,7 +20,8 @@
     "@suite/files": "workspace:*",
     "@suite/graph": "workspace:*",
     "zod": "^4.6.7",
-    "@suite/sync": "workspace:*"
+    "@suite/sync": "workspace:*",
+    "@suite/sync-desktop": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

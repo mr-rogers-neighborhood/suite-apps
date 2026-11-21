@@ -53,19 +53,21 @@ with an unrelated one.
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Path                             | Responsibility                                                          |
-| -------------------------------- | ----------------------------------------------------------------------- |
-| `src/main/sync/service.ts`       | The relay connection, the MLS group, admission and catch-up             |
-| `src/main/sync/identity.ts`      | This install's Ed25519 key; its fingerprint is the device id            |
-| `src/main/sync/contactsStore.ts` | The people this install chose to know, kept in `sync/contacts.json`     |
-| `src/main/sync/groupStore.ts`    | The group and the "this device founded it" marker                       |
-| `src/main/sync/relayConfig.ts`   | The relay address and certificate pin for this workspace                |
-| `src/main/sync/cursorStore.ts`   | The last frame applied, as the relay numbered it                        |
-| `src/main/sync/pendingStore.ts`  | A join that was still waiting when the app closed                       |
-| `src/main/sync/workspaceId.ts`   | The 64-hex sync name derived from the document's own id                 |
-| `src/main/sync/ipc.ts`           | The controller: one service per open workspace, snapshots to the window |
-| `src/main/ipc.ts`                | The validated `sync:*` channels and the commit that publishes a delta   |
-| `src/renderer/src/sync`          | The pill, the dialog and their wording                                  |
+| Path                           | Responsibility                                                          |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| `src/main/sync/service.ts`     | Planner's identity, contacts decision, invitations and lifecycle wiring |
+| `src/main/sync/identity.ts`    | This install's Ed25519 key; its fingerprint is the device id            |
+| `@suite/sync-desktop`          | The group, relay pin, cursor, pending join, frame queue and reconnect   |
+| `src/main/sync/workspaceId.ts` | The 64-hex sync name derived from the document's own id                 |
+| `src/main/sync/ipc.ts`         | The controller: one service per open workspace, snapshots to the window |
+| `src/main/ipc.ts`              | The validated `sync:*` channels and the commit that publishes a delta   |
+| `src/renderer/src/sync`        | The pill, the dialog and their wording                                  |
+
+The on-disk mechanics and the connection lifecycle come from `@suite/sync-desktop`. Planner injects
+its own data directory, its identity and its events; the package writes the same files under `sync/`
+that it always wrote, so an existing workspace opens where it did. What stays here is the trust
+decision — verifying a signed envelope and resolving its code against Planner's own
+`sync/contacts.json` — plus the capability and IPC surface.
 
 Identity, group state, cursors, a pending join and the relay pin sit in `sync/` beside the workspace
 file. The pin is `sync/relays/<workspaceId>.json`, written mode 0600: it is this installation's trust
