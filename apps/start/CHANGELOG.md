@@ -11,6 +11,42 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 No changes yet.
 
+## [0.4.0] - 2026-11-21
+
+### Added
+
+- **The hub is a Flatpak.** `run.suite.start` is built from the same unpacked tree as the AppImage
+  and the Arch package, registers `suite://`, and gets a menu entry from the desktop. Its sandbox
+  grants one door to the host, the Flatpak service, because a package manager inside a sandbox has
+  no other way to install one. That grant is host command execution, and the manifest says so.
+- **One hub, one install list.** The AppImage and Flatpak forms keep their records in
+  `~/.config/suite/start/installs.json`, adopting the old Electron data directory once, and a lock
+  stops two hubs managing the same apps. The command-line launcher reads the same file.
+- **The hub updates itself when Flatpak owns its bytes.** Its own row says `Flatpak` and offers
+  **Update Start**; the AppImage form still cannot replace itself and links to the release.
+
+### Changed
+
+- **A pre-release is `slop-<app>`.** The manifest id, the card and the documents folder finally name
+  one thing. The old `slop.<app>` form is still read, so an installed pre-release keeps its identity.
+- **The store is found, not assumed.** Start looks for the `suite` remote first and falls back to
+  `suite-local`, so the remote the packaging page tells a person to add is the one the hub uses.
+- **A tier reads stable documents and writes only its own.** The generated sandbox permission is
+  read-only on `Documents/Suite`, writable on `Documents/Suite Slop/`.
+
+### Fixed
+
+- **A placed copy no longer claims it updates itself.** Nothing called the updater; the copy is not
+  managed here, and a new build is a manual download.
+- **Updating a Flatpak app asks Flatpak to close it.** Inside the sandbox a helper's process id is
+  not the app's, so `flatpak kill` replaces the signal. An AppImage the hub launched is left for the
+  person to close.
+- **Deleting a pre-release's documents works from the sandbox.** The deletion runs through the host
+  with a validated path under `Documents/Suite Slop`, instead of asking for write access to the
+  whole documents tree.
+- **The Arch package names this repository.** Its source pointed at the archived one, and the
+  release script rewrote the version without the source.
+
 ## [0.3.15] - 2026-11-20
 
 ### Added
