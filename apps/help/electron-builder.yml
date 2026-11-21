@@ -24,11 +24,23 @@ files:
   # the last matching pattern, so these re-include what the `.md` negation drops.
   - "**/README*"
   - "**/LICENSE*"
+  - "**/NOTICE*"
+  - "**/COPYING*"
+  - "**/LICENCE*"
   - "!**/test/**"
   - "!**/tests/**"
   - "!**/__tests__/**"
   - "!**/*.test.*"
   - "!**/*.spec.*"
+  # Help's main process requires `electron` and `node:*` only; the preload
+  # requires `electron` only. Every package in `dependencies` is renderer-only
+  # and is already bundled into `out/renderer`, and `fumadocs-mdx`'s esbuild
+  # toolchain runs during the build, never from the app. The whole
+  # `node_modules` tree and its unpacked native binaries are dead weight, so
+  # this exclusion is last: it also wins over the licence re-includes above,
+  # which would otherwise pull NOTICE files back out of dependencies Help does
+  # not load.
+  - "!node_modules/**"
 
 asar: true
 

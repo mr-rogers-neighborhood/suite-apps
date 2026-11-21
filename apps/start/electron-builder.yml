@@ -39,11 +39,24 @@ files:
   # the last matching pattern, so these re-include what the `.md` negation drops.
   - "**/README*"
   - "**/LICENSE*"
+  - "**/NOTICE*"
+  - "**/COPYING*"
+  - "**/LICENCE*"
   - "!**/test/**"
   - "!**/tests/**"
   - "!**/__tests__/**"
   - "!**/*.test.*"
   - "!**/*.spec.*"
+  # Dependency files no process loads. Zod's root entry loads `v4/classic` and
+  # `v4/core` only: `src/` is TypeScript source and v3/v4-mini are entry points
+  # this app never imports. `@types/` is declarations. Verified against the
+  # packaged main/preload require graph: neither is reachable.
+  - "!node_modules/zod/src/**"
+  - "!node_modules/zod/v3/**"
+  - "!node_modules/zod/v4-mini/**"
+  - "!node_modules/zod/mini/**"
+  - "!node_modules/zod/v4/mini/**"
+  - "!node_modules/@types/**"
 
 asar: true
 
