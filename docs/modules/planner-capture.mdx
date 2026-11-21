@@ -1,0 +1,59 @@
+---
+module: apps/planner/packages/core/src/capture
+title: Planner / Capture
+summary: "The one-line grammar that turns typed text into a task draft, and nothing else."
+---
+
+Capture is one line of text turned into a task draft. The module owns the
+grammar: which tokens mean a day, a clock time, a project, a tag, a priority or
+an estimate, and the rule that a token it does not recognise stays in the title.
+It is pure. `today` and an optional implied date are parameters, so nothing here
+reads the clock, the document or the DOM.
+
+It does not own names to ids, the write, or the form. The parser returns a
+project name and tag names; the renderer resolves them through the document
+facade immediately before the write. Creating a project or a tag is a side
+effect, and a parser test that needed a workspace would stop the grammar from
+being cheap to change. The renderer's capture bar owns the input text, the
+target and the submit; this module owns only what those tokens mean.
+
+## apps/planner/packages/core/src/capture/parse.ts#parseCapture
+
+One line in, a draft out. Every token the grammar understands is removed from
+the title; a token it does not understand is kept, so `Fix the 404 page` stays a
+title and a mistyped token is visible rather than silently swallowed. The line
+is read left to right, so a later date, project or priority token replaces an
+earlier one while tags accumulate.
+
+The implied date is the contextual part. When a clock time is present and no day
+token was, the draft borrows `options.impliedDate` or `today`. That is why the
+same line schedules today from the inbox and the selected day from a day view. A
+day with no time still returns a date and a null time, and the time itself is an
+`HH:MM` string rather than a `Date`, so the draft does not depend on a timezone.
+A token that looks like a time but is impossible, such as `25:00`, is not
+consumed and stays in the title.
+
+## apps/planner/packages/core/src/capture/parse.ts#ParsedCapture
+
+The draft is names and optional fields, not a record. `dateKey`, `time`,
+`estimateMinutes`, `projectName` and `priority` are nullable, `tagNames` is a
+list, and there is no id, status or timestamp. Those belong to the writer.
+Keeping the shape this narrow is what lets capture exist without the schema and
+without a workspace, and it is why a caller must resolve `projectName` and
+`tagNames` before it can call `createTask`.
+
+## apps/planner/packages/core/src/capture/parse.ts#parseClockToken
+
+This is the one place clock syntax is decided. It accepts `9:30`, `9:30am` and
+`2pm`, rejects impossible hours and minutes, and normalises to `HH:MM`. A
+rejected token returns `null`, which sends it back to the title rather than
+inventing a time. It is private so the grammar has a single entry point; a
+second clock parser in the renderer would drift from what the tests pin.
+
+## file: apps/planner/packages/core/src/capture/parse.test.ts
+
+The test is the grammar's contract. It pins the ordinary tokens, a weekday and
+`next friday`, a meridiem time, an unknown token that must stay in the title,
+and the metadata-only line `#Planner` whose title falls back to the raw input.
+That last case is the one that proves the parser never returns an empty title by
+deleting every word it recognised.
