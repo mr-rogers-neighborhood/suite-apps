@@ -10,6 +10,7 @@ import {
 } from "./channels.js";
 import {
   appIdFromFlatpakId,
+  commitsMatch,
   FLATPAK_APP_PREFIX,
   type FlatpakApp,
   findFlatpak,
@@ -93,6 +94,20 @@ const STORE_CACHE_MS = 60_000;
 const NO_STORE: ReadonlyMap<string, string> = new Map();
 
 /**
+ * Whether this hub's own deployment has a newer build in its origin.
+ *
+ * `available` is true only after the installed commit and the origin's current
+ * commit were both read and differ. `checked` separates "the origin answered and
+ * this is current" from "nothing was asked", and `error` says why when the check
+ * could not finish. No caller may read `available` as anything but a fact.
+ */
+export interface SelfUpdateCheck {
+  readonly available: boolean;
+  readonly checked: boolean;
+  readonly error: string | null;
+}
+
+/**
  * The native backend, plus the one operation only a Flatpak deployment has.
  *
  * Kept off `PackageBackend` because it is not a general package operation: a backend
@@ -100,6 +115,13 @@ const NO_STORE: ReadonlyMap<string, string> = new Map();
  * owns the seam, so the window still never learns a second way to run `flatpak`.
  */
 export interface NativePackageBackend extends PackageBackend {
+  /**
+   * Compare the deployed hub's commit with the same origin's newest commit.
+   *
+   * A process Flatpak did not deploy returns "not checked": it has no origin to
+   * compare and no deployment Flatpak may replace.
+   */
+  checkSelfUpdate(): Promise<SelfUpdateCheck>;
   /** Ask Flatpak to replace this hub. Throws when this build is not that deployment. */
   updateSelf(): Promise<void>;
   /**
@@ -183,6 +205,96 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     );
     flatpakCache = { at: now, apps };
     return apps;
+  }
+
+  /**
+   * The last self-update answer, cached with the store.
+   *
+   * `state()` runs on every broadcast. The comparison costs two Flatpak calls,
+   * and the answer changes only when the origin or the deployment does, so a
+   * short cache is what keeps a redraw from spawning a process.
+   */
+  let selfCheckCache: { readonly at: number; readonly status: SelfUpdateCheck } | null = null;
+
+  /**
+   * Read whether this hub may update itself.
+   *
+   * Only a process Flatpak deployed as `run.suite.start` has a deployment to
+   * compare. Its own origin supplies the newest commit: measuring against a
+   * different remote would invent an update the deployment's origin does not
+   * publish. Anything missing is "not checked", never "up to date" and never
+   * an update.
+   */
+  async function checkSelfUpdate(): Promise<SelfUpdateCheck> {
+    if (sandboxId() !== SELF_FLATPAK_ID) {
+      return { available: false, checked: false, error: null };
+    }
+    const executable = await binary();
+    if (executable === null) {
+      return { available: false, checked: false, error: "Flatpak is not available" };
+    }
+    const now = Date.now();
+    if (selfCheckCache !== null && now - selfCheckCache.at < STORE_CACHE_MS) {
+      return selfCheckCache.status;
+    }
+
+    const deployment =
+      (await flatpakInstalls()).find((candidate) => candidate.applicationId === SELF_FLATPAK_ID) ??
+      null;
+    let status: SelfUpdateCheck;
+    if (deployment === null) {
+      status = {
+        available: false,
+        checked: false,
+        error: `Flatpak does not list ${SELF_FLATPAK_ID}`,
+      };
+    } else {
+      const origin = deployment.origin.trim();
+      const installed = deployment.commit ?? "";
+      if (origin.length === 0) {
+        status = {
+          available: false,
+          checked: false,
+          error: "Flatpak did not report where this build came from",
+        };
+      } else if (installed.length === 0) {
+        status = {
+          available: false,
+          checked: false,
+          error: "Flatpak did not report this build's commit",
+        };
+      } else {
+        try {
+          const offered = parseCommitOutput(
+            await runFlatpak(
+              host,
+              storeInfoArgs(origin, SELF_FLATPAK_ID, deployment.installation),
+              executable,
+            ),
+          );
+          status =
+            offered === null
+              ? {
+                  available: false,
+                  checked: false,
+                  error: `${origin} did not report a commit for ${SELF_FLATPAK_ID}`,
+                }
+              : {
+                  available: !commitsMatch(installed, offered),
+                  checked: true,
+                  error: null,
+                };
+        } catch {
+          status = {
+            available: false,
+            checked: false,
+            error: `could not read ${origin} for ${SELF_FLATPAK_ID}`,
+          };
+        }
+      }
+    }
+    selfCheckCache = { at: now, status };
+    return status;
   }
 
   /** The store remote a fresh install probes: `suite` first, then `suite-local`. */
@@ -310,6 +422,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
   }
 
   async function listing(forceOffers = false): Promise<PackageListing> {
+    if (forceOffers) selfCheckCache = null;
     const result = await discoverApps({
       roots,
       records: await registry.list(),
@@ -384,6 +497,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
     flatpakCache = null;
     channelCache = null;
     storeCache = null;
+    selfCheckCache = null;
     const version = await flatpakVersionOf(install);
     await storeCommits(await listingApps());
     return version;
@@ -460,6 +574,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
 
   return {
     list: (listOptions?: PackageListOptions) => listing(listOptions?.refresh === true),
+    checkSelfUpdate,
 
     async install(request) {
       const list = await listing();
@@ -517,6 +632,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
         flatpakCache = null;
         channelCache = null;
         storeCache = null;
+        selfCheckCache = null;
         return;
       }
       // A copy in a folder is forgotten, never deleted.
@@ -600,6 +716,11 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Nati
         throw new Error("this build is not managed by Flatpak as run.suite.start");
       }
       await flatpak(selfUpdateArgs());
+      // The deployment just moved. The next read must compare the new commit,
+      // not the one Flatpak listed before the update.
+      flatpakCache = null;
+      selfCheckCache = null;
+      storeCache = null;
     },
 
     /**

@@ -155,8 +155,6 @@ export interface AppCard {
    * is never a second install of `run.suite.slop.<app>`.
    */
   readonly switchTier: "slop" | "canary" | "beta" | null;
-  /** The risk and removal path a pre-release card states in words. */
-  readonly channelNotice: string | null;
   readonly executable: string | null;
   readonly fileExtensions: readonly string[];
   readonly lastOpenedAt: number | null;

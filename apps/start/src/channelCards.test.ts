@@ -1,5 +1,6 @@
 import type { SuiteAppManifest } from "@suite/contracts";
 import { describe, expect, it } from "vitest";
+import { APP_ICONS } from "./appIcons.js";
 import { appCards } from "./cards.js";
 import { ALL_CATALOGUE_APPS, type CatalogueApp } from "./catalogue.js";
 import { isPreReleaseId } from "./channels.js";
@@ -86,7 +87,7 @@ describe("channel-aware cards", () => {
     expect(cardsFor.map((card) => card.id)).toEqual(["canvas", "planner", "budget", "help"]);
     expect(cardsFor.find((card) => card.id === "slop-canvas")).toBeUndefined();
     expect(cardsFor[0]?.tier).toBe("stable");
-    expect(cardsFor[0]?.channelNotice).toBeNull();
+    expect(cardsFor[0]?.icon).toBe(APP_ICONS.canvas);
   });
 
   it("shows stable and one pre-release side by side, each named", () => {
@@ -100,7 +101,8 @@ describe("channel-aware cards", () => {
 
     const stable = cardsFor.find((card) => card.id === "canvas");
     const preRelease = cardsFor.find((card) => card.id === "slop-canvas");
-    expect(stable).toMatchObject({ tier: "stable", channelNotice: null, source: "folder" });
+    expect(stable).toMatchObject({ tier: "stable", source: "folder" });
+    expect(stable?.icon).toBe(APP_ICONS.canvas);
     expect(preRelease).toMatchObject({
       id: "slop-canvas",
       name: "Suite Canvas (pre-release)",
@@ -109,8 +111,14 @@ describe("channel-aware cards", () => {
       state: "current",
       switchTier: null,
     });
-    expect(preRelease?.channelNotice).toContain("Canary");
-    expect(preRelease?.channelNotice).toContain("uninstalling asks before deleting it");
+    // The pre-release card previews the stable app, so it wears the same mark.
+    expect(preRelease?.icon).toBe(APP_ICONS.canvas);
+  });
+
+  it("recognises the legacy pre-release id and still uses the stable app's mark", () => {
+    const cardsFor = cards([discovered("slop.canvas")]);
+    const preRelease = cardsFor.find((card) => card.id === "slop.canvas");
+    expect(preRelease?.icon).toBe(APP_ICONS.canvas);
   });
 
   it("offers a switch, not a second install, when two pre-release branches exist", () => {
@@ -134,8 +142,6 @@ describe("channel-aware cards", () => {
       state: "current",
       switchTier: "canary",
     });
-    expect(preRelease[0]?.channelNotice).toContain("Switching to canary keeps this install");
-    expect(preRelease[0]?.channelNotice).toContain("changes its data folder");
     expect(
       cardsFor.some((card) => card.id === "slop-canvas" && card.state === "not-installed"),
     ).toBe(false);

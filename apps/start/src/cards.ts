@@ -2,10 +2,10 @@ import { workspaceLink } from "@suite/contracts";
 import { APP_ICONS } from "./appIcons.js";
 import { type CatalogueApp, SELF_ID } from "./catalogue.js";
 import {
+  appIdFor,
   isPreReleaseId,
   PRE_RELEASE_TIERS,
   type PreReleaseTier,
-  preReleaseNotice,
   type ReleaseTier,
   tierForInstall,
   tierFromBranch,
@@ -65,12 +65,23 @@ function nameFor(path: string): string {
   return last ?? path;
 }
 
+/**
+ * The mark an app carries, including when the card names the pre-release identity.
+ *
+ * A pre-release card's id is `slop-<app>` (or the older `slop.<app>`), and the
+ * artwork belongs to the stable app it previews. Mapping the id back is what keeps
+ * the card recognisable instead of falling back to no mark at all.
+ */
+function iconFor(id: string): string | null {
+  return APP_ICONS[appIdFor(id)] ?? null;
+}
+
 export function appCards(input: CardInput): readonly AppCard[] {
   const refused: AppCard[] = input.rejected.map((install) => ({
     id: install.id ?? null,
     name: nameFor(install.path),
     source: "folder",
-    icon: install.id === undefined ? null : (APP_ICONS[install.id] ?? null),
+    icon: install.id === undefined ? null : iconFor(install.id),
     state: "refused",
     version: null,
     reason: install.reason,
@@ -78,7 +89,6 @@ export function appCards(input: CardInput): readonly AppCard[] {
     channel: "stable",
     tier: "stable",
     switchTier: null,
-    channelNotice: null,
     executable: null,
     fileExtensions: [],
     lastOpenedAt: null,
@@ -151,7 +161,7 @@ export function appCards(input: CardInput): readonly AppCard[] {
           id: entry.id,
           name: found?.manifest.name ?? entry.name,
           source,
-          icon: APP_ICONS[entry.id] ?? null,
+          icon: iconFor(entry.id),
           state,
           version: found?.manifest.version ?? null,
           reason: state === "no-release" ? "the store does not offer this app" : null,
@@ -159,10 +169,6 @@ export function appCards(input: CardInput): readonly AppCard[] {
           channel: found?.manifest.update?.channel ?? entry.channel,
           tier,
           switchTier,
-          channelNotice:
-            isPre && tier !== "stable"
-              ? preReleaseNotice(tier as PreReleaseTier, switchTier)
-              : null,
           executable: found?.executable ?? null,
           fileExtensions: found?.manifest.fileExtensions ?? entry.extensions,
           lastOpenedAt: input.recents.find((row) => row.appId === entry.id)?.openedAt ?? null,
@@ -180,7 +186,7 @@ export function appCards(input: CardInput): readonly AppCard[] {
       id: entry.manifest.id,
       name: entry.manifest.name,
       source,
-      icon: APP_ICONS[entry.manifest.id] ?? null,
+      icon: iconFor(entry.manifest.id),
       state: source === "flatpak" ? "current" : "local",
       version: entry.manifest.version,
       reason: null,
@@ -194,15 +200,6 @@ export function appCards(input: CardInput): readonly AppCard[] {
           })
         : "stable",
       switchTier: null,
-      channelNotice: isPreReleaseId(entry.manifest.id)
-        ? preReleaseNotice(
-            tierForInstall({
-              id: entry.manifest.id,
-              branch: entry.flatpak?.branch,
-              channel: entry.channel ?? entry.manifest.update?.channel,
-            }) as PreReleaseTier,
-          )
-        : null,
       executable: entry.executable,
       fileExtensions: entry.manifest.fileExtensions,
       lastOpenedAt: input.recents.find((row) => row.appId === entry.manifest.id)?.openedAt ?? null,
@@ -219,13 +216,20 @@ export interface SelfCardOptions {
   /** True when Flatpak deployed this Start, so Flatpak is its update channel. */
   readonly flatpak?: boolean;
   /**
-   * Whether the update action exists.
+   * Whether the deployment's own origin publishes a different commit.
    *
-   * A Flatpak whose application id is Start's own may ask Flatpak for the newest
-   * build. Any other id has no deployment this process may name, so it keeps the
-   * fact and loses the button rather than offering one that would fail.
+   * True only after both commits were read and compared. Any other id, a copy
+   * Flatpak does not own, and a failed check all lose the button rather than
+   * offering one that would fail or claiming an update nobody found.
    */
   readonly canUpdate?: boolean;
+  /**
+   * Whether the origin answered.
+   *
+   * This is the difference between "Flatpak reports the newest build is
+   * installed" and "not checked"; neither offers a button.
+   */
+  readonly checked?: boolean;
   /** True after Flatpak reported a successful update; the new build is not running yet. */
   readonly updated?: boolean;
   /** What Flatpak said when the update failed, when it did. */
@@ -245,26 +249,31 @@ export function selfCard(
   options: SelfCardOptions = {},
 ): AppCard {
   if (options.flatpak === true) {
-    const canUpdate = options.canUpdate === true;
+    // A successful update is the newest word even when a cached comparison still
+    // saw the old commit: the next launch is what this row is waiting for now.
+    const canUpdate = options.canUpdate === true && options.updated !== true;
     return {
       id: SELF_ID,
       name: entry.name,
       source: "flatpak",
       icon: null,
-      // "update-available" is the renderer's word for "there is something to press",
-      // not a claim that a newer version was found: Flatpak was not asked.
-      state: canUpdate ? "update-available" : "no-release",
+      // "update-available" is the renderer's word for "there is something to press".
+      // It is set only for a commit the origin really publishes.
+      state: canUpdate ? "update-available" : "current",
       version,
       reason:
-        options.error ??
-        (options.updated === true
+        options.updated === true
           ? "Flatpak deployed the newest build; it starts next launch"
-          : "not checked (Flatpak)"),
+          : (options.error ??
+            (canUpdate
+              ? "Flatpak reports a newer build is available"
+              : options.checked === true
+                ? "Flatpak reports the newest build is installed"
+                : "not checked (Flatpak)")),
       running: false,
       channel: entry.channel,
       tier: "stable",
       switchTier: null,
-      channelNotice: null,
       executable: null,
       fileExtensions: [],
       lastOpenedAt: null,
@@ -285,7 +294,6 @@ export function selfCard(
     channel: entry.channel,
     tier: "stable",
     switchTier: null,
-    channelNotice: null,
     executable: null,
     fileExtensions: [],
     lastOpenedAt: null,

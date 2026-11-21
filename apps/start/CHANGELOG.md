@@ -11,6 +11,20 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 No changes yet.
 
+## [0.5.1] - 2026-11-21
+
+### Changed
+
+- **Pre-release apps have their own section.** Stable cards keep the main list, and the
+  pre-release cards sit below it under one heading and one caution: the tier's risk, the
+  single install shared by every tier, the switch's data folder, and the separate
+  `Suite Slop` documents. The caution is no longer repeated on every card, and each
+  pre-release card wears its stable app's mark.
+- **Update Start appears only when there is an update.** Start compares the commit of its
+  own Flatpak deployment with the newest commit on the same origin. A deployment Flatpak
+  does not own, a current build and a failed check all say so and offer no button; a
+  successful update still says the new build starts next launch.
+
 ## [0.5.0] - 2026-11-21
 
 ### Changed

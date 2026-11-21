@@ -270,25 +270,38 @@ describe("appCards", () => {
 });
 
 describe("selfCard", () => {
-  it("reports a Flatpak deployment as Flatpak's to update", () => {
+  it("offers Update Start only when the origin publishes another commit", () => {
     const card = selfCard(offered({ id: "start", name: "Suite Start" }), "0.3.0", {
       flatpak: true,
       canUpdate: true,
+      checked: true,
     });
     expect(card).toMatchObject({
       id: "start",
       source: "flatpak",
       state: "update-available",
       version: "0.3.0",
-      reason: "not checked (Flatpak)",
+      reason: "Flatpak reports a newer build is available",
     });
   });
 
-  it("loses the action, and keeps the fact, when the id is not Start's own", () => {
-    const card = selfCard(offered({ id: "start" }), "0.3.0", { flatpak: true, canUpdate: false });
+  it("says the installed build is current when the origin offers nothing newer", () => {
+    const card = selfCard(offered({ id: "start" }), "0.3.0", {
+      flatpak: true,
+      checked: true,
+    });
     expect(card).toMatchObject({
       source: "flatpak",
-      state: "no-release",
+      state: "current",
+      reason: "Flatpak reports the newest build is installed",
+    });
+  });
+
+  it("offers nothing when Flatpak did not deploy this build", () => {
+    const card = selfCard(offered({ id: "start" }), "0.3.0", { flatpak: true });
+    expect(card).toMatchObject({
+      source: "flatpak",
+      state: "current",
       reason: "not checked (Flatpak)",
     });
   });
@@ -297,18 +310,23 @@ describe("selfCard", () => {
     const card = selfCard(offered({ id: "start" }), "0.3.0", {
       flatpak: true,
       canUpdate: true,
+      checked: true,
       updated: true,
     });
     expect(card.reason).toContain("starts next launch");
+    // The update already happened, so the row does not ask for it again.
+    expect(card.state).toBe("current");
   });
 
-  it("shows what Flatpak said when the update did not happen", () => {
+  it("a failed check never claims an update", () => {
     const card = selfCard(offered({ id: "start" }), "0.3.0", {
       flatpak: true,
-      canUpdate: true,
-      error: "error: app run.suite.start not installed",
+      error: "could not read suite-local for run.suite.start",
     });
-    expect(card.reason).toBe("error: app run.suite.start not installed");
+    expect(card).toMatchObject({
+      state: "current",
+      reason: "could not read suite-local for run.suite.start",
+    });
   });
 
   it("a non-Flatpak build cannot replace itself", () => {

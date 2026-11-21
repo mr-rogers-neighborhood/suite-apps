@@ -249,6 +249,104 @@ exit 0
     }
   });
 
+  it("offers a self update only when its own origin publishes another commit", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "suite-self-check-"));
+    const previous = process.env.FLATPAK_ID;
+    try {
+      const installed = "a".repeat(64);
+      const newer = "b".repeat(64);
+      const state = join(directory, "self");
+      const log = join(directory, "self.log");
+      const flatpak = join(directory, "flatpak");
+      await writeFile(`${state}-installed`, `${installed}\n`);
+      await writeFile(`${state}-offered`, `${installed}\n`);
+      await writeFile(
+        flatpak,
+        `#!/bin/sh
+STATE="${state}"
+LOG="${log}"
+printf '%s\\n' "$*" >>"$LOG"
+if [ "$1" = "list" ]; then
+  printf '[{"name":"Suite Start","application_id":"run.suite.start","version":"0.5.0","branch":"master","origin":"suite-local","installation":"user"}]\\n'
+  exit 0
+fi
+if [ "$1" = "--user" ] || [ "$1" = "--system" ]; then
+  shift
+fi
+case "$1" in
+  info)
+    shift
+    case "$1" in
+      --show-commit) cat "$STATE-installed" ;;
+      *) printf '\\nSuite Start\\n\\n       Version: 0.5.0\\n' ;;
+    esac
+    ;;
+  remote-info)
+    case "$2" in
+      --show-commit)
+        if [ -f "$STATE-fail" ]; then exit 1; fi
+        cat "$STATE-offered"
+        ;;
+    esac
+    ;;
+esac
+exit 0
+`,
+        { mode: 0o755 },
+      );
+
+      const backend = nativePackageBackend({
+        roots: [join(directory, "installs")],
+        registry: registryStore(join(directory, "data")),
+        catalogue: [CANVAS],
+        flatpak,
+        host: hostFor(false),
+      });
+
+      process.env.FLATPAK_ID = "run.suite.start";
+      // Same commit: the origin answered, and there is nothing to press.
+      expect(await backend.checkSelfUpdate()).toEqual({
+        available: false,
+        checked: true,
+        error: null,
+      });
+
+      // A newer commit on the same origin is the one update state.
+      await writeFile(`${state}-offered`, `${newer}\n`);
+      await backend.list({ refresh: true });
+      expect(await backend.checkSelfUpdate()).toEqual({
+        available: true,
+        checked: true,
+        error: null,
+      });
+
+      // A failed fetch is not an update, and not a claim that this is current.
+      await writeFile(`${state}-fail`, "1");
+      await backend.list({ refresh: true });
+      const failed = await backend.checkSelfUpdate();
+      expect(failed.available).toBe(false);
+      expect(failed.checked).toBe(false);
+      expect(failed.error).toContain("suite-local");
+
+      // The comparison asks the deployment's own origin for its own app id.
+      const commands = (await readFile(log, "utf8")).trim().split("\n");
+      expect(commands).toContain("--user info --show-commit run.suite.start");
+      expect(commands).toContain("--user remote-info --show-commit suite-local run.suite.start");
+
+      // A copy Flatpak does not own has no origin to compare and no update.
+      delete process.env.FLATPAK_ID;
+      expect(await backend.checkSelfUpdate()).toEqual({
+        available: false,
+        checked: false,
+        error: null,
+      });
+    } finally {
+      if (previous === undefined) delete process.env.FLATPAK_ID;
+      else process.env.FLATPAK_ID = previous;
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("compares an installed app with its own origin, not the first store remote", async () => {
     // `suite-local` installed this build. The public `suite` remote carries a
     // different commit; measuring against it would invent an update that the
