@@ -55,6 +55,7 @@ For the product story and the influences behind it, read
 | `packages/protocol` | `@suite/sync`: ids, roles, signed membership and role records, invites, sealed frames, relay messages, relay codes and QR. The root is pure and defines no document format. |
 | `packages/host`     | `@suite/host`: the relay — frame admission, the numbered frame log, the file store, the WebSocket server and the loopback console.                                          |
 | `src`               | `suite-sync`: the CLI over `@suite/host` (`serve`, `status`, `--version`).                                                                                                  |
+| `app`               | `@suite/sync-app`: the Flatpak's Electron shell. A tray keeps the embedded relay serving; the window shows its address, code and fingerprint.                               |
 | `docs/`             | Protocol, threat model, and the decisions behind them.                                                                                                                      |
 
 ## Commands
@@ -81,18 +82,46 @@ When Start runs the relay, it also makes and keeps the TLS pair under the relay 
 directory, mode 0600, so the fingerprint survives a restart. The Sync tab shows that fingerprint and
 opens the console; a relay you run by hand uses `--tls-cert` and `--tls-key` as the guide describes.
 
-## Run the relay on another machine
+## Run the relay
 
-A relay does not have to live on the computer running Start. Install `suite-sync` on the always-on
-machine and leave it running under systemd — [Leave a relay running](docs/how-to/relay.md) has the
-binary, the address choice, the certificate pair and the unit file. On each device, enter the relay
-address in the app's Sync dialog, for example `wss://192.168.1.20:8787/sync`, and paste the
-`certificate SHA-256 fingerprint:` line the relay printed at startup into **Relay certificate
-fingerprint**.
+The relay ships as a Flatpak, `run.suite.sync`. Install it from this checkout with
+`node scripts/flatpak.mjs --app sync`, which publishes it to the local `suite-local` repository and
+installs it; the manifest is `packaging/flatpak/run.suite.sync.yml`. The public store does not carry it
+yet: it arrives with the release that publishes the app, and from then on `flatpak install --user
+suite run.suite.sync` is the shorter path. [Leave a relay running](docs/how-to/relay.md) is the guide.
 
-Nothing else changes: the apps keep their documents, and Start remains a launcher that manages no
-relay when the relay is elsewhere. The address must be one the device can route to; `127.0.0.1` is
-always the device itself.
+The two ways to use the same build are:
+
+- **A desktop app.** `flatpak run run.suite.sync` starts a tray item and a small window. The relay runs
+  in the app's own main process, so closing the window hides it to the tray and the relay keeps
+  serving; **Quit** stops it. It listens on loopback until you widen it — the tailnet, or the whole
+  network behind a confirmation — and the window remembers that choice. The window shows the address
+  another device needs, a `suite://relay` code carrying that address and the certificate pin, the
+  fingerprint to paste into an app, and the read-only console. It also starts and stops the relay and
+  can add it to login.
+- **The headless relay.** The same install runs the CLI on a machine with no desktop:
+
+  ```sh
+  flatpak run --command=suite-sync run.suite.sync serve \
+    --host 127.0.0.1 --port 8787 --trust-all
+  ```
+
+  `serve`, `status` and `--version` are the CLI in `src`, unchanged. The Flatpak carries no Node
+  runtime of its own, so the `suite-sync` command runs the app's binary with `ELECTRON_RUN_AS_NODE=1`.
+
+The app keeps its store under its own data directory,
+`~/.var/app/run.suite.sync/data/suite-sync`, and the certificate pair in `tls/` beside it, mode 0600.
+Nothing else in the home directory is touched except one autostart entry, which the tray app writes
+only when asked. In the headless form the store is whatever `--store` names.
+
+A relay the app owns is not one Suite Start supervises: Start looks for a `suite-sync` binary through
+`SUITE_SYNC_BIN` or `PATH`, and a Flatpak install is neither. Point each device at the address the
+window shows — for example `wss://192.168.1.20:8787/sync` — and paste the `certificate SHA-256
+fingerprint:` line into **Relay certificate fingerprint**.
+
+Nothing else changes: the apps keep their documents, and Start stays a launcher that manages no relay
+when the relay runs on another machine. The address must be one the device can route to; `127.0.0.1`
+is always the device itself.
 
 ## Working in the monorepo
 

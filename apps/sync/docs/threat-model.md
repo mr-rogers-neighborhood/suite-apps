@@ -61,6 +61,41 @@ already understood, and it has no friend-code or contacts exchange. The code and
 the relay's roster is an admission list, while the contacts file is the person's trust decision, and
 neither stands in for the other.
 
+## Reach scopes
+
+The relay admits a device by what it can prove to the relay, and that is not much: it pins a device
+key on join and checks that a frame's sender holds a role. With no device registry, the signature
+check is `--trust-all` — the only mode a `serve` accepts — so **the machine that can reach the port is
+the admission control**. The app makes that an explicit choice with three scopes:
+
+| Scope                | Bind                           | Who can reach it                                   |
+| -------------------- | ------------------------------ | -------------------------------------------------- |
+| `loopback` (default) | `127.0.0.1`                    | only a process on this machine                     |
+| `tailnet`            | the first IPv4 on `tailscale0` | devices the person's Tailscale network routes here |
+| `network`            | `0.0.0.0`                      | every device that can route to this machine        |
+
+Only the network scope needs a confirmation, and the choice is stored. Selecting it is the
+acknowledgement the CLI's `--trust-all-remote` asks for; a restart does not ask again, because the
+stored choice is the opt-in, and going back to a narrower reach never asks. If Tailscale is not
+running the tailnet scope refuses that bind and the relay stays on loopback, saying so. `SUITE_SYNC_BIND`
+overrides the bind for a test or a host unit, and the app says the reach is fixed rather than
+pretending the selector decided.
+
+**What a writer on the network can do.** It can present any device key, and the relay pins it. It can
+claim an **empty** mailbox whose id it knows — the first role record may claim a workspace no owner
+has claimed — and with that role it can append frames, send invitations and removals, and fill the
+store, which is a denial of service on that mailbox. A workspace that already has an owner needs an
+invitation: the relay can be made to hold records for it, but membership is the MLS group, and a
+reachable writer cannot give itself the key to join. What it cannot do is read a frame: payloads are
+MLS ciphertext, the relay has no group key, and a device only applies a frame it can decrypt as a
+member. It cannot list workspaces, and it cannot reach the console, which is loopback-only and needs
+the token minted at startup.
+
+**What the scopes do not change.** TLS is still required off loopback and clients still pin the
+certificate: the scope decides who gets to open the socket, not what the relay can read. A tailnet is a
+network boundary somebody else operates — it narrows who arrives, and it is not a substitute for the
+group's membership rules.
+
 ## Accepted limits
 
 - **Metadata.** Workspace and device ids, device names, public keys, epochs, kinds, payload lengths,

@@ -42,8 +42,10 @@ The rules that shape this repository. Each is current; the code follows it.
 
 ## Packaging
 
-- Flatpak is the only Linux desktop form: Canvas, Planner, Budget, Help and Start. The relay is a
-  server tarball. There is no AppImage, Arch package, `deb`, `rpm` or `snap`.
+- Flatpak is the only Linux desktop form: Canvas, Planner, Budget, Help, Start and Sync. Sync's app is
+  also the relay: its tray keeps an embedded relay serving, and the same Flatpak runs the CLI
+  headlessly with `flatpak run --command=suite-sync`. There is no AppImage, Arch package, `deb`, `rpm`
+  or `snap`.
 - Start never writes a deployment. It installs, updates and removes by asking Flatpak, launches with
   `flatpak run`, and reveals a deployment. A folder copy a person places is first-class but not
   Start's: the card offers Open, Reveal and Forget, and Start does not update it.
@@ -56,7 +58,14 @@ The rules that shape this repository. Each is current; the code follows it.
 - `scripts/flatpak.mjs` builds the local deployment and signs the repository summary with the store
   key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to the public
   `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`.
-  `scripts/release.mjs` releases only the relay tarball.
+  `scripts/release.mjs` still builds the relay tarball; retiring it is a separate change.
+- The relay app's store and certificate pair live under the app's own data directory
+  (`$XDG_DATA_HOME/suite-sync`), not in a documents folder, and its one host grant outside the
+  sandbox is `xdg-config/autostart` for the login entry it writes when asked.
+- The relay's reach is a stored choice, not a bind the build ships: `loopback` by default, `tailnet`
+  when Tailscale is running, and `network` only after a confirmation in the window — the app's form
+  of the CLI's `--trust-all-remote`. `SUITE_SYNC_BIND` overrides it for a test or a host unit, and
+  the window says the reach is fixed rather than pretending the selector decides.
 - A version lives in one place and a tag names one app's release. [Version ownership](../how-to/package-and-release.md#version-ownership)
   states which file owns it and which prefix the tag uses.
 - The Flatpak store key signs the OSTree summary; the relay's update key signs its `SHA256SUMS`.

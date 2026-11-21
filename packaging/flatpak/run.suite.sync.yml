@@ -1,0 +1,81 @@
+# Suite Sync as a Flatpak.
+#
+# Build the unpacked app first, then let this manifest package it:
+#
+#   pnpm --filter @suite/sync-app run package:dir
+#   node scripts/flatpak.mjs --app sync
+#
+# The manifest packages what electron-builder produced rather than rebuilding it inside
+# flatpak-builder: the shell is built by the same gate the other artifact forms use, and the
+# sandbox should not carry a second pnpm and a network build. `org.electronjs.Electron2.BaseApp`
+# supplies zypak, which gives Electron its sandbox without a setuid chrome-sandbox.
+#
+# Two entry points come out of the one app:
+#
+#   flatpak run run.suite.sync                                   the tray app and its window
+#   flatpak run --command=suite-sync run.suite.sync serve …      the relay without a window
+#
+# The second runs `dist/cli.js` with `ELECTRON_RUN_AS_NODE=1`, because the base app has no Node
+# runtime and the relay is the same code either way.
+app-id: run.suite.sync
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: run.suite.sync
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  # The relay listens on loopback by default, but the tailnet and network scopes bind a real
+  # interface: the sandbox has to share the host's network namespace for both. That is also what
+  # makes `tailscale0` visible to the tailnet scope, so enumerating it needs no grant and no
+  # `flatpak-spawn`. Which scope is in force is the app's own stored choice.
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # A tray item is what keeps the window closable. libappindicator talks to the desktop's
+  # StatusNotifier host; Electron owns its own `org.kde.StatusNotifierItem-<pid>-<id>` name,
+  # which Flatpak grants an app for its own pid.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # "Start the relay when I log in" writes one XDG autostart entry, and this is the only host
+  # path the app writes outside its sandbox. A directory grant on a Flatpak keeps the host's
+  # own `~/.config/autostart` in place, so the session reads the file the app wrote.
+  - --filesystem=xdg-config/autostart:create
+
+modules:
+  - name: suite-sync
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/sync
+      - cp -a app/. /app/sync/
+      # Electron's XDG application id and WM_CLASS come from package.json's `desktopName`, so
+      # the BaseApp helper rewrites the asar copy to the Flatpak id. Without it Wayland groups
+      # the window under `suite-sync`.
+      - patch-desktop-filename /app/sync/resources/app.asar
+      - install -Dm755 run.suite.sync /app/bin/run.suite.sync
+      - install -Dm755 suite-sync /app/bin/suite-sync
+      - install -Dm644 run.suite.sync.desktop /app/share/applications/run.suite.sync.desktop
+      - install -Dm644 run.suite.sync.metainfo.xml /app/share/metainfo/run.suite.sync.metainfo.xml
+      - install -Dm644 icons/run.suite.sync-48.png /app/share/icons/hicolor/48x48/apps/run.suite.sync.png
+      - install -Dm644 icons/run.suite.sync-64.png /app/share/icons/hicolor/64x64/apps/run.suite.sync.png
+      - install -Dm644 icons/run.suite.sync-128.png /app/share/icons/hicolor/128x128/apps/run.suite.sync.png
+      - install -Dm644 icons/run.suite.sync-256.png /app/share/icons/hicolor/256x256/apps/run.suite.sync.png
+      - install -Dm644 icons/run.suite.sync-512.png /app/share/icons/hicolor/512x512/apps/run.suite.sync.png
+    sources:
+      - type: dir
+        path: ../../apps/sync/app/release/linux-unpacked
+        dest: app
+      - type: file
+        path: run.suite.sync
+      - type: file
+        path: suite-sync
+      - type: file
+        path: run.suite.sync.desktop
+      - type: file
+        path: run.suite.sync.metainfo.xml
+      - type: dir
+        path: icons
+        dest: icons

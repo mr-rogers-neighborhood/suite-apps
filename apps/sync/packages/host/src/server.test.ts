@@ -818,3 +818,23 @@ describe("the role record a host is asked to keep", () => {
     expect(second_).toEqual({ ok: false, reason: "not-owner" });
   });
 });
+
+describe("a bind that cannot happen", () => {
+  it("rejects with the listen error instead of throwing from inside it", async () => {
+    const first = await started();
+    // Ask for the port the first host is already holding. Before the listener had its own
+    // `error` handler, `ws` re-emitted this failure and the process saw an uncaught
+    // exception before the promise the caller awaits could reject.
+    await expect(
+      createSyncServer({
+        registry: new HostRegistry(),
+        host: "127.0.0.1",
+        port: first.server.port,
+        store: new MemoryHostStore(),
+        verifyFrame: ed25519Verifier,
+        verifyRole: ed25519Verifier,
+      }),
+    ).rejects.toMatchObject({ code: "EADDRINUSE" });
+    await first.server.close();
+  });
+});

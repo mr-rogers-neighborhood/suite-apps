@@ -42,6 +42,7 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/start` | `apps/start` | Hub |
 | `@suite/help` | `apps/help` | Documentation app: explorer and handbook |
 | `@suite/sync-server` | `apps/sync` | Sync server |
+| `@suite/sync-app` | `apps/sync/app` | Sync tray app and its embedded relay |
 | `@suite/sync` | `apps/sync/packages/protocol` | Sync protocol |
 | `@suite/host` | `apps/sync/packages/host` | Sync host |
 | `@suite/go-app` | `apps/go` | Go container |

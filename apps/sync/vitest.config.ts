@@ -42,6 +42,16 @@ export default defineConfig({
           include: ["src/**/*.test.ts"],
         },
       },
+      {
+        // The tray app's decisions — the menu, the code, the close, the autostart file — are
+        // pure. Its wiring lives in `main.ts`, which needs a display and is exercised by a
+        // packaged run instead.
+        test: {
+          name: "app",
+          environment: "node",
+          include: ["app/src/**/*.test.ts"],
+        },
+      },
     ],
   },
 });

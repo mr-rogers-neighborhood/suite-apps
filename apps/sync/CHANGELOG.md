@@ -13,6 +13,29 @@ Entries stop at 0.4.0 and resume at 0.11.3, the first version released from this
 Versions 0.5.0 through 0.11.2 carry tags in the standalone repository but no written notes here, and
 this file does not invent them; every release from here adds its section first.
 
+## [Unreleased]
+
+### Added
+
+- **The relay as a desktop app.** `run.suite.sync` is a Flatpak with a tray and a small window. The
+  relay runs in the app's own main process, so closing the window hides it to the tray and the relay
+  keeps serving; the window shows the address, the relay code, the certificate fingerprint and the
+  console, and can start or stop the relay. The same Flatpak is the headless relay:
+  `flatpak run --command=suite-sync run.suite.sync serve`. It is installed from a checkout with
+  `node scripts/flatpak.mjs --app sync` until the release that publishes the app to the store lands.
+- **Starting at login** writes one XDG autostart entry and nothing else outside the sandbox. The
+  manifest grants exactly `--filesystem=xdg-config/autostart:create` for it.
+- **Who can reach the relay is a choice, loopback by default.** The window's selector offers this
+  device (the default), the tailnet (`tailscale0`, read from the shared network namespace), and the
+  whole network. The network scope is the acknowledgement the CLI's `--trust-all-remote` asks for:
+  it warns before it applies, the main process refuses an unconfirmed change, and the choice is
+  stored in the app's own config so a login launch keeps it. `SUITE_SYNC_BIND` overrides the bind,
+  and the window's sentence is derived from the address actually bound, so a literal bind says which
+  network it exposes.
+- **`@suite/host` can make the TLS pair it serves** (`ensureSelfSignedPair`), so an app that embeds a
+  relay keeps one fingerprint across restarts. A bind that fails now rejects with the listen error
+  instead of surfacing as an uncaught exception from the WebSocket server.
+
 ## [0.11.3] - 2026-11-20
 
 The first relay artifact published from the monorepo.

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Suite Sync</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="head">
+        <h1>Suite Sync</h1>
+        <p id="status" class="status">Starting…</p>
+      </header>
+
+      <section class="block" aria-labelledby="address-label">
+        <h2 id="address-label" class="label">Address</h2>
+        <div class="row">
+          <code id="address" class="value">—</code>
+          <button id="copy-link" type="button" disabled>Copy link</button>
+        </div>
+      </section>
+
+      <section class="block" aria-labelledby="scope-label">
+        <h2 id="scope-label" class="label">Who can reach it</h2>
+        <div id="scopes" class="scopes" role="radiogroup" aria-labelledby="scope-label"></div>
+        <p id="scope-note" class="note" hidden></p>
+        <div id="scope-confirm" class="confirm" hidden>
+          <p id="scope-warning" class="confirm-text"></p>
+          <div class="actions">
+            <button id="scope-cancel" type="button">Cancel</button>
+            <button id="scope-continue" class="danger" type="button">Use this network</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="code" aria-labelledby="code-label">
+        <h2 id="code-label" class="label">Relay code</h2>
+        <canvas id="qr" width="480" height="480" role="img" aria-label="Relay code"></canvas>
+        <p id="code-note" class="note">
+          The code carries this relay's address and certificate pin. A phone or another
+          computer scans it to meet the relay.
+        </p>
+      </section>
+
+      <section class="block" aria-labelledby="fingerprint-label">
+        <h2 id="fingerprint-label" class="label">Certificate SHA-256 fingerprint</h2>
+        <div class="row">
+          <code id="fingerprint" class="value wrap">—</code>
+          <button id="copy-fingerprint" type="button" disabled>Copy</button>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button id="toggle" class="primary" type="button">Stop relay</button>
+        <button id="console" type="button" disabled>Open console</button>
+      </div>
+
+      <label class="autostart">
+        <input id="autostart" type="checkbox" />
+        <span>Start the relay when I log in</span>
+      </label>
+
+      <p id="problem" class="problem" role="status" hidden></p>
+      <p id="store" class="note"></p>
+    </main>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

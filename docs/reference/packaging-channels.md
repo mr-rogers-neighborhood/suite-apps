@@ -1,17 +1,18 @@
 # Packaging channels
 
 Linux desktop apps in the suite ship as Flatpaks. Suite Go ships as a debug-signed Android APK. The
-relay is a server tarball. The forms differ in **who owns the installed files**, and that decides who
+relay is one of the Flatpaks: `run.suite.sync` has a tray app for a desktop and the same app's CLI for
+a machine with no display. The forms differ in **who owns the installed files**, and that decides who
 may update them.
 
 | Form | Built for | Who owns the files | Updates arrive by | Root |
 | --- | --- | --- | --- | --- |
-| Flatpak | Canvas, Planner, Budget, Help and the hub | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
+| Flatpak | Canvas, Planner, Budget, Help, the hub and Sync | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
 | Debug APK | Suite Go | the person, through `adb` or the file manager | the person installs the next APK | no |
-| Relay tarball | `suite-sync` | the person, under `/opt` | the person replaces the tree | yes |
+| Relay tarball (retiring) | `suite-sync` on a host without Flatpak | the person, under `/opt` | the person replaces the tree | yes |
 
-There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, the relay
-is not an app, and Suite Go has no Play Store listing.
+There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, Sync is an
+app the hub lists like the rest, and Suite Go has no Play Store listing.
 
 The release tiers a build can carry, and what each promises, are [Channels](../explanation/channels.md).
 
@@ -34,7 +35,7 @@ That is why there are two writers, and neither is Start:
 
 ## Flatpak
 
-Canvas, Planner, Budget, Help and the hub each have a manifest beside the others:
+Canvas, Planner, Budget, Help, the hub and Sync each have a manifest beside the others:
 
 ```
 packaging/flatpak/run.suite.canvas.yml
@@ -42,6 +43,7 @@ packaging/flatpak/run.suite.planner.yml
 packaging/flatpak/run.suite.budget.yml
 packaging/flatpak/run.suite.help.yml
 packaging/flatpak/run.suite.start.yml
+packaging/flatpak/run.suite.sync.yml
 ```
 
 The manifest packages the unpacked build `package:dir` produced, using zypak from
@@ -54,6 +56,7 @@ node scripts/flatpak.mjs --app planner         # Planner, same path
 node scripts/flatpak.mjs --app budget          # Budget, same path
 node scripts/flatpak.mjs --app start           # the hub, same path
 node scripts/flatpak.mjs --app help             # Help
+node scripts/flatpak.mjs --app sync             # the relay: tray app and headless CLI
 node scripts/flatpak.mjs --app planner --no-build   # reuse release/linux-unpacked
 node scripts/flatpak.mjs --app planner --channel slop  # pre-release id on branch slop
 flatpak run run.suite.planner
@@ -80,11 +83,30 @@ Canvas writes `Documents/Suite/Canvas`, Planner writes `Documents/Suite/Planner`
 `--share=network` because they sync a workspace with the other devices in it. Budget has no network
 permission: it has no bank sync, no updater and no other client.
 
+Sync is the one app granted no documents folder at all. Its sandbox has `--share=network` because it
+is the relay other devices connect to, `--talk-name=org.kde.StatusNotifierWatcher` for its tray item,
+and one host path, `--filesystem=xdg-config/autostart:create`, for the single autostart entry it
+writes when a person asks. Its store and certificate pair live in the app's own data directory.
+
 The `.desktop` file is named for the Flatpak id, and each app's `desktopName` is that id, so Wayland
-associates the window with the entry and keeps its icon. Planner and Budget follow that rule; Canvas's
-shell still declares the older `suite-canvas.desktop` name. A pre-release reuses the stable manifest's
-runtime but replaces its documents grant: the stable folder is read-only, and the pre-release writes
-`Suite Slop`. It generates its own id, desktop entry, metainfo and icon names.
+associates the window with the entry and keeps its icon. Planner, Budget and Sync follow that rule;
+Canvas's shell still declares the older `suite-canvas.desktop` name. A pre-release reuses the stable
+manifest's runtime but replaces its documents grant: the stable folder is read-only, and the
+pre-release writes `Suite Slop`. It generates its own id, desktop entry, metainfo and icon names.
+
+### The relay as a Flatpak
+
+`node scripts/flatpak.mjs --app sync` builds `run.suite.sync` from the same unpacked tree and zypak
+base. The app has two entry points and both are inside the one sandbox:
+
+```sh
+flatpak run run.suite.sync                                  # tray app and window
+flatpak run --command=suite-sync run.suite.sync serve …     # the relay without a window
+```
+
+The second is a launcher that runs the app's own binary with `ELECTRON_RUN_AS_NODE=1`, because the
+base app carries no Node runtime. `scripts/flatpak.mjs` refuses `--channel` for Sync: it ships no
+`suite.app.json`, and a tier would be a second mailbox on the same data.
 
 ### The hub as a Flatpak
 
@@ -232,16 +254,41 @@ deployed.
 directory, such as Orca, hides the real user installation; run with
 `XDG_DATA_HOME=$HOME/.local/share` to see it.
 
-## Relay tarball
+## The relay
 
-`suite-sync` is a server binary, not an app: it has no Electron shell, no Flatpak and no update feed.
-It ships as `suite-sync-<version>-<arch>.tar.gz` on `sync-v<version>`, with a `SHA256SUMS` list signed
-by the update key. The tarball carries the CLI, its JavaScript dependencies and a launcher, but not a
-Node runtime; the launcher needs Node.js 22 or later on the host.
+`run.suite.sync` is the install path for the relay. It is a Flatpak like the apps, and it has two
+entry points:
+- **The tray app.** `flatpak run run.suite.sync` keeps an embedded relay serving while its window is
+  hidden. It shows the address, the relay code and the certificate fingerprint, starts and stops the
+  relay, and can write the one autostart entry that starts it at login. The store lives in the app's
+  own data directory, `~/.var/app/run.suite.sync/data/suite-sync`.
 
-Suite Start supervises a relay it finds through `SUITE_SYNC_BIN` or `PATH`; it never updates one. The
-download, checksum and signature checks are in
-[Leave a relay running](../../apps/sync/docs/how-to/relay.md#1-install-the-relay).
+  Who can reach it is a stored choice: loopback by default, the machine's tailnet when Tailscale is
+  running, or the whole network after a confirmation in the window. The manifest needs no grant for
+  the wider two — `--share=network` already shares the host's network namespace, which is also what
+  makes `tailscale0` visible. The choice is `$XDG_CONFIG_HOME/suite-sync/relay.json` in the app's own
+  config; `SUITE_SYNC_BIND` overrides the bind for a test or a host unit.
+- **The headless CLI.** `flatpak run --command=suite-sync run.suite.sync serve …` is the same relay
+  without a window, for a machine that has no desktop. The launcher runs the app's binary with
+  `ELECTRON_RUN_AS_NODE=1`, because the Flatpak base carries no Node runtime.
+
+[Leave a relay running](../../apps/sync/docs/how-to/relay.md) is the install and operation guide.
+
+Today it is installed from a checkout: `node scripts/flatpak.mjs --app sync` publishes it to
+`suite-local` and installs it. The public store does not carry `run.suite.sync` yet — it joins the
+store with the release that publishes the app — so `flatpak install --user suite run.suite.sync` is
+the command from that release on, not before. Every other sentence here about how the relay is
+installed, run and updated is true of the local build now.
+
+`suite-sync-<version>-<arch>.tar.gz` on `sync-v<version>` still exists: a tarball with the CLI, its
+JavaScript dependencies and a launcher, but not a Node runtime, plus a `SHA256SUMS` list signed by the
+update key. It is for a host without Flatpak. The release script still builds and signs it; removing it
+from `scripts/release.mjs` is a separate change that has not landed. Nothing in the docs above makes a
+new install use it.
+
+Suite Start supervises a relay it finds through `SUITE_SYNC_BIN` or `PATH`; it never updates one, and a
+Flatpak install is neither, so Start reports no relay and stays a launcher. Each device enters the
+address and pin the app shows.
 
 ## Android APK
 
@@ -279,5 +326,6 @@ to download.
 
 The Flatpak store key signs the OSTree summary; `flatpak install` and `flatpak update` verify the
 summary and every object's content hash against the public half in the `.flatpakrepo`. The relay's
-update key signs `SHA256SUMS`, and a person verifies it before installing the tree. The two keys are
-separate and rotate separately. [Manage signing keys](../how-to/keys.md) owns the procedures.
+update key still signs the retiring tarball's `SHA256SUMS`, and a person verifies it before installing
+that tree. The two keys are separate and rotate separately. [Manage signing
+keys](../how-to/keys.md) owns the procedures.
