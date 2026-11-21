@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useUiStore } from "../store/uiStore";
@@ -77,5 +77,21 @@ describe("Shell navigation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close navigation" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull());
+  });
+
+  it("should offer the registered views from the bar without leaving the rail", async () => {
+    render(<Shell />);
+
+    const trigger = screen.getByRole("button", { name: "Switch view (Today)" });
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    const menu = await screen.findByRole("menu");
+
+    expect(within(menu).getByText("Inbox")).toBeInTheDocument();
+    expect(within(menu).getByText("Probe")).toBeInTheDocument();
+
+    fireEvent.click(within(menu).getByText("Probe"));
+
+    expect(await screen.findByRole("region", { name: "Probe view" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Probe" })).toHaveAttribute("aria-current", "page");
   });
 });

@@ -4,9 +4,18 @@ The app is one window, one budget, one month at a time.
 
 ## Shell
 
+The top bar is the shared `@suite/ui` `MenuBar`. Its zones carry the budget's own material: the Suite
+Budget mark (a link back to **All budgets**), the budget name as context, a Plan/Accounts/Reports view
+switcher, the command palette trigger as search, Save status, undo, redo, import and **Add transaction**
+as actions, and the theme control. Below `md` the wide zones hide, leaving the rail as the navigation and
+**Add transaction** as the bar's control.
+
 A left sidebar holds the budget name, the three main views (Plan, Accounts, Reports), the accounts with
 their balances, and the tools (Schedules, Payees, Rules). The footer holds Export and **All budgets**.
-The top bar names the current view and holds Undo, Redo, Search, Import, and Add transaction.
+The rail remains the full navigation at every width; the bar's switcher is the compact one.
+
+The window auto-hides its native menu on Linux and Windows (`autoHideMenuBar`). The bar is the visible
+menu, and the native accelerators still fire without a second menu drawn beside it.
 
 The launcher is the first screen: recent budgets, a new-budget wizard, and an import door. There is no
 account and no settings page that belongs to a server.
@@ -116,4 +125,5 @@ a11y addon.
 ## Theme
 
 Dark first, system light. The surfaces and typography match Suite Planner; the accent is Suite Budget's
-green. Charts use the five chart tokens and remain legible in both schemes.
+green. Charts use the five chart tokens and remain legible in both schemes. The theme control sits in
+the bar's controls from `lg` up and in the rail below that, so there is one copy at every width.

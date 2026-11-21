@@ -56,7 +56,10 @@ export function createMainWindow(): BrowserWindow {
     ...(icon === null ? {} : { icon }),
     title: "Suite Budget",
     backgroundColor: "#0b0d12",
-    autoHideMenuBar: false,
+    // The bar in the renderer is the menu now. A second, always-visible native menu on
+    // Linux and Windows would offer the same commands beside it, so it hides and keeps only
+    // its accelerators, exactly as Planner's does.
+    autoHideMenuBar: process.platform !== "darwin",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,

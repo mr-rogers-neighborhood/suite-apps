@@ -46,7 +46,10 @@ export function Sidebar({
   const offBudget = open.filter((account) => !account.onBudget);
 
   return (
-    <aside className="flex w-[236px] shrink-0 flex-col border-r border-line bg-panel">
+    <aside
+      aria-label="Navigation"
+      className="flex w-[236px] shrink-0 flex-col border-r border-line bg-panel"
+    >
       <div className="flex items-center gap-2.5 px-4 pb-4 pt-5">
         <BudgetMark size="sm" />
         <div className="min-w-0">
@@ -57,7 +60,7 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="px-3 pb-2">
+      <div className="px-3 pb-2 lg:hidden">
         <ThemePicker />
       </div>
 

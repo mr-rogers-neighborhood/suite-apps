@@ -24,7 +24,7 @@ const MODES: readonly { readonly value: ThemeMode; readonly label: string }[] = 
   { value: "dark", label: "Dark" },
 ];
 
-export function ThemePicker() {
+export function ThemePicker({ layout = "stacked" }: { readonly layout?: "stacked" | "inline" }) {
   const [choice, setChoice] = useState<ThemeChoice>(() => readStoredTheme(window.localStorage));
 
   const apply = (next: ThemeChoice) => {
@@ -32,15 +32,21 @@ export function ThemePicker() {
     setChoice(next);
   };
 
+  const inline = layout === "inline";
+
   return (
-    <div className="space-y-1.5">
+    <div className={inline ? "flex items-center gap-1.5" : "space-y-1.5"}>
       <label className="flex items-center gap-2 text-[10px] text-faint">
-        <span className="w-14 shrink-0">Theme</span>
+        <span className={inline ? "sr-only" : "w-14 shrink-0"}>Theme</span>
         <select
           aria-label="Theme"
           value={choice.preset}
           onChange={(event) => apply({ ...choice, preset: event.target.value })}
-          className="min-w-0 flex-1 rounded-md border border-line bg-panel px-1.5 py-1 text-[11px] text-ink"
+          className={
+            inline
+              ? "w-28 rounded-md border border-line bg-panel px-1.5 py-1 text-[11px] text-ink"
+              : "min-w-0 flex-1 rounded-md border border-line bg-panel px-1.5 py-1 text-[11px] text-ink"
+          }
         >
           {themeOptions().map((preset) => (
             <option key={preset.id} value={preset.id}>
@@ -50,12 +56,16 @@ export function ThemePicker() {
         </select>
       </label>
       <label className="flex items-center gap-2 text-[10px] text-faint">
-        <span className="w-14 shrink-0">Brightness</span>
+        <span className={inline ? "sr-only" : "w-14 shrink-0"}>Brightness</span>
         <select
           aria-label="Brightness"
           value={choice.mode}
           onChange={(event) => apply({ ...choice, mode: event.target.value as ThemeMode })}
-          className="min-w-0 flex-1 rounded-md border border-line bg-panel px-1.5 py-1 text-[11px] text-ink"
+          className={
+            inline
+              ? "w-28 rounded-md border border-line bg-panel px-1.5 py-1 text-[11px] text-ink"
+              : "min-w-0 flex-1 rounded-md border border-line bg-panel px-1.5 py-1 text-[11px] text-ink"
+          }
         >
           {MODES.map((mode) => (
             <option key={mode.value} value={mode.value}>

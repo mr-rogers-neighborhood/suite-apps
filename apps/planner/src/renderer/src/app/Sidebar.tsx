@@ -1,12 +1,13 @@
 import { todayKey } from "@suite/planner-core";
-import { Button, IconButton, Modal, PrivacyLine } from "@suite/ui";
-import { Download, Upload, X } from "lucide-react";
+import { IconButton, Modal, PrivacyLine } from "@suite/ui";
+import { X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { getBridge } from "../platform/bridge";
 import { useUiStore } from "../store/uiStore";
 import { ThemePicker } from "../theme/ThemePicker";
 import { PlannerMark } from "./PlannerMark";
 import { views } from "./views";
+import { WorkspaceActions } from "./WorkspaceActions";
 
 /**
  * The desktop rail.
@@ -51,7 +52,6 @@ function SidebarContent({
   const view = useUiStore((state) => state.view);
   const setView = useUiStore((state) => state.setView);
   const setSelectedDate = useUiStore((state) => state.setSelectedDate);
-  const setNotice = useUiStore((state) => state.setNotice);
   const [workspacePath, setWorkspacePath] = useState<string>("");
 
   useEffect(() => {
@@ -60,24 +60,6 @@ function SidebarContent({
       .then((info) => setWorkspacePath(info.path))
       .catch(() => setWorkspacePath(""));
   }, []);
-
-  async function exportWorkspace(): Promise<void> {
-    try {
-      const result = await getBridge().exportWorkspace();
-      if (!result.canceled) setNotice(`Exported to ${result.path ?? "your chosen file"}`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Export failed");
-    }
-  }
-
-  async function importWorkspace(): Promise<void> {
-    try {
-      const result = await getBridge().importWorkspace();
-      if (!result.canceled) setNotice("Workspace imported");
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Import failed");
-    }
-  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -91,7 +73,7 @@ function SidebarContent({
         )}
       </div>
 
-      <div className="px-3 pb-2">
+      <div className="px-3 pb-2 lg:hidden">
         <ThemePicker />
       </div>
 
@@ -115,16 +97,7 @@ function SidebarContent({
       </nav>
 
       <div className="mt-auto space-y-3 border-t border-line p-4">
-        <div className="flex gap-2">
-          <Button size="sm" className="flex-1" onClick={() => void exportWorkspace()}>
-            <Download size={13} />
-            Export
-          </Button>
-          <Button size="sm" className="flex-1" onClick={() => void importWorkspace()}>
-            <Upload size={13} />
-            Import
-          </Button>
-        </div>
+        <WorkspaceActions className="flex gap-2 md:hidden" grow />
         <PrivacyLine {...(workspacePath ? { where: workspacePath } : {})} />
       </div>
     </div>

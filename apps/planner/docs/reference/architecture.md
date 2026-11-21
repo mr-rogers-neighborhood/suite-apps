@@ -63,6 +63,22 @@ rail's "Soon" list stays for surfaces that do not exist yet. An id this build do
 store written by a different build — opens `today` rather than an empty pane. The Projects, Tags and
 Upcoming surfaces are described in [projects-tags-upcoming.md](projects-tags-upcoming.md).
 
+## Window chrome
+
+`Shell.tsx` renders the shared `@suite/ui` `MenuBar` above the active view. Its zones carry the material
+this app has: the Planner mark as a link back to today, the workspace file's name as context, a compact
+view switcher over the same `views` registry, export and import in the actions, and the theme picker in
+the controls. The rail stays the full navigation, and the bar's switcher is the compact one. Planner has
+no command palette and no sync, so the search, peers and sync zones stay empty rather than holding a
+control that does nothing.
+
+Below `md` the rail is not rendered: the bar's navigation button opens `SidebarDrawer`, which carries the
+same navigation, theme and export/import, and the bar hides its wide zones so the day view keeps the
+width. The bar therefore adds no horizontal scrolling at 360, 390 or 430 px.
+
+The Electron window auto-hides its native menu on Linux and Windows (`autoHideMenuBar`), so the in-app
+bar is the visible menu and the native accelerators do not draw a second copy beside it.
+
 ## Why main is the authority
 
 The renderer is sandboxed and its lifetime is a window. The scheduler has to outlive the window, and
