@@ -8,7 +8,8 @@
   "description": "The Suite relay as a desktop app: the tray keeps one running, the window shows its address and code.",
   "main": "./dist/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/stage.mjs",
+    "build:deps": "pnpm --filter @suite/sync --filter @suite/host --filter @suite/sync-server --workspace-concurrency=1 run build",
+    "build": "pnpm run build:deps && tsc -p tsconfig.build.json && node scripts/stage.mjs",
     "package:dir": "pnpm build && electron-builder --dir",
     "start": "electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
