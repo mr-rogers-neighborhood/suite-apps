@@ -165,4 +165,32 @@ describe("useLibraryItems", () => {
     const updatedCardItem = result.current.cardItems.find((item) => item.id === card2.id);
     expect(updatedCardItem?.boards).toEqual([{ id: board.id, name: board.name }]);
   });
+
+  it("lists every board a card sits on, in the order the document returns placements", () => {
+    const { workspace, snapshot: initialSnapshot, board, card1 } = createSeededWorkspace();
+    const second = workspace.createBoard({ name: "Second" });
+    workspace.placeCard(second.id, card1.id, { x: 20, y: 20 });
+    const sectionIdsFor = () => [];
+
+    const { result } = renderHook(() =>
+      useLibraryItems({
+        snapshot: {
+          ...initialSnapshot,
+          boards: workspace.listBoards(),
+          placements: workspace.listPlacements(),
+        },
+        workspace,
+        sectionIdsFor,
+        libraryOpen: true,
+      }),
+    );
+
+    const item = result.current.cardItems.find((entry) => entry.id === card1.id);
+    // The first placement was made before the second, which is the order the drawer rows
+    // have always used; the index that replaced the per-card walk must keep it.
+    expect(item?.boards).toEqual([
+      { id: board.id, name: board.name },
+      { id: second.id, name: second.name },
+    ]);
+  });
 });

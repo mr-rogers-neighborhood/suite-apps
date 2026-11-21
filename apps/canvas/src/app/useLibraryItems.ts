@@ -61,6 +61,30 @@ export function useLibraryItems({
   // facet needs the counts computed against the others.
   const boardItems = useMemo(() => toBoardItems(snapshot), [snapshot]);
 
+  /**
+   * Placements by card, in the order `listCardPlacements` returns them.
+   *
+   * Asking the document per card walks every placement every time, and the library asks
+   * for every card in the workspace: on a board with thousands of placements that is
+   * O(cards × placements) on open and again on every change while the drawer is up. One
+   * pass over the snapshot is the same answer for the whole list.
+   */
+  const boardsByCard = useMemo(() => {
+    const names = new Map(snapshot.boards.map((board) => [board.id, board.name]));
+    const byCard = new Map<string, Array<{ id: string; name: string }>>();
+    const ordered = [...snapshot.placements].sort(
+      (a, b) => a.createdAt - b.createdAt || a.boardId.localeCompare(b.boardId),
+    );
+    for (const placement of ordered) {
+      const name = names.get(placement.boardId);
+      if (name === undefined) continue;
+      const boards = byCard.get(placement.cardId);
+      if (boards === undefined) byCard.set(placement.cardId, [{ id: placement.boardId, name }]);
+      else boards.push({ id: placement.boardId, name });
+    }
+    return byCard;
+  }, [snapshot.placements, snapshot.boards]);
+
   const toItem = useCallback(
     (cardId: string): LibraryItem => {
       void snapshot;
@@ -68,17 +92,14 @@ export function useLibraryItems({
       return {
         id: cardId,
         title: workspace.displayTitle(cardId),
-        boards: workspace.listCardPlacements(cardId).flatMap((placement) => {
-          const board = workspace.getBoard(placement.boardId);
-          return board ? [{ id: board.id, name: board.name }] : [];
-        }),
+        boards: boardsByCard.get(cardId) ?? [],
         typeIds: card?.typeIds ?? [],
         tagIds: card?.tags ?? [],
         sectionIds: sectionIdsFor(cardId),
         properties: card?.properties ?? {},
       };
     },
-    [workspace, sectionIdsFor, snapshot],
+    [workspace, sectionIdsFor, snapshot, boardsByCard],
   );
 
   // A board is a row in the Cards tab and never in the inbox: it has no placement, so
