@@ -24,7 +24,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Linux packaging | Working | Flatpak for Canvas, Planner, Budget, Help and Start; the relay ships as a tarball; no AppImage or Arch package |
 | Flatpak | Working | Signed local store and a published `suite-dev` remote: Canvas, Planner, Budget, Help and Start install and update through Flatpak; Start compares a deployment with its own origin; [Packaging channels](packaging-channels.md#flatpak) owns the remote |
 | macOS and Windows | Not built | No signing identity, so nothing is published |
-| Accessibility | Partial | Contrast and start screens are machine-checked; no full manual pass recorded |
+| Accessibility | Partial | Contrast is machine-checked in the desktop apps; Canvas runs axe over its Storybook stories, Planner has no axe gate and Budget's Storybook panel does not fail the build; no full manual pass recorded. The app statements own the detail: [Canvas](../../apps/canvas/ACCESSIBILITY.md), [Planner](../../apps/planner/ACCESSIBILITY.md), [Budget](../../apps/budget/ACCESSIBILITY.md), [Start](../../apps/start/ACCESSIBILITY.md) |
 | The gate | Working | Local, at the root; `--fresh` proves a commit rather than a working tree |
 
 ## Reading the table

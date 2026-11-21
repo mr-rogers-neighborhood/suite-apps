@@ -13,12 +13,28 @@ working.
 | Status     | Meaning                                                                      |
 | ---------- | ---------------------------------------------------------------------------- |
 | **Gated**  | An automated check fails the build if this regresses.                        |
+| **Partial** | An automated check covers some apps; the rest need the manual step.        |
 | **Manual** | A step in `manual-testing.md` covers it. Not verified until someone runs it. |
 | **N/A**    | Does not apply to this software, with the reason given.                      |
 | **Gap**    | Known not to meet it yet. Tracked, not hidden.                               |
 
 Totals: **86 criteria** in WCAG 2.2 — WCAG 2.1's 78, plus 9 new, minus 4.1.1 Parsing, which 2.2
 removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
+
+## Machine checks by app
+
+| App | Gated check | Not gated |
+| --- | --- | --- |
+| Canvas | `@suite/theme` contrast; axe over the Storybook stories | Running-window contrast, focus order and screen-reader output |
+| Planner | `@suite/theme` contrast; lint, types, unit tests and build | No axe in the gate; no manual pass recorded |
+| Budget | `@suite/theme` contrast | Storybook's a11y panel reports without failing the build; no axe against the running app; no manual pass recorded |
+| Start | `@suite/theme` contrast | No axe run; no manual pass recorded |
+| Sync | — | No user interface |
+
+A **Gated** row is a check that fails the build where it exists; it is not a claim that every app
+runs it. A **Partial** row is gated in the app named in its How column and manual elsewhere. Help and
+Go have no accessibility statement, so this table makes no claim about them; each app's
+`ACCESSIBILITY.md` owns its detail.
 
 ## Principle 1: Perceivable
 
@@ -34,14 +50,14 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 | 1.2.7  | AAA   | Extended Audio Description             | N/A    | No prerecorded media.                                                                                          |
 | 1.2.8  | AAA   | Media Alternative (Prerecorded)        | N/A    | No prerecorded media.                                                                                          |
 | 1.2.9  | AAA   | Audio-only (Live)                      | N/A    | No live media.                                                                                                 |
-| 1.3.1  | A     | Info and Relationships                 | Gated  | axe checks landmarks, list structure, and heading order.                                                       |
+| 1.3.1  | A     | Info and Relationships                 | Partial | Canvas's axe run checks landmarks, list structure and heading order; the other apps need the manual pass.    |
 | 1.3.2  | A     | Meaningful Sequence                    | Manual | Keyboard sweep, step 1: focus order matches visual order.                                                      |
 | 1.3.3  | A     | Sensory Characteristics                | Manual | Wording never relies on "the button on the right".                                                             |
 | 1.3.4  | AA    | Orientation                            | N/A    | Desktop windows are resizable in both orientations by the OS.                                                  |
 | 1.3.5  | AA    | Identify Input Purpose                 | Manual | No autofill-relevant personal inputs except Budget amounts.                                                    |
 | 1.4.1  | A     | Use of Color                           | Manual | Sweep step 6, greyscale. **Highest risk in the suite**: Canvas colours cards by type.                          |
 | 1.4.2  | A     | Audio Control                          | N/A    | Nothing plays audio.                                                                                           |
-| 1.4.3  | AA    | Contrast (Minimum)                     | Gated  | `@suite/theme` holds every preset to 4.5:1 for text on every surface, and axe re-checks the painted result.    |
+| 1.4.3  | AA    | Contrast (Minimum)                     | Partial | `@suite/theme` holds every preset to 4.5:1 for text; Canvas's axe run re-checks the painted result, the other apps measure the palette only. |
 | 1.4.4  | AA    | Resize Text                            | Manual | Sweep step 3, zoom to 200%.                                                                                    |
 | 1.4.5  | AA    | Images of Text                         | Gated  | No text is rendered as an image; marks are SVG with `<title>`.                                                 |
 | 1.4.6  | AAA   | Contrast (Enhanced)                    | Gap    | 7:1 is not met; AA is the target.                                                                              |
@@ -71,12 +87,12 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 | 2.3.1  | A     | Three Flashes                 | Gated   | No flashing content exists; nothing animates above 3 times per second.                                                                                                                                                                                                                                     |
 | 2.3.2  | AAA   | Three Flashes (Enhanced)      | N/A     | As 2.3.1.                                                                                                                                                                                                                                                                                                  |
 | 2.3.3  | AAA   | Animation from Interactions   | Manual  | Sweep step 4, reduce-motion.                                                                                                                                                                                                                                                                               |
-| 2.4.1  | A     | Bypass Blocks                 | Gated   | A `<main>` landmark per screen; axe checks landmarks.                                                                                                                                                                                                                                                      |
+| 2.4.1  | A     | Bypass Blocks                 | Partial | Canvas's axe run checks landmarks; Planner's `<main>` landmark has component tests. The other apps need the manual pass.                                                                                                                                                                                   |
 | 2.4.2  | A     | Page Titled                   | Gated   | Each window sets a document title naming the app.                                                                                                                                                                                                                                                          |
 | 2.4.3  | A     | Focus Order                   | Manual  | Sweep step 1.                                                                                                                                                                                                                                                                                              |
 | 2.4.4  | A     | Link Purpose (In Context)     | Manual  | Links name their destination in text.                                                                                                                                                                                                                                                                      |
 | 2.4.5  | AA    | Multiple Ways                 | N/A     | A single-document desktop app has one way in by design.                                                                                                                                                                                                                                                    |
-| 2.4.6  | AA    | Headings and Labels           | Gated   | axe checks heading order and label presence.                                                                                                                                                                                                                                                               |
+| 2.4.6  | AA    | Headings and Labels           | Partial | Canvas's axe run checks heading order and label presence; the other apps need the manual pass.                                                                                                                                                                                                             |
 | 2.4.7  | AA    | Focus Visible                 | Gated   | One `FOCUS_RING` constant on every pressable primitive, held to 3:1.                                                                                                                                                                                                                                       |
 | 2.4.8  | AAA   | Location                      | Manual  | The window title and rail name the current document.                                                                                                                                                                                                                                                       |
 | 2.4.9  | AAA   | Link Purpose (Link Only)      | Manual  | As 2.4.4.                                                                                                                                                                                                                                                                                                  |
@@ -110,7 +126,7 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 | 3.2.5 | AAA   | Change on Request                         | Manual | Navigation follows an explicit action.                                                             |
 | 3.2.6 | A     | Consistent Help                           | Manual | **New in 2.2.** The privacy line and repository link hold the same position on every start screen. |
 | 3.3.1 | A     | Error Identification                      | Gated  | Errors render with `role="alert"`.                                                                 |
-| 3.3.2 | A     | Labels or Instructions                    | Gated  | Every field has a `Field` label; axe checks.                                                       |
+| 3.3.2 | A     | Labels or Instructions                    | Partial | Every field has a `Field` label; Canvas's axe run checks it, the other apps need the manual pass. |
 | 3.3.3 | AA    | Error Suggestion                          | Manual | Messages say what to do, not only what failed.                                                     |
 | 3.3.4 | AA    | Error Prevention (Legal, Financial, Data) | Manual | Destructive actions require typing the name to confirm.                                            |
 | 3.3.5 | AAA   | Help                                      | Manual | Contextual help lives in the docs, not in the app.                                                 |
@@ -125,7 +141,7 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 | ----- | ----- | ----------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 4.1.1 | —     | Parsing           | N/A    | **Obsolete in WCAG 2.2.** Removed; nothing to meet.                                                                                                                                                                                                                                                                                                      |
 | 4.1.2 | A     | Name, Role, Value | Gated  | Primitives use native elements; the import control is a disclosure, not a `menu` it would not honour.                                                                                                                                                                                                                                                    |
-| 4.1.3 | AA    | Status Messages   | Manual | Canvas announces through a persistent `LiveRegion` (`role="status"` / `role="alert"`, `aria-atomic`). Budget and Planner mount the shared `Toast` with `role="status"` per notice, which is the less reliable shape: a region created and filled at the same moment can be missed by a reader. Verify with Orca, and make it persistent if it is missed. |
+| 4.1.3 | AA    | Status Messages   | Manual | Canvas announces through a persistent `LiveRegion` (`role="status"` / `role="alert"`, `aria-atomic`). [Planner's statement](../../../apps/planner/ACCESSIBILITY.md) records a persistent status region for week moves and `Toast` for other confirmations; [Budget's](../../../apps/budget/ACCESSIBILITY.md) records `Toast` per notice. Verify with Orca, and make it persistent if it is missed. |
 
 ## The gaps, in one place
 
