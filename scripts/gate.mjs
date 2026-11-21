@@ -21,6 +21,7 @@
  *   node scripts/gate.mjs --fresh
  *   node scripts/gate.mjs --only suite-canvas
  *   node scripts/gate.mjs --no-e2e
+ *   node scripts/gate.mjs --e2e
  *   node scripts/gate.mjs --dry
  *   node scripts/gate.mjs --json
  */
@@ -222,15 +223,10 @@ if (e2e && results.length > 0 && results.every((row) => row.ok)) {
     );
   }
   for (const entry of selected.filter((row) => row.e2e === true)) {
-    if (skipDesktop) {
-      results.push({
-        ...entry,
-        repo: `${entry.repo} e2e`,
-        ok: true,
-        detail: "skipped: desktop display, no xvfb-run",
-      });
-      continue;
-    }
+    // No result row on a skip: `ok` has always meant "ran and passed", and a
+    // desktop without Xvfb must not put a green e2e line in the report. The
+    // notice above and `e2e: false` in the status carry the skip instead.
+    if (skipDesktop) continue;
     if (!json) process.stdout.write(`\n▶ ${entry.repo} · e2e\n`);
     const suite = runE2e(join(workdir, "apps", entry.repo), display);
     const ok = suite.status === 0;
