@@ -359,8 +359,11 @@ if (released === null) {
 const release = join(root, "docs/how-to/release.md");
 if (!existsSync(release)) {
   problems.push("docs/how-to/release.md: missing");
-} else if (!readFileSync(release, "utf8").includes(`v${version}`)) {
-  problems.push(`docs/how-to/release.md: does not name the tagged version v${version}`);
+} else if (!readFileSync(release, "utf8").includes("canvas-v<version>")) {
+  // The page must name the tag convention, not the number in package.json: a
+  // restated version goes stale on the next release, and the version owns one
+  // file. The prefix is what a reader needs to copy.
+  problems.push("docs/how-to/release.md: does not name the tag convention canvas-v<version>");
 }
 
 for (const entry of pending) {

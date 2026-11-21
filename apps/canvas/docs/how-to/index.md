@@ -6,8 +6,8 @@ One task at a time: the steps for a job you already know you need to do.
 
 | Article | What it covers | Updated |
 | --- | --- | --- |
+| [Release](release.md) | A release is a tag, an artifact and a note. Canvas is one app in a suite of four, and each ships its own version, because they release on their own sc… | 2026-11-21 |
 | [Run the desktop app](run-the-desktop-app.md) | The Canvas desktop application is one renderer in a shell that owns a file. This page is the loop for working on it. It assumes a checkout and pnpm in… | 2026-11-20 |
-| [Release](release.md) | A release is a tag, an artifact and a note. Canvas is one app in a suite of four, and each ships its own version, because they release on their own sc… | 2026-11-20 |
 | [Add a feature](add-a-feature.md) | The data flow fixes the order: the document package owns the shape, the workspace document owns the write, the snapshot store owns the read, and the c… | 2026-11-20 |
 | [Change the data model](change-the-data-model.md) | A record change travels one path: schema, reader, writer, facade, then the tests that prove two clients still converge. Skipping the reader step is ho… | 2026-11-20 |
 | [Change the canvas](change-the-canvas.md) | Adding to the canvas means answering three questions before writing code: which layer owns the input, what the document records, and what peers see wh… | 2026-11-19 |
