@@ -38,6 +38,16 @@ Use it when uncommitted files could be hiding a dependency, or when you are abou
 `--no-e2e` skips the cross-app Playwright suite for a quick loop. It does not make the run equivalent
 to a full gate; say that the e2e suite was skipped.
 
+`--only <repo>` writes a status that names that repository. It is a loop, not a suite proof:
+`release.mjs` and the Flatpak publisher refuse a publish on it, so run the full gate before a release.
+
+The suite launches the real Electron app, so the gate runs it under `xvfb-run` whenever that is
+installed — including on a desktop session, where it would otherwise open a burst of windows over
+whatever the person is doing. With no `xvfb-run`, a desktop session skips the suite and the status
+file records `e2e: false`; install Xvfb, run the gate on the VM, or pass `--e2e` to accept the
+windows. A headless host with neither a display nor `xvfb-run` fails the run rather than pretending
+it passed.
+
 ## Export retention
 
 A passing `--fresh` run keeps its own export and the previous proof under `.dev/gate/`; older export

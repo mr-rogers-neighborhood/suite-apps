@@ -378,6 +378,13 @@ export function gateProblems(status, head) {
   }
   const problems = [];
   if (status.ok !== true) problems.push("the last gate run did not pass");
+  // `--only <repo>` leaves a passing status for that one repository. It is a
+  // useful loop, not a suite proof, and a publish must not read it as one.
+  if (typeof status.only === "string" && status.only.length > 0) {
+    problems.push(
+      `the last gate ran --only ${status.only}, so it proved one repository, not the suite`,
+    );
+  }
   if (status.fresh !== true) {
     problems.push("the last gate ran on the working tree, not a clean export of this commit");
   }
