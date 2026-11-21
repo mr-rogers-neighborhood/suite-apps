@@ -69,22 +69,43 @@ function startManagesUpdates(): boolean {
   return process.env[MANAGED_BY_ENV] === "start";
 }
 
+/**
+ * Flatpak owns the installed tree.
+ *
+ * OSTree replaces a whole deployment, so an in-app updater that writes beside the
+ * binary would fight the commit the package manager is applying. The sandbox sets
+ * `FLATPAK_ID` for exactly this question; when it is present the build leaves its
+ * bytes alone and `flatpak update` is the update path. A pre-release Flatpak
+ * therefore never checks the stable AppImage feed.
+ */
+const FLATPAK_ENV = "FLATPAK_ID";
+
+function flatpakManagesUpdates(): boolean {
+  const id = process.env[FLATPAK_ENV]?.trim();
+  return id !== undefined && id.length > 0;
+}
+
+/** The report for a launch where another process owns the app's bytes. */
+function notChecked(options: UpdateCheckOptions): SuiteUpdateState {
+  return {
+    format: "suite.update-state",
+    version: options.version,
+    available: null,
+    checkedAt: null,
+    channel: options.channel,
+  };
+}
+
 /** Ask the feed once, write the report, and say what happened. */
 export async function checkForUpdates(options: UpdateCheckOptions): Promise<UpdateCheckResult> {
   const now = options.now ?? (() => new Date());
   const platform = options.platform ?? process.platform;
 
-  if (startManagesUpdates()) {
+  if (startManagesUpdates() || flatpakManagesUpdates()) {
     // A report is still written, so the hub reads "not checked" rather than an answer
     // from weeks ago. `suite.update-state` is strict, so "not checked" is said the only
     // way it can be: no time, no version offered. Why is in the app's own log.
-    const skipped: SuiteUpdateState = {
-      format: "suite.update-state",
-      version: options.version,
-      available: null,
-      checkedAt: null,
-      channel: options.channel,
-    };
+    const skipped = notChecked(options);
     await writeReport(options.dataDir, skipped);
     return { state: skipped, error: null, verified: false };
   }

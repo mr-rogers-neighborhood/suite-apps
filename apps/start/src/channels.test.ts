@@ -17,11 +17,24 @@ import {
 
 describe("the pre-release identity", () => {
   it("is one id shared by every tier", () => {
-    expect(preReleaseIdFor("canvas")).toBe("slop.canvas");
-    expect(isPreReleaseId("slop.canvas")).toBe(true);
+    expect(preReleaseIdFor("canvas")).toBe("slop-canvas");
+    expect(isPreReleaseId("slop-canvas")).toBe(true);
     expect(isPreReleaseId("canvas")).toBe(false);
-    expect(appIdFor("slop.canvas")).toBe("canvas");
+    expect(appIdFor("slop-canvas")).toBe("canvas");
     expect(appIdFor("canvas")).toBe("canvas");
+  });
+
+  it("still reads the legacy dot form an installed build wrote", () => {
+    // A manifest written before the id became canonical is not rewritten in place,
+    // and calling it stable would hand it the stable documents folder.
+    expect(isPreReleaseId("slop.canvas")).toBe(true);
+    expect(appIdFor("slop.canvas")).toBe("canvas");
+    expect(tierForInstall({ id: "slop.canvas", branch: "canary" })).toBe("canary");
+  });
+
+  it("does not take a bare prefix for an app", () => {
+    expect(isPreReleaseId("slop-")).toBe(false);
+    expect(isPreReleaseId("slop.")).toBe(false);
   });
 
   it("takes the tier from the ref branch, not from a version", () => {
@@ -41,10 +54,10 @@ describe("tierForInstall", () => {
   });
 
   it("reads a pre-release branch first and a manifest channel second", () => {
-    expect(tierForInstall({ id: "slop.canvas", branch: "canary" })).toBe("canary");
-    expect(tierForInstall({ id: "slop.canvas", channel: "beta" })).toBe("beta");
+    expect(tierForInstall({ id: "slop-canvas", branch: "canary" })).toBe("canary");
+    expect(tierForInstall({ id: "slop-canvas", channel: "beta" })).toBe("beta");
     // No branch and no identity is still the first pre-release tier, never stable.
-    expect(tierForInstall({ id: "slop.canvas" })).toBe("slop");
+    expect(tierForInstall({ id: "slop-canvas" })).toBe("slop");
     expect(tierFromChannel("alpha")).toBe("slop");
   });
 });

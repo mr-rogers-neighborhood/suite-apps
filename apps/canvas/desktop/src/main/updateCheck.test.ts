@@ -95,6 +95,58 @@ describe("checkForUpdates", () => {
   });
 });
 
+describe("a Flatpak launch", () => {
+  const savedFlatpak = process.env.FLATPAK_ID;
+  const savedManaged = process.env.SUITE_MANAGED_BY;
+
+  afterEach(() => {
+    if (savedFlatpak === undefined) delete process.env.FLATPAK_ID;
+    else process.env.FLATPAK_ID = savedFlatpak;
+    if (savedManaged === undefined) delete process.env.SUITE_MANAGED_BY;
+    else process.env.SUITE_MANAGED_BY = savedManaged;
+  });
+
+  it("leaves updating to Flatpak, asks no feed, and writes not checked", async () => {
+    // OSTree replaces the deployment; an AppImage feed check would fight it.
+    delete process.env.SUITE_MANAGED_BY;
+    process.env.FLATPAK_ID = "run.suite.slop.canvas";
+    const dataDir = await folder();
+    let asked = false;
+
+    const result = await checkForUpdates({
+      dataDir,
+      version: "0.1.0",
+      channel: "alpha",
+      packaged: true,
+      feed: FEED,
+      updater: {
+        autoDownload: true,
+        checkForUpdates: async () => {
+          asked = true;
+          return null;
+        },
+      },
+      now,
+      fetch: (async () => {
+        asked = true;
+        return { ok: false, status: 404, text: async () => "" };
+      }) as unknown as typeof fetch,
+    });
+
+    expect(asked).toBe(false);
+    expect(result.error).toBeNull();
+    expect(result.verified).toBe(false);
+
+    const written = JSON.parse(await readFile(join(dataDir, "update-state.json"), "utf8"));
+    expect(written).toMatchObject({
+      version: "0.1.0",
+      available: null,
+      checkedAt: null,
+      channel: "alpha",
+    });
+  });
+});
+
 describe("a launch the hub performed", () => {
   const saved = process.env.SUITE_MANAGED_BY;
   afterEach(() => {

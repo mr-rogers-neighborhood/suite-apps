@@ -23,16 +23,18 @@ describe("channelFrom", () => {
     expect(channelFrom({})).toBe("stable");
   });
 
-  it("reads a pre-release Flatpak id", () => {
+  it("reads any of the three pre-release signals", () => {
+    // The Flatpak sandbox sets the pre-release id.
     expect(channelFrom({ flatpakId: "run.suite.slop.budget" })).toBe("slop");
-  });
-
-  it("reads a manifest that names a pre-release channel", () => {
+    // A build-time channel names the tier.
     expect(channelFrom({ manifest: { channel: "beta" } })).toBe("slop");
+    // The manifest id the release script writes.
+    expect(channelFrom({ manifest: { id: "slop-budget" } })).toBe("slop");
   });
 
-  it("reads a manifest whose id belongs to the pre-release", () => {
+  it("still reads the legacy dot id an installed build wrote", () => {
     expect(channelFrom({ manifest: { id: "slop.budget" } })).toBe("slop");
+    expect(channelFrom({ manifest: { id: "slop-budget", channel: "stable" } })).toBe("slop");
   });
 
   it("does not mistake the stable update channel for the build channel", () => {

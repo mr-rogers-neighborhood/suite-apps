@@ -20,6 +20,17 @@ export interface ChannelSignals {
 
 const SLOP_FLATPAK_PREFIX = "run.suite.slop.";
 
+/**
+ * The pre-release manifest id, `slop-<app>`.
+ *
+ * The release script writes it into a pre-release `suite.app.json`; the hyphen is the canonical
+ * form. The dot form is the id an older pre-release build was installed with, and it is still read
+ * because that manifest is not rewritten in place — calling it stable would give it the stable
+ * documents folder.
+ */
+const SLOP_MANIFEST_PREFIX = "slop-";
+const LEGACY_SLOP_MANIFEST_PREFIX = "slop.";
+
 function manifestIsPreRelease(manifest: unknown): boolean {
   if (typeof manifest !== "object" || manifest === null) return false;
   const record = manifest as Record<string, unknown>;
@@ -33,7 +44,13 @@ function manifestIsPreRelease(manifest: unknown): boolean {
 
   if (typeof record.id === "string") {
     const id = record.id.trim().toLowerCase();
-    if (id.startsWith("slop.") || id.startsWith(SLOP_FLATPAK_PREFIX)) return true;
+    if (
+      id.startsWith(SLOP_MANIFEST_PREFIX) ||
+      id.startsWith(LEGACY_SLOP_MANIFEST_PREFIX) ||
+      id.startsWith(SLOP_FLATPAK_PREFIX)
+    ) {
+      return true;
+    }
   }
   return false;
 }

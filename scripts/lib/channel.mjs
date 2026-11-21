@@ -43,7 +43,15 @@ export function flatpakId(app, channel) {
   return isPreRelease(channel) ? `run.suite.slop.${app}` : `run.suite.${app}`;
 }
 
-/** The `suite.app.json` id for one app on one channel. */
+/**
+ * The `suite.app.json` id for one app on one channel.
+ *
+ * A pre-release id is `slop-<app>` with a hyphen: that is the canonical manifest
+ * id, and the one every app classifies as a pre-release. The Flatpak id is a
+ * different field and keeps its dots (`run.suite.slop.<app>`); the branch names
+ * the tier. Do not change this to the dot form an early build wrote — that form
+ * is read for compatibility, never written.
+ */
 export function suiteAppId(app, channel) {
   return isPreRelease(channel) ? `slop-${app}` : app;
 }
