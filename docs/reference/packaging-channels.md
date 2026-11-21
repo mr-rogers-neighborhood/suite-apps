@@ -49,17 +49,49 @@ The hub is the only app packaged this way.
 
 ## Flatpak
 
-Flatpak is a second channel, currently proven on Canvas. The manifest is
-`packaging/flatpak/run.suite.canvas.yml`, and the build uses zypak from the Electron base app.
+Flatpak is a second channel for Canvas, Planner and Budget. Each app has a manifest beside the others:
 
-```sh
-node scripts/flatpak.mjs              # package, build, publish, install
-node scripts/flatpak.mjs --no-build   # reuse release/linux-unpacked
-flatpak run run.suite.canvas
+```
+packaging/flatpak/run.suite.canvas.yml
+packaging/flatpak/run.suite.planner.yml
+packaging/flatpak/run.suite.budget.yml
 ```
 
-The script exports to `~/suite-flatpak/repo`, adds it as the user remote `suite-local`, and installs
-from that remote, so `flatpak update` is the real update path.
+The manifest packages the unpacked build `package:dir` produced, using zypak from
+`org.electronjs.Electron2.BaseApp`, so the Flatpak carries the same bytes as the AppImage and the
+deb. The wrapper, `.desktop`, `.metainfo.xml` and hicolor icons live beside the manifest.
+
+```sh
+node scripts/flatpak.mjs                       # Canvas: package, build, publish, install
+node scripts/flatpak.mjs --app planner         # Planner, same path
+node scripts/flatpak.mjs --app budget          # Budget, same path
+node scripts/flatpak.mjs --app planner --no-build   # reuse release/linux-unpacked
+flatpak run run.suite.planner
+```
+
+Canvas stays the default so an existing habit keeps working. The script exports to
+`~/suite-flatpak/repo`, adds it as the user remote `suite-local`, and installs from that remote, so
+`flatpak update` is the real update path.
+
+The sandbox reaches one documents folder and nothing broader:
+
+```
+--filesystem=xdg-documents/Suite:create
+```
+
+Planner writes `Documents/Suite/Planner` and Budget writes `Documents/Suite/Budget`; `:create` lets a
+first launch make the folder. Planner also has `--share=network` because it syncs a workspace with the
+other devices in it. Budget has no network permission: it has no bank sync and no other client.
+
+The `.desktop` file is named for the Flatpak id, and each app's `desktopName` is that id, so Wayland
+associates the window with the entry and keeps its icon. Planner and Budget follow that rule; Canvas's
+shell still declares the older `suite-canvas.desktop` name.
+
+**OSTree owns updates inside Flatpak.** The sandbox sets `FLATPAK_ID`, and the app then skips its own
+feed check and writes a "not checked" report instead of offering a download. `flatpak update` replaces
+the deployment, and Start's card asks Flatpak for the update rather than the app's feed. The AppImage
+path is unchanged: a copy outside Flatpak still checks its signed feed and updates itself, unless
+Start launched it.
 
 `scripts/store-key.sh` makes the store's signing key once. When it has run, `flatpak.mjs` signs the
 repository summary, exports the public key beside the fingerprint in `~/suite-flatpak`, and adds the
