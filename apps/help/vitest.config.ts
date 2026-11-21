@@ -24,6 +24,13 @@ export default defineConfig({
           include: ["src/renderer/src/**/*.test.{ts,tsx}"],
         },
       },
+      {
+        test: {
+          name: "scripts",
+          environment: "node",
+          include: ["scripts/**/*.test.mjs"],
+        },
+      },
     ],
   },
 });
