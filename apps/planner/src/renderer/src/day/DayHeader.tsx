@@ -27,6 +27,8 @@ export function DayHeader({ date }: { date: DateKey }) {
     replica.document.updateDay(date, { intention });
   }
 
+  const today = todayKey();
+  const dayLabel = humanDayLabel(date, today);
   const fullDate = fromDateKey(date).toLocaleDateString(undefined, {
     weekday: "long",
     month: "long",
@@ -43,15 +45,13 @@ export function DayHeader({ date }: { date: DateKey }) {
           <ChevronRight size={16} />
         </IconButton>
         <div className="ml-1 flex items-baseline gap-2.5">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {humanDayLabel(date, todayKey())}
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">{dayLabel}</h1>
           <span className="text-xs text-faint">{fullDate}</span>
         </div>
-        {date !== todayKey() && (
+        {date !== today && (
           <button
             type="button"
-            onClick={() => setSelectedDate(todayKey())}
+            onClick={() => setSelectedDate(today)}
             className="ml-auto rounded-md border border-line px-2.5 py-1 text-xs text-muted transition-colors hover:bg-raised hover:text-ink"
           >
             Back to today
@@ -60,7 +60,7 @@ export function DayHeader({ date }: { date: DateKey }) {
       </div>
 
       <label className="mt-4 flex items-center gap-2">
-        <span className="sr-only">Today's intention</span>
+        <span className="sr-only">Intention for {dayLabel}</span>
         <input
           value={intention}
           onChange={(event) => setIntention(event.target.value)}
@@ -68,7 +68,7 @@ export function DayHeader({ date }: { date: DateKey }) {
           onKeyDown={(event) => {
             if (event.key === "Enter") event.currentTarget.blur();
           }}
-          placeholder="What matters most today?"
+          placeholder={date === today ? "What matters most today?" : "What matters most this day?"}
           className="w-full bg-transparent text-sm text-ink placeholder:text-faint focus:outline-none"
         />
       </label>
