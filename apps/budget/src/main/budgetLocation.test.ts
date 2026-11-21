@@ -1,6 +1,37 @@
 import { describe, expect, it } from "vitest";
 
-import { budgetFromArgv, budgetFromLink } from "./budgetLocation";
+import { budgetFromArgv, budgetFromLink, slopBudgetsFolder } from "./budgetLocation";
+
+describe("slopBudgetsFolder", () => {
+  it("puts a pre-release budget beside the stable folder, never inside it", () => {
+    const documents = "/home/me/Documents";
+
+    expect(slopBudgetsFolder(documents)).toBe("/home/me/Documents/Suite Slop/Budget");
+    expect(slopBudgetsFolder(documents)).not.toBe("/home/me/Documents/Suite/Budget");
+  });
+});
+
+describe("pre-release link resolution", () => {
+  it("cannot resolve the stable default from the pre-release folder", () => {
+    const stable = "/home/me/Documents/Suite/Budget";
+    const slop = slopBudgetsFolder("/home/me/Documents");
+    const present = (path: string) => path.startsWith(stable);
+
+    expect(budgetFromLink("suite://budget/workspace/2026.budget", slop, present)).toBeNull();
+    expect(
+      budgetFromArgv(["suite-budget", "suite://budget/workspace/2026.budget"], slop, present),
+    ).toBe(null);
+  });
+
+  it("still resolves a budget in its own folder", () => {
+    const slop = slopBudgetsFolder("/home/me/Documents");
+    const present = (path: string) => path.startsWith(slop);
+
+    expect(budgetFromLink("suite://budget/workspace/2026.budget", slop, present)).toBe(
+      "/home/me/Documents/Suite Slop/Budget/2026.budget",
+    );
+  });
+});
 
 describe("budgetFromLink", () => {
   const folder = "/home/me/Documents/Suite/Budget";

@@ -1,6 +1,8 @@
 import { join, sep } from "node:path";
 import { SUITE_PROTOCOL, workspaceTarget } from "@suite/contracts";
 
+import type { DocumentChannel } from "./channel";
+
 /**
  * Where budget files live, and where the recovery copies live.
  *
@@ -21,7 +23,20 @@ export type AppPaths = {
   budgetsDir: string;
   backupsDir: string;
   recoveredDir: string;
+  /**
+   * Which build owns `budgetsDir`. A pre-release copies a stable budget into its own folder rather
+   * than opening one in place.
+   */
+  channel: DocumentChannel;
 };
+
+/** The folder a pre-release keeps documents in, a sibling of `Documents/Suite`. */
+export const SLOP_DOCUMENTS_FOLDER = "Suite Slop";
+
+/** The pre-release folder for this app, given the person's documents root. */
+export function slopBudgetsFolder(documentsRoot: string, app = "Budget"): string {
+  return join(documentsRoot, SLOP_DOCUMENTS_FOLDER, app);
+}
 
 export function budgetPath(paths: Pick<AppPaths, "budgetsDir">, id: string): string {
   return join(paths.budgetsDir, `${id}.budget`);

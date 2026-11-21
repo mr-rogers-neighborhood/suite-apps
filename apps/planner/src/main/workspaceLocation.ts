@@ -1,6 +1,8 @@
 import { copyFile, mkdir, stat } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { SUITE_PROTOCOL, workspaceTarget } from "@suite/contracts";
+
+import type { DocumentChannel } from "./channel";
 
 /**
  * Where a planner workspace lives on disk.
@@ -38,6 +40,20 @@ export function workspacePathsFrom(documents: string, file?: string | null): Wor
   };
 }
 
+/** The folder a pre-release keeps documents in, a sibling of `Documents/Suite`. */
+export const SLOP_DOCUMENTS_FOLDER = "Suite Slop";
+
+/** The pre-release folder for this app, given the person's documents root. */
+export function slopWorkspaceFolder(documentsRoot: string, app = "Planner"): string {
+  return join(documentsRoot, SLOP_DOCUMENTS_FOLDER, app);
+}
+
+/** Whether `path` sits inside `directory`, rather than merely sharing a prefix with it. */
+export function isInFolder(path: string, directory: string): boolean {
+  const remainder = relative(resolve(directory), resolve(path));
+  return remainder === "" || (!remainder.startsWith("..") && !isAbsolute(remainder));
+}
+
 async function exists(path: string): Promise<boolean> {
   try {
     await stat(path);
@@ -45,6 +61,31 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Where a handed-over file is opened, and the folder that decides whether it must be copied. */
+export interface ChannelOpen {
+  readonly channel: DocumentChannel;
+  readonly folder: string;
+}
+
+/**
+ * The file a build should actually open.
+ *
+ * A stable build opens what it is given. A pre-release copies any file outside its own folder and
+ * opens the copy, so a workspace, its backup and its temporary file in the stable folder are never
+ * touched. An existing copy is opened rather than overwritten, because replacing it would discard
+ * the work already done in this channel.
+ */
+export async function adoptChannelWorkspace(source: string, open: ChannelOpen): Promise<string> {
+  if (open.channel === "stable") return source;
+  if (isInFolder(source, open.folder)) return source;
+
+  await mkdir(open.folder, { recursive: true });
+  const target = join(open.folder, basename(source));
+  if (await exists(target)) return target;
+  await copyFile(source, target);
+  return target;
 }
 
 /**

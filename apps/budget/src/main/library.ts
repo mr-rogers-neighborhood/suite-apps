@@ -79,6 +79,36 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
+function insideBudgets(paths: AppPaths, path: string): boolean {
+  return relativeTo(path, paths.budgetsDir) !== null;
+}
+
+/**
+ * A pre-release entry always points inside its own folder.
+ *
+ * The library is machine state, but an older or copied index can still name a stable file. Copying
+ * it here keeps the write path inside the channel; the stable file, its backups and its temporary
+ * file stay untouched.
+ */
+async function adoptEntry(paths: AppPaths, entry: LibraryEntry): Promise<LibraryEntry> {
+  if (paths.channel === "stable" || insideBudgets(paths, entry.path)) return entry;
+
+  const target = budgetPath(paths, entry.id);
+  await mkdir(paths.budgetsDir, { recursive: true });
+  if (!(await fileExists(target))) await copyFile(entry.path, target);
+  return { ...entry, path: target };
+}
+
+/** The document id a handed-over file names, or null when this build cannot read it yet. */
+async function sourceDocumentId(sourcePath: string): Promise<string | null> {
+  try {
+    const decoded = decodeBudgetFile(await readFile(sourcePath, "utf8"));
+    return decoded.isOk() ? BudgetDocument.fromSnapshot(decoded.value).getMeta().budgetId : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Copy budgets written before the documents convention into its folder.
  *
@@ -200,9 +230,10 @@ export async function openBudget(
   now: Date = new Date(),
 ): Promise<{ entry: LibraryEntry; doc: BudgetDocument; usedBackup?: string }> {
   const file = await readLibrary(paths);
-  const entry = file.entries.find((candidate) => candidate.id === id);
-  if (!entry) throw new LibraryError("missing", "That budget is no longer in the library");
+  const found = file.entries.find((candidate) => candidate.id === id);
+  if (!found) throw new LibraryError("missing", "That budget is no longer in the library");
 
+  const entry = await adoptEntry(paths, found);
   const loaded = await loadWithFallback(paths, entry);
   const next = { ...entry, lastOpenedAt: now.toISOString() };
   await putEntry(paths, next);
@@ -303,7 +334,19 @@ export async function openFromPath(
 ): Promise<{ entry: LibraryEntry; doc: BudgetDocument; usedBackup?: string }> {
   const library = await readLibrary(paths);
   const existing = library.entries.find((entry) => entry.path === sourcePath);
-  if (existing) return openBudget(paths, existing.id, now);
+  if (existing && (paths.channel === "stable" || insideBudgets(paths, sourcePath))) {
+    return openBudget(paths, existing.id, now);
+  }
+
+  if (paths.channel === "slop") {
+    // Opening the same stable file twice must land on the copy made the first time, not leave two
+    // budgets with one name. The document id survives the copy, so it is the identity to match.
+    const id = await sourceDocumentId(sourcePath);
+    const copy = library.entries.find(
+      (entry) => entry.id === id && insideBudgets(paths, entry.path),
+    );
+    if (copy) return openBudget(paths, copy.id, now);
+  }
   return importFromPath(paths, sourcePath, now);
 }
 

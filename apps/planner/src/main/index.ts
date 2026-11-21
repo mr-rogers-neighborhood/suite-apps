@@ -6,17 +6,22 @@ import { suitePaths } from "@suite/contracts";
 import type { ReminderEvent } from "@suite/planner-core";
 import { app, BrowserWindow, dialog, Notification, type Tray } from "electron";
 
+import { currentChannel } from "./channel";
 import { registerIpc } from "./ipc";
 import { installMenu } from "./menu";
 import { findNewerInstall } from "./newerInstall";
-import { workspacePaths } from "./paths";
+import { workspaceFolder, workspacePaths } from "./paths";
 import { registerAppScheme, serveRenderer } from "./protocol";
 import { ReminderScheduler } from "./scheduler";
 import { createPlannerSyncController, type PlannerSyncController } from "./sync/ipc";
 import { createTray } from "./tray";
 import { checkForUpdates } from "./updateCheck";
 import { applyContentSecurityPolicy, createMainWindow, pageCsp } from "./window";
-import { adoptLegacyWorkspace, workspaceFromArgv } from "./workspaceLocation";
+import {
+  adoptChannelWorkspace,
+  adoptLegacyWorkspace,
+  workspaceFromArgv,
+} from "./workspaceLocation";
 import { WorkspaceStore } from "./workspaceStore";
 
 app.setName("Suite Planner");
@@ -68,7 +73,7 @@ function newerInstall(): { version: string; execPath: string } | null {
 
 /** The workspace the command line names, whether a path or a link the hub routed here. */
 function workspaceFromCommandLine(argv: readonly string[]): string | null {
-  return workspaceFromArgv(argv, workspacePaths().dir, existsSync);
+  return workspaceFromArgv(argv, workspaceFolder(), existsSync);
 }
 
 function notifyReminder(reminder: ReminderEvent): void {
@@ -154,7 +159,13 @@ async function bootstrap(initialFile: string | null): Promise<void> {
     pageCsp(Boolean(process.env.ELECTRON_RENDERER_URL)),
   );
   applyContentSecurityPolicy();
-  const paths = workspacePaths(initialFile);
+  // A pre-release copies a handed-over stable file before opening it, so the copy is what the
+  // store and its backup and temporary file live beside.
+  const channel = currentChannel();
+  const opened = initialFile
+    ? await adoptChannelWorkspace(initialFile, { channel, folder: workspaceFolder(channel) })
+    : null;
+  const paths = workspacePaths(opened);
   const legacyDir = app.getPath("userData");
   const copied = await adoptLegacyWorkspace(paths, legacyDir);
   if (copied.length > 0) console.info(`Suite Planner: copied the workspace from ${legacyDir}`);
@@ -220,7 +231,12 @@ async function openWorkspaceFile(file: string): Promise<void> {
   const previous = store;
   let next: WorkspaceStore;
   try {
-    next = await WorkspaceStore.open(workspacePaths(file));
+    const channel = currentChannel();
+    const opened = await adoptChannelWorkspace(file, {
+      channel,
+      folder: workspaceFolder(channel),
+    });
+    next = await WorkspaceStore.open(workspacePaths(opened));
   } catch (error) {
     // Opening a newer file from the hub must keep the current workspace and say why, not replace
     // the window with a failed open.

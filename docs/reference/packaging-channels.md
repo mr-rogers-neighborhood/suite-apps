@@ -183,6 +183,16 @@ packaging it as a Flatpak is a separate decision.
 directory, such as Orca, hides the real user installation; run with
 `XDG_DATA_HOME=$HOME/.local/share` to see it.
 
+## Pre-release documents
+
+A pre-release install is a second identity (`run.suite.slop.<app>`), not a second window on the
+stable data. Stable keeps `Documents/Suite/<App>`. A pre-release keeps `Documents/Suite Slop/<App>`;
+a stable document handed to it by a path, a link, or a file manager is copied into that folder and the
+copy is opened, so the stable file, its backup and its temporary file are never written. Export is
+explicit, writes where the person chooses, and refuses the stable folder. The rule is in
+[Planner's workspace location](../../apps/planner/src/main/workspaceLocation.ts) and
+[Budget's library](../../apps/budget/src/main/library.ts), with tests beside each.
+
 ## Platforms
 
 Linux is the only platform with published builds. macOS and Windows are configured but have no

@@ -7,6 +7,7 @@ import { isTrustedSender } from "@suite/desktop";
 import { app, BrowserWindow, dialog, ipcMain, type OpenDialogOptions, shell } from "electron";
 import { z } from "zod";
 
+import { relativeTo } from "./budgetLocation";
 import {
   createBudget,
   importFromPath,
@@ -16,7 +17,7 @@ import {
   renameBudget,
   toOpenInfo,
 } from "./library";
-import { appPaths } from "./paths";
+import { appPaths, stableBudgetsFolder } from "./paths";
 import { pageOrigins } from "./protocol";
 import { closeSession, openSession, requireStore } from "./session";
 
@@ -121,15 +122,25 @@ export function registerIpc(): void {
 
   onIpc("budget:export", async (event) => {
     const store = requireStore();
+    const folder = paths.channel === "slop" ? paths.budgetsDir : app.getPath("documents");
     const filePath = await pickSaveTarget(event, {
       title: "Export budget",
       defaultPath: join(
-        app.getPath("documents"),
+        folder,
         `${safeName(store.entry.name)}-${new Date().toISOString().slice(0, 10)}.budget`,
       ),
       filters: [{ name: "Suite Budget", extensions: ["budget"] }],
     });
     if (!filePath) return { canceled: true };
+    if (paths.channel === "slop" && relativeTo(filePath, stableBudgetsFolder()) !== null) {
+      // An explicit export may write anywhere the person chooses, except a folder this build does
+      // not own. The stable file is the thing copy-on-open exists to protect.
+      dialog.showErrorBox(
+        "Export budget",
+        "A pre-release build cannot write into the stable budget folder. Choose another folder.",
+      );
+      return { canceled: true };
+    }
     await store.exportTo(filePath);
     return { canceled: false, path: filePath };
   });

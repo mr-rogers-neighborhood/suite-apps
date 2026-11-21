@@ -43,6 +43,15 @@ directory is copied into the folder once, without deleting the original. A `.pla
 by the operating system or by the hub replaces the open workspace. The renderer
 asks for a snapshot and builds a replica.
 
+**Pre-release isolation.** A build whose manifest or Flatpak id marks it as a pre-release
+(`run.suite.slop.planner`) keeps its default workspace in `~/Documents/Suite Slop/Planner`. A
+`.planner` file handed to it from anywhere else, including the stable folder, is copied in before it
+is opened; the original, its backup and its temporary file are never written. Export is the only write
+a person asks for, and it refuses the stable folder. The rule is in
+[workspaceLocation.ts](../../src/main/workspaceLocation.ts) and [channel.ts](../../src/main/channel.ts),
+with the copy and the untouched original proven in
+[workspaceLocation.test.ts](../../src/main/workspaceLocation.test.ts).
+
 **Edits.** The renderer mutates its replica. `subscribeLocalUpdates` emits the CRDT delta; the
 snapshot store forwards it over `workspace:commit`, refreshes its derived snapshot, and the UI
 re-renders. Main imports the delta and debounces an atomic write (400 ms). The same delta is sealed

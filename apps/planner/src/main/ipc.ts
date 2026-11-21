@@ -4,8 +4,11 @@ import { todayKey } from "@suite/planner-core";
 
 import { app, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
 import { z } from "zod";
+import { currentChannel } from "./channel";
+import { workspaceFolder } from "./paths";
 import { pageOrigins } from "./protocol";
 import type { PlannerSyncController } from "./sync/ipc";
+import { isInFolder } from "./workspaceLocation";
 import type { WorkspaceStore } from "./workspaceStore";
 
 const updateSchema = z.custom<Uint8Array>((value) => value instanceof Uint8Array, {
@@ -61,9 +64,13 @@ export function registerIpc(getStore: () => WorkspaceStore, sync: PlannerSyncCon
   }));
 
   onIpc("workspace:export", async (event) => {
+    const channel = currentChannel();
     const options = {
       title: "Export workspace",
-      defaultPath: join(app.getPath("documents"), `planner-${todayKey()}.planner`),
+      defaultPath:
+        channel === "slop"
+          ? join(workspaceFolder(channel), `planner-slop-${todayKey()}.planner`)
+          : join(app.getPath("documents"), `planner-${todayKey()}.planner`),
       filters: [{ name: "Suite Planner workspace", extensions: ["planner"] }],
     };
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -71,6 +78,15 @@ export function registerIpc(getStore: () => WorkspaceStore, sync: PlannerSyncCon
       ? await dialog.showSaveDialog(window, options)
       : await dialog.showSaveDialog(options);
     if (result.canceled || !result.filePath) return { canceled: true };
+    if (channel === "slop" && isInFolder(result.filePath, workspaceFolder("stable"))) {
+      // An export is the one write a person explicitly asks for. It still may not land on a stable
+      // document, because a pre-release build does not own that folder.
+      dialog.showErrorBox(
+        "Export workspace",
+        "A pre-release build cannot write into the stable workspace folder. Choose another folder.",
+      );
+      return { canceled: true };
+    }
     await getStore().exportTo(result.filePath);
     return { canceled: false, path: result.filePath };
   });

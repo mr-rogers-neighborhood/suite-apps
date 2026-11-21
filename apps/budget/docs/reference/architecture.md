@@ -41,6 +41,14 @@ This page is the map. The rules are in [conventions.md](conventions.md), the rec
 **Boot.** The app starts with no budget open. The renderer asks the bridge for the library and renders
 the launcher. Opening a budget returns a snapshot; the renderer builds a replica and subscribes.
 
+**Pre-release isolation.** A build whose manifest or Flatpak id marks it as a pre-release
+(`run.suite.slop.budget`) keeps budgets in `~/Documents/Suite Slop/Budget`. A `.budget` handed to it
+from the stable folder, or a library entry that still names one, is copied into that folder before it
+is opened; the stable file, its backups and its temporary file stay untouched, and export refuses the
+stable folder. The rule is in [budgetLocation.ts](../../src/main/budgetLocation.ts),
+[library.ts](../../src/main/library.ts) and [channel.ts](../../src/main/channel.ts), with the copy
+proven in [library.test.ts](../../src/main/library.test.ts).
+
 **Edits.** The replica mutates; `subscribeLocalUpdates` emits a CRDT delta; the snapshot store
 forwards it over `budget:commit` and rebuilds its derived snapshot. Main imports the delta and debounces
 an atomic write (400 ms). The same delta channel is what a relay would carry later, so the document
