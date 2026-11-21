@@ -8,93 +8,103 @@ order: 5
 This path follows the desktop open: a path arrives from the command line, a
 dialog, a recent or the hub, becomes one open file in main, crosses the preload
 bridge as a snapshot, and is projected into the renderer. Each stop is a place
-where the path or the bytes are checked; the module notes own the rules.
+where the path, the bytes or the host answer is settled; the module notes own the
+rules.
 
 ## apps/canvas/desktop/src/main/index.ts#attachFile
 
-A cold start queues a file only when its extension is one this app opens. The
-gate is narrower than the parser and runs before the app is ready, which is why
-the window can open on a known file without reading it twice. A `suite://`
-argument is resolved against the library first, so a link is never treated as a
-path.
+The pre-ready queue. It accepts only a path whose extension this app opens and
+reads nothing, so a cold start can hold the file before `ready` and parse it once
+when the window exists. A `suite://` argument does not reach it as a link:
+`documentFromArgv` resolves the link against the library first, and a link that
+resolves to nothing leaves the launcher. The Desktop / Main note owns the order.
 
 ## apps/canvas/desktop/src/main/index.ts#openDocument
 
-Every way in ends here. A refusal is shown over the window that was already open,
-so a failed open does not look like a deleted file; a success adopts the store and
-reloads the renderer before it announces the document. The renderer never passes
-a destination back, only the identity main gave it.
+Every open ends here: the command line, a dialog choice, a recent, a link the hub
+routed. A new document takes `create` instead. A refusal is a dialog over the
+page already showing, so a failed open cannot look like a deleted file; a success
+adopts the store and reloads the renderer, which then asks for the identity. The
+Desktop / Main note owns the refusal codes and the window.
 
 ## apps/canvas/desktop/src/main/store.ts#DocumentStore.open
 
 Opening is an ordered set of refusals: take the lock, parse the envelope, convert
-a legacy file, then try the backups. A damaged file is never replaced with an
-empty one; when neither it nor a backup parses, the bytes stay exactly as they
-were. The store is constructed only through this path, so there is no half-open
-state to save from.
+a legacy file, then try the backups newest first. A damaged file is never
+replaced by an empty one; when neither it nor a backup parses, the bytes stay
+exactly as they were. The store has two static factories, `open` and `create`,
+because a half-open store must not exist to save from. The Desktop / Main note
+owns the lock, the write and the mtime guard.
 
 ## apps/canvas/desktop/src/main/index.ts#registerIpc
 
-The renderer's whole capability set crosses one registration. `loadDocument`
-hands over the open snapshot, `saveDocument` creates the file on first save, and
-`openDocument` accepts only a path main already reported. Every handler is wrapped
-by `onIpc`, which refuses a sender that is not the page this shell loaded.
+The page's whole capability set crosses this registration. `loadDocument` hands
+over the open snapshot, `saveDocument` creates the file on first save, and
+`openDocument` accepts only a path the shell reported earlier. Every handler is
+wrapped by `onIpc`, which refuses a sender that is not the page this shell
+loaded. The Desktop / Main note owns the seed and the first save.
 
 ## apps/canvas/desktop/src/preload/index.cjs
 
-The preload is the allowlist, not a pass-through. It publishes the named methods
-and values the renderer may call and nothing else; a path is always an argument
-main re-validates, never a capability the page holds. Its channel names are
-checked against the main-process constants so the two sides cannot drift.
+The allowlist, not a pass-through. `contextBridge` publishes the named methods
+and the three host values; with `contextIsolation` on, the page can reach nothing
+else. Save takes no path at all, and open takes back only one main reported
+earlier and re-checks. A sandboxed preload cannot import the shared channel
+constants, so `preload.test.ts` compares the names spelled here. The Canvas
+Desktop / Preload note owns the boundary.
 
 ## apps/canvas/src/host/bridge.ts#desktopBridge
 
-The bridge is the host signal. Its presence means the page is in the shell, not
-that a build flag was set, and the callable methods are checked because an old
-preload can publish the marker without the method the renderer needs. The
-interface deliberately takes no path on open or save: the page says what, main
-decides where.
+The host signal. Its presence means the page is in the shell, not that a build
+flag was set; it requires the marker and a version because those are what an
+older preload still publishes. The callable half is checked separately, because
+a missing method is a version mismatch rather than a reason to write elsewhere.
+The Canvas / Host note owns the required list.
 
 ## apps/canvas/src/main.tsx#bootDesktop
 
-The desktop answer is the open file, not the address bar. The workspace id lives
-inside the file, so a second id in the URL would be a competing source of truth
-and is ignored. A missing method is refused before the store is imported, because
-a control that silently does nothing is worse than a clear version mismatch.
+The desktop answer is the open file, not the address bar: the shell says which
+document is open, and the session is configured from it before `App` and the
+store are imported. The store reads the session once at import, so a later answer
+would key the document to nothing. `boot` refuses a missing method before this
+runs. The Canvas / Host note owns the mismatch, and the Canvas note owns the boot
+order.
 
 ## apps/canvas/src/App.tsx#App
 
-With a session but no workspace, the shell shows the launcher; with a workspace,
-it shows the canvas. The launcher stays reachable, which is what makes "Open…"
-work when the shell started without a file. The component reads the session and
-the store; it does not parse the file or decide which adapter backs it.
+With no workspace the shell renders the launcher; with one it renders the canvas.
+A successful desktop open owns the window, so the launcher is the state for "no
+file", not a page the address bar can return to. The shell opens it first even
+when a file was handed over, which is what leaves a place to work when the open
+is refused. `App` reads the session and the store; it neither parses the file nor
+chooses the adapter. The Canvas note owns the surface.
 
 ## apps/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
 
-The adapter hydrates from the snapshot main already handed over, so a large
-document does not cross the boundary twice. It subscribes to local updates only:
-an update that arrived from sync must not be echoed back as a save. The pending
-flag is a "something changed" bit; the snapshot is taken at flush time, after the
-edits settle.
+The adapter hydrates from the snapshot the boot already took, so a large document
+does not cross the boundary twice, and it subscribes to local updates only: an
+update that arrived from sync must not be echoed back as a save. Its pending flag
+is a "something changed" bit; the snapshot is taken at write time, after the
+edits settle. The Canvas / Storage note owns the coalescing and the failure path.
 
 ## apps/canvas/src/store/useCanvasStore.ts#useCanvasStore
 
-The store owns the live document the adapter just hydrated. Its `ready` gate
-keeps the canvas from painting before local state is loaded, and its `flush`
-action is the one call that asks persistence to catch up before a publish or a
-close. It holds the document instance, not a copy of its records.
+The store holds the live document the adapter hydrated. `ready` keeps the canvas
+from painting before hydration finishes, and `flush` asks persistence to catch up
+before the window leaves the workspace. It holds the document instance, not a
+copy of its records, and a refused write never becomes document state. The Canvas
+/ Store note owns what may live in the store.
 
 ## apps/canvas/packages/graph/src/workspaceFile.ts#tryParseWorkspaceFile
 
 Parsing answers with a `Result` because the person chose the file and needs a
 sentence they can act on. It never merges into an open document; the caller gives
 it a new workspace id. A missing image is reported as damaged while the rest of
-the document imports, because losing one picture must not cost the text beside
-it.
+the document imports. The Graph note owns the envelope and the version refusals.
 
 ## apps/canvas/packages/graph/src/workspaceFile.test.ts
 
-The reload contract is the end of the path: write an envelope, read it into a
-fresh document and assert that the board, card and tag survived. The other cases
-pin the refusals and the attachment bytes. An open path is only correct while
-this test still passes.
+The reload contract is the end of the path: the first case writes an envelope,
+reads it into a fresh document and asserts that the board, card and tag survived.
+The other cases pin the refusals and the attachment bytes. The Graph note owns
+what a weakened case would change.

@@ -1,0 +1,38 @@
+---
+module: apps/canvas/desktop/src/preload
+title: Canvas Desktop / Preload
+summary: "The one allowlist between a sandboxed page and Canvas main: named channels, no path the page can steer."
+---
+
+The preload owns the whole surface a Canvas page may reach. It is one
+`contextBridge.exposeInMainWorld("suiteDesktop", …)` call: the methods the page
+may invoke, the channel each one uses, and the three values that identify the
+host. Nothing else is published, and `contextIsolation` means the page has no
+second way in.
+
+It deliberately does not own what a channel does. The handlers, the sender check
+and the file rules live in `src/main`; the channel constants live in
+`src/shared/ipc.ts`; the document bridge's TypeScript shape lives in
+`src/host/bridge.ts`. The preload is CommonJS on purpose: a sandboxed preload has
+no ESM and only a small set of built-ins, so it cannot import the shared
+constants and must spell the names out.
+
+## file: apps/canvas/desktop/src/preload/index.cjs
+
+This file is the entire bridge. It publishes document doors, the sync doors and
+the host values, and it exposes no filesystem primitive: there is no `saveAs`, no
+`readFile` and no channel that takes a write destination. Save receives a
+snapshot; main chooses where it goes and validates what it is given.
+A page compromised by a document still cannot write outside the file main opened.
+
+## apps/canvas/desktop/src/preload/index.cjs#CHANNELS
+
+One map from method name to channel string, so adding a capability means adding
+one line in one place. Because the file cannot import `shared/ipc.ts`,
+`preload.test.ts` reads this file and asserts every shared channel appears here,
+and that no path-shaped name such as `saveAs`, `openPath`, `writeFile` or
+`readFile` is present. That test holds one direction of the contract: a rename in
+`shared/ipc.ts` fails there instead of at runtime, where the symptom would be a
+bridge method that never returns. The sync entries carry an exported update in
+each direction and leave the keys and socket in main, which is why they are the
+only sync doors the page gets.

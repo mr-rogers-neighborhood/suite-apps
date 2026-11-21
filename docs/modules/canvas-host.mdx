@@ -1,0 +1,109 @@
+---
+module: apps/canvas/src/host
+title: Canvas / Host
+summary: "The host signal the renderer reads, its minimum shell, and the page a stale shell gets."
+---
+
+This module answers one question before anything else starts: which process is
+hosting this renderer. `bridge.ts` holds the shape of the bridge the preload
+publishes, the methods this build calls, and the three pure functions that read
+them. `StaleShell.tsx` is the page for a window whose preload is older than the
+renderer.
+
+It deliberately does not own the channels or their handlers. The names live in
+`apps/canvas/desktop/src/shared/ipc.ts`, the handlers in the desktop main
+process, and the preload is the side that spells them out. This module also does
+not choose the session or the persistence adapter; it only reports the host, and
+the entry point acts on that answer. The bridge is a host signal rather than a
+build flag because a flag says what was compiled, while the page needs to know
+what actually loaded beside it.
+
+## file: apps/canvas/src/host/bridge.ts
+
+One contract file, with no Electron import and no I/O. The scope is a parameter
+so a test can pass a fake global instead of depending on how the runner started.
+That is what makes the host rules unit-testable without a window.
+
+## apps/canvas/src/host/bridge.ts#DESKTOP_BRIDGE_KEY
+
+One global name, because the renderer should not search several. Renaming it
+breaks the preload's `exposeInMainWorld` call and every reader at once, which is
+the intended failure: there is no second lookup to fall back to.
+
+## apps/canvas/src/host/bridge.ts#DesktopBridge
+
+Every method here is a capability the renderer did not have before, so the
+interface is kept small and grows one increment at a time. Save takes no path at
+all; open takes back an identity the shell already reported. The version is
+carried for diagnostics and a future minimum-shell check; nothing branches on its
+value today.
+
+## apps/canvas/src/host/bridge.ts#BridgeDocumentInfo
+
+The identity main gives the page: workspace id, path, file name, and whether the
+open converted a legacy file or recovered from a backup. The path is for the
+title bar and for showing the person where their file is; it is not a destination
+the page can write to. The two provenance fields exist so the page can say what
+happened instead of presenting a recovered file as an ordinary open.
+
+## apps/canvas/src/host/bridge.ts#BridgeSaveRequest
+
+A save is a whole snapshot because the file format is a whole document. The
+manifest is a small, human-readable count, not a permission. Attachments appear
+only when the referenced set changed, so a routine autosave does not re-encode
+every image; the title is only needed when this save is the one that names a new
+file.
+
+## apps/canvas/src/host/bridge.ts#BridgeCreateRequest
+
+The seed for a document that does not exist yet. It carries the workspace id,
+title, snapshot and manifest so main never has to invent a document it cannot
+describe. It carries no path: the shell chooses the file, and the same rule
+applies when the first `saveDocument` creates one.
+
+## apps/canvas/src/host/bridge.ts#BridgeFailure
+
+A refusal is a value rather than an exception because it has to survive the
+context bridge and end up in front of a person. The code is for the renderer to
+branch on; the message is the sentence it shows. A failure that cannot say what
+happened is a control that silently does nothing.
+
+## apps/canvas/src/host/bridge.ts#REQUIRED_BRIDGE_METHODS
+
+The list is what this build requires from the bridge, not every method the current
+preload happens to publish. A window keeps the preload it loaded at launch, so a
+method added since then is absent while the marker is still present. Adding a
+method to the bridge means adding it here; otherwise the renderer can call
+`undefined` and the window looks functional.
+
+## apps/canvas/src/host/bridge.ts#desktopBridge
+
+The presence test: the global exists, is an object, and claims the desktop host
+with a string version. Methods are not required here, because an older shell
+still publishes the marker and the version; the callable half is checked
+separately. The test pins that a string, a number, `null`, the wrong host and a
+missing version all read as a browser, so a stray global cannot claim to be the
+shell.
+
+## apps/canvas/src/host/bridge.ts#hostKind
+
+The same answer as a word, because callers choose behavior rather than inspect a
+bridge: the store picks its persistence adapter from this. It follows
+`desktopBridge` exactly, so a bridge that fails the marker test reads as `"web"`
+and never gets a desktop-only code path.
+
+## apps/canvas/src/host/bridge.ts#bridgeMissing
+
+It returns names, not a boolean, so the stale page can carry what is missing for
+diagnostics and a future caller can narrow the required list for a partial
+upgrade. A non-function value counts as missing: a property that exists but
+cannot be called is the same silence as an absent one. Only a restart replaces
+the preload, so the answer is a message rather than a retry.
+
+## apps/canvas/src/host/StaleShell.tsx#StaleShell
+
+The page that removes the silence. It offers no button because nothing the page
+can do replaces a restart, and the only instruction is to restart Suite. The
+missing method names go into `data-missing` for diagnostics, not into the
+sentence a person reads. The test asserts both: the heading and instruction, and
+the absence of any button or link.
