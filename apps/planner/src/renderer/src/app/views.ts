@@ -1,8 +1,9 @@
 import type { LucideIcon } from "lucide-react";
-import { CalendarDays, Folder, Inbox, Sun, Tag } from "lucide-react";
+import { CalendarDays, Folder, Inbox, Sun, Tag, Timer } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { DayView } from "../day/DayView";
+import { FocusView } from "../focus/FocusView";
 import { InboxView } from "../inbox/InboxView";
 import { ProjectsView } from "../projects/ProjectsView";
 import { TagsView } from "../tags/TagsView";
@@ -30,6 +31,7 @@ export const views = {
   upcoming: { id: "upcoming", label: "Upcoming", icon: CalendarDays, component: UpcomingView },
   projects: { id: "projects", label: "Projects", icon: Folder, component: ProjectsView },
   tags: { id: "tags", label: "Tags", icon: Tag, component: TagsView },
+  focus: { id: "focus", label: "Focus", icon: Timer, component: FocusView },
 } as const satisfies ViewRegistry;
 
 export type ViewId = keyof typeof views;
