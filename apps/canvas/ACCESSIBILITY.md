@@ -70,4 +70,4 @@ of the barrier is more useful than a suggested fix, and both are welcome.
 
 ## What this runs on
 
-Electron with Chromium, React 19, on Linux, with Orca as the screen reader used for testing.
+Electron with Chromium, React 19, on Linux. Orca is the screen reader these manual passes will use.

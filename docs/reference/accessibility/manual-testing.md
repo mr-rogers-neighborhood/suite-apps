@@ -1,12 +1,15 @@
 # Manual accessibility testing
 
-axe catches roughly a third of real accessibility problems. Not every app runs it: Planner has no
-axe gate, and Budget's Storybook panel reports without failing the build; each app's
-`ACCESSIBILITY.md` owns the detail. This document is the other two thirds, and it is written so you
-can run it without re-deriving what to look for.
+axe catches roughly a third of real accessibility problems. Not every surface runs it: Canvas runs
+axe over its Storybook stories, Planner and Start have no axe gate, Budget's Storybook panel reports
+without failing the build, and the relay's loopback console has no axe at all. The apps that have an
+`ACCESSIBILITY.md` — Canvas, Planner, Budget, Start and Sync — own the detail; Help and Go have no
+statement. This document is the other two thirds, and it is written so you can run it without
+re-deriving what to look for.
 
 Run this after any change to layout, colour, focus handling, or a dialog. It takes about twenty
-minutes for one app.
+minutes for one app. The relay's console is a browser page rather than a desktop window; run the same
+sweep on it in the browser, against `127.0.0.1`.
 
 ## What to read, and what each thing is for
 

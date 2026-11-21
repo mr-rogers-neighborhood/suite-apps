@@ -1,6 +1,6 @@
 # Accessibility
 
-Suite is alpha software. This page says where accessibility stands, and what has actually been
+Suite Start is the hub, and this page says where its accessibility stands, and what has actually been
 checked, rather than what is intended.
 
 The target is **WCAG 2.2 level AA**. That is 55 of the 86 success criteria in the standard. The full
@@ -47,10 +47,10 @@ below are the ones a code review can name; the manual protocol is what would con
 row in the [criterion map](../../docs/reference/accessibility/wcag-22-map.md) naming its success
 criterion.
 
-| Area | What is missing | Level |
-| --- | --- | --- |
-| Reflow | The rail is a fixed 208px column and an app card has a 320px minimum, with no breakpoint. At 200% zoom, or a 320 CSS px viewport, the content column is narrower than a card and the page overflows instead of reflowing (SC 1.4.10). | AA |
-| Status messages | Install progress is a `role="status"` region created and filled at the same moment. Install failures, launch errors and the update-check result are plain text with no live region, and the copy-link confirmation is only a button label change, so a screen reader may miss them (SC 4.1.3). | AA |
+| Area            | What is missing                                                                                                                                                                                                                                                                                | Level |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| Reflow          | The rail is a fixed 208px column and an app card has a 320px minimum, with no breakpoint. At a 320 CSS px viewport the content column is narrower than a card and the page overflows instead of reflowing (SC 1.4.10).                                                                         | AA    |
+| Status messages | Install progress is a `role="status"` region created and filled at the same moment. Install failures, launch errors and the update-check result are plain text with no live region, and the copy-link confirmation is only a button label change, so a screen reader may miss them (SC 4.1.3). | AA    |
 
 ## What does not apply
 
@@ -70,4 +70,4 @@ of the barrier is more useful than a suggested fix, and both are welcome.
 
 ## What this runs on
 
-Electron with Chromium, React 19, on Linux, with Orca as the screen reader used for testing.
+Electron with Chromium, React 19, on Linux. Orca is the screen reader these manual passes will use.

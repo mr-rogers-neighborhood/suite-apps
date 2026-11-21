@@ -13,6 +13,7 @@ export { addInvite, createInviteState, invitedRole, inviteRecordPayload, inviteR
 export { formatInvite, INVITE_SCHEME, JOIN_HOST, parseInvite, } from "./inviteLink.js";
 export { qrMatrix, qrSvg, } from "./qr.js";
 export { encodeRelayMessage, ephemeralPayload, isRelayCompatible, parseClientMessage, parseHostMessage, RELAY_PROTOCOL_VERSION, relayClientMessageSchema, relayErrorCodeSchema, relayHostMessageSchema, } from "./relay.js";
+export { isLoopbackRelayUrl } from "./relayAddress.js";
 export { createRelayClient, signFrame, } from "./relayClient.js";
 export { formatRelayLink, parseRelayLink, RELAY_LINK_HOST, RELAY_LINK_SCHEME, } from "./relayLink.js";
 export { applyRemovalRecord, createRemovalState, isRemoved, reinstateDevice, removalRecordPayload, removalRecordSchema, removalRejectionSchema, } from "./removal.js";

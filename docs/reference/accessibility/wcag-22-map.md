@@ -25,16 +25,19 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 
 | App | Gated check | Not gated |
 | --- | --- | --- |
-| Canvas | `@suite/theme` contrast; axe over the Storybook stories | Running-window contrast, focus order and screen-reader output |
-| Planner | `@suite/theme` contrast; lint, types, unit tests and build | No axe in the gate; no manual pass recorded |
-| Budget | `@suite/theme` contrast | Storybook's a11y panel reports without failing the build; no axe against the running app; no manual pass recorded |
-| Start | `@suite/theme` contrast | No axe run; no manual pass recorded |
-| Sync | — | No user interface |
+| Canvas | `@suite/theme` contrast (suite-level); axe over the Storybook stories | Running-window contrast, focus order and screen-reader output |
+| Planner | `@suite/theme` contrast (suite-level); lint, types, unit tests, shape, knip and build | No axe in the gate; no manual pass recorded |
+| Budget | `@suite/theme` contrast (suite-level) | Storybook's a11y panel reports without failing the build; no axe against the running app; no manual pass recorded |
+| Start | `@suite/theme` contrast (suite-level); lint, types and unit tests | No axe run; no manual pass recorded |
+| Sync | — | No desktop app UI. The relay serves a loopback console page: no axe, no manual pass, and it reloads every five seconds |
 
-A **Gated** row is a check that fails the build where it exists; it is not a claim that every app
-runs it. A **Partial** row is gated in the app named in its How column and manual elsewhere. Help and
-Go have no accessibility statement, so this table makes no claim about them; each app's
-`ACCESSIBILITY.md` owns its detail.
+The `@suite/theme` contrast test is one suite-level check, not five per-app ones: it lives in
+`packages/theme/src/presets.test.ts` and runs inside Start's Vitest project, so the root gate runs it
+for every app that draws its presets from that package. A **Gated** row is a check that fails the
+build; it is not a claim that every app runs every check named in it. A **Partial** row is gated in
+the app named in its How column and manual elsewhere. Help and Go have no accessibility statement and
+this table makes no claim about them; Canvas, Planner, Budget, Start and Sync each have an
+`ACCESSIBILITY.md` that owns its detail.
 
 ## Principle 1: Perceivable
 
@@ -64,7 +67,7 @@ Go have no accessibility statement, so this table makes no claim about them; eac
 | 1.4.7  | AAA   | Low or No Background Audio             | N/A    | No audio.                                                                                                      |
 | 1.4.8  | AAA   | Visual Presentation                    | Manual | Partly: line length and justification are controlled where text is long.                                       |
 | 1.4.9  | AAA   | Images of Text (No Exception)          | Gated  | As 1.4.5.                                                                                                      |
-| 1.4.10 | AA    | Reflow                                 | Manual | Sweep step 3, 320px and 400%.                                                                                  |
+| 1.4.10 | AA    | Reflow                                 | **Gap** | Start's fixed 208px rail and 320px card minimum overflow a 320 CSS px viewport instead of reflowing ([Start's statement](../../../apps/start/ACCESSIBILITY.md)). The other apps still need sweep step 3 at 320px and 400%. |
 | 1.4.11 | AA    | Non-text Contrast                      | Gated  | `border-strong` and `focus` are held to 3:1 on every surface. `hairline` is deliberately exempt as decorative. |
 | 1.4.12 | AA    | Text Spacing                           | Manual | Sweep step 3: overriding spacing must not clip.                                                                |
 | 1.4.13 | AA    | Content on Hover or Focus              | Manual | Tooltips must be dismissable, hoverable, and persistent.                                                       |
@@ -141,7 +144,7 @@ Go have no accessibility statement, so this table makes no claim about them; eac
 | ----- | ----- | ----------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 4.1.1 | —     | Parsing           | N/A    | **Obsolete in WCAG 2.2.** Removed; nothing to meet.                                                                                                                                                                                                                                                                                                      |
 | 4.1.2 | A     | Name, Role, Value | Gated  | Primitives use native elements; the import control is a disclosure, not a `menu` it would not honour.                                                                                                                                                                                                                                                    |
-| 4.1.3 | AA    | Status Messages   | Manual | Canvas announces through a persistent `LiveRegion` (`role="status"` / `role="alert"`, `aria-atomic`). [Planner's statement](../../../apps/planner/ACCESSIBILITY.md) records a persistent status region for week moves and `Toast` for other confirmations; [Budget's](../../../apps/budget/ACCESSIBILITY.md) records `Toast` per notice. Verify with Orca, and make it persistent if it is missed. |
+| 4.1.3 | AA    | Status Messages   | Manual | Canvas announces through a persistent `LiveRegion` (`role="status"` / `role="alert"`, `aria-atomic`). [Planner's statement](../../../apps/planner/ACCESSIBILITY.md) records a persistent status region for week moves and `Toast` for other confirmations; [Budget's](../../../apps/budget/ACCESSIBILITY.md) records `Toast` per notice. Verify with Orca, and make it persistent if it is missed. Start is not a verification gap: install progress is a `role="status"` region created and filled at the same moment, while install failures, launch errors and the update result are plain text with no live region, and the copy-link confirmation is only a button label change ([Start's statement](../../../apps/start/ACCESSIBILITY.md)). |
 
 ## The gaps, in one place
 
@@ -149,13 +152,16 @@ These are the honest list. Each is tracked, and none is claimed as working in `A
 
 | SC     | What is missing                                                |
 | ------ | -------------------------------------------------------------- |
+| 1.4.10 | Start's rail and card minimum overflow a 320 CSS px viewport ([statement](../../../apps/start/ACCESSIBILITY.md)). |
 | 2.1.4  | Canvas single-key shortcuts are not remappable.                |
 | 2.4.12 | AAA. Sticky regions may overlap focused content in edge cases. |
 | 2.5.5  | AAA. Targets are 24px, not 44px.                               |
+| 4.1.3  | Start's install failures, launch errors and update result are plain text with no live region ([statement](../../../apps/start/ACCESSIBILITY.md)). |
 
 Order of work: **2.1.4 first** (A, and the only gap that is unambiguously real), then the three
 2.5.7 items above, then the AAA rows.
 
-4.1.3 is a _verification_ gap rather than a known failure: the markup is right, and whether a reader
-hears it needs the screen-reader step to answer. Do not upgrade it to "working" until someone has
-listened.
+For Canvas, Planner and Budget, 4.1.3 is a _verification_ gap rather than a known failure: the markup
+is right, and whether a reader hears it needs the screen-reader step to answer. Do not upgrade it to
+"working" until someone has listened. Start's 4.1.3 row is a known failure, and stays listed until
+the messages get a live region.
