@@ -151,3 +151,47 @@ describe("a launch the hub performed", () => {
     expect(written).toMatchObject({ version: "0.1.0", available: null, checkedAt: null });
   });
 });
+
+describe("a launch inside a Flatpak", () => {
+  const saved = process.env.FLATPAK_ID;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.FLATPAK_ID;
+    else process.env.FLATPAK_ID = saved;
+  });
+
+  it("leaves updating to OSTree and asks no feed", async () => {
+    // OSTree replaces the whole deployment; an in-app updater writing beside the
+    // binary is the second writer the sandbox exists to prevent.
+    process.env.FLATPAK_ID = "run.suite.budget";
+    const dataDir = await folder();
+    let asked = false;
+    const updater: UpdaterLike = {
+      autoDownload: true,
+      checkForUpdates: async () => {
+        asked = true;
+        return null;
+      },
+    };
+
+    const result = await checkForUpdates({
+      dataDir,
+      version: "0.1.0",
+      channel: "alpha",
+      packaged: true,
+      feed: FEED,
+      updater,
+      now,
+      fetch: (async () => {
+        asked = true;
+        return { ok: false, status: 404, text: async () => "" };
+      }) as unknown as typeof fetch,
+    });
+
+    expect(asked).toBe(false);
+    expect(result.error).toBeNull();
+    expect(result.verified).toBe(false);
+    expect(result.state).toMatchObject({ version: "0.1.0", available: null, checkedAt: null });
+    const written = JSON.parse(await readFile(join(dataDir, "update-state.json"), "utf8"));
+    expect(written).toMatchObject({ version: "0.1.0", available: null, checkedAt: null });
+  });
+});

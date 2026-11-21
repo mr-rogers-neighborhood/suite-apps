@@ -89,7 +89,8 @@ async function bootstrap(): Promise<void> {
   openWindow();
 
   // One check per launch, in the background: it writes the report the hub reads.
-  // A dev run has no feed, so it does not ask.
+  // A dev run has no feed, so it does not ask, and a Flatpak launch leaves its
+  // bytes to OSTree rather than checking at all.
   void checkForUpdates({
     dataDir: paths.root,
     version: app.getVersion(),
