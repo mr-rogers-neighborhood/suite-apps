@@ -11,6 +11,20 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 No changes yet.
 
+## [0.3.15] - 2026-11-20
+
+### Added
+
+- **Pre-release apps sit beside stable ones.** A stable app and its one pre-release now appear as
+  two cards: the pre-release carries a text badge naming its tier (slop, canary or beta) and a
+  notice naming the risk and how to remove it. Removing a pre-release asks before deleting its
+  separate documents; stable data is never touched.
+- **One pre-release install at a time.** Choosing another tier switches the existing install's
+  branch instead of adding a second copy, and the card says the data folder changes with it.
+- **Sync is a service you can run anywhere.** The Sync pane starts and stops a `suite-sync` relay it
+  finds through `SUITE_SYNC_BIN` or `PATH`, shows its address and store, and explains how to install
+  the relay when it is missing. The relay itself now ships as a checksummed, signed release.
+
 ## [0.3.14] - 2026-11-20
 
 ### Changed
