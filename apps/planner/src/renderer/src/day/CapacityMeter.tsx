@@ -10,7 +10,14 @@ export function capacityLabel(capacity: Capacity): string {
   return `${formatDuration(capacity.plannedMinutes)} planned · ${formatDuration(capacity.remainingMinutes)} left`;
 }
 
-export function CapacityMeter({ capacity }: { capacity: Capacity }) {
+export function CapacityMeter({
+  capacity,
+  label = "Planned time against daily capacity",
+}: {
+  capacity: Capacity;
+  /** A per-column name when several meters share a page, such as the week view. */
+  label?: string;
+}) {
   const width = Math.min(100, Math.round(capacity.ratio * 100));
   const bar =
     capacity.state === "over" ? "bg-danger" : capacity.state === "tight" ? "bg-warn" : "bg-accent";
@@ -24,7 +31,7 @@ export function CapacityMeter({ capacity }: { capacity: Capacity }) {
       {/* biome-ignore lint/a11y/useSemanticElements: a styled meter is not consistently stylable in Chromium; the role and values carry the semantics */}
       <div
         role="meter"
-        aria-label="Planned time against daily capacity"
+        aria-label={label}
         aria-valuemin={0}
         aria-valuemax={capacity.availableMinutes}
         aria-valuenow={Math.min(capacity.plannedMinutes, capacity.availableMinutes)}

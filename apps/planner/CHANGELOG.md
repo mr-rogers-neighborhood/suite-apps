@@ -10,6 +10,16 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 No changes yet.
 
+## [0.5.0] - 2026-11-21
+
+### Added
+
+- **Plan the whole week on one page.** A seventh surface beside Today shows seven day columns that
+  start on the day your week starts, each with its scheduled tasks and a capacity meter that respects
+  the day's own override. Drag a task to another day, or focus it and press Alt+← / Alt+→; unfinished
+  work from before today waits in a labelled carry-over area until you move it, and no task is
+  rescheduled silently.
+
 ## [0.4.0] - 2026-11-21
 
 ### Added

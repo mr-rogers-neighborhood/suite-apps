@@ -11,3 +11,9 @@ export { isOccurrence, isOccurrenceDone, occurrencesBetween } from "./recurrence
 export { pendingReminders } from "./reminders";
 export { searchTasks } from "./search";
 export { nextOrder, sortByOrder, sortByPriority } from "./sort";
+export {
+  type WeekDay,
+  type WeekPlan,
+  type WeekPlanOptions,
+  weekPlan,
+} from "./weekPlan";

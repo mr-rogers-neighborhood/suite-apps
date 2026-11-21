@@ -44,6 +44,10 @@ export {
   searchTasks,
   sortByOrder,
   sortByPriority,
+  type WeekDay,
+  type WeekPlan,
+  type WeekPlanOptions,
+  weekPlan,
 } from "./plan";
 export type {
   AppCommand,
