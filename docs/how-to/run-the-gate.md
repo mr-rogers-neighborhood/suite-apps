@@ -84,3 +84,9 @@ ssh suite-dev tail -f ~/ci/logs/<sha>.log
 
 The run is capped at 5 GiB high and 6 GiB max, and takes a lock so a second push waits rather than
 doubling memory. See `scripts/ci/` for the setup.
+
+The hook checks the transient unit a second after queueing it. If the unit did not start, the push
+prints a `remote: post-receive: … nothing will gate <sha>` line and the hook exits non-zero: the
+branch is updated, but no run exists. Treat that line as an ungated push — fix the cause shown by
+`sudo journalctl -u suite-gate-<sha12>-<timestamp>`, then push a new commit (re-pushing an unchanged
+ref does not run the hook).

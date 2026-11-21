@@ -15,6 +15,15 @@ LOCK=$ROOT/gate.lock
 
 mkdir -p "$ROOT/logs" "$CHECKOUT"
 
+# This process owns its log. systemd opens a `StandardOutput=` file in the
+# executor's domain (`init_t`) before it switches the service to the user's
+# domain, and `init_t` may neither create nor append to a file under the
+# user's `user_home_t` home, so the unit died at 209/STDOUT before this script
+# ran. Opening the log here — as the service, `unconfined_t` — keeps the path
+# the docs promise (`~/ci/logs/<sha>.log`) and works for a transient unit or a
+# run from a shell. `append` so a re-run of a commit keeps the earlier output.
+exec >>"$LOG" 2>&1
+
 write_status() {
   local state=$1 ok=$2 detail=$3
   node -e '
