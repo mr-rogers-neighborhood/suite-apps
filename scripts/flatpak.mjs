@@ -11,6 +11,7 @@
  *   node scripts/flatpak.mjs --app budget    # Budget stable, same path
  *   node scripts/flatpak.mjs --app start     # Start (the hub) stable, same path
  *   node scripts/flatpak.mjs --app help      # Help stable, same path
+ *   node scripts/flatpak.mjs --app sync      # Sync (the tray relay) stable, same path
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
  *   node scripts/flatpak.mjs --app planner --channel slop
  *                                            # pre-release id on the slop branch
@@ -106,6 +107,18 @@ const APPS = {
     metainfo: join(ROOT, "packaging", "flatpak", "run.suite.start.metainfo.xml"),
     unpacked: join(ROOT, "apps", "start", "release", "linux-unpacked"),
   },
+  sync: {
+    id: "run.suite.sync",
+    name: "Suite Sync",
+    package: "@suite/sync-app",
+    project: join(ROOT, "apps", "sync", "app"),
+    folder: "sync",
+    binary: "suite-sync",
+    manifest: join(ROOT, "packaging", "flatpak", "run.suite.sync.yml"),
+    desktop: join(ROOT, "packaging", "flatpak", "run.suite.sync.desktop"),
+    metainfo: join(ROOT, "packaging", "flatpak", "run.suite.sync.metainfo.xml"),
+    unpacked: join(ROOT, "apps", "sync", "app", "release", "linux-unpacked"),
+  },
 };
 
 function argumentValue(argv, flag) {
@@ -138,9 +151,13 @@ if (!app) {
 }
 
 // The hub ships no suite.app.json, so it has no pre-release app identity to
-// generate. Refuse before a package build or a manifest is written.
-if (appName === "start" && isPreRelease(channel)) {
-  process.stderr.write("Suite Start has no pre-release identity: it ships no suite.app.json\n");
+// generate. Refuse before a package build or a manifest is written. Sync is the
+// same: it is a server that happens to have a tray, and a tier would be a second
+// mailbox on the same data.
+if ((appName === "start" || appName === "sync") && isPreRelease(channel)) {
+  process.stderr.write(
+    `Suite ${appName === "start" ? "Start" : "Sync"} has no pre-release identity: it ships no suite.app.json\n`,
+  );
   process.exit(1);
 }
 

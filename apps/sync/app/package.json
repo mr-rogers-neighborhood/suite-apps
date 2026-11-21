@@ -1,0 +1,39 @@
+{
+  "name": "@suite/sync-app",
+  "productName": "Suite Sync",
+  "desktopName": "run.suite.sync",
+  "version": "0.11.3",
+  "private": true,
+  "type": "module",
+  "description": "The Suite relay as a desktop app: the tray keeps one running, the window shows its address and code.",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/stage.mjs",
+    "package:dir": "pnpm build && electron-builder --dir",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@suite/desktop": "workspace:*",
+    "@suite/host": "workspace:*",
+    "@suite/sync": "workspace:*",
+    "@suite/sync-server": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "electron": "^45.2.2",
+    "electron-builder": "^26.18.0",
+    "typescript": "~5.9.3",
+    "vitest": "5.1.0"
+  },
+  "author": {
+    "name": "Suite contributors",
+    "email": "maintainers@suite.run"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@12.17.0",
+  "engines": {
+    "node": ">=22"
+  }
+}

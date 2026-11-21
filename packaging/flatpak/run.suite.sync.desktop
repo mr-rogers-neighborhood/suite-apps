@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Suite Sync
+Comment=Your own Suite relay, in the tray
+Exec=run.suite.sync %U
+Icon=run.suite.sync
+Terminal=false
+Type=Application
+Categories=Network;Utility;
+StartupWMClass=run.suite.sync

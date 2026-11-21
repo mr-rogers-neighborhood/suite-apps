@@ -1,0 +1,20 @@
+[Unit]
+Description=Suite Sync relay (the Flatpak, running headless as you)
+Documentation=https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/docs/how-to/relay.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# A user unit, because the relay is a user Flatpak and its store is the app's own data
+# directory. `--store` has to name a path inside the sandbox: `/var/lib` is not writable there.
+#
+# The pair for a reachable address is made once with openssl and kept in the same directory;
+# see docs/how-to/relay.md. Replace the loopback line with the reachable one when you have it.
+EnvironmentFile=-%h/.config/suite-sync/relay.env
+ExecStart=/usr/bin/flatpak run --command=suite-sync run.suite.sync serve --store %h/.var/app/run.suite.sync/data/suite-sync --host 127.0.0.1 --port 8787 --trust-all $SUITE_SYNC_ARGS
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The AppStream record is what a store reads: name, summary, categories, icon.
+  The same record is what a package manager lists beside the app's own desktop entry.
+-->
+<component type="desktop-application">
+  <id>run.suite.sync</id>
+  <name>Suite Sync</name>
+  <summary>Your own Suite relay, in the tray</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://github.com/mr-rogers-neighborhood/suite-apps</url>
+  <description>
+    <p>
+      Sync is the mailbox the Suite apps sync through. It runs on a machine you
+      own — a spare desktop, a home server, the computer you leave on — and it
+      stores encrypted frames it cannot open. It never joins a group and never
+      reads a document.
+    </p>
+    <p>
+      The tray keeps the relay serving while the window is closed. The window
+      shows the address another device needs, its certificate fingerprint, the
+      relay code to scan and the read-only console. There is no account and no
+      Suite-operated server.
+    </p>
+    <p>
+      On a machine without a desktop, the same Flatpak runs the relay headless:
+      <code>flatpak run --command=suite-sync run.suite.sync serve</code>.
+    </p>
+  </description>
+  <launchable type="desktop-id">run.suite.sync.desktop</launchable>
+  <provides>
+    <binary>run.suite.sync</binary>
+    <binary>suite-sync</binary>
+  </provides>
+  <releases>
+    <release version="0.11.3" date="2026-11-21"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

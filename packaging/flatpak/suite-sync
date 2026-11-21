@@ -1,0 +1,7 @@
+#!/bin/sh
+# The relay without a window: `flatpak run --command=suite-sync run.suite.sync serve …`.
+#
+# The Flatpak carries one Electron runtime and no Node of its own, so the app's own binary is
+# asked to behave as Node. The CLI is the same `@suite/sync-server` entry the window's app
+# embeds, so `serve`, `status` and `--version` mean exactly what they mean in a checkout.
+exec env ELECTRON_RUN_AS_NODE=1 /app/sync/suite-sync /app/sync/resources/app.asar/dist/cli.js "$@"
