@@ -13,6 +13,7 @@ export { addInvite, createInviteState, type InviteRecord, type InviteRejection, 
 export { formatInvite, INVITE_SCHEME, type InviteDetails, type InviteParse, JOIN_HOST, parseInvite, } from "./inviteLink.js";
 export { type QrErrorCorrection, type QrMatrix, type QrSvgOptions, qrMatrix, qrSvg, } from "./qr.js";
 export { type EphemeralBody, type EphemeralMessage, encodeRelayMessage, ephemeralPayload, isRelayCompatible, parseClientMessage, parseHostMessage, RELAY_PROTOCOL_VERSION, type RelayApplied, type RelayClientMessage, type RelayEphemeral, type RelayErrorCode, type RelayFrame, type RelayHostMessage, type RelayJoined, type RelayMember, type RelayRoster, type RelayWaiting, relayClientMessageSchema, relayErrorCodeSchema, relayHostMessageSchema, } from "./relay.js";
+export { isLoopbackRelayUrl } from "./relayAddress.js";
 export { createRelayClient, type RelayClient, type RelayClientHandlers, type RelayClientOptions, type RelayWebSocket, type RelayWebSocketFactory, signFrame, } from "./relayClient.js";
 export { formatRelayLink, parseRelayLink, RELAY_LINK_HOST, RELAY_LINK_SCHEME, type RelayLinkDetails, type RelayLinkParse, } from "./relayLink.js";
 export { applyRemovalRecord, createRemovalState, isRemoved, type RemovalRecord, type RemovalRejection, type RemovalResult, type RemovalState, type RemovalVerifier, reinstateDevice, removalRecordPayload, removalRecordSchema, removalRejectionSchema, } from "./removal.js";

@@ -9,6 +9,12 @@ export declare function decodeBase64(value: string): Uint8Array | null;
  * padding is dropped for the same reason; `decodeBase64Url` puts it back.
  */
 export declare function encodeBase64Url(bytes: Uint8Array): string;
-/** Decode URL-safe base64, or null when the text is not one. */
+/**
+ * Decode URL-safe base64, or null when the text is not the canonical encoding.
+ *
+ * The standard decoder is deliberately forgiving about leftover bits; a link is not.
+ * Re-encoding and comparing rejects a value whose trailing bits another spelling could
+ * have produced, so one payload has exactly one link form.
+ */
 export declare function decodeBase64Url(value: string): Uint8Array | null;
 //# sourceMappingURL=base64.d.ts.map

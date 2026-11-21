@@ -25,12 +25,12 @@ typecheck; none of that is an accessibility check. What the page has by construc
 
 ## Known gaps and unverified areas
 
-| Area     | What is missing                                                                                                                                                                                                 | Level |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| Reload   | **Known gap.** The page reloads itself every five seconds so its counts stay current. It cannot be paused, and a reader part-way through the page loses its place (SC 2.2.2).                                  | A     |
-| Reflow   | Not measured. The page is a single column with a 52rem maximum, so it should reflow, but nobody has tested it at 320 CSS px (SC 1.4.10).                                                                         | AA    |
-| Contrast | Not measured. Secondary text is `color-mix()` at 60–65% of `currentColor`, which the palette gate cannot measure (SC 1.4.3).                                                                                    | AA    |
-| Testing  | No axe run and no manual pass. Keyboard order, screen-reader output and focus visibility on the console are unverified.                                                                                          | —     |
+| Area     | What is missing                                                                                                                                                               | Level |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| Reload   | **Known gap.** The page reloads itself every five seconds so its counts stay current. It cannot be paused, and a reader part-way through the page loses its place (SC 2.2.2). | A     |
+| Reflow   | Not measured. The page is a single column with a 52rem maximum, so it should reflow, but nobody has tested it at 320 CSS px (SC 1.4.10).                                      | AA    |
+| Contrast | Not measured. Secondary text is `color-mix()` at 60–65% of `currentColor`, which the palette gate cannot measure (SC 1.4.3).                                                  | AA    |
+| Testing  | No axe run and no manual pass. Keyboard order, screen-reader output and focus visibility on the console are unverified.                                                       | —     |
 
 ## What does not apply
 
