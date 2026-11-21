@@ -9,18 +9,20 @@ breakdown is in
 
 ## What is verified by machine
 
-Two checks run on every change, and a failure stops the work.
+One accessibility check runs on every change and a failure stops the work.
 
 - **Colour contrast in every theme.** Each preset in `@suite/theme` is measured: 4.5:1 for body text
   on every surface it can sit on, 4.5:1 for faint text, and 3:1 for focus rings and component
   boundaries. A preset that fails cannot be merged. A colour that cannot be measured, such as a
   gradient or a `color-mix()`, is not allowed in a preset, because an unmeasurable colour cannot be
   checked.
-- **axe on every start screen.** All four apps are audited against the WCAG 2.2 A and AA rule sets in
-  a real window, and any violation fails the build.
 
-The second check found a real problem the moment it was written: faint text was 3.42:1 against white
-at 11px. It is fixed.
+**Start runs no axe.** There is no axe or Playwright accessibility sweep in Start's gate. The
+end-to-end suite exercises the launcher, not an accessibility rule set; painted contrast, focus order
+and screen-reader output still need the manual pass.
+
+The contrast check found a real problem the moment it was written: faint text was 3.42:1 against
+white at 11px. It is fixed.
 
 ## What is verified by hand
 
@@ -40,7 +42,8 @@ It covers six passes per screen:
 
 ## Known gaps
 
-These are real and tracked. Each has a row in the criterion map naming its success criterion.
+These are real and tracked. Each has a row in the
+[criterion map](../../docs/reference/accessibility/wcag-22-map.md) naming its success criterion.
 
 | Area             | What is missing                                                                                                                                                               | Level |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
