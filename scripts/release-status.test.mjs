@@ -298,6 +298,25 @@ describe("release bodies", () => {
     assert.match(body, /SHA256SUMS/u);
   });
 
+  it("states whether the Go APK is attached in the per-app body", () => {
+    const live = appReleaseBody(go, goEntry.section, {
+      tag: "suite-2026.11.21",
+      apkLive: true,
+    });
+    assert.match(live, /is attached to \[the rolling Suite release\]/u);
+    assert.match(live, /releases\/tag\/suite-2026\.11\.21/u);
+    assert.doesNotMatch(live, /Mobile table says whether/u);
+
+    const pending = appReleaseBody(go, goEntry.section, { tag: "suite-2026.11.21" });
+    assert.match(pending, /Mobile table says whether this build is attached yet/u);
+    assert.doesNotMatch(pending, /is attached to/u);
+    assert.match(pending, /releases\/tag\/suite-2026\.11\.21/u);
+
+    const unknown = appReleaseBody(go, goEntry.section);
+    assert.match(unknown, /releases\/latest/u);
+    assert.match(unknown, /Mobile table says whether/u);
+  });
+
   it("builds one aggregate row per app with version, date, link and install", () => {
     const body = aggregateReleaseBody(entries, { date: "2026-11-21" });
     assert.match(body, /Latest/u);

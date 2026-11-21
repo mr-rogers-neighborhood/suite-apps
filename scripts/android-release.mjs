@@ -207,14 +207,36 @@ function build({ config, env }) {
   return { version, asset, apkPath, checksumPath, sha256 };
 }
 
-/** Refuse an upload when the rolling release is not there to receive it. */
-function releaseExists(tag) {
+/**
+ * What `gh release view` answered, as three distinct states.
+ *
+ * A missing release and a missing or unauthenticated `gh` need different
+ * remedies: the first wants `release-status.mjs --publish`, the second wants a
+ * working GitHub CLI. `gh` reports a missing release on stderr; anything else
+ * that is not a success is the CLI being unavailable.
+ */
+export function classifyReleaseView({ error = null, status = null, stderr = "" } = {}) {
+  if (error !== null) return { state: "unavailable", detail: String(error.message ?? error) };
+  if (status === 0) return { state: "present", detail: null };
+  const text = String(stderr).trim();
+  if (/release not found|HTTP 404/iu.test(text)) {
+    return { state: "missing", detail: text };
+  }
+  return { state: "unavailable", detail: text || `gh exited ${status}` };
+}
+
+/** Whether gh can see the rolling release, and why not when it cannot. */
+function readRelease(tag) {
   const result = spawnSync("gh", ["release", "view", tag, "--json", "tagName"], {
     cwd: ROOT,
     encoding: "utf8",
     env: process.env,
   });
-  return result.error === undefined && result.status === 0;
+  return classifyReleaseView({
+    error: result.error ?? null,
+    status: result.status,
+    stderr: result.stderr ?? "",
+  });
 }
 
 async function main(argv) {
@@ -257,6 +279,26 @@ async function main(argv) {
     return;
   }
 
+  const tag = currentAggregateTag();
+  const release = readRelease(tag);
+
+  // Fail before a long build when there is nowhere to upload: the rolling release
+  // belongs to `release-status.mjs`, and a missing `gh` is a different problem.
+  if (options.publish && release.state === "missing") {
+    throw new Error(
+      `no GitHub release ${tag}, so there is nowhere to attach the APK.\n` +
+        "Run `node scripts/release-status.mjs --publish` first; it creates the rolling " +
+        "release. Then run this again.",
+    );
+  }
+  if (options.publish && release.state === "unavailable") {
+    throw new Error(
+      `could not read GitHub release ${tag}, so the upload is refused` +
+        (release.detail === "" ? "." : `:\n  ${release.detail}`) +
+        "\nCheck `gh auth status` and that the repository is reachable, then run this again.",
+    );
+  }
+
   const env = androidEnvironment(toolchain.sdkRoot, toolchain.jdk);
   const built = build({ config, env });
   const size = statSync(built.apkPath).size;
@@ -273,18 +315,9 @@ async function main(argv) {
       `\`adb uninstall run.suite.go\` first.${RESET}\n`,
   );
 
-  const tag = currentAggregateTag();
   const upload = ["gh", ["release", "upload", tag, built.apkPath, built.checksumPath, "--clobber"]];
-  const releaseThere = releaseExists(tag);
 
   if (options.publish) {
-    if (!releaseThere) {
-      throw new Error(
-        `no GitHub release ${tag}, so there is nowhere to attach the APK.\n` +
-          "Run `node scripts/release-status.mjs --publish` first; it creates the rolling " +
-          "release. Then run this again.",
-      );
-    }
     command(upload[0], upload[1]);
     process.stdout.write(`\n${GREEN}uploaded${RESET} ${built.asset} to ${tag}\n`);
     return;
@@ -292,10 +325,14 @@ async function main(argv) {
 
   process.stdout.write(`\nDry run: nothing was uploaded. The upload would be:\n`);
   process.stdout.write(`  $ ${commandText(upload[0], upload[1])}\n`);
-  if (!releaseThere) {
+  if (release.state === "missing") {
     process.stdout.write(
       `${DIM}${tag} does not exist yet; \`--publish\` refuses until ` +
         "`node scripts/release-status.mjs --publish` has created it.${RESET}\n",
+    );
+  } else if (release.state === "unavailable") {
+    process.stdout.write(
+      `${DIM}gh could not read ${tag}, so \`--publish\` would refuse. Check \`gh auth status\`.${RESET}\n`,
     );
   } else {
     process.stdout.write(`${DIM}${tag} exists; the rolling release is ready for it.${RESET}\n`);

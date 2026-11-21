@@ -592,8 +592,11 @@ export function aggregateReleaseBody(entries, { date, tag = null, apkLive = fals
  * One app's release body: its changelog section, then how to install it.
  *
  * No version is restated outside the title `gh` sets; the section is the note.
+ * The APK entry is the one that cannot assume its artifact: `apkLive` is read
+ * from the rolling release's assets, and without it the body says where the
+ * truth is rather than claiming an attachment that may not exist yet.
  */
-export function appReleaseBody(app, section) {
+export function appReleaseBody(app, section, { tag = null, apkLive = false } = {}) {
   const lines = [section.trim(), "", "## Install", ""];
 
   if (app.kind === "relay") {
@@ -610,10 +613,14 @@ export function appReleaseBody(app, section) {
       "",
     );
   } else if (app.kind === "apk") {
+    const releaseLink = tag === null ? latestReleaseUrl() : releaseUrl(tag);
     lines.push(
-      "Suite Go is a mobile app, not a Flatpak. Its debug-signed APK is attached to",
-      `[the rolling Suite release](${latestReleaseUrl()}), which is the repository's Latest`,
-      "release; this entry is history and carries no binary.",
+      "Suite Go is a mobile app, not a Flatpak.",
+      apkLive
+        ? `This build's debug-signed APK is attached to [the rolling Suite release](${releaseLink}).`
+        : `Its debug-signed APK is published on [the rolling Suite release](${releaseLink}); that ` +
+            "release's Mobile table says whether this build is attached yet.",
+      "This per-app entry is history and carries no binary.",
       "",
       `[How to sideload it](${blobUrl("apps/go/README.md")}) is in Suite Go's README.`,
       "",
@@ -1155,7 +1162,7 @@ async function main(argv) {
   const notes = [
     ...entries.map((entry) => ({
       path: join(NOTES_DIR, `${entry.tag}.md`),
-      body: appReleaseBody(entry.app, entry.section),
+      body: appReleaseBody(entry.app, entry.section, { tag, apkLive }),
     })),
     { path: join(NOTES_DIR, `${tag}.md`), body },
   ];
@@ -1241,7 +1248,7 @@ async function main(argv) {
 
   for (const entry of entries) {
     process.stdout.write(`\n--- ${entry.app.name} ${entry.version} · body ---\n\n`);
-    process.stdout.write(appReleaseBody(entry.app, entry.section));
+    process.stdout.write(appReleaseBody(entry.app, entry.section, { tag, apkLive }));
   }
 
   process.stdout.write(`\n--- ${tag} · body ---\n\n`);
