@@ -60,6 +60,26 @@ DevTools: `pnpm android:eval "localStorage.getItem('suite-go:shell:list')"`.
 unauthorised looks exactly like one that is not attached, and Gradle reports a missing SDK component
 in a stack trace whose useful sentence is twenty lines in.
 
+## Install the APK
+
+Suite Go ships as a **debug-signed APK** attached to the rolling Suite release. It is what you
+sideload and what the owner tests; there is no Play Store build and no release signing key yet.
+
+```sh
+mise exec -- node scripts/android-release.mjs            # build, name and checksum it
+mise exec -- node scripts/android-release.mjs --publish  # attach it to the rolling release
+adb install -r -t apps/go/.dev/release/suite-go-<version>.apk
+```
+
+"Debug-signed" means the build uses this machine's `~/.android/debug.keystore`. That signature is
+specific to the machine that built it, so an APK from another machine cannot update this one: run
+`adb uninstall run.suite.go` once, then install. The build is debuggable, which is why it is a
+sideload artifact and not a store one.
+
+`pnpm android:install` stays the dev loop; `scripts/android-release.mjs` is the release copy that
+names and checksums the artifact for download. [Android notes](docs/reference/android.md) cover the
+device and the toolchain.
+
 ## Packages
 
 | Path          | Owns                                                       | Does not own                                     |
