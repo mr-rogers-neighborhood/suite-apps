@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeBase64, encodeBase64 } from "./base64.js";
+import { decodeBase64, decodeBase64Url, encodeBase64, encodeBase64Url } from "./base64.js";
 
 describe("base64", () => {
   it("encodes and decodes every byte value", () => {
@@ -23,5 +23,28 @@ describe("base64", () => {
 
   it("refuses a character outside the alphabet", () => {
     expect(decodeBase64("not base64!")).toBeNull();
+    expect(decodeBase64("AB=CD")).toBeNull();
+  });
+});
+
+describe("base64url", () => {
+  it("round-trips every byte value without padding or characters a query string escapes", () => {
+    const bytes = Uint8Array.from({ length: 256 }, (_, index) => index);
+    const encoded = encodeBase64Url(bytes);
+    expect(encoded).not.toMatch(/[=+/]/u);
+    expect(Array.from(decodeBase64Url(encoded) ?? [])).toEqual(Array.from(bytes));
+  });
+
+  it("drops padding and uses the URL-safe alphabet", () => {
+    // 0xfb 0xff encodes as "+/8=" in standard base64.
+    expect(encodeBase64Url(Uint8Array.from([0xfb, 0xff]))).toBe("-_8");
+    expect(decodeBase64Url("-_8")).toEqual(Uint8Array.from([0xfb, 0xff]));
+  });
+
+  it("refuses standard-alphabet, padded or spaced values", () => {
+    expect(decodeBase64Url("+/8=")).toBeNull();
+    expect(decodeBase64Url("AAAA ")).toBeNull();
+    expect(decodeBase64Url("AA\nAA")).toBeNull();
+    expect(decodeBase64Url("")).toEqual(new Uint8Array());
   });
 });

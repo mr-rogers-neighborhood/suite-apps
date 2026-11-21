@@ -56,7 +56,8 @@ holds.
   the role it named; the relay pins that device's key, but there is no fingerprint confirmation yet.
   A relay code that includes an invitation carries that token, so it is a secret too.
 - **The console is loopback and token-gated.** The token is generated at startup and printed with the
-  console URL; a request without it gets a 401. A friend-code or contacts exchange is not built.
+  console URL; a request without it gets a 401. The relay has no friend-code or contacts exchange:
+  those are app data and never reach the console or the store.
 - **Availability is the operator's.** The relay can delete or withhold frames. Every device keeps a
   local copy, but a device away longer than the retention window (30 days by default) needs a
   snapshot from a peer, because the relay cannot produce one.

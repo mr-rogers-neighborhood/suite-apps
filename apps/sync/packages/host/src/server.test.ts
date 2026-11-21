@@ -747,6 +747,32 @@ describe("the wire", () => {
     await server.close();
   });
 
+  it("refuses an invitation that carries a friend envelope, and stores nothing", async () => {
+    const { server, store } = await started();
+    const alice = await RelayClient.connect(server.url);
+    await joined(alice, owner);
+    alice.send({ type: "role", record: roleRecord(owner, owner, "owner") });
+    await alice.until((m) => m.type === "applied");
+
+    // The envelope travels out of band. A client that spread it into the relay's invite
+    // record must be refused, not quietly stored: the relay is not a friend-code directory.
+    const record = inviteRecord(owner, "d1".repeat(32));
+    alice.send({
+      type: "invite",
+      record: {
+        ...record,
+        friend: { to: "49AD1CD0E5G07PAC", nonce: "c".repeat(32) },
+      },
+    });
+
+    const error = await alice.until((m) => m.type === "error");
+    expect(error.type === "error" && error.code).toBe("malformed");
+    expect(await store.loadInvites(workspaceId)).toHaveLength(0);
+
+    alice.close();
+    await server.close();
+  });
+
   it("tells the sender when its role record is refused, and nobody else", async () => {
     const { server } = await started();
     const alice = await RelayClient.connect(server.url);

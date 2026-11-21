@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { deriveFriendCode, isFriendCode, parseFriendCode } from "./friendCode.js";
+import { decodeBase64, decodeBase64Url } from "./base64.js";
+import { deriveFriendCode, parseFriendCode } from "./friendCode.js";
 import { deviceIdFromPublicKey, type FriendInvite } from "./friendInvite.js";
 import { deviceIdSchema } from "./ids.js";
 
@@ -10,7 +11,20 @@ import { deviceIdSchema } from "./ids.js";
  * owns only the shape and the pure rules for reading one. Nothing here reads or writes
  * a file, and nothing here talks to a directory.
  */
-const friendCodeSchema = z.string().refine(isFriendCode, "a friend code is 16 Crockford symbols");
+
+/**
+ * The code a contacts file stores is the canonical one: sixteen upper-case symbols with no
+ * separators. Reading the display form here would let a hand-edited file hold a code that
+ * no lookup can find, so a valid display form is normalised on the way in.
+ */
+const friendCodeSchema = z.string().transform((value, context) => {
+  const parsed = parseFriendCode(value);
+  if (!parsed.ok) {
+    context.addIssue({ code: "custom", message: parsed.reason });
+    return z.NEVER;
+  }
+  return parsed.code;
+});
 
 export const syncContactSchema = z
   .object({
@@ -115,7 +129,7 @@ export function addContact(
   if (
     existing.publicKey !== undefined &&
     input.publicKey !== undefined &&
-    existing.publicKey !== input.publicKey
+    !samePublicKey(existing.publicKey, input.publicKey)
   ) {
     throw new Error("That friend code already belongs to a different device.");
   }
@@ -163,15 +177,19 @@ export function resolveFriendInvite(
   }
 
   if (invite.to !== undefined) {
+    // The recipient may have signed the display form. Compare codes, not strings, so a
+    // hyphen or lower case in a signed `to` does not turn an invitation for this device
+    // into one addressed to somebody else.
     const own = parseFriendCode(ownCode);
-    if (!own.ok || own.code !== invite.to) {
+    const target = parseFriendCode(invite.to);
+    if (!own.ok || !target.ok || own.code !== target.code) {
       return { status: "for-someone-else", code: inviterCode };
     }
   }
 
   const contact = contacts.find((entry) => entry.code === inviterCode);
   if (contact === undefined) return { status: "unknown", code: inviterCode };
-  if (contact.publicKey !== undefined && contact.publicKey !== invite.from.publicKey) {
+  if (contact.publicKey !== undefined && !samePublicKey(contact.publicKey, invite.from.publicKey)) {
     return { status: "key-mismatch", code: inviterCode, contact };
   }
   if (contact.deviceId !== undefined && contact.deviceId !== invite.from.deviceId) {
@@ -198,14 +216,43 @@ export function learnContact(
   } catch {
     return contacts;
   }
-  return contacts.map((contact) =>
-    contact.code === code
-      ? {
-          ...contact,
-          deviceId: invite.from.deviceId,
-          publicKey: invite.from.publicKey,
-          lastSeenAt: now.toISOString(),
-        }
-      : contact,
-  );
+  return contacts.map((contact) => {
+    if (contact.code !== code) return contact;
+    // Never complete a contact with a key that is not the one already stored. The resolver
+    // refuses that mismatch; this keeps a direct caller from doing the same thing silently.
+    if (
+      contact.publicKey !== undefined &&
+      !samePublicKey(contact.publicKey, invite.from.publicKey)
+    ) {
+      return contact;
+    }
+    if (
+      contact.publicKey === undefined &&
+      contact.deviceId !== undefined &&
+      contact.deviceId !== invite.from.deviceId
+    ) {
+      return contact;
+    }
+    return {
+      ...contact,
+      deviceId: invite.from.deviceId,
+      publicKey: invite.from.publicKey,
+      lastSeenAt: now.toISOString(),
+    };
+  });
+}
+
+/**
+ * Whether two base64 strings name the same 32 raw bytes.
+ *
+ * A padded, unpadded or URL-safe spelling of one key decodes to the same bytes, and a
+ * contact saved by one platform must still match an invitation written by another. A
+ * value that will not decode is never equal to anything.
+ */
+function samePublicKey(first: string, second: string): boolean {
+  if (first === second) return true;
+  const left = decodeBase64(first) ?? decodeBase64Url(first);
+  const right = decodeBase64(second) ?? decodeBase64Url(second);
+  if (left === null || right === null || left.length !== right.length) return false;
+  return left.every((byte, index) => byte === right[index]);
 }
