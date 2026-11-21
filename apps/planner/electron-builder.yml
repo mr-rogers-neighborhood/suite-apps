@@ -12,6 +12,24 @@ directories:
 files:
   - out/**
   - package.json
+  # Production payload only. Nothing below is loaded by any process: source maps
+  # and declarations are for editors, and changelogs and other registry markdown
+  # are not shipped. The renderer is already one Vite bundle in `out/`.
+  - "!**/*.map"
+  - "!**/*.d.ts"
+  - "!**/*.d.mts"
+  - "!**/*.d.cts"
+  - "!**/CHANGELOG*"
+  - "!**/*.md"
+  # A dependency's licence and notice must travel with it. Electron-builder takes
+  # the last matching pattern, so these re-include what the `.md` negation drops.
+  - "**/README*"
+  - "**/LICENSE*"
+  - "!**/test/**"
+  - "!**/tests/**"
+  - "!**/__tests__/**"
+  - "!**/*.test.*"
+  - "!**/*.spec.*"
 
 asar: true
 
