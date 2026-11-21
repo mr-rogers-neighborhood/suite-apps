@@ -72,7 +72,7 @@ export interface PackageListing {
   /**
    * Every tier branch the store publishes for a pre-release id.
    *
-   * Keyed by the pre-release id (`slop.<app>`), because the id is shared and the
+   * Keyed by the pre-release id (`slop-<app>`), because the id is shared and the
    * branch is what differs. Empty for an app with no pre-release deployment.
    */
   readonly channels: ReadonlyMap<string, readonly StoreChannel[]>;

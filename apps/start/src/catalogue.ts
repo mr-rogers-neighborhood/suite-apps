@@ -46,7 +46,7 @@ export interface CatalogueEntry {
    * Whether this entry is the one pre-release identity for its app.
    *
    * Stable is the default: a build with no pre-release identity is stable. The
-   * pre-release id is `slop.<app>` and every tier shares it.
+   * pre-release id is `slop-<app>` and every tier shares it.
    */
   readonly preRelease?: boolean;
   /**
@@ -113,7 +113,7 @@ export const CATALOGUE_APPS = [
 /**
  * The one pre-release entry per app.
  *
- * Every tier shares `slop.<app>` and therefore one card; the tier is the Flatpak
+ * Every tier shares `slop-<app>` and therefore one card; the tier is the Flatpak
  * ref branch, not the id. These entries carry no feed on purpose: a pre-release
  * AppImage is a manual download and the tier's update path is its Flatpak branch
  * ([docs/explanation/channels.md](../../../docs/explanation/channels.md)).

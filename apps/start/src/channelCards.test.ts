@@ -92,7 +92,7 @@ describe("channel-aware cards", () => {
   it("shows the stable card when a machine has neither id", () => {
     const cardsFor = cards([]);
     expect(cardsFor.map((card) => card.id)).toEqual(["canvas", "planner", "budget"]);
-    expect(cardsFor.find((card) => card.id === "slop.canvas")).toBeUndefined();
+    expect(cardsFor.find((card) => card.id === "slop-canvas")).toBeUndefined();
     expect(cardsFor[0]?.tier).toBe("stable");
     expect(cardsFor[0]?.channelNotice).toBeNull();
   });
@@ -101,16 +101,16 @@ describe("channel-aware cards", () => {
     const cardsFor = cards(
       [
         discovered("canvas"),
-        discovered("slop.canvas", { flatpak: { branch: "canary", commit: COMMIT_A } }),
+        discovered("slop-canvas", { flatpak: { branch: "canary", commit: COMMIT_A } }),
       ],
-      new Map([["slop.canvas", [{ tier: "canary", branch: "canary", commit: COMMIT_A }]]]),
+      new Map([["slop-canvas", [{ tier: "canary", branch: "canary", commit: COMMIT_A }]]]),
     );
 
     const stable = cardsFor.find((card) => card.id === "canvas");
-    const preRelease = cardsFor.find((card) => card.id === "slop.canvas");
+    const preRelease = cardsFor.find((card) => card.id === "slop-canvas");
     expect(stable).toMatchObject({ tier: "stable", channelNotice: null, source: "managed" });
     expect(preRelease).toMatchObject({
-      id: "slop.canvas",
+      id: "slop-canvas",
       name: "Suite Canvas (pre-release)",
       tier: "canary",
       source: "flatpak",
@@ -124,10 +124,10 @@ describe("channel-aware cards", () => {
 
   it("offers a switch, not a second install, when two pre-release branches exist", () => {
     const cardsFor = cards(
-      [discovered("slop.canvas", { flatpak: { branch: "slop", commit: COMMIT_A } })],
+      [discovered("slop-canvas", { flatpak: { branch: "slop", commit: COMMIT_A } })],
       new Map([
         [
-          "slop.canvas",
+          "slop-canvas",
           [
             { tier: "slop", branch: "slop", commit: COMMIT_A },
             { tier: "canary", branch: "canary", commit: COMMIT_B },
@@ -136,7 +136,7 @@ describe("channel-aware cards", () => {
       ]),
     );
 
-    const preRelease = cardsFor.filter((card) => card.id === "slop.canvas");
+    const preRelease = cardsFor.filter((card) => card.id === "slop-canvas");
     // One id, one card: the other branch is a switch on it, never a second package.
     expect(preRelease).toHaveLength(1);
     expect(preRelease[0]).toMatchObject({
@@ -146,17 +146,17 @@ describe("channel-aware cards", () => {
     expect(preRelease[0]?.channelNotice).toContain("Switching to canary keeps this install");
     expect(preRelease[0]?.channelNotice).toContain("changes its data folder");
     expect(
-      cardsFor.some((card) => card.id === "slop.canvas" && card.state === "not-installed"),
+      cardsFor.some((card) => card.id === "slop-canvas" && card.state === "not-installed"),
     ).toBe(false);
   });
 
   it("updates inside the installed tier without offering another branch", () => {
     const cardsFor = cards(
-      [discovered("slop.canvas", { flatpak: { branch: "beta", commit: COMMIT_A } })],
-      new Map([["slop.canvas", [{ tier: "beta", branch: "beta", commit: COMMIT_B }]]]),
+      [discovered("slop-canvas", { flatpak: { branch: "beta", commit: COMMIT_A } })],
+      new Map([["slop-canvas", [{ tier: "beta", branch: "beta", commit: COMMIT_B }]]]),
     );
 
-    const preRelease = cardsFor.find((card) => card.id === "slop.canvas");
+    const preRelease = cardsFor.find((card) => card.id === "slop-canvas");
     expect(preRelease).toMatchObject({
       tier: "beta",
       state: "update-available",

@@ -12,6 +12,7 @@ import {
   tierFromBranch,
 } from "./channels.js";
 import {
+  appIdFromFlatpakId,
   FLATPAK_APP_PREFIX,
   type FlatpakApp,
   findFlatpak,
@@ -236,9 +237,8 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
 
     const channels = new Map<string, StoreChannel[]>();
     for (const ref of refs) {
-      if (!ref.applicationId.startsWith(FLATPAK_APP_PREFIX)) continue;
-      const id = ref.applicationId.slice(FLATPAK_APP_PREFIX.length);
-      if (!isPreReleaseId(id)) continue;
+      const id = appIdFromFlatpakId(ref.applicationId);
+      if (id === null || !isPreReleaseId(id)) continue;
       const tier = tierFromBranch(ref.branch);
       if (tier === null) continue;
       const list = channels.get(id) ?? [];

@@ -2,6 +2,7 @@ import { parseAppManifest } from "@suite/contracts";
 import { describe, expect, it } from "vitest";
 import type { CatalogueEntry } from "./catalogue.js";
 import {
+  appIdFromFlatpakId,
   commitsMatch,
   FLATPAK_APP_PREFIX,
   flatpakIdFor,
@@ -81,6 +82,26 @@ describe("flatpakIdFor", () => {
   it("names the application under the suite namespace", () => {
     expect(flatpakIdFor("canvas")).toBe(`${FLATPAK_APP_PREFIX}canvas`);
     expect(flatpakIdFor("canvas")).toBe("run.suite.canvas");
+  });
+
+  it("keeps the reverse-DNS pre-release id while the manifest id is kebab-case", () => {
+    // The manifest id and the deployment id are two names for one identity:
+    // `slop-canvas` is what `suite.app.json` carries, `run.suite.slop.canvas` is
+    // what Flatpak deploys. Concatenating the prefix would invent `slop-canvas`.
+    expect(flatpakIdFor("slop-canvas")).toBe("run.suite.slop.canvas");
+    expect(flatpakIdFor("slop.canvas")).toBe("run.suite.slop.canvas");
+  });
+});
+
+describe("appIdFromFlatpakId", () => {
+  it("returns the canonical catalogue id, including for a legacy deployment", () => {
+    expect(appIdFromFlatpakId("run.suite.canvas")).toBe("canvas");
+    expect(appIdFromFlatpakId("run.suite.slop.canvas")).toBe("slop-canvas");
+  });
+
+  it("refuses an id outside the suite namespace", () => {
+    expect(appIdFromFlatpakId("org.gnome.Calculator")).toBeNull();
+    expect(appIdFromFlatpakId("run.suite.")).toBeNull();
   });
 });
 

@@ -3,6 +3,7 @@ packages:
   - "apps/*/*"
   - "apps/*/packages/*"
   - "packages/*"
+  - "tools/*"
 
 # Shared packages are workspace packages. A local edit is the one that builds.
 linkWorkspacePackages: true

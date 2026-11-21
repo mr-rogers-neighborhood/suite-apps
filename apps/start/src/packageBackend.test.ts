@@ -286,7 +286,7 @@ describe("the native PackageBackend", () => {
       const registry = registryStore(join(directory, "data"));
       const state = join(directory, "state");
       const log = join(directory, "flatpak.log");
-      const entry = PRE_RELEASE_CATALOGUE_APPS.find((candidate) => candidate.id === "slop.canvas");
+      const entry = PRE_RELEASE_CATALOGUE_APPS.find((candidate) => candidate.id === "slop-canvas");
       if (entry === undefined) throw new Error("the pre-release Canvas entry is missing");
 
       await writeFile(join(directory, "state-branch"), "slop");
@@ -344,7 +344,7 @@ exit 0
       });
 
       const result = await backend.update({ entry, channel: "canary" });
-      expect(result).toMatchObject({ id: "slop.canvas", version: "0.2.0" });
+      expect(result).toMatchObject({ id: "slop-canvas", version: "0.2.0" });
 
       const commands = (await readFile(log, "utf8")).trim().split("\n");
       expect(commands).toHaveLength(1);
@@ -353,7 +353,7 @@ exit 0
       expect(commands[0]).not.toMatch(/--noninteractive suite-local run\.suite\.slop\.canvas$/u);
 
       const listing = await backend.list();
-      expect(listing.channels.get("slop.canvas")).toEqual([
+      expect(listing.channels.get("slop-canvas")).toEqual([
         expect.objectContaining({ tier: "slop", branch: "slop" }),
         expect.objectContaining({ tier: "canary", branch: "canary" }),
       ]);

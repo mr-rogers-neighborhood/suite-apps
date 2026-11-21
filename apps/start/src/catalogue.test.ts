@@ -170,9 +170,9 @@ describe("readCatalogue", () => {
       "canvas",
       "planner",
       "budget",
-      "slop.canvas",
-      "slop.planner",
-      "slop.budget",
+      "slop-canvas",
+      "slop-planner",
+      "slop-budget",
       SELF_ID,
     ]);
     // Stable reads a feed; the pre-release entries have none by design.

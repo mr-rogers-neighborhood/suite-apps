@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { CONTRACT_VERSION, SUITE_PROTOCOL_PREFIX, type SuiteAppManifest } from "@suite/contracts";
 import type { CatalogueEntry } from "./catalogue.js";
+import { appIdFor, isPreReleaseId } from "./channels.js";
 import type { DiscoveredApp, DiscoveryResult, FlatpakInstall } from "./registry.js";
 
 /**
@@ -46,9 +47,33 @@ export interface FlatpakApp {
   readonly commit?: string;
 }
 
-/** The Flatpak application id a catalogue app publishes under. */
+/**
+ * The Flatpak application id a catalogue app publishes under.
+ *
+ * Stable is one prefix away: `canvas` is `run.suite.canvas`. A pre-release is
+ * not: its manifest id is `slop-<app>`, while the deployment keeps the reverse-DNS
+ * id `run.suite.slop.<app>`. Both sides are canonical, so the mapping is stated
+ * here rather than derived by string concatenation at each call site.
+ */
 export function flatpakIdFor(appId: string): string {
+  if (isPreReleaseId(appId)) return `${FLATPAK_APP_PREFIX}slop.${appIdFor(appId)}`;
   return `${FLATPAK_APP_PREFIX}${appId}`;
+}
+
+/**
+ * The catalogue id behind a Flatpak application id, or null when it is not a
+ * suite app. A pre-release deployment returns the canonical `slop-<app>` form,
+ * including one whose deployment predates the rename.
+ */
+export function appIdFromFlatpakId(applicationId: string): string | null {
+  if (!applicationId.startsWith(FLATPAK_APP_PREFIX)) return null;
+  const rest = applicationId.slice(FLATPAK_APP_PREFIX.length);
+  if (rest.length === 0) return null;
+  if (rest.startsWith("slop.")) {
+    const app = rest.slice("slop.".length);
+    return app.length === 0 ? null : `slop-${app}`;
+  }
+  return rest;
 }
 
 /**
