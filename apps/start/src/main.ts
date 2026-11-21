@@ -1683,7 +1683,16 @@ function registerIpc(): void {
   onIpc(START_IPC.openSyncConsole, async () => {
     const current = syncRelay === null ? null : await syncRelay.snapshot();
     if (current?.consoleUrl === null || current?.consoleUrl === undefined) return false;
-    await shell.openExternal(current.consoleUrl);
+    // The line came from a child process. Open it only if it is the loopback HTTP
+    // console this feature is for, never an arbitrary URL a relay printed.
+    let consoleUrl: URL;
+    try {
+      consoleUrl = new URL(current.consoleUrl);
+    } catch {
+      return false;
+    }
+    if (consoleUrl.protocol !== "http:" || consoleUrl.hostname !== "127.0.0.1") return false;
+    await shell.openExternal(consoleUrl.href);
     return true;
   });
 
