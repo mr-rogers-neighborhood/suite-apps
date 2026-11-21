@@ -13,7 +13,8 @@ Read [docs/reference/conventions.md](docs/reference/conventions.md) before writi
 - Desktop: Electron + electron-vite, React 19, TypeScript strict, Tailwind CSS v4, Radix primitives,
   Zustand for UI state.
 - Document: Loro CRDT, Zod schema, `WorkspaceDocument` as the only writer.
-- Notes: a Loro text container today; the Tiptap binding lands with the task editor.
+- Notes: a Loro text container (`note:<taskId>`); the task detail dialog edits it through a plain
+  textarea.
 - Quality: Biome, Vitest + Testing Library, Storybook with a11y, Playwright for Electron smoke.
 
 ## Repo map
