@@ -1159,11 +1159,7 @@ export async function workspaceKey(
 
 /** An invite id is 32 random bytes, written the way every other id in the protocol is. */
 function randomInviteId(): string {
-  const bytes = new Uint8Array(32);
-  for (let index = 0; index < bytes.length; index += 1) {
-    bytes[index] = Math.floor(Math.random() * 256);
-  }
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return randomBytes(32).toString("hex");
 }
 
 /** A refused envelope, in a sentence the person holding the link can act on. */

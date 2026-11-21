@@ -499,9 +499,31 @@ describe("inviting someone in", () => {
     const parsed = parseInvite(link);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) throw new Error(parsed.reason);
+    expect(parsed.value.inviteId).toMatch(/^[0-9a-f]{64}$/u);
     expect(parsed.value.friend).toBeDefined();
     if (parsed.value.friend === undefined) throw new Error("no envelope");
     expect(verifyFriendInvite(parsed.value.friend, verifyEd25519).ok).toBe(true);
+    expect(parsed.value.friend.nonce).toMatch(/^[0-9a-f]{32}$/u);
+
+    // The envelope is out of band: the relay's record carries only the fields it understands.
+    const sent = fake.sent.find((message) => message.type === "invite") as
+      | { record: Record<string, unknown> }
+      | undefined;
+    expect(Object.keys(sent?.record ?? {}).sort()).toEqual([
+      "expiresAt",
+      "inviteId",
+      "role",
+      "signature",
+      "signerId",
+      "workspaceId",
+    ]);
+
+    // A second invitation is a second bearer token, not a repeat of the first.
+    const second = parseInvite(await service.createInvite("editor"));
+    expect(second.ok).toBe(true);
+    if (!second.ok) throw new Error(second.reason);
+    expect(second.value.inviteId).not.toBe(parsed.value.inviteId);
+    expect(second.value.friend?.nonce).not.toBe(parsed.value.friend.nonce);
   });
 
   it("gives this installation a code that matches its key, and remembers contacts", async () => {
