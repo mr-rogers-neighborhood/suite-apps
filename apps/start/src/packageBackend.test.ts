@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { appCards } from "./cards.js";
 import { type CatalogueEntry, PRE_RELEASE_CATALOGUE_APPS } from "./catalogue.js";
+import { SYNC_APPLICATION } from "./flatpak.js";
 import { hostFor } from "./host.js";
 import { registryStore } from "./installs.js";
 import { nativePackageBackend } from "./nativePackageBackend.js";
@@ -94,6 +95,23 @@ function fakeBackend(listing: PackageListing): FakeBackend {
     async location(package_: InstalledPackage) {
       calls.push(`location:${package_.app.manifest.id}`);
       return null;
+    },
+    async deployment(application: string) {
+      calls.push(`deployment:${application}`);
+      return {
+        installed: false,
+        version: null,
+        commit: null,
+        canInstall: true,
+        problem: null,
+      };
+    },
+    async installDeployment(application: string) {
+      calls.push(`install-deployment:${application}`);
+      return null;
+    },
+    async openDeployment(application: string) {
+      calls.push(`open-deployment:${application}`);
     },
     async adopt(executable: string) {
       calls.push(`adopt:${executable}`);
@@ -244,6 +262,78 @@ exit 0
         expect.objectContaining({ tier: "canary", branch: "canary" }),
       ]);
       expect(listing.packages[0]?.app.flatpak?.branch).toBe("canary");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("reads and installs a deployment that has no catalogue card", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "suite-sync-deploy-"));
+    try {
+      const state = join(directory, "state");
+      const log = join(directory, "flatpak.log");
+      const commit = "b".repeat(64);
+      const flatpak = join(directory, "flatpak");
+      await writeFile(
+        flatpak,
+        `#!/bin/sh
+STATE="${state}"
+LOG="${log}"
+if [ "$1" = "list" ]; then
+  if [ ! -f "$STATE-installed" ]; then
+    printf '[]\\n'
+    exit 0
+  fi
+  printf '[{"name":"Suite Sync","application_id":"run.suite.sync","version":"0.11.3","branch":"master","origin":"suite","installation":"user"}]\\n'
+  exit 0
+fi
+if [ "$1" = "remotes" ]; then
+  printf 'suite\\n'
+  exit 0
+fi
+if [ "$1" = "--user" ] || [ "$1" = "--system" ]; then
+  shift
+fi
+case "$1" in
+  info)
+    shift
+    case "$1" in
+      --show-commit) printf '${commit}\\n' ;;
+      *) printf '\\nSuite Sync\\n\\n       Version: 0.11.3\\n' ;;
+    esac
+    ;;
+  install)
+    touch "$STATE-installed"
+    printf '%s\\n' "$*" >>"$LOG"
+    ;;
+esac
+exit 0
+`,
+        { mode: 0o755 },
+      );
+
+      const backend = nativePackageBackend({
+        roots: [join(directory, "installs")],
+        registry: registryStore(join(directory, "data")),
+        catalogue: [CANVAS],
+        flatpak,
+        host: hostFor(false),
+      });
+
+      // No catalogue entry is needed: the deployment is read from Flatpak itself.
+      expect(await backend.deployment(SYNC_APPLICATION)).toMatchObject({
+        installed: false,
+        canInstall: true,
+        problem: null,
+      });
+
+      expect(await backend.installDeployment(SYNC_APPLICATION)).toBe("0.11.3");
+      const installed = await backend.deployment(SYNC_APPLICATION);
+      expect(installed.installed).toBe(true);
+      expect(installed.commit).toBe(commit);
+      expect((await readFile(log, "utf8")).trim()).toBe(
+        "install --user --noninteractive suite run.suite.sync",
+      );
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

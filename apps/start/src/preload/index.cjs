@@ -29,14 +29,10 @@ contextBridge.exposeInMainWorld("suiteStart", {
   // On demand: the page asks, main fetches, nothing runs on a timer.
   checkUpdates: () => ipcRenderer.invoke("suite:start:check-updates"),
   info: () => ipcRenderer.invoke("suite:start:info"),
-  // The relay this machine runs. The page can start, stop and widen it, and read
-  // what it holds — which is a count of encrypted frames and who may write.
-  startSync: () => ipcRenderer.invoke("suite:start:sync-start"),
-  stopSync: () => ipcRenderer.invoke("suite:start:sync-stop"),
-  setSyncScope: (scope) => ipcRenderer.invoke("suite:start:sync-scope", scope),
-  // The console's URL carries a one-time token, so the page asks main to open the
-  // URL main already holds rather than handing main one from the renderer.
-  openSyncConsole: () => ipcRenderer.invoke("suite:start:sync-console"),
+  // Suite Sync is a Flatpak deployment: Start installs it from the store and opens
+  // it. The app's tray keeps the relay and shows its own address and fingerprint.
+  installSync: () => ipcRenderer.invoke("suite:start:sync-install"),
+  openSync: () => ipcRenderer.invoke("suite:start:sync-open"),
   // The window outlives no page load, so the listener is never removed.
   onChanged: (listener) => {
     ipcRenderer.on("suite:start:changed", (_event, state) => listener(state));

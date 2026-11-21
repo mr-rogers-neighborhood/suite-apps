@@ -1,8 +1,8 @@
 # Suite Start
 
-The hub for Suite. It is a launcher and a sync supervisor, not a host: apps stay separate signed
-processes, and Start never holds a document. Suite operates no server; a person runs the `suite-sync`
-server on a device they control.
+The hub for Suite. It is a launcher, not a host: apps stay separate signed processes, and Start
+never holds a document. Suite operates no server; a person runs the Suite Sync app on a device they
+control.
 
 ## Install it
 
@@ -15,9 +15,8 @@ replaces one itself. Everything below describes the code rather than the downloa
 ## What exists
 
 - **Built:** the shared packages (`@suite/contracts`, `@suite/files`), the Electron launcher shell with
-  discovery, install, routing and the Suite Help card, the sync-status surfaces, supervision of the
-  separate `suite-sync` server including its certificate, console and relay code, and the invite/join
-  flow in the apps' Sync dialogs.
+  discovery, install, routing and the Suite Help card, the Sync tab's deployment states for the
+  `run.suite.sync` Flatpak, and the invite/join flow in the apps' Sync dialogs.
 - **Later:** person keys and the shared sync protocol's remaining surface. There is no hosted web app,
   control plane or relay; sync is a server the user runs.
 
@@ -26,18 +25,18 @@ Where accessibility stands, and what is checked by hand: [ACCESSIBILITY.md](ACCE
 
 ## Sync
 
-Start runs `suite-sync` as a child and owns the TLS pair for the relay it starts. The pair lives under
-the relay store's `tls/` directory, mode 0600, and is made once and reused; a half pair is refused
-rather than rotated. Loopback keeps `ws://`; **Other devices on this network** serves `wss://` with
-that pair. The Sync tab shows the SHA-256 fingerprint a device pins.
+Suite Sync is the Flatpak `run.suite.sync`, and its tray app is the relay. Start installs it and opens
+it exactly like any other app: detection reads `flatpak list`, Install asks the Suite store, and Open
+runs `flatpak run run.suite.sync`. Start never writes into the deployment and never supervises the
+relay.
 
-The same tab can open the relay's console: a separate listener on `127.0.0.1` with a token generated
-at startup. It shows the relay's metadata and draws a `suite://relay` code with the address and pin;
-the console's code adds a live invitation when one exists, while Start's own code carries no
-invitation. Neither the console nor a code reads a frame.
+The Sync tab has three honest states: not installed (Install), installed (the version and commit
+Flatpak reports, and Open), or a problem (why neither is possible). The app shows its own address,
+relay code and SHA-256 fingerprint; the pane does not repeat them, open its console, or read its
+frames. Start is not a contact book either: friend codes and contacts live in the apps.
 
-Start is not a contact book: friend codes and contacts live in the apps, not in the hub. A device
-joins with an invitation, a relay code, or the relay address plus its fingerprint.
+A relay may run on this machine or another. Either way the tray app owns it, and a device joins with
+an invitation, a relay code, or the address and fingerprint the app shows.
 
 ## Two rules
 

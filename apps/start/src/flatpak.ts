@@ -26,6 +26,15 @@ import type {
 /** The application-id namespace every suite app publishes under. */
 export const FLATPAK_APP_PREFIX = "run.suite.";
 
+/**
+ * The tray app that keeps the Suite Sync relay.
+ *
+ * It is a Flatpak like every other app, so Start detects, installs and opens it the
+ * same way. It is not a catalogue entry: it owns no documents, and the relay's
+ * address, code and certificate belong to it rather than to the hub.
+ */
+export const SYNC_APPLICATION = "run.suite.sync";
+
 /** One installed Flatpak application, from `flatpak list --app --json`. */
 export interface FlatpakApp {
   /** Reverse-DNS application id, e.g. `run.suite.canvas`. */

@@ -25,19 +25,19 @@ The rules that shape Start.
 - One writer per deployment. Flatpak owns every Linux desktop install; Start asks it to install,
   update, switch or remove, and never writes into an install tree. A folder copy a person placed is
   first-class but not Start's: the card offers Open, Reveal and Forget.
-- Start manages the Suite Sync service; it is not a server. Start locates `suite-sync` (an explicit
-  `SUITE_SYNC_BIN`, a bundled copy, then `PATH`), starts and stops it, and reports its address, store
-  and fingerprint. It makes and keeps the relay's TLS pair under the store's `tls/` directory, mode
-  0600, reuses it, and refuses a half pair rather than rotating the fingerprint. Loopback serves
-  `ws://`; the network scope serves `wss://` with that pair. The relay owns its frames and role
-  records; Start keeps no listener and no frame store. When there is no binary the Sync pane says
-  what to install instead of showing a dead control.
-- The Sync tab opens the relay's console: a separate loopback-only listener with a token generated at
-  startup. The console and its relay code read metadata, never frames; a code carries the address,
-  pin and a live invitation when one exists, while Start's own code carries the address and pin. A
-  friend-code or contacts exchange lives in the apps, not in the hub or the relay.
-- A relay may run on another machine. Start then manages none, and the apps reach that relay through
-  the address entered in their Sync dialog; the local Sync pane describes only a relay Start started.
+- Start manages the Suite Sync **deployment**, not the relay; it is not a server. Suite Sync is the
+  Flatpak `run.suite.sync`. Start detects it through `flatpak list`, installs it from the Suite store
+  and opens it with `flatpak run`, all through `PackageBackend`. It never writes into the deployment
+  and never spawns, stops or supervises the relay. The tray app owns the relay, its store, its TLS
+  pair, its console, its relay code and the fingerprint a device pins.
+- The Sync tab has three honest states: not installed, with Install; installed, with the version and
+  commit Flatpak reports and Open; or a problem that names why neither is possible. When Flatpak or a
+  Suite remote is missing the pane says so instead of drawing a dead control. Start does not show the
+  relay's address, code, fingerprint or console, because the app already does and Start would only be
+  repeating a value it does not own. At startup Start removes the legacy `hub.json` an older Start
+  wrote, because Canvas still reads it and a stale report would claim a relay that is not running.
+- A relay may run on this machine or another. Either way Start manages no relay process, and the apps
+  reach it through the address and pin entered in their own Sync dialog.
 - Start is not in the data path. It returns a path or a URL and launches a separate process. It never
   proxies or parses document bytes.
 - The manifest (`suite.app.json`) says what an app is. The install record (`installs.json`) is the

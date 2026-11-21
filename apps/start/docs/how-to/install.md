@@ -85,5 +85,6 @@ own origin, so a copy from `suite-local` is not measured against the public `sui
   added with `--no-gpg-verify` is for local testing only.
 
 The relay is the sixth Flatpak, `run.suite.sync`: a tray app on a desktop, and the same install as the
-headless relay on a machine with no display. See
-[Leave a relay running](../../../sync/docs/how-to/relay.md).
+headless relay on a machine with no display. Start's Sync tab detects it, installs it from the store,
+and opens it; the tray app then runs the relay and shows its own address, relay code and fingerprint.
+See [Leave a relay running](../../../sync/docs/how-to/relay.md).

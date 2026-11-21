@@ -124,6 +124,26 @@ export interface PackageCommand {
 }
 
 /**
+ * A Flatpak deployment Start manages by application id rather than as a catalogue card.
+ *
+ * Suite Sync is the one such deployment: its tray app keeps the relay, and Start does
+ * not list it beside the document apps or supervise its process. It is still a package,
+ * so it crosses the same seam: list it with `flatpak list`, install it from the Suite
+ * store, and open it with `flatpak run`.
+ */
+export interface DeploymentState {
+  readonly installed: boolean;
+  /** The version Flatpak reports, or null when it reports none. */
+  readonly version: string | null;
+  /** The deployed commit, or null when Flatpak did not resolve one. */
+  readonly commit: string | null;
+  /** Whether Install can be offered: Flatpak and a Suite remote are both available. */
+  readonly canInstall: boolean;
+  /** Why the deployment cannot be read, installed or opened. Null when all is well. */
+  readonly problem: string | null;
+}
+
+/**
  * How a launch went, for the window.
  *
  * The backend owns the child process, so it also owns the first second and a half of
@@ -159,6 +179,18 @@ export interface PackageBackend {
   launch(request: PackageLaunchRequest, observer?: PackageLaunchObserver): void;
   /** Where a deployment lives, for Reveal. Null when this backend cannot say. */
   location(package_: InstalledPackage): Promise<string | null>;
+
+  /**
+   * Read a Flatpak Start manages without a catalogue card, by application id.
+   *
+   * The answer is the pane's whole state: whether the deployment is there, what
+   * version and commit it reports, and whether Install is possible at all.
+   */
+  deployment(application: string): Promise<DeploymentState>;
+  /** Ask Flatpak to install one deployment from the Suite store. Returns its version. */
+  installDeployment(application: string): Promise<string | null>;
+  /** Start one deployment with `flatpak run`, through the same launch path as a card. */
+  openDeployment(application: string, observer?: PackageLaunchObserver): Promise<void>;
 
   /** Register an executable a person picked. False when it is not a Suite app. */
   adopt(executable: string): Promise<boolean>;

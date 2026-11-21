@@ -30,7 +30,6 @@
   "dependencies": {
     "@suite/contracts": "workspace:*",
     "@suite/desktop": "workspace:*",
-    "@suite/sync": "workspace:*",
     "@suite/theme": "workspace:*"
   },
   "devDependencies": {

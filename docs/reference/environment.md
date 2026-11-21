@@ -8,10 +8,8 @@ portable install; they are not configuration a normal user needs.
 | Variable | Replaces |
 | --- | --- |
 | `SUITE_START_DOCUMENTS` | the shared documents root, `~/Documents/Suite` |
-| `SUITE_START_DATA` | the hub's Electron data directory (recents, theme, sync store) |
+| `SUITE_START_DATA` | the hub's Electron data directory (recents, theme) |
 | `SUITE_START_USER_DATA` | Electron's `userData` for the hub |
-| `SUITE_START_SYNC_PORT` | the port the Suite Sync relay Start supervises listens on, `8787`; `0` asks for a free one |
-| `SUITE_SYNC_BIN` | the `suite-sync` binary Start runs; without it Start looks beside itself and on `PATH` |
 | `SUITE_START_APPS_ROOT` | the managed app root, `~/Applications/Suite` |
 | `SUITE_START_FEED_BASE` | the base URL of the release feed |
 | `SUITE_START_REGISTRY` | the install registry file |
@@ -35,7 +33,8 @@ portable install; they are not configuration a normal user needs.
 
 The desktop apps take the relay address in their own Sync dialog. `SUITE_SYNC_URL`,
 `SUITE_SYNC_MEMBER`, `SUITE_SYNC_WORKSPACE`, `SUITE_SYNC_EPOCH` and `SUITE_SYNC_DEVICE` were listed
-here but no shell reads them; `SUITE_SYNC_BIN` is in the hub table because Start does read it.
+here but no shell reads them. Start reads no relay variable: it installs and opens the Suite Sync
+Flatpak, and the tray app owns the relay's configuration.
 
 ## Packaging
 

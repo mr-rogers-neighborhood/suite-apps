@@ -137,6 +137,8 @@ export async function fakeFlatpak(
     installed?: boolean;
     commit?: string;
     storeCommit?: string;
+    /** Add `run.suite.sync` to the same store and listing, installed or not. */
+    sync?: { installed?: boolean; version?: string; commit?: string };
   } = {},
 ): Promise<{ executable: string; logPath: string; location: string }> {
   const application = options.application ?? "run.suite.canvas";
@@ -156,17 +158,30 @@ export async function fakeFlatpak(
   await writeFile(join(state, "store-commit"), storeCommit);
   if (installed) await writeFile(join(state, "installed"), "");
 
-  const listing = JSON.stringify([
-    {
-      name: options.name ?? "Suite Canvas",
-      application_id: application,
-      version: "@VERSION@",
-      branch: "master",
-      arch: "x86_64",
-      origin: "suite-local",
-      installation: "user",
-    },
-  ]);
+  if (options.sync !== undefined) {
+    await writeFile(join(state, "sync-version"), options.sync.version ?? "0.11.3");
+    await writeFile(join(state, "sync-commit"), options.sync.commit ?? "b".repeat(64));
+    if (options.sync.installed === true) await writeFile(join(state, "sync-installed"), "");
+  }
+
+  const appRow = JSON.stringify({
+    name: options.name ?? "Suite Canvas",
+    application_id: application,
+    version: "@VERSION@",
+    branch: "master",
+    arch: "x86_64",
+    origin: "suite-local",
+    installation: "user",
+  });
+  const syncRow = JSON.stringify({
+    name: "Suite Sync",
+    application_id: "run.suite.sync",
+    version: "@VERSION@",
+    branch: "master",
+    arch: "x86_64",
+    origin: "suite-local",
+    installation: "user",
+  });
 
   await writeFile(
     executable,
@@ -175,18 +190,30 @@ STATE="${state}"
 LOG="${logPath}"
 LOCATION="${location}"
 if [ "$1" = "list" ]; then
-  if [ ! -f "$STATE/installed" ]; then
-    printf '[]\\n'
-    exit 0
-  fi
-  sed "s/@VERSION@/$(cat "$STATE/version")/" <<'JSON'
-${listing}
+  printf '['
+  SEP=''
+  if [ -f "$STATE/installed" ]; then
+    printf '%s' "$SEP"
+    sed "s/@VERSION@/$(cat "$STATE/version")/" <<'JSON'
+${appRow}
 JSON
+    SEP=','
+  fi
+  if [ -f "$STATE/sync-installed" ]; then
+    printf '%s' "$SEP"
+    sed "s/@VERSION@/$(cat "$STATE/sync-version")/" <<'JSON'
+${syncRow}
+JSON
+  fi
+  printf ']\\n'
   exit 0
 fi
 if [ "$1" = "--user" ] || [ "$1" = "--system" ]; then
   shift
 fi
+# The last argument names the app for install and info.
+LAST=''
+for ARG in "$@"; do LAST="$ARG"; done
 case "$1" in
   remotes)
     # flatpak remotes --user --columns=name: one name per line, no header.
@@ -194,7 +221,7 @@ case "$1" in
     ;;
   remote-ls)
     # flatpak remote-ls --user --app --json --columns=application,branch,commit:
-    # a JSON array of the refs this one-app store publishes.
+    # a JSON array of the refs this store publishes.
     printf '[{"application_id":"${application}","branch":"master","commit":"%s"}]\\n' "$(cat "$STATE/store-commit")"
     ;;
   remote-info)
@@ -203,17 +230,32 @@ case "$1" in
   info)
     shift
     case "$1" in
-      --show-commit) printf '%s\\n' "$(cat "$STATE/installed-commit")" ;;
+      --show-commit)
+        if [ "$LAST" = "run.suite.sync" ]; then
+          cat "$STATE/sync-commit"
+        else
+          cat "$STATE/installed-commit"
+        fi
+        ;;
       --show-location) printf '%s\\n' "$LOCATION" ;;
       *)
-        printf '\\nSuite Canvas\\n\\n            ID: ${application}\\n       Version: %s\\n\\n' "$(cat "$STATE/version")"
+        if [ "$LAST" = "run.suite.sync" ]; then
+          printf '\\nSuite Sync\\n\\n            ID: run.suite.sync\\n       Version: %s\\n\\n' "$(cat "$STATE/sync-version")"
+        else
+          printf '\\nSuite Canvas\\n\\n            ID: ${application}\\n       Version: %s\\n\\n' "$(cat "$STATE/version")"
+        fi
         ;;
     esac
     ;;
   install)
-    touch "$STATE/installed"
-    cp "$STATE/store-commit" "$STATE/installed-commit"
-    printf 'install\\n' >>"$LOG"
+    if [ "$LAST" = "run.suite.sync" ]; then
+      touch "$STATE/sync-installed"
+      printf 'install run.suite.sync\\n' >>"$LOG"
+    else
+      touch "$STATE/installed"
+      cp "$STATE/store-commit" "$STATE/installed-commit"
+      printf 'install\\n' >>"$LOG"
+    fi
     ;;
   update)
     cp "$STATE/store-commit" "$STATE/installed-commit"
@@ -237,29 +279,6 @@ exit 0
   return { executable, logPath, location };
 }
 
-/**
- * A stand-in `suite-sync` binary.
- *
- * Start runs it as its own process. The script records the arguments it was given and
- * prints the one line the lifecycle adapter needs, so the pane can be checked against a
- * real spawn without opening a socket or running the relay.
- */
-export async function fakeRelay(box: Sandbox): Promise<{ executable: string; logPath: string }> {
-  const executable = join(box.apps, "suite-sync");
-  const logPath = join(box.root, "suite-sync-args.txt");
-  await writeFile(
-    executable,
-    `#!/bin/sh
-printf '%s\\n' "$@" >>"${logPath}"
-printf 'suite-sync 0.0.0-e2e (relay protocol 1)\\n'
-printf 'listening on ws://127.0.0.1:18787/sync\\n'
-exec sleep 3600
-`,
-    { mode: 0o755 },
-  );
-  return { executable, logPath };
-}
-
 export interface Launched {
   readonly app: ElectronApplication;
   readonly page: Page;
@@ -275,13 +294,12 @@ export async function launch(
     args: [START_DIR, ...args],
     env: {
       ...process.env,
-      // The home a person's hub writes into: desktop entries, the hub report and
-      // the documents root Start scans when a spec does not name one. A spec's
-      // own `$HOME` keeps those out of the real one, and out of another spec's.
+      // The home a person's hub writes into: desktop entries and the documents root
+      // Start scans when a spec does not name one. A spec's own `$HOME` keeps those
+      // out of the real one, and out of another spec's.
       HOME: box.home,
-      // `hubReportPath` reads `XDG_DATA_HOME` before `$HOME/.local/share`, and the
-      // environment this runs in may set it. Pin it inside the sandbox, or two
-      // runs rename the same temporary file and each writes the other's answer.
+      // The data root a launch writes into. Pin it inside the sandbox so two runs
+      // cannot share one temporary file.
       XDG_DATA_HOME: join(box.home, ".local", "share"),
       // Chromium's profile and the single-instance lock it carries. Without an
       // override every launch — and every other Playwright run on the machine —
@@ -293,13 +311,6 @@ export async function launch(
       SUITE_START_APPS_ROOT: box.installedApps,
       // No published feed: a spec that wants one supplies its own base.
       SUITE_START_FEED_BASE: box.feeds,
-      // The relay's port, 8787, belongs to whoever is running one. Zero asks the
-      // kernel for a free one, so a second run never competes for it.
-      SUITE_START_SYNC_PORT: "0",
-      // Hermetic: a machine that happens to have suite-sync installed must not make
-      // a spec depend on it. A spec that wants the relay points SUITE_SYNC_BIN at
-      // its own stand-in.
-      SUITE_SYNC_BIN: join(box.root, "no-suite-sync"),
       // Hermetic on a machine that has Flatpak and a real suite app installed:
       // only a spec that supplies a stand-in may see a Flatpak.
       SUITE_START_FLATPAK: "",
