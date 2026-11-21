@@ -10,12 +10,38 @@ import { generateIndexes } from "./generate-doc-indexes.mjs";
 const silent = { log: () => {}, error: () => {} };
 const roots: string[] = [];
 
+/**
+ * Git environment variables a hook can leave set.
+ *
+ * A pre-push hook exports `GIT_DIR`; a fixture that inherits it runs its `git init`
+ * and commits against the caller's repository instead of the temporary one. The
+ * fixtures below must discover their repository from `cwd`, so these are removed
+ * from the child environment.
+ */
+const INHERITED_GIT_VARIABLES = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_COMMON_DIR",
+  "GIT_NAMESPACE",
+  "GIT_PREFIX",
+] as const;
+
+function fixtureEnvironment(): NodeJS.ProcessEnv {
+  const environment = { ...process.env };
+  for (const name of INHERITED_GIT_VARIABLES) delete environment[name];
+  return environment;
+}
+
 function git(root: string, args: string[]) {
   return execFileSync(
     "git",
     ["-c", "user.name=Test", "-c", "user.email=test@example.com", ...args],
     {
       cwd: root,
+      env: fixtureEnvironment(),
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     },
@@ -37,6 +63,8 @@ function newRepo() {
   }
   writeFileSync(join(root, "docs/how-to/page.md"), "# A page\n\nFirst paragraph.\n");
   git(root, ["init", "-q", "-b", "main"]);
+  // A fixture that inherited the caller's GIT_DIR would resolve to the parent checkout.
+  expect(git(root, ["rev-parse", "--show-toplevel"]).trim()).toBe(root);
   commitAll(root, "docs: add a page");
   expect(generateIndexes({ root, log: silent }).refused).toEqual([]);
   commitAll(root, "docs: generate the indexes");
@@ -114,5 +142,17 @@ describe("generated doc indexes", () => {
     expect(generateIndexes({ root, check: true, log: silent }).stale).toEqual([
       join(root, "docs/how-to/index.md"),
     ]);
+  });
+
+  it("does not give a fixture the git directory a hook exported", () => {
+    const before = process.env.GIT_DIR;
+    process.env.GIT_DIR = "/tmp/a-parent-checkout/.git";
+    try {
+      expect(fixtureEnvironment().GIT_DIR).toBeUndefined();
+      expect(fixtureEnvironment().GIT_WORK_TREE).toBeUndefined();
+    } finally {
+      if (before === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = before;
+    }
   });
 });
