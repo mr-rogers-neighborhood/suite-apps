@@ -168,9 +168,35 @@ describe("a signed friend invitation", () => {
     });
   });
 
-  it("lets a loopback relay carry no certificate pin", () => {
-    const loopback = invite({ relay: { url: "ws://127.0.0.1:8787/sync", fingerprint: null } });
-    expect(verifyFriendInvite(loopback, verifier).ok).toBe(true);
+  it("allows a plaintext relay only on loopback, and only without a pin", () => {
+    for (const url of [
+      "ws://127.0.0.1:8787/sync",
+      "ws://[::1]:8787/sync",
+      "ws://localhost:8787/sync",
+    ]) {
+      const loopback = invite({ relay: { url, fingerprint: null } });
+      expect(verifyFriendInvite(loopback, verifier).ok).toBe(true);
+    }
+
+    for (const url of [
+      "ws://192.168.1.20:8787/sync",
+      "ws://relay.example:8787/sync",
+      "ws://127.0.0.1.evil.example:8787/sync",
+    ]) {
+      const remote = invite({ relay: { url, fingerprint: null } });
+      expect(verifyFriendInvite(remote, verifier)).toEqual({
+        ok: false,
+        reason: "unpinned-relay",
+      });
+    }
+
+    const pinnedPlaintext = invite({
+      relay: { url: "ws://127.0.0.1:8787/sync", fingerprint: PIN },
+    });
+    expect(verifyFriendInvite(pinnedPlaintext, verifier)).toEqual({
+      ok: false,
+      reason: "unpinned-relay",
+    });
   });
 
   it("refuses a key that is not 32 bytes", () => {

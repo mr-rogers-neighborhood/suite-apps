@@ -38,6 +38,9 @@ const expiresAtSchema = z
     "expiresAt is an ISO-8601 timestamp",
   );
 
+/** The only hosts a plaintext `ws://` relay may name. */
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "[::1]", "localhost"]);
+
 export const friendInviteSchema = z
   .object({
     /** The inviter's installation, and the public half of the key that signed this. */
@@ -111,8 +114,9 @@ export function friendInvitePayload(record: FriendInviteBody): string {
  *
  * The caller still decides two things: whether the workspace is the one this device has
  * open, and whether the inviter is a contact it trusts. This function establishes that
- * the signer holds the key it names, that the key is the device id it claims, that a
- * `wss://` relay carries a usable pin, and that the invitation has not expired.
+ * the signer holds the key it names, that the key is the device id it claims, that the
+ * relay is either plaintext loopback or `wss://` with a usable pin, and that the
+ * invitation has not expired.
  */
 export function verifyFriendInvite(
   record: FriendInvite,
@@ -136,11 +140,26 @@ export function verifyFriendInvite(
     return { ok: false, reason: "invalid-signature" };
   }
 
-  if (record.relay.url.startsWith("wss://")) {
+  // A plaintext relay is a loopback convenience, not something an invitation may extend to
+  // another machine. Those carry `wss://`, and only a usable pin makes that trustworthy.
+  let relay: URL;
+  try {
+    relay = new URL(record.relay.url);
+  } catch {
+    return { ok: false, reason: "unpinned-relay" };
+  }
+  if (relay.protocol === "ws:") {
+    if (!LOOPBACK_HOSTS.has(relay.hostname.toLowerCase())) {
+      return { ok: false, reason: "unpinned-relay" };
+    }
+    if (record.relay.fingerprint !== null) return { ok: false, reason: "unpinned-relay" };
+  } else if (relay.protocol === "wss:") {
     if (record.relay.fingerprint === null) return { ok: false, reason: "unpinned-relay" };
     if (normaliseFingerprint(record.relay.fingerprint) === null) {
       return { ok: false, reason: "unpinned-relay" };
     }
+  } else {
+    return { ok: false, reason: "unpinned-relay" };
   }
 
   const expiresAt = Date.parse(record.expiresAt);

@@ -94,6 +94,11 @@ export function addContact(
 ): readonly SyncContact[] {
   const code = parseFriendCode(input.code);
   if (!code.ok) throw new Error(code.reason);
+  // A device id is only meaningful with the key that implies it. Accepting one alone would
+  // store an unverifiable claim and then refuse the honest invitation that disagrees with it.
+  if (input.deviceId !== undefined && input.publicKey === undefined) {
+    throw new Error("A contact device id needs its public key.");
+  }
   if (input.publicKey !== undefined && deriveFriendCode(input.publicKey) !== code.code) {
     throw new Error("That public key does not belong to that friend code.");
   }

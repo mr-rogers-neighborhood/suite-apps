@@ -45,6 +45,15 @@ describe("base64url", () => {
     expect(decodeBase64Url("+/8=")).toBeNull();
     expect(decodeBase64Url("AAAA ")).toBeNull();
     expect(decodeBase64Url("AA\nAA")).toBeNull();
+    expect(decodeBase64Url("-_8=")).toBeNull();
     expect(decodeBase64Url("")).toEqual(new Uint8Array());
+  });
+
+  it("refuses trailing bits that another spelling could have produced", () => {
+    // "-_9" decodes to the same two bytes as "-_8", but only "-_8" re-encodes to itself.
+    expect(decodeBase64Url("-_9")).toBeNull();
+    // The standard decoder stays forgiving, because signatures and other old payloads
+    // already depend on it accepting the same bytes.
+    expect(Array.from(decodeBase64("+/9=") ?? [])).toEqual([0xfb, 0xff]);
   });
 });

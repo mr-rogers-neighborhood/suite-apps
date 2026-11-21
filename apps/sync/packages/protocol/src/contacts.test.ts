@@ -67,6 +67,13 @@ describe("a contact added by code", () => {
     ).toThrow(/does not belong/u);
   });
 
+  it("refuses a device id that arrives without the key that proves it", () => {
+    const code = deriveFriendCode(key());
+    expect(() => addContact([], { code, name: "Ada", deviceId: "a".repeat(64) })).toThrow(
+      /needs its public key/u,
+    );
+  });
+
   it("treats padded and unpadded spellings of one key as the same device", () => {
     const publicKey = key();
     const code = deriveFriendCode(publicKey);
