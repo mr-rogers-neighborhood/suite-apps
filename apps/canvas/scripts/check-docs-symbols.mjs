@@ -20,6 +20,22 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const docsRoot = join(root, "docs");
+
+/**
+ * The monorepo root, for a page that names a path from there.
+ *
+ * Canvas lives inside one workspace now, and its pages use the repository's own
+ * spelling (`apps/canvas/desktop/package.json`) rather than a path relative to
+ * this app. A backticked path is checked from both places.
+ */
+const repoRoot = (() => {
+  let dir = root;
+  while (dir !== dirname(dir)) {
+    if (existsSync(join(dir, "pnpm-workspace.yaml"))) return dir;
+    dir = dirname(dir);
+  }
+  return root;
+})();
 const ROOT_PAGES = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md"];
 const KNOWN_EXT = new Set([
   ".ts",
@@ -161,8 +177,9 @@ for (const page of pages) {
 
     if (isRecord) continue;
     const fromRoot = join(root, path);
+    const fromRepo = join(repoRoot, path);
     const fromPage = join(dirname(page), path);
-    if (!existsSync(fromRoot) && !existsSync(fromPage)) {
+    if (!existsSync(fromRoot) && !existsSync(fromRepo) && !existsSync(fromPage)) {
       problems.push(`${rel}:${lineAt(text, match.index)}: missing path \`${path}\`.`);
     }
   }
