@@ -77,6 +77,27 @@ export type Walk = {
   steps: WalkStep[];
 };
 
+export type TourTarget =
+  | { kind: "module"; id: string }
+  | { kind: "file"; id: string }
+  | { kind: "symbol"; id: string; level?: "symbol" | "file" }
+  | { kind: "walk"; id: string; step?: number }
+  | { kind: "doc"; path: string };
+
+export type TourStep = {
+  target: TourTarget;
+  callout?: string;
+};
+
+export type Tour = {
+  id: string;
+  title: string;
+  summary: string;
+  order: number;
+  start: boolean;
+  steps: TourStep[];
+};
+
 export type FolderNode = {
   type: "folder";
   name: string;
@@ -103,4 +124,5 @@ export type BaseData = {
   modules: ModuleSummary[];
   search: SearchEntry[];
   walks: Walk[];
+  tours: Tour[];
 };

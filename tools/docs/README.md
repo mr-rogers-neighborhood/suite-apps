@@ -15,6 +15,7 @@ From the repository root:
 
 ```sh
 mise exec -- pnpm docs:index     # build tools/docs/public/data
+mise exec -- pnpm docs:index:check # validate notes, walks, tours and generated data
 mise exec -- pnpm docs:dev       # index, sync and start the dev server (foreground)
 mise exec -- pnpm docs:dev:bg    # the same, detached; log in .dev/docs.log
 mise exec -- pnpm docs:status    # TCP check on the docs port
@@ -45,17 +46,18 @@ the anchor when switching views.
 
 ## What is where
 
-| Path                                | Purpose                                                                                              |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `scripts/index-code.mjs`            | TypeScript compiler index: files, declarations, imports, tests, modules. Writes `public/data/`.      |
-| `public/data/`                      | Generated `tree.json`, `search.json`, `modules.json`, `modules/*.json`, `walks.json`. Not committed. |
-| `components/explorer/`              | The three-mode shell, tree, detail pane, search and code view.                                       |
-| `app/explore/page.tsx`              | The explorer route.                                                                                  |
-| `scripts/sync-docs.mjs`             | Mirrors `docs/` into `.generated/docs/` for Fumadocs.                                                |
-| `app/docs/`                         | Reference pages generated from `docs/`.                                                              |
-| `docs/modules/*.mdx`                | One authored narrative per module, with `## <node-id>` notes.                                        |
-| `docs/walkthroughs/*.mdx`           | Curated ordered paths; headings are node IDs.                                                        |
-| `app/llms.txt`, `app/llms-full.txt` | Agent-readable reference exports.                                                                    |
+| Path                                | Purpose                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `scripts/index-code.mjs`            | TypeScript compiler index: files, declarations, imports, tests, modules. Writes `public/data/`.                    |
+| `public/data/`                      | Generated `tree.json`, `search.json`, `modules.json`, `modules/*.json`, `walks.json`, `tours.json`. Not committed. |
+| `components/explorer/`              | The three-mode shell, tree, detail pane, search and code view.                                                     |
+| `app/explore/page.tsx`              | The explorer route.                                                                                                |
+| `scripts/sync-docs.mjs`             | Mirrors `docs/` into `.generated/docs/` for Fumadocs.                                                              |
+| `app/docs/`                         | Reference pages generated from `docs/`.                                                                            |
+| `docs/modules/*.mdx`                | One authored narrative per module, with `## <node-id>` notes.                                                      |
+| `docs/walkthroughs/*.mdx`           | Curated ordered paths; headings are node IDs.                                                                      |
+| `docs/walkthroughs/*.tour.mjs`      | Composed tours that cross modules, files, symbols, walks or docs. Normal walks need no file.                       |
+| `app/llms.txt`, `app/llms-full.txt` | Agent-readable reference exports.                                                                                  |
 
 ## Index rules
 
@@ -67,6 +69,9 @@ the anchor when switching views.
   split. Files without a natural module join a `config:*` virtual module.
 - Imports resolve relative files and `.js` specifiers back to `.ts`. Test files mark the files they
   import.
+- `docs:index:check` resolves every note heading, walk step and tour target, and compares the
+  generated files with the ones on disk. A stale index or an unknown ID fails the check; a normal
+  `docs:index` reports the same problems as warnings and rewrites the data.
 
 ## Authoring
 
@@ -105,6 +110,33 @@ Why this is the first stop.
 ```
 
 `Full descent` is generated from the index; it is not a file.
+
+### Composed tours
+
+A normal walk is already a tour: the runner plays its steps in order. Add a
+`docs/walkthroughs/<id>.tour.mjs` only when the path crosses targets or needs a
+callout that is not prose in a walk. It is data, not a second authoring format:
+
+```js
+export default {
+  id: "suite-in-one-sitting",
+  title: "The suite in one sitting",
+  order: 50,
+  steps: [
+    { target: { kind: "module", id: "packages/contracts" }, callout: "…" },
+    { target: { kind: "file", id: "packages/contracts/src/appManifest.ts" } },
+    { target: { kind: "symbol", id: "…/appManifest.ts#suiteAppManifestSchema" } },
+    { target: { kind: "walk", id: "start", step: 0 } },
+    { target: { kind: "symbol", id: "apps/canvas/src/App.tsx#App", level: "file" } },
+    { target: { kind: "doc", path: "docs/reference/decisions.md" } },
+  ],
+};
+```
+
+A target is `module`, `file`, `symbol`, `walk` or `doc`. `symbol` with
+`level: "file"` opens the containing file with the declaration highlighted. The
+index resolves every target; `docs:index:check` fails on an unknown one. A tour
+step points at content and never restates it.
 
 ## Constraints
 

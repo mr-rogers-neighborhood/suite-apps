@@ -11,6 +11,7 @@ type Props = {
   selectedModule: string | null;
   walk: Walk | null;
   stepIndex: number;
+  detailLevel: "file" | "symbol" | null;
   moduleData: Record<string, ModuleData>;
   searchById: Map<string, SearchEntry>;
   moduleById: Map<string, ModuleSummary>;
@@ -73,6 +74,7 @@ export function DetailPane({
   selectedModule,
   walk,
   stepIndex,
+  detailLevel,
   moduleData,
   searchById,
   moduleById,
@@ -106,6 +108,26 @@ export function DetailPane({
           onOpenBrowser={onOpenBrowser}
         />
       );
+    }
+    if (detailLevel === "file" && entry.kind !== "file") {
+      const fileEntry = searchById.get(entry.path);
+      if (fileEntry?.kind === "file") {
+        return (
+          <NodeDetail
+            entry={fileEntry}
+            focusSymbolId={entry.id}
+            view={view}
+            walk={walk}
+            stepIndex={stepIndex}
+            moduleData={moduleData}
+            moduleById={moduleById}
+            onSelectNode={onSelectNode}
+            onSelectModule={onSelectModule}
+            onOpenBrowser={onOpenBrowser}
+            onSelectWalkStep={onSelectWalkStep}
+          />
+        );
+      }
     }
     return (
       <NodeDetail
@@ -303,6 +325,7 @@ function ModuleDetail({
 
 function NodeDetail({
   entry,
+  focusSymbolId,
   view,
   walk,
   stepIndex,
@@ -314,6 +337,7 @@ function NodeDetail({
   onSelectWalkStep,
 }: {
   entry: SearchEntry;
+  focusSymbolId?: string;
   view: View;
   walk: Walk | null;
   stepIndex: number;
@@ -331,15 +355,22 @@ function NodeDetail({
   const file =
     module?.files.find((candidate) => candidate.id === entry.path || candidate.id === entry.id) ??
     undefined;
-  const symbol = file?.symbols.find((candidate) => candidate.id === entry.id);
+  const focusSymbol = focusSymbolId
+    ? file?.symbols.find((candidate) => candidate.id === focusSymbolId)
+    : undefined;
+  const symbol = focusSymbolId
+    ? undefined
+    : file?.symbols.find((candidate) => candidate.id === entry.id);
+  const activeSymbol = symbol ?? focusSymbol;
   const step = walk?.steps[stepIndex];
-  const stepNote = step?.node === entry.id ? step.note : undefined;
-  const note = stepNote ?? symbol?.note ?? file?.note ?? "";
-  const jsdoc = !note && symbol?.jsdoc ? symbol.jsdoc : "";
+  const stepNote =
+    step?.node === entry.id || step?.node === focusSymbol?.id ? step?.note : undefined;
+  const note = stepNote ?? activeSymbol?.note ?? file?.note ?? "";
+  const jsdoc = !note && activeSymbol?.jsdoc ? activeSymbol.jsdoc : "";
   const moduleTitle = moduleId ? (moduleById.get(moduleId)?.title ?? moduleId) : "config";
   const title = symbol?.name ?? file?.name ?? entry.label;
-  const lineStart = symbol?.startLine ?? 1;
-  const lineEnd = symbol?.endLine ?? file?.lineCount ?? 1;
+  const lineStart = activeSymbol?.startLine ?? 1;
+  const lineEnd = activeSymbol?.endLine ?? file?.lineCount ?? 1;
 
   return (
     <article className="mx-auto max-w-5xl p-8">
@@ -364,28 +395,26 @@ function NodeDetail({
               {file.name}
             </button>
           ) : null}
-          {symbol ? <span>/</span> : null}
-          {symbol ? <span className="text-fd-foreground">{symbol.name}</span> : null}
+          {activeSymbol ? <span>/</span> : null}
+          {activeSymbol ? <span className="text-fd-foreground">{activeSymbol.name}</span> : null}
         </nav>
-
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{kindLabel(entry.kind)}</Badge>
-          {symbol?.visibility && symbol.visibility !== "export" ? (
-            <Badge>{symbol.visibility}</Badge>
+          {activeSymbol?.visibility && activeSymbol.visibility !== "export" ? (
+            <Badge>{activeSymbol.visibility}</Badge>
           ) : null}
-          {symbol?.tags.map((tag) => (
+          {activeSymbol?.tags.map((tag) => (
             <Badge key={tag}>{tag}</Badge>
           ))}
           <Badge>{note ? "authored" : jsdoc ? "JSDoc" : "generated"}</Badge>
           {file && file.tests.length > 0 ? <Badge>{file.tests.length} tests</Badge> : null}
         </div>
-
         <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
         {symbol ? (
           <pre className="overflow-auto rounded-lg border border-fd-border bg-fd-muted p-3 font-mono text-xs text-fd-muted-foreground">
             {symbol.signature}
           </pre>
-        ) : null}
+        ) : null}{" "}
         <p className="font-mono text-xs text-fd-muted-foreground">{entry.id}</p>
       </header>
 
@@ -431,10 +460,10 @@ function NodeDetail({
           <section className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-fd-muted-foreground">
-                {symbol ? "Definition" : "Source"}
+                {activeSymbol ? "Definition" : "Source"}
               </h2>
               <div className="flex gap-2">
-                <LinkButton href={sourceUrl(file.id, symbol?.startLine)}>
+                <LinkButton href={sourceUrl(file.id, activeSymbol?.startLine)}>
                   <ExternalLink className="size-3.5" />
                   GitHub
                 </LinkButton>
@@ -455,12 +484,12 @@ function NodeDetail({
               source={file.source}
               startLine={lineStart}
               endLine={lineEnd}
-              highlight={Boolean(symbol)}
+              highlight={Boolean(activeSymbol)}
             />
           </section>
         ) : null}
 
-        {file && !symbol ? (
+        {file && !activeSymbol ? (
           <section className="space-y-2">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-fd-muted-foreground">
               Symbols

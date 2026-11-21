@@ -20,13 +20,14 @@
  * Usage: node tools/docs/scripts/index-code.mjs
  */
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, extname, join, posix } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, extname, join, posix, relative } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Project, ts } from "ts-morph";
 import { parse as parseYaml } from "yaml";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const outDir = join(root, "tools/docs/public/data");
+const check = process.argv.includes("--check");
 const modulesDir = join(root, "docs/modules");
 const walksDir = join(root, "docs/walkthroughs");
 const modulesConfigPath = join(root, "docs/modules.json");
@@ -267,34 +268,54 @@ function sections(body) {
   return { preamble: preamble.join("\n").trim(), sections: out };
 }
 
-async function collectNotes() {
+async function collectNotes(problems) {
   const moduleNotes = new Map();
   const moduleSummaries = new Map();
   const nodeNotes = new Map();
   const fileNotes = new Map();
+  const moduleOwners = new Map();
   const walks = [];
 
   const moduleFiles = await walkFiles(modulesDir);
   for (const file of moduleFiles) {
     if (!file.endsWith(".mdx")) continue;
+    const source = relative(root, file);
     const { data, body } = frontmatter(await readFile(file, "utf8"));
     const moduleId = typeof data.module === "string" ? data.module : undefined;
-    if (!moduleId) continue;
+    if (!moduleId) {
+      problems.push({ level: "warning", message: `${source}: frontmatter has no module id` });
+      continue;
+    }
+    if (moduleOwners.has(moduleId)) {
+      problems.push({
+        level: "warning",
+        message: `${source}: module ${moduleId} is already described by ${moduleOwners.get(moduleId)}`,
+      });
+    } else {
+      moduleOwners.set(moduleId, source);
+    }
     if (typeof data.summary === "string") moduleSummaries.set(moduleId, data.summary);
     const parsed = sections(body);
     if (parsed.preamble) moduleNotes.set(moduleId, parsed.preamble);
+    const seen = new Set();
     for (const section of parsed.sections) {
       const key = section.heading.replaceAll("`", "").trim();
       const text = section.text.join("\n").trim();
       if (!text) continue;
+      if (seen.has(key)) {
+        problems.push({ level: "warning", message: `${source}: duplicate section for ${key}` });
+      }
+      seen.add(key);
       if (key.startsWith("file:")) fileNotes.set(key.slice(5).trim(), text);
       else nodeNotes.set(key, text);
     }
   }
 
   const walkEntries = await walkFiles(walksDir);
+  const walkIds = new Map();
   for (const file of walkEntries) {
     if (!file.endsWith(".mdx")) continue;
+    const source = relative(root, file);
     const { data, body } = frontmatter(await readFile(file, "utf8"));
     const parsed = sections(body);
     const steps = parsed.sections
@@ -304,14 +325,24 @@ async function collectNotes() {
       }))
       .filter((step) => step.node !== "");
     if (steps.length === 0) continue;
+    const id = typeof data.id === "string" ? data.id : posix.basename(file, ".mdx");
+    if (walkIds.has(id)) {
+      problems.push({
+        level: "warning",
+        message: `${source}: walk id ${id} is already used by ${walkIds.get(id)}`,
+      });
+    } else {
+      walkIds.set(id, source);
+    }
     walks.push({
-      id: typeof data.id === "string" ? data.id : posix.basename(file, ".mdx"),
+      id,
       title: typeof data.title === "string" ? data.title : titleCase(posix.basename(file, ".mdx")),
       summary: typeof data.summary === "string" ? data.summary : "",
       start: data.start === true,
       order: typeof data.order === "number" ? data.order : 100,
       kind: "path",
       steps,
+      source,
     });
   }
 
@@ -328,6 +359,95 @@ async function walkFiles(dir) {
     else out.push(path);
   }
   return out.sort();
+}
+
+function targetProblem(target, { nodeIds, moduleIds, walkIds }) {
+  if (!target || typeof target !== "object") return "step has no target";
+  switch (target.kind) {
+    case "module":
+      return moduleIds.has(target.id) ? null : `unknown module: ${target.id}`;
+    case "file":
+      return nodeIds.has(target.id) && !target.id.includes("#")
+        ? null
+        : `unknown file: ${target.id}`;
+    case "symbol": {
+      if (!nodeIds.has(target.id) || !target.id.includes("#")) {
+        return `unknown symbol: ${target.id}`;
+      }
+      if (target.level && target.level !== "symbol" && target.level !== "file") {
+        return `unknown symbol level: ${target.level}`;
+      }
+      return null;
+    }
+    case "walk":
+      return walkIds.has(target.id) ? null : `unknown walk: ${target.id}`;
+    case "doc":
+      return typeof target.path === "string" && target.path.startsWith("docs/")
+        ? null
+        : `doc target must be a docs/ path: ${target.path}`;
+    default:
+      return `unknown target kind: ${target.kind}`;
+  }
+}
+
+async function collectTours(problems, scope) {
+  const tours = [];
+  const seen = new Map();
+  const files = (await walkFiles(walksDir)).filter((file) => file.endsWith(".tour.mjs"));
+  for (const file of files) {
+    const source = relative(root, file);
+    let loaded;
+    try {
+      loaded = await import(pathToFileURL(file).href);
+    } catch (reason) {
+      problems.push({
+        level: "warning",
+        message: `${source}: could not load tour: ${
+          reason instanceof Error ? reason.message : String(reason)
+        }`,
+      });
+      continue;
+    }
+    const tour = loaded.default;
+    if (!tour || typeof tour !== "object") {
+      problems.push({ level: "warning", message: `${source}: tour has no default export` });
+      continue;
+    }
+    const id = typeof tour.id === "string" ? tour.id : posix.basename(file, ".tour.mjs");
+    if (seen.has(id)) {
+      problems.push({
+        level: "warning",
+        message: `${source}: tour id ${id} is already used by ${seen.get(id)}`,
+      });
+    } else {
+      seen.set(id, source);
+    }
+    if (!Array.isArray(tour.steps) || tour.steps.length === 0) {
+      problems.push({ level: "warning", message: `${source}: tour has no steps` });
+      continue;
+    }
+    const steps = [];
+    for (const step of tour.steps) {
+      const problem = targetProblem(step?.target, scope);
+      if (problem) {
+        problems.push({ level: "warning", message: `${source}: ${problem}` });
+        continue;
+      }
+      steps.push({
+        target: step.target,
+        callout: typeof step.callout === "string" ? step.callout : undefined,
+      });
+    }
+    tours.push({
+      id,
+      title: typeof tour.title === "string" ? tour.title : titleCase(id),
+      summary: typeof tour.summary === "string" ? tour.summary : "",
+      order: typeof tour.order === "number" ? tour.order : 100,
+      start: tour.start === true,
+      steps,
+    });
+  }
+  return tours.sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
 }
 
 function jsdocFor(node) {
@@ -357,10 +477,11 @@ function isTestFile(file) {
 }
 
 async function main() {
+  const problems = [];
   const [files, packages, notes] = await Promise.all([
     collectFiles(),
     collectPackages(),
-    collectNotes(),
+    collectNotes(problems),
   ]);
   const config = await readJson(modulesConfigPath);
   const explicitModules = new Map((config?.modules ?? []).map((module) => [module.id, module]));
@@ -640,16 +761,47 @@ async function main() {
   ];
   if (!walks.some((walk) => walk.start) && walks.length > 0) walks[0].start = true;
 
-  // Unresolved notes are a warning here; docs:check will make them fatal.
+  // Unresolved notes and walks are warnings in a normal run; --check fails.
   const nodeIds = new Set();
   for (const file of files) {
     nodeIds.add(file);
     for (const symbol of fileNodes.get(file).symbols) nodeIds.add(symbol.id);
   }
+  const tours = await collectTours(problems, {
+    nodeIds,
+    moduleIds: new Set(moduleMap.keys()),
+    walkIds: new Set(walks.map((walk) => walk.id)),
+  });
+  for (const [id] of notes.moduleNotes) {
+    if (!moduleMap.has(id)) {
+      problems.push({ level: "warning", message: `note names an unknown module: ${id}` });
+    }
+  }
+  for (const [id] of notes.fileNotes) {
+    if (!nodeIds.has(id)) {
+      problems.push({ level: "warning", message: `note names an unknown file: ${id}` });
+    }
+  }
   for (const [id] of notes.nodeNotes) {
     if (!nodeIds.has(id)) {
-      process.stderr.write(`warning: note names an unknown node: ${id}\n`);
+      problems.push({ level: "warning", message: `note names an unknown node: ${id}` });
     }
+  }
+  for (const walk of notes.walks) {
+    for (const step of walk.steps) {
+      if (!nodeIds.has(step.node)) {
+        problems.push({
+          level: "warning",
+          message: `${walk.source}: step names an unknown node: ${step.node}`,
+        });
+      }
+    }
+  }
+  if (notes.walks.some((walk) => walk.id === "full-descent")) {
+    problems.push({
+      level: "warning",
+      message: "walk id full-descent is reserved for the generated walk",
+    });
   }
 
   // Tree: the real filesystem, then a synthetic Config root for virtual modules.
@@ -784,13 +936,10 @@ async function main() {
     });
   }
 
-  await rm(outDir, { recursive: true, force: true });
-  await mkdir(join(outDir, "modules"), { recursive: true });
-  await mkdir(join(root, "tools/docs/public/data"), { recursive: true });
-
+  const output = new Map();
   for (const module of modulesSorted) {
-    await writeFile(
-      join(outDir, "modules", `${module.slug}.json`),
+    output.set(
+      `modules/${module.slug}.json`,
       JSON.stringify(
         {
           ...modules.find((candidate) => candidate.id === module.id),
@@ -802,14 +951,67 @@ async function main() {
       ),
     );
   }
+  output.set("tree.json", JSON.stringify(treeRoot));
+  output.set("modules.json", JSON.stringify(modules, null, 2));
+  output.set("search.json", JSON.stringify(search));
+  output.set("tours.json", JSON.stringify(tours));
+  output.set(
+    "walks.json",
+    JSON.stringify(
+      walks.map((walk) => {
+        const copy = { ...walk };
+        delete copy.source;
+        return copy;
+      }),
+    ),
+  );
 
-  await writeFile(join(outDir, "tree.json"), JSON.stringify(treeRoot));
-  await writeFile(join(outDir, "modules.json"), JSON.stringify(modules, null, 2));
-  await writeFile(join(outDir, "search.json"), JSON.stringify(search));
-  await writeFile(join(outDir, "walks.json"), JSON.stringify(walks));
+  if (check) {
+    const stale = [];
+    for (const [relativePath, content] of output) {
+      const existing = await readFile(join(outDir, relativePath), "utf8").catch(() => null);
+      if (existing !== content) stale.push(relativePath);
+    }
+    const expectedModules = new Set(
+      [...output.keys()]
+        .filter((relativePath) => relativePath.startsWith("modules/"))
+        .map((relativePath) => relativePath.slice("modules/".length)),
+    );
+    const existingModules = await readdir(join(outDir, "modules")).catch(() => []);
+    for (const name of existingModules) {
+      if (!expectedModules.has(name)) stale.push(`modules/${name}`);
+    }
+    if (stale.length > 0) {
+      const shown = stale.slice(0, 6).join(", ");
+      const more = stale.length > 6 ? ` and ${stale.length - 6} more` : "";
+      problems.push({
+        level: "warning",
+        message: `generated index is stale (${shown}${more}); run pnpm docs:index`,
+      });
+    }
+    if (problems.length > 0) {
+      for (const problem of problems) process.stderr.write(`error: ${problem.message}\n`);
+      process.stderr.write(`index check failed: ${problems.length} problem(s)\n`);
+      process.exitCode = 1;
+      return;
+    }
+    process.stdout.write(`index is current: ${files.length} files, ${modules.length} modules\n`);
+    return;
+  }
+
+  for (const problem of problems) process.stderr.write(`warning: ${problem.message}\n`);
+
+  await rm(outDir, { recursive: true, force: true });
+  await mkdir(join(outDir, "modules"), { recursive: true });
+
+  for (const [relativePath, content] of output) {
+    const target = join(outDir, relativePath);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, content);
+  }
 
   process.stdout.write(
-    `indexed ${files.length} files, ${search.filter((entry) => entry.kind !== "file" && entry.kind !== "module" && entry.kind !== "walk").length} symbols, ${modules.length} modules, ${walks.length} walks\n`,
+    `indexed ${files.length} files, ${search.filter((entry) => entry.kind !== "file" && entry.kind !== "module" && entry.kind !== "walk").length} symbols, ${modules.length} modules, ${walks.length} walks, ${tours.length} tours\n`,
   );
 }
 

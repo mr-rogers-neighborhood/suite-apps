@@ -14,6 +14,7 @@
     "gate:fresh": "node scripts/gate.mjs --fresh",
     "docs:check": "node scripts/docs-check.mjs",
     "docs:index": "pnpm --dir tools/docs index",
+    "docs:index:check": "pnpm --dir tools/docs index:check",
     "docs:dev": "pnpm --dir tools/docs dev",
     "docs:dev:bg": "pnpm --dir tools/docs dev:bg",
     "docs:stop": "pnpm --dir tools/docs stop",

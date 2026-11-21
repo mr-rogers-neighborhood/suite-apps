@@ -3,7 +3,14 @@
 import { Boxes, ChevronRight, FolderTree, Route, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { BrowserTree } from "@/components/explorer/tree";
-import type { FolderNode, ModuleSummary, SearchEntry, View, Walk } from "@/lib/explorer-types";
+import type {
+  FolderNode,
+  ModuleSummary,
+  SearchEntry,
+  Tour,
+  View,
+  Walk,
+} from "@/lib/explorer-types";
 
 type Props = {
   view: View;
@@ -16,6 +23,7 @@ type Props = {
   modules: ModuleSummary[];
   tree: FolderNode;
   walks: Walk[];
+  tours: Tour[];
   selectedNode: string | null;
   selectedModule: string | null;
   walkId: string | null;
@@ -28,6 +36,7 @@ type Props = {
   onToggleInternal: (fileId: string) => void;
   onSelectWalk: (id: string) => void;
   onSelectStep: (index: number) => void;
+  onStartTour: (tour: Tour) => void;
   onSearchSelect: (entry: SearchEntry) => void;
 };
 
@@ -48,6 +57,7 @@ export function ExplorerSidebar({
   modules,
   tree,
   walks,
+  tours,
   selectedNode,
   selectedModule,
   walkId,
@@ -60,6 +70,7 @@ export function ExplorerSidebar({
   onToggleInternal,
   onSelectWalk,
   onSelectStep,
+  onStartTour,
   onSearchSelect,
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
@@ -164,12 +175,14 @@ export function ExplorerSidebar({
         ) : (
           <WalkList
             walks={walks}
+            tours={tours}
             walkId={walkId}
             stepIndex={stepIndex}
             searchById={searchById}
             moduleById={moduleById}
             onSelectWalk={onSelectWalk}
             onSelectStep={onSelectStep}
+            onStartTour={onStartTour}
           />
         )}
       </div>
@@ -312,25 +325,58 @@ function ModuleList({
 
 function WalkList({
   walks,
+  tours,
   walkId,
   stepIndex,
   searchById,
   moduleById,
   onSelectWalk,
   onSelectStep,
+  onStartTour,
 }: {
   walks: Walk[];
+  tours: Tour[];
   walkId: string | null;
   stepIndex: number;
   searchById: Map<string, SearchEntry>;
   moduleById: Map<string, ModuleSummary>;
   onSelectWalk: (id: string) => void;
   onSelectStep: (index: number) => void;
+  onStartTour: (tour: Tour) => void;
 }) {
   const walk = walks.find((candidate) => candidate.id === walkId) ?? null;
 
   return (
     <div className="text-[13px]">
+      {tours.length > 0 ? (
+        <div className="border-b border-fd-border py-1">
+          <h2 className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-fd-muted-foreground">
+            Composed tours
+          </h2>
+          {tours.map((tour) => (
+            <button
+              key={tour.id}
+              type="button"
+              onClick={() => onStartTour(tour)}
+              className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-fd-accent"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="truncate text-xs font-medium">{tour.title}</span>
+                  <span className="rounded bg-fd-primary/10 px-1 text-[9px] uppercase text-fd-primary">
+                    tour
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-[10px] text-fd-muted-foreground">
+                  {tour.steps.length} stops · crosses views
+                </span>
+              </span>
+              <ChevronRight className="mt-1 size-3.5 shrink-0 text-fd-muted-foreground" />
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="py-1">
         {walks.map((candidate) => (
           <button

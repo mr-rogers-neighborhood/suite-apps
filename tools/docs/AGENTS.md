@@ -12,7 +12,9 @@ then `tools/docs/README.md` for the model and its limits.
 - One authored MDX per module, not per file. `docs/modules/<module>.mdx` holds the narrative and
   `## <node-id>` notes. The explorer splits by file and declaration at render time.
 - A walkthrough is an ordered list of node IDs, not a copy of the code. Authored walks live in
-  `docs/walkthroughs/`; the full descent is generated.
+  `docs/walkthroughs/`; the full descent is generated. A composed tour lives in
+  `docs/walkthroughs/*.tour.mjs` and only exists when it crosses targets or needs a callout; a normal
+  walk derives its tour from its steps.
 - Do not generate prose for every symbol. Compiler facts and optional notes; generated entries say
   so.
 - Do not add `tools/docs` to `pnpm build`, the release path, or a shipped package.
@@ -23,6 +25,7 @@ then `tools/docs/README.md` for the model and its limits.
 
 ```sh
 mise exec -- pnpm docs:index
+mise exec -- pnpm docs:index:check
 mise exec -- pnpm docs:dev
 mise exec -- pnpm docs:dev:bg
 mise exec -- pnpm docs:status
