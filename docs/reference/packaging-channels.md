@@ -253,9 +253,10 @@ channel.
 The debug signature belongs to the machine that built it, so an APK from another machine is a
 different signer; changing machines means `adb uninstall run.suite.go` once before installing.
 `scripts/android-release.mjs` builds, names and checksums the artifact, and `--publish` attaches both
-files to the rolling release after `release-status.mjs --publish` has created it. The sideload line
-and what debug-signed means are in
-[Suite Go's README](../../apps/go/README.md#install-the-apk).
+files to the rolling release after `release-status.mjs --publish` has created it. It also uploads the
+same bytes as `suite-go.apk`, the stable name
+[Suite Go's README](../../apps/go/README.md#install-the-apk) links through `releases/latest`; the
+versioned asset stays canonical, and that README owns the sideload line and what debug-signed means.
 
 ## Pre-release documents
 

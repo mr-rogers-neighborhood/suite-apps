@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { classifyReleaseView } from "./android-release.mjs";
+import { classifyReleaseView, GO_APK_ALIAS, uploadNames } from "./android-release.mjs";
 
 describe("release lookup", () => {
   it("treats a successful read as present", () => {
@@ -30,5 +30,19 @@ describe("release lookup", () => {
       stderr: "gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable.",
     });
     assert.equal(unauthenticated.state, "unavailable");
+  });
+});
+
+describe("upload set", () => {
+  it("uploads the versioned APK, its checksum and the stable alias", () => {
+    const names = uploadNames("0.1.0");
+    assert.deepEqual(names, [
+      "suite-go-0.1.0.apk",
+      "suite-go-0.1.0.apk.sha256",
+      "suite-go.apk",
+    ]);
+    assert.ok(names.includes("suite-go-0.1.0.apk"));
+    assert.ok(names.includes(GO_APK_ALIAS));
+    assert.equal(GO_APK_ALIAS, "suite-go.apk");
   });
 });

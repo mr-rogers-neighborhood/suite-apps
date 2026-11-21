@@ -77,8 +77,10 @@ specific to the machine that built it, so an APK from another machine cannot upd
 sideload artifact and not a store one.
 
 `pnpm android:install` stays the dev loop; `scripts/android-release.mjs` is the release copy that
-names and checksums the artifact for download. [Android notes](docs/reference/android.md) cover the
-device and the toolchain.
+names and checksums the artifact for download. The rolling release also carries the same bytes as
+[suite-go.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/latest/download/suite-go.apk),
+so that URL always names the newest debug build; `suite-go-<version>.apk` remains canonical.
+[Android notes](docs/reference/android.md) cover the device and the toolchain.
 
 ## Packages
 

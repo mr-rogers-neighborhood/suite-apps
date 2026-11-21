@@ -12,6 +12,10 @@
  *   Play Store channel yet. The debug APK is what a person sideloads and what
  *   the owner tests; it is fine to attach to the rolling release for that.
  *
+ * The upload also carries `suite-go.apk`, the same bytes under a stable name, so
+ * `releases/latest/download/suite-go.apk` always names the newest build. The
+ * versioned asset stays canonical and is what the release table links.
+ *
  * The steps are the ones `apps/go/scripts/android.mjs` already uses for the dev
  * loop: build the web bundle, sync it into the committed Android project, then
  * `assembleDebug`. Nothing here needs a device: the APK is built, copied out
@@ -103,6 +107,21 @@ function appConfig() {
 }
 
 /**
+ * The stable name on the Latest release.
+ *
+ * `suite-go-<version>.apk` is canonical and is what the release table links.
+ * This alias carries the same bytes under a name that never changes, so a
+ * README can link `releases/latest/download/suite-go.apk` forever.
+ */
+export const GO_APK_ALIAS = "suite-go.apk";
+
+/** The three asset names one publish uploads, in order. */
+export function uploadNames(version) {
+  const asset = goApkName(version);
+  return [asset, `${asset}.sha256`, GO_APK_ALIAS];
+}
+
+/**
  * The SDK and JDK Gradle needs, or the reasons they are missing.
  *
  * `apps/go/scripts/preflight.mjs` already owns these lookups, including the
@@ -166,13 +185,13 @@ function sha256OfFile(path) {
  * Build the debug APK, copy it out under its release name and checksum it.
  *
  * `suite-go-<version>.apk` is the asset name `release-status.mjs` links, so the
- * two scripts cannot drift on spelling. The checksum file uses the `sha256sum`
- * format, which is what a person already has.
+ * two scripts cannot drift on spelling. `suite-go.apk` is the same bytes under
+ * the stable name the README links through `releases/latest`. The checksum file
+ * uses the `sha256sum` format, which is what a person already has.
  */
 function build({ config, env }) {
   const version = config.version;
-  const asset = goApkName(version);
-  const checksum = `${asset}.sha256`;
+  const [asset, checksum, alias] = uploadNames(version);
   mkdirSync(RELEASE_DIR, { recursive: true });
 
   command("pnpm", ["--filter", "@suite/go-app", "build"]);
@@ -204,7 +223,12 @@ function build({ config, env }) {
   const checksumPath = join(RELEASE_DIR, checksum);
   writeFileSync(checksumPath, `${sha256}  ${asset}\n`);
 
-  return { version, asset, apkPath, checksumPath, sha256 };
+  // A copy, not a second build: the alias has to be the exact bytes the
+  // versioned asset carries, or the stable URL would download another app.
+  const aliasPath = join(RELEASE_DIR, alias);
+  copyFileSync(apkPath, aliasPath);
+
+  return { version, asset, apkPath, checksumPath, alias, aliasPath, sha256 };
 }
 
 /**
@@ -307,6 +331,7 @@ async function main(argv) {
   process.stdout.write(`  size      ${size} bytes\n`);
   process.stdout.write(`  sha256    ${built.sha256}\n`);
   process.stdout.write(`  checksum  ${built.checksumPath}\n`);
+  process.stdout.write(`  alias     ${built.aliasPath}\n`);
   process.stdout.write(
     `\nInstall on an attached phone:\n  adb install -r -t ${quote(built.apkPath)}\n`,
   );
@@ -315,7 +340,18 @@ async function main(argv) {
       `\`adb uninstall run.suite.go\` first.${RESET}\n`,
   );
 
-  const upload = ["gh", ["release", "upload", tag, built.apkPath, built.checksumPath, "--clobber"]];
+  const upload = [
+    "gh",
+    [
+      "release",
+      "upload",
+      tag,
+      built.apkPath,
+      built.checksumPath,
+      built.aliasPath,
+      "--clobber",
+    ],
+  ];
 
   if (options.publish) {
     command(upload[0], upload[1]);

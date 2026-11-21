@@ -122,6 +122,10 @@ script prints a non-fatal warning naming the upload command. Run `release-status
 again after the upload so the GitHub body and `RELEASES.md` link the download instead of describing
 it as missing.
 
+The upload also carries the same bytes as `suite-go.apk`, so
+`https://github.com/mr-rogers-neighborhood/suite-apps/releases/latest/download/suite-go.apk` always
+names the newest debug build; the versioned asset stays canonical.
+
 Only the debug keystore signs this build — there is no release signing key and no Play channel. The
 APK is for sideloading and for the owner's phone, and the signature belongs to the machine that built
 it. [Suite Go's README](../../apps/go/README.md#install-the-apk) owns that install path.
