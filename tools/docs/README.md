@@ -85,9 +85,9 @@ return to the default width. The width is stored in `localStorage`.
 - Imports resolve relative files and `.js` specifiers back to `.ts`. Test files mark the files they
   import.
 - `docs:index:check` resolves every note heading, tour step and composed-tour target, and compares the
-  generated files with the ones on disk. A stale index or an unknown ID fails the check; a normal
-  `docs:index` reports the same problems as warnings and rewrites the data. It also checks intros,
-  interludes and overlays.
+  generated files with the ones on disk. A stale index, an unknown ID or a note repeated in two module
+  MDX files fails the check; a normal `docs:index` reports the same problems as warnings and rewrites
+  the data. It also checks intros, interludes and overlays.
 
 ## Authoring
 

@@ -324,8 +324,26 @@ async function collectNotes(problems) {
         problems.push({ level: "warning", message: `${source}: duplicate section for ${key}` });
       }
       seen.add(key);
-      if (key.startsWith("file:")) fileNotes.set(key.slice(5).trim(), text);
-      else nodeNotes.set(key, text);
+      if (key.startsWith("file:")) {
+        const fileId = key.slice(5).trim();
+        if (fileNotes.has(fileId)) {
+          problems.push({
+            level: "warning",
+            message: `${source}: file note for ${fileId} is already in another module MDX`,
+          });
+        } else {
+          fileNotes.set(fileId, text);
+        }
+      } else {
+        if (nodeNotes.has(key)) {
+          problems.push({
+            level: "warning",
+            message: `${source}: node note for ${key} is already in another module MDX`,
+          });
+        } else {
+          nodeNotes.set(key, text);
+        }
+      }
     }
   }
 
