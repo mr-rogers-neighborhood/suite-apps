@@ -41,7 +41,7 @@ export function workspacePathsFrom(documents: string, file?: string | null): Wor
 }
 
 /** The folder a pre-release keeps documents in, a sibling of `Documents/Suite`. */
-export const SLOP_DOCUMENTS_FOLDER = "Suite Slop";
+const SLOP_DOCUMENTS_FOLDER = "Suite Slop";
 
 /** The pre-release folder for this app, given the person's documents root. */
 export function slopWorkspaceFolder(documentsRoot: string, app = "Planner"): string {

@@ -31,7 +31,7 @@ export type AppPaths = {
 };
 
 /** The folder a pre-release keeps documents in, a sibling of `Documents/Suite`. */
-export const SLOP_DOCUMENTS_FOLDER = "Suite Slop";
+const SLOP_DOCUMENTS_FOLDER = "Suite Slop";
 
 /** The pre-release folder for this app, given the person's documents root. */
 export function slopBudgetsFolder(documentsRoot: string, app = "Budget"): string {
