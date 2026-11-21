@@ -18,7 +18,7 @@
  *      `<` and `{}` are escaped because MDX treats them as JSX.
  *
  * The sidebar is generated as `_meta.json` per directory, because that is what
- * Fumadocs reads: the sections in their authored order, a section's index page
+ * Fumadocs reads: the sections in their written order, a section's index page
  * first, and every other page in file order.
  *
  * The output is a pure function of `docs/`: the target is deleted first, entries
@@ -276,12 +276,12 @@ function convertPage(source, rel) {
     return `---\n${fields.join("\n")}\n---\n\n${mdxSafe(withoutHeading)}`;
   }
 
-  const authored = frontmatter.split("\n");
+  const declared = frontmatter.split("\n");
   const kept = fields.filter((field) => {
     const key = field.slice(0, field.indexOf(":"));
     return !new RegExp(`^${key}\\s*:`, "m").test(frontmatter);
   });
-  return `---\n${[...kept, ...authored].join("\n")}\n---\n\n${mdxSafe(withoutHeading)}`;
+  return `---\n${[...kept, ...declared].join("\n")}\n---\n\n${mdxSafe(withoutHeading)}`;
 }
 
 /** Walk `docs/` and return every published entry as a POSIX path relative to it. */

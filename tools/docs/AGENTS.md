@@ -9,8 +9,10 @@ then `tools/docs/README.md` for the model and its limits.
   `.generated/docs/`; run `pnpm docs:index` / `pnpm docs:dev` to regenerate.
 - Do not add a new Diátaxis page. The explorer is the structure; new explanations go in
   `docs/modules/`, new guided paths in `docs/tours/`. `docs/` keeps the older notes archive.
-- One authored MDX per module, not per file. `docs/modules/<module>.mdx` holds the narrative and
+- One prose MDX per module, not per file. `docs/modules/<module>.mdx` holds the narrative and
   `## <node-id>` notes. The explorer splits by file and declaration at render time.
+- Prose is generated until a person reviews it. Only a person adds `reviewed: human` to a module or
+  tour frontmatter; an agent must never add that marker to its own prose.
 - A tour is one concept with two authoring forms. A linear tour lives in `docs/tours/*.mdx` and its
   headings are node IDs. A composed tour lives in `docs/tours/*.tour.mjs` and only exists when it
   crosses targets or needs a step that is not prose. Both appear in one Tours list.

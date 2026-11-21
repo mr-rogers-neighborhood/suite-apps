@@ -22,6 +22,7 @@ export type ModuleSummary = {
   noteCount: number;
   summary: string;
   tourCount: number;
+  reviewed: boolean;
 };
 
 export type SymbolSummary = {
@@ -101,6 +102,7 @@ export type Tour = {
   intro: string;
   order: number;
   start: boolean;
+  reviewed: boolean;
   source: TourSource;
   steps: TourStep[];
 };

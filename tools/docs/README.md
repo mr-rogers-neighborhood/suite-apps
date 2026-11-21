@@ -5,7 +5,9 @@ excluded from the root build and release, has no deployment and no telemetry.
 
 The reader is **not organized by Diátaxis**. Its structure is the explorer: Browser, Modules and
 Tours over one generated index of every file and declaration. Reference facts are derived; module MDX
-and tours are the authored layer.
+and tours are the prose layer. Prose is **authored** only after a person reviews or rewrites it and
+adds `reviewed: human` to the module or tour frontmatter. Until then it is generated, whether a person
+or an agent wrote it.
 
 `/docs` is the older notes archive. It stays readable, but it is not the primary interface.
 
@@ -16,7 +18,7 @@ From the repository root:
 ```sh
 mise exec -- pnpm docs:index     # build tools/docs/public/data
 mise exec -- pnpm docs:index:check # validate notes, tours and generated data
-mise exec -- pnpm docs:coverage  # report authored coverage; never fails on a gap
+mise exec -- pnpm docs:coverage  # report authored vs generated prose; never fails on a gap
 mise exec -- pnpm docs:explain <node-id> # scaffold one note section in its module MDX
 mise exec -- pnpm docs:dev       # index, sync and start the dev server (foreground)
 mise exec -- pnpm docs:dev:bg    # the same, detached; log in .dev/docs.log
@@ -69,7 +71,7 @@ return to the default width. The width is stored in `localStorage`.
 | `app/explore/page.tsx`              | The explorer route.                                                                                                          |
 | `scripts/sync-docs.mjs`             | Mirrors `docs/` into `.generated/docs/` for Fumadocs.                                                                        |
 | `app/docs/`                         | Reference pages generated from `docs/`.                                                                                      |
-| `docs/modules/*.mdx`                | One authored narrative per module, with `## <node-id>` notes.                                                                |
+| `docs/modules/*.mdx`                | One prose narrative per module, with `## <node-id>` notes.                                                                  |
 | `docs/tours/*.mdx`                  | Linear tours; headings are node IDs, the preamble is the intro.                                                              |
 | `docs/tours/*.tour.mjs`             | Composed tours that cross modules, files, symbols, tours or docs.                                                            |
 | `app/llms.txt`, `app/llms-full.txt` | Agent-readable reference exports.                                                                                            |
@@ -112,9 +114,13 @@ unknown node. A module without an MDX still renders generated facts. Notes are o
 facts are honest and never invent prose.
 
 `pnpm docs:explain <node-id>` adds a section with the generated signature and a TODO, and refuses if
-the section already exists. `pnpm docs:coverage` reports narrative, file, symbol and tour coverage
-plus the largest modules with no authored prose. Neither command gates a change; the tour and note
-review does.
+the section already exists. `pnpm docs:coverage` reports how many modules and tours a person has
+reviewed, alongside the generated prose, file and symbol counts, plus the largest modules with no
+prose. Neither command gates a change; the tour and note review does.
+
+A module or tour becomes authored when its frontmatter carries `reviewed: human`. That is a claim a
+person makes after reading and rewriting the prose, not a marker an agent may add. Remove it if a
+later edit leaves the prose unreviewed.
 
 A linear tour is an MDX file. The preamble is the intro; headings are node IDs or interlude chapters:
 
@@ -180,9 +186,9 @@ not hand-write an outline or a “What this does not do” section.
 
 - Do not edit `.generated/` or `public/data/`; run `pnpm docs:index` or `pnpm docs:dev`.
 - Do not add one MDX per file. One module narrative, many nodes.
-- Do not generate prose for every symbol. Use compiler facts plus authored notes.
+- Do not generate prose for every symbol. Use compiler facts plus written notes.
 - Do not add `tools/docs` to `pnpm build`, the release path, or a shipped package.
-- The code index is data, not truth: the code and the authored MDX win.
+- The code index is data, not truth: the code and the prose MDX win.
 
 ## Pins
 

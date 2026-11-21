@@ -84,7 +84,7 @@ the gate or a release.
 ```sh
 mise exec -- pnpm docs:index     # index every file and declaration into tools/docs/public/data
 mise exec -- pnpm docs:index:check # resolve notes, tours and generated data
-mise exec -- pnpm docs:coverage  # report authored coverage; never fails on a gap
+mise exec -- pnpm docs:coverage  # report authored vs generated prose; never fails on a gap
 mise exec -- pnpm docs:explain <node-id> # scaffold one note section in its module MDX
 mise exec -- pnpm docs:dev       # index, sync docs/ and start the dev server (foreground)
 mise exec -- pnpm docs:dev:bg    # the same, detached; log in .dev/docs.log
@@ -100,11 +100,12 @@ mise exec -- pnpm docs:clean     # remove .next, .generated, .source and public/
 modules are package roots plus `src/` children, and config files become `config:*` modules. It writes
 `tools/docs/public/data/` and is not committed. `docs:index:check` resolves every note heading, tour
 step and composed-tour target and compares the generated files with the ones on disk; it exits
-nonzero on an unknown ID or stale data. It also checks that authored tours have an intro and that
+nonzero on an unknown ID or stale data. It also checks that prose tours have an intro and that
 interludes and overlays have content. `docs:dev` and `docs:build` also run
 `tools/docs/scripts/sync-docs.mjs`, which mirrors `docs/` into `.generated/docs/` with the frontmatter
-and sidebar Fumadocs expects. `docs:coverage` reports narrative, file and symbol coverage, tour intros
-and the largest modules with no authored prose. `docs:explain <node-id>` appends a TODO section with
+and sidebar Fumadocs expects. `docs:coverage` reports how many modules and tours a person has
+reviewed (`reviewed: human`) against the generated prose, file and symbol counts, and the largest
+modules with no prose. `docs:explain <node-id>` appends a TODO section with
 the generated signature to the owning module MDX; it refuses to overwrite an existing note.
 
 Open `/explore` for the three-mode explorer. `/docs` remains the reference site. `docs:start` serves

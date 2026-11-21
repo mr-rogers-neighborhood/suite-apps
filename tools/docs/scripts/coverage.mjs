@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Reports how much of the code index has authored prose.
+ * Reports how much of the code index has prose, and how much of that prose a
+ * person has reviewed. Generated notes are never counted as authored.
  *
  * Report only: this never fails on a gap. Run `pnpm docs:index` first so the
  * data matches the tree.
@@ -52,6 +53,7 @@ const moduleDetails = await Promise.all(
       id: module.id,
       title: module.title,
       narrative: Boolean(module.summary?.trim()),
+      reviewed: Boolean(module.reviewed),
       files: files.length,
       notedFiles,
       symbols: symbols.length,
@@ -63,20 +65,22 @@ const moduleDetails = await Promise.all(
 );
 
 const modulesWithNarrative = moduleDetails.filter((module) => module.narrative).length;
+const modulesReviewed = moduleDetails.filter((module) => module.reviewed).length;
 const modulesWithNotes = moduleDetails.filter(
   (module) => module.notedFiles > 0 || module.notedSymbols > 0,
 ).length;
 const notedFiles = moduleDetails.reduce((sum, module) => sum + module.notedFiles, 0);
 const notedSymbols = moduleDetails.reduce((sum, module) => sum + module.notedSymbols, 0);
-const authoredSymbols = symbolEntries.length;
-const authoredExported = exportedSymbols.length;
-const authoredTours = tours.filter((tour) => tour.source !== "generated");
+const indexedSymbols = symbolEntries.length;
+const indexedExported = exportedSymbols.length;
+const writtenTours = tours.filter((tour) => tour.source !== "generated");
+const reviewedTours = writtenTours.filter((tour) => tour.reviewed);
 const generatedTour = tours.find((tour) => tour.source === "generated");
-const steps = authoredTours.flatMap((tour) => tour.steps ?? []);
+const steps = writtenTours.flatMap((tour) => tour.steps ?? []);
 const nodeSteps = steps.filter((step) => step.kind === "node");
 const noteSteps = nodeSteps.filter((step) => step.note);
 const interludes = steps.filter((step) => step.kind === "interlude");
-const toursWithIntro = authoredTours.filter((tour) => tour.intro?.trim()).length;
+const toursWithIntro = writtenTours.filter((tour) => tour.intro?.trim()).length;
 
 const gaps = moduleDetails
   .filter((module) => !module.narrative && module.notedFiles === 0 && module.notedSymbols === 0)
@@ -86,18 +90,20 @@ const gaps = moduleDetails
 const report = {
   modules: {
     total: moduleDetails.length,
-    withNarrative: modulesWithNarrative,
+    reviewed: modulesReviewed,
+    withProse: modulesWithNarrative,
     withNotes: modulesWithNotes,
   },
   files: { total: fileEntries.length, withNotes: notedFiles },
   symbols: {
-    total: authoredSymbols,
-    exported: authoredExported,
+    total: indexedSymbols,
+    exported: indexedExported,
     withNotes: notedSymbols,
   },
   tours: {
     total: tours.length,
-    authored: authoredTours.length,
+    reviewed: reviewedTours.length,
+    written: writtenTours.length,
     withIntro: toursWithIntro,
     steps: nodeSteps.length,
     stepsWithNotes: noteSteps.length,
@@ -112,13 +118,13 @@ if (asJson) {
 } else {
   process.stdout.write(
     `${[
-      "docs coverage (report only)",
-      `modules  ${modulesWithNarrative}/${moduleDetails.length} narrative, ${modulesWithNotes}/${moduleDetails.length} any note`,
+      'docs coverage (report only; "authored" means a person read or rewrote it)',
+      `modules  ${modulesReviewed}/${moduleDetails.length} human-authored; ${modulesWithNarrative}/${moduleDetails.length} with generated prose`,
       `files    ${notedFiles}/${fileEntries.length} with a note (${percent(notedFiles, fileEntries.length)})`,
-      `symbols  ${notedSymbols}/${authoredSymbols} with a note (${percent(notedSymbols, authoredSymbols)})`,
-      `tours    ${toursWithIntro}/${authoredTours.length} intros; ${noteSteps.length}/${nodeSteps.length} steps with a note; ${interludes.length} interludes; ${generatedTour?.steps?.length ?? 0} generated`,
+      `symbols  ${notedSymbols}/${indexedSymbols} with a note (${percent(notedSymbols, indexedSymbols)})`,
+      `tours    ${reviewedTours.length}/${writtenTours.length} human-authored; ${noteSteps.length}/${nodeSteps.length} generated notes; ${interludes.length} interludes; ${generatedTour?.steps?.length ?? 0} generated steps`,
       "",
-      "largest modules with no authored prose:",
+      "largest modules with no prose yet:",
       ...(gaps.length === 0
         ? ["  none"]
         : gaps.map(

@@ -338,7 +338,11 @@ function TourIntro({
         <div className="flex flex-wrap items-center gap-2">
           {tour.start ? <Badge>start here</Badge> : null}
           <Badge>{tour.steps.length} steps</Badge>
-          {tour.source === "generated" ? <Badge>generated</Badge> : null}
+          {tour.source === "generated" ? (
+            <Badge>generated</Badge>
+          ) : (
+            <Badge>{tour.reviewed ? "human-authored" : "generated prose"}</Badge>
+          )}
         </div>
       </header>
 
@@ -470,6 +474,9 @@ function ModuleDetail({
           <Badge>{module.fileCount} files</Badge>
           <Badge>{module.symbolCount} symbols</Badge>
           <Badge>{module.noteCount} notes</Badge>
+          {module.summary ? (
+            <Badge>{module.reviewed ? "human-authored" : "generated prose"}</Badge>
+          ) : null}
           {module.tourCount > 0 ? <Badge>{module.tourCount} tours</Badge> : null}
         </div>
         <h1 className="text-3xl font-bold tracking-tight">{module.title}</h1>
@@ -593,6 +600,9 @@ function NodeDetail({
   const activeSymbol = symbol ?? focusSymbol;
   const durableNote = activeSymbol?.note ?? file?.note ?? "";
   const note = tourStep?.note ?? durableNote;
+  const reviewed = Boolean(
+    tourStep ? tour?.reviewed : moduleId && moduleById.get(moduleId)?.reviewed,
+  );
   const jsdoc = !note && activeSymbol?.jsdoc ? activeSymbol.jsdoc : "";
   const moduleTitle = moduleId ? (moduleById.get(moduleId)?.title ?? moduleId) : "config";
   const title = symbol?.name ?? file?.name ?? entry.label;
@@ -639,7 +649,15 @@ function NodeDetail({
           {activeSymbol?.tags.map((tag) => (
             <Badge key={tag}>{tag}</Badge>
           ))}
-          <Badge>{note ? "authored" : jsdoc ? "JSDoc" : "generated"}</Badge>
+          <Badge>
+            {note
+              ? reviewed
+                ? "human-authored"
+                : "generated note"
+              : jsdoc
+                ? "JSDoc"
+                : "generated"}
+          </Badge>
           {file && file.tests.length > 0 ? <Badge>{file.tests.length} tests</Badge> : null}
         </div>
 
@@ -672,8 +690,8 @@ function NodeDetail({
         ) : null}
         {!note && !jsdoc ? (
           <p className="rounded-lg border border-dashed border-fd-border p-4 text-sm text-fd-muted-foreground">
-            No authored note yet. This entry is generated from the compiler. Add a section to the
-            module MDX to explain the why.
+            No note yet. This entry is generated from the compiler. Add a section to the module MDX
+            to explain the why.
           </p>
         ) : null}
 

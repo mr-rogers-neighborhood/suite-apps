@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Scaffolds one authored note section for a node.
+ * Scaffolds one note section for a node.
  *
  * It appends to the owning module MDX and never overwrites an existing section.
  * The generated line is a fact; the TODO is for the person writing the why.

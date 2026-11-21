@@ -16,7 +16,9 @@ The rules that shape this repository. Each is current; the code follows it.
   `docs/modules/` and tours in `docs/tours/`. It is excluded from the root build and release. `docs/`
   and each app's `docs/` remain the source of truth.
 - The reader is not organized by Diátaxis. Browser, Modules and Tours are the structure over one code
-  index; reference facts are generated, and module MDX plus tours are the authored layer. The old
+  index; reference facts are generated, and module MDX plus tours are the prose layer. Prose is
+  authored only after a person reviews it and adds `reviewed: human` to the module or tour
+  frontmatter; until then it is generated, whoever wrote it. The old
   tutorials, how-to, reference and explanation pages remain a notes archive; new content goes to
   `docs/modules/` or `docs/tours/`.
 - A tour is one concept with two authoring forms: `docs/tours/*.mdx` for a linear prose path and

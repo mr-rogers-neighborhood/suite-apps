@@ -15,7 +15,7 @@
  *   public/data/tours.json
  *   public/data/tour-membership.json
  *
- * Authored notes come from `docs/modules/`; tours from `docs/tours/`.
+ * Prose notes come from `docs/modules/`; tours from `docs/tours/`.
  * The generator never overwrites either.
  *
  * Usage: node tools/docs/scripts/index-code.mjs
@@ -289,6 +289,7 @@ function splitOverlay(text) {
 async function collectNotes(problems) {
   const moduleNotes = new Map();
   const moduleSummaries = new Map();
+  const moduleReviewed = new Map();
   const nodeNotes = new Map();
   const fileNotes = new Map();
   const moduleOwners = new Map();
@@ -313,6 +314,7 @@ async function collectNotes(problems) {
       moduleOwners.set(moduleId, source);
     }
     if (typeof data.summary === "string") moduleSummaries.set(moduleId, data.summary);
+    moduleReviewed.set(moduleId, data.reviewed === "human");
     const parsed = sections(body);
     if (parsed.preamble) moduleNotes.set(moduleId, parsed.preamble);
     const seen = new Set();
@@ -397,13 +399,14 @@ async function collectNotes(problems) {
       intro,
       start: data.start === true,
       order: typeof data.order === "number" ? data.order : 100,
+      reviewed: data.reviewed === "human",
       source: "mdx",
       steps,
       file: source,
     });
   }
 
-  return { moduleNotes, moduleSummaries, nodeNotes, fileNotes, tours };
+  return { moduleNotes, moduleSummaries, moduleReviewed, nodeNotes, fileNotes, tours };
 }
 
 async function walkFiles(dir) {
@@ -538,6 +541,7 @@ async function collectTours(problems, scope) {
       intro,
       order: typeof tour.order === "number" ? tour.order : 100,
       start: tour.start === true,
+      reviewed: tour.reviewed === true || tour.reviewed === "human",
       source: "composed",
       steps,
       file: source,
@@ -809,6 +813,7 @@ async function main() {
   // Module summaries and note attachment.
   for (const module of moduleMap.values()) {
     module.summary = notes.moduleSummaries.get(module.id) ?? notes.moduleNotes.get(module.id) ?? "";
+    module.reviewed = notes.moduleReviewed.get(module.id) ?? false;
     module.files.sort((left, right) => {
       const testDelta = Number(isTestFile(left.id)) - Number(isTestFile(right.id));
       return testDelta !== 0 ? testDelta : left.id.localeCompare(right.id);
@@ -824,7 +829,7 @@ async function main() {
     module.slug = module.id.replaceAll("/", "__").replaceAll(":", "-");
   }
 
-  // Authored and composed tours plus the generated full descent.
+  // Written and composed tours plus the generated full descent.
   const MODULE_ORDER = [
     "packages/contracts",
     "packages/files",
@@ -875,15 +880,15 @@ async function main() {
   if (notes.tours.some((tour) => tour.id === "full-descent")) {
     problems.push({ level: "warning", message: "tour id full-descent is reserved" });
   }
-  const authoredTours = notes.tours.sort((left, right) => left.order - right.order);
-  const tourIds = new Set([...authoredTours.map((tour) => tour.id), "full-descent"]);
+  const writtenTours = notes.tours.sort((left, right) => left.order - right.order);
+  const tourIds = new Set([...writtenTours.map((tour) => tour.id), "full-descent"]);
   const composedTours = await collectTours(problems, {
     nodeIds,
     moduleIds: new Set(moduleMap.keys()),
     tourIds,
   });
   const tours = [
-    ...authoredTours,
+    ...writtenTours,
     ...composedTours,
     {
       id: "full-descent",
@@ -893,6 +898,7 @@ async function main() {
       start: false,
       order: 999,
       source: "generated",
+      reviewed: false,
       steps: fullSteps,
     },
   ].sort((left, right) => left.order - right.order || left.title.localeCompare(right.title));
@@ -1071,6 +1077,7 @@ async function main() {
     noteCount: module.noteCount,
     tourCount: module.tourCount,
     summary: module.summary,
+    reviewed: module.reviewed,
   }));
 
   const search = [];
