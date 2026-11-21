@@ -1,6 +1,6 @@
 # Accessibility
 
-Suite is alpha software. This page says where accessibility stands, and what has actually been
+Suite Planner is pre-alpha. This page says where accessibility stands, and what has actually been
 checked, rather than what is intended.
 
 The target is **WCAG 2.2 level AA**. That is 55 of the 86 success criteria in the standard. The full
@@ -9,23 +9,26 @@ breakdown is in
 
 ## What is verified by machine
 
-Two checks run on every change, and a failure stops the work.
+- **Colour contrast in every preset.** Planner uses the presets in `@suite/theme`, and that package's
+  tests measure each one: 4.5:1 for body and faint text on every surface, 3:1 for focus rings and
+  component boundaries. This checks the palette, not the pixels in a running Planner window.
+- **Structure, types and behaviour.** The gate runs Biome, strict TypeScript, Vitest, the shape
+  check, knip and the production build. The shared `Button`, `IconButton`, `Field` and `Modal`
+  primitives use native elements or Radix, and their component tests cover labels, focus return and
+  the dialog's focus trap.
+- **One visible focus ring.** The renderer defines `*:focus-visible` once in
+  [`theme/styles.css`](src/renderer/src/theme/styles.css), and the shared primitives reuse the same
+  ring token.
 
-- **Colour contrast in every theme.** Each preset in `@suite/theme` is measured: 4.5:1 for body text
-  on every surface it can sit on, 4.5:1 for faint text, and 3:1 for focus rings and component
-  boundaries. A preset that fails cannot be merged. A colour that cannot be measured, such as a
-  gradient or a `color-mix()`, is not allowed in a preset, because an unmeasurable colour cannot be
-  checked.
-- **axe on every start screen.** All four apps are audited against the WCAG 2.2 A and AA rule sets in
-  a real window, and any violation fails the build.
-
-The second check found a real problem the moment it was written: faint text was 3.42:1 against white
-at 11px. It is fixed.
+**There is no axe run in Planner's gate.** The suite's manual-testing page describes an automated
+start-screen audit, but Planner has no axe or Playwright accessibility sweep configured. The checks
+above do not cover painted contrast, focus order or screen-reader output, and should not be read as
+if they did.
 
 ## What is verified by hand
 
 **None of it yet.** This section will list the passes below once they have been done and written
-down. Until then, do not read the machine checks above as coverage of the interface.
+down.
 
 The protocol is written and ready to run:
 [`docs/reference/accessibility/manual-testing.md`](../../docs/reference/accessibility/manual-testing.md).
@@ -40,14 +43,13 @@ It covers six passes per screen:
 
 ## Known gaps
 
-These are real and tracked. Each has a row in the criterion map naming its success criterion.
+| Area            | What is missing                                                                                                                                                                                                                      | Level |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
+| Status messages | Week moves announce through a persistent `role="status"` region. Other confirmations use the shared `Toast`, which mounts `role="status"` at the same moment it fills it; whether a screen reader hears it has not been listened to. | AA    |
 
-| Area             | What is missing                                                                                                                                                               | Level |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| Shortcuts        | Canvas single-key shortcuts are not remappable or disableable (SC 2.1.4).                                                                                                     | A     |
-| Board navigation | The Canvas board has no complete keyboard model for moving between cards.                                                                                                     | AA    |
-| Dragging         | Most drag actions have a menu or arrow-key equivalent. Three do not: resizing a section to an arbitrary size, re-pointing a section link, and bending a connector (SC 2.5.7). | AA    |
-| Status messages  | The markup is correct. Whether a screen reader hears a confirmation has not been listened to yet.                                                                             | AA    |
+The criterion map's SC 4.1.3 row records the status-message question. The keyboard fixes in this
+change — row actions visible on focus, and a `<main>` landmark around the active screen — are in
+the tree; the landmarks have component tests, and none of it has had a manual pass.
 
 ## What does not apply
 
@@ -58,6 +60,10 @@ Listed because a statement that admits nothing is not a statement.
 - **No audio and no video.** The time-based media criteria (SC 1.2.1 to 1.2.9) do not apply.
 - **No time limits.** Nothing expires while you are working (SC 2.2.1).
 - **No flashing content.** Nothing animates at a rate that could trigger a seizure (SC 2.3.1).
+- **No single-key shortcuts.** Planner's shortcuts use a modifier (`Ctrl N` for capture, `Alt` +
+  arrow keys in the week), so SC 2.1.4 does not apply.
+- **No drag without an equivalent.** The week view is the only drag surface, and every move it
+  offers also has `Alt` + arrow keys and a menu item.
 - **Parsing is obsolete.** SC 4.1.1 was removed in WCAG 2.2.
 
 ## Telling us about a barrier
@@ -67,4 +73,4 @@ of the barrier is more useful than a suggested fix, and both are welcome.
 
 ## What this runs on
 
-Electron with Chromium, React 19, on Linux, with Orca as the screen reader used for testing.
+Electron with Chromium, React 19, on Linux. Orca is the screen reader these manual passes will use.

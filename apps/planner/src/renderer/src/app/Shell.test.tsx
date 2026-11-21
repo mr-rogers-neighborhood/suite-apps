@@ -50,6 +50,9 @@ describe("Shell navigation", () => {
     render(<Shell />);
 
     expect(screen.getByRole("region", { name: "Probe view" })).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "Planner" })).toContainElement(
+      screen.getByRole("region", { name: "Probe view" }),
+    );
   });
 
   it("should mark the rail entry for the active view", () => {

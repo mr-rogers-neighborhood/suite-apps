@@ -8,7 +8,26 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 ## [Unreleased]
 
-No changes yet.
+### Added
+
+- **A main landmark around the active screen.** A screen reader can jump to the plan, or to the
+  first-run start screen, instead of walking the surrounding chrome first.
+
+### Fixed
+
+- **A row action stays visible when the keyboard reaches it.** The inbox's Schedule button and a
+  task row's actions menu were invisible until a pointer hovered them, so a keyboard user could
+  focus a control they could not see. They now appear on focus too.
+- **A task's inline title editor has a name**, so it is not just an unnamed text box to a screen
+  reader.
+- **A day's intention is named for the day it edits.** The field said "Today's intention" and the
+  overdue link said "Pull to today" while the screen could be showing another date. Both now name
+  the day they act on.
+
+### Changed
+
+- **The app manifest reports the version the package already carries**, so the hub shows the
+  current Planner version for the build it installed.
 
 ## [0.5.0] - 2026-11-21
 

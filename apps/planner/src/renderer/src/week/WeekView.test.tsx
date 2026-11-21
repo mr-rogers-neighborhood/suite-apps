@@ -180,4 +180,53 @@ describe("WeekView", () => {
 
     expect(mocks.scheduleTask).toHaveBeenCalledWith("task-1", today);
   });
+
+  it("should leave a repeating occurrence on its series anchor", () => {
+    const secondDay = addDaysToKey(weekStart, 1);
+    mocks.snapshot.current = snapshot({
+      tasks: [
+        task({
+          id: "task-repeat",
+          title: "Daily standup",
+          scheduledFor: weekStart,
+          recurrence: { frequency: "daily", interval: 1, weekdays: [], until: null },
+        }),
+      ],
+    });
+
+    render(<WeekView />);
+
+    const occurrence = within(columnFor(secondDay)).getByRole("button", { name: "Daily standup" });
+    expect(occurrence).not.toHaveAttribute("aria-keyshortcuts");
+    expect(occurrence.closest("li")?.getAttribute("draggable")).not.toBe("true");
+
+    fireEvent.keyDown(occurrence, { key: "ArrowRight", altKey: true });
+    expect(mocks.scheduleTask).not.toHaveBeenCalled();
+
+    fireEvent.drop(columnFor(addDaysToKey(weekStart, 2)), {
+      dataTransfer: { getData: () => "task-repeat" },
+    });
+    expect(mocks.scheduleTask).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Daily standup repeats, so its series stays where it is.",
+    );
+  });
+
+  it("should say when a task is already on the first day of the week", () => {
+    mocks.snapshot.current = snapshot({
+      tasks: [task({ id: "task-1", title: "Plan the week", scheduledFor: weekStart })],
+    });
+
+    render(<WeekView />);
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Plan the week" }), {
+      key: "ArrowLeft",
+      altKey: true,
+    });
+
+    expect(mocks.scheduleTask).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Plan the week is already on the first day of this week.",
+    );
+  });
 });

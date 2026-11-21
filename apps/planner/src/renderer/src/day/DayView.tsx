@@ -61,7 +61,7 @@ export function DayView() {
                     onClick={() => replica.document.scheduleTask(task.id, date)}
                     className="rounded-md border border-line px-2 py-0.5 text-[11px] text-muted transition-colors hover:bg-raised hover:text-ink"
                   >
-                    Pull to today
+                    Pull to this day
                   </button>
                 </li>
               ))}

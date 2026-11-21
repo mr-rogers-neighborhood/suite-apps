@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { WorkspaceDocument } from "@suite/planner-core";
+import { encodeWorkspaceFile, SCHEMA_VERSION, WorkspaceDocument } from "@suite/planner-core";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { WorkspacePaths } from "./paths";
@@ -78,6 +78,22 @@ describe("WorkspaceStore", () => {
 
     const recovered = await WorkspaceStore.open(location);
     expect(recovered.document.getTask(first)?.title).toBe("First task");
+  });
+
+  it("should refuse a newer workspace instead of falling back or rewriting it", async () => {
+    const location = await paths();
+    const envelope = JSON.parse(encodeWorkspaceFile(WorkspaceDocument.create())) as Record<
+      string,
+      unknown
+    >;
+    envelope.schemaVersion = SCHEMA_VERSION + 1;
+    const newer = `${JSON.stringify(envelope, null, 2)}\n`;
+    await writeFile(location.workspace, newer, "utf8");
+
+    await expect(WorkspaceStore.open(location)).rejects.toMatchObject({
+      code: "unsupported-schema",
+    });
+    expect(await readFile(location.workspace, "utf8")).toBe(newer);
   });
 
   it("should reject an import that is not a workspace file", async () => {

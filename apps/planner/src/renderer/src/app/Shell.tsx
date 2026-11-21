@@ -83,7 +83,9 @@ export function Shell() {
             </div>
           }
         />
-        <View />
+        <main aria-label="Planner" className="flex min-h-0 flex-1 flex-col">
+          <View />
+        </main>
       </div>
       <DayCalendar />
     </div>
