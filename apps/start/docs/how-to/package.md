@@ -4,11 +4,11 @@ A note for anyone arriving from web development, where "deploy" means one thing.
 means several, and they differ in **who owns the file on disk** — which decides everything else,
 including who is allowed to update it.
 
-| Form | Closest web analogy | Who owns the installed files | Updates arrive by | Root needed |
-| --- | --- | --- | --- | --- |
-| **AppImage** | a self-contained static build you run with `./` | the user, in `~/Applications` | Start, from the signed feed | no |
-| **Arch package** | deploying into the host's package registry | **root**, under `/opt` | the package manager | yes |
-| **Flatpak** | a container runtime for desktop apps | Flatpak (user or system), inside a sandbox | an OSTree remote | no for `--user`, yes for `--system` |
+| Form             | Closest web analogy                             | Who owns the installed files               | Updates arrive by           | Root needed                         |
+| ---------------- | ----------------------------------------------- | ------------------------------------------ | --------------------------- | ----------------------------------- |
+| **AppImage**     | a self-contained static build you run with `./` | the user, in `~/Applications`              | Start, from the signed feed | no                                  |
+| **Arch package** | deploying into the host's package registry      | **root**, under `/opt`                     | the package manager         | yes                                 |
+| **Flatpak**      | a container runtime for desktop apps            | Flatpak (user or system), inside a sandbox | an OSTree remote            | no for `--user`, yes for `--system` |
 
 The three apps and the hub ship as AppImage and Flatpak; only the hub has the Arch package. `deb` is
 no longer a configured target, and `rpm` and `snap` were never built.

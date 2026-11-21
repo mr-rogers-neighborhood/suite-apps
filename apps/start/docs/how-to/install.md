@@ -88,17 +88,17 @@ sudo dnf install fuse         # Fedora
 
 You get one window with a card per app the suite offers:
 
-| What the card says                     | What it means                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------------ |
-| **Install Suite Canvas**               | A release is published and verified; one press downloads it.                   |
-| **Not installed yet · from the store** | A Flatpak store has it; one press asks Flatpak to install it.                  |
-| **No release found**                   | Nothing is published for that app yet. The button appears when a version does. |
-| `‹version›` **· up to date**           | Installed, and the published version is the one you have.                      |
-| `‹version›` **· newer version available** | Installed, with **Update to …** as the main button.                         |
-| `‹version›` **· Flatpak**              | Flatpak installed it, and Flatpak is its update path.                          |
-| `‹version›` **· Flatpak · update available** | The store publishes a different build; **Update** asks Flatpak to replace it. |
-| **slop** badge                         | A pre-release build. Its card names the risk and the separate data folder.     |
-| **Switch to canary**                   | Moves the one pre-release install to another tier; it is not a second install. |
+| What the card says                           | What it means                                                                  |
+| -------------------------------------------- | ------------------------------------------------------------------------------ |
+| **Install Suite Canvas**                     | A release is published and verified; one press downloads it.                   |
+| **Not installed yet · from the store**       | A Flatpak store has it; one press asks Flatpak to install it.                  |
+| **No release found**                         | Nothing is published for that app yet. The button appears when a version does. |
+| `‹version›` **· up to date**                 | Installed, and the published version is the one you have.                      |
+| `‹version›` **· newer version available**    | Installed, with **Update to …** as the main button.                            |
+| `‹version›` **· Flatpak**                    | Flatpak installed it, and Flatpak is its update path.                          |
+| `‹version›` **· Flatpak · update available** | The store publishes a different build; **Update** asks Flatpak to replace it.  |
+| **slop** badge                               | A pre-release build. Its card names the risk and the separate data folder.     |
+| **Switch to canary**                         | Moves the one pre-release install to another tier; it is not a second install. |
 
 A download shows a bar **on the card**, in place of the button, and a failure says what went wrong in
 the same place. An install through Flatpak shows **Installing…** there instead, because Flatpak does
