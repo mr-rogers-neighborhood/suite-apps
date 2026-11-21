@@ -41,5 +41,5 @@ date such as `tomorrow`.
 ## Registration
 
 All three are entries in `src/renderer/src/app/views.ts`. The rail renders the registry in order and
-the shell resolves the component, so neither file branches on a view id. Focus and Rituals are still
-listed under "Soon" in the rail; they are not part of this surface.
+the shell resolves the component, so neither file branches on a view id. Focus and Rituals are
+entries too; [Focus](focus.md) and [Rituals](rituals.md) own their pages.
