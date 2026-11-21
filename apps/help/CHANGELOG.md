@@ -10,6 +10,19 @@ this file and there is no AppImage release tag.
 
 No changes yet.
 
+## [0.1.1] - 2026-11-21
+
+### Added
+
+- **Help wears the suite's theme.** The reader now offers the shared presets and a
+  light/dark/system choice, remembered per device as `suite.theme`, instead of carrying a
+  second neutral palette of its own.
+
+### Changed
+
+- **One mark for Help everywhere.** The app, the window frame, the packaged icon and the Flatpak
+  entry all use the headset on the hub's ink tile that Start already shows on its card.
+
 ## [0.1.0] - 2026-11-21
 
 ### Added
