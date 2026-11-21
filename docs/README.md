@@ -18,8 +18,10 @@ The older notes keep their historical grouping so links do not rot. Do not add n
 [explanation](explanation/index.md). A new explanation belongs in a module MDX; a new guided path
 belongs in a tour.
 
-Current rules are in [reference/decisions.md](reference/decisions.md). App-specific notes stay in
-`apps/<app>/docs/`; the app README is the way in. The Canvas handbook remains the user-facing
+Current rules are in [reference/decisions.md](reference/decisions.md), and the
+[idea tracker](reference/ideas.md) records what is being considered next. The tracker is a planning
+page, not a reference fact: each entry links to the page that owns the detail. App-specific notes stay
+in `apps/<app>/docs/`; the app README is the way in. The Canvas handbook remains the user-facing
 interface guide.
 
 ## Suite Help
@@ -78,7 +80,9 @@ Never restate a version in prose here. Link to the file that holds it.
 - **The explorer is the structure.** Browser, Modules and Tours are the reading model. Reference
   facts are generated; do not create a parallel section by hand.
 - **Do not add a new Diátaxis page.** The four old sections are a notes archive. A new explanation
-  goes in `docs/modules/`; a new guided path goes in `docs/tours/`.
+  goes in `docs/modules/`; a new guided path goes in `docs/tours/`. The
+  [idea tracker](reference/ideas.md) is the one planning exception the owner asked for; it owns no
+  fact and links every entry to its owner.
 - **Link, do not copy.** Duplicated paragraphs drift, and the reader cannot tell which one is true.
 - **Name the local command.** Every verification claim names the command that produced it.
 - **Docs change with the code.** A change that alters behaviour, ownership or the shape of a
