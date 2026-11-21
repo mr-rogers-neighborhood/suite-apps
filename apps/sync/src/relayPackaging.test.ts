@@ -10,23 +10,35 @@ import { parseServeOptions } from "./cli.js";
  * A relay nobody can start is worse than no relay: `suite-dev` once launched `serve` with a flag this
  * CLI does not have and without the one it requires, so the dev sync server exited immediately and
  * the failure surfaced as a health-probe timeout. These tests read the files a person copies from —
- * the unit, the env example, the how-to — and run their flags through the same parser the binary uses.
+ * the units, the env examples, the how-to — and run their flags through the same parser the binary
+ * uses.
+ *
+ * The how-to names two launch commands and they are the same CLI: `suite-sync serve` on a host, and
+ * `flatpak run --command=suite-sync run.suite.sync serve` inside the Flatpak.
  */
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
 
+/** The prefixes a documented `serve` line may carry. */
+const SERVE_LINE = /^(?:flatpak run --command=suite-sync run\.suite\.sync |suite-sync )serve\b/u;
+
+/** A line with its optional `#` comment marker removed. */
+function withoutComment(line: string): string {
+  return line.replace(/^#\s*/u, "").trim();
+}
+
 describe("relay packaging", () => {
-  it("every `suite-sync serve` line in the how-to is a command this CLI accepts", () => {
+  it("every `serve` line in the how-to is a command this CLI accepts", () => {
     // The page wraps long commands with a trailing backslash. Join those lines
     // before splitting flags, or the parser sees the backslash as an argument.
     const lines = read("docs/how-to/relay.md")
       .split("\n")
-      .map((line) => line.trim());
+      .map((line) => withoutComment(line.trim()));
     const commands: string[] = [];
     for (let index = 0; index < lines.length; index += 1) {
       const first = lines[index];
-      if (first === undefined || !first.startsWith("suite-sync serve")) continue;
+      if (first === undefined || !SERVE_LINE.test(first)) continue;
       let command = first;
       while (command.endsWith("\\")) {
         index += 1;
@@ -37,12 +49,36 @@ describe("relay packaging", () => {
 
     expect(commands.length).toBeGreaterThan(0);
     for (const line of commands) {
-      const args = line
-        .replace(/^suite-sync serve\s*/u, "")
-        .split(/\s+/u)
-        .filter(Boolean);
+      const args = line.replace(SERVE_LINE, "").split(/\s+/u).filter(Boolean);
       const parsed = parseServeOptions(args);
       expect(parsed, line).toMatchObject({ ok: true });
+    }
+  });
+
+  it("the Flatpak unit runs the headless command with the store inside its own sandbox", () => {
+    const unit = read("deploy/suite-sync-flatpak.service");
+    expect(unit).toContain(
+      "ExecStart=/usr/bin/flatpak run --command=suite-sync run.suite.sync serve ",
+    );
+    // A user unit, because the app is a user Flatpak and its data directory is the writable path.
+    expect(unit).toContain("WantedBy=default.target");
+
+    const line = unit
+      .split("\n")
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith("ExecStart="));
+    expect(line).toBeDefined();
+    const args = (line ?? "")
+      .replace(/^ExecStart=\S+flatpak run --command=suite-sync run\.suite\.sync serve\s*/u, "")
+      .replace("$SUITE_SYNC_ARGS", "")
+      .split(/\s+/u)
+      .filter(Boolean);
+    const parsed = parseServeOptions(args);
+    expect(parsed).toMatchObject({ ok: true });
+    if (parsed.ok) {
+      expect(parsed.value.store).toBe("%h/.var/app/run.suite.sync/data/suite-sync");
+      expect(parsed.value.host).toBe("127.0.0.1");
+      expect(parsed.value.trustAll).toBe(true);
     }
   });
 
