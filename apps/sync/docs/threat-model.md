@@ -82,12 +82,14 @@ overrides the bind for a test or a host unit, and the app says the reach is fixe
 pretending the selector decided.
 
 **What a writer on the network can do.** It can present any device key, and the relay pins it. It can
-claim ownership of a workspace whose id it knows — the first role record may claim an empty mailbox,
-and after that it can write a record as an owner — and with a role it can append frames to that
-workspace's log, send invitations and removals, and fill the store, which is a denial of service on
-that mailbox. What it cannot do is read a frame: payloads are MLS ciphertext, the relay has no group
-key, and a device only applies a frame it can decrypt as a member. It cannot list workspaces, and it
-cannot reach the console, which is loopback-only and needs the token minted at startup.
+claim an **empty** mailbox whose id it knows — the first role record may claim a workspace no owner
+has claimed — and with that role it can append frames, send invitations and removals, and fill the
+store, which is a denial of service on that mailbox. A workspace that already has an owner needs an
+invitation: the relay can be made to hold records for it, but membership is the MLS group, and a
+reachable writer cannot give itself the key to join. What it cannot do is read a frame: payloads are
+MLS ciphertext, the relay has no group key, and a device only applies a frame it can decrypt as a
+member. It cannot list workspaces, and it cannot reach the console, which is loopback-only and needs
+the token minted at startup.
 
 **What the scopes do not change.** TLS is still required off loopback and clients still pin the
 certificate: the scope decides who gets to open the socket, not what the relay can read. A tailnet is a

@@ -79,13 +79,29 @@ export interface RelayTarget {
   readonly problem: string | null;
 }
 
-function scopeForBind(bind: string, chosen: RelayScope): RelayScope {
+function scopeForBind(bind: string, interfaces: InterfaceTable): RelayScope {
   const normalized = bind.trim().toLowerCase();
   if (normalized === "0.0.0.0" || normalized === "::") return "network";
-  if (normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1") {
-    return "loopback";
-  }
-  return chosen === "network" ? "tailnet" : chosen;
+  if (isLoopbackLiteral(normalized)) return "loopback";
+  if (isTailnetLiteral(normalized, interfaces)) return "tailnet";
+  // Any other address is some other interface on some other network. Classify it as the widest
+  // reach, not the safest: the sentence is a warning, and understating a bind is the failure this
+  // classification exists to prevent.
+  return "network";
+}
+
+function isLoopbackLiteral(value: string): boolean {
+  if (value === "localhost" || value === "::1") return true;
+  const match = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/u.exec(value);
+  if (match === null) return false;
+  return match.slice(1).every((part) => Number(part) <= 255);
+}
+
+/** Whether a literal address is one this machine's `tailscale0` holds. */
+function isTailnetLiteral(value: string, interfaces: InterfaceTable): boolean {
+  return (interfaces[TAILNET_INTERFACE] ?? []).some(
+    (info) => String(info.family) === "IPv4" && info.address === value,
+  );
 }
 
 /**
@@ -104,7 +120,7 @@ export function resolveRelayTarget(options: {
   if (override.length > 0) {
     return {
       scope: options.scope,
-      effective: scopeForBind(override, options.scope),
+      effective: scopeForBind(override, options.interfaces),
       bind: override,
       locked: true,
       problem: null,

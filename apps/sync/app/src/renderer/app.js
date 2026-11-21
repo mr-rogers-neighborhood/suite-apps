@@ -149,7 +149,7 @@ function chooseScope(option) {
   if (option.needsConfirmation) {
     // The warning is on screen before anything changes; the change itself waits for Continue.
     pending = option.id;
-    scopeWarning.textContent = `${option.sentence} A device that can reach the port can claim a role in a workspace whose id it knows. Choose this only on a network you trust.`;
+    scopeWarning.textContent = `${option.sentence} A device that can reach the port can claim an empty mailbox whose id it knows; a workspace that already has an owner needs an invitation. Choose this only on a network you trust.`;
     scopeConfirm.hidden = false;
     restoreRadios();
     scopeContinue.focus();

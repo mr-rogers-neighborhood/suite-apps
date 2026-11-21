@@ -105,6 +105,43 @@ describe("the bind each scope resolves to", () => {
   });
 });
 
+describe("a literal bind is classified by the address, never by the stored scope", () => {
+  function effective(scope: "loopback" | "tailnet" | "network", envBind: string): string {
+    return resolveRelayTarget({ scope, envBind, interfaces: tailscaleUp }).effective;
+  }
+
+  it("reads a LAN literal as the network reach even when loopback is stored", () => {
+    expect(effective("loopback", "192.168.1.20")).toBe("network");
+  });
+
+  it("reads a tailnet literal as the tailnet reach under a stored loopback", () => {
+    expect(effective("loopback", "100.101.102.103")).toBe("tailnet");
+  });
+
+  it("reads a tailnet literal as the tailnet reach under a stored network", () => {
+    expect(effective("network", "100.101.102.103")).toBe("tailnet");
+  });
+
+  it("reads the wildcard as the network reach under every stored scope", () => {
+    expect(effective("loopback", "0.0.0.0")).toBe("network");
+    expect(effective("tailnet", "0.0.0.0")).toBe("network");
+    expect(effective("network", "0.0.0.0")).toBe("network");
+    expect(effective("loopback", "::")).toBe("network");
+  });
+
+  it("reads any loopback literal as loopback under any stored scope", () => {
+    expect(effective("network", "127.0.0.1")).toBe("loopback");
+    expect(effective("network", "127.0.0.5")).toBe("loopback");
+    expect(effective("tailnet", "localhost")).toBe("loopback");
+    expect(effective("network", "::1")).toBe("loopback");
+  });
+
+  it("falls back to the widest reach for an address it cannot place", () => {
+    expect(effective("loopback", "myhost.lan")).toBe("network");
+    expect(effective("loopback", "203.0.113.7")).toBe("network");
+  });
+});
+
 describe("the words for each reach", () => {
   it("says what the bind exposes", () => {
     expect(scopeSentence("loopback")).toBe("Only this device can reach the relay.");

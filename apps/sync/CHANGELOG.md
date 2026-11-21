@@ -29,7 +29,9 @@ this file does not invent them; every release from here adds its section first.
   device (the default), the tailnet (`tailscale0`, read from the shared network namespace), and the
   whole network. The network scope is the acknowledgement the CLI's `--trust-all-remote` asks for:
   it warns before it applies, the main process refuses an unconfirmed change, and the choice is
-  stored in the app's own config so a login launch keeps it. `SUITE_SYNC_BIND` overrides the bind.
+  stored in the app's own config so a login launch keeps it. `SUITE_SYNC_BIND` overrides the bind,
+  and the window's sentence is derived from the address actually bound, so a literal bind says which
+  network it exposes.
 - **`@suite/host` can make the TLS pair it serves** (`ensureSelfSignedPair`), so an app that embeds a
   relay keeps one fingerprint across restarts. A bind that fails now rejects with the listen error
   instead of surfacing as an uncaught exception from the WebSocket server.
