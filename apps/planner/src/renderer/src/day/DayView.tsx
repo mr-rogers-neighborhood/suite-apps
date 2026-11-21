@@ -4,6 +4,7 @@ import { Inbox } from "lucide-react";
 import { CaptureBar } from "../capture/CaptureBar";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore } from "../store/uiStore";
+import { TaskDetail } from "../task/TaskDetail";
 import { CapacityMeter } from "./CapacityMeter";
 import { DayHeader } from "./DayHeader";
 import { TaskRow } from "./TaskRow";
@@ -103,6 +104,7 @@ export function DayView() {
           </details>
         )}
       </div>
+      <TaskDetail />
     </section>
   );
 }

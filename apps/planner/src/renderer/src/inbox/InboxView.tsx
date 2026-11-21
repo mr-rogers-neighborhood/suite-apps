@@ -1,15 +1,17 @@
 import { formatDuration, inboxTasks, type Project } from "@suite/planner-core";
 import { Button } from "@suite/ui";
-import { Inbox } from "lucide-react";
+import { Inbox, Maximize2 } from "lucide-react";
 import { CaptureBar } from "../capture/CaptureBar";
 import { TaskCheckbox } from "../components/TaskCheckbox";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore } from "../store/uiStore";
+import { TaskDetail } from "../task/TaskDetail";
 
 export function InboxView() {
   const snapshot = useWorkspaceSnapshot();
   const replica = useReplica();
   const date = useUiStore((state) => state.selectedDate);
+  const selectTask = useUiStore((state) => state.selectTask);
   const tasks = inboxTasks(snapshot.tasks);
   const projects = new Map<string, Project>(
     snapshot.projects.map((project) => [project.id, project]),
@@ -81,12 +83,21 @@ export function InboxView() {
                   >
                     Schedule
                   </Button>
+                  <button
+                    type="button"
+                    aria-label={`Open details for ${task.title}`}
+                    onClick={() => selectTask(task.id)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-muted opacity-0 transition-colors hover:bg-raised hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+                  >
+                    <Maximize2 size={14} />
+                  </button>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+      <TaskDetail />
     </section>
   );
 }

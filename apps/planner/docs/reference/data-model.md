@@ -24,7 +24,8 @@ whole-record write would make the second one win.
 
 Notes are Loro text containers named `note:<taskId>`. The note is not in the task record, so a text
 edit never rewrites the task. Until the editor binds to the container, a save replaces the whole
-note; concurrent edits to one note are the one place v1 does not merge at character level.
+note; concurrent edits to one note are the one place v1 does not merge at character level. The task
+detail surface reads and writes these fields; see [task-detail.md](task-detail.md).
 
 ## Records
 

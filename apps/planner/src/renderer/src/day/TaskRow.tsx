@@ -1,10 +1,11 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { type DayTask, formatDuration, type Project, type Tag } from "@suite/planner-core";
 import { IconButton } from "@suite/ui";
-import { Bell, ChevronRight, MoreHorizontal, Repeat, Timer } from "lucide-react";
+import { Bell, ChevronRight, Maximize2, MoreHorizontal, Repeat, Timer } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TaskCheckbox } from "../components/TaskCheckbox";
 import { useReplica } from "../store/snapshotStore";
+import { useUiStore } from "../store/uiStore";
 import { eveningReminder, inMinutes, reminderLabel, tomorrowMorning } from "./reminderPresets";
 
 type TaskRowProps = {
@@ -15,9 +16,11 @@ type TaskRowProps = {
 
 export function TaskRow({ entry, project, tags }: TaskRowProps) {
   const replica = useReplica();
+  const selectTask = useUiStore((state) => state.selectTask);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.task.title);
   const inputRef = useRef<HTMLInputElement>(null);
+  const detailsRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setDraft(entry.task.title);
@@ -55,6 +58,12 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
 
   function clearReminder(): void {
     replica.document.updateTask(entry.task.id, { remindAt: null });
+  }
+
+  function openDetails(): void {
+    // Modal restores focus to whatever had it when it opened, so point that at this row.
+    detailsRef.current?.focus();
+    selectTask(entry.task.id);
   }
 
   const dueTime = entry.task.dueAt
@@ -138,6 +147,16 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
         </div>
       </div>
 
+      <button
+        ref={detailsRef}
+        type="button"
+        aria-label={`Open details for ${entry.task.title}`}
+        onClick={openDetails}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent bg-transparent text-muted opacity-0 transition-colors hover:bg-raised hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Maximize2 size={14} />
+      </button>
+
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
           <IconButton
@@ -153,6 +172,13 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
             sideOffset={4}
             className="z-50 min-w-[180px] rounded-lg border border-line bg-panel p-1 shadow-2xl"
           >
+            <DropdownMenu.Item
+              onSelect={openDetails}
+              className="cursor-default rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised"
+            >
+              Open details
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator className="my-1 h-px bg-line" />
             <DropdownMenu.Sub>
               <DropdownMenu.SubTrigger className="flex cursor-default items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-raised data-[state=open]:bg-raised">
                 Remind me
