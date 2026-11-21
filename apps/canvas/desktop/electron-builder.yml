@@ -34,11 +34,33 @@ files:
   # the last matching pattern, so these re-include what the `.md` negation drops.
   - "**/README*"
   - "**/LICENSE*"
+  - "**/NOTICE*"
+  - "**/COPYING*"
+  - "**/LICENCE*"
   - "!**/test/**"
   - "!**/tests/**"
   - "!**/__tests__/**"
   - "!**/*.test.*"
   - "!**/*.spec.*"
+  # Dependency files no process loads. Loro's Node loader is `nodejs/` and the
+  # renderer's wasm is already emitted into `out/renderer`; `browser/`,
+  # `bundler/`, `web/` and `base64/` are alternative entry points nothing
+  # requires. Zod's root entry loads `v4/classic` and `v4/core` only: `src/` is
+  # TypeScript source and v3/v4-mini are entry points this app never imports.
+  # Rollup's native addon is a build-time dependency of the bundler, and
+  # `@types/` is declarations. Verified against the packaged main/preload
+  # require graph: none of these paths is reachable.
+  - "!node_modules/loro-crdt/browser/**"
+  - "!node_modules/loro-crdt/bundler/**"
+  - "!node_modules/loro-crdt/web/**"
+  - "!node_modules/loro-crdt/base64/**"
+  - "!node_modules/zod/src/**"
+  - "!node_modules/zod/v3/**"
+  - "!node_modules/zod/v4-mini/**"
+  - "!node_modules/zod/mini/**"
+  - "!node_modules/zod/v4/mini/**"
+  - "!node_modules/@rollup/**"
+  - "!node_modules/@types/**"
 extraResources:
   - from: ../dist
     to: renderer
