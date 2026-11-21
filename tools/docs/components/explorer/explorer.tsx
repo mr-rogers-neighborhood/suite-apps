@@ -208,6 +208,7 @@ export function Explorer() {
   const selectNode = useCallback(
     (id: string, nextView?: View) => {
       setSelectedNode(id);
+      setDetailLevel(null);
       expandFor(id);
       setView(nextView ?? (view === "walkthroughs" ? "browser" : view));
       setSidebarOpen(false);
@@ -218,6 +219,7 @@ export function Explorer() {
   const selectModule = useCallback((id: string) => {
     setSelectedModule(id);
     setSelectedNode(null);
+    setDetailLevel(null);
     setView("modules");
     setSidebarOpen(false);
   }, []);
@@ -226,6 +228,7 @@ export function Explorer() {
     setWalkId(id);
     setStepIndex(0);
     setSelectedNode(null);
+    setDetailLevel(null);
     setView("walkthroughs");
     setSidebarOpen(false);
   }, []);
@@ -236,6 +239,7 @@ export function Explorer() {
       const next = Math.max(0, Math.min(walk.steps.length - 1, index));
       setStepIndex(next);
       setSelectedNode(null);
+      setDetailLevel(null);
       setView("walkthroughs");
       setSidebarOpen(false);
     },
@@ -374,6 +378,7 @@ export function Explorer() {
         return;
       }
       setSelectedNode(entry.id);
+      setDetailLevel(null);
       expandFor(entry.id);
       setView("browser");
       setSidebarOpen(false);
