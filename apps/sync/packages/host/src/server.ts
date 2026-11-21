@@ -34,6 +34,7 @@ import {
 } from "@suite/sync";
 import { type RawData, WebSocket, WebSocketServer } from "ws";
 import { admitFrame, FrameLog, type FrameVerifier } from "./blindRoom.js";
+import { advertisedRelayUrl, createRelayConsole, type RelayConsole } from "./console.js";
 import { FileHostStore, type HostStore, type PinnedKey } from "./store.js";
 import { certificateFingerprint, isLoopbackHost, type TlsMaterial } from "./tls.js";
 
@@ -116,6 +117,20 @@ export interface SyncServerOptions {
    * deliberate choice, and the CLI is where a person makes it explicitly.
    */
   readonly allowPlaintext?: boolean;
+  /**
+   * Start the loopback console at `/console` on its own port.
+   *
+   * Off for an embedded host unless the caller asks: a library that opened a second
+   * listener whenever it started a server would surprise its embedder. The CLI asks.
+   */
+  readonly console?: { readonly version: string; readonly storePath: string } | false;
+}
+
+export interface RelayConsoleInfo {
+  readonly host: string;
+  readonly port: number;
+  /** The URL carrying the one-time token. */
+  readonly url: string;
 }
 
 export interface SyncServer {
@@ -126,6 +141,8 @@ export interface SyncServer {
   /** SHA-256 of the serving certificate, when there is one. */
   readonly fingerprint: string | null;
   readonly secure: boolean;
+  /** The loopback console, when this server was asked to start one. */
+  readonly console: RelayConsoleInfo | null;
   close(): Promise<void>;
 }
 
@@ -689,14 +706,44 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
 
   const address = httpServer.address();
   const boundPort = typeof address === "object" && address !== null ? address.port : port;
+  const fingerprint = tls === undefined ? null : certificateFingerprint(tls.cert);
+
+  let relayConsole: RelayConsole | null = null;
+  if (options.console !== undefined && options.console !== false) {
+    try {
+      relayConsole = await createRelayConsole({
+        rooms: () => registry.list(),
+        version: options.console.version,
+        protocolVersion: RELAY_PROTOCOL_VERSION,
+        store: options.console.storePath,
+        relayUrl: advertisedRelayUrl(host, boundPort, secure),
+        bind: `${host}:${boundPort}`,
+        fingerprint,
+        now,
+      });
+    } catch (error) {
+      // The mailbox still works without its window. Say so rather than taking the
+      // relay down over a second loopback listener.
+      console.warn(
+        `[sync] the console could not start: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
 
   return {
     host,
     port: boundPort,
     url: `${secure ? "wss" : "ws"}://${host}:${boundPort}/sync`,
-    fingerprint: tls === undefined ? null : certificateFingerprint(tls.cert),
+    fingerprint,
     secure,
+    console:
+      relayConsole === null
+        ? null
+        : { host: relayConsole.host, port: relayConsole.port, url: relayConsole.url },
     async close() {
+      if (relayConsole !== null) await relayConsole.close();
       for (const socket of wss.clients) socket.terminate();
       await new Promise<void>((resolve) => wss.close(() => resolve()));
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));

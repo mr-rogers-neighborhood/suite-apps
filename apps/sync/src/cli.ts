@@ -111,6 +111,10 @@ SHA-256 fingerprint; each app pins that line. A self-signed pair is enough:
 Loopback may serve ws://. Any other address needs TLS and refuses to start without
 it unless --allow-plaintext is passed; that choice prints a warning and is never
 made silently.
+
+serve also starts a read-only console on 127.0.0.1 and prints its one-time URL:
+  console: http://127.0.0.1:<port>/console?token=<token>
+The token is generated at startup and accepted as ?token= or X-Suite-Console-Token.
 `;
 
 /**
@@ -287,6 +291,7 @@ export async function runCli(argv: readonly string[]): Promise<CliResult> {
         verifyRole: () => true,
         ...(tls === undefined ? {} : { tls }),
         allowPlaintext: parsed.value.allowPlaintext,
+        console: { version: SERVER_VERSION, storePath: parsed.value.store },
       });
     })().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -302,11 +307,12 @@ export async function runCli(argv: readonly string[]): Promise<CliResult> {
         ? "warning: serving ws:// on a reachable address without TLS. Anyone who can route here can read the metadata and drop or replay traffic.\n"
         : "";
     const fingerprint = server.fingerprint === null ? [] : [fingerprintLine(server.fingerprint)];
+    const consoleLine = server.console === null ? [] : [`console: ${server.console.url}`];
     return {
       code: 0,
       stdout: `${formatStatus(parsed.value)}\nlistening on ${server.url}\n${fingerprint.join("\n")}${
         fingerprint.length === 0 ? "" : "\n"
-      }`,
+      }${consoleLine.join("\n")}${consoleLine.length === 0 ? "" : "\n"}`,
       stderr: warning,
     };
   }
