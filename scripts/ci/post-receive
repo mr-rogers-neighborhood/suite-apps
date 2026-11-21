@@ -4,6 +4,14 @@
 # A push to `main` starts one gate run per pushed commit. The run is a transient
 # system unit: it survives this hook's shell, carries a memory cap, and keeps
 # its own log file. The unit runs as `aurora`, not root.
+#
+# The unit's stdout and stderr stay on the journal. Do not ask systemd for
+# `StandardOutput=append:$HOME/...`: the manager opens that file in the
+# executor's default domain before it switches the service to `unconfined_t`,
+# and that domain may neither create nor append to a file under the user's
+# `user_home_t` home. The unit then dies at 209/STDOUT and nothing runs.
+# run-gate.sh opens `~/ci/logs/<sha>.log` itself instead, and the journal still
+# records a failure from before that point.
 set -euo pipefail
 
 ROOT=${SUITE_CI_ROOT:-$HOME/ci}
@@ -25,32 +33,49 @@ while read -r old new ref; do
   fi
 
   unit="suite-gate-${new:0:12}-$(date -u +%Y%m%dT%H%M%SZ)"
-  log="$ROOT/logs/$new.log"
 
   # systemd-run --user needs a session bus that a non-interactive SSH session
   # does not have, so the hook asks the system manager for a transient unit and
   # hands it back to this user. One run at a time: run-gate.sh takes a lock, so
   # a second push waits its turn instead of doubling the memory footprint.
   #
-  # The unit runs in the user's own SELinux domain. Without it the default
-  # `init_t` domain may not execute `run-gate.sh` or create the log under
-  # `$HOME` (both are `user_home_t`), and the unit dies with 203/EXEC or
-  # 209/STDOUT before the gate starts. A host that relabels `$HOME` — a VM
-  # reboot runs `restorecon` — reproduces that silently, so the domain is set
-  # here rather than left to file labels.
-  sudo -n systemd-run --unit="$unit" --collect --quiet \
+  # The unit runs in the user's own SELinux domain. The manager's default
+  # `init_t` domain may not read `run-gate.sh` or write a log under
+  # `user_home_t`, and a host that relabels `$HOME` — a VM reboot runs
+  # `restorecon` — reproduces that silently, so the domain is set here rather
+  # than left to file labels.
+  #
+  # ExecStart is `/bin/bash`, not the script: this manager will not exec a
+  # script that lives under `user_home_t` (203/EXEC, no matter the domain),
+  # while bash inside the service's own domain reads and runs it.
+  if ! sudo -n systemd-run --unit="$unit" --collect --quiet \
     --uid="$(id -u)" --gid="$(id -g)" \
     --property=SELinuxContext=unconfined_u:unconfined_r:unconfined_t:s0 \
     --property=SupplementaryGroups=docker \
     --working-directory="$ROOT" \
     --property=MemoryHigh=5G \
     --property=MemoryMax=6G \
-    --property=StandardOutput=append:"$log" \
-    --property=StandardError=append:"$log" \
     --setenv=HOME="$HOME" \
     --setenv=PATH=/usr/local/bin:/usr/bin:/bin \
     --setenv=NODE_OPTIONS=--max-old-space-size=3072 \
-    "$ROOT/run-gate.sh" "$new"
+    /bin/bash "$ROOT/run-gate.sh" "$new"; then
+    echo "post-receive: systemd-run could not queue a gate unit for $new" >&2
+    exit 1
+  fi
+
+  # A queued unit is not a running one. `systemd-run` returns while the unit is
+  # still starting, and a failure to set up exec or stdio kills it a few
+  # milliseconds later; `--collect` then unloads it. An immediate check can
+  # still catch that unit as active, so wait past the start, then report a run
+  # only if the unit is up. A lost run must not look like a queue that is
+  # merely slow.
+  sleep 1
+  state=$(systemctl show --property=ActiveState --value "$unit" 2>/dev/null || true)
+  if [ "$state" != active ]; then
+    echo "post-receive: $unit did not start (${state:-gone}); nothing will gate $new" >&2
+    echo "post-receive: sudo journalctl -u $unit" >&2
+    exit 1
+  fi
 
   echo "post-receive: queued $unit for $new"
 done
