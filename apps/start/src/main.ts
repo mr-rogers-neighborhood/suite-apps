@@ -527,6 +527,8 @@ async function syncState(): Promise<SyncState> {
     port: current?.port ?? syncPort(),
     store: current?.store ?? join(dataDirectory, "sync"),
     binary: current?.binary ?? null,
+    fingerprint: current?.fingerprint ?? null,
+    consoleUrl: current?.consoleUrl ?? null,
     problem: current?.problem ?? null,
     workspaces: (current?.workspaces ?? []).map((workspace) => ({
       ...workspace,
@@ -1671,6 +1673,16 @@ function registerIpc(): void {
     });
     await broadcast();
     return syncState();
+  });
+
+  // The console's token is in the URL Start already holds. The renderer names no
+  // URL, so this remains a capability over the relay's own loopback page rather
+  // than a browser launcher for anything a page asks for.
+  onIpc(START_IPC.openSyncConsole, async () => {
+    const current = syncRelay === null ? null : await syncRelay.snapshot();
+    if (current?.consoleUrl === null || current?.consoleUrl === undefined) return false;
+    await shell.openExternal(current.consoleUrl);
+    return true;
   });
 
   onIpc(START_IPC.checkUpdates, () => refreshAndBroadcast());

@@ -187,31 +187,74 @@ describe("starting and stopping the relay", () => {
       port: 4321,
       problem: null,
     });
+    // The pair exists even on loopback, so the pane has a fingerprint to show
+    // before somebody turns the network switch on.
+    expect(started.fingerprint).toMatch(/^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/u);
     expect(args()).toContain("serve");
     expect(args()).toContain("--store");
     expect(args()).toContain("--trust-all");
     expect(args()).not.toContain("--trust-all-remote");
+    expect(args()).not.toContain("--tls-cert");
+    expect(args()).not.toContain("--tls-key");
 
     const stopped = await relay.stop();
     expect(child().signals).toEqual(["SIGTERM"]);
     expect(stopped).toMatchObject({ installed: true, running: false, address: null });
   });
 
-  it("warns the network acknowledgement and advertises an interface address", async () => {
+  it("serves the network scope with wss and the pair Start keeps", async () => {
     const { relay, child, args } = await fakeRelay({
       scope: "network",
       lanAddress: () => "192.168.1.20",
     });
     const pending = relay.start();
-    child().stdout.emitData("listening on ws://0.0.0.0:4321/sync\n");
+    child().stdout.emitData("listening on wss://0.0.0.0:4321/sync\n");
     const started = await pending;
 
-    expect(started.address).toBe("ws://192.168.1.20:4321/sync");
+    expect(started.address).toBe("wss://192.168.1.20:4321/sync");
     expect(started.address).not.toContain("0.0.0.0");
+    expect(started.fingerprint).toMatch(/^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/u);
     expect(args()).toContain("--host");
     expect(args()).toContain("0.0.0.0");
     expect(args()).toContain("--trust-all-remote");
+    expect(args()).toContain("--tls-cert");
+    expect(args()).toContain("--tls-key");
+    expect(args()).not.toContain("--allow-plaintext");
     await relay.stop();
+  });
+
+  it("reuses the same certificate across restarts and keeps the console URL", async () => {
+    const dataDir = await folder();
+    const binary = "/opt/suite/suite-sync";
+    let child = new FakeProcess();
+    const options = {
+      dataDir,
+      env: { SUITE_SYNC_BIN: binary, PATH: "" },
+      exists: (path: string) => path === binary,
+      scope: "network" as const,
+      lanAddress: () => "192.168.1.20",
+      spawn: () => {
+        child = new FakeProcess();
+        return child;
+      },
+    };
+
+    const first = new SuiteSyncRelay(options);
+    const starting = first.start();
+    child.stdout.emitData("listening on wss://0.0.0.0:4321/sync\n");
+    child.stdout.emitData("console: http://127.0.0.1:9999/console?token=one-time\n");
+    const started = await starting;
+    expect(started.consoleUrl).toBe("http://127.0.0.1:9999/console?token=one-time");
+    expect(started.fingerprint).not.toBeNull();
+    await first.stop();
+
+    const second = new SuiteSyncRelay(options);
+    const restarting = second.start();
+    child.stdout.emitData("listening on wss://0.0.0.0:4321/sync\n");
+    const restarted = await restarting;
+    expect(restarted.fingerprint).toBe(started.fingerprint);
+    expect(restarted.consoleUrl).toBeNull();
+    await second.stop();
   });
 
   it("reports a non-zero exit as a stopped relay with the relay's own words", async () => {
@@ -228,7 +271,7 @@ describe("starting and stopping the relay", () => {
   });
 
   it("changes scope by reopening, not by claiming a narrower socket", async () => {
-    const { relay, child } = await fakeRelay({});
+    const { relay, child } = await fakeRelay({ lanAddress: () => "192.168.1.20" });
     const first = relay.start();
     const firstChild = child();
     firstChild.stdout.emitData("listening on ws://127.0.0.1:4321/sync\n");
@@ -241,11 +284,12 @@ describe("starting and stopping the relay", () => {
     // `setScope` spawns a second fake, reached through the next emitted line.
     const spawned = child();
     expect(spawned).not.toBe(firstChild);
-    spawned.stdout.emitData("listening on ws://0.0.0.0:4321/sync\n");
+    spawned.stdout.emitData("listening on wss://0.0.0.0:4321/sync\n");
     const state = await changing;
 
     expect(state.scope).toBe("network");
     expect(state.running).toBe(true);
+    expect(state.address).toBe("wss://192.168.1.20:4321/sync");
     await relay.stop();
   });
 });

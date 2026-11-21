@@ -27,6 +27,7 @@ export const START_IPC = {
   startSync: "suite:start:sync-start",
   stopSync: "suite:start:sync-stop",
   setSyncScope: "suite:start:sync-scope",
+  openSyncConsole: "suite:start:sync-console",
   info: "suite:start:info",
 } as const;
 
@@ -288,6 +289,10 @@ export interface SyncState {
   readonly store: string;
   /** The binary Start runs, or null when none was found. */
   readonly binary: string | null;
+  /** The relay's certificate, which other devices pin. Null when Start could not make one. */
+  readonly fingerprint: string | null;
+  /** The loopback console's one-time URL, or null while the relay is stopped. */
+  readonly consoleUrl: string | null;
   /** Why the relay is not installed or why its last start failed. Null when all is well. */
   readonly problem: string | null;
   readonly workspaces: readonly SyncWorkspace[];

@@ -84,6 +84,38 @@ function addressBlock(sync, actions) {
 
   block.append(value, toggle);
   if (sync.problem) block.append(el("p", "pane-note", sync.problem));
+  if (sync.fingerprint) {
+    block.append(
+      el(
+        "p",
+        "pane-note",
+        sync.scope === "network"
+          ? "Other devices pin this certificate. It stays the same until the pair is replaced."
+          : "Other devices pin this certificate when you let them through the network switch.",
+      ),
+    );
+    const fingerprint = el("code", null, sync.fingerprint);
+    fingerprint.id = "sync-fingerprint";
+    block.append(fingerprint);
+  }
+  if (sync.consoleUrl) {
+    const consoleButton = el("button", "button", "Open the relay console");
+    consoleButton.type = "button";
+    consoleButton.id = "sync-console";
+    consoleButton.addEventListener("click", async () => {
+      consoleButton.disabled = true;
+      await actions.openSyncConsole();
+      consoleButton.disabled = false;
+    });
+    block.append(consoleButton);
+    block.append(
+      el(
+        "p",
+        "pane-note",
+        "The console opens in your browser, on this machine only, with a token the relay printed when it started.",
+      ),
+    );
+  }
   block.append(storeNote(sync));
   return block;
 }

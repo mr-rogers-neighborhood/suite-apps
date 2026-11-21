@@ -617,7 +617,8 @@ select:disabled {
 }
 
 .sync-workspaces code,
-#sync-address {
+#sync-address,
+#sync-fingerprint {
   font-family: var(--font-mono, ui-monospace, monospace);
   word-break: break-all;
 }

@@ -38,6 +38,9 @@ contextBridge.exposeInMainWorld("suiteStart", {
   startSync: () => ipcRenderer.invoke("suite:start:sync-start"),
   stopSync: () => ipcRenderer.invoke("suite:start:sync-stop"),
   setSyncScope: (scope) => ipcRenderer.invoke("suite:start:sync-scope", scope),
+  // The console's URL carries a one-time token, so the page asks main to open the
+  // URL main already holds rather than handing main one from the renderer.
+  openSyncConsole: () => ipcRenderer.invoke("suite:start:sync-console"),
   // The window outlives no page load, so the listener is never removed.
   onChanged: (listener) => {
     ipcRenderer.on("suite:start:changed", (_event, state) => listener(state));
