@@ -58,6 +58,25 @@ It also upgrades or refuses the schema before any caller can read a record;
 `migratedFrom` is how a host learns that the upgrade was a local commit which
 would otherwise never travel to the renderer as an update.
 
+## apps/planner/packages/core/src/loro/notes.ts#getNote
+
+A note is not a task field. It is a root keyed `note:<taskId>`, and the key
+can hold two container types at once: the rich note is a `LoroMap` tree that
+`loro-prosemirror` writes, and the legacy note is a `LoroText` that an older
+build still reads. Loro separates roots by container type, which is what lets
+the upgrade sit beside the old value instead of rewriting it.
+
+`getNote` prefers the map once it has a `nodeName` and flattens its children
+back to words, one line per block, so a caller that only needs text does not
+learn the tree. Without a map it reads the legacy text. `plainTextToContent`
+turns an old note's newlines into hard breaks before the editor opens it, so the
+words and lines survive the first rich edit. The compatibility is one-way: an
+older build reads the text and does not see the rich note.
+
+The map is a CRDT tree, so an edit is a set of node writes rather than a
+whole-note replacement. The test in `workspace.test.ts` keeps both roots in one
+snapshot and proves `getNote` prefers the rich one.
+
 ## apps/planner/packages/core/src/file/workspaceFile.ts#decodeWorkspaceFile
 
 The `.planner` file is a small JSON envelope around an opaque base64 CRDT

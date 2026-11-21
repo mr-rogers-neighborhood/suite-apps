@@ -6,18 +6,38 @@ submenu stays where it was. Closing returns focus to the row control that opened
 
 It shows and edits the task record from [data-model.md](data-model.md): title, notes, estimate,
 project, tags, due and reminder times, checklist, recurrence preset and completion history. The
-record stays in the document; the only React state is the text currently being typed into a field.
+record stays in the document; React state holds the drafts for the fields that need one, never a copy
+of the record.
+
+## Notes
+
+The note is a Tiptap 3 editor over the task's Loro note root, not a textarea. The toolbar offers
+bold, italic, inline code and a link control; **Text** returns a block to a paragraph and **H1**,
+**H2** and **H3** set a heading; two list buttons toggle bullets and numbering. The link control
+opens a small address row with **Apply**, **Remove** and **Cancel**, so a URL has somewhere to be
+typed. A button takes the selection without moving focus out of the editor, and the command runs with
+focus returned to it.
+
+The editor is labelled **Notes**; the label targets the editable region, the toolbar exposes a name
+and its buttons their pressed state, and the hint under the editor says changes save as you type.
+Escape closes the task dialog while the note has focus, and closing returns focus to the row control
+that opened the dialog.
 
 ## Writes
 
 Every edit calls a typed method on the replica's `WorkspaceDocument` with a leaf patch. A title,
 estimate, project, tag, due or reminder change is one `updateTask` call, which parses the merged
 record with the Zod schema before it commits. Checklist add and remove write the `checklist` leaf;
-toggle uses `toggleChecklistItem`. Notes use the task's Loro text through `setNote`, so an edit is a
-text-container write rather than a task-record rewrite, and the textarea reads the container through
-`getNote` instead of keeping its own copy.
+toggle uses `toggleChecklistItem`.
 
-There are no fields behind this surface that the schema does not already have, and no schema bump.
+Notes are different. The editor binds to the task's `LoroMap` root through
+`loro-prosemirror`, and each ProseMirror transaction writes into that root; the replica's single
+`observe` subscription forwards the update, so there is no save action and no note copy in React
+state. `TaskNotesEditor` reads the root with `getNoteDoc`, and `getNote` supplies the words — flattened
+from the rich map, or the legacy text when no map exists yet.
+
+There are no fields behind this surface that the schema does not already have, and no schema bump:
+the note root sits beside the task record.
 
 ## Refusals
 

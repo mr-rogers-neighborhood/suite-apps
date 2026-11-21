@@ -16,8 +16,10 @@ No changes yet.
 
 - **Task notes take formatting.** Paragraphs, headings, bold, italic, inline code, links and bullet
   or numbered lists edit in place from the task detail dialog, with a toolbar over the note instead
-  of a plain textarea. The note is the task's Loro text container, so an edit is saved as you type
-  and two edits merge; a note written before this release opens as the same words it held.
+  of a plain textarea. The note is the task's Loro note root, so an edit lands in the document as you
+  type and needs no save action. A note written before this release opens with its words and line
+  breaks intact; an older build still reads the plain-text copy, so it does not see changes made in
+  the rich note.
 
 ## [0.3.0] - 2026-11-20
 

@@ -22,10 +22,21 @@ Each task, project, tag, event, day and focus session is a mergeable map, so a f
 write. Two clients editing a title and an estimate at the same time both keep their edit; a
 whole-record write would make the second one win.
 
-Notes are Loro text containers named `note:<taskId>`. The note is not in the task record, so a text
-edit never rewrites the task. Until the editor binds to the container, a save replaces the whole
-note; concurrent edits to one note are the one place v1 does not merge at character level. The task
-detail surface reads and writes these fields; see [task-detail.md](task-detail.md).
+Notes live in a Loro root named `note:<taskId>`, not in the task record. The rich note is a `LoroMap`
+holding the tree `loro-prosemirror` writes: a `nodeName`, `children` lists and text leaves. The
+legacy plain-text note is a `LoroText` at the same key; Loro keeps roots of different container types
+apart, so the two coexist.
+
+The rich map is the truth once it has a `nodeName`. `getNote` flattens it back to words, one line per
+block, for a caller that only wants text; `getNoteDoc` returns the map the editor binds to, and
+`getNoteText` keeps the legacy container. A note written before the rich editor is seeded through
+`plainTextToContent`, which turns each old newline into a `hardBreak`, so its words and line breaks
+are preserved. The editor writes the map, not the legacy text.
+
+That compatibility is one-way. An older build still reads `LoroText`, so it does not see edits made
+in the rich note; a newer build prefers the rich map and ignores the old text once the map exists. A
+rich note changes as a CRDT tree of node writes rather than a whole-note replacement. The task detail
+surface reads and writes these roots; see [task-detail.md](task-detail.md).
 
 ## Records
 

@@ -33,6 +33,22 @@ before opening the new document, so an observer of the closed workspace cannot
 keep committing edits. `dispose` clears both the subscription and the listeners,
 which is the path a closed window takes.
 
+## apps/planner/src/renderer/src/task/TaskNotesEditor.tsx#TaskNotesEditor
+
+The note editor is a Tiptap 3 view over the task's Loro map, not a controlled
+input. `LoroNoteSync` returns `LoroSyncPlugin` from `loro-prosemirror`, and each
+ProseMirror transaction writes into the replica's document; the replica's one
+`observe` subscription forwards that update to main, which is why there is no
+save button and no `onChange` value to keep in React.
+
+`StarterKit` is narrowed to the formatting the toolbar offers: paragraphs,
+H1–H3, bold, italic, inline code, links, bullet and ordered lists. The toolbar
+keeps the selection by cancelling the pointer's default focus move and returns
+focus with the command. The editor carries the **Notes** label, a description
+that says changes save as you type, and Escape closes the dialog while it has
+focus. `plainTextToContent` seeds an old note as hard-broken lines; once the map
+exists, the plugin loads it and the seed is ignored.
+
 ## apps/planner/src/renderer/src/app/Shell.tsx#Shell
 
 The shell composes the shared menu bar with the active view. It reads the view

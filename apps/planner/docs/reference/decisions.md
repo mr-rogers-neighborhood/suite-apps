@@ -22,6 +22,10 @@ The rules that shape Planner.
 - Navigation renders from one view registry. An id the build does not register opens today.
 - UI uses Tailwind v4 with Radix primitives. There is no Turborepo.
 - The gate is local: `pnpm check` to edit, `pnpm verify` for the full gate.
+- A note is a Loro root at `note:<taskId>`, not a task field. A rich note is a `LoroMap` tree beside
+  the legacy `LoroText` at the same key, rather than a replacement for it: an older build keeps
+  reading the text it wrote, and the editor prefers the map once it exists. The fallback is what makes
+  the upgrade one-way instead of rewriting every note or breaking an older build.
 - Sync is a relay a person runs, not a Suite service. A workspace is carried by sealed MLS frames
   over `@suite/sync`; the relay stores ciphertext and signed metadata and never reads a document.
   The main process holds the keys, the socket and the certificate pin, the renderer holds none of

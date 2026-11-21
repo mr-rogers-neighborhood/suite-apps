@@ -11,7 +11,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Hub: routing | Working | `suite://` links and document files open the owning app |
 | Hub: Flatpak | Working | Lists, installs from the store, updates, launches and removes Flatpak installs, including its own deployment |
 | Canvas | Alpha | Cards, boards, editor, library and views; opt-in sync through a host; no account or share link, and still changing shape |
-| Planner | Pre-alpha | Day view, inbox, capture and estimates; Upcoming, Projects, Tags, Focus and Rituals views; a task detail dialog; sync through a user-run relay ([Planner's Sync](../../apps/planner/docs/reference/sync.md)) |
+| Planner | Pre-alpha | Day view, inbox, capture and estimates; Upcoming, Projects, Tags, Focus and Rituals views; a task detail dialog with rich task notes; sync through a user-run relay ([Planner's Sync](../../apps/planner/docs/reference/sync.md)) |
 | Budget | Pre-alpha | Launcher, accounts, register, month grid, rollover, reconcile, backups, targets, rules, schedules, CSV/QIF import, reports; no network |
 | Sync | Working | Phase 4 demo: protocol, membership, invite/join, relay, CLI and the Canvas and Planner clients work; the relay is a separate `suite-sync` service Start supervises when installed; it stores sealed frames, not a document; loopback by default, and a reachable relay serves `wss://` with a pinned self-signed certificate |
 | Sync: invite and join | Working | An invitation link in the Sync dialog; the relay records the joining device's key and spends the invitation |
