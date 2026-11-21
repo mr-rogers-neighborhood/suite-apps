@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The AppStream record is what a store reads: name, summary, categories, icon.
+  Start's marketplace will read it from the same OSTree repo, so it is written
+  once here rather than in two places.
+-->
+<component type="desktop-application">
+  <id>run.suite.planner</id>
+  <name>Suite Planner</name>
+  <summary>Your day, planned on your own disk</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Planner is a local-first daily planner: tasks, projects, focus and the
+      rituals that close a day. A workspace is an ordinary file on your machine;
+      there is no account and no suite-operated server.
+    </p>
+    <p>
+      This flatpak is the same build as the other artifact forms; Flatpak is a
+      second way to install it, not a different application.
+    </p>
+  </description>
+  <launchable type="desktop-id">run.suite.planner.desktop</launchable>
+  <provides>
+    <binary>suite-planner</binary>
+  </provides>
+  <releases>
+    <release version="0.3.0" date="2026-11-20"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

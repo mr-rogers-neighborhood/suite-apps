@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Suite Planner
+Comment=Your day, planned on your own disk
+Exec=run.suite.planner %U
+Icon=run.suite.planner
+Terminal=false
+Type=Application
+Categories=Office;Utility;
+MimeType=application/x-suite-planner;
+StartupWMClass=run.suite.planner

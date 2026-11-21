@@ -1,0 +1,58 @@
+# Suite Budget as a Flatpak.
+#
+# Build the unpacked app first, then let this manifest package it:
+#
+#   pnpm --filter @suite/budget run package:dir
+#   node scripts/flatpak.mjs --app budget
+#
+# The manifest packages what electron-builder produced rather than rebuilding it
+# inside flatpak-builder. The renderer and the shell are built by the same gate
+# the other artifact forms use, and the sandbox should not carry a second pnpm
+# and a network build. `org.electronjs.Electron2.BaseApp` supplies zypak, which
+# gives Electron its sandbox without a setuid chrome-sandbox.
+app-id: run.suite.budget
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: run.suite.budget
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Only the suite's own folder: budgets live in `Documents/Suite/Budget`, and
+  # nothing above it is reachable. `:create` lets the first launch make the
+  # folder.
+  - --filesystem=xdg-documents/Suite:create
+
+modules:
+  - name: suite-budget
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/budget
+      - cp -a app/. /app/budget/
+      - install -Dm755 run.suite.budget /app/bin/run.suite.budget
+      - install -Dm644 run.suite.budget.desktop /app/share/applications/run.suite.budget.desktop
+      - install -Dm644 run.suite.budget.metainfo.xml /app/share/metainfo/run.suite.budget.metainfo.xml
+      - install -Dm644 icons/run.suite.budget-48.png /app/share/icons/hicolor/48x48/apps/run.suite.budget.png
+      - install -Dm644 icons/run.suite.budget-64.png /app/share/icons/hicolor/64x64/apps/run.suite.budget.png
+      - install -Dm644 icons/run.suite.budget-128.png /app/share/icons/hicolor/128x128/apps/run.suite.budget.png
+      - install -Dm644 icons/run.suite.budget-256.png /app/share/icons/hicolor/256x256/apps/run.suite.budget.png
+      - install -Dm644 icons/run.suite.budget-512.png /app/share/icons/hicolor/512x512/apps/run.suite.budget.png
+    sources:
+      - type: dir
+        path: ../../apps/budget/release/linux-unpacked
+        dest: app
+      - type: file
+        path: run.suite.budget
+      - type: file
+        path: run.suite.budget.desktop
+      - type: file
+        path: run.suite.budget.metainfo.xml
+      - type: dir
+        path: icons
+        dest: icons

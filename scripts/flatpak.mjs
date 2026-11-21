@@ -7,6 +7,8 @@
  * the one the other artifact forms carry.
  *
  *   node scripts/flatpak.mjs                 # Canvas: package, build, install
+ *   node scripts/flatpak.mjs --app planner   # Planner, same path
+ *   node scripts/flatpak.mjs --app budget    # Budget, same path
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
  *
  * The repository lives outside the checkout, at ~/suite-flatpak/repo, and is
@@ -28,6 +30,18 @@ const APPS = {
     package: "@suite/canvas-desktop",
     manifest: join(ROOT, "packaging", "flatpak", "run.suite.canvas.yml"),
     unpacked: join(ROOT, "apps", "canvas", "desktop", "release", "linux-unpacked"),
+  },
+  planner: {
+    id: "run.suite.planner",
+    package: "@suite/planner",
+    manifest: join(ROOT, "packaging", "flatpak", "run.suite.planner.yml"),
+    unpacked: join(ROOT, "apps", "planner", "release", "linux-unpacked"),
+  },
+  budget: {
+    id: "run.suite.budget",
+    package: "@suite/budget",
+    manifest: join(ROOT, "packaging", "flatpak", "run.suite.budget.yml"),
+    unpacked: join(ROOT, "apps", "budget", "release", "linux-unpacked"),
   },
 };
 

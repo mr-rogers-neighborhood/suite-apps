@@ -1,0 +1,64 @@
+# Suite Planner as a Flatpak.
+#
+# Build the unpacked app first, then let this manifest package it:
+#
+#   pnpm --filter @suite/planner run package:dir
+#   node scripts/flatpak.mjs --app planner
+#
+# The manifest packages what electron-builder produced rather than rebuilding it
+# inside flatpak-builder. The renderer and the shell are built by the same gate
+# the other artifact forms use, and the sandbox should not carry a second pnpm
+# and a network build. `org.electronjs.Electron2.BaseApp` supplies zypak, which
+# gives Electron its sandbox without a setuid chrome-sandbox.
+app-id: run.suite.planner
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: run.suite.planner
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  # Planner syncs a workspace with the other devices in it; the AppImage has the
+  # same reach.
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  # Only the suite's own folder: a planner workspace lives in
+  # `Documents/Suite/Planner`, and nothing above it is reachable. `:create`
+  # lets the first launch make the folder.
+  - --filesystem=xdg-documents/Suite:create
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+
+modules:
+  - name: suite-planner
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/planner
+      - cp -a app/. /app/planner/
+      - install -Dm755 run.suite.planner /app/bin/run.suite.planner
+      - install -Dm644 run.suite.planner.desktop /app/share/applications/run.suite.planner.desktop
+      - install -Dm644 run.suite.planner.metainfo.xml /app/share/metainfo/run.suite.planner.metainfo.xml
+      - install -Dm644 icons/run.suite.planner-48.png /app/share/icons/hicolor/48x48/apps/run.suite.planner.png
+      - install -Dm644 icons/run.suite.planner-64.png /app/share/icons/hicolor/64x64/apps/run.suite.planner.png
+      - install -Dm644 icons/run.suite.planner-128.png /app/share/icons/hicolor/128x128/apps/run.suite.planner.png
+      - install -Dm644 icons/run.suite.planner-256.png /app/share/icons/hicolor/256x256/apps/run.suite.planner.png
+      - install -Dm644 icons/run.suite.planner-512.png /app/share/icons/hicolor/512x512/apps/run.suite.planner.png
+    sources:
+      - type: dir
+        path: ../../apps/planner/release/linux-unpacked
+        dest: app
+      - type: file
+        path: run.suite.planner
+      - type: file
+        path: run.suite.planner.desktop
+      - type: file
+        path: run.suite.planner.metainfo.xml
+      - type: dir
+        path: icons
+        dest: icons

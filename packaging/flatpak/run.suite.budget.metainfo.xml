@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The AppStream record is what a store reads: name, summary, categories, icon.
+  Start's marketplace will read it from the same OSTree repo, so it is written
+  once here rather than in two places.
+-->
+<component type="desktop-application">
+  <id>run.suite.budget</id>
+  <name>Suite Budget</name>
+  <summary>Envelope budgeting that stays on your disk</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Budget is a local-first envelope budget: accounts, categories, schedules
+      and reports in a document you own. There is no bank sync, no account and
+      no suite-operated server.
+    </p>
+    <p>
+      This flatpak is the same build as the other artifact forms; Flatpak is a
+      second way to install it, not a different application.
+    </p>
+  </description>
+  <launchable type="desktop-id">run.suite.budget.desktop</launchable>
+  <provides>
+    <binary>suite-budget</binary>
+  </provides>
+  <releases>
+    <release version="0.2.5" date="2026-11-20"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>
