@@ -1,0 +1,28 @@
+---
+module: apps/canvas/src/archive
+title: Canvas / Archive
+summary: "Reading books as untrusted archives: a zip index, an EPUB package, sanitised chapters and quote anchors."
+---
+
+A book is a zip of untrusted markup. This module turns those bytes into the few facts a reader
+needs without mounting a DOM or fetching anything: the archive index, the package, the spine and
+the table of contents. Chapters stay in the archive until a renderer asks for one, because a reader
+browsing a contents page should not pay for markup it will never show.
+
+Sanitising is where a chapter becomes our markup. Scripts, frames, forms and remote resources are
+refused, no `on*` handler survives, and the report says what was lost. An anchor is a quote plus
+its surroundings rather than a byte offset, so a highlight survives a different column width and
+reports ambiguity instead of marking the wrong sentence.
+
+## apps/canvas/src/archive/epub/open.ts#openEpub
+
+An EPUB is a zip with `META-INF/container.xml`, a package document and a navigation document or
+NCX. The function reads the container and package first, then resolves the spine and table of
+contents into archive paths. `readChapter` and `readResource` keep the archive open for later
+reads rather than decompressing the book up front.
+
+A file that is not a zip, or has no container, is refused with a sentence a reader can act on.
+Anything smaller — a missing nav, an unreadable chapter — is reported by absence, because a book
+with a broken contents page is still a book. Protection is a separate question: `protectionOf`
+looks for `rights.xml` or encryption that covers content documents, and does not refuse a book
+merely because it obfuscates its embedded fonts.

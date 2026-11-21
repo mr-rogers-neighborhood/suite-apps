@@ -1,0 +1,40 @@
+---
+module: apps/sync/packages/host
+title: Sync / Host
+summary: "The blind mailbox: four refusals, a numbered frame log, and a file store that never reads a payload."
+---
+
+`@suite/host` is the relay. It accepts a frame, numbers it, writes it down and hands it to the other
+sockets in the room. It holds no group key, merges nothing and answers no question about a
+document. Its whole authority is the small set of facts it can check before storing bytes: the
+workspace, the epoch, the role and the device signature.
+
+The store is the durable half. Frames are ciphertext, and roles, invitations, pinned keys and
+removals are signed public metadata, so none of them needs a key to sit on disk. A host that forgot
+roles or removals after a restart would look like a broken workspace, so both are replayed before
+the first frame is judged.
+
+## apps/sync/packages/host/src/blindRoom.ts#admitFrame
+
+The order is the policy: workspace and epoch are cheap and unambiguous, the role is next, and the
+signature last because it is the expensive check. A frame is stored only when all four agree. The
+refusal vocabulary is shared with the client, so `not-authorized` and `removed` mean the same thing
+on both sides of the socket.
+
+A key package is the one kind that skips the epoch floor. It carries `0` because a device with no
+group has no epoch, and it is a request to join rather than a message in the group's ordering. It
+still has to be signed by the key it claims, and a live invitation is what makes the exception safe.
+`blindRoom.test.ts` pins the four refusals and the key-package exception.
+
+## apps/sync/packages/host/src/store.ts#FileHostStore
+
+Each workspace is one append-only JSONL file for frames, and one each for roles, invites, pinned
+keys and removals. The frame file stores the position beside the frame and a header that records the
+next position, so an emptied log still knows where it was. A crash mid-append can leave a partial
+line; the loader drops that line rather than failing the room, because a frame is only a message a
+device can send again.
+
+Compaction rewrites the file through a temporary file and a rename, and leaves the recorded
+positions alone. There is no snapshot and no document on disk. `store.test.ts` covers the position
+across a restart and the compacted file. Retention drops old entries without renumbering them, so a
+client's cursor still means the same frame after the window moves.

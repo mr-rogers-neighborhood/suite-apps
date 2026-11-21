@@ -1,0 +1,34 @@
+---
+module: apps/canvas/src/storage
+title: Canvas / Storage
+summary: "The renderer's persistence port: one snapshot per save, one adapter per host, and a failure a person can see."
+---
+
+The renderer's store does not know where its bytes go. It talks to a three-method port, and this
+module chooses the adapter: a shell-owned file on the desktop, IndexedDB in a browser. The port is
+small on purpose. Locking, compaction and multi-tab leadership belong to the adapter that has them,
+not to every caller.
+
+A failed write is a visible state, never a silent one. The in-memory document is untouched by a
+refused save, because persistence is a side channel and never the source of truth. A desktop build
+without its bridge is refused outright rather than allowed to keep a workspace only in memory.
+
+## apps/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence.write
+
+A save is a whole snapshot, not a stream of updates. The adapter marks that something changed and
+takes the snapshot at write time, after edits settle, so a keystroke does not cross the bridge. It
+subscribes to local updates only: an update that arrived from sync must not be echoed back as a
+save, or a peer's edit becomes this window's file write.
+
+Writes are serialised through one promise. The newest snapshot replaces an earlier pending one
+because the snapshot is the whole state. Attachments travel only when the set of referenced images
+changes, and a missing image is reported while the document still saves. A main-process refusal
+goes to `onFailure`; it is not thrown into a render. `desktopPersistence.test.ts` covers the local-
+only subscription, the coalesced save and the failure path.
+
+## apps/canvas/src/storage/workspacePersistence.ts#createWorkspacePersistence
+
+The adapter is chosen from the host signal, not a build flag. A page with no room gets no
+persistence. A desktop page without a bridge throws, because the alternative is a session that
+silently persists nowhere. A browser page without IndexedDB gets no adapter rather than a memory
+fallback. Nothing above the port learns which implementation it received.

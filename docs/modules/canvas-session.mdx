@@ -1,0 +1,37 @@
+---
+module: apps/canvas/src/session
+title: Canvas / Session
+summary: "Which document is open, what the window may do with it, and the small local mirrors around that answer."
+---
+
+The session is the one place that answers which document a window is editing. On the desktop the
+answer comes from the shell and lives inside the file; in a browser it comes from the page URL.
+There is no second authority behind it now: the relay, accounts and share links are gone, so the
+person with the file has every capability the app still offers.
+
+The rest of the directory is local convenience: recent workspaces, the last board, pinned boards
+and workspaces, cached names and the backup/import path. Those are mirrors and preferences. Losing
+them may change what the launcher shows; it must never change the document.
+
+## apps/canvas/src/session/desktopDocument.ts#configureDesktopSession
+
+The desktop boot resolves before the store module is imported, because that module reads the
+session once to choose its room and its persistence. The workspace id is inside the envelope, not
+in the address bar, so a second id in the URL would be a competing source of truth.
+
+The snapshot the shell handed over is kept here and taken exactly once by the persistence adapter.
+A second caller asking for it is a bug worth surfacing, and a large document should not cross the
+IPC boundary twice on open. A shell with no document configures a session with no workspace and
+returns the home state rather than leaving the previous page's key in place.
+
+## apps/canvas/src/session/workspaceTransfer.ts#importWorkspaceFile
+
+An import always creates a new workspace id and never merges into the open document, so two
+histories cannot silently become one. Images embedded in the envelope are restored under the ids
+their nodes already carry; an image that cannot be cached is logged and skipped so it cannot cost
+the text beside it.
+
+The file is read through the same envelope decoder as a legacy `.suite` canvas file. A damaged
+attachment is returned as a warning naming the affected cards, because a backup that imports a
+hole quietly is the loss the format exists to prevent. `workspaceTransfer.test.ts` covers the new
+id, the attachment restore and the missing-image warning.

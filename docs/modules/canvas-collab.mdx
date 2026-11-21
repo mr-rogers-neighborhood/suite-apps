@@ -1,0 +1,38 @@
+---
+module: apps/canvas/src/collab
+title: Canvas / Collab
+summary: "The browser's local replica and the live presence around it, neither of which owns document truth."
+---
+
+This module is what makes one browser's copy survive a reload and two people's cursors visible. It
+holds the IndexedDB snapshot-and-update log, the per-tab identity used for presence, and the
+projection that turns awareness states into peers on the board. The sync socket and the group keys
+live in the desktop main process, not here.
+
+The split matters. The local log records what this browser has seen, but it never defines the
+document; Loro does. Presence is deliberately ephemeral and never enters
+the document. A closed tab, a dropped socket or a sleeping device must cost no edit and leave no
+record behind.
+
+## apps/canvas/src/collab/loroPersistence.ts#LoroIndexeddbPersistence.compact
+
+One tab per workspace holds the compaction lock. Followers append their updates but do not write
+snapshots, because two tabs writing snapshots is how a tab with less of the document replaces one
+with more, and the rows covered by the overwritten copy then look deletable.
+
+The leader writes a snapshot and deletes only update rows the stored snapshot provably contains.
+It never replaces a snapshot that covers more than its own, and a compaction that cannot prove that
+aborts instead of guessing. When Web Locks is missing, every tab compacts but deletes only its own
+rows; replaying another tab's rows on load is idempotent, so the fallback costs space and never an
+edit. `loroPersistence.test.ts` covers the leader, the follower and the no-locks path.
+
+## apps/canvas/src/collab/peerProjection.ts#projectPeers
+
+Presence has no leave message, so silence is the only available signal and a heartbeat is what
+keeps silence from meaning departure. Each client publishes a beat; a peer unheard for longer than
+the TTL is dropped even though its awareness state still exists. An in-flight gesture has a shorter
+TTL than the peer, so a drag that stops arriving does not leave a ghost card on every board.
+
+The projection mutates its `seen` and `heard` maps in place and removes entries for clients that
+are gone. It returns presentation state only. Nothing in this file writes to the document, which is
+why presence can be late, out of order or absent without costing an edit.

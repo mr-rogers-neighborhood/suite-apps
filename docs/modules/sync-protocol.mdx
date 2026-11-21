@@ -1,0 +1,61 @@
+---
+module: apps/sync/packages/protocol
+title: Sync / Protocol
+summary: "The wire vocabulary: ids, membership metadata, sealed frames and the relay messages that carry both."
+---
+
+`@suite/sync` is the pure half of sync. It defines the ids, the canonical bytes a signature
+covers, the frame header, the MLS group operations, the signed membership records and the relay
+message schemas. It opens no socket and reads no document. An app supplies the document, the keys
+and the transport; the host supplies storage and admission.
+
+Two authorities meet here and stay separate. The MLS group decides who can decrypt an update. The
+signed role and removal records decide who may write and whether the relay should carry a device's
+mail. A frame carries both facts without carrying content the relay can read: the workspace, device
+and epoch in the header, and the MLS message inside `payload`.
+
+## apps/sync/packages/protocol/src/group.ts#seal
+
+Sealing advances the group. `seal` returns the new `DeviceGroup` beside the bytes because the MLS
+application secret ratchets on send; a caller that keeps the input state reuses a ratchet step, and
+peers cannot open the next message. One document update becomes one application frame. The frame names a workspace, never a document, so the relay cannot learn which board moved.
+
+The returned group state is the thing to persist: losing it loses the ability to read later frames.
+This function runs in an app's main process, never in a renderer, and the host never calls it.
+
+## apps/sync/packages/protocol/src/frame.ts#frameRejection
+
+A receiving client reads a frame only at its own epoch, with one exception: a commit at the
+receiver's epoch plus one, which is how the receiver moves. The rule exists because the MLS library
+quietly absorbs a commit from a passed epoch as an application message instead of refusing it. Two
+devices that committed from the same epoch would otherwise each accept the other's commit and
+disagree about the group.
+
+A frame newer than the receiver's epoch is not late mail to open. It is a signal that a commit is
+missing, so the client asks for everything after its last applied index and applies the commits in
+order first. A frame older than the receiver's epoch is dropped. `group.test.ts` pins the drop with
+a frame from an epoch the receiver has left.
+
+## apps/sync/packages/protocol/src/roleRecord.ts#applyRoleRecord
+
+Membership says who is in the group; this signed record says who may write. The first record in an
+empty workspace is a device claiming ownership of itself. After that only an owner's device may
+change a role, each device's records form a chain by `seq`, and the last owner cannot be demoted:
+an owner list that reaches zero can never change again. The host asks `mayWrite` before it stores a
+frame, so a viewer's update is refused without decrypting anything.
+
+The record is public metadata on purpose. It carries a workspace, a device, a role, a sequence and
+a signature, and nothing a person wrote. `roleRecord.test.ts` covers the first claim, the owner
+gate, the sequence gap and the last-owner refusal.
+
+## apps/sync/packages/protocol/src/removal.ts#applyRemovalRecord
+
+Removing a device has two halves. The MLS commit rotates the epoch and is ciphertext; this record is
+the host's readable half, signed by an owner. It lets the host close the socket, drop the device
+from the roster and refuse it afterwards without reading a frame. An owner cannot remove itself,
+because that is how a workspace ends up owned by nobody.
+
+The record is not a key revocation and cannot be one. The removed device keeps every frame and
+epoch key it already held; what it loses is everything sealed after the commit, which is the
+forward-only promise. Spending a fresh invitation is what clears the mark and lets a device return.
+`removal.test.ts` covers the owner gate, the self refusal and the reinstate path.

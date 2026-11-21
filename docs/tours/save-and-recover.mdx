@@ -1,0 +1,91 @@
+---
+id: save-and-recover
+title: Save and recover
+summary: "One snapshot's route from a renderer edit to an atomic file write, and the refusals recovery is built on."
+order: 21
+---
+
+A save starts as an edit in the renderer and ends as bytes beside a lock file. This path follows
+that route through the persistence adapter, the desktop store and the graph's envelope, then turns
+to recovery: the backup, the mtime guard, the backup import and the parser that refuses to merge.
+The module notes own the invariants; each stop is the place where one of them is enforced.
+
+## interlude: The renderer's snapshot
+
+The renderer does not write a file. It hands whole snapshots to a port, and the host decides which
+adapter receives them.
+
+## apps/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
+
+The adapter is the renderer's whole save surface. The storage module owns how it hydrates and what
+it deliberately does not know.
+
+## apps/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence.write
+
+The point where an edit becomes a snapshot. The storage module owns coalescing, the local-only
+subscription and the failure callback.
+
+## apps/canvas/src/storage/workspacePersistence.ts#createWorkspacePersistence
+
+The host chooses the adapter here, and a missing one is a loud failure. The storage module owns why
+there is no memory fallback.
+
+## apps/canvas/src/collab/loroPersistence.ts#LoroIndexeddbPersistence.compact
+
+The browser's other save path: an update log beside a snapshot. The collab module owns the leader
+rule and the proof required before a row is deleted.
+
+## apps/canvas/src/collab/loroPersistence.ts#versionCovers
+
+The proof itself. A row may be deleted only when the stored snapshot already contains it.
+
+## interlude: The file's guarantees
+
+Main owns what a sandboxed page cannot: the lock, the atomic write, the backup and the mtime guard.
+
+## apps/canvas/desktop/src/main/store.ts#DocumentStore.save
+
+A menu Save and an autosave meet in one queue. The desktop module owns why the newest snapshot is
+the only one worth writing.
+
+## apps/canvas/desktop/src/main/store.ts#DocumentStore.write
+
+The queue becomes bytes: one envelope, one atomic write. The mtime guard just above it is why a
+later save can refuse.
+
+### overlay: Why the mtime guard stops
+
+If the file changed since this session last wrote it, something outside the app edited it — a sync
+client, an editor, a restore. Saving would overwrite that silently, so the write fails with
+`changed-on-disk`.
+
+## apps/canvas/desktop/src/main/lock.ts#acquireLock
+
+The file guarantee starts before any bytes are read. The desktop module owns which lock goes stale
+and which never does.
+
+## apps/canvas/desktop/src/main/store.ts#DocumentStore.open
+
+Recovery is an ordered set of refusals, not a best-effort repair. The desktop module owns the order;
+this stop either finds a document or leaves the file alone.
+
+### overlay: Recovery refuses to invent a document
+
+Trying a backup is not permission to start over. The store opens only bytes that parse as the
+workspace they claim to be, and a failed open leaves the original file untouched for a person to
+inspect or restore.
+
+## apps/canvas/packages/graph/src/workspaceFile.ts#tryParseWorkspaceFile
+
+The last gate on the recovery path: a file becomes a document or a sentence. The graph module owns
+the refusal vocabulary and the damaged-image rule.
+
+## apps/canvas/src/session/workspaceTransfer.ts#prepareWorkspaceBackup
+
+A backup is the envelope plus the images the document references. The session module owns the
+missing-image warning and why it never cancels the export.
+
+## apps/canvas/src/session/workspaceTransfer.ts#importWorkspaceFile
+
+Recovery into a new workspace, never a merge. The session module owns the new id and the
+attachment restore.
