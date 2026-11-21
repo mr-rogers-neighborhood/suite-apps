@@ -16,7 +16,7 @@
  * which is a scratch directory the build replaces, so a cleanup took the only copy with it. Nothing
  * durable belongs there, and `inspectKey` never looks there.
  *
- * This file is imported by `scripts/keys.mjs`, `scripts/release.mjs`, and two of Suite Go's
+ * This file is imported by `scripts/keys.mjs`, `scripts/android-release.mjs` and two of Suite Go's
  * scripts. It has no side effects: importing it reads nothing.
  */
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync } from "node:crypto";
@@ -67,7 +67,7 @@ export const KEYS = {
     pinName: "SUITE_UPDATE_PUBLIC_KEY",
     pinKind: "spki-pem",
     generate: "pnpm keys generate update",
-    reader: "node scripts/release.mjs",
+    reader: "nothing: the relay installs as a Flatpak",
   },
 };
 

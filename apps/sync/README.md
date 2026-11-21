@@ -84,11 +84,15 @@ opens the console; a relay you run by hand uses `--tls-cert` and `--tls-key` as 
 
 ## Run the relay
 
-The relay ships as a Flatpak, `run.suite.sync`. Install it from this checkout with
-`node scripts/flatpak.mjs --app sync`, which publishes it to the local `suite-local` repository and
-installs it; the manifest is `packaging/flatpak/run.suite.sync.yml`. The public store does not carry it
-yet: it arrives with the release that publishes the app, and from then on `flatpak install --user
-suite run.suite.sync` is the shorter path. [Leave a relay running](docs/how-to/relay.md) is the guide.
+The relay ships as a Flatpak, `run.suite.sync`, and installs from the suite store:
+
+```sh
+flatpak install --user suite run.suite.sync
+```
+
+A contributor builds it from a checkout instead with `node scripts/flatpak.mjs --app sync`, which
+publishes it to the local `suite-local` repository and installs it; the manifest is
+`packaging/flatpak/run.suite.sync.yml`. [Leave a relay running](docs/how-to/relay.md) is the guide.
 
 The two ways to use the same build are:
 

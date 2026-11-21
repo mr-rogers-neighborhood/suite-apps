@@ -65,7 +65,7 @@ one copy is already wrong.
 | App renderer bridge contracts | [Bridges](reference/bridges.md) |
 | WCAG 2.2 coverage and manual tests | [Accessibility](reference/accessibility/wcag-22-map.md) |
 | Commands and the gate | [Commands](reference/commands.md) |
-| Flatpak, relay tarball, update ownership | [Packaging channels](reference/packaging-channels.md) |
+| Flatpak, Android APK, update ownership | [Packaging channels](reference/packaging-channels.md) |
 | Document files, folders and backups | [File formats](reference/file-formats.md) |
 | Environment variables | [Environment](reference/environment.md) |
 | What works, per subsystem | [Status](reference/status.md) |

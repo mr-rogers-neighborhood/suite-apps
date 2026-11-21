@@ -57,8 +57,9 @@ The rules that shape this repository. Each is current; the code follows it.
   can move tier while stable stays installed.
 - `scripts/flatpak.mjs` builds the local deployment and signs the repository summary with the store
   key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to the public
-  `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`.
-  `scripts/release.mjs` still builds the relay tarball; retiring it is a separate change.
+  `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`. The relay publishes on
+  the same remote; its `sync-v<version>` tarball release is retired history, and `scripts/release.mjs`
+  now holds only the shared release helpers and the gate proof.
 - The relay app's store and certificate pair live under the app's own data directory
   (`$XDG_DATA_HOME/suite-sync`), not in a documents folder, and its one host grant outside the
   sandbox is `xdg-config/autostart` for the login entry it writes when asked.
@@ -68,8 +69,9 @@ The rules that shape this repository. Each is current; the code follows it.
   the window says the reach is fixed rather than pretending the selector decides.
 - A version lives in one place and a tag names one app's release. [Version ownership](../how-to/package-and-release.md#version-ownership)
   states which file owns it and which prefix the tag uses.
-- The Flatpak store key signs the OSTree summary; the relay's update key signs its `SHA256SUMS`.
-  Flatpak verifies the summary and every object's content hash on install and update.
+- The Flatpak store key signs the OSTree summary. Flatpak verifies the summary and every object's
+  content hash on install and update. The relay's update key signed the retired tarball's
+  `SHA256SUMS`; no shipped artifact carries it any more.
 - Private signing keys live outside the repository, in `~/.config/suite/keys/` or wherever
   `SUITE_KEYS_DIR` points. A public half is pinned in the source that verifies it, and
   `pnpm keys status` proves the two agree. No secret is stored in a generated directory such as

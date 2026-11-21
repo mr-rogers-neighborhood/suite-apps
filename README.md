@@ -21,7 +21,7 @@ install **Suite Go**.
 | <img src="apps/start/build/app-icons/canvas.png" width="20" height="20" alt=""> **Suite Canvas** | Thinking and research: cards, boards, writing, links and views in one document | Alpha | `flatpak install --user suite run.suite.canvas` |
 | <img src="apps/start/build/app-icons/planner.png" width="20" height="20" alt=""> **Suite Planner** | A daily planner: inbox, estimates, capacity and a local calendar | Pre-alpha | `flatpak install --user suite run.suite.planner` |
 | <img src="apps/start/build/app-icons/budget.png" width="20" height="20" alt=""> **Suite Budget** | An envelope budget: give every dollar a job; [what it does](apps/budget/README.md) | Pre-alpha | `flatpak install --user suite run.suite.budget` |
-| **Suite Sync** | The sync protocol and a relay a person runs | Working | [Run the relay](apps/sync/docs/how-to/relay.md) |
+| **Suite Sync** | The sync protocol and a relay a person runs | Working | `flatpak install --user suite run.suite.sync` |
 | <img src="apps/start/build/app-icons/help.png" width="20" height="20" alt=""> **Suite Help** | The documentation app: the code explorer and the handbook, offline; [what it is](apps/help/README.md) | Working | `flatpak install --user suite run.suite.help` |
 
 Windows and macOS have no published build.
@@ -39,8 +39,9 @@ in the data path. Sync carries a document between devices; it never defines its 
 
 ## Install
 
-Add the signed store once, then run the command in the row you want. The desktop apps are Flatpaks
-on that store; Sync is the relay you run yourself.
+Add the signed store once, then run the command in the row you want. Every desktop app is a Flatpak
+on that store, including Sync — the relay you run yourself, on a desktop or on a machine with no
+display.
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite \
@@ -80,7 +81,7 @@ met and which are still partial.
 
 | | |
 | --- | --- |
-| Platforms | Linux x86_64. Flatpak for Canvas, Planner, Budget, Help and Start; the relay ships as a tarball; no macOS or Windows build. |
+| Platforms | Linux x86_64. Flatpak for Canvas, Planner, Budget, Help, Start and Sync (the relay); no macOS or Windows build. |
 | Sync | Canvas and Planner sync through a user-run relay; Start shows the relay's fingerprint and opens its console. Budget has no network client. |
 | Security | No account or telemetry. Document files are unencrypted; use disk encryption. The sync relay holds sealed frames; off loopback it uses `wss://` with a pinned self-signed certificate, and it is loopback by default. |
 | Mobile | Suite Go installs on Android as a debug build. No domain ships; iOS is unbuilt. |

@@ -39,7 +39,8 @@ Use it when uncommitted files could be hiding a dependency, or when you are abou
 to a full gate; say that the e2e suite was skipped.
 
 `--only <repo>` writes a status that names that repository. It is a loop, not a suite proof:
-`release.mjs` and the Flatpak publisher refuse a publish on it, so run the full gate before a release.
+The Flatpak publisher and `release-status.mjs` refuse a publish on it, so run the full gate before a
+release.
 
 The suite launches the real Electron app, so the gate runs it under `xvfb-run` whenever that is
 installed — including on a desktop session, where it would otherwise open a burst of windows over

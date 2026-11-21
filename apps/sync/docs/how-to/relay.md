@@ -10,9 +10,9 @@ network that you did not put there.
 ## What you need
 
 - A machine on the same network as the devices you want to sync (or reachable over a VPN).
-- Flatpak, and a way to get `run.suite.sync`: this checkout, through the build script, while the public
-  store does not carry the app yet, or the store once it does. The relay ships in the same app as the
-  desktop tray, so there is no separate runtime to install: the Flatpak carries its own.
+- Flatpak, and `run.suite.sync` from the suite store. A contributor can build the same app from a
+  checkout instead. The relay ships in the same app as the desktop tray, so there is no separate
+  runtime to install: the Flatpak carries its own.
 - A user session for the tray form; none for the headless form.
 
 Both forms are one build. The **tray app** is what a person with a desktop wants: it keeps the relay
@@ -21,7 +21,15 @@ binary runs the same CLI and prints the same startup lines.
 
 ## 1. Install the relay
 
-Build it from this checkout:
+Add the store and install the app:
+
+```sh
+flatpak remote-add --user --if-not-exists --from suite \
+  https://flatpak.suite.run/suite.flatpakrepo
+flatpak install --user suite run.suite.sync
+```
+
+A contributor builds it from a checkout instead:
 
 ```sh
 node scripts/flatpak.mjs --app sync
@@ -30,23 +38,8 @@ node scripts/flatpak.mjs --app sync
 That packages the unpacked build `apps/sync/app/release/linux-unpacked`, signs the repository summary
 with the store key, publishes it to `~/suite-flatpak/repo` and installs `run.suite.sync` from
 `suite-local`. The manifest is `packaging/flatpak/run.suite.sync.yml`; `--no-build` reuses an unpacked
-tree that already exists.
-
-The public store does not carry `run.suite.sync` yet. It arrives with the release that publishes the
-app, and from then on the ordinary store install is the shorter path:
-
-```sh
-flatpak remote-add --user --if-not-exists --from suite \
-  https://flatpak.suite.run/suite.flatpakrepo
-flatpak install --user suite run.suite.sync
-```
-
-Until the store carries it, the local build above is the install path. A machine with no checkout to
-build from can still run the relay from the tarball the release script builds — a host install rather
-than a Flatpak, described in
-[Building and publishing a release](#building-and-publishing-a-release).
-
-Either install updates with `flatpak update --user`; the app has no updater of its own.
+tree that already exists. Either install updates with `flatpak update --user`; the app has no updater
+of its own.
 
 Check what arrived:
 
@@ -259,9 +252,9 @@ Keep the unit alive between logins with `loginctl enable-linger "$USER"`; withou
 stops when the last session closes, which is exactly the machine a relay is meant to outlive.
 
 The host-binary alternative is `deploy/suite-sync.service`, a system unit with `DynamicUser=yes` and
-`StateDirectory=suite-sync`. It is for a `suite-sync` tree on the host (`/opt/suite-sync` and a
-`/usr/local/bin` symlink) and its own `deploy/relay.env.example`. A Flatpak cannot write
-`/var/lib/suite-sync`, so do not mix the two.
+`StateDirectory=suite-sync`. It is for a tree built from a checkout on the host (`/opt/suite-sync` and
+a `/usr/local/bin` symlink) with its own `deploy/relay.env.example`; there is no tarball to install
+any more. A Flatpak cannot write `/var/lib/suite-sync`, so do not mix the two.
 
 ## 4. Check it is actually up
 
@@ -346,10 +339,9 @@ The manifest packages the unpacked build `package:dir` produced, so the relay in
 same code the gate tested. There is no pre-release identity for Sync: a tier would be a second mailbox
 on the same data, so `--channel` is refused.
 
-The `sync-v<version>` release still carries `suite-sync-<version>-<arch>.tar.gz`, `SHA256SUMS` and its
-signature today; `node scripts/release.mjs sync` builds and signs them. Removing that artifact from the
-release script is a separate change that has not landed yet, so this page does not tell you to skip
-it. The Flatpak is the install path described above.
+Publishing the signed repository is `node scripts/flatpak-remote.mjs --target s3 --publish`, the same
+path as the apps. There is no separate relay artifact: the `sync-v<version>` tarball releases are
+retired and remain downloadable history only.
 
 ## Upgrading
 

@@ -69,9 +69,9 @@ removes the record only. A pre-release asks separately whether to delete its cha
 
 ## 4. What is published today
 
-Canvas, Planner, Budget, Help and Start are Flatpaks on the signed remote. A fresh install probes the
-`suite` remote first and then `suite-local`. An installed deployment is compared with its own origin,
-so a copy from `suite-local` is not measured against the public `suite` store.
+Canvas, Planner, Budget, Help, Start and Sync are Flatpaks on the signed remote. A fresh install
+probes the `suite` remote first and then `suite-local`. An installed deployment is compared with its
+own origin, so a copy from `suite-local` is not measured against the public `suite` store.
 
 ## 5. If something goes wrong
 
@@ -84,5 +84,6 @@ so a copy from `suite-local` is not measured against the public `suite` store.
   [Packaging channels](../../../../docs/reference/packaging-channels.md#flatpak) describes; a remote
   added with `--no-gpg-verify` is for local testing only.
 
-The relay is not a Flatpak app. It ships as a tarball and is installed separately; see
+The relay is the sixth Flatpak, `run.suite.sync`: a tray app on a desktop, and the same install as the
+headless relay on a machine with no display. See
 [Leave a relay running](../../../sync/docs/how-to/relay.md).

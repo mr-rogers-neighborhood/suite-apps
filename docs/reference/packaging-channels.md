@@ -9,7 +9,6 @@ may update them.
 | --- | --- | --- | --- | --- |
 | Flatpak | Canvas, Planner, Budget, Help, the hub and Sync | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
 | Debug APK | Suite Go | the person, through `adb` or the file manager | the person installs the next APK | no |
-| Relay tarball (retiring) | `suite-sync` on a host without Flatpak | the person, under `/opt` | the person replaces the tree | yes |
 
 There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, Sync is an
 app the hub lists like the rest, and Suite Go has no Play Store listing.
@@ -274,17 +273,17 @@ entry points:
 
 [Leave a relay running](../../apps/sync/docs/how-to/relay.md) is the install and operation guide.
 
-Today it is installed from a checkout: `node scripts/flatpak.mjs --app sync` publishes it to
-`suite-local` and installs it. The public store does not carry `run.suite.sync` yet — it joins the
-store with the release that publishes the app — so `flatpak install --user suite run.suite.sync` is
-the command from that release on, not before. Every other sentence here about how the relay is
-installed, run and updated is true of the local build now.
+It installs from the suite store like every other Flatpak:
 
-`suite-sync-<version>-<arch>.tar.gz` on `sync-v<version>` still exists: a tarball with the CLI, its
-JavaScript dependencies and a launcher, but not a Node runtime, plus a `SHA256SUMS` list signed by the
-update key. It is for a host without Flatpak. The release script still builds and signs it; removing it
-from `scripts/release.mjs` is a separate change that has not landed. Nothing in the docs above makes a
-new install use it.
+```sh
+flatpak install --user suite run.suite.sync
+```
+
+A contributor builds it from a checkout instead: `node scripts/flatpak.mjs --app sync` publishes it to
+`suite-local` and installs it from there. Both forms update with `flatpak update --user`.
+
+The `sync-v<version>` tarball releases are retired: they remain downloadable history, and nothing in
+this repository builds, signs or documents one as an install path any more.
 
 Suite Start supervises a relay it finds through `SUITE_SYNC_BIN` or `PATH`; it never updates one, and a
 Flatpak install is neither, so Start reports no relay and stays a launcher. Each device enters the
@@ -326,6 +325,6 @@ to download.
 
 The Flatpak store key signs the OSTree summary; `flatpak install` and `flatpak update` verify the
 summary and every object's content hash against the public half in the `.flatpakrepo`. The relay's
-update key still signs the retiring tarball's `SHA256SUMS`, and a person verifies it before installing
-that tree. The two keys are separate and rotate separately. [Manage signing
+update key signed the retired tarball's `SHA256SUMS` and now signs nothing the suite ships; the key and
+its pin are kept until they are retired deliberately. [Manage signing
 keys](../how-to/keys.md) owns the procedures.

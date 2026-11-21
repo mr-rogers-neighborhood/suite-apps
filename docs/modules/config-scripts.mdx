@@ -5,26 +5,23 @@ summary: "The repository-level scripts that prove the gate and publish one app."
 ---
 
 The repository-level scripts are not a shipped package. `gate.mjs` builds the
-shared libraries and runs each app's gate in dependency order; `release.mjs` is
-the only publishing path; `keys.mjs` reports whether a private key matches its
-pin; `lib/channel.mjs` and `lib/keys.mjs` hold the identities and key rules both
-release paths use; `flatpak.mjs` and `flatpak-remote.mjs` publish the store.
+shared libraries and runs each app's gate in dependency order; `release.mjs` holds the release
+helpers the publishing paths share — the version, the changelog section, the dirty-tree and gate-proof
+refusals; `keys.mjs` reports whether a private key matches its pin; `lib/channel.mjs` and
+`lib/keys.mjs` hold the identities and key rules the scripts use; `flatpak.mjs` and
+`flatpak-remote.mjs` build and publish the store; `android-release.mjs` publishes Suite Go's APK; and
+`release-status.mjs` writes the release bodies and `RELEASES.md`.
 
 A root script has to name its own packages: bare `pnpm -r` would recurse through
 every app. The scripts are plain Node with no build step, so the release path is
 inspectable without building the thing it releases.
 
-## scripts/release.mjs#publisherKeyProblem
+## scripts/release.mjs#gateProblems
 
-The check runs before the build, not after it. An installed app verifies a feed
-with the update key compiled into that build, so a manifest signed by any other
-key downloads nothing and reports no release; discovering that after upload and
-a feed commit is too late. The function derives the public half from the private
-key and compares it with the pin the apps trust.
-
-The pin is read from `packages/desktop/src/updateSignature.ts`, the same source
-the verifier uses. A mismatch prints both fingerprints and names the two ways
-out: pin the key in hand, or use the one the tree already trusts.
+The gate proof is a commit, not a working tree. The publish paths share this check: a status file that
+did not pass, came from `--only`, came from a warm checkout, or names another commit is refused before
+any byte is copied. The relay tarball this module used to build is retired; `sync-v<version>` assets
+are history and the relay installs as `run.suite.sync`.
 
 ## scripts/lib/channel.mjs#suiteAppId
 
