@@ -1,7 +1,11 @@
-export { decodeBase64, encodeBase64 } from "./base64.js";
+export { decodeBase64, decodeBase64Url, encodeBase64, encodeBase64Url } from "./base64.js";
 export { canonicalJson } from "./canonical.js";
+export { addContact, contactForCode, contactsFileSchema, learnContact, removeContact, resolveFriendInvite, syncContactSchema, } from "./contacts.js";
 export { formatFingerprint, normaliseFingerprint } from "./fingerprint.js";
 export { frameHeaderSchema, frameKindSchema, framePayload, frameRejection, frameRejectionSchema, frameSchema, hostAcceptsEpoch, sealedFrameSchema, } from "./frame.js";
+export { deriveFriendCode, deriveFriendCodeFromBytes, formatFriendCode, friendCodeMatches, isFriendCode, parseFriendCode, } from "./friendCode.js";
+export { deviceIdFromPublicKey, friendInvitePayload, friendInviteRejectionSchema, friendInviteSchema, verifyFriendInvite, } from "./friendInvite.js";
+export { FRIEND_LINK_HOST, FRIEND_LINK_SCHEME, formatFriendLink, friendCodeLabel, parseFriendLink, } from "./friendLink.js";
 export { genesisNamesItsRoot, genesisPayload, genesisRecordSchema, verifyGenesis, workspaceIdFromRootKey, } from "./genesis.js";
 export { addDevice, applyCommit, createDeviceIdentity, createWorkspaceGroup, decodeGroup, decodeKeyPackageBytes, encodeGroup, encodeKeyPackageBytes, exportKey, joinWorkspaceGroup, leafIndexOf, open, removeDevice, SUITE_CIPHERSUITE, seal, } from "./group.js";
 export { deviceIdSchema, inviteIdSchema, isDeviceId, isInviteId, isMemberId, isWorkspaceId, memberIdSchema, workspaceIdSchema, } from "./ids.js";

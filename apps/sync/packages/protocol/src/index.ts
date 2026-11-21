@@ -1,5 +1,18 @@
-export { decodeBase64, encodeBase64 } from "./base64.js";
+export { decodeBase64, decodeBase64Url, encodeBase64, encodeBase64Url } from "./base64.js";
 export { canonicalJson } from "./canonical.js";
+export {
+  addContact,
+  type ContactsFile,
+  contactForCode,
+  contactsFileSchema,
+  type FriendInviteResolution,
+  learnContact,
+  type NewContact,
+  removeContact,
+  resolveFriendInvite,
+  type SyncContact,
+  syncContactSchema,
+} from "./contacts.js";
 export { formatFingerprint, normaliseFingerprint } from "./fingerprint.js";
 export {
   type Frame,
@@ -16,6 +29,37 @@ export {
   type SealedFrame,
   sealedFrameSchema,
 } from "./frame.js";
+export {
+  deriveFriendCode,
+  deriveFriendCodeFromBytes,
+  type FriendCode,
+  type FriendCodeParse,
+  formatFriendCode,
+  friendCodeMatches,
+  isFriendCode,
+  parseFriendCode,
+} from "./friendCode.js";
+export {
+  deviceIdFromPublicKey,
+  type FriendInvite,
+  type FriendInviteBody,
+  type FriendInviteRejection,
+  type FriendInviteResult,
+  type FriendInviteVerifier,
+  friendInvitePayload,
+  friendInviteRejectionSchema,
+  friendInviteSchema,
+  verifyFriendInvite,
+} from "./friendInvite.js";
+export {
+  FRIEND_LINK_HOST,
+  FRIEND_LINK_SCHEME,
+  type FriendLinkDetails,
+  type FriendLinkParse,
+  formatFriendLink,
+  friendCodeLabel,
+  parseFriendLink,
+} from "./friendLink.js";
 export {
   type GenesisBody,
   type GenesisRecord,

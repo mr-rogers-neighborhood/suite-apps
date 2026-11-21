@@ -7,20 +7,28 @@ import {
   createWorkspaceGroup,
   decodeBase64,
   decodeKeyPackageBytes,
+  deriveFriendCode,
   encodeBase64,
   encodeKeyPackageBytes,
   ephemeralPayload,
   exportKey,
   type Frame,
+  type FriendInvite,
+  type FriendInviteBody,
+  type FriendInviteRejection,
+  formatFriendCode,
   formatInvite,
   frameRejection,
+  friendInvitePayload,
   type InviteRecord,
   inviteRecordPayload,
   joinWorkspaceGroup,
   leafIndexOf,
   type MemberRole,
+  type NewContact,
   normaliseFingerprint,
   open as openMessage,
+  parseFriendCode,
   parseInvite,
   type RelayClient,
   type RelayClientHandlers,
@@ -28,9 +36,12 @@ import {
   type RelayWebSocketFactory,
   removalRecordPayload,
   removeDevice as removeDeviceFromGroup,
+  resolveFriendInvite,
   roleRecordPayload,
+  type SyncContact,
   seal,
   signFrame,
+  verifyFriendInvite,
 } from "@suite/sync";
 import {
   createNodeWebSocketFactory,
@@ -39,6 +50,7 @@ import {
   RelayPinError,
 } from "@suite/sync/node";
 import type { SyncState } from "../../shared/ipc.js";
+import { forgetContact, loadContacts, noteSeen, rememberContact } from "./contactsStore.js";
 import { loadCursor, saveCursor } from "./cursorStore.js";
 import { isOwned, loadGroup, markOwned, saveGroup } from "./groupStore.js";
 import {
@@ -46,6 +58,7 @@ import {
   deviceIdFrom,
   loadOrCreateIdentity,
   readStoredIdentity,
+  verifyEd25519,
   writeStoredIdentity,
 } from "./identity.js";
 import { exportKit, importKit } from "./kit.js";
@@ -95,10 +108,18 @@ export interface SyncService {
   status(): SyncStatus;
   /** The device id and public key the host pins, for a pairing string. */
   identity(): Promise<Pick<DeviceIdentity, "deviceId" | "publicKey">>;
+  /** The code this installation shows a person when they want to be added. */
+  friendCode(): string;
+  /** The people this installation has chosen to know, as the file holds them. */
+  contacts(): readonly SyncContact[];
+  /** Add a person by code, or complete one whose key arrived with the code. */
+  addContact(input: NewContact): Promise<readonly SyncContact[]>;
+  /** Forget a person. Their code can be added again. */
+  removeContact(code: string): Promise<readonly SyncContact[]>;
   /** Seal a document update from the renderer and send it. */
   publish(update: Uint8Array): Promise<void>;
   /** Write an invitation and hand back the link to give someone. */
-  createInvite(role: "editor" | "viewer"): Promise<string>;
+  createInvite(role: "editor" | "viewer", to?: string): Promise<string>;
   /** Ask to join from a link somebody shared. Resolves once this device is in. */
   join(link: string, fingerprint?: string): Promise<SyncStatus>;
   /**
@@ -187,6 +208,10 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
   let identity = await loadOrCreateIdentity(options.dataDir);
   /** What the other person's screen calls this device. */
   const deviceName = options.deviceName ?? "a Suite app";
+  /** This installation's code; a recovery file can replace the identity, so read it fresh. */
+  const ownFriendCode = (): string => deriveFriendCode(identity.publicKey);
+  /** The people this installation knows. Adding one is the explicit act; nothing is pushed. */
+  let contacts = await loadContacts(options.dataDir);
   let group = await loadGroup(options.dataDir, options.workspaceId);
   /** The relay this workspace last used, and the certificate it must present. */
   const storedRelay = await loadRelayConfig(options.dataDir, options.workspaceId);
@@ -728,22 +753,46 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
 
     identity: async () => ({ deviceId: identity.deviceId, publicKey: identity.publicKey }),
 
+    friendCode: () => ownFriendCode(),
+
+    contacts: () => contacts,
+
+    async addContact(input) {
+      contacts = await rememberContact(options.dataDir, contacts, input);
+      return contacts;
+    },
+
+    async removeContact(code) {
+      contacts = await forgetContact(options.dataDir, contacts, code);
+      return contacts;
+    },
+
     members: () => members,
 
     /**
      * Write an invitation and hand back the link to give someone.
      *
      * The role is decided here, by the person inviting, and travels inside the signed record
-     * — so letting somebody in later does not ask the same question twice.
+     * — so letting somebody in later does not ask the same question twice. The link also
+     * carries a signed envelope naming this installation and the relay pin, so a person this
+     * device has added connects without comparing a certificate by hand. The legacy fields
+     * stay, so an older build still joins.
      */
-    async createInvite(role) {
+    async createInvite(role, to) {
       if (relay === null || hostUrl === null) throw new Error("Sync is not connected.");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const inviteId = randomInviteId();
+      let target: string | undefined;
+      if (to !== undefined) {
+        const parsedTo = parseFriendCode(to);
+        if (!parsedTo.ok) throw new Error(parsedTo.reason);
+        target = parsedTo.code;
+      }
       const unsigned = {
         workspaceId: options.workspaceId,
         inviteId,
         role,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt,
         signerId: identity.deviceId,
       };
       const record: InviteRecord = {
@@ -751,7 +800,26 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
         signature: identity.sign(inviteRecordPayload(unsigned)),
       };
       relay.sendInvite(record);
-      return formatInvite({ host: hostUrl, workspaceId: options.workspaceId, inviteId });
+
+      const body: FriendInviteBody = {
+        from: { deviceId: identity.deviceId, publicKey: identity.publicKey },
+        relay: { url: hostUrl, fingerprint: pinnedFingerprint },
+        workspace: options.workspaceId,
+        invite: inviteId,
+        ...(target !== undefined ? { to: target } : {}),
+        expiresAt,
+        nonce: randomBytes(16).toString("hex"),
+      };
+      const friend: FriendInvite = {
+        ...body,
+        signature: identity.sign(friendInvitePayload(body)),
+      };
+      return formatInvite({
+        host: hostUrl,
+        workspaceId: options.workspaceId,
+        inviteId,
+        friend,
+      });
     },
 
     /**
@@ -794,7 +862,70 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
         return status;
       }
 
-      const pin = await resolvePin(parsed.value.host, fingerprint);
+      // A new link carries an envelope. Verify it and decide whether the person who sent it
+      // is one this installation chose to know. An unknown code is refused, not trusted on
+      // first use: adding the contact is the explicit act.
+      let suppliedPin = fingerprint;
+      const friend = parsed.value.friend;
+      if (friend !== undefined) {
+        const checked = verifyFriendInvite(friend, verifyEd25519);
+        if (!checked.ok) {
+          publishStatus({ state: "refused", reason: friendRejection(checked.reason) });
+          return status;
+        }
+
+        const resolution = resolveFriendInvite(friend, contacts, ownFriendCode());
+        switch (resolution.status) {
+          case "known":
+            contacts = await noteSeen(options.dataDir, contacts, friend);
+            break;
+          case "unknown":
+            publishStatus({
+              state: "refused",
+              reason: `This invitation is from friend code ${formatFriendCode(resolution.code)}. Add that code in Contacts, then join again.`,
+            });
+            return status;
+          case "untrusted":
+            publishStatus({
+              state: "refused",
+              reason: `Friend code ${formatFriendCode(resolution.code)} is saved but not trusted. Trust it in Contacts, then join again.`,
+            });
+            return status;
+          case "key-mismatch":
+            publishStatus({
+              state: "refused",
+              reason: `This invitation claims to be from ${formatFriendCode(resolution.code)}, but its key is not the one saved here. Remove and re-add the contact only if you trust this device.`,
+            });
+            return status;
+          case "for-someone-else":
+            publishStatus({
+              state: "refused",
+              reason: "That invitation was written for a different friend code.",
+            });
+            return status;
+          case "malformed-key":
+            publishStatus({
+              state: "refused",
+              reason: "That invitation does not carry a usable identity key.",
+            });
+            return status;
+        }
+
+        if (friend.relay.fingerprint !== null && suppliedPin !== undefined) {
+          const typed = normaliseFingerprint(suppliedPin);
+          if (typed !== null && typed !== friend.relay.fingerprint) {
+            publishStatus({
+              state: "refused",
+              reason:
+                "That invitation's certificate does not match the one in the field. Ask for a fresh invitation.",
+            });
+            return status;
+          }
+        }
+        suppliedPin = friend.relay.fingerprint ?? suppliedPin;
+      }
+
+      const pin = await resolvePin(parsed.value.host, suppliedPin);
       if (!pin.ok) {
         publishStatus({ state: "refused", reason: pin.reason });
         return status;
@@ -1033,4 +1164,20 @@ function randomInviteId(): string {
     bytes[index] = Math.floor(Math.random() * 256);
   }
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** A refused envelope, in a sentence the person holding the link can act on. */
+function friendRejection(reason: FriendInviteRejection): string {
+  switch (reason) {
+    case "expired":
+      return "That invitation has expired. Ask for a fresh one.";
+    case "unpinned-relay":
+      return "That invitation does not pin its relay certificate.";
+    case "device-key-mismatch":
+      return "That invitation's device id does not match its key.";
+    case "invalid-signature":
+      return "That invitation's signature is not valid. Ask for a fresh one.";
+    case "malformed-key":
+      return "That invitation does not carry a usable identity key.";
+  }
 }

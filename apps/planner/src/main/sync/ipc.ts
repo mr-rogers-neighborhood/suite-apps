@@ -1,4 +1,5 @@
 import type { SyncInfo, SyncState } from "@suite/planner-core";
+import type { NewContact } from "@suite/sync";
 import type { WebContents } from "electron";
 
 import type { WorkspaceStore } from "../workspaceStore";
@@ -17,8 +18,10 @@ export interface PlannerSyncController {
   status(): Promise<SyncInfo>;
   enable(url: string, fingerprint?: string): Promise<SyncInfo>;
   disable(): Promise<SyncInfo>;
-  invite(role: "editor" | "viewer"): Promise<string | null>;
+  invite(role: "editor" | "viewer", to?: string): Promise<string | null>;
   join(link: string, fingerprint?: string): Promise<SyncInfo>;
+  addContact(input: NewContact): Promise<SyncInfo>;
+  removeContact(code: string): Promise<SyncInfo>;
   /** A local commit the renderer sent. Never creates a connection. */
   publish(update: Uint8Array): void;
   /** The workspace behind the controller changed: drop the old connection. */
@@ -52,6 +55,16 @@ export function createPlannerSyncController(
       deviceId,
       status,
       members: service?.members() ?? [],
+      friendCode: service?.friendCode() ?? "",
+      contacts: (service?.contacts() ?? []).map((contact) => ({
+        code: contact.code,
+        name: contact.name,
+        addedAt: contact.addedAt,
+        trusted: contact.trusted,
+        ...(contact.deviceId !== undefined ? { deviceId: contact.deviceId } : {}),
+        ...(contact.publicKey !== undefined ? { publicKey: contact.publicKey } : {}),
+        ...(contact.lastSeenAt !== undefined ? { lastSeenAt: contact.lastSeenAt } : {}),
+      })),
     };
   }
 
@@ -139,16 +152,32 @@ export function createPlannerSyncController(
       return info(off);
     },
 
-    async invite(role: "editor" | "viewer") {
+    async invite(role: "editor" | "viewer", to?: string) {
       const current = await ensureService();
       if (current === null) return null;
-      return current.createInvite(role);
+      return current.createInvite(role, to);
     },
 
     async join(link, fingerprint) {
       const current = await ensureService();
       if (current === null) return info(off);
       return info(await current.join(link, fingerprint));
+    },
+
+    async addContact(input) {
+      const current = await ensureService();
+      if (current === null) return info(off);
+      await current.addContact(input);
+      announce();
+      return info();
+    },
+
+    async removeContact(code) {
+      const current = await ensureService();
+      if (current === null) return info(off);
+      await current.removeContact(code);
+      announce();
+      return info();
     },
 
     publish(update) {

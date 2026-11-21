@@ -56,6 +56,23 @@ export type SyncMember = {
 };
 
 /**
+ * One person this installation chose to know.
+ *
+ * The renderer sees the contact but never the file it came from. `publicKey` may be absent
+ * while a contact is known by code alone; the first signed invitation from that code
+ * completes it. Nothing here is sent to a relay or a directory.
+ */
+export type SyncContact = {
+  readonly code: string;
+  readonly name: string;
+  readonly deviceId?: string;
+  readonly publicKey?: string;
+  readonly addedAt: string;
+  readonly lastSeenAt?: string;
+  readonly trusted: boolean;
+};
+
+/**
  * Everything the sync dialog needs, in one value.
  *
  * Pushed by main whenever it changes, so the pill and the dialog read one source rather than
@@ -67,6 +84,10 @@ export type SyncInfo = {
   readonly deviceId: string;
   readonly status: SyncState;
   readonly members: readonly SyncMember[];
+  /** The code this installation shows another person who wants to add it. */
+  readonly friendCode: string;
+  /** The people this installation knows, whichever workspace is open. */
+  readonly contacts: readonly SyncContact[];
 };
 
 /**
@@ -144,9 +165,13 @@ export type PlannerBridge = {
   /** Stop syncing this copy. The workspace keeps its file and its membership. */
   syncDisable?(): Promise<SyncInfo>;
   /** Write a single-use invitation and hand back the link to give someone. */
-  syncInvite?(role: "editor" | "viewer"): Promise<string | null>;
+  syncInvite?(role: "editor" | "viewer", to?: string): Promise<string | null>;
   /** Ask to join from a link somebody shared. Resolves once this device has asked. */
   syncJoin?(link: string, fingerprint?: string): Promise<SyncInfo>;
+  /** Add a person by friend code, or complete one whose key arrived with the code. */
+  syncAddContact?(input: { code: string; name: string; publicKey?: string }): Promise<SyncInfo>;
+  /** Forget a person. Their code can be added again. */
+  syncRemoveContact?(code: string): Promise<SyncInfo>;
   /** Main pushes every change of state, so one subscription feeds the pill and the dialog. */
   onSyncChanged?(listener: (info: SyncInfo) => void): () => void;
 };

@@ -36,8 +36,8 @@ at startup. It shows the relay's metadata and draws a `suite://relay` code with 
 the console's code adds a live invitation when one exists, while Start's own code carries no
 invitation. Neither the console nor a code reads a frame.
 
-A friend-code or contacts exchange is not built. A device joins with an invitation, a relay code, or
-the relay address plus its fingerprint.
+Start is not a contact book: friend codes and contacts live in the apps, not in the hub. A device
+joins with an invitation, a relay code, or the relay address plus its fingerprint.
 
 ## Two rules
 

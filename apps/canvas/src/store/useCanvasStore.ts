@@ -16,6 +16,17 @@ export interface SyncMember {
   readonly role: "owner" | "editor" | "viewer";
 }
 
+/** One person this installation chose to know. */
+export interface SyncContact {
+  readonly code: string;
+  readonly name: string;
+  readonly deviceId?: string;
+  readonly publicKey?: string;
+  readonly addedAt: string;
+  readonly lastSeenAt?: string;
+  readonly trusted: boolean;
+}
+
 /**
  * What sync is doing, and who is here.
  *
@@ -27,6 +38,10 @@ export interface SyncInfo {
   readonly deviceId: string;
   readonly status: SyncState;
   readonly members: readonly SyncMember[];
+  /** The code this installation shows another person who wants to add it. */
+  readonly friendCode: string;
+  /** The people this installation knows, whichever workspace is open. */
+  readonly contacts: readonly SyncContact[];
   /** The SHA-256 fingerprint this workspace pins for its relay certificate. */
   readonly fingerprint?: string | null;
   /** What this device has said about its way back in; null until anybody asked. */
@@ -67,6 +82,12 @@ interface SyncBridge {
   syncPublish(update: number[]): Promise<unknown>;
   syncInvite(role: "editor" | "viewer"): Promise<string | null>;
   syncJoin(link: string, fingerprint?: string): Promise<unknown>;
+  syncAddContact(input: {
+    code: string;
+    name: string;
+    publicKey?: string;
+  }): Promise<SyncInfo | null>;
+  syncRemoveContact(code: string): Promise<SyncInfo | null>;
   onSyncIncoming(listener: (update: number[]) => void): void;
   onSyncChanged(listener: (info: SyncInfo) => void): void;
   onSyncSnapshotWanted(listener: () => void): void;
@@ -156,6 +177,10 @@ interface CanvasState {
   disableSync: () => Promise<void>;
   /** Hand back a link to give someone. Null when sync is not on. */
   inviteSomeone: (role: "editor" | "viewer") => Promise<string | null>;
+  /** Add a person by code, or complete one whose key arrived with the code. */
+  addContact: (input: { code: string; name: string; publicKey?: string }) => Promise<void>;
+  /** Forget a person. Their code can be added again. */
+  forgetContact: (code: string) => Promise<void>;
   /** Take a device out. Answers with what went wrong, or null. */
   removeDevice: (deviceId: string) => Promise<string | null>;
   /** Where the hub on this machine listens, so sharing does not begin with a paste. */
@@ -272,6 +297,14 @@ export const useCanvasStore = create<CanvasState>((set) => {
       if (info != null) set({ sync: info });
     },
     inviteSomeone: async (role) => (await sync?.syncInvite(role)) ?? null,
+    addContact: async (input) => {
+      const info = await sync?.syncAddContact(input);
+      if (info != null) set({ sync: info });
+    },
+    forgetContact: async (code) => {
+      const info = await sync?.syncRemoveContact(code);
+      if (info != null) set({ sync: info });
+    },
     removeDevice: async (deviceId) => {
       const result = await sync?.syncRemove(deviceId);
       return result?.problem ?? null;

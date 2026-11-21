@@ -1,5 +1,6 @@
+import { formatFriendCode, parseFriendCode } from "@suite/sync";
 import { useState } from "react";
-import type { SyncMember } from "../store/useCanvasStore";
+import type { SyncContact, SyncMember } from "../store/useCanvasStore";
 
 /**
  * The four things the sync dialog can be asking.
@@ -343,4 +344,148 @@ export function UnlockStep({ busy, onOpen }: UnlockStepProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * The people this installation knows, and the code it shows in return.
+ *
+ * A friend code is an identifier, not a password: it names this installation so a signed
+ * invitation can be matched to a contact. Adding somebody is the explicit act, so an
+ * invitation from a code that is not in this list is refused with the code to add.
+ */
+export interface FriendsSectionProps {
+  friendCode: string;
+  contacts: readonly SyncContact[];
+  /** What is being typed into the add form. */
+  code: string;
+  name: string;
+  copied: boolean;
+  busy: boolean;
+  onCode: (value: string) => void;
+  onName: (value: string) => void;
+  onAdd: () => void;
+  onCopy: () => void;
+  onForget: (code: string) => void;
+}
+
+export function FriendsSection({
+  friendCode,
+  contacts,
+  code,
+  name,
+  copied,
+  busy,
+  onCode,
+  onName,
+  onAdd,
+  onCopy,
+  onForget,
+}: FriendsSectionProps) {
+  const ownCode = friendCodeDisplay(friendCode);
+
+  return (
+    <section
+      data-testid="sync-friends"
+      className="mt-4 rounded-lg border border-[var(--hairline)] p-3"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-xs font-semibold">Your friend code</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+            Give this to someone you trust. It names this installation; it is not a password.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <code
+            data-testid="friend-code"
+            className="rounded-md border border-[var(--hairline)] px-2 py-1 font-mono text-[11px]"
+          >
+            <span className="sr-only">Your friend code: </span>
+            {ownCode === "" ? "…" : ownCode}
+          </code>
+          <button
+            type="button"
+            disabled={ownCode === ""}
+            onClick={onCopy}
+            className="rounded-md px-2 py-1 text-[11px] hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3 border-t border-[var(--hairline)] pt-3">
+        <h3 className="text-xs font-semibold">People you know</h3>
+        {contacts.length === 0 ? (
+          <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+            Nobody yet. Add a friend's code and their invitation will be recognised.
+          </p>
+        ) : (
+          <ul aria-label="Contacts" className="mt-2 space-y-1">
+            {contacts.map((contact) => (
+              <li
+                key={contact.code}
+                className="flex items-center justify-between gap-3 rounded-md border border-[var(--hairline)] px-2 py-1.5"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-xs">{contact.name}</span>
+                  <span className="block truncate font-mono text-[10px] text-[var(--ink-muted)]">
+                    {friendCodeDisplay(contact.code)}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onForget(contact.code)}
+                  className="shrink-0 text-[11px] text-[var(--ink-muted)] underline-offset-2 hover:underline disabled:opacity-50"
+                >
+                  Forget
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-3 border-t border-[var(--hairline)] pt-3">
+        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <label className="block text-[11px] text-[var(--ink-muted)]">
+            Friend code
+            <input
+              value={code}
+              onChange={(event) => onCode(event.target.value)}
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="ABCD-EFGH-JKMN-PQRS"
+              className="mt-1 w-full rounded-md border border-[var(--hairline)] bg-transparent px-2 py-1 font-mono text-xs"
+            />
+          </label>
+          <label className="block text-[11px] text-[var(--ink-muted)]">
+            Name
+            <input
+              value={name}
+              onChange={(event) => onName(event.target.value)}
+              autoComplete="off"
+              placeholder="Ada"
+              className="mt-1 w-full rounded-md border border-[var(--hairline)] bg-transparent px-2 py-1 text-xs"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy || code.trim() === "" || name.trim() === ""}
+            onClick={onAdd}
+            className="rounded-md px-3 py-1.5 text-xs font-medium hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The display form, without throwing on a value that is not a code yet. */
+function friendCodeDisplay(code: string): string {
+  const parsed = parseFriendCode(code);
+  return parsed.ok ? formatFriendCode(parsed.code) : code;
 }

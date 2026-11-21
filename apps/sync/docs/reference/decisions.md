@@ -23,3 +23,15 @@ The rules that shape Sync.
 - A revoke is done when the relay has numbered the commit that rotates the epoch, not when the removal
   record has been sent. A workspace created when it is first shared has an identity root and a signed
   genesis; a workspace that predates the root opens without one.
+- A friend code is a 16-symbol Crockford base32 commitment to an install key, with a checksum. It is
+  an identifier, not a secret, and it cannot be reversed into the key; an app resolves it through its
+  own contacts file, never a directory.
+- A friend invitation is the ordinary invitation link plus a signed, out-of-band envelope naming the
+  inviter's device and key, the relay and pin, the workspace, the invite, an optional recipient code,
+  an expiry and a nonce. The relay never sees the envelope and learns no contact.
+- Adding a contact is the explicit trust act. A signed invitation from a known code connects without
+  a second certificate question; a known code with a different key is refused; an unknown code is
+  refused with the code to add, never trusted on first use.
+- Contacts are app data in each app's main process (`sync/contacts.json`, mode 0600), outside the
+  document, the workspace file and the relay store. A code-only contact is completed by the first
+  signed invitation whose key hashes to that code.

@@ -39,4 +39,20 @@ export function decodeBase64(value) {
     }
     return Uint8Array.from(bytes);
 }
+/**
+ * URL-safe base64 for a payload that travels in a link.
+ *
+ * A signed invitation is JSON, so the standard alphabet's `+` and `/` would be
+ * percent-encoded by `URLSearchParams` and make an already long link longer. The
+ * padding is dropped for the same reason; `decodeBase64Url` puts it back.
+ */
+export function encodeBase64Url(bytes) {
+    return encodeBase64(bytes).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+/** Decode URL-safe base64, or null when the text is not one. */
+export function decodeBase64Url(value) {
+    if (/[^A-Za-z0-9_-]/u.test(value))
+        return null;
+    return decodeBase64(value.replaceAll("-", "+").replaceAll("_", "/"));
+}
 //# sourceMappingURL=base64.js.map

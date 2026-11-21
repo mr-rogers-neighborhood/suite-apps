@@ -40,8 +40,8 @@ and stays a launcher when the relay is absent or runs somewhere else.
 > **The console and the relay code.** `serve` also opens a read-only console on `127.0.0.1` and
 > prints its URL with a token generated at startup. The console shows the relay's metadata and draws
 > a `suite://relay` code carrying the address, the certificate pin and, when one is live, an
-> invitation. Start opens that console from its Sync tab. A friend-code or contacts exchange is not
-> built.
+> invitation. Start opens that console from its Sync tab. Friend codes and contacts live in the
+> apps' main processes, not in the relay: the console never sees either.
 
 ---
 

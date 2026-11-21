@@ -56,6 +56,7 @@ export type {
   PlannerBridge,
   ReminderEvent,
   ReminderSchedule,
+  SyncContact,
   SyncInfo,
   SyncMember,
   SyncMemberRole,

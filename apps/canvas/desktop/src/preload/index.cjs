@@ -32,6 +32,8 @@ const CHANNELS = {
   syncChanged: "suite:sync:changed",
   syncInvite: "suite:sync:invite",
   syncJoin: "suite:sync:join",
+  syncContactAdd: "suite:sync:contact:add",
+  syncContactRemove: "suite:sync:contact:remove",
   syncSnapshotWanted: "suite:sync:snapshot-wanted",
   syncPresence: "suite:sync:presence",
   syncPresenceIncoming: "suite:sync:presence-incoming",
@@ -73,6 +75,8 @@ contextBridge.exposeInMainWorld("suiteDesktop", {
   },
   syncInvite: (role) => ipcRenderer.invoke(CHANNELS.syncInvite, role),
   syncJoin: (link, fingerprint) => ipcRenderer.invoke(CHANNELS.syncJoin, link, fingerprint),
+  syncAddContact: (input) => ipcRenderer.invoke(CHANNELS.syncContactAdd, input),
+  syncRemoveContact: (code) => ipcRenderer.invoke(CHANNELS.syncContactRemove, code),
   onSyncSnapshotWanted: (listener) => {
     ipcRenderer.on(CHANNELS.syncSnapshotWanted, () => listener());
   },

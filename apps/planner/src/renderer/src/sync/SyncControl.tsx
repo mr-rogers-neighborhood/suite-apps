@@ -1,4 +1,5 @@
 import type { SyncInfo } from "@suite/planner-core";
+import { formatFriendCode, parseFriendCode } from "@suite/sync";
 import { Button, Field, IconButton, Modal, SyncPill } from "@suite/ui";
 import { Check, Copy, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -61,6 +62,9 @@ function SyncDialog({
   const [pasted, setPasted] = useState("");
   const [fingerprint, setFingerprint] = useState("");
   const [link, setLink] = useState<string | null>(null);
+  const [friendCode, setFriendCode] = useState("");
+  const [friendName, setFriendName] = useState("");
+  const [codeCopied, setCodeCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -69,6 +73,7 @@ function SyncDialog({
     if (!open) return;
     setProblem(null);
     setCopied(false);
+    setCodeCopied(false);
   }, [open]);
 
   const status = info?.status ?? { state: "off" as const };
@@ -137,6 +142,38 @@ function SyncDialog({
       .catch(() => setProblem("That link could not be copied. Select it and copy it by hand."));
   }
 
+  function copyFriendCode(): void {
+    const shown = friendCodeDisplay(info?.friendCode ?? "");
+    const clipboard = navigator.clipboard;
+    if (clipboard === undefined) {
+      setProblem("That code could not be copied. Select it and copy it by hand.");
+      return;
+    }
+    void clipboard
+      .writeText(shown)
+      .then(() => setCodeCopied(true))
+      .catch(() => setProblem("That code could not be copied. Select it and copy it by hand."));
+  }
+
+  function addFriend(): void {
+    void run(async () => {
+      const next = await getBridge().syncAddContact?.({
+        code: friendCode.trim(),
+        name: friendName.trim(),
+      });
+      if (next !== undefined) onInfo(next);
+      setFriendCode("");
+      setFriendName("");
+    });
+  }
+
+  function forgetFriend(code: string): void {
+    void run(async () => {
+      const next = await getBridge().syncRemoveContact?.(code);
+      if (next !== undefined) onInfo(next);
+    });
+  }
+
   return (
     <Modal open={open} onClose={onClose} label="Sync" size="md">
       <div className="flex items-start justify-between gap-3">
@@ -147,6 +184,19 @@ function SyncDialog({
       </div>
 
       <p className="mt-1.5 text-[12px] leading-relaxed text-muted">{syncSentence(status)}</p>
+
+      <FriendsSection
+        info={info}
+        code={friendCode}
+        name={friendName}
+        copied={codeCopied}
+        busy={busy}
+        onCode={setFriendCode}
+        onName={setFriendName}
+        onAdd={addFriend}
+        onCopy={copyFriendCode}
+        onForget={forgetFriend}
+      />
 
       <div className="mt-4 flex flex-col gap-4">
         {shared ? (
@@ -376,4 +426,128 @@ function SharedBody({
       </div>
     </>
   );
+}
+
+/**
+ * The people this installation knows, and the code it shows in return.
+ *
+ * A friend code is an identifier, not a password: it names this installation so a
+ * signed invitation can be matched to a contact. Adding somebody is the explicit act,
+ * so an invitation from a code that is not in this list is refused with the code to add.
+ */
+function FriendsSection({
+  info,
+  code,
+  name,
+  copied,
+  busy,
+  onCode,
+  onName,
+  onAdd,
+  onCopy,
+  onForget,
+}: {
+  readonly info: SyncInfo | null;
+  readonly code: string;
+  readonly name: string;
+  readonly copied: boolean;
+  readonly busy: boolean;
+  readonly onCode: (value: string) => void;
+  readonly onName: (value: string) => void;
+  readonly onAdd: () => void;
+  readonly onCopy: () => void;
+  readonly onForget: (code: string) => void;
+}) {
+  const contacts = info?.contacts ?? [];
+  const ownCode = friendCodeDisplay(info?.friendCode ?? "");
+
+  return (
+    <section className="mt-4 rounded-lg border border-line bg-panel p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[12px] font-medium text-ink">Your friend code</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted">
+            Give this to someone you trust. It names this installation; it is not a password.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <code
+            data-testid="friend-code"
+            className="rounded-md border border-line bg-panel px-2 py-1 font-mono text-[11px] text-ink"
+          >
+            <span className="sr-only">Your friend code: </span>
+            {ownCode === "" ? "…" : ownCode}
+          </code>
+          <Button size="sm" variant="secondary" disabled={ownCode === ""} onClick={onCopy}>
+            {copied ? <Check size={13} /> : <Copy size={13} />}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-3 border-t border-line pt-3">
+        <p className="text-[12px] font-medium text-ink">People you know</p>
+        {contacts.length === 0 ? (
+          <p className="mt-1 text-[11px] leading-relaxed text-muted">
+            Nobody yet. Add a friend's code and their invitation will be recognised.
+          </p>
+        ) : (
+          <ul aria-label="Contacts" className="mt-2 flex flex-col gap-1.5">
+            {contacts.map((contact) => (
+              <li
+                key={contact.code}
+                className="flex items-center justify-between gap-3 rounded-md border border-line bg-panel px-3 py-2"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-[12px] text-ink">{contact.name}</span>
+                  <span className="block truncate font-mono text-[10px] text-muted">
+                    {friendCodeDisplay(contact.code)}
+                  </span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => onForget(contact.code)}
+                >
+                  Forget
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-3 border-t border-line pt-3">
+        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <Field
+            label="Friend code"
+            value={code}
+            hint="Sixteen symbols, four groups of four."
+            onChange={(event) => onCode(event.target.value)}
+          />
+          <Field
+            label="Name"
+            value={name}
+            hint="What you will call them here."
+            onChange={(event) => onName(event.target.value)}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy || code.trim() === "" || name.trim() === ""}
+            onClick={onAdd}
+          >
+            Add
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The display form, without throwing on a value that is not a code yet. */
+function friendCodeDisplay(code: string): string {
+  const parsed = parseFriendCode(code);
+  return parsed.ok ? formatFriendCode(parsed.code) : code;
 }

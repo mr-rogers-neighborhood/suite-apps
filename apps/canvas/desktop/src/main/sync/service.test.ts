@@ -6,16 +6,19 @@ import {
   createDeviceIdentity,
   createWorkspaceGroup,
   decodeKeyPackageBytes,
+  deriveFriendCode,
   encodeBase64,
   encodeKeyPackageBytes,
   joinWorkspaceGroup,
+  parseInvite,
   type RelayWebSocket,
   seal,
+  verifyFriendInvite,
 } from "@suite/sync";
 import { describe, expect, it, vi } from "vitest";
 import { loadCursor } from "./cursorStore.js";
 import { loadGroup, saveGroup } from "./groupStore.js";
-import { loadOrCreateIdentity } from "./identity.js";
+import { loadOrCreateIdentity, verifyEd25519 } from "./identity.js";
 import { loadRelayConfig } from "./relayConfig.js";
 import { genesisChecksOut, readGenesis, readRootFile } from "./rootStore.js";
 import { createSyncService, type SyncStatus } from "./service.js";
@@ -491,6 +494,33 @@ describe("inviting someone in", () => {
     const link = await service.createInvite("editor");
     expect(link.startsWith("suite://join?")).toBe(true);
     expect(fake.sent.some((message) => message.type === "invite")).toBe(true);
+
+    // The same link carries a signed envelope, and the legacy fields an older build reads.
+    const parsed = parseInvite(link);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error(parsed.reason);
+    expect(parsed.value.friend).toBeDefined();
+    if (parsed.value.friend === undefined) throw new Error("no envelope");
+    expect(verifyFriendInvite(parsed.value.friend, verifyEd25519).ok).toBe(true);
+  });
+
+  it("gives this installation a code that matches its key, and remembers contacts", async () => {
+    const dataDir = await folder();
+    const service = await createSyncService({ dataDir, workspaceId });
+    const identity = await service.identity();
+
+    expect(service.friendCode()).toBe(deriveFriendCode(identity.publicKey));
+    await service.addContact({
+      code: service.friendCode(),
+      name: "Ada",
+      publicKey: identity.publicKey,
+    });
+    expect(service.contacts()).toHaveLength(1);
+
+    const restarted = await createSyncService({ dataDir, workspaceId });
+    expect(restarted.contacts()[0]?.name).toBe("Ada");
+    await restarted.removeContact(restarted.friendCode());
+    expect(restarted.contacts()).toEqual([]);
   });
 
   it("refuses to write an invitation while it is not connected", async () => {

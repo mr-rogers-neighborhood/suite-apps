@@ -1,7 +1,11 @@
-export { decodeBase64, encodeBase64 } from "./base64.js";
+export { decodeBase64, decodeBase64Url, encodeBase64, encodeBase64Url } from "./base64.js";
 export { canonicalJson } from "./canonical.js";
+export { addContact, type ContactsFile, contactForCode, contactsFileSchema, type FriendInviteResolution, learnContact, type NewContact, removeContact, resolveFriendInvite, type SyncContact, syncContactSchema, } from "./contacts.js";
 export { formatFingerprint, normaliseFingerprint } from "./fingerprint.js";
 export { type Frame, type FrameHeader, type FrameKind, type FrameRejection, frameHeaderSchema, frameKindSchema, framePayload, frameRejection, frameRejectionSchema, frameSchema, hostAcceptsEpoch, type SealedFrame, sealedFrameSchema, } from "./frame.js";
+export { deriveFriendCode, deriveFriendCodeFromBytes, type FriendCode, type FriendCodeParse, formatFriendCode, friendCodeMatches, isFriendCode, parseFriendCode, } from "./friendCode.js";
+export { deviceIdFromPublicKey, type FriendInvite, type FriendInviteBody, type FriendInviteRejection, type FriendInviteResult, type FriendInviteVerifier, friendInvitePayload, friendInviteRejectionSchema, friendInviteSchema, verifyFriendInvite, } from "./friendInvite.js";
+export { FRIEND_LINK_HOST, FRIEND_LINK_SCHEME, type FriendLinkDetails, type FriendLinkParse, formatFriendLink, friendCodeLabel, parseFriendLink, } from "./friendLink.js";
 export { type GenesisBody, type GenesisRecord, type GenesisVerifier, genesisNamesItsRoot, genesisPayload, genesisRecordSchema, verifyGenesis, workspaceIdFromRootKey, } from "./genesis.js";
 export { type AddDeviceResult, type AppliedCommit, addDevice, applyCommit, createDeviceIdentity, createWorkspaceGroup, type DeviceGroup, type DeviceIdentity, decodeGroup, decodeKeyPackageBytes, encodeGroup, encodeKeyPackageBytes, exportKey, joinWorkspaceGroup, leafIndexOf, type OpenedMessage, open, type RemoveDeviceResult, removeDevice, type SealedMessage, SUITE_CIPHERSUITE, seal, } from "./group.js";
 export { type DeviceId, deviceIdSchema, type InviteId, inviteIdSchema, isDeviceId, isInviteId, isMemberId, isWorkspaceId, type MemberId, memberIdSchema, type WorkspaceId, workspaceIdSchema, } from "./ids.js";

@@ -21,6 +21,8 @@ function shared(state: SyncInfo["status"]): SyncInfo {
     deviceId: thisDevice.deviceId,
     status: state,
     members: [thisDevice, otherDevice],
+    friendCode: "0123456789ABCDEF",
+    contacts: [],
   };
 }
 

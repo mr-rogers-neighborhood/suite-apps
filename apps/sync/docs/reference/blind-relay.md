@@ -453,8 +453,8 @@ attacker from dropping traffic.
 The relay's console is a separate loopback listener with a token generated at startup. It reads the
 metadata the relay already holds — workspaces, roles, names, frame counts, epochs, connected devices
 and store size — and draws a `suite://relay` code with the address, the pin and, when the console
-holds a live invitation, that invitation. It never reads a frame. A friend-code or contacts exchange
-is not built.
+holds a live invitation, that invitation. It never reads a frame, and it never stores a friend code
+or a contact: those belong to each app's main process.
 
 ## What this does not settle
 

@@ -1,9 +1,10 @@
+import { friendCodeLabel } from "@suite/sync";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { syncPresentation } from "../feedback/syncState";
 import { useEscapeLayer } from "../shell/escapeLayers";
 import { useCanvasStore } from "../store/useCanvasStore";
-import { KitStep, LocalFace, SyncedFace, UnlockStep } from "./SyncFaces";
+import { FriendsSection, KitStep, LocalFace, SyncedFace, UnlockStep } from "./SyncFaces";
 import { useFocusTrap } from "./useFocusTrap";
 
 /**
@@ -35,6 +36,8 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
   const enableSync = useCanvasStore((state) => state.enableSync);
   const disableSync = useCanvasStore((state) => state.disableSync);
   const inviteSomeone = useCanvasStore((state) => state.inviteSomeone);
+  const addContact = useCanvasStore((state) => state.addContact);
+  const forgetContact = useCanvasStore((state) => state.forgetContact);
   const joinWorkspace = useCanvasStore((state) => state.joinWorkspace);
   const removeDevice = useCanvasStore((state) => state.removeDevice);
   const hub = useCanvasStore((state) => state.hub);
@@ -51,6 +54,9 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
   const [problem, setProblem] = useState<string | null>(null);
   const [step, setStep] = useState<Step>({ name: "main" });
   const [removing, setRemoving] = useState<string | null>(null);
+  const [friendCode, setFriendCode] = useState("");
+  const [friendName, setFriendName] = useState("");
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEscapeLayer(onClose, open);
   useFocusTrap(panel, open);
@@ -59,6 +65,7 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
     if (!open) return;
     setProblem(null);
     setStep({ name: "main" });
+    setCodeCopied(false);
     // The hub reports where it listens, so sharing does not begin with copying an address out
     // of another window. A hub that is not running leaves the default in place and editable.
     void refreshHub().then(() => {
@@ -103,6 +110,26 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
       }
       if (result.reason === "message") setProblem(result.message);
     });
+
+  const addFriend = () =>
+    run(async () => {
+      await addContact({ code: friendCode.trim(), name: friendName.trim() });
+      setFriendCode("");
+      setFriendName("");
+    });
+
+  const copyFriendCode = () => {
+    const shown = friendCodeLabel(sync?.friendCode ?? "");
+    const clipboard = navigator.clipboard;
+    if (clipboard === undefined) {
+      setProblem("That code could not be copied. Select it and copy it by hand.");
+      return;
+    }
+    void clipboard
+      .writeText(shown)
+      .then(() => setCodeCopied(true))
+      .catch(() => setProblem("That code could not be copied. Select it and copy it by hand."));
+  };
 
   const face =
     step.name === "kit"
@@ -149,6 +176,26 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
               ? "That file is sealed with a passphrase. Type it to open it."
               : presentation.sentence}
         </p>
+
+        {step.name === "main" ? (
+          <FriendsSection
+            friendCode={sync?.friendCode ?? ""}
+            contacts={sync?.contacts ?? []}
+            code={friendCode}
+            name={friendName}
+            copied={codeCopied}
+            busy={busy}
+            onCode={setFriendCode}
+            onName={setFriendName}
+            onAdd={addFriend}
+            onCopy={copyFriendCode}
+            onForget={(code) =>
+              void run(async () => {
+                await forgetContact(code);
+              })
+            }
+          />
+        ) : null}
 
         {step.name === "kit" ? (
           <KitStep

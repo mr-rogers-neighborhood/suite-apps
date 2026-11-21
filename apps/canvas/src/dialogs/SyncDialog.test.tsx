@@ -1,15 +1,18 @@
+import { deriveFriendCode, formatFriendCode } from "@suite/sync";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useCanvasStore } from "../store/useCanvasStore";
 import { SyncDialog } from "./SyncDialog";
 
 const workspaceId = "a".repeat(64);
+const friendCode = deriveFriendCode("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
 const thisDevice = { deviceId: "b".repeat(64), name: "this laptop", role: "owner" } as const;
 const otherDevice = { deviceId: "c".repeat(64), name: "the desktop", role: "editor" } as const;
 
 function open(options: {
   status: Parameters<typeof structuredClone>[0];
   members?: readonly unknown[];
+  contacts?: readonly unknown[];
   kit?: "made" | "declined" | null;
 }) {
   useCanvasStore.setState({
@@ -19,6 +22,8 @@ function open(options: {
       deviceId: thisDevice.deviceId,
       status: options.status as never,
       members: (options.members ?? []) as never,
+      friendCode,
+      contacts: (options.contacts ?? []) as never,
       kit: options.kit ?? null,
     },
   });
@@ -90,6 +95,8 @@ describe("the sync dialog", () => {
         deviceId: thisDevice.deviceId,
         status: { state: "syncing", count: 1 },
         members: [thisDevice],
+        friendCode,
+        contacts: [],
         kit: null,
         fingerprint: "AB:CD:EF",
       },
@@ -207,5 +214,33 @@ describe("the sync dialog", () => {
     expect(await screen.findByTestId("sync-problem")).toHaveTextContent(
       "no invitation was written",
     );
+  });
+
+  it("shows this installation's friend code and adds a person by code", async () => {
+    const addContact = vi.fn(async () => undefined);
+    useCanvasStore.setState({ addContact });
+    open({ status: { state: "off" } });
+
+    expect(screen.getByTestId("friend-code")).toHaveTextContent(formatFriendCode(friendCode));
+    fireEvent.change(screen.getByLabelText("Friend code"), { target: { value: friendCode } });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(addContact).toHaveBeenCalledWith({ code: friendCode, name: "Ada" });
+  });
+
+  it("forgets a person without touching the workspace", async () => {
+    const forgetContact = vi.fn(async () => undefined);
+    useCanvasStore.setState({ forgetContact });
+    open({
+      status: { state: "off" },
+      contacts: [
+        { code: friendCode, name: "Ada", addedAt: "2026-01-01T00:00:00.000Z", trusted: true },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Forget" }));
+
+    expect(forgetContact).toHaveBeenCalledWith(friendCode);
   });
 });

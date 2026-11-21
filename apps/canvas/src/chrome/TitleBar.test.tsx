@@ -18,6 +18,8 @@ function synced(options: {
       { deviceId: "b".repeat(64), name: "this laptop", role: "owner" },
       { deviceId: "c".repeat(64), name: "the desktop", role: "editor" },
     ],
+    friendCode: "0123456789ABCDEF",
+    contacts: [],
   };
 }
 

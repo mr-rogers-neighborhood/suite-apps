@@ -69,6 +69,16 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
     deviceId: service === null ? "" : deviceIdCache,
     status,
     members: service === null ? [] : service.members(),
+    friendCode: service === null ? "" : service.friendCode(),
+    contacts: (service === null ? [] : service.contacts()).map((contact) => ({
+      code: contact.code,
+      name: contact.name,
+      addedAt: contact.addedAt,
+      trusted: contact.trusted,
+      ...(contact.deviceId !== undefined ? { deviceId: contact.deviceId } : {}),
+      ...(contact.publicKey !== undefined ? { publicKey: contact.publicKey } : {}),
+      ...(contact.lastSeenAt !== undefined ? { lastSeenAt: contact.lastSeenAt } : {}),
+    })),
     fingerprint: service === null ? null : service.relayFingerprint(),
     kit: kitState,
   });
@@ -152,6 +162,44 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
     return info(
       await current.join(link, typeof fingerprint === "string" ? fingerprint : undefined),
     );
+  });
+
+  options.onIpc(IPC.syncContactAdd, async (_event, input: unknown) => {
+    const current = await ensureService();
+    if (current === null) return info({ state: "off" });
+    if (typeof input !== "object" || input === null) return info(current.status());
+    const record = input as { code?: unknown; name?: unknown; publicKey?: unknown };
+    if (
+      typeof record.code !== "string" ||
+      record.code.trim() === "" ||
+      typeof record.name !== "string" ||
+      record.name.trim() === ""
+    ) {
+      return info(current.status());
+    }
+    try {
+      await current.addContact({
+        code: record.code,
+        name: record.name.trim(),
+        ...(typeof record.publicKey === "string" ? { publicKey: record.publicKey } : {}),
+      });
+    } catch (error) {
+      return {
+        ...info(current.status()),
+        problem: error instanceof Error ? error.message : "That contact could not be added.",
+      };
+    }
+    announce(current.status());
+    return info(current.status());
+  });
+
+  options.onIpc(IPC.syncContactRemove, async (_event, code: unknown) => {
+    const current = await ensureService();
+    if (current === null) return info({ state: "off" });
+    if (typeof code !== "string" || code.trim() === "") return info(current.status());
+    await current.removeContact(code);
+    announce(current.status());
+    return info(current.status());
   });
 
   options.onIpc(IPC.syncPublish, async (_event, update: unknown) => {

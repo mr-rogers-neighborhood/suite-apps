@@ -1,4 +1,11 @@
-import { createHash, createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
+import {
+  createHash,
+  createPrivateKey,
+  createPublicKey,
+  generateKeyPairSync,
+  sign,
+  verify,
+} from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -86,6 +93,26 @@ export async function loadOrCreateIdentity(dataDir: string): Promise<DeviceIdent
 /** The id the protocol expects: the SHA-256 of the raw public key, lower-case hex. */
 export function deviceIdFrom(publicKeyBase64: string): string {
   return createHash("sha256").update(Buffer.from(publicKeyBase64, "base64")).digest("hex");
+}
+
+const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
+
+/** Check an Ed25519 signature with a base64 public key, as a signed invitation needs. */
+export function verifyEd25519(
+  payload: string,
+  signature: string,
+  publicKeyBase64: string,
+): boolean {
+  try {
+    const key = createPublicKey({
+      key: Buffer.concat([ED25519_SPKI_PREFIX, Buffer.from(publicKeyBase64, "base64")]),
+      format: "der",
+      type: "spki",
+    });
+    return verify(null, Buffer.from(payload), key, Buffer.from(signature, "base64"));
+  } catch {
+    return false;
+  }
 }
 
 function fromStored(stored: StoredIdentity): DeviceIdentity {

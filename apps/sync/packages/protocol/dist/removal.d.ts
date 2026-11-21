@@ -26,8 +26,8 @@ export interface RemovalState {
     readonly removed: Readonly<Record<string, string>>;
 }
 export declare const removalRejectionSchema: z.ZodEnum<{
-    "wrong-workspace": "wrong-workspace";
     "invalid-signature": "invalid-signature";
+    "wrong-workspace": "wrong-workspace";
     "not-owner": "not-owner";
     self: "self";
 }>;

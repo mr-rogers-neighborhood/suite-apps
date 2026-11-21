@@ -31,6 +31,13 @@ good: it can no longer read anything new, its own copy stays where it is, and th
 a fresh invitation. **Stop sharing on this device** leaves the workspace here and lets go of the copy
 the other machines keep, which is why it is not the same as deleting anything.
 
+**Friends.** Every Sync dialog shows this installation's **friend code**, four groups of four
+symbols, and the **People you know** list. Give the code to somebody you trust; they add it here with
+a name. An invitation from a code in that list connects without asking for the certificate again,
+because the signed invitation already names the relay and its pin. An invitation from a code that is
+not listed is refused and names the code to add: being introduced is the explicit act, and there is
+no directory to ask.
+
 **Shared, and nobody has answered about a way back in.** The dialog offers one file, once, with an
 optional passphrase ([a way back in](target:ui:sync-status)). Declining is a decision, and it is
 remembered.

@@ -1,4 +1,5 @@
 import type { SyncInfo } from "@suite/planner-core";
+import { deriveFriendCode, formatFriendCode } from "@suite/sync";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,17 +10,25 @@ const bridge = vi.hoisted(() => ({
   syncDisable: vi.fn(),
   syncInvite: vi.fn(),
   syncJoin: vi.fn(),
+  syncAddContact: vi.fn(),
+  syncRemoveContact: vi.fn(),
 }));
 
 vi.mock("../platform/bridge", () => ({ getBridge: () => bridge }));
 
 const { SyncControl } = await import("./SyncControl");
 
+/** 32 zero bytes in base64: a fixed key, so the expected code is stable. */
+const SOME_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+const FRIEND_CODE = deriveFriendCode(SOME_KEY);
+
 const local: SyncInfo = {
   workspaceId: "a".repeat(64),
   deviceId: "d".repeat(64),
   status: { state: "off" },
   members: [],
+  friendCode: FRIEND_CODE,
+  contacts: [],
 };
 
 const synced: SyncInfo = {
@@ -39,6 +48,8 @@ beforeEach(() => {
   bridge.syncDisable.mockReset().mockResolvedValue(local);
   bridge.syncInvite.mockReset();
   bridge.syncJoin.mockReset().mockResolvedValue({ ...local, status: { state: "waiting" } });
+  bridge.syncAddContact.mockReset().mockResolvedValue(local);
+  bridge.syncRemoveContact.mockReset().mockResolvedValue(local);
 });
 
 afterEach(cleanup);
@@ -109,5 +120,66 @@ describe("SyncControl", () => {
     fireEvent.click(screen.getByRole("button", { name: "Share this workspace" }));
 
     expect(bridge.syncEnable).toHaveBeenCalledWith("wss://192.168.1.9:8787/sync", "AB:CD:EF");
+  });
+
+  it("shows this installation's friend code in the form a person reads out", async () => {
+    render(<SyncControl />);
+    fireEvent.click(await screen.findByTestId("sync-status"));
+
+    expect(screen.getByTestId("friend-code")).toHaveTextContent(formatFriendCode(FRIEND_CODE));
+    expect(screen.getByText(/Nobody yet/u)).toBeInTheDocument();
+  });
+
+  it("adds a friend by code and name, and shows them in the list", async () => {
+    const added: SyncInfo = {
+      ...local,
+      contacts: [
+        {
+          code: FRIEND_CODE,
+          name: "Ada",
+          addedAt: "2026-01-01T00:00:00.000Z",
+          trusted: true,
+        },
+      ],
+    };
+    bridge.syncAddContact.mockResolvedValue(added);
+
+    render(<SyncControl />);
+    fireEvent.click(await screen.findByTestId("sync-status"));
+
+    fireEvent.change(screen.getByLabelText("Friend code"), {
+      target: { value: formatFriendCode(FRIEND_CODE) },
+    });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(bridge.syncAddContact).toHaveBeenCalledWith({
+      code: formatFriendCode(FRIEND_CODE),
+      name: "Ada",
+    });
+    expect(await screen.findByText("Ada")).toBeInTheDocument();
+  });
+
+  it("forgets a friend without touching the workspaces they are in", async () => {
+    const withContact: SyncInfo = {
+      ...local,
+      contacts: [
+        {
+          code: FRIEND_CODE,
+          name: "Ada",
+          addedAt: "2026-01-01T00:00:00.000Z",
+          trusted: true,
+        },
+      ],
+    };
+    bridge.syncStatus.mockResolvedValue(withContact);
+    bridge.syncRemoveContact.mockResolvedValue(local);
+
+    render(<SyncControl />);
+    fireEvent.click(await screen.findByTestId("sync-status"));
+    fireEvent.click(screen.getByRole("button", { name: "Forget" }));
+
+    expect(bridge.syncRemoveContact).toHaveBeenCalledWith(FRIEND_CODE);
+    expect(await screen.findByText(/Nobody yet/u)).toBeInTheDocument();
   });
 });

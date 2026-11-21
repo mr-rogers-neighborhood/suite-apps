@@ -1,3 +1,4 @@
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,15 +7,21 @@ import {
   addDevice,
   createDeviceIdentity,
   createWorkspaceGroup,
+  deriveFriendCode,
   encodeBase64,
+  type FriendInvite,
+  formatInvite,
+  friendInvitePayload,
   joinWorkspaceGroup,
+  parseInvite,
   type RelayWebSocket,
   seal,
+  verifyFriendInvite,
 } from "@suite/sync";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { loadGroup, saveGroup } from "./groupStore";
-import { loadOrCreateIdentity } from "./identity";
+import { loadOrCreateIdentity, verifyEd25519 } from "./identity";
 import { loadRelayConfig } from "./relayConfig";
 import { createPlannerSyncService } from "./service";
 
@@ -167,6 +174,115 @@ describe("the Planner sync service", () => {
     await service.disconnect();
   });
 });
+
+describe("friend codes and contacts", () => {
+  it("gives this installation a code that matches its public key", async () => {
+    const service = await createPlannerSyncService({ dataDir: await folder(), workspaceId });
+    const identity = await service.identity();
+
+    expect(service.friendCode()).toBe(deriveFriendCode(identity.publicKey));
+    expect(service.contacts()).toEqual([]);
+    await service.disconnect();
+  });
+
+  it("writes an invitation with a signed envelope and the legacy fields", async () => {
+    const dataDir = await folder();
+    const fake = fakeRelay();
+    const service = await createPlannerSyncService({
+      dataDir,
+      workspaceId,
+      webSocket: () => fake.socket,
+    });
+
+    const connected = service.connect("ws://127.0.0.1:8787/sync");
+    fake.open();
+    await connected;
+
+    const link = await service.createInvite("editor");
+    const parsed = parseInvite(link);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error(parsed.reason);
+
+    // The old fields still name the same invitation, so an older build can join.
+    expect(parsed.value).toMatchObject({
+      host: "ws://127.0.0.1:8787/sync",
+      workspaceId,
+    });
+    expect(parsed.value.friend).toBeDefined();
+    const friend = parsed.value.friend;
+    if (friend === undefined) throw new Error("the envelope is missing");
+
+    expect(friend.from.deviceId).toBe((await service.identity()).deviceId);
+    expect(friend.relay).toEqual({ url: "ws://127.0.0.1:8787/sync", fingerprint: null });
+    expect(friend.workspace).toBe(workspaceId);
+    expect(friend.invite).toBe(parsed.value.inviteId);
+    const checked = verifyFriendInvite(friend, verifyEd25519);
+    expect(checked.ok).toBe(true);
+
+    await service.disconnect();
+  });
+
+  it("remembers a contact by code, across a restart", async () => {
+    const dataDir = await folder();
+    const first = await createPlannerSyncService({ dataDir, workspaceId });
+    const publicKey = (await first.identity()).publicKey;
+
+    const added = await first.addContact({
+      code: deriveFriendCode(publicKey),
+      name: "Ada",
+      publicKey,
+    });
+    expect(added).toHaveLength(1);
+    expect(added[0]).toMatchObject({ name: "Ada", publicKey });
+    await first.disconnect();
+
+    const second = await createPlannerSyncService({ dataDir, workspaceId });
+    expect(second.contacts()).toHaveLength(1);
+    expect(second.contacts()[0]?.name).toBe("Ada");
+
+    await second.removeContact(deriveFriendCode(publicKey));
+    expect(second.contacts()).toEqual([]);
+    await second.disconnect();
+  });
+
+  it("refuses a signed invitation from a code this installation has not added", async () => {
+    const service = await createPlannerSyncService({ dataDir: await folder(), workspaceId });
+
+    // A device this Planner has never met: the envelope is valid, but the code is not a
+    // contact. Adding it is the explicit act, so the join stops with something to do.
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const raw = publicKey.export({ format: "der", type: "spki" }).subarray(12);
+    const publicKeyBase64 = raw.toString("base64");
+    const body = {
+      from: {
+        deviceId: deviceIdOf(raw),
+        publicKey: publicKeyBase64,
+      },
+      relay: { url: "ws://127.0.0.1:8787/sync", fingerprint: null },
+      workspace: workspaceId,
+      invite: "b".repeat(64),
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      nonce: "c".repeat(32),
+    };
+    const friend: FriendInvite = {
+      ...body,
+      signature: sign(null, Buffer.from(friendInvitePayload(body)), privateKey).toString("base64"),
+    };
+    const link = formatInvite({
+      host: body.relay.url,
+      workspaceId,
+      inviteId: body.invite,
+      friend,
+    });
+
+    await expect(service.join(link)).rejects.toThrow(/Add that code in Contacts/u);
+    await service.disconnect();
+  });
+});
+
+function deviceIdOf(rawPublicKey: Buffer): string {
+  return createHash("sha256").update(rawPublicKey).digest("hex");
+}
 
 describe("pinning a relay certificate", () => {
   it("refuses a wss relay until a fingerprint is entered", async () => {

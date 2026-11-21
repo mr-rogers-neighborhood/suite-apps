@@ -139,6 +139,10 @@ describe("two Planner profiles through a real relay", () => {
       "the relay to keep the invitation",
     );
 
+    // A signed invitation is recognised through a contact, so Bob adds Alice's code first.
+    // That is the explicit act the friend-code design asks for; an unknown code is refused.
+    await bob.addContact({ code: alice.friendCode(), name: "Planner on Alice" });
+
     // Join: the invitation is a bearer token, the relay spends it, Alice admits the key
     // package, and Bob takes the welcome that follows.
     await bob.join(invitation);

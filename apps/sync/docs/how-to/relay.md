@@ -228,8 +228,9 @@ already reads — and no frame payload. Start opens this URL from its **Sync** t
 The page draws a `suite://relay` QR code. `u` is the relay address, `f` the certificate fingerprint,
 and a live invitation adds `w` (workspace id) and `i` (invitation id), so the code is also a bearer
 invitation. Start's Sync tab draws a code with the address and pin; the console's code adds the
-invitation when one exists. A friend-code or contacts exchange is not built; the shipped ways to
-reach a relay are its address plus pin, an invitation, or one of these codes.
+invitation when one exists. Friend codes and contacts are app data, not relay data; the relay never
+stores them. The shipped ways to reach a relay are its address plus pin, an invitation, or one of
+these codes.
 
 ## 5. Point devices at it
 

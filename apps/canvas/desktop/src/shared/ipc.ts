@@ -40,6 +40,10 @@ export const IPC = {
   syncInvite: "suite:sync:invite",
   /** Join from a link somebody shared. */
   syncJoin: "suite:sync:join",
+  /** Add a person by friend code, or complete one whose key arrived with the code. */
+  syncContactAdd: "suite:sync:contact:add",
+  /** Forget a person. Their code can be added again. */
+  syncContactRemove: "suite:sync:contact:remove",
   /**
    * Pushed when somebody has been let in, so the page hands over a snapshot.
    *
@@ -93,6 +97,17 @@ export interface SyncMember {
   readonly role: "owner" | "editor" | "viewer";
 }
 
+/** One person this installation chose to know. The renderer never sees the file. */
+export interface SyncContact {
+  readonly code: string;
+  readonly name: string;
+  readonly deviceId?: string;
+  readonly publicKey?: string;
+  readonly addedAt: string;
+  readonly lastSeenAt?: string;
+  readonly trusted: boolean;
+}
+
 /** Everything the renderer needs to draw a status line, and nothing else. */
 export interface SyncInfo {
   readonly workspaceId: string | null;
@@ -106,6 +121,10 @@ export interface SyncInfo {
    * hex string cannot answer it.
    */
   readonly members: readonly SyncMember[];
+  /** The code this installation shows another person who wants to add it. */
+  readonly friendCode: string;
+  /** The people this installation knows, whichever workspace is open. */
+  readonly contacts: readonly SyncContact[];
   /**
    * The SHA-256 fingerprint this workspace pins for its relay certificate.
    *

@@ -76,10 +76,10 @@ export declare function framePayload(header: FrameHeader): Uint8Array;
  * somebody made rather than a permission that was never granted.
  */
 export declare const frameRejectionSchema: z.ZodEnum<{
+    "invalid-signature": "invalid-signature";
     "wrong-workspace": "wrong-workspace";
     "stale-epoch": "stale-epoch";
     "not-authorized": "not-authorized";
-    "invalid-signature": "invalid-signature";
     removed: "removed";
 }>;
 export type FrameRejection = z.infer<typeof frameRejectionSchema>;

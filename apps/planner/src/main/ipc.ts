@@ -26,6 +26,16 @@ const relayFingerprintSchema = z.string().trim().min(1).optional();
 
 const inviteLinkSchema = z.string().trim().min(1);
 
+const friendCodeSchema = z.string().trim().min(1);
+
+const addContactSchema = z
+  .object({
+    code: friendCodeSchema,
+    name: z.string().trim().min(1).max(120),
+    publicKey: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 /**
  * Register a channel, but only answer the page this app loaded.
  *
@@ -129,9 +139,27 @@ export function registerIpc(getStore: () => WorkspaceStore, sync: PlannerSyncCon
 
   onIpc("sync:disable", () => sync.disable());
 
-  onIpc("sync:invite", (_event, role: unknown) => sync.invite(inviteRoleSchema.parse(role)));
+  onIpc("sync:invite", (_event, role: unknown, to: unknown) =>
+    sync.invite(
+      inviteRoleSchema.parse(role),
+      to === undefined ? undefined : friendCodeSchema.parse(to),
+    ),
+  );
 
   onIpc("sync:join", (_event, link: unknown, fingerprint: unknown) =>
     sync.join(inviteLinkSchema.parse(link), relayFingerprintSchema.parse(fingerprint)),
+  );
+
+  onIpc("sync:contact:add", (_event, input: unknown) => {
+    const parsed = addContactSchema.parse(input);
+    return sync.addContact({
+      code: parsed.code,
+      name: parsed.name,
+      ...(parsed.publicKey !== undefined ? { publicKey: parsed.publicKey } : {}),
+    });
+  });
+
+  onIpc("sync:contact:remove", (_event, code: unknown) =>
+    sync.removeContact(friendCodeSchema.parse(code)),
   );
 }

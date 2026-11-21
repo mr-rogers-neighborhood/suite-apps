@@ -35,3 +35,6 @@ The rules that shape Planner.
   The main process holds the keys, the socket and the certificate pin, the renderer holds none of
   them, and the file stays the only document. A reachable relay serves `wss://` with a self-signed
   certificate the main process pins by SHA-256; the default remains loopback. See [sync.md](sync.md).
+- A friend code names an installation, and a contact is a local trust decision. `sync/contacts.json`
+  stays in main, outside the `.planner` file and the relay store. An invitation from a known code
+  connects without a second certificate question; an unknown code is refused with the code to add.

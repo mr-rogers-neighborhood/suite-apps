@@ -35,7 +35,7 @@ The rules that shape Start.
 - The Sync tab opens the relay's console: a separate loopback-only listener with a token generated at
   startup. The console and its relay code read metadata, never frames; a code carries the address,
   pin and a live invitation when one exists, while Start's own code carries the address and pin. A
-  friend-code or contacts exchange is not built.
+  friend-code or contacts exchange lives in the apps, not in the hub or the relay.
 - A relay may run on another machine. Start then manages none, and the apps reach that relay through
   the address entered in their Sync dialog; the local Sync pane describes only a relay Start started.
 - Start is not in the data path. It returns a path or a URL and launches a separate process. It never

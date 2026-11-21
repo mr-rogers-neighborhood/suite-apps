@@ -39,6 +39,14 @@ function fakeService() {
     async publish(update) {
       calls.publish.push(update);
     },
+    friendCode: () => "0123456789ABCDEF",
+    contacts: () => [],
+    async addContact() {
+      return [];
+    },
+    async removeContact() {
+      return [];
+    },
     async createInvite(role) {
       calls.invites.push(role);
       if (state.state === "off") throw new Error("Sync is not connected.");

@@ -17,11 +17,14 @@ This page is the seam. The protocol is owned by
 2. The other machine opens a **copy of the same `.planner` file**. The sync identity of a workspace
    is derived from the id inside the file, so a copy is what makes both devices name the same relay
    room. Nothing migrates and no schema field is added.
-3. The sharing machine makes an invitation: one use, one person, good for a day.
-4. The joining machine pastes it under **Join with an invitation**, enters the relay's fingerprint if
-   the invitation is `wss://` and this device has not pinned it, and waits. The sharing machine
-   admits the device without a second question — the invitation already named the role — and hands
-   over a snapshot of the workspace.
+3. The sharing machine makes an invitation: one use, one person, good for a day. The link carries a
+   signed envelope naming the inviter's installation, the relay and its pin, so the other side can
+   tell who wrote it.
+4. The joining machine pastes it under **Join with an invitation**. A code in **People you know** is
+   the explicit trust act: an invitation from a contact connects without a second certificate
+   question, while an invitation from a code that is not listed is refused with the code to add. A
+   person with no invitation can still add the code from **Your friend code** and be ready for the
+   next one.
 5. **Leave** stops the connection. The file, the group and the membership stay; sharing again
    reconnects.
 
@@ -50,18 +53,19 @@ with an unrelated one.
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Path                            | Responsibility                                                          |
-| ------------------------------- | ----------------------------------------------------------------------- |
-| `src/main/sync/service.ts`      | The relay connection, the MLS group, admission and catch-up             |
-| `src/main/sync/identity.ts`     | This install's Ed25519 key; its fingerprint is the device id            |
-| `src/main/sync/groupStore.ts`   | The group and the "this device founded it" marker                       |
-| `src/main/sync/relayConfig.ts`  | The relay address and certificate pin for this workspace                |
-| `src/main/sync/cursorStore.ts`  | The last frame applied, as the relay numbered it                        |
-| `src/main/sync/pendingStore.ts` | A join that was still waiting when the app closed                       |
-| `src/main/sync/workspaceId.ts`  | The 64-hex sync name derived from the document's own id                 |
-| `src/main/sync/ipc.ts`          | The controller: one service per open workspace, snapshots to the window |
-| `src/main/ipc.ts`               | The validated `sync:*` channels and the commit that publishes a delta   |
-| `src/renderer/src/sync`         | The pill, the dialog and their wording                                  |
+| Path                             | Responsibility                                                          |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| `src/main/sync/service.ts`       | The relay connection, the MLS group, admission and catch-up             |
+| `src/main/sync/identity.ts`      | This install's Ed25519 key; its fingerprint is the device id            |
+| `src/main/sync/contactsStore.ts` | The people this install chose to know, kept in `sync/contacts.json`     |
+| `src/main/sync/groupStore.ts`    | The group and the "this device founded it" marker                       |
+| `src/main/sync/relayConfig.ts`   | The relay address and certificate pin for this workspace                |
+| `src/main/sync/cursorStore.ts`   | The last frame applied, as the relay numbered it                        |
+| `src/main/sync/pendingStore.ts`  | A join that was still waiting when the app closed                       |
+| `src/main/sync/workspaceId.ts`   | The 64-hex sync name derived from the document's own id                 |
+| `src/main/sync/ipc.ts`           | The controller: one service per open workspace, snapshots to the window |
+| `src/main/ipc.ts`                | The validated `sync:*` channels and the commit that publishes a delta   |
+| `src/renderer/src/sync`          | The pill, the dialog and their wording                                  |
 
 Identity, group state, cursors, a pending join and the relay pin sit in `sync/` beside the workspace
 file. The pin is `sync/relays/<workspaceId>.json`, written mode 0600: it is this installation's trust
@@ -110,6 +114,11 @@ merges the result, so two devices handing each other a snapshot converge instead
   dependency and no snapshot to hand back.
 - **No recovery kit.** The only thing that can read the workspace is a device's group state. Losing
   `sync/` means being invited again.
+- **A friend code is a name, not a key.** It is a 70-bit commitment, so a code alone cannot complete
+  a contact; a `suite://friend` QR may carry the public key, and otherwise the first signed invitation
+  completes it. There is no directory, no lookup and no account.
+- **An unknown code is refused, not trusted.** Adding the contact is the explicit act; a known code
+  with a different key is refused as an impersonation or a reinstalled device.
 - **No removal from Planner yet.** An owner removes a device through Canvas or the relay's own
   tools; Planner's dialog lets this copy leave, not another one.
 - **No presence and no push.** A device with Planner closed learns nothing until it opens and

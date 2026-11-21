@@ -32,6 +32,14 @@ function fakeService() {
     },
     status: () => state,
     identity: async () => ({ deviceId, publicKey: "public-key" }),
+    friendCode: () => "0123456789ABCDEF",
+    contacts: () => [],
+    async addContact() {
+      return [];
+    },
+    async removeContact() {
+      return [];
+    },
     members: () => roster,
     async publish(update) {
       calls.publish.push(update);

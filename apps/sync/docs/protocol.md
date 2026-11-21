@@ -222,8 +222,38 @@ The transport is a WebSocket at `/sync` with a `/health` HTTP route.
 
 A relay code is `suite://relay?u=<url>&f=<fingerprint>&w=<workspaceId>&i=<inviteId>`. `u` and `f`
 are enough to meet and pin a relay; `w` and `i` are added together, and only when the console holds a
-live invitation. A `wss://` code without `f` is refused. A friend-code or contacts exchange is not
-built.
+live invitation. A `wss://` code without `f` is refused. The relay and its console know nothing about
+friends: a friend code and a contacts file belong to each app's main process, and the relay never
+stores either.
+
+## Friend codes and signed invitations
+
+A friend code is a 16-symbol Crockford base32 name for an installation: 70 bits of
+`SHA-256("suite/friend-code/v1" || public key)`, a 10-bit checksum, and no secret. It is
+`suite://friend?c=<code>` and, when the link is a QR that may carry the key, `k=<publicKey>`; a
+code alone is a promise to be introduced, and the first signed invitation completes it. Codes are
+shown as four groups of four.
+
+A new invitation is the same `suite://join` link with an envelope in `e`, base64url of canonical
+JSON signed by the inviter's install key:
+
+```text
+from:      { deviceId, publicKey }
+relay:     { url, fingerprint }
+workspace: <workspaceId>
+invite:    <inviteId>
+to?:       <friend code>        // optional, the person it was written for
+expiresAt: <ISO-8601>
+nonce:     <random>
+signature: <Ed25519 over the canonical envelope>
+```
+
+The legacy `h`, `w` and `i` fields stay beside the envelope, so a build without friend codes still
+joins. A build that understands `e` verifies the key/device binding, the signature, the expiry and
+the relay pin, then resolves the inviter's code against its own contacts list. A known contact
+connects without a second certificate question; a known code with a different key is refused; an
+unknown code is refused with the code to add. Adding a contact is the explicit act. The relay sees
+only the invitation record it already understood.
 
 The store is one append-only file per workspace for frames, and one each for roles, invites, pinned
 keys and removals. A frame file holds the sealed frame with the position the relay assigned, plus a

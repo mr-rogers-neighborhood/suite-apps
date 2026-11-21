@@ -27,8 +27,10 @@ const bridge: PlannerBridge = {
   syncStatus: () => ipcRenderer.invoke("sync:status"),
   syncEnable: (url, fingerprint) => ipcRenderer.invoke("sync:enable", url, fingerprint),
   syncDisable: () => ipcRenderer.invoke("sync:disable"),
-  syncInvite: (role) => ipcRenderer.invoke("sync:invite", role),
+  syncInvite: (role, to) => ipcRenderer.invoke("sync:invite", role, to),
   syncJoin: (link, fingerprint) => ipcRenderer.invoke("sync:join", link, fingerprint),
+  syncAddContact: (input) => ipcRenderer.invoke("sync:contact:add", input),
+  syncRemoveContact: (code) => ipcRenderer.invoke("sync:contact:remove", code),
   onSyncChanged: (listener) => subscribe<SyncInfo>("sync:changed", listener),
 };
 

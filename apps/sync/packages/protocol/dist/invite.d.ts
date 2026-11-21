@@ -32,10 +32,10 @@ export interface InviteState {
     readonly spent: Readonly<Record<string, true>>;
 }
 export declare const inviteRejectionSchema: z.ZodEnum<{
-    "wrong-workspace": "wrong-workspace";
-    "invalid-signature": "invalid-signature";
-    "not-owner": "not-owner";
     expired: "expired";
+    "invalid-signature": "invalid-signature";
+    "wrong-workspace": "wrong-workspace";
+    "not-owner": "not-owner";
     "unknown-invite": "unknown-invite";
     "invite-spent": "invite-spent";
 }>;

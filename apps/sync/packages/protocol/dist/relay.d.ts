@@ -300,28 +300,28 @@ export declare const relayHostMessageSchema: z.ZodDiscriminatedUnion<[z.ZodObjec
 }, z.core.$strict>, z.ZodObject<{
     type: z.ZodLiteral<"refused">;
     reason: z.ZodUnion<readonly [z.ZodEnum<{
+        "invalid-signature": "invalid-signature";
         "wrong-workspace": "wrong-workspace";
         "stale-epoch": "stale-epoch";
         "not-authorized": "not-authorized";
-        "invalid-signature": "invalid-signature";
         removed: "removed";
     }>, z.ZodEnum<{
-        "wrong-workspace": "wrong-workspace";
         "invalid-signature": "invalid-signature";
+        "wrong-workspace": "wrong-workspace";
         "not-owner": "not-owner";
         "wrong-seq": "wrong-seq";
         "last-owner": "last-owner";
         "role-unchanged": "role-unchanged";
     }>, z.ZodEnum<{
-        "wrong-workspace": "wrong-workspace";
-        "invalid-signature": "invalid-signature";
-        "not-owner": "not-owner";
         expired: "expired";
+        "invalid-signature": "invalid-signature";
+        "wrong-workspace": "wrong-workspace";
+        "not-owner": "not-owner";
         "unknown-invite": "unknown-invite";
         "invite-spent": "invite-spent";
     }>, z.ZodEnum<{
-        "wrong-workspace": "wrong-workspace";
         "invalid-signature": "invalid-signature";
+        "wrong-workspace": "wrong-workspace";
         "not-owner": "not-owner";
         self: "self";
     }>]>;

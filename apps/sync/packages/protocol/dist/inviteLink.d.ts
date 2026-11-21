@@ -1,3 +1,4 @@
+import { type FriendInvite } from "./friendInvite.js";
 /**
  * The thing one person sends another.
  *
@@ -7,6 +8,11 @@
  *
  * It carries three facts and no secrets. The invite id is a bearer token — whoever holds the
  * link can ask to join — which is why it expires and why it works once.
+ *
+ * A new invitation also carries a signed envelope in `e`, naming the inviter's install key
+ * and the relay pin. The three legacy fields stay beside it, so an older build still joins
+ * and a newer build verifies. A link with no `e` is an old invitation and is read exactly
+ * as it always was.
  */
 export declare const INVITE_SCHEME = "suite";
 export declare const JOIN_HOST = "join";
@@ -15,6 +21,8 @@ export interface InviteDetails {
     readonly host: string;
     readonly workspaceId: string;
     readonly inviteId: string;
+    /** The signed envelope, when the invitation was written by a build that has one. */
+    readonly friend?: FriendInvite;
 }
 export type InviteParse = {
     readonly ok: true;
