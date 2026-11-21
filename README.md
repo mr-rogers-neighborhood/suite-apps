@@ -21,7 +21,7 @@ install **Suite Go**.
 | <img src="apps/start/build/app-icons/canvas.png" width="20" height="20" alt=""> **Suite Canvas** | Thinking and research: cards, boards, writing, links and views in one document | Alpha | `flatpak install --user suite run.suite.canvas` |
 | <img src="apps/start/build/app-icons/planner.png" width="20" height="20" alt=""> **Suite Planner** | A daily planner: inbox, estimates, capacity and a local calendar | Pre-alpha | `flatpak install --user suite run.suite.planner` |
 | <img src="apps/start/build/app-icons/budget.png" width="20" height="20" alt=""> **Suite Budget** | An envelope budget: give every dollar a job; [what it does](apps/budget/README.md) | Pre-alpha | `flatpak install --user suite run.suite.budget` |
-| **Suite Sync** | The sync protocol and a relay a person runs | Working | `flatpak install --user suite run.suite.sync` |
+| **Suite Sync** | The sync protocol and a relay a person runs | Working | [Run the relay](apps/sync/docs/how-to/relay.md) |
 | <img src="apps/start/build/app-icons/help.png" width="20" height="20" alt=""> **Suite Help** | The documentation app: the code explorer and the handbook, offline; [what it is](apps/help/README.md) | Working | `flatpak install --user suite run.suite.help` |
 
 Windows and macOS have no published build.
@@ -39,8 +39,8 @@ in the data path. Sync carries a document between devices; it never defines its 
 
 ## Install
 
-Add the signed store once, then run the command in the row you want. Every desktop app is a Flatpak
-on that store.
+Add the signed store once, then run the command in the row you want. The desktop apps are Flatpaks
+on that store; Sync is the relay you run yourself.
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite \
