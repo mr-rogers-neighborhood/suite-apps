@@ -10,7 +10,8 @@ the app keeps an autosaved workspace and one rolling backup on this machine.
 Suite Planner is the planning app in the Suite family, alongside
 [Suite Canvas](../canvas/README.md) and [Suite Budget](../budget/README.md).
 
-> Suite Planner is pre-alpha. The core loop works; editing surfaces and rituals are being built.
+> Suite Planner is pre-alpha. The core loop works; editing surfaces and rituals are being built. The
+> closing conditions for leaving pre-alpha are the [alpha checklist](docs/reference/alpha.md).
 
 ---
 

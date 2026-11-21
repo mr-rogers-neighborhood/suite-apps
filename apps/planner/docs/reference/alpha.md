@@ -1,0 +1,49 @@
+# The alpha bar
+
+Alpha is the first promise Planner makes: the daily path holds. The app may still change shape, but
+a person can open a workspace, plan a day, capture work, move it, finish it, see the week and set a
+reminder without a dead end or a lost edit.
+
+[Channels](../../../../docs/explanation/channels.md) owns the release tiers. The tier names are
+`slop`, `canary`, `beta` and `stable`; Planner's README calls the current build pre-alpha. This page
+is the checklist that has to be green before Planner asks for the `slop` → `canary` boundary, whose
+question is "does it work?".
+
+An item is closed only when its evidence runs locally. A manual pass, a device install or an e2e run
+is named as such and is not replaced by a unit test. The evidence column names the file, not a
+snapshot of its output.
+
+## Boundary
+
+| # | What must hold | Evidence | State |
+| --- | --- | --- | --- |
+| 1 | The gate is green and the app builds: lint, strict types, tests, shape, knip and the production bundle. | `node scripts/gate.mjs --only planner --no-e2e`; the full gate at `--fresh` is the boundary run. | Closed locally; the `--fresh` run happens at the boundary. |
+| 2 | The app launches, a fresh workspace is created, and an existing workspace opens and is restored after relaunch. | `e2e/smoke.spec.ts` (on request, not in the gate); `src/main/workspaceStore.test.ts`; `packages/core/src/file/migration.test.ts`. | Closed by unit tests; the relaunch journey is the smoke spec. |
+| 3 | A schema change is additive or migrates, a previous release's file still opens, and a newer file is refused rather than rewritten. | `packages/core/src/file/migration.test.ts` opens the fixtures in `packages/core/src/file/__fixtures__/`. | Closed. |
+
+## The daily path
+
+| # | What must hold | Evidence | State |
+| --- | --- | --- | --- |
+| 4 | **Capture.** One line becomes a task on the day or in the inbox, with project, tag, estimate, priority and time parsed from the text. | `packages/core/src/capture/parse.test.ts`; `src/renderer/src/capture/CaptureBar.test.tsx`. | Closed. |
+| 5 | **The day plan.** Today opens to an ordered list, the estimate total is measured against capacity, an override wins for that day, and overdue work is reported rather than moved. | `packages/core/src/plan/dayPlan.test.ts`; `packages/core/src/plan/capacity.test.ts`; `src/renderer/src/day/DayView.test.tsx`. | Closed. |
+| 6 | **The inbox.** Captured work can be scheduled to the selected day, completed, or opened in task detail. | `src/renderer/src/inbox/InboxView.test.tsx`. | Closed. |
+| 7 | **Moving work.** Day arrows cross a month and a year; a week moves by drag, `Alt` + arrow and menu; a move past the week's edge says so; carry-over moves only when chosen. | `src/renderer/src/day/DayHeader.test.tsx`; `src/renderer/src/week/WeekView.test.tsx`. | Closed. |
+| 8 | **Completing work.** A task completes and uncompletes; a recurring occurrence completes without closing the series. | `src/renderer/src/day/TaskRow.test.tsx`; `packages/core/src/plan/recurrence.test.ts`. | Closed. |
+| 9 | **Task detail.** Title, estimate, project, tags, due and reminder times, checklist, recurrence and history are editable; an invalid value is refused in place; notes survive a close and reopen; closing returns focus to the row. | `src/renderer/src/task/TaskDetail.test.tsx`; `src/renderer/src/task/taskDetail.test.ts`. | Closed after this wave. |
+| 10 | **Reminders.** A reminder is set, fires once, can be cancelled, and fires again after a new time is chosen. A denied permission is a sentence, not silence, on desktop and in the pack. | `src/main/scheduler.test.ts`; `src/renderer/src/app/ReminderScheduler.test.tsx`; `pack/src/plannerHost.test.ts`. | Closed after this wave. |
+| 11 | **The calendar.** Local events show on the selected day, are clipped to the visible day rather than drawn at the wrong hour, and the empty state names the day it is describing. | `src/renderer/src/calendar/DayCalendar.test.tsx`. | Closed after this wave. |
+| 12 | **The week.** Seven labelled columns share the day's tasks and capacity; a recurring occurrence stays on its series anchor; the first and last day edges refuse a move. | `src/renderer/src/week/WeekView.test.tsx`. | Closed after this wave. |
+| 13 | **Focus and rituals.** The countdown comes from the stored session and survives leaving the view; plan and shutdown write the one day record and repeat without duplicating it. | `src/renderer/src/focus/FocusView.test.tsx`; `src/renderer/src/rituals/RitualsView.test.tsx`. | Closed. |
+| 14 | **Keyboard and focus.** Every action is reachable without a pointer, focus is visible, a dialog traps and returns it, and an edit that removes a control puts focus somewhere named. | `src/renderer/src/app/Shell.test.tsx`; `TaskDetail.test.tsx`; `TaskRow.test.tsx`; `DayHeader.test.tsx`. | Closed after this wave. |
+| 15 | **The same layout on a phone.** The rail collapses at 360, 390 and 430 px, the drawer replaces it, and neither the day nor the drawer scrolls sideways. The pack runs the same renderer and the same daily path. | `e2e/mobile-layout.spec.ts` (on request, not in the gate); `pack/src/plannerHost.test.ts` for the pack bridge. | Spec exists; the phone-width run and a device install are still manual. |
+
+## What is deliberately outside
+
+Alpha does not promise a reviewed shape: no manual accessibility pass, no
+[`canary` → `beta`](../../../../docs/explanation/channels.md) review, no second window, no calendar
+account, no share link and no account or telemetry. Those belong to later boundaries, and naming
+their absence is part of the bar.
+
+The checkboxes above are the closing conditions. When one is open, the row says what is missing
+rather than what is intended.
