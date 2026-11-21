@@ -27,6 +27,10 @@ finish-args:
   - --socket=fallback-x11
   - --socket=pulseaudio
   - --device=dri
+  # Only the suite's own folder: Canvas writes `Documents/Suite/Canvas`, and
+  # nothing above it is reachable. `:create` lets the first launch make the
+  # folder.
+  - --filesystem=xdg-documents/Suite:create
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.kde.StatusNotifierWatcher
 
