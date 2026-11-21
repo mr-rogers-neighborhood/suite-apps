@@ -36,7 +36,7 @@ finish-args:
   # which is effectively host command execution. A sandboxed package manager
   # needs the host's own Flatpak, and this is the only grant that reaches it.
   - --talk-name=org.freedesktop.Flatpak
-  # The hub installs AppImages here; `:create` lets the first install make it.
+  # Older folder copies live here; `:create` lets a first launch make the folder.
   - --filesystem=~/Applications/Suite:create
   # Shortcut entries and their icons are files a desktop reads, not the hub.
   - --filesystem=xdg-data/applications:create

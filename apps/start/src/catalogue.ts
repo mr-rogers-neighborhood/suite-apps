@@ -1,12 +1,9 @@
 import {
-  compareSemver,
-  parseSemver,
   SUITE_APPS,
   type SuiteAppName,
   type SuiteCapability,
   type SuiteReleaseChannel,
 } from "@suite/contracts";
-import { checkSignedFeed, type FeedArtifact, type FeedFetch } from "@suite/desktop";
 import { preReleaseIdFor } from "./channels.js";
 
 /**
@@ -14,33 +11,23 @@ import { preReleaseIdFor } from "./channels.js";
  *
  * Start used to list what it found. A list of what is found is empty on a new machine,
  * and empty is the one answer the front door cannot give. So the catalogue names every
- * app the suite has, compiles in the feed each document app declares, and asks each feed
- * what version it offers. A card then has something true to say either way.
+ * app the suite has; the store decides what can be installed, and discovery decides
+ * whether it is already here.
  *
- * **The feed URL appears three times on purpose, and this is the third.** The app's own
- * `suite.app.json` declares it for its updater, `electron-builder.yml` writes it beside a
- * packaged binary, and this table holds it because an app that is not installed has no
- * manifest to read it from. All three name the Pages host, `feeds/<app>/`; the release
- * script writes the signed manifest there and the artifact it names stays a release asset.
- * Installed or not, the signature still has to verify against the key compiled into
- * `@suite/desktop`, so a wrong URL buys nothing.
- *
- * **When the network is read.** When the launcher opens, and when a person presses a
- * button asking it to look again. Not on a timer, and never to download: a version can be
- * read, an artifact is only fetched when somebody asks for it.
+ * **No feed lives here.** Linux desktop apps ship as Flatpaks, so the update channel is
+ * an OSTree remote. Start compares commits in `nativePackageBackend.ts`; it does not
+ * read a signed AppImage manifest.
  */
 
-/** One app the suite offers, and where its releases are published. */
+/** One app the suite offers. */
 export interface CatalogueEntry {
   readonly id: string;
   /** What a person calls it. Also what an installed manifest will say. */
   readonly name: string;
-  /** The folder under the documents root, which install's own folder sits beside. */
+  /** The folder under the documents root. */
   readonly folder: SuiteAppName;
   readonly extensions: readonly string[];
   readonly capabilities: readonly SuiteCapability[];
-  /** The app's own declared feed. Blank for the hub and every pre-release entry. */
-  readonly feed: string;
   readonly channel: SuiteReleaseChannel;
   /**
    * Whether this entry is the one pre-release identity for its app.
@@ -49,27 +36,6 @@ export interface CatalogueEntry {
    * pre-release id is `slop-<app>` and every tier shares it.
    */
   readonly preRelease?: boolean;
-  /**
-   * Where an AppImage for this entry is placed, when it differs from `folder`.
-   *
-   * A pre-release must not share a version directory with stable, or removing one
-   * would delete the other. A Flatpak deployment has no version directory here.
-   */
-  readonly installFolder?: string;
-  /**
-   * Where a person can fetch a newer build by hand.
-   *
-   * Only the hub has one: every other app's update is a button Start can press, and the
-   * hub cannot replace its own running binary.
-   */
-  readonly releases?: string | undefined;
-  /**
-   * Whether Flatpak is the only install channel for this app.
-   *
-   * Help ships no AppImage feed: Flatpak installs it, updates it and owns the
-   * deployment. A card still offers Install before the store has been read.
-   */
-  readonly flatpakOnly?: boolean;
 }
 
 /** The hub's own id. It is not one of the apps the hub lists. */
@@ -78,14 +44,10 @@ export const SELF_ID = "start";
 /**
  * The three document apps.
  *
- * Every field here mirrors that app's own `suite.app.json` and `electron-builder.yml`:
- * the id, the name, the extension, the capabilities, the channel and the feed. A test
- * cannot read a sibling checkout, so it checks what can be checked — that the ids,
- * folders and extensions agree with `SUITE_APPS` — and this comment carries the rest.
- *
- * Start writes these into the manifest an install leaves behind, because an AppImage
- * carries its own copy inside the image where nothing can read it without unpacking.
- * The version in that manifest comes from the signed feed, never from here.
+ * Every field here mirrors that app's own `suite.app.json`: the id, the name, the
+ * extension, the capabilities and the channel. A test cannot read a sibling
+ * checkout, so it checks what can be checked — that the ids, folders and extensions
+ * agree with `SUITE_APPS` — and this comment carries the rest.
  */
 export const CATALOGUE_APPS = [
   {
@@ -94,7 +56,6 @@ export const CATALOGUE_APPS = [
     folder: "Canvas",
     extensions: ["canvas"],
     capabilities: ["document.file", "sync", "attachments", "publish"],
-    feed: "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/canvas",
     channel: "alpha",
   },
   {
@@ -103,7 +64,6 @@ export const CATALOGUE_APPS = [
     folder: "Planner",
     extensions: ["planner"],
     capabilities: ["document.file"],
-    feed: "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/planner",
     channel: "alpha",
   },
   {
@@ -112,7 +72,6 @@ export const CATALOGUE_APPS = [
     folder: "Budget",
     extensions: ["budget"],
     capabilities: ["document.file"],
-    feed: "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/budget",
     channel: "alpha",
   },
 ] as const satisfies readonly CatalogueEntry[];
@@ -121,27 +80,23 @@ export const CATALOGUE_APPS = [
  * The one pre-release entry per app.
  *
  * Every tier shares `slop-<app>` and therefore one card; the tier is the Flatpak
- * ref branch, not the id. These entries carry no feed on purpose: a pre-release
- * AppImage is a manual download and the tier's update path is its Flatpak branch
- * ([docs/explanation/channels.md](../../../docs/explanation/channels.md)).
+ * ref branch, not the id. A pre-release is a store branch, so it carries no feed.
  */
 export const PRE_RELEASE_CATALOGUE_APPS = CATALOGUE_APPS.map(
   (entry): CatalogueEntry => ({
     ...entry,
     id: preReleaseIdFor(entry.id),
     name: `${entry.name} (pre-release)`,
-    feed: "",
     preRelease: true,
-    installFolder: preReleaseIdFor(entry.id),
   }),
 );
 
 /**
- * The one app with no AppImage feed.
+ * Help, which ships only through the store.
  *
- * Help is Flatpak-only. It is listed with the stable apps so the hub has a card
- * before the store answers, and it never enters the pre-release table: there is
- * no AppImage identity for a tier to replace.
+ * It is listed with the stable apps so the hub has a card before the store answers,
+ * and it never enters the pre-release table: there is no pre-release identity for a
+ * tier to replace.
  */
 export const FLATPAK_CATALOGUE_APPS = [
   {
@@ -150,23 +105,16 @@ export const FLATPAK_CATALOGUE_APPS = [
     folder: "Help",
     extensions: [],
     capabilities: [],
-    feed: "",
     channel: "alpha",
-    flatpakOnly: true,
   },
 ] as const satisfies readonly CatalogueEntry[];
 
-/** Stable apps, the pre-release identity of each, then the Flatpak-only app. */
+/** Stable apps, the pre-release identity of each, then the Help card. */
 export const ALL_CATALOGUE_APPS: readonly CatalogueEntry[] = [
   ...CATALOGUE_APPS,
   ...PRE_RELEASE_CATALOGUE_APPS,
   ...FLATPAK_CATALOGUE_APPS,
 ];
-
-/** The folder under the applications root where this entry's AppImage is placed. */
-export function installFolderFor(entry: Pick<CatalogueEntry, "folder" | "installFolder">): string {
-  return entry.installFolder ?? entry.folder;
-}
 
 /** Whether the catalogue still says the same thing `SUITE_APPS` does. */
 export function catalogueMatchesContracts(): readonly string[] {
@@ -182,153 +130,50 @@ export function catalogueMatchesContracts(): readonly string[] {
   });
 }
 
-/** The hub's own row: a name and a channel, with its feed supplied by the build. */
+/** The hub's own row: a name and a channel. */
 export const SELF_ENTRY: CatalogueEntry = {
   id: SELF_ID,
   name: "Suite Start",
   folder: "Start",
   extensions: [],
   capabilities: [],
-  feed: "",
   channel: "alpha",
-  releases: "https://github.com/mr-rogers-neighborhood/suite-apps/releases",
 };
 
 /** What the catalogue knows about one app. */
 export interface CatalogueApp extends CatalogueEntry {
-  /** The feed this answer came from. */
-  readonly feed: string;
-  /** The version the signed feed offers, or null when it offered nothing verifiable. */
-  readonly available: string | null;
-  /** Why `available` is null, in words a card can show. */
-  readonly reason: string | null;
   /** The version installed here, or null when this machine does not have it. */
   readonly installed: string | null;
-  /** True only when both versions are known and the feed's is the later one. */
-  readonly newer: boolean;
-  /**
-   * The file an install would download, from the same verified manifest.
-   *
-   * Null when nothing verified, or when the manifest named no file; an install then has
-   * nothing it is allowed to fetch.
-   */
-  readonly artifact: FeedArtifact | null;
 }
 
 export interface CatalogueOptions {
-  /** What is installed here, by app id: the version that install reports. */
+  /** What is installed here, by app id: the version that discovery reports. */
   readonly installed: ReadonlyMap<string, string>;
-  /**
-   * A root that replaces every compiled feed, with one folder per app id under it.
-   *
-   * This is the seam a local folder of releases uses: `<base>/planner`, `<base>/start`.
-   */
-  readonly feedBase?: string | undefined;
-  /** The hub's own feed, read from the `app-update.yml` beside a packaged binary. */
-  readonly selfFeed?: string | null;
-  readonly platform?: string;
-  readonly fetch?: FeedFetch;
-  readonly now?: () => Date;
-  /** Overridable so a test can prove the accepting path without the publisher's key. */
-  readonly publicKey?: string | undefined;
 }
 
 /**
- * The feed to read for one entry.
+ * The catalogue after one store change: the new version, and nothing else re-read.
  *
- * A base replaces the whole URL rather than a prefix: a local release folder holds one
- * folder per app, and rewriting a feed-host path would describe a server that does not exist.
- */
-export function feedFor(entry: CatalogueEntry, feedBase?: string | undefined): string | null {
-  // A pre-release has no AppImage feed by design: its update path is its Flatpak
-  // branch. A local release folder must not quietly invent one. Help is
-  // Flatpak-only for the same reason.
-  if (entry.preRelease === true || entry.flatpakOnly === true) return null;
-  const base = feedBase?.trim().replace(/\/+$/u, "");
-  if (base !== undefined && base.length > 0) return `${base}/${entry.id}`;
-  return entry.feed.length > 0 ? entry.feed : null;
-}
-
-/** Whether `available` is a later version than `installed`. Unparseable versions are not. */
-export function isNewer(available: string | null, installed: string | null): boolean {
-  if (available === null || installed === null) return false;
-  const left = parseSemver(available);
-  const right = parseSemver(installed);
-  if (left === null || right === null) return false;
-  return compareSemver(left, right) > 0;
-}
-
-/** Read one entry's feed and pair it with what is installed. */
-async function readEntry(entry: CatalogueEntry, options: CatalogueOptions): Promise<CatalogueApp> {
-  const installed = options.installed.get(entry.id) ?? null;
-  const feed = feedFor(entry, options.feedBase);
-
-  if (feed === null) {
-    return {
-      ...entry,
-      feed: "",
-      available: null,
-      reason:
-        entry.flatpakOnly === true
-          ? "Flatpak owns updates"
-          : entry.preRelease === true
-            ? "a pre-release updates through its Flatpak branch, not an AppImage feed"
-            : "this build was packaged without a feed",
-      installed,
-      newer: false,
-      artifact: null,
-    };
-  }
-
-  const check = await checkSignedFeed(
-    feed,
-    options.platform ?? process.platform,
-    options.fetch,
-    options.now,
-    options.publicKey,
-  );
-
-  return {
-    ...entry,
-    feed,
-    available: check.verified ? check.version : null,
-    reason: check.verified ? null : (check.reason ?? "the feed could not be verified"),
-    installed,
-    newer: check.verified ? isNewer(check.version, installed) : false,
-    artifact: check.verified ? check.artifact : null,
-  };
-}
-
-/**
- * The catalogue after one install: the new version, and nothing else re-read.
- *
- * A feed answer is still the answer from the last check, so this refetches nothing and
- * claims nothing: it only records what is now on disk.
+ * Discovery is the authority on what is installed; this only keeps the table in
+ * step between a successful install and the next listing.
  */
 export function withInstalled(
   catalogue: readonly CatalogueApp[],
   id: string,
   version: string | null,
 ): readonly CatalogueApp[] {
-  return catalogue.map((entry) =>
-    entry.id === id
-      ? {
-          ...entry,
-          installed: version,
-          newer: version === null ? false : isNewer(entry.available, version),
-        }
-      : entry,
-  );
+  return catalogue.map((entry) => (entry.id === id ? { ...entry, installed: version } : entry));
 }
 
 /**
- * Every app the suite offers, each with what is installed and what is offered.
+ * Every app the suite offers, each with what is installed.
  *
- * The hub's own row is included, and always last: it cannot replace its own running
- * binary, so it is shown as a fact rather than as a button.
+ * The hub's own row is included, and always last.
  */
 export async function readCatalogue(options: CatalogueOptions): Promise<readonly CatalogueApp[]> {
-  const apps = await Promise.all(ALL_CATALOGUE_APPS.map((entry) => readEntry(entry, options)));
-  const self = await readEntry({ ...SELF_ENTRY, feed: options.selfFeed ?? "" }, options);
-  return [...apps, self];
+  const entry = (candidate: CatalogueEntry): CatalogueApp => ({
+    ...candidate,
+    installed: options.installed.get(candidate.id) ?? null,
+  });
+  return [...ALL_CATALOGUE_APPS.map(entry), entry({ ...SELF_ENTRY })];
 }

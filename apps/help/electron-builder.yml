@@ -37,7 +37,7 @@ extraFiles:
 linux:
   syncDesktopName: true
   # Help ships through Flatpak. A local unpacked build is enough to package it;
-  # there is no AppImage feed and nothing to publish here.
+  # there is no other Linux artifact and nothing to publish from this config.
   target:
     - dir
   category: Documentation

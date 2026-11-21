@@ -11,6 +11,24 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 No changes yet.
 
+## [0.5.0] - 2026-11-21
+
+### Changed
+
+- **Linux ships Flatpak only.** The AppImage and Arch forms are retired, with their signed update
+  feeds. Start no longer downloads an AppImage, checks a feed for one, or keeps a second version to
+  roll back to. A copy a person places in a folder still opens, reveals and forgets; Start just does
+  not replace it.
+- **An update follows the deployment's own origin.** Start reads the `origin` Flatpak reports for an
+  installed app and compares that remote's commit, so a copy installed from `suite-local` is not
+  measured against the public `suite` store. The update itself is `flatpak update`, which uses the
+  same origin. A fresh install still probes `suite` first, then `suite-local`.
+
+### Removed
+
+- **The AppImage feed cards, version history and rollback.** A card now says what the store offers
+  and what Flatpak owns; there is no second copy of an app to switch back to.
+
 ## [0.4.2] - 2026-11-21
 
 ### Added

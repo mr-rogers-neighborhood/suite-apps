@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * Release one app from the monorepo.
+ * Release the Suite Sync relay from the monorepo.
  *
- * A release used to be a sequence of remembered commands. With four apps in one
- * repository, the remembered command is the failure mode: the wrong target, the
- * stale changelog heading or the artifact nobody proved all publish silently.
+ * The desktop apps ship as Flatpaks. `scripts/flatpak.mjs` builds the deployment
+ * and `scripts/flatpak-remote.mjs` publishes the signed OSTree summary, so this
+ * script no longer has an AppImage, Arch package or update feed to write.
  *
- * This script builds the artifact, signs the manifest, uploads the app's release
- * assets, and commits the feed Pages serves. It refuses to start when the tree,
- * the version, the changelog, the gate status or the built manifest disagree.
+ * The relay is different: it is a server tarball rather than an Electron app, and
+ * it has no store. This script builds that tarball, signs the checksum list, and
+ * uploads it. It refuses to start when the tree, the version, the changelog or the
+ * gate status disagree.
  *
  * Two deliberate defaults:
  *
@@ -18,11 +19,12 @@
  *
  * The private key never enters this repository. It is read from `SUITE_UPDATE_KEY`, or from
  * `~/.config/suite/keys/update-key.pem` (`pnpm keys status` names it). A key that does not match
- * the pin the apps trust is refused before the build: such a feed is refused by every install.
+ * the pin the apps trust is refused before the build: such a checksum list is refused by every
+ * install.
  *
  * Usage:
- *   node scripts/release.mjs <app-id> [--publish]
- *   node scripts/release.mjs <app-id> --verify
+ *   node scripts/release.mjs sync [--publish]
+ *   node scripts/release.mjs sync --verify
  *   node scripts/release.mjs --help
  */
 import { spawnSync } from "node:child_process";
@@ -33,25 +35,15 @@ import {
   copyFile,
   mkdir,
   mkdtemp,
-  readdir,
   readFile,
   rm,
   stat,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import {
-  artifactStem,
-  channelProblem,
-  channelRecord,
-  displayName,
-  flatpakId,
-  isPreRelease,
-  preReleaseAppManifest,
-  releaseTag,
-} from "./lib/channel.mjs";
+import { releaseTag } from "./lib/channel.mjs";
 import {
   fingerprintOf as secretFingerprint,
   groupedFingerprint,
@@ -61,17 +53,7 @@ import {
 } from "./lib/keys.mjs";
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-export const FEED_HOST = "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main";
 export const RELEASE_REPO = "mr-rogers-neighborhood/suite-apps";
-export const FEED_FILE = "latest-linux.yml";
-
-/**
- * The only tree publishing writes.
- *
- * A feed commit moves HEAD after every app, so the next app inherits the gate
- * proof only when everything between the proven commit and HEAD stays here.
- */
-export const FEED_ROOT = "feeds/";
 
 /** The relay's artifact id, and the name its launcher installs as. */
 export const RELAY_ARTIFACT_ID = "suite-sync";
@@ -112,53 +94,12 @@ const RELAY_DROP = [
 ];
 
 /**
- * Every app this repository publishes.
+ * Every artifact this repository still publishes through this script.
  *
- * `project` is the package whose `package.json` carries the version electron-builder
- * stamps. Canvas's shell lives one folder below the canvas itself, so its changelog
- * and its project are deliberately different paths.
+ * Desktop apps are Flatpaks and are released by `scripts/flatpak-remote.mjs`.
+ * The relay is the one server tarball.
  */
 export const APPS = {
-  start: {
-    id: "start",
-    name: "Suite Start",
-    package: "@suite/start",
-    project: "apps/start",
-    changelog: "apps/start/CHANGELOG.md",
-    output: "apps/start/release",
-    manifest: null,
-    pkgbuild: "apps/start/packaging/arch/PKGBUILD",
-  },
-  canvas: {
-    id: "canvas",
-    name: "Suite Canvas",
-    package: "@suite/canvas-desktop",
-    project: "apps/canvas/desktop",
-    changelog: "apps/canvas/CHANGELOG.md",
-    output: "apps/canvas/desktop/release",
-    manifest: "apps/canvas/desktop/suite.app.json",
-    pkgbuild: null,
-  },
-  planner: {
-    id: "planner",
-    name: "Suite Planner",
-    package: "@suite/planner",
-    project: "apps/planner",
-    changelog: "apps/planner/CHANGELOG.md",
-    output: "apps/planner/release",
-    manifest: "apps/planner/suite.app.json",
-    pkgbuild: null,
-  },
-  budget: {
-    id: "budget",
-    name: "Suite Budget",
-    package: "@suite/budget",
-    project: "apps/budget",
-    changelog: "apps/budget/CHANGELOG.md",
-    output: "apps/budget/release",
-    manifest: "apps/budget/suite.app.json",
-    pkgbuild: null,
-  },
   sync: {
     id: "sync",
     name: "Suite Sync",
@@ -166,51 +107,33 @@ export const APPS = {
     project: "apps/sync",
     changelog: "apps/sync/CHANGELOG.md",
     output: "apps/sync/dist/release",
-    manifest: null,
-    pkgbuild: null,
     kind: "relay",
   },
 };
 
-const USAGE = `usage: node scripts/release.mjs <app-id> [options]
+const USAGE = `usage: node scripts/release.mjs sync [options]
 
-  --publish           upload the release (an app path also commits its feed)
+  --publish           upload the release
   --dry-run           stop before every network write; the default
-  --verify            verify the published feed, or the local relay artifact
-  --channel <tier>    stable, slop, canary or beta (default: stable)
-  --tag <name>        release tag (default: <app>-v<version>, or <tier>-<app>-v<version>)
+  --verify            verify the local relay artifact
+  --tag <name>        release tag (default: sync-v<version>)
   --notes-file <path> release notes (default: the version's changelog section)
-  --feed-dir <path>   also copy the artifact, manifest and signature into a folder
+  --feed-dir <path>   also copy the artifact, checksums and signature into a folder
   --no-build          reuse the last build in the app's release folder
   --help              print this text
 
 Known apps: ${Object.keys(APPS).join(", ")}
-Channels: stable, slop, canary, beta
+Desktop apps publish as Flatpaks: node scripts/flatpak-remote.mjs
 `;
 
-/** The tag a version is published under, so several apps share the repository. */
-export function tagFor(app, version, channel = "stable") {
-  return releaseTag(app.id, version, channel);
+/** The tag a version is published under. */
+export function tagFor(app, version) {
+  return releaseTag(app.id, version);
 }
 
-/** The Pages folder the app's signed manifest lives in. */
-export function feedPath(app) {
-  return `feeds/${app.id}/${FEED_FILE}`;
-}
-
-/** The base URL an installed app and the hub both read. */
-export function feedUrl(app) {
-  return `${FEED_HOST}/feeds/${app.id}`;
-}
-
-/** The manifest URL Pages serves, which is what a release prints. */
-export function manifestUrl(app) {
-  return `${feedUrl(app)}/${FEED_FILE}`;
-}
-
-/** The base a manifest's artifact URLs resolve against: this app's release tag. */
-export function releaseAssetBase(app, version, channel = "stable") {
-  return `https://github.com/${RELEASE_REPO}/releases/download/${tagFor(app, version, channel)}/`;
+/** The base a release's assets answer on. */
+export function releaseAssetBase(app, version) {
+  return `https://github.com/${RELEASE_REPO}/releases/download/${tagFor(app, version)}/`;
 }
 
 /** The architecture token a relay tarball is named with. */
@@ -439,79 +362,6 @@ export function dirtyTreeProblem(porcelain) {
   );
 }
 
-/** True when this path is one a publish may commit. */
-export function isFeedPath(path) {
-  return path.startsWith(FEED_ROOT);
-}
-
-/**
- * The stdout of a git command, for the range check.
- *
- * Kept behind a function so `feedOnlyRange` can be told the answer in a test
- * rather than needing this repository.
- */
-function gitQuery(args) {
-  const result = spawnSync("git", args, { cwd: ROOT, encoding: "utf8", env: process.env });
-  return {
-    ok: result.status === 0,
-    stdout: (result.stdout ?? "").trim(),
-    stderr: (result.stderr ?? "").trim(),
-  };
-}
-
-/**
- * Why the commits in `from..to` do not inherit `from`'s gate proof, or null.
- *
- * Publishing commits `feeds/<app>/`, which moves HEAD. The next app should not
- * need a second fresh gate, so a descendant is accepted when every commit
- * between them changes only feed files. The proof is the trees: `git rev-list`
- * lists the commits, and each commit's changed paths are read against its
- * parent. A commit message is never consulted, since a prefix is forgeable.
- *
- * A merge has to account for every path it contributes: its diff against each
- * parent must stay under `feeds/`. `git` is injected so a test can answer
- * without a repository.
- */
-export function feedOnlyRange(from, to, git = gitQuery) {
-  const shortTo = to.slice(0, 12);
-  if (!git(["merge-base", "--is-ancestor", from, to]).ok) {
-    return `${from} is not an ancestor of ${shortTo}`;
-  }
-
-  const listed = git(["rev-list", "--parents", `${from}..${to}`]);
-  if (!listed.ok) return `git could not list the commits between ${from} and ${shortTo}`;
-
-  for (const line of listed.stdout.split(/\r?\n/u)) {
-    const [commit, ...parents] = line.trim().split(/\s+/u);
-    if (commit === undefined || commit.length === 0) continue;
-
-    // `-m` gives a merge a diff against each parent; `--no-renames` keeps both
-    // sides of a moved file visible. A path outside `feeds/` refuses either way.
-    const diff = git([
-      "diff-tree",
-      "--no-commit-id",
-      "-r",
-      "--name-only",
-      "--no-renames",
-      ...(parents.length > 1 ? ["-m"] : []),
-      commit,
-    ]);
-    if (!diff.ok) return `git could not read the tree of ${commit.slice(0, 12)}`;
-
-    const outside = diff.stdout
-      .split(/\r?\n/u)
-      .map((path) => path.trim())
-      .filter((path) => path.length > 0 && !isFeedPath(path));
-    if (outside.length > 0) {
-      const shown = outside.slice(0, 5).join(", ");
-      const more = outside.length > 5 ? `, and ${outside.length - 5} more` : "";
-      return `${commit.slice(0, 12)} changes ${shown}${more}, outside ${FEED_ROOT}`;
-    }
-  }
-
-  return null;
-}
-
 /**
  * Why the gate has not proven this commit, or null when it has.
  *
@@ -519,12 +369,10 @@ export function feedOnlyRange(from, to, git = gitQuery) {
  * clean export of it. A working-tree run proves the tree, not the commit, which
  * is why `fresh` matters here.
  *
- * `range(from, to)` is the feed-only check, passed in so this function needs no
- * repository. It returns null when the commits between the two inherit the
- * proof, or a sentence saying why they do not. Omitting it refuses the range:
- * only an exact HEAD is accepted without an inspection.
+ * Nothing is published that moves HEAD any more, so only the exact commit is
+ * accepted. `head` is compared against the recorded commit directly.
  */
-export function gateProblems(status, head, { range = null } = {}) {
+export function gateProblems(status, head) {
   if (status === null || typeof status !== "object") {
     return ["no .dev/gate-status.json. Run the gate before releasing."];
   }
@@ -536,161 +384,10 @@ export function gateProblems(status, head, { range = null } = {}) {
   if (typeof status.commit !== "string" || status.commit.length < 7) {
     problems.push("the gate status names no commit");
   } else if (!head.startsWith(status.commit)) {
-    const inherited = range === null
-      ? "no feed-only check was supplied, so the commits since the gate were not inspected"
-      : range(status.commit, head);
-    if (inherited !== null) {
-      problems.push(
-        `the gate proved ${status.commit}, but HEAD is ${head.slice(0, 12)}: ${inherited}`,
-      );
-    }
-  }
-  return problems;
-}
-
-/** Why the app's own manifest disagrees with its package, or null. */
-export function manifestVersionProblem(manifestText, packageVersion) {
-  if (manifestText === null) return null;
-  let version;
-  try {
-    version = JSON.parse(manifestText).version;
-  } catch {
-    return "suite.app.json is not JSON";
-  }
-  if (version === packageVersion) return null;
-  return (
-    `package.json says ${packageVersion} and suite.app.json says ${String(version)}. ` +
-    "The version, the manifest and the tag describe one commit."
-  );
-}
-
-function scalar(value) {
-  return value.replace(/^["']|["']$/gu, "").trim();
-}
-
-function field(line) {
-  const match = /^\s*(?:-\s+)?([A-Za-z][\w-]*):\s*(.*)$/u.exec(line);
-  if (match?.[1] === undefined) return null;
-  return { key: match[1], value: scalar(match[2] ?? "") };
-}
-
-/** The parts of a `latest-linux.yml` this script has to agree with. */
-function readManifest(text) {
-  const entries = [];
-  let path = null;
-  let sha512 = null;
-  let version = null;
-  let inFiles = false;
-
-  for (const line of text.split(/\r?\n/u)) {
-    if (/^\S/u.test(line)) {
-      const top = field(line);
-      inFiles = top?.key === "files" && top.value.length === 0;
-      if (top?.key === "version" && top.value.length > 0) version = top.value;
-      if (top?.key === "path" && top.value.length > 0) path = top.value;
-      if (top?.key === "sha512" && top.value.length > 0) sha512 = top.value;
-      continue;
-    }
-    if (!inFiles) continue;
-
-    if (/^\s*-\s+/u.test(line)) entries.push({ url: "", sha512: null, size: null });
-    const current = entries.at(-1);
-    const found = field(line);
-    if (current === undefined || found === null) continue;
-    if (found.key === "url") current.url = found.value;
-    else if (found.key === "sha512") current.sha512 = found.value;
-    else if (found.key === "size") {
-      const bytes = Number.parseInt(found.value, 10);
-      current.size = Number.isFinite(bytes) ? bytes : null;
-    }
-  }
-
-  return { version, entries, path, sha512 };
-}
-
-/** The version a manifest names, or null. */
-export function versionFromManifest(text) {
-  return readManifest(text).version;
-}
-
-/**
- * The filename inside an artifact locator, or null when it could escape the folder.
- *
- * The release script writes an absolute release-asset URL; an older feed may still
- * name a bare file. Only the last segment is ever used as an install name.
- */
-export function artifactFilename(locator) {
-  const raw = locator.trim();
-  if (raw.length === 0) return null;
-
-  let name = raw;
-  if (/^https:\/\//u.test(raw)) {
-    try {
-      const parsed = new URL(raw);
-      if (parsed.protocol !== "https:") return null;
-      name = decodeURIComponent(parsed.pathname.split("/").at(-1) ?? "");
-    } catch {
-      return null;
-    }
-  }
-
-  if (name.length === 0 || name === "." || name === "..") return null;
-  if (name.endsWith(".blockmap")) return null;
-  if (/[\\/\0]/u.test(name)) return null;
-  return name;
-}
-
-/** The primary artifact a manifest names, or null when it names none. */
-export function manifestArtifact(text) {
-  const { entries, path, sha512: declaredSha } = readManifest(text);
-  const declaredEntry = path === null ? undefined : entries.find((entry) => entry.url === path);
-  const chosen =
-    declaredEntry ?? entries.find((entry) => !entry.url.endsWith(".blockmap")) ?? entries[0];
-  const locator = path ?? chosen?.url ?? null;
-  const sha512 = declaredSha ?? chosen?.sha512 ?? null;
-  if (locator === null || sha512 === null) return null;
-
-  const name = artifactFilename(locator);
-  if (name === null) return null;
-  return { locator, name, sha512, size: chosen?.size ?? null };
-}
-
-/**
- * Rewrite a manifest's relative artifact references to the release tag's assets.
- *
- * The manifest is served from Pages, but the bytes it names stay on the release.
- * This is the one transformation that makes the two hosts describe one artifact.
- */
-export function absoluteManifest(text, baseUrl) {
-  const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  return text
-    .split(/\r?\n/u)
-    .map((line) => {
-      const match = /^(\s*(?:-\s+)?)(url|path):[ \t]*(.+?)[ \t]*$/u.exec(line);
-      if (match === null) return line;
-      const [, prefix, key, raw] = match;
-      const value = scalar(raw ?? "");
-      if (value.length === 0 || /^https?:\/\//iu.test(value)) return line;
-      return `${prefix}${key}: ${new URL(value, base).href}`;
-    })
-    .join("\n");
-}
-
-/** Everything wrong with a manifest this run just built. */
-export function manifestProblems({ text, outputDir, version, exists = existsSync }) {
-  const problems = [];
-  const namedVersion = versionFromManifest(text);
-  if (namedVersion !== version) {
-    problems.push(`the manifest names ${String(namedVersion)}, but package.json says ${version}`);
-  }
-
-  const artifact = manifestArtifact(text);
-  if (artifact === null) {
-    problems.push("the manifest names no artifact with a sha512");
-    return problems;
-  }
-  if (!exists(join(outputDir, artifact.name))) {
-    problems.push(`the manifest names ${artifact.name}, but it is not in ${outputDir}`);
+    problems.push(
+      `the gate proved ${status.commit}, but HEAD is ${head.slice(0, 12)}: ` +
+        "publish only a commit the gate proved",
+    );
   }
   return problems;
 }
@@ -724,9 +421,10 @@ export function updateKeyPath(env = process.env) {
 /**
  * Why a private key must not publish, or null when it is the key the apps pin.
  *
- * Exported so the refusal can be exercised without a release. An installed app verifies with the
- * key compiled into it, so a feed signed by anything else downloads nothing and reports no
- * release; the build should not start, let alone upload, before that is known.
+ * Exported so the refusal can be exercised without a release. An installed app
+ * verifies the relay's checksum list with the key compiled into it, so a release
+ * signed by anything else is refused; the build should not start, let alone
+ * upload, before that is known.
  */
 export function publisherKeyProblem(privateKey, { pinned = pinnedSecretPublic("update") } = {}) {
   let derived;
@@ -745,15 +443,14 @@ export function publisherKeyProblem(privateKey, { pinned = pinnedSecretPublic("u
     "the publisher key is not the key the apps pin.\n" +
     `  this key  ${groupedFingerprint(secretFingerprint(derived, "spki-pem"))}\n` +
     `  pinned    ${groupedFingerprint(secretFingerprint(pinned, "spki-pem"))}\n` +
-    "A feed signed with this key is refused by every installed app. Run `pnpm keys status`; " +
-    "pin this key first, or use the one the tree already trusts."
+    "A checksum list signed with this key is refused by every installed relay. Run " +
+    "`pnpm keys status`; pin this key first, or use the one the tree already trusts."
   );
 }
 
 export function parseArgs(argv) {
   const options = {
     appId: null,
-    channel: "stable",
     publish: false,
     dryRun: false,
     verify: false,
@@ -779,10 +476,7 @@ export function parseArgs(argv) {
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--verify") options.verify = true;
     else if (arg === "--no-build") options.build = false;
-    else if (arg === "--channel") {
-      options.channel = takeValue(index, "--channel");
-      index += 1;
-    } else if (arg === "--tag") {
+    else if (arg === "--tag") {
       options.tag = takeValue(index, "--tag");
       index += 1;
     } else if (arg === "--notes-file") {
@@ -799,9 +493,6 @@ export function parseArgs(argv) {
       throw new Error(`unexpected argument ${arg}`);
     }
   }
-
-  const channelMiss = channelProblem(options.channel);
-  if (channelMiss !== null) throw new Error(channelMiss);
 
   return options;
 }
@@ -914,285 +605,6 @@ async function buildRelayArtifact({ app, version, outputDir, arch = process.arch
   }
 }
 
-/**
- * A PKGBUILD with the version, source and checksum of the artifact just built.
- *
- * The committed PKGBUILD records the release it was written for; a release builds
- * the package from its own bytes, so all three numbers are rewritten here. The
- * source line is part of that: a template that names the archived repository, or a
- * tag this run did not upload to, would 404 while the feed named a working file.
- */
-export function pkgbuildFor({ text, version, sha256, source = null }) {
-  let patched = text
-    .replace(/^pkgver=.*$/mu, `pkgver=${version}`)
-    .replace(/^pkgrel=.*$/mu, "pkgrel=1")
-    .replace(/^sha256sums=\(.*$/mu, `sha256sums=('${sha256}')`);
-  if (source !== null) {
-    patched = patched.replace(/^source=\(.*$/mu, `source=("$pkgname-$pkgver.AppImage::${source}")`);
-  }
-  const required = source === null ? ["pkgver", "sha256sums"] : ["pkgver", "source", "sha256sums"];
-  const unchanged = required.filter(
-    (fieldName) => !new RegExp(`^${fieldName}=`, "mu").test(patched),
-  );
-  if (unchanged.length > 0) {
-    throw new Error(`the PKGBUILD has no ${unchanged.join(" or ")} line to rewrite`);
-  }
-  return patched;
-}
-
-/**
- * What is wrong with a built package's file modes, or null when nothing is.
- *
- * 0.3.1 installed and then could not start because `cp -a` reproduced the
- * AppImage's 0700 directories onto `/opt/suite-start`. Reading `bsdtar -tvf`
- * catches that before upload.
- */
-export function packageModeProblems(listing) {
-  const problems = [];
-  let hasExecutable = false;
-
-  for (const line of listing.split(/\r?\n/u)) {
-    if (line.trim().length === 0) continue;
-    const match = TAR_LINE.exec(line.trim());
-    if (match === null) continue;
-    const [, kind, mode, path] = match;
-    if (kind === undefined || mode === undefined || path === undefined) continue;
-
-    if (kind === "d" && path.startsWith("opt/")) {
-      if (mode[6] !== "r" || mode[8] !== "x") {
-        problems.push(`${path} is mode ${mode}, so a user cannot read or enter it`);
-      }
-    }
-
-    if (path === "opt/suite-start/suite-start") {
-      if (kind !== "-") problems.push("the hub's binary is not a regular file");
-      else if (mode[2] !== "x" && mode[2] !== "s") {
-        problems.push("the hub's binary is not executable");
-      } else hasExecutable = true;
-    }
-  }
-
-  if (!hasExecutable) problems.push("the package does not contain opt/suite-start/suite-start");
-  return problems;
-}
-
-const TAR_LINE =
-  /^([-dlpscbD])([rwxsStT-]{9})\s+\d+\s+\S+\s+\S+\s+\d+\s+\S+\s+\d+\s+[\d:]+\s+(.+)$/u;
-
-/**
- * Build the Arch package for the artifact this run produced, when the app has one.
- *
- * A second delivery form for the same bytes: the PKGBUILD wraps the AppImage
- * rather than rebuilding the app. A machine without `makepkg` skips it with a
- * note; only the hub has a PKGBUILD today.
- */
-async function packageFor(app, { version, artifactPath }) {
-  if (app.pkgbuild === null) return null;
-  const pkgbuildPath = join(ROOT, app.pkgbuild);
-  if (!existsSync(pkgbuildPath)) return null;
-  if (process.platform !== "linux" || !existsSync("/usr/bin/makepkg")) {
-    process.stdout.write("\nmakepkg is not here, so no Arch package was built\n");
-    return null;
-  }
-
-  const text = await readFile(pkgbuildPath, "utf8");
-  const pkgname = /^pkgname=(\S+)$/mu.exec(text)?.[1];
-  if (pkgname === undefined) throw new Error(`${pkgbuildPath} names no pkgname`);
-
-  const work = await mkdtemp(join(tmpdir(), "suite-pkg-"));
-  const patched = pkgbuildFor({
-    text,
-    version,
-    sha256: await sha256OfFile(artifactPath),
-    // The image this run built, on the tag this run uploads to. The manifest names
-    // the same file, so the package and the feed resolve to one release asset.
-    source: `${releaseAssetBase(app, version)}${basename(artifactPath)}`,
-  });
-  await writeFile(join(work, "PKGBUILD"), patched);
-  await copyFile(artifactPath, join(work, `${pkgname}-${version}.AppImage`));
-
-  process.stdout.write(`\n=== arch package (${pkgname}) ===\n`);
-  run("makepkg", ["--nocheck", "--nodeps", "--force"], work);
-
-  const built = (await readdir(work)).find((name) => name.endsWith(".pkg.tar.zst"));
-  if (built === undefined) throw new Error("makepkg produced no .pkg.tar.zst");
-
-  const listing = capture("bsdtar", ["-tvf", built], work);
-  const problems = packageModeProblems(listing);
-  if (problems.length > 0) {
-    throw new Error(`${built} would not run:\n  ${problems.join("\n  ")}`);
-  }
-
-  const destination = join(ROOT, app.output, built);
-  await copyFile(join(work, built), destination);
-  await rm(work, { recursive: true, force: true });
-  return destination;
-}
-
-/**
- * Read the published feed back and verify it, without writing anything.
- *
- * This is the second command issue #20 asks for: after a release, a person can
- * ask whether Pages serves a manifest signed by the key the apps pin, whether it
- * names the version in the tree, and whether its artifact answers.
- */
-export async function verifyPublishedFeed({ feed, publicKey, fetchImpl = globalThis.fetch }) {
-  const manifestUrl = `${feed.replace(/\/+$/u, "")}/${FEED_FILE}`;
-  let manifestResponse;
-  try {
-    manifestResponse = await fetchImpl(manifestUrl);
-  } catch {
-    return { ok: false, reason: "the feed could not be reached", version: null, artifact: null };
-  }
-  if (!manifestResponse.ok) {
-    return { ok: false, reason: `the feed answered ${manifestResponse.status}`, version: null, artifact: null };
-  }
-
-  let signatureResponse;
-  try {
-    signatureResponse = await fetchImpl(`${manifestUrl}.sig`);
-  } catch {
-    return { ok: false, reason: "the signature could not be reached", version: null, artifact: null };
-  }
-  if (!signatureResponse.ok) {
-    return { ok: false, reason: "the feed published no signature", version: null, artifact: null };
-  }
-
-  const body = await manifestResponse.text();
-  const signature = Buffer.from((await signatureResponse.text()).trim(), "base64");
-  if (!signatureVerifies(Buffer.from(body), signature, publicKey)) {
-    return {
-      ok: false,
-      reason: "the manifest is not signed by the publisher's key",
-      version: null,
-      artifact: null,
-    };
-  }
-
-  const version = versionFromManifest(body);
-  if (version === null) {
-    return { ok: false, reason: "the feed named no version", version: null, artifact: null };
-  }
-
-  const artifact = manifestArtifact(body);
-  if (artifact === null) {
-    return { ok: false, reason: "the feed named no artifact", version, artifact: null };
-  }
-
-  const artifactUrl = /^https:\/\//u.test(artifact.locator)
-    ? artifact.locator
-    : `${feed.replace(/\/+$/u, "")}/${artifact.name}`;
-  try {
-    const response = await fetchImpl(artifactUrl, { method: "HEAD" });
-    if (!response.ok) {
-      return {
-        ok: false,
-        reason: `the artifact answered ${response.status}`,
-        version,
-        artifact: artifactUrl,
-      };
-    }
-  } catch {
-    return { ok: false, reason: "the artifact could not be reached", version, artifact: artifactUrl };
-  }
-
-  return { ok: true, reason: null, version, artifact: artifactUrl };
-}
-
-async function pinnedPublicKey() {
-  const built = join(ROOT, "packages/desktop/dist/updateSignature.js");
-  if (!existsSync(built)) {
-    throw new Error("the shared packages are not built. Run the gate before verifying a release.");
-  }
-  const module = await import(pathToFileURL(built).href);
-  return module.SUITE_UPDATE_PUBLIC_KEY;
-}
-
-/**
- * Remove one top-level YAML mapping from an electron-builder config.
- *
- * The pre-release build reuses the app's committed config, so it has to remove
- * the file associations rather than merge an empty list into them: electron-
- * builder concatenates arrays, and an empty list would leave the stable MIME
- * registrations in place.
- */
-export function removeTopLevelBlock(text, key) {
-  const lines = text.split(/\r?\n/u);
-  const start = lines.findIndex((line) => new RegExp(`^${key}:`, "u").test(line));
-  if (start < 0) return text;
-  let end = start + 1;
-  while (end < lines.length && (/^\s/u.test(lines[end]) || lines[end].trim().length === 0)) {
-    end += 1;
-  }
-  return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
-}
-
-/** The build-time config a pre-release AppImage is packaged with. */
-export function preReleaseBuilderConfig(text, { app, channel }) {
-  let config = text
-    .replace(/^appId:.*$/mu, `appId: ${flatpakId(app.id, channel)}`)
-    .replace(/^productName:.*$/mu, `productName: ${displayName(app.name, channel)}`)
-    .replace(
-      /^artifactName:.*$/mu,
-      `artifactName: ${artifactStem(app.id, channel)}-` + "${version}-${arch}.${ext}",
-    )
-    .replace(/^\s+MimeType:.*$/gmu, "");
-
-  config = removeTopLevelBlock(config, "fileAssociations");
-
-  // The tier is a build fact beside the manifest. electron-builder copies
-  // extraFiles after building the app, so this lands next to suite.app.json.
-  const extraFiles = [
-    "extraFiles:",
-    "  - from: suite.app.json",
-    "    to: suite.app.json",
-    "  - from: suite.channel.json",
-    "    to: suite.channel.json",
-  ].join("\n");
-  config = config.replace(
-    ["extraFiles:", "  - from: suite.app.json", "    to: suite.app.json"].join("\n"),
-    extraFiles,
-  );
-  return config;
-}
-
-/**
- * Write the pre-release manifest and config into the app project, and return
- * the restore step.
- *
- * The release refuses a dirty tree before this runs, and the restore is in a
- * `finally`, so the working tree describes stable again whether the build
- * succeeds or fails. The files are swapped rather than copied through an
- * override because electron-builder's array merge cannot remove `fileAssociations`.
- */
-async function stagePreReleaseBuild(app, channel) {
-  const ymlPath = join(ROOT, app.project, "electron-builder.yml");
-  const manifestPath = join(ROOT, app.manifest);
-  const channelPath = join(ROOT, app.project, "suite.channel.json");
-  const originalYml = await readFile(ymlPath, "utf8");
-  const originalManifest = await readFile(manifestPath, "utf8");
-  const channelExisted = existsSync(channelPath);
-  const originalChannel = channelExisted ? await readFile(channelPath, "utf8") : null;
-
-  const baseManifest = JSON.parse(originalManifest);
-  await writeFile(
-    manifestPath,
-    `${JSON.stringify(preReleaseAppManifest(baseManifest, channel), null, 2)}\n`,
-  );
-  await writeFile(
-    channelPath,
-    `${JSON.stringify(channelRecord({ app: app.id, channel }), null, 2)}\n`,
-  );
-  await writeFile(ymlPath, preReleaseBuilderConfig(originalYml, { app, channel }));
-
-  return async () => {
-    await writeFile(ymlPath, originalYml);
-    await writeFile(manifestPath, originalManifest);
-    if (channelExisted) await writeFile(channelPath, originalChannel);
-    else await rm(channelPath, { force: true });
-  };
-}
-
 async function readJson(path) {
   try {
     return JSON.parse(await readFile(path, "utf8"));
@@ -1204,10 +616,10 @@ async function readJson(path) {
 /**
  * Build, sign and publish the relay tarball.
  *
- * The relay is a server, not an app: it has no update feed and no electron
+ * The relay is a server, not an app: it has no update feed and no Electron
  * manifest. The update key signs the checksum list, and that list is what
  * verifies the tarball. The tag, the version and the changelog section are the
- * same facts the app path uses, so they are checked before this runs.
+ * same facts the desktop paths use, so they are checked before this runs.
  */
 async function releaseRelay(app, options, { head, version, tag, changelog, privateKey, keyPath }) {
   const outputDir = join(ROOT, app.output);
@@ -1303,38 +715,26 @@ async function releaseRelay(app, options, { head, version, tag, changelog, priva
 }
 
 async function release(app, options) {
-  const channel = options.channel;
-  const preRelease = isPreRelease(channel);
-  const channelName = displayName(app.name, channel);
   const head = capture("git", ["rev-parse", "HEAD"]);
   const porcelain = capture("git", ["status", "--porcelain"]);
   const packageText = await readFile(join(ROOT, app.project, "package.json"), "utf8");
   const version = versionFromPackage(packageText);
   const changelog = await readFile(join(ROOT, app.changelog), "utf8").catch(() => "");
-  const manifestText =
-    app.manifest === null ? null : await readFile(join(ROOT, app.manifest), "utf8").catch(() => null);
   const gateStatus = existsSync(join(ROOT, ".dev", "gate-status.json"))
     ? await readJson(join(ROOT, ".dev", "gate-status.json"))
     : null;
 
   const problems = [];
   if (version === null) problems.push(`${app.project}/package.json names no version`);
-  if (preRelease && app.id === "start") {
-    problems.push(
-      "Suite Start has no pre-release channel: the hub's own card is the stable hub and nothing updates it",
-    );
-  }
   const dirty = dirtyTreeProblem(porcelain);
   if (dirty !== null) problems.push(dirty);
   if (version !== null) {
     const changelogMiss = changelogProblem(changelog, version);
     if (changelogMiss !== null) problems.push(changelogMiss);
   }
-  const manifestMiss = manifestVersionProblem(manifestText, version);
-  if (manifestMiss !== null) problems.push(manifestMiss);
-  problems.push(...gateProblems(gateStatus, head, { range: feedOnlyRange }));
+  problems.push(...gateProblems(gateStatus, head));
 
-  const tag = options.tag ?? (version === null ? null : tagFor(app, version, channel));
+  const tag = options.tag ?? (version === null ? null : tagFor(app, version));
   if (tag === null) problems.push("no tag to release under");
 
   if (problems.length > 0) {
@@ -1350,146 +750,14 @@ async function release(app, options) {
   }
   const privateKey = await readFile(keyPath, "utf8");
 
-  // The pin is what an installed app trusts. Signing with any other key produces a feed that
-  // every existing install refuses as "not signed by the publisher" — after the artifact has
-  // been uploaded and the feed committed. Refuse before the build instead.
+  // The pin is what an installed relay trusts. Signing with any other key produces a checksum
+  // list that every existing install refuses as "not signed by the publisher".
   const keyProblem = publisherKeyProblem(privateKey);
   if (keyProblem !== null) {
     throw new Error(`${keyProblem}\n  at        ${keyPath}`);
   }
 
-  if (app.kind === "relay") {
-    await releaseRelay(app, options, { head, version, tag, changelog, privateKey, keyPath });
-    return;
-  }
-
-  process.stdout.write(`\nreleasing ${channelName} ${version} as ${tag}\n`);
-
-  if (options.build) {
-    process.stdout.write("\n=== build ===\n");
-    run("pnpm", ["--filter", app.package, "run", "build"]);
-    process.stdout.write("\n=== package ===\n");
-    const restore = preRelease ? await stagePreReleaseBuild(app, channel) : null;
-    try {
-      run("pnpm", [
-        "--filter",
-        app.package,
-        "exec",
-        "electron-builder",
-        "--linux",
-        "AppImage",
-        "--publish",
-        "never",
-      ]);
-    } finally {
-      if (restore !== null) await restore();
-    }
-  }
-
-  const outputDir = join(ROOT, app.output);
-  const manifestPath = join(outputDir, FEED_FILE);
-  if (!existsSync(manifestPath)) {
-    throw new Error(`${manifestPath} is missing after packaging`);
-  }
-  const builtManifest = await readFile(manifestPath, "utf8");
-  const builtProblems = manifestProblems({
-    text: builtManifest,
-    outputDir,
-    version,
-  });
-  if (builtProblems.length > 0) throw new Error(builtProblems.join("\n"));
-
-  const artifact = manifestArtifact(builtManifest);
-  if (artifact === null) throw new Error(`${manifestPath} names no artifact`);
-  const artifactPath = join(outputDir, artifact.name);
-
-  const packagePath = await packageFor(app, { version, artifactPath });
-
-  // The manifest Pages serves names the release asset, not a file beside itself.
-  const publishedManifest = absoluteManifest(builtManifest, releaseAssetBase(app, version, channel));
-  const publishedBytes = Buffer.from(publishedManifest);
-  const signature = signManifest(publishedBytes, privateKey);
-  const fingerprint = fingerprintOf(privateKey);
-
-  const feedDir = options.feedDir;
-  if (feedDir !== null) {
-    await mkdir(feedDir, { recursive: true });
-    await copyFile(artifactPath, join(feedDir, artifact.name));
-    await writeFile(join(feedDir, FEED_FILE), publishedManifest);
-    await writeFile(join(feedDir, `${FEED_FILE}.sig`), `${signature}\n`);
-    process.stdout.write(`\nfeed written to ${feedDir}\n`);
-  }
-
-  process.stdout.write(`\n  channel     ${channel}\n`);
-  if (preRelease) {
-    process.stdout.write("  feed        none (a pre-release never writes feeds/<app>/)\n");
-  } else {
-    process.stdout.write(`  feed        ${manifestUrl(app)}\n`);
-  }
-  process.stdout.write(`  tag         ${tag}\n`);
-  process.stdout.write(`  artifact    ${artifact.name}\n`);
-  process.stdout.write(`  manifest    ${publishedManifest.split(/\r?\n/u).find((line) => line.startsWith("path:")) ?? ""}\n`);
-  process.stdout.write(`  key         ${keyPath}\n`);
-  process.stdout.write(`  fingerprint ${fingerprint}\n`);
-
-  if (!options.publish) {
-    process.stdout.write("\ndry run: nothing was tagged, uploaded, written or committed.\n");
-    process.stdout.write(
-      `To publish: node scripts/release.mjs ${app.id} --channel ${channel} --publish\n`,
-    );
-    return;
-  }
-
-  const work = await mkdtemp(join(tmpdir(), "suite-release-"));
-  try {
-    const uploadManifest = join(work, FEED_FILE);
-    const uploadSignature = join(work, `${FEED_FILE}.sig`);
-    await writeFile(uploadManifest, publishedManifest);
-    await writeFile(uploadSignature, `${signature}\n`);
-
-    const notes =
-      options.notesFile === null
-        ? ["--notes", changelogSection(changelog, version) || `Suite ${app.name} ${version}`]
-        : ["--notes-file", options.notesFile];
-
-    process.stdout.write(`\n=== publish ${tag} ===\n`);
-    run("gh", [
-      "release",
-      "create",
-      tag,
-      artifactPath,
-      uploadManifest,
-      uploadSignature,
-      ...(packagePath === null ? [] : [packagePath]),
-      "--title",
-      `${channelName} ${version}`,
-      ...notes,
-      "--target",
-      head,
-      "--latest=false",
-      ...(preRelease ? ["--prerelease"] : []),
-    ]);
-
-    if (preRelease) {
-      process.stdout.write(`\npublished ${tag}\n`);
-      process.stdout.write("pre-release: no feed was written and the stable feed is untouched.\n");
-      process.stdout.write("Install it by hand from the tag; stable keeps its own update path.\n");
-      return;
-    }
-
-    const feedFile = join(ROOT, feedPath(app));
-    await mkdir(dirname(feedFile), { recursive: true });
-    await writeFile(feedFile, publishedManifest);
-    await writeFile(`${feedFile}.sig`, `${signature}\n`);
-    run("git", ["add", "--", feedPath(app), `${feedPath(app)}.sig`]);
-    run("git", ["commit", "-m", `chore(release): publish ${app.id} ${version} feed`]);
-
-    process.stdout.write(`\npublished ${tag}\n`);
-    process.stdout.write(`feed ${manifestUrl(app)}\n`);
-    process.stdout.write("Push the feed commit; it inherits this gate while it only touches feeds/.\n");
-  } finally {
-    await rm(work, { recursive: true, force: true });
-  }
+  await releaseRelay(app, options, { head, version, tag, changelog, privateKey, keyPath });
 }
 
 async function main() {
@@ -1516,49 +784,28 @@ async function main() {
 
   const app = APPS[options.appId];
   if (app === undefined) {
-    process.stderr.write(`unknown app ${options.appId}\n\n${USAGE}`);
+    process.stderr.write(
+      `unknown app ${options.appId}\n\n${USAGE}\n` +
+        "Desktop apps ship as Flatpaks; publish them with `node scripts/flatpak-remote.mjs`.\n",
+    );
     process.exit(2);
   }
 
   if (options.verify) {
-    if (isPreRelease(options.channel)) {
-      throw new Error(
-        `a ${options.channel} pre-release has no committed feed to verify; ` +
-          "the artifact and its signed manifest live on the pre-release tag.",
-      );
-    }
     const packageText = await readFile(join(ROOT, app.project, "package.json"), "utf8");
     const expected = versionFromPackage(packageText);
-
-    if (app.kind === "relay") {
-      const publicKey = pinnedSecretPublic("update");
-      if (publicKey === null) {
-        throw new Error("SUITE_UPDATE_PUBLIC_KEY is missing from packages/desktop/src/updateSignature.ts");
-      }
-      const result = await verifyRelayArtifact({
-        dir: join(ROOT, app.output),
-        version: expected,
-        publicKey,
-      });
-      if (!result.ok) throw new Error(result.reason ?? "the relay artifact did not verify");
-      process.stdout.write(`verified ${app.name} ${expected}\n`);
-      process.stdout.write(`  artifact ${join(app.output, result.artifact)}\n`);
-      return;
+    const publicKey = pinnedSecretPublic("update");
+    if (publicKey === null) {
+      throw new Error("SUITE_UPDATE_PUBLIC_KEY is missing from packages/desktop/src/updateSignature.ts");
     }
-
-    const result = await verifyPublishedFeed({
-      feed: feedUrl(app),
-      publicKey: await pinnedPublicKey(),
+    const result = await verifyRelayArtifact({
+      dir: join(ROOT, app.output),
+      version: expected,
+      publicKey,
     });
-    if (!result.ok) throw new Error(result.reason ?? "the feed did not verify");
-    if (result.version !== expected) {
-      throw new Error(
-        `the feed serves ${String(result.version)}, but ${app.project}/package.json says ${String(expected)}`,
-      );
-    }
-    process.stdout.write(`verified ${app.name} ${result.version}\n`);
-    process.stdout.write(`  feed     ${manifestUrl(app)}\n`);
-    process.stdout.write(`  artifact ${result.artifact}\n`);
+    if (!result.ok) throw new Error(result.reason ?? "the relay artifact did not verify");
+    process.stdout.write(`verified ${app.name} ${expected}\n`);
+    process.stdout.write(`  artifact ${join(app.output, result.artifact)}\n`);
     return;
   }
 

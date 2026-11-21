@@ -1,19 +1,14 @@
 # The Canvas desktop build.
 #
-# Linux ships the AppImage only. The `.canvas` association is declared by
-# `fileAssociations` and `linux.desktop.entry`, which electron-builder writes into
-# the image's own desktop entry, so the portable build keeps it without an
-# installer; Start declares the same MIME type when it places the image. Canvas
-# claims no URL scheme of its own: `suite://` belongs to Start, which routes a
-# link by launching this app with it.
+# Linux ships as a Flatpak. `scripts/flatpak.mjs` packages this unpacked build,
+# so `dir` is the only target configured here. The `.canvas` association is
+# declared by `fileAssociations` and `linux.desktop.entry`, which Flatpak's
+# exported desktop entry keeps. Canvas claims no URL scheme of its own:
+# `suite://` belongs to Start, which routes a link by launching this app with it.
 #
 # macOS and Windows are configured but cannot be produced here: both need a
 # signing identity this repository does not have, and an unsigned build is not
 # something to hand a user.
-# The name travels into the feed's `url`, so it stays a name a URL can carry: no
-# spaces, no capitals to disagree about, and the same stem as the executable.
-artifactName: suite-canvas-${version}-${arch}.${ext}
-
 appId: run.suite.canvas
 productName: Suite Canvas
 copyright: Copyright © Suite
@@ -60,7 +55,7 @@ electronFuses:
 linux:
   syncDesktopName: true
   target:
-    - AppImage
+    - dir
   # Without this the binary is named after the package, which for a scoped name
   # becomes `@suitedesktop`. The executable name is part of what Start records,
   # so it has to be a name a person would recognise.
@@ -73,11 +68,6 @@ linux:
     entry:
       MimeType: application/x-suite-canvas;
       StartupWMClass: Suite Canvas
-
-# No `appImage.license`: electron-builder reads it as a path to a file to show at
-# install, wants `.txt` or `.html`, and a bare `MIT` made it look for a file with
-# that name and fail the build. The licence is in the repository, and in the app's
-# own About rows.
 
 mac:
   category: public.app-category.productivity
@@ -97,11 +87,3 @@ fileAssociations:
 
 # No per-app scheme: Start owns `suite://` and routes to the app. A second
 # scheme nothing registers or handles is a promise the app does not keep.
-
-# The feed the app's updater reads, and the one the hub reads when a person asks.
-# `latest/download` is a stable redirect to the newest release's assets, so the
-# URL never has to be rewritten per version, and GitHub serves the manifest the
-# updater writes beside the artifacts.
-publish:
-  provider: generic
-  url: https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/canvas

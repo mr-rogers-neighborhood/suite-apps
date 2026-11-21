@@ -1,19 +1,18 @@
 import { joinPath } from "@suite/contracts";
 
 /**
- * The menu entry a managed install earns.
+ * Where an older build wrote a menu entry, and how to remove it.
  *
- * An app Start placed lives in `~/Applications/Suite`, which no shell searches, so without
- * this it can only be opened from Start. A launcher that keeps an app to itself is the
- * thing this suite is trying not to be — every app in the suite should be launchable the
- * way every other program on the machine is.
+ * Flatpak exports its own desktop entry, so Start no longer writes one. A build
+ * that predates the Flatpak-only tree may still have left `suite-<id>.desktop`
+ * and a content-addressed icon; forgetting an app removes exactly those.
  *
- * Two decisions worth naming:
+ * Two facts still matter:
  *
- * - **User scope.** The entry goes in `~/.local/share/applications`, not `/usr/share`. No
- *   root, and it lives and dies with the install that created it.
- * - **One entry per app id**, named `suite-<id>.desktop`, so an update rewrites the entry
- *   rather than accumulating one per version, and an uninstall can delete exactly one file.
+ * - **User scope.** The entry lived in `~/.local/share/applications`, not
+ *   `/usr/share`, so a user can remove it without root.
+ * - **One entry per app id**, named `suite-<id>.desktop`, so cleanup deletes
+ *   exactly one file rather than guessing at names.
  */
 export interface ShortcutInput {
   readonly id: string;

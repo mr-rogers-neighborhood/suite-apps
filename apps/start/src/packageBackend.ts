@@ -1,19 +1,16 @@
-import type { FeedArtifact } from "@suite/desktop";
 import type { CatalogueEntry } from "./catalogue.js";
 import type { PackageChannel, ReleaseTier } from "./channels.js";
-import type { DownloadProgress, InstalledApp } from "./install.js";
-import type { DiscoveredApp, FlatpakInstall, InstallRecord, RejectedInstall } from "./registry.js";
+import type { DiscoveredApp, FlatpakInstall, RejectedInstall } from "./registry.js";
 import type { AppSource } from "./shared.js";
 
 /**
  * The one way Start reads or changes an installed package.
  *
- * Today Start is an AppImage that talks to Flatpak and to `~/Applications` itself.
- * A packaged-as-Flatpak Start cannot: its sandbox has no `flatpak` binary and no
- * writable applications root, so it has to ask a host agent over D-Bus. The window
- * must not learn a second way to list, install or start an app for that to be a
- * transport swap rather than a second implementation. So every operation below is a
- * method on a backend, and the native one is the only place that spawns anything.
+ * Linux desktop apps ship as Flatpaks. Start's sandbox has no `flatpak` binary of
+ * its own, so it asks a host agent over D-Bus for every operation. The window must
+ * not learn a second way to list, install or start an app for that to be a
+ * transport swap rather than a second implementation. So every operation below is
+ * a method on a backend, and the native one is the only place that spawns anything.
  *
  * The data is the model Start already has: `DiscoveredApp` keeps the manifest, the
  * record's executable and the Flatpak identity; `InstallRecord` and `FlatpakInstall`
@@ -56,17 +53,10 @@ export interface PackageListing {
   /** Installs that exist but cannot be launched, so a card can say why. */
   readonly rejected: readonly RejectedInstall[];
   /**
-   * Versions of each catalogue app on disk, newest first.
-   *
-   * Empty for an app that is not installed. A Flatpak deployment has no version
-   * directories of its own and answers empty here too.
-   */
-  readonly versions: ReadonlyMap<string, readonly string[]>;
-  /**
    * The Flatpak commit each catalogue app's store offers, by app id.
    *
-   * Absent when this machine has no store, or when the store has not been read.
-   * The card reads it as "which channel would Install use", not as a promise.
+   * An installed app is compared with its own origin; an app that is not
+   * installed is compared with the store a fresh install would use.
    */
   readonly offers: ReadonlyMap<string, string>;
   /**
@@ -86,23 +76,13 @@ export interface PackageListOptions {
 /**
  * One install request.
  *
- * The version, artifact and feed are present for an AppImage and absent when the
- * backend is asked to install from a store it owns. `channel` names the target
- * tier for a pre-release; stable ignores it. A pre-release that is already
- * installed is switched, never installed a second time.
+ * `channel` names the target tier for a pre-release; stable ignores it. A
+ * pre-release that is already installed is switched, never installed a second time.
  */
 export interface PackageInstallRequest {
   readonly entry: CatalogueEntry;
-  /** The version the verified feed named. */
-  readonly version?: string;
-  /** The artifact that same verified manifest named. */
-  readonly artifact?: FeedArtifact;
-  /** The feed an AppImage download reads. */
-  readonly feed?: string;
   /** The target tier for a pre-release switch or first install. */
   readonly channel?: PackageChannel;
-  /** Called as bytes arrive; only the card's progress bar consumes it. */
-  readonly onProgress?: DownloadProgress;
 }
 
 /** A replacement of something already installed. */
@@ -115,8 +95,6 @@ export interface PackageInstallResult {
   readonly id: string;
   /** The version now installed, or null when the backend could not read one. */
   readonly version: string | null;
-  /** Present only when Start placed the bytes itself, never for a Flatpak deployment. */
-  readonly installed?: InstalledApp;
 }
 
 export interface PackageRemoveRequest {
@@ -125,7 +103,7 @@ export interface PackageRemoveRequest {
    * The discovered package to remove.
    *
    * Absent for a record whose files discovery refused to launch: there is still a
-   * folder and a record to delete, and no owned deployment to ask Flatpak about.
+   * record to delete, and no owned deployment to ask Flatpak about.
    */
   readonly package?: InstalledPackage;
 }
@@ -167,9 +145,9 @@ export interface PackageLaunchObserver {
  * Every package operation Start performs.
  *
  * `install` and `update` are separate because they promise different things: an
- * update may prune the version it replaced, while an install leaves other copies
- * alone. The backend decides the format (AppImage or Flatpak) from its own listing,
- * so the window never has to speak either one.
+ * update replaces the deployment Flatpak owns, while an install asks the store for
+ * a first copy. The backend decides the command from its own listing, so the
+ * window never has to speak Flatpak.
  */
 export interface PackageBackend {
   list(options?: PackageListOptions): Promise<PackageListing>;
@@ -186,8 +164,4 @@ export interface PackageBackend {
   adopt(executable: string): Promise<boolean>;
   /** Forget a record without touching files Start does not own. */
   forget(id: string): Promise<void>;
-  /** Managed installs whose menu entry Startup may repair. */
-  repairable(): Promise<readonly InstallRecord[]>;
-  /** Point an install back at the version it replaced. Null when there is none. */
-  rollback(entry: CatalogueEntry): Promise<InstalledApp | null>;
 }

@@ -6,10 +6,6 @@
 appId: run.suite.start
 productName: Suite Start
 executableName: suite-start
-# No spaces: GitHub rewrites a space in an asset name to a dot, and the feed names the
-# file it published — so `Suite Start-0.3.0.AppImage` in the yml became
-# `Suite.Start-0.3.0.AppImage` on the release, and the download the feed promised 404ed.
-artifactName: suite-start-${version}-${arch}.${ext}
 copyright: Copyright © Suite contributors
 
 directories:
@@ -46,11 +42,10 @@ electronFuses:
   grantFileProtocolExtraPrivileges: false
 
 linux:
-  # One Linux artifact per release: this image is what the feed names, what Start
-  # replaces, and what the Arch PKGBUILD repackages. A deb target was configured
-  # here but never built or uploaded.
+  # Linux ships as a Flatpak. `scripts/flatpak.mjs` packages this unpacked build,
+  # so `dir` is the only target configured here.
   target:
-    - AppImage
+    - dir
   # The package declares its own desktop entry, so the shell must agree with it about
   # WM_CLASS or a panel draws a second, generic icon for the same window.
   syncDesktopName: true
@@ -65,11 +60,3 @@ protocols:
   - name: Suite
     schemes:
       - suite
-
-# The feed the app's updater reads, and the one the hub reads when a person asks.
-# The release script writes the signed manifest under `feeds/start/`, which Pages
-# serves from this repository. The manifest names the AppImage on the hub's release
-# tag, so the manifest can move while the artifact stays a release asset.
-publish:
-  provider: generic
-  url: https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/start

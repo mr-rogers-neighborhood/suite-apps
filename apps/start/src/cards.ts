@@ -1,6 +1,6 @@
 import { workspaceLink } from "@suite/contracts";
 import { APP_ICONS } from "./appIcons.js";
-import { type CatalogueApp, isNewer, SELF_ID } from "./catalogue.js";
+import { type CatalogueApp, SELF_ID } from "./catalogue.js";
 import {
   isPreReleaseId,
   PRE_RELEASE_TIERS,
@@ -16,7 +16,6 @@ import type { StoreChannel } from "./packageBackend.js";
 import type { RecentEntry } from "./recents.js";
 import type { DiscoveredApp, RejectedInstall } from "./registry.js";
 import { packageSource } from "./registry.js";
-import { type ReportedUpdate, UNREPORTED } from "./reportedUpdate.js";
 import type { AppCard, AppCardState, FileCard } from "./shared.js";
 
 /**
@@ -27,30 +26,21 @@ import type { AppCard, AppCardState, FileCard } from "./shared.js";
  * empty window — the one answer a front door cannot give. So the catalogue decides
  * which cards exist, and discovery decides what each one says about being installed.
  *
- * A refused install is still a card rather than a second list, because the question a
- * person asks is "what do I have?", and "an app that will not start" belongs in the
- * answer. What is wrong with it is a line on the card, and a card with no launch button
- * is honest where a dead button is not.
+ * Linux desktop apps ship as Flatpaks. A card therefore compares the deployment's
+ * commit with the commit its own origin offers; a copy in a folder is opened and
+ * forgotten, never downloaded or updated.
  */
 export interface CardInput {
   readonly apps: readonly DiscoveredApp[];
   readonly rejected: readonly RejectedInstall[];
   readonly files: readonly IndexedFile[];
   readonly recents: readonly RecentEntry[];
-  /** What each app reported about its own updating, by app id. */
-  readonly updates: ReadonlyMap<string, ReportedUpdate>;
   /** What the suite offers, installed or not. The hub's own row is not a card. */
   readonly catalogue: readonly CatalogueApp[];
-  /** How many version directories each app has on disk, by app id. */
-  readonly versions: ReadonlyMap<string, number>;
-  /** The version a rollback would return to, by app id, when one is on disk. */
-  readonly previous?: ReadonlyMap<string, string | null> | undefined;
   /** Which apps Start started and has not seen exit, by app id. */
   readonly running: ReadonlySet<string>;
-  /** Where Start installs. An app under it is Start's to manage, whoever asked first. */
-  readonly appsRoot: string;
   /**
-   * What the store offers, by app id: the commit `suite-local` publishes.
+   * What the store offers, by app id: the commit the app's origin publishes.
    *
    * Absent when the store has not been read (no Flatpak, no remote, or the
    * window has not opened yet), which is why the card treats it as "no
@@ -75,49 +65,20 @@ function nameFor(path: string): string {
   return last ?? path;
 }
 
-/**
- * What one entry can offer, given what this machine actually has.
- *
- * The installed version comes from discovery rather than from the catalogue: discovery is
- * what read the disk, and a catalogue that remembered an install after it was removed
- * would put "up to date" on a card with no version at all.
- *
- * A store that offers the app is enough to make "not installed yet" true even when
- * no AppImage feed answered: the Install button works through Flatpak, so calling the
- * card "no release found" would hide the one channel that can install it.
- */
-function stateFor(
-  installedVersion: string | null,
-  available: string | null,
-  installChannel: "appimage" | "flatpak" = "appimage",
-): AppCardState {
-  if (installedVersion === null) {
-    return available !== null || installChannel === "flatpak" ? "not-installed" : "no-release";
-  }
-  if (available === null) return "no-release";
-  return isNewer(available, installedVersion) ? "update-available" : "current";
-}
-
 export function appCards(input: CardInput): readonly AppCard[] {
   const refused: AppCard[] = input.rejected.map((install) => ({
     id: install.id ?? null,
     name: nameFor(install.path),
     source: "folder",
-    installChannel: "appimage",
     icon: install.id === undefined ? null : (APP_ICONS[install.id] ?? null),
     state: "refused",
     version: null,
-    available: null,
     reason: install.reason,
-    versions: 0,
-    previousVersion: null,
     running: false,
-    releases: null,
     channel: "stable",
     tier: "stable",
     switchTier: null,
     channelNotice: null,
-    update: UNREPORTED,
     executable: null,
     fileExtensions: [],
     lastOpenedAt: null,
@@ -135,23 +96,14 @@ export function appCards(input: CardInput): readonly AppCard[] {
       const isPre = entry.preRelease === true || isPreReleaseId(entry.id);
       const storeChannels = input.storeChannels?.get(entry.id) ?? [];
       const storeCommit = input.store?.get(entry.id) ?? null;
+      const inStore = storeCommit !== null || storeChannels.length > 0;
 
       // A pre-release card exists when its id exists on this machine or in the
-      // store. A machine with neither still gets only the stable card, as before.
-      if (isPre && found === null && storeChannels.length === 0 && storeCommit === null) {
-        return [];
-      }
+      // store. A machine with neither still gets only the stable card.
+      if (isPre && found === null && !inStore) return [];
 
-      // A Flatpak answers to its remote, not to the AppImage feed. Saying
-      // "newer version available" from a feed this install cannot read would
-      // offer an Update button that installs a second copy in another format.
       const fromFlatpak = found?.flatpak !== undefined;
-      const flatpakOnly = entry.flatpakOnly === true;
-      const installChannel: "appimage" | "flatpak" =
-        flatpakOnly || fromFlatpak || storeCommit !== null || storeChannels.length > 0
-          ? "flatpak"
-          : "appimage";
-      const source = found === null ? "managed" : packageSource(found, input.appsRoot);
+      const source = found === null ? "folder" : packageSource(found);
 
       const installedBranch = tierFromBranch(found?.flatpak?.branch);
       const tier: ReleaseTier = isPre
@@ -183,33 +135,27 @@ export function appCards(input: CardInput): readonly AppCard[] {
             ) ?? null)
           : null;
 
+      const state: AppCardState = fromFlatpak
+        ? flatpakUpdate
+          ? "update-available"
+          : "current"
+        : found !== null
+          ? // A copy in a folder is not Start's to replace.
+            "local"
+          : inStore
+            ? "not-installed"
+            : "no-release";
+
       return [
         {
           id: entry.id,
           name: found?.manifest.name ?? entry.name,
           source,
-          installChannel,
           icon: APP_ICONS[entry.id] ?? null,
-          state: fromFlatpak
-            ? flatpakUpdate
-              ? "update-available"
-              : "current"
-            : source === "folder"
-              ? // A copy a person placed is not Start's to replace. Reading the hub's feed
-                // into its state would offer an Update that installs a second copy.
-                "local"
-              : stateFor(
-                  found?.manifest.version ?? null,
-                  flatpakOnly ? null : entry.available,
-                  installChannel,
-                ),
+          state,
           version: found?.manifest.version ?? null,
-          available: flatpakOnly ? null : fromFlatpak ? null : entry.available,
-          reason: flatpakOnly ? null : fromFlatpak ? null : entry.reason,
-          versions: fromFlatpak ? 1 : (input.versions.get(entry.id) ?? (found === null ? 0 : 1)),
-          previousVersion: fromFlatpak ? null : (input.previous?.get(entry.id) ?? null),
+          reason: state === "no-release" ? "the store does not offer this app" : null,
           running: input.running.has(entry.id),
-          releases: fromFlatpak ? null : (entry.releases ?? null),
           channel: found?.manifest.update?.channel ?? entry.channel,
           tier,
           switchTier,
@@ -217,7 +163,6 @@ export function appCards(input: CardInput): readonly AppCard[] {
             isPre && tier !== "stable"
               ? preReleaseNotice(tier as PreReleaseTier, switchTier)
               : null,
-          update: input.updates.get(entry.id) ?? UNREPORTED,
           executable: found?.executable ?? null,
           fileExtensions: found?.manifest.fileExtensions ?? entry.extensions,
           lastOpenedAt: input.recents.find((row) => row.appId === entry.id)?.openedAt ?? null,
@@ -227,25 +172,19 @@ export function appCards(input: CardInput): readonly AppCard[] {
       ];
     });
 
-  // Discovery found an app the catalogue does not name — either a copy this person placed
-  // (D44 makes it first-class) or a managed install whose feed has not answered yet. Only
-  // the first is "from a folder"; the second is Start's, and says so.
+  // Discovery found an app the catalogue does not name: a copy this person placed
+  // (D44 makes it first-class). It has no store entry, so it says so.
   const local: AppCard[] = [...byId.values()].map((entry) => {
-    const source = packageSource(entry, input.appsRoot);
+    const source = packageSource(entry);
     return {
       id: entry.manifest.id,
       name: entry.manifest.name,
       source,
-      installChannel: "appimage",
       icon: APP_ICONS[entry.manifest.id] ?? null,
-      state: source === "folder" ? "local" : source === "flatpak" ? "current" : "no-release",
+      state: source === "flatpak" ? "current" : "local",
       version: entry.manifest.version,
-      available: null,
-      reason: source === "managed" ? "its release feed has not been read yet" : null,
-      versions: source === "flatpak" ? 1 : (input.versions.get(entry.manifest.id) ?? 1),
-      previousVersion: input.previous?.get(entry.manifest.id) ?? null,
+      reason: null,
       running: input.running.has(entry.manifest.id),
-      releases: null,
       channel: entry.manifest.update?.channel ?? "stable",
       tier: isPreReleaseId(entry.manifest.id)
         ? tierForInstall({
@@ -264,7 +203,6 @@ export function appCards(input: CardInput): readonly AppCard[] {
             }) as PreReleaseTier,
           )
         : null,
-      update: input.updates.get(entry.manifest.id) ?? UNREPORTED,
       executable: entry.executable,
       fileExtensions: entry.manifest.fileExtensions,
       lastOpenedAt: input.recents.find((row) => row.appId === entry.manifest.id)?.openedAt ?? null,
@@ -297,10 +235,9 @@ export interface SelfCardOptions {
 /**
  * The hub's own row: a fact rather than a button.
  *
- * Start cannot replace its own running binary, so the row says what version it is
- * running and what its feed offers, and offers nothing to press. The one exception
- * is a Flatpak deployment: Flatpak is the writer there, so the row can ask it for
- * the newest build and say that the result arrives at the next launch.
+ * A Flatpak deployment has a writer: Flatpak owns it, so the row can ask for the
+ * newest build and say that the result arrives at the next launch. Any other
+ * build cannot replace its own running binary.
  */
 export function selfCard(
   entry: CatalogueApp,
@@ -313,27 +250,21 @@ export function selfCard(
       id: SELF_ID,
       name: entry.name,
       source: "flatpak",
-      installChannel: "flatpak",
       icon: null,
       // "update-available" is the renderer's word for "there is something to press",
       // not a claim that a newer version was found: Flatpak was not asked.
       state: canUpdate ? "update-available" : "no-release",
       version,
-      available: null,
       reason:
         options.error ??
         (options.updated === true
           ? "Flatpak deployed the newest build; it starts next launch"
           : "not checked (Flatpak)"),
-      versions: 1,
-      previousVersion: null,
       running: false,
-      releases: null,
       channel: entry.channel,
       tier: "stable",
       switchTier: null,
       channelNotice: null,
-      update: UNREPORTED,
       executable: null,
       fileExtensions: [],
       lastOpenedAt: null,
@@ -345,27 +276,16 @@ export function selfCard(
   return {
     id: SELF_ID,
     name: entry.name,
-    source: "managed",
-    installChannel: "appimage",
+    source: "folder",
     icon: null,
-    state:
-      entry.available === null
-        ? "no-release"
-        : isNewer(entry.available, version)
-          ? "update-available"
-          : "current",
+    state: "current",
     version,
-    available: entry.available,
-    reason: entry.reason,
-    versions: 1,
-    previousVersion: null,
+    reason: null,
     running: false,
-    releases: entry.releases ?? null,
     channel: entry.channel,
     tier: "stable",
     switchTier: null,
     channelNotice: null,
-    update: UNREPORTED,
     executable: null,
     fileExtensions: [],
     lastOpenedAt: null,

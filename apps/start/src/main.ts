@@ -1,7 +1,6 @@
-import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { readdir, rm } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   appDocumentsFolder,
@@ -13,12 +12,7 @@ import {
   suiteDocumentsRoot,
   suitePaths,
 } from "@suite/contracts";
-import {
-  desktopCsp,
-  feedUrlFromAppUpdateYml,
-  isTrustedSender,
-  resolveProtocolAsset,
-} from "@suite/desktop";
+import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/desktop";
 import { cssVariables, defaultTheme, presetById } from "@suite/theme";
 import {
   app,
@@ -31,14 +25,10 @@ import {
   protocol,
   shell,
 } from "electron";
-import { resolveAppIcon } from "./appIconFile.js";
 import { appCards, fileCards, selfCard } from "./cards.js";
 import {
   ALL_CATALOGUE_APPS,
-  CATALOGUE_APPS,
   type CatalogueApp,
-  type CatalogueEntry,
-  installFolderFor,
   readCatalogue,
   SELF_ID,
   withInstalled,
@@ -50,12 +40,11 @@ import {
   type PreReleaseTier,
   preReleaseDataDirectory,
   preReleaseRemovalCopy,
-  stableRemovalCopy,
   tierForInstall,
 } from "./channels.js";
 import { type DocumentsFolder, indexDocuments, isInsideDocuments } from "./fileIndex.js";
 
-import { defaultHost, SELF_FLATPAK_ID, sandboxId, toolRunner } from "./host.js";
+import { defaultHost, SELF_FLATPAK_ID, sandboxId } from "./host.js";
 import {
   adoptLegacyRegistry,
   type HostPaths,
@@ -75,7 +64,6 @@ import type { PackageLaunchObserver, PackageListing } from "./packageBackend.js"
 import { RECENT_LIMIT, type RecentsFile, recentsFile } from "./recents.js";
 import { type RecoveryLookup, readRecoveryReports, recoveryFor } from "./recovery.js";
 import type { DiscoveredApp } from "./registry.js";
-import { type ReportedUpdate, readReportedUpdate, type UpdateLookup } from "./reportedUpdate.js";
 import { describeRouteRejection, routeLaunch } from "./route.js";
 import {
   type AppLocation,
@@ -89,13 +77,7 @@ import {
   type SyncState,
   type ThemeChoice,
 } from "./shared.js";
-import {
-  isIconOf,
-  shortcutIconName,
-  shortcutIconPathIn,
-  shortcutPathIn,
-  shortcutText,
-} from "./shortcuts.js";
+import { isIconOf, shortcutIconPathIn, shortcutPathIn } from "./shortcuts.js";
 import { relayCode } from "./syncCode.js";
 import { isAddressInUse, SuiteSyncRelay } from "./syncRelay.js";
 import {
@@ -105,7 +87,6 @@ import {
   saveThemeChoice,
   themeOptions,
 } from "./theme.js";
-import { checkForUpdates } from "./updateCheck.js";
 import { resolveWindowIcon } from "./windowIcon.js";
 
 /**
@@ -145,7 +126,6 @@ if (userDataOverride !== undefined && userDataOverride.length > 0) {
  * re-rooted XDG directories, because the manifest grants those host paths.
  */
 const host = defaultHost();
-const tools = toolRunner(host);
 
 function hostPathTable(): HostPaths {
   return hostPaths({
@@ -249,38 +229,6 @@ function applicationsRoot(): string {
 }
 
 /**
- * A local feed, in place of the published ones. Empty when not set.
- *
- * A folder is accepted as well as a URL, and turned into one: nothing else in this
- * process can read a path, and the point of the seam is that a person can point it at
- * releases they built on their own machine.
- */
-function feedBase(): string | undefined {
-  const named = process.env.SUITE_START_FEED_BASE?.trim();
-  if (named === undefined || named.length === 0) return undefined;
-  return /^[a-z][a-z0-9+.-]*:\/\//iu.test(named) ? named : pathToFileURL(resolve(named)).toString();
-}
-
-/**
- * The hub's own feed, from the `app-update.yml` electron-builder writes beside a
- * packaged binary. A dev run has no such file, so its row says the build has no feed.
- *
- * A Flatpak build has no feed check at all: Flatpak's remote is its update channel,
- * the sandbox is not granted a network, and the row says "not checked (Flatpak)".
- */
-async function selfFeed(): Promise<string | null> {
-  if (sandboxId() !== null) return null;
-  if (!app.isPackaged) return null;
-  try {
-    return feedUrlFromAppUpdateYml(
-      await readFile(join(process.resourcesPath, "app-update.yml"), "utf8"),
-    );
-  } catch {
-    return null;
-  }
-}
-
-/**
  * What the last self-update did, for the row that asked for it.
  *
  * In memory only: it describes a request made in this session, and a restart is the
@@ -290,22 +238,6 @@ let selfUpdate: { readonly done: boolean; readonly error: string | null } = {
   done: false,
   error: null,
 };
-
-/**
- * One request per feed, and none of them may hold the window.
- *
- * `net.fetch` rather than the global: it is the only one that can read a `file:` URL, and
- * a feed in a local folder is how an install is proven before anything is published. A
- * feed that hangs is a launcher that hangs if this had no ceiling; ten seconds is long
- * enough for a slow network and short enough to be a reason rather than a stall.
- */
-function fetchFeed(url: string): Promise<Response> {
-  return net.fetch(url, { signal: AbortSignal.timeout(10_000) });
-}
-
-/** The fetch an install should use, for the same reason as `fetchFeed`. */
-const installFetch: typeof globalThis.fetch = (url, init) =>
-  net.fetch(typeof url === "string" ? url : url.toString(), init);
 
 /**
  * The apps Start has started and not seen exit, by app id.
@@ -351,56 +283,24 @@ let catalogue: readonly CatalogueApp[] = [];
 const installProgress = new Map<string, InstallProgress>();
 
 /**
- * Ask every feed what it offers.
+ * Read what the store offers.
  *
- * This runs when the window opens and when a person presses a button — never on a timer,
- * and it never downloads. A feed it cannot read becomes a sentence on the card rather
- * than a failure of the window.
+ * This runs when the window opens, when a person presses Check for updates, and
+ * after a store change — never on a timer. Nothing is downloaded here.
  */
 async function refreshCatalogue(): Promise<void> {
   // The listing carries what is installed and what the store offers; asking the
-  // backend to refresh re-reads both on the same occasions as the feeds: when the
-  // window opens and when a person asks it to look again. Never on a timer.
+  // backend to refresh re-reads both on the same occasions: when the window opens
+  // and when a person asks it to look again.
   const listing = await discover({ refresh: true });
-  const [next] = await Promise.all([
-    readCatalogue({
-      installed: new Map(
-        listing.packages.map((entry) => [entry.app.manifest.id, entry.app.manifest.version]),
-      ),
-      feedBase: feedBase(),
-      selfFeed: await selfFeed(),
-      fetch: fetchFeed,
-    }),
-  ]);
-  catalogue = next;
+  catalogue = await readCatalogue({
+    installed: new Map(
+      listing.packages.map((entry) => [entry.app.manifest.id, entry.app.manifest.version]),
+    ),
+  });
 }
 
-/** How many versions of each catalogue app are on disk here. */
-function versionCounts(listing: PackageListing): ReadonlyMap<string, number> {
-  return new Map([...listing.versions].map(([id, versions]) => [id, versions.length]));
-}
-
-/**
- * The version each app could go back to, by app id.
- *
- * Read from the disk rather than remembered: an update keeps exactly one replaced version
- * (§RETAINED_VERSIONS), and a card should offer the button only when that directory is
- * really there. The installed version is the one discovery found, so this cannot disagree
- * with the version the card prints.
- */
-function previousVersions(listing: PackageListing): ReadonlyMap<string, string | null> {
-  const installed = new Map(
-    listing.packages.map((entry) => [entry.app.manifest.id, entry.app.manifest.version]),
-  );
-  return new Map(
-    [...listing.versions].map(([id, versions]) => [
-      id,
-      versions.find((version) => version !== installed.get(id)) ?? null,
-    ]),
-  );
-}
-
-/** Send the progress list, which is the only thing that changes while a bar moves. */
+/** Send the progress list, which is the only thing that changes while an operation moves. */
 function sendProgress(): void {
   window?.webContents.send(START_INSTALL_PROGRESS, [...installProgress.values()]);
 }
@@ -408,21 +308,6 @@ function sendProgress(): void {
 function reportProgress(progress: InstallProgress): void {
   installProgress.set(progress.id, progress);
   sendProgress();
-}
-
-/**
- * Where each app keeps its machine-local state.
- *
- * The same roots `suitePaths` gives the app itself, so a report is read from the
- * place it was written. The documents override does not apply: an update report is
- * machine state, not a document.
- */
-function updateLookup(): UpdateLookup {
-  return {
-    platform: process.platform,
-    home: app.getPath("home"),
-    xdgDataHome: dataHome(),
-  };
 }
 
 /**
@@ -478,10 +363,10 @@ function documentFolders(): readonly DocumentsFolder[] {
 /**
  * The one way Start touches an installed package.
  *
- * Discovery, Flatpak and the managed AppImage writer live behind `PackageBackend`
- * (§packageBackend). Main asks for a listing, an install or a launch and never picks
- * a binary or a process itself, so a Start packaged as a Flatpak reaches the host through
- * the seam without the window learning a second way.
+ * Discovery and Flatpak live behind `PackageBackend` (§packageBackend). Main asks for
+ * a listing, an install or a launch and never picks a binary or a process itself, so a
+ * Start packaged as a Flatpak reaches the host through the seam without the window
+ * learning a second way.
  */
 let backend: NativePackageBackend;
 
@@ -591,30 +476,14 @@ async function state(): Promise<LauncherState> {
     new Set(apps.map((entry) => entry.manifest.id)),
   );
 
-  // What each app says about its own updating. Still read, because an app Start did not
-  // install may check its own feed, and the card should be able to say what it found.
-  const updates = new Map<string, ReportedUpdate>();
-  await Promise.all(
-    apps.map(async (entry) => {
-      updates.set(
-        entry.manifest.id,
-        await readReportedUpdate(entry.manifest.id, updateLookup(), nodeRegistryFileSystem()),
-      );
-    }),
-  );
-
   const self = catalogue.find((entry) => entry.id === SELF_ID) ?? undefined;
   const cards = appCards({
     apps,
     rejected: listing.rejected,
     files,
     recents: recent,
-    updates,
     catalogue,
-    versions: versionCounts(listing),
-    previous: previousVersions(listing),
     running: liveRunning(),
-    appsRoot: applicationsRoot(),
     store: listing.offers,
     storeChannels: listing.channels,
   });
@@ -789,120 +658,12 @@ function shortcutDirs(): { entry: (id: string) => string; icon: (name: string) =
 }
 
 /**
- * Write (or rewrite) the menu entry for a managed install.
+ * Remove an app's entry and icon left by an older AppImage install.
  *
- * The entry names the versioned executable, so an update has to rewrite it — which is why
- * it is one file per app rather than one per version. Failure is a warning, never a failed
- * install: a missing menu entry is a smaller problem than an app that will not install.
- *
- * The icon is the **app's**, looked up by id (`appIconFile.ts`). It used to be the hub's
- * own mark copied under every app's name, which is why three apps shared one menu icon.
+ * Start no longer writes these: Flatpak exports its own desktop entry. A build
+ * that predates the Flatpak-only tree may still have left one, so forgetting an
+ * app cleans it up. Best effort, like every menu-entry operation.
  */
-async function writeShortcut(entry: CatalogueEntry, executable: string): Promise<void> {
-  const dirs = shortcutDirs();
-  let iconName: string | null = null;
-  try {
-    const iconSource = appIcon(entry.id);
-    if (iconSource !== null) {
-      const bytes = await readFile(iconSource);
-      // The name carries the content, so no desktop can serve a cached picture under it
-      // (§shortcutIconName). Eight hex characters is a fingerprint, not a security boundary.
-      iconName = shortcutIconName(entry.id, iconDigest(bytes));
-      const destination = dirs.icon(iconName);
-      await mkdir(dirname(destination), { recursive: true });
-      await writeFile(destination, bytes);
-      await pruneIcons(entry.id, iconName);
-      await refreshIconCache();
-    } else {
-      console.warn(`[shortcut] no artwork for ${entry.id}; its entry keeps a generic icon`);
-    }
-    const path = dirs.entry(entry.id);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(
-      path,
-      shortcutText({
-        id: entry.id,
-        name: entry.name,
-        executable,
-        extensions: [...entry.extensions],
-        // Null rather than a name with nothing behind it: an entry pointing at a missing
-        // icon draws a generic placeholder, and one with no `Icon=` line at least says why.
-        iconName,
-      }),
-    );
-    // Best effort: the cache is a convenience, and a machine without the tool still finds
-    // a freshly written file on its next scan.
-    void tools("update-desktop-database", [dirname(path)]);
-  } catch (error) {
-    console.warn(`[shortcut] could not write the entry for ${entry.id}`, error);
-  }
-}
-
-/** A short, stable fingerprint of an icon's bytes, for the name it is written under. */
-function iconDigest(bytes: Uint8Array): string {
-  return createHash("sha256").update(bytes).digest("hex").slice(0, 8);
-}
-
-/**
- * Remove the icons earlier builds left for one app.
- *
- * Hashed names are why this exists: every new artwork leaves the old file behind, and a
- * directory of orphans is the same problem as a menu entry pointing at a version that was
- * deleted. Only this app's own names are touched (§isIconOf).
- */
-async function pruneIcons(id: string, keep: string): Promise<void> {
-  const directory = dirname(shortcutDirs().icon(keep));
-  let names: string[];
-  try {
-    names = await readdir(directory);
-  } catch {
-    return;
-  }
-  await Promise.all(
-    names
-      .filter((name) => name !== `${keep}.png` && isIconOf(id, name))
-      .map((name) => rm(join(directory, name), { force: true }).catch(() => undefined)),
-  );
-}
-
-/**
- * Tell GTK the hicolor theme changed, and wait for it.
- *
- * `gtk-update-icon-cache` is what makes a freshly written PNG resolvable by *name* on
- * desktops that read the cache. Without it the entry can keep drawing the icon it cached
- * for that name, which for a replaced app is the old artwork.
- *
- * Awaited rather than fire-and-forget, unlike `update-desktop-database` below: this tool
- * writes into the same tree the PNG was just placed in, so a cache built before the file
- * lands is a stale cache. The host seam runs it on the host when Start is sandboxed, and
- * a machine without the tool costs one failed invocation and nothing else.
- */
-function refreshIconCache(): Promise<void> {
-  const themeDir = join(hostPathTable().icons, "hicolor");
-  return tools("gtk-update-icon-cache", ["-f", "-t", themeDir]);
-}
-
-/**
- * Re-write the menu entry and icon of every app this hub installed.
- *
- * Idempotent and cheap — one file and one PNG per app — so it runs at startup rather than
- * behind a button nobody would press. It is what carries a correction to entries written by
- * an older build, which is most of them: an entry is only rewritten when its app is installed
- * or updated, and an app that is already current never is.
- */
-async function reconcileShortcuts(): Promise<void> {
-  try {
-    const repairable = await backend.repairable();
-    for (const record of repairable) {
-      const entry = CATALOGUE_APPS.find((candidate) => candidate.id === record.id);
-      if (entry !== undefined) await writeShortcut(entry, record.executable);
-    }
-  } catch (error) {
-    console.warn("[shortcut] could not reconcile the menu entries", error);
-  }
-}
-
-/** Remove an app's entry and icon. Best effort, for the same reason as writing them. */
 async function removeShortcut(id: string): Promise<void> {
   const dirs = shortcutDirs();
   await rm(dirs.entry(id), { force: true }).catch(() => undefined);
@@ -924,7 +685,7 @@ async function removeShortcut(id: string): Promise<void> {
  * Signal the process Start can see on the host.
  *
  * SIGTERM first, because that is a request an app can answer — a document can be flushed.
- * This is the AppImage/Arch path and it is unchanged.
+ * This is the direct host path.
  */
 function signalApp(id: string): void {
   const pid = runningPids.get(id);
@@ -1066,7 +827,7 @@ function describeInstallFailure(error: unknown): string {
     : "the install did not finish, and nothing was replaced";
 }
 /**
- * Finish a package change that has no AppImage to place.
+ * Finish a package change that Flatpak made.
  *
  * The backend re-reads the deployment's version and the store before it returns; main only
  * records the answer on the card. A running app keeps running the old commit until it
@@ -1081,11 +842,11 @@ async function finishPackage(id: string, version: string | null): Promise<void> 
 }
 
 /**
- * Install or update one app, and let the card watch it happen.
+ * Install or update one app through Flatpak, and let the card watch it happen.
  *
- * The artifact is downloaded to a staging directory, checked against the fingerprint the
- * verified manifest named, and only then placed. So a download that fails, or a file that
- * is not the one the publisher signed, leaves the previous install exactly as it was.
+ * There is no download here any more. Flatpak owns every deployment: an install
+ * asks the store, an update asks Flatpak to replace the deployment, and a copy in
+ * a folder is not Start's to replace.
  */
 async function installOne(id: string, channel?: unknown): Promise<void> {
   // The hub's own row is the one package Start may update through a writer that is
@@ -1116,134 +877,29 @@ async function installOne(id: string, channel?: unknown): Promise<void> {
   const found = listing.packages.find((candidate) => candidate.app.manifest.id === id) ?? null;
   const installed = found?.app ?? null;
 
-  // Flatpak owns its installs, so when it is the writer Start asks it and waits.
-  // A running app keeps running the old commit until it restarts; closing it would
-  // be Start doing a job it does not own.
-  if (installed?.flatpak !== undefined) {
-    reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
-    try {
-      const result = await backend.update({
-        entry,
-        flatpak: installed.flatpak,
-        ...(target === undefined ? {} : { channel: target }),
-      });
-      await finishPackage(id, result.version);
-    } catch (error) {
-      reportProgress({
-        id,
-        phase: "failed",
-        received: 0,
-        total: null,
-        reason: describeInstallFailure(error),
-      });
-    }
-    return;
-  }
-
-  // The store is also the install channel for an app it offers, which is what makes a
-  // fresh machine's Install button work without an AppImage feed.
-  if (installed === null && (listing.offers.has(id) || listing.channels.has(id))) {
-    reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
-    try {
-      const result = await backend.install({
-        entry,
-        ...(target === undefined ? {} : { channel: target }),
-      });
-      await finishPackage(id, result.version);
-    } catch (error) {
-      reportProgress({
-        id,
-        phase: "failed",
-        received: 0,
-        total: null,
-        reason: describeInstallFailure(error),
-      });
-    }
-    return;
-  }
-
-  if (entry.available === null || entry.artifact === null) {
-    reportProgress({
-      id,
-      phase: "failed",
-      received: 0,
-      total: null,
-      reason: entry.reason ?? "the feed named no file to install",
-    });
-    return;
-  }
-
-  const artifact = entry.artifact;
-  const version = entry.available;
-  // An update replaces a version this machine already has, and finishes by relaunching it.
-  const updating = entry.installed !== null && entry.installed !== version;
-
-  // Replacing the bytes under a live process is legal on Linux and rude in practice: the
-  // window a person is using would keep running the old image until they closed it. So an
-  // app Start started is closed first, by asking.
-  if (runningPids.has(id) && window !== null) {
-    const answer = await dialog.showMessageBox(window, {
-      type: "question",
-      title: "Update",
-      message: `Close ${entry.name} and update it to ${version}?`,
-      detail: "It will be reopened when the new version is in place.",
-      buttons: ["Cancel", "Close and update"],
-      defaultId: 1,
-      cancelId: 0,
-    });
-    if (answer.response !== 1) return;
-
-    if (!(await closeRunning(id, entry.name, { requireExit: true }))) {
-      reportProgress({
-        id,
-        phase: "failed",
-        received: 0,
-        total: null,
-        reason: `${entry.name} did not close, so nothing was replaced`,
-      });
-      return;
-    }
-  }
-  let emitted = { at: 0, percent: -1 };
-  reportProgress({ id, phase: "downloading", received: 0, total: artifact.size, reason: null });
-
+  reportProgress({ id, phase: "installing", reason: null });
   try {
-    // The backend decides the format from the same listing; passing the verified
-    // artifact is the AppImage shape it places itself.
-    const request = {
-      entry,
-      version,
-      artifact,
-      feed: entry.feed,
-      ...(target === undefined ? {} : { channel: target }),
-      onProgress: (received: number, total: number | null) => {
-        const percent = total === null || total === 0 ? -1 : Math.floor((received / total) * 100);
-        const at = Date.now();
-        // A bar does not need every chunk, and the window is not the thing being written.
-        if (percent === emitted.percent && at - emitted.at < 500) return;
-        emitted = { at, percent };
-        reportProgress({ id, phase: "downloading", received, total, reason: null });
-      },
-    };
-    const result = updating ? await backend.update(request) : await backend.install(request);
-
-    installProgress.delete(id);
-    sendProgress();
-    // The feed answer is still the last check's; only what is on disk changed.
-    if (result.installed !== undefined) await writeShortcut(entry, result.installed.executable);
-    catalogue = withInstalled(catalogue, id, result.version);
-    await broadcast();
-    // A replace should finish where it started: the app a person was using is running
-    // again, from the version they just agreed to.
-    if (updating && result.installed !== undefined) {
-      backend.launch({ executable: result.installed.executable, argv: [] });
+    if (installed !== null && installed.flatpak === undefined) {
+      throw new Error(
+        "this app is a copy in a folder, not a Flatpak deployment: Start opens and forgets it, but replaces neither",
+      );
     }
+    const result =
+      installed?.flatpak !== undefined
+        ? await backend.update({
+            entry,
+            flatpak: installed.flatpak,
+            ...(target === undefined ? {} : { channel: target }),
+          })
+        : await backend.install({
+            entry,
+            ...(target === undefined ? {} : { channel: target }),
+          });
+    await finishPackage(id, result.version);
   } catch (error) {
     reportProgress({
       id,
       phase: "failed",
-      received: 0,
-      total: null,
       reason: describeInstallFailure(error),
     });
   }
@@ -1294,13 +950,13 @@ async function startRefreshRelay(): Promise<void> {
   await broadcast();
 }
 
-/** Read the feeds again and redraw, which is what the menu item and the button both do. */
+/** Read the store again and redraw, which is what the menu item and the button both do. */
 async function refreshAndBroadcast(): Promise<void> {
   for (const [id, progress] of installProgress) {
     if (progress.phase === "failed") installProgress.delete(id);
   }
   await refreshCatalogue().catch((error: unknown) => {
-    console.warn("[catalogue] the feeds could not be read", error);
+    console.warn("[catalogue] the store could not be read", error);
   });
   sendProgress();
   await broadcast();
@@ -1329,17 +985,6 @@ function windowIcon(): string | null {
   if (icon === null) console.warn("[start] no window icon to load");
   else if (icon.reason !== null) console.warn(`[start] ${icon.reason}; using ${icon.path}`);
   return icon?.path ?? null;
-}
-
-/** One app's own artwork, for its menu entry. Never the hub's mark (§appIconFile). */
-function appIcon(id: string): string | null {
-  return resolveAppIcon({
-    id,
-    isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath,
-    appPath: appDir(),
-    exists: (path) => existsSync(path),
-  });
 }
 
 function createWindow(): BrowserWindow {
@@ -1412,7 +1057,7 @@ function registerIpc(): void {
   /**
    * Install or update one app, with the card watching.
    *
-   * Every step here is the person's: the feed was read because the window opened or
+   * Every step here is the person's: the store was read because the window opened or
    * because they asked it to look again, and this runs only because they pressed the
    * button the card drew.
    */
@@ -1463,11 +1108,11 @@ function registerIpc(): void {
   });
 
   /**
-   * Uninstall: remove what Start installed, and forget it.
+   * Uninstall a Flatpak deployment.
    *
-   * "Remove" that leaves two hundred megabytes behind is a lie by omission, so this is the
-   * only removal a card offers for a managed install — with one dialog that names what
-   * goes. A copy Start did not place is not Start's to delete, and keeps the forget path.
+   * Flatpak owns these files, so Start asks Flatpak to remove them and then stops
+   * describing itself as installed. A copy in a folder is not Start's to delete;
+   * that card offers Forget instead.
    */
   onIpc(START_IPC.uninstallApp, async (_event, id: unknown) => {
     if (typeof id !== "string" || window === null) return;
@@ -1479,82 +1124,31 @@ function registerIpc(): void {
     const listing = await discover();
     const found = listing.packages.find((candidate) => candidate.app.manifest.id === id) ?? null;
     const flatpak = found?.app.flatpak;
+    if (found === null || flatpak === undefined) return;
+
     const preRelease = isPreReleaseId(id);
     const tier = tierForInstall({
       id,
-      branch: flatpak?.branch,
-      channel: found?.app.channel ?? found?.app.manifest.update?.channel,
+      branch: flatpak.branch,
+      channel: found.app.channel ?? found.app.manifest.update?.channel,
     });
     const channelData = preRelease ? preReleaseDataDirectory(documentsRoot(), entry.folder) : null;
 
-    if (found !== null && flatpak !== undefined) {
-      // Flatpak owns these files, so Start asks Flatpak to remove them and then
-      // stops describing itself as installed. Nothing under ~/Applications is
-      // touched: there may be an AppImage there that is somebody else's.
-      const copy = preRelease
-        ? preReleaseRemovalCopy({
-            name: entry.name,
-            tier,
-            dataDirectory: channelData ?? "",
-            flatpak,
-          })
-        : {
-            message: `Uninstall ${entry.name} from Flatpak?`,
-            detail:
-              `This asks Flatpak to remove ${flatpak.application} from the ` +
-              `${flatpak.installation} installation. Documents are not touched.`,
-            buttons: ["Cancel", "Uninstall"],
-          };
-      const confirm = await dialog.showMessageBox(window, {
-        type: "warning",
-        title: "Uninstall",
-        message: copy.message,
-        detail: copy.detail,
-        buttons: [...copy.buttons],
-        defaultId: 0,
-        cancelId: 0,
-      });
-      if (confirm.response === 0) return;
-
-      if (runningPids.has(id)) {
-        // A sandboxed Flatpak is closed by id; a sandboxed AppImage asks the person.
-        // If it is still running, nothing is removed: the files are in use.
-        if (!(await closeRunning(id, entry.name, { requireExit: false }))) return;
-        forgetRunning(id);
-      }
-      try {
-        await backend.remove({ entry, package: found });
-      } catch (error) {
-        console.warn(`[flatpak] could not uninstall ${flatpak.application}`, error);
-        await dialog.showMessageBox(window, {
-          type: "error",
-          title: "Uninstall",
-          message: `${entry.name} was not removed.`,
-          detail: "Flatpak refused the request; its own output is in the log.",
-        });
-        return;
-      }
-      if (preRelease && confirm.response === 2 && channelData !== null) {
-        await removeChannelData(channelData);
-      }
-      catalogue = withInstalled(catalogue, id, null);
-      await broadcast();
-      return;
-    }
-
-    const versions = listing.versions.get(id) ?? [];
     const copy = preRelease
       ? preReleaseRemovalCopy({
           name: entry.name,
           tier,
           dataDirectory: channelData ?? "",
+          flatpak,
         })
-      : stableRemovalCopy({
-          name: entry.name,
-          versions: versions.length,
-          folder: `${applicationsRoot()}/${installFolderFor(entry)}`,
-        });
-    const answer = await dialog.showMessageBox(window, {
+      : {
+          message: `Uninstall ${entry.name} from Flatpak?`,
+          detail:
+            `This asks Flatpak to remove ${flatpak.application} from the ` +
+            `${flatpak.installation} installation. Documents are not touched.`,
+          buttons: ["Cancel", "Uninstall"],
+        };
+    const confirm = await dialog.showMessageBox(window, {
       type: "warning",
       title: "Uninstall",
       message: copy.message,
@@ -1563,62 +1157,30 @@ function registerIpc(): void {
       defaultId: 0,
       cancelId: 0,
     });
-    if (answer.response === 0) return;
+    if (confirm.response === 0) return;
 
     if (runningPids.has(id)) {
+      // A sandboxed Flatpak is closed by id; a running copy keeps the files in use.
       if (!(await closeRunning(id, entry.name, { requireExit: false }))) return;
       forgetRunning(id);
     }
-    await backend.remove({ entry, ...(found === null ? {} : { package: found }) });
-    if (preRelease && answer.response === 2 && channelData !== null) {
+    try {
+      await backend.remove({ entry, package: found });
+    } catch (error) {
+      console.warn(`[flatpak] could not uninstall ${flatpak.application}`, error);
+      await dialog.showMessageBox(window, {
+        type: "error",
+        title: "Uninstall",
+        message: `${entry.name} was not removed.`,
+        detail: "Flatpak refused the request; its own output is in the log.",
+      });
+      return;
+    }
+    if (preRelease && confirm.response === 2 && channelData !== null) {
       await removeChannelData(channelData);
     }
     catalogue = withInstalled(catalogue, id, null);
-    await removeShortcut(id);
     await broadcast();
-  });
-
-  /**
-   * Roll back: point the install at the version it replaced.
-   *
-   * Deliberately dumb. It writes no new record shape, downloads nothing, and takes no view
-   * on which version is good — it moves the one path in `installs.json` to a directory this
-   * hub is already holding. The card offers it only because that directory is on disk.
-   *
-   * The replaced version is kept after a rollback too, so going back is not a one-way door:
-   * the version just left becomes the one to return to, and `pruneOtherVersions` reads the
-   * disk rather than a history, so it does not care which direction the walk went.
-   */
-  onIpc(START_IPC.rollbackApp, async (_event, id: unknown) => {
-    if (typeof id !== "string") return;
-    const entry = CATALOGUE_APPS.find((candidate) => candidate.id === id);
-    if (entry === undefined) return;
-
-    // The backend reads the disk, picks the version this install replaced and moves
-    // the one record path to it. Main only stops the running copy and relaunches.
-    const installed = await backend.rollback(entry);
-    if (installed === null) {
-      await broadcast();
-      return;
-    }
-
-    // A running copy is the version being replaced; it goes the same way an update sends it.
-    if (runningPids.has(id)) {
-      if (!(await closeRunning(id, entry.name, { requireExit: false }))) {
-        // The record already points at the version it replaced; show that rather
-        // than relaunching over a window the person chose not to close.
-        await broadcast();
-        return;
-      }
-      forgetRunning(id);
-    }
-
-    catalogue = withInstalled(catalogue, id, installed.version);
-    await writeShortcut(entry, installed.executable);
-    await broadcast();
-
-    // Same courtesy an update pays: finish where it started.
-    backend.launch({ executable: installed.executable, argv: [], appId: id }, launchObserver(id));
   });
 
   /**
@@ -1662,10 +1224,8 @@ function registerIpc(): void {
   });
 
   /**
-   * Ask each app's feed whether something newer exists.
-   *
-   * On demand, one request per app, and nothing is written: the answer is a
-   * reading, and installing remains the app's business.
+   * Re-read the store, on demand: the answer is a reading, and installing remains
+   * the person's decision.
    */
   onIpc(START_IPC.startSync, async () => {
     await relay().start();
@@ -1778,9 +1338,9 @@ if (!gotLock) {
   void app.whenReady().then(async () => {
     dataDirectory = process.env.SUITE_START_DATA?.trim() || join(app.getPath("userData"));
 
-    // The same lock whether this is the AppImage or the Flatpak. Electron's own lock
-    // lives in `userData`, which differs between the two, so without this each form
-    // could open beside the other. A live holder wins; a stale pid is taken over.
+    // The cross-form lock in the suite config directory. Electron's own lock lives in
+    // `userData`, which differs between a dev run and a Flatpak, so without this each
+    // form could open beside the other. A live holder wins; a stale pid is taken over.
     const launched = await takeHubLock(hubLockPath(hostPathTable()), process.pid, isAlive).catch(
       (error: unknown) => {
         console.warn("[start] the cross-form lock could not be read", error);
@@ -1815,18 +1375,16 @@ if (!gotLock) {
     registry = registryAt(registryPath);
     recents = recentsFile(dataDirectory);
     backend = nativePackageBackend({
-      appsRoot: paths.appsRoot,
       roots: roots(),
       registry,
-      catalogue: CATALOGUE_APPS,
-      fetch: installFetch,
+      catalogue: ALL_CATALOGUE_APPS,
       host,
     });
     app.setAppUserModelId("run.suite.start");
 
-    // The hub owns `suite://`; every other app is reached through it. An
-    // installed package declares the scheme in its desktop entry, an AppImage
-    // does not, so ask the platform once when packaged.
+    // The hub owns `suite://`; every other app is reached through it. The Flatpak
+    // exports the scheme in its desktop entry, and a packaged dev build registers it
+    // with the platform once.
     if (app.isPackaged) {
       try {
         app.setAsDefaultProtocolClient("suite");
@@ -1887,30 +1445,12 @@ if (!gotLock) {
 
     void startRefreshRelay();
 
-    // After the window, never before it: this is housekeeping, and a person opening the
-    // launcher should not wait for three icons.
-    void reconcileShortcuts();
-
-    // The window is up before any feed is read, so a slow network delays a card rather
+    // The window is up before the store is read, so a slow remote delays a card rather
     // than the launcher. What arrives is broadcast, and the cards redraw.
     await refreshCatalogue().catch((error: unknown) => {
-      console.warn("[catalogue] the feeds could not be read", error);
+      console.warn("[catalogue] the store could not be read", error);
     });
     await broadcast();
-
-    // The hub updates itself like any app: its own feed, its own report. A dev run
-    // has no feed, so it does not ask. A Flatpak is Flatpak's to update, and the
-    // sandbox has no network grant, so its row says "not checked (Flatpak)" instead.
-    if (sandboxId() === null) {
-      void checkForUpdates({
-        dataDir: dataDirectory,
-        version: app.getVersion(),
-        channel: "alpha",
-        packaged: app.isPackaged,
-      }).then(({ error }) => {
-        if (error !== null && app.isPackaged) console.warn(`[update] ${error}`);
-      });
-    }
 
     const coldStart = targetFromArgv(process.argv);
     if (coldStart) pendingTargets.push(coldStart);

@@ -9,7 +9,6 @@ import {
   preReleaseIdFor,
   preReleaseNotice,
   preReleaseRemovalCopy,
-  stableRemovalCopy,
   tierForInstall,
   tierFromBranch,
   tierFromChannel,
@@ -89,17 +88,6 @@ describe("removal copy", () => {
     expect(copy.detail).toContain("/home/me/Documents/Suite Slop/Planner");
     expect(copy.detail).toContain("Stable documents are never touched");
     expect(copy.buttons).toEqual(["Cancel", "Uninstall, keep data", "Uninstall and delete data"]);
-  });
-
-  it("never mentions channel data when removing stable", () => {
-    const copy = stableRemovalCopy({
-      name: "Suite Planner",
-      versions: 2,
-      folder: "/home/me/Applications/Suite/Planner",
-    });
-    expect(copy.detail).not.toContain("Suite Slop");
-    expect(copy.detail).not.toContain("channel");
-    expect(copy.buttons).toEqual(["Cancel", "Uninstall"]);
   });
 });
 

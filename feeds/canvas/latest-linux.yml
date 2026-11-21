@@ -1,9 +1,0 @@
-version: 0.1.10
-files:
-  - url: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/canvas-v0.1.10/suite-canvas-0.1.10-x86_64.AppImage
-    sha512: Lh60W+wyVh5PTBynJt2RhqEi3oBR/AA5ObRHU6xOexmkWEm97wpMdRriReFwmaGCbbO4r7O5+GMCy36mqKs4+A==
-    size: 136761587
-    blockMapSize: 143623
-path: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/canvas-v0.1.10/suite-canvas-0.1.10-x86_64.AppImage
-sha512: Lh60W+wyVh5PTBynJt2RhqEi3oBR/AA5ObRHU6xOexmkWEm97wpMdRriReFwmaGCbbO4r7O5+GMCy36mqKs4+A==
-releaseDate: '2026-11-20T10:59:39.687Z'

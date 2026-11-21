@@ -1,5 +1,4 @@
 import type { SuiteReleaseChannel } from "@suite/contracts";
-import type { ReportedUpdate } from "./reportedUpdate.js";
 
 /**
  * What the hub window asks the main process for.
@@ -17,7 +16,6 @@ export const START_IPC = {
   removeApp: "suite:start:remove",
   installApp: "suite:start:install",
   uninstallApp: "suite:start:uninstall",
-  rollbackApp: "suite:start:rollback",
   setTheme: "suite:start:theme",
   revealApp: "suite:start:reveal",
   recents: "suite:start:recents",
@@ -106,14 +104,10 @@ export type AppCardState =
   | "local"
   | "refused";
 
-/** How one install is going, for the bar that replaces its button. */
+/** How one store operation is going, for the line that replaces its button. */
 export interface InstallProgress {
   readonly id: string;
-  readonly phase: "downloading" | "installing" | "placed" | "failed";
-  /** Bytes written so far. Zero unless something is being downloaded. */
-  readonly received: number;
-  /** Bytes the feed said to expect, or null when it did not say. */
-  readonly total: number | null;
+  readonly phase: "installing" | "failed";
   /** What went wrong, in the same words the card will show. */
   readonly reason: string | null;
 }
@@ -121,13 +115,11 @@ export interface InstallProgress {
 /**
  * Who put this install on the machine.
  *
- * It decides what the card may offer, and it is read from the install rather
- * than from the catalogue: an AppImage Start placed and one somebody downloaded
- * themselves are the same file shape and different promises. `flatpak` is the
- * third writer — it owns the deployment, so Start opens and removes it but
- * never replaces it.
+ * It decides what the card may offer. `flatpak` owns the deployment, so Start
+ * opens, updates and removes it. `folder` is a copy a person placed: Start opens,
+ * reveals and forgets it, and never downloads or replaces it.
  */
-export type AppSource = "managed" | "folder" | "flatpak";
+export type AppSource = "folder" | "flatpak";
 
 /** One app card, installed, offered, or refused. */
 export interface AppCard {
@@ -136,35 +128,13 @@ export interface AppCard {
   readonly name: string;
   /** How this copy got here. Decides which buttons the card can honestly offer. */
   readonly source: AppSource;
-  /**
-   * What Install would use for this app right now.
-   *
-   * `flatpak` when the store offers it, `appimage` otherwise. A card states the
-   * channel before the button is pressed, so nobody has to guess which format
-   * they are about to get.
-   */
-  readonly installChannel: "appimage" | "flatpak";
   /** The app's own mark, as a data URI, when the hub knows one. */
   readonly icon: string | null;
   readonly state: AppCardState;
   /** The version installed here, or null when this machine does not have it. */
   readonly version: string | null;
-  /** The version the feed offers, when one verified. */
-  readonly available: string | null;
   /** Why no version is offered, when none is. */
   readonly reason: string | null;
-  /** Where a newer build can be fetched by hand, when this app cannot fetch it itself. */
-  readonly releases: string | null;
-  /** How many versions of this app are on disk here. */
-  readonly versions: number;
-  /**
-   * The version a rollback would return to, or null when there is nothing to go back to.
-   *
-   * Only ever a version already on this machine. It is offered, never taken automatically:
-   * going back is a decision, and a hub that silently reverted an update would be doing the
-   * thing this card exists to make visible.
-   */
-  readonly previousVersion: string | null;
   /**
    * Whether the process Start started is still alive.
    *
@@ -187,8 +157,6 @@ export interface AppCard {
   readonly switchTier: "slop" | "canary" | "beta" | null;
   /** The risk and removal path a pre-release card states in words. */
   readonly channelNotice: string | null;
-  /** What the app says about its own updating, or `unknown` before it has asked. */
-  readonly update: ReportedUpdate;
   readonly executable: string | null;
   readonly fileExtensions: readonly string[];
   readonly lastOpenedAt: number | null;

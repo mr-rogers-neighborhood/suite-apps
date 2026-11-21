@@ -56,10 +56,10 @@ export function launchIntent(
  * How Start may close a running app before replacing or removing it.
  *
  * On the host the pid is the app (or the `flatpak` CLI that owns it), so SIGTERM is
- * exactly what the AppImage/Arch build does today. Inside a Flatpak sandbox the pid
- * belongs to `flatpak-spawn`: signalling the helper does not reach the app. There a
- * Flatpak is closed by application id (`flatpak kill`) and an AppImage has to be
- * closed by the person, because nothing may guess at a host-wide `pkill`.
+ * exactly what a host build does today. Inside a Flatpak sandbox the pid belongs to
+ * `flatpak-spawn`: signalling the helper does not reach the app. There a Flatpak is
+ * closed by application id (`flatpak kill`) and a folder copy has to be closed by
+ * the person, because nothing may guess at a host-wide `pkill`.
  */
 export type StopApproach = "signal" | "flatpak-kill" | "manual";
 

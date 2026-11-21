@@ -60,7 +60,6 @@ const CANVAS: CatalogueEntry = {
   folder: "Canvas",
   extensions: ["canvas"],
   capabilities: ["document.file", "sync"],
-  feed: "https://example.test/canvas",
   channel: "alpha",
 };
 
@@ -347,8 +346,8 @@ describe("store commands", () => {
 
   it("asks the store for the commit it offers", () => {
     expect(storeInfoArgs("suite-local", "run.suite.canvas")).toEqual([
-      "remote-info",
       "--user",
+      "remote-info",
       "--show-commit",
       "suite-local",
       "run.suite.canvas",
