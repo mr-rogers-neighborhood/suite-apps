@@ -212,6 +212,9 @@ importers:
       '@suite/desktop':
         specifier: workspace:*
         version: link:../../packages/desktop
+      '@suite/document-runtime':
+        specifier: workspace:*
+        version: link:../../packages/document-runtime
       '@suite/theme':
         specifier: workspace:*
         version: link:../../packages/theme
@@ -779,6 +782,9 @@ importers:
       '@suite/desktop':
         specifier: workspace:*
         version: link:../../packages/desktop
+      '@suite/document-runtime':
+        specifier: workspace:*
+        version: link:../../packages/document-runtime
       '@suite/planner-core':
         specifier: workspace:*
         version: link:packages/core

@@ -1,20 +1,22 @@
-import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile } from "node:fs/promises";
 
+import { MainDocumentStore } from "@suite/document-runtime/node";
 import {
   decodeWorkspaceFile,
   encodeWorkspaceFile,
   WorkspaceDocument,
   WorkspaceFileError,
+  type WorkspaceSnapshot,
 } from "@suite/planner-core";
 
 import type { WorkspacePaths } from "./paths";
 
 /**
  * Owns the authoritative document in the main process. Renderer edits arrive as CRDT updates and
- * are written to disk on a debounce; the file write is atomic and keeps one previous copy.
+ * are written to disk on a debounce through `@suite/document-runtime`; Planner keeps its own file
+ * format, directory and one rolling backup.
  */
-export class WorkspaceStore {
-  #doc: WorkspaceDocument;
+export class WorkspaceStore extends MainDocumentStore<WorkspaceDocument, WorkspaceSnapshot> {
   readonly #paths: WorkspacePaths;
   /**
    * True when this session started from nothing.
@@ -24,11 +26,24 @@ export class WorkspaceStore {
    * already there and they expect to land in it.
    */
   readonly #created: boolean;
-  #saveTimer: NodeJS.Timeout | null = null;
-  #flushing: Promise<void> = Promise.resolve();
 
   private constructor(doc: WorkspaceDocument, paths: WorkspacePaths, created: boolean) {
-    this.#doc = doc;
+    super({
+      doc,
+      path: paths.workspace,
+      tempPath: paths.temp,
+      serialize: encodeWorkspaceFile,
+      backup: async () => {
+        try {
+          await copyFile(paths.workspace, paths.backup);
+        } catch {
+          // First save: there is no previous file to keep.
+        }
+      },
+      logWriteError: (error) => {
+        console.error("Suite Planner: could not write the workspace", error);
+      },
+    });
     this.#paths = paths;
     this.#created = created;
   }
@@ -44,59 +59,9 @@ export class WorkspaceStore {
     return this.#created;
   }
 
-  get document(): WorkspaceDocument {
-    return this.#doc;
-  }
-
-  get path(): string {
-    return this.#paths.workspace;
-  }
-
   /** The folder the workspace lives in. Sync keeps its identity and group state here. */
   get directory(): string {
     return this.#paths.dir;
-  }
-
-  snapshot(): Uint8Array {
-    return this.#doc.snapshot();
-  }
-
-  commit(update: Uint8Array): void {
-    this.#doc.applyUpdate(update);
-    this.scheduleSave();
-  }
-
-  /** Runs a main-process mutation and schedules the write that follows it. */
-  mutate<T>(mutation: (doc: WorkspaceDocument) => T): T {
-    const result = mutation(this.#doc);
-    this.scheduleSave();
-    return result;
-  }
-
-  scheduleSave(): void {
-    if (this.#saveTimer) clearTimeout(this.#saveTimer);
-    this.#saveTimer = setTimeout(() => {
-      this.#saveTimer = null;
-      void this.flush();
-    }, 400);
-  }
-
-  flush(): Promise<void> {
-    if (this.#saveTimer) {
-      clearTimeout(this.#saveTimer);
-      this.#saveTimer = null;
-    }
-    this.#flushing = this.#flushing
-      .then(() => this.writeCurrent())
-      .catch((error: unknown) => {
-        // Keep the chain alive: a transient write failure must not stop every later save.
-        console.error("Suite Planner: could not write the workspace", error);
-      });
-    return this.#flushing;
-  }
-
-  async exportTo(target: string): Promise<void> {
-    await writeFile(target, encodeWorkspaceFile(this.#doc), "utf8");
   }
 
   async importFrom(source: string): Promise<void> {
@@ -108,24 +73,8 @@ export class WorkspaceStore {
     const validation = next.validate();
     if (validation.isErr()) throw validation.error;
 
-    this.#doc = next;
-    await this.writeCurrent();
-  }
-
-  async close(): Promise<void> {
+    this.replaceDocument(next);
     await this.flush();
-  }
-
-  private async writeCurrent(): Promise<void> {
-    const contents = encodeWorkspaceFile(this.#doc);
-    const { workspace, backup, temp } = this.#paths;
-    await writeFile(temp, contents, "utf8");
-    try {
-      await copyFile(workspace, backup);
-    } catch {
-      // First save: there is no previous file to keep.
-    }
-    await rename(temp, workspace);
   }
 }
 

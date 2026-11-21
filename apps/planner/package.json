@@ -33,6 +33,7 @@
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@suite/contracts": "workspace:*",
     "@suite/desktop": "workspace:*",
+    "@suite/document-runtime": "workspace:*",
     "@suite/planner-core": "workspace:*",
     "@suite/sync": "workspace:*",
     "@suite/theme": "workspace:*",
