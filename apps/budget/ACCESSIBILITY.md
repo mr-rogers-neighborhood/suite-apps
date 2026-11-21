@@ -1,6 +1,6 @@
 # Accessibility
 
-Suite is alpha software. This page says where accessibility stands, and what has actually been
+Suite Budget is pre-alpha. This page says where accessibility stands, and what has actually been
 checked, rather than what is intended.
 
 The target is **WCAG 2.2 level AA**. That is 55 of the 86 success criteria in the standard. The full
@@ -9,18 +9,25 @@ breakdown is in
 
 ## What is verified by machine
 
-Two checks run on every change, and a failure stops the work.
+One check runs on every change and a failure stops the work. One runs in the workshop and reports
+what it finds without failing a build.
 
-- **Colour contrast in every theme.** Each preset in `@suite/theme` is measured: 4.5:1 for body text
-  on every surface it can sit on, 4.5:1 for faint text, and 3:1 for focus rings and component
-  boundaries. A preset that fails cannot be merged. A colour that cannot be measured, such as a
-  gradient or a `color-mix()`, is not allowed in a preset, because an unmeasurable colour cannot be
-  checked.
-- **axe on every start screen.** All four apps are audited against the WCAG 2.2 A and AA rule sets in
-  a real window, and any violation fails the build.
+- **Colour contrast in every theme, on every change.** Each preset in `@suite/theme` is measured in
+  both modes: 4.5:1 for body, secondary and faint text on every surface it can sit on, 4.5:1 for
+  text on every filled role, and 3:1 for focus rings and component boundaries. A preset that fails
+  cannot be merged; the test is in `packages/theme/src/presets.test.ts` and Budget draws its three
+  presets from it.
+- **Storybook's accessibility panel, in the workshop.** The a11y addon is enabled for every story,
+  so a story opened in the workshop runs axe and reports its violations. It is the author's check,
+  not the gate: a violation is visible but does not fail `pnpm verify`, and only the two stories
+  (`Button`, `Charts`) exist so far.
 
-The second check found a real problem the moment it was written: faint text was 3.42:1 against white
-at 11px. It is fixed.
+There is no axe run against the running application. The end-to-end suite covers the launcher and
+the phone widths (360, 390 and 430 CSS pixels), not an accessibility rule set.
+
+`pnpm shape` also fails a component that imports Loro and keeps `observe()` to one call site, and the
+renderer is sandboxed at build time; neither is an accessibility check, but both remove a class of
+failure that would otherwise be invisible until a manual pass.
 
 ## What is verified by hand
 
@@ -38,26 +45,53 @@ It covers six passes per screen:
 5. Contrast measured in the running app, not only in the palette.
 6. Greyscale, to catch anything told apart by colour alone.
 
+## What the interface does today
+
+These are the deliberate choices a manual pass will check, not claims that it passed.
+
+- Radix `Dialog`, `DropdownMenu` and `Select` carry the focus trap, Escape, and menu keyboard model.
+  The amount input, the month grid, and the SVG charts are hand-rolled.
+- Every icon-only control has an accessible name and a title: modal close, split expand, schedule
+  delete, and the cleared toggle on a register row. A dashboard widget's move, remove and range
+  controls name the widget and its position, so several widgets do not produce identical controls in
+  a screen reader's list.
+- The register's cleared control is a pressed state ("Cleared", pressed or not) rather than a colour
+  swatch, and a reconciled row says it is locked in its title. The row itself is keyboard-activatable;
+  its own Enter and Space are handled only on the row, so the controls inside it do not also open the
+  editor.
+- Report tabs carry their selected state, the closed-account group says whether it is expanded, and
+  every range picker has a label.
+- Charts are SVG with a role and an accessible name, and each chart has a **Data table** under it.
+- Overspent, Funded, Left and Reconciled are words, not colour alone.
+- The status line for an automatic-entry batch and the toast for a save or import result are
+  announced (`role="status"`, or `role="alert"` for a failure).
+- `prefers-reduced-motion` collapses every animation and transition.
+- The focus ring is defined once in `src/renderer/src/theme/styles.css`; it is not removed from
+  buttons or inputs.
+
 ## Known gaps
 
-These are real and tracked. Each has a row in the criterion map naming its success criterion.
+These are real. Each names the success criterion it touches; the suite-wide map is the fuller record.
 
-| Area             | What is missing                                                                                                                                                               | Level |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| Shortcuts        | Canvas single-key shortcuts are not remappable or disableable (SC 2.1.4).                                                                                                     | A     |
-| Board navigation | The Canvas board has no complete keyboard model for moving between cards.                                                                                                     | AA    |
-| Dragging         | Most drag actions have a menu or arrow-key equivalent. Three do not: resizing a section to an arbitrary size, re-pointing a section link, and bending a connector (SC 2.5.7). | AA    |
-| Status messages  | The markup is correct. Whether a screen reader hears a confirmation has not been listened to yet.                                                                             | AA    |
+| Area            | What is missing                                                                                                                                                                                           | Level |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| Screen reader   | No pass has been listened to yet, so chart descriptions, the month grid's reading order, and every confirmation are unverified (SC 4.1.3, SC 1.3.1).                                                      | AA    |
+| Register row    | A row is a `role="button"` that contains the expand and cleared buttons. Their keys no longer bubble, but the nested focusable controls remain an ARIA shape a screen reader has to interpret (SC 4.1.2). | AA    |
+| Split children  | A split's child rows follow their parent in the DOM as peers; the indent is visual only, so the relationship is not in the markup (SC 1.3.1).                                                             | AA    |
+| Reconciliation  | Cleared, statement and difference are three visual blocks with no table or list semantics, so a screen reader does not associate them (SC 1.3.1).                                                         | AA    |
+| Zoom and reflow | The plan grid and the register use fixed column widths. 200% zoom and 320 CSS pixels reflow are unmeasured (SC 1.4.10).                                                                                   | AA    |
 
 ## What does not apply
 
 Listed because a statement that admits nothing is not a statement.
 
 - **No accounts.** There is nothing to sign in to, so the accessible-authentication criteria
-  (SC 3.3.8 and 3.3.9) do not apply. Sync pairs devices with a code.
+  (SC 3.3.8 and 3.3.9) do not apply.
 - **No audio and no video.** The time-based media criteria (SC 1.2.1 to 1.2.9) do not apply.
 - **No time limits.** Nothing expires while you are working (SC 2.2.1).
 - **No flashing content.** Nothing animates at a rate that could trigger a seizure (SC 2.3.1).
+- **No single-character shortcuts.** Every shortcut is a `Cmd`/`Ctrl` combination or an editing key
+  such as Enter, Escape, or an arrow, so SC 2.1.4 does not apply.
 - **Parsing is obsolete.** SC 4.1.1 was removed in WCAG 2.2.
 
 ## Telling us about a barrier
@@ -67,4 +101,5 @@ of the barrier is more useful than a suggested fix, and both are welcome.
 
 ## What this runs on
 
-Electron with Chromium, React 19, on Linux, with Orca as the screen reader used for testing.
+Electron with Chromium, React 19, on Linux. No screen reader has been used for a recorded pass yet;
+Orca is the screen reader named in the manual protocol.

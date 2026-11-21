@@ -48,6 +48,7 @@ export function Modal({
               <button
                 type="button"
                 aria-label="Close"
+                title="Close"
                 className="rounded-md p-1 text-faint hover:bg-raised hover:text-ink"
               >
                 <X size={16} />

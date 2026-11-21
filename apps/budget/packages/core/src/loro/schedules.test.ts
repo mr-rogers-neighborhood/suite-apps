@@ -157,6 +157,20 @@ describe("schedule auto-enter", () => {
     expect(reopened.listSchedules()[0]?.nextDate).toBe("2026-04-15");
   });
 
+  it("should post nothing when the same catch-up runs again while open", () => {
+    const { doc, account, category } = setup();
+    const schedule = addSchedule(doc, account.id, category.id);
+    doc.updateSchedule(schedule.id, { nextDate: "2026-01-15" }, NOW);
+    expect(doc.autoEnterSchedules(NOW).postedCount).toBe(3);
+
+    const again = doc.autoEnterSchedules(NOW);
+
+    expect(again.postedCount).toBe(0);
+    expect(again.batch).toBeNull();
+    expect(doc.listTransactions()).toHaveLength(3);
+    expect(doc.listSchedules()[0]?.nextDate).toBe("2026-04-15");
+  });
+
   it("should stop at the end date", () => {
     const { doc, account, category } = setup();
     const schedule = addSchedule(doc, account.id, category.id, { endDate: "2026-02-20" });

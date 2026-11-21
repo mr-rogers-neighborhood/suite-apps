@@ -277,3 +277,99 @@ describe("an imported id that becomes a filename", () => {
     expect((await listEntries(paths))[0]?.id).toBe("../escape");
   });
 });
+
+describe("backups", () => {
+  it("should keep the previous copy and today's daily, and prune to seven dailies", async () => {
+    const paths = await sandbox();
+    const created = await createBudget(paths, {
+      name: "Household",
+      currency: "USD",
+      template: "blank",
+    });
+    const directory = join(paths.backupsDir, created.entry.id);
+    await mkdir(directory, { recursive: true });
+    for (const day of ["01", "02", "03", "04", "05", "06", "07", "08", "09"]) {
+      await writeFile(join(directory, `2026-01-${day}.budget`), "old", "utf8");
+    }
+
+    await backupCurrent(paths, created.entry.id, created.entry.path);
+
+    const names = (await readdir(directory)).sort();
+    expect(names).toContain("previous.budget");
+    expect(names.filter((name) => name !== "previous.budget")).toHaveLength(7);
+    for (const pruned of ["2026-01-01.budget", "2026-01-02.budget"]) {
+      expect(names).not.toContain(pruned);
+    }
+    expect(names).toContain("2026-01-09.budget");
+  });
+
+  it("should not replace a daily snapshot taken earlier the same day", async () => {
+    const paths = await sandbox();
+    const created = await createBudget(paths, {
+      name: "Household",
+      currency: "USD",
+      template: "blank",
+    });
+    const directory = join(paths.backupsDir, created.entry.id);
+    await mkdir(directory, { recursive: true });
+    const today = new Date().toISOString().slice(0, 10);
+    await writeFile(join(directory, `${today}.budget`), "morning", "utf8");
+
+    await backupCurrent(paths, created.entry.id, created.entry.path);
+
+    expect(await readFile(join(directory, `${today}.budget`), "utf8")).toBe("morning");
+    expect((await stat(join(directory, "previous.budget"))).isFile()).toBe(true);
+  });
+
+  it("should write nothing when the live file does not exist", async () => {
+    const paths = await sandbox();
+    const directory = join(paths.backupsDir, "budget_missing");
+    await mkdir(directory, { recursive: true });
+
+    await backupCurrent(paths, "budget_missing", join(paths.budgetsDir, "budget_missing.budget"));
+
+    expect(await readdir(directory)).toEqual([]);
+  });
+});
+
+describe("recovery", () => {
+  it("should open the newest backup when the live file is damaged", async () => {
+    const paths = await sandbox();
+    const created = await createBudget(paths, {
+      name: "Household",
+      currency: "USD",
+      template: "blank",
+    });
+    const good = await readFile(created.entry.path, "utf8");
+    const directory = join(paths.backupsDir, created.entry.id);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, "previous.budget"), good, "utf8");
+    await writeFile(created.entry.path, "{ this is not a budget", "utf8");
+
+    const opened = await openBudget(paths, created.entry.id);
+
+    expect(opened.usedBackup).toBe(join(directory, "previous.budget"));
+    expect(opened.doc.getMeta().name).toBe("Household");
+    // The damaged live file is left exactly as it was for the person to inspect.
+    expect(await readFile(created.entry.path, "utf8")).toBe("{ this is not a budget");
+  });
+
+  it("should keep a damaged file aside and refuse to overwrite it", async () => {
+    const paths = await sandbox();
+    const created = await createBudget(paths, {
+      name: "Household",
+      currency: "USD",
+      template: "blank",
+    });
+    const damaged = "{ this is not a budget";
+    await writeFile(created.entry.path, damaged, "utf8");
+
+    await expect(openBudget(paths, created.entry.id)).rejects.toThrow(/could not be read/u);
+
+    const recovered = (await readdir(paths.recoveredDir)).map((name) => name);
+    expect(recovered).toHaveLength(1);
+    const folder = join(paths.recoveredDir, recovered[0] ?? "");
+    expect(await readFile(join(folder, `${created.entry.id}.budget`), "utf8")).toBe(damaged);
+    expect(await readFile(created.entry.path, "utf8")).toBe(damaged);
+  });
+});
