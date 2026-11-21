@@ -2,7 +2,7 @@
   "name": "@suite/help",
   "productName": "Suite Help",
   "desktopName": "run.suite.help",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Suite Help: the repository's handbook and code explorer, shipped as a local-first desktop app.",
   "type": "module",
@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@suite/desktop": "workspace:*",
+    "@suite/theme": "workspace:*",
     "fumadocs-core": "16.19.5",
     "fumadocs-mdx": "15.6.4",
     "lucide-react": "^1.71.0",

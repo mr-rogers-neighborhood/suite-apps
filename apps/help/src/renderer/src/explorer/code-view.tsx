@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BundledLanguage } from "shiki";
 
+import { observeResolvedTheme, type ResolvedTheme, resolvedTheme } from "@/theme";
+
 type Props = {
   fileId: string;
   source: string;
@@ -29,6 +31,7 @@ export function CodeView({ fileId, source, startLine, endLine, highlight = true 
   const container = useRef<HTMLDivElement>(null);
   const selected = useRef<HTMLDivElement | null>(null);
   const [tokens, setTokens] = useState<Token[][] | null>(null);
+  const [mode, setMode] = useState<ResolvedTheme>(() => resolvedTheme());
   const lines = useMemo(() => source.split("\n"), [source]);
   const tokenLines = useMemo<RenderToken[][] | null>(
     () =>
@@ -42,13 +45,21 @@ export function CodeView({ fileId, source, startLine, endLine, highlight = true 
   );
 
   useEffect(() => {
+    setMode(resolvedTheme());
+    return observeResolvedTheme(setMode);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     setTokens(null);
     const language = languageFor(fileId);
     if (language === "text") return;
     void import("shiki")
       .then(({ codeToTokens }) =>
-        codeToTokens(source, { lang: language as BundledLanguage, theme: "github-dark" }),
+        codeToTokens(source, {
+          lang: language as BundledLanguage,
+          theme: mode === "dark" ? "github-dark" : "github-light",
+        }),
       )
       .then((result) => {
         if (!cancelled) setTokens(result.tokens as Token[][]);
@@ -59,7 +70,7 @@ export function CodeView({ fileId, source, startLine, endLine, highlight = true 
     return () => {
       cancelled = true;
     };
-  }, [fileId, source]);
+  }, [fileId, mode, source]);
 
   useEffect(() => {
     void fileId;
@@ -77,9 +88,9 @@ export function CodeView({ fileId, source, startLine, endLine, highlight = true 
   return (
     <div
       ref={container}
-      className="max-h-[62vh] overflow-auto rounded-xl border border-fd-border bg-[#0d1117]"
+      className="max-h-[62vh] overflow-auto rounded-xl border border-fd-border bg-fd-muted"
     >
-      <div className="min-w-fit py-3 font-mono text-[12px] leading-5 text-[#c9d1d9]">
+      <div className="min-w-fit py-3 font-mono text-[12px] leading-5 text-fd-foreground">
         {lines.map((line, index) => {
           const number = index + 1;
           const active = highlight && number >= startLine && number <= endLine;
@@ -94,7 +105,7 @@ export function CodeView({ fileId, source, startLine, endLine, highlight = true 
                   : "flex border-l-2 border-transparent"
               }
             >
-              <span className="w-12 shrink-0 select-none pr-3 text-right text-[#6e7681]">
+              <span className="w-12 shrink-0 select-none pr-3 text-right text-fd-muted-foreground">
                 {number}
               </span>
               <span className="whitespace-pre pr-6">

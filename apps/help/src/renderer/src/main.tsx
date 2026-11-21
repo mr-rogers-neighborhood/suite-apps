@@ -5,6 +5,9 @@ import { BrowserRouter } from "react-router";
 
 import { App } from "./App";
 import "./styles.css";
+import { initTheme } from "./theme";
+
+initTheme();
 
 const root = document.getElementById("root");
 if (root === null) throw new Error("Suite Help needs a #root element");
