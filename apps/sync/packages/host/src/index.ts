@@ -6,11 +6,21 @@ export {
   type HostVerdict,
   type HostWorkspace,
 } from "./blindRoom.js";
+export {
+  advertisedRelayUrl,
+  type ConsoleMember,
+  type ConsoleState,
+  type ConsoleWorkspace,
+  createRelayConsole,
+  type RelayConsole,
+  type RelayConsoleOptions,
+} from "./console.js";
 export { deviceIdFromPublicKey, ed25519Verifier } from "./crypto.js";
 export {
   createSyncServer,
   type HostedRoom,
   HostRegistry,
+  type RelayConsoleInfo,
   type SyncServer,
   type SyncServerOptions,
 } from "./server.js";

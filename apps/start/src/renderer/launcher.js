@@ -89,6 +89,9 @@ const actions = {
     await bridge.setSyncScope(scope);
     await refresh();
   },
+  async openSyncConsole() {
+    await bridge.openSyncConsole();
+  },
   async copyLink(link) {
     try {
       await navigator.clipboard.writeText(link);

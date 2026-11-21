@@ -84,7 +84,81 @@ function addressBlock(sync, actions) {
 
   block.append(value, toggle);
   if (sync.problem) block.append(el("p", "pane-note", sync.problem));
+  if (sync.fingerprint) {
+    block.append(
+      el(
+        "p",
+        "pane-note",
+        sync.scope === "network"
+          ? "Other devices pin this certificate. It stays the same until the pair is replaced."
+          : "Other devices pin this certificate when you let them through the network switch.",
+      ),
+    );
+    const fingerprint = el("code", null, sync.fingerprint);
+    fingerprint.id = "sync-fingerprint";
+    block.append(fingerprint);
+  }
+  if (sync.consoleUrl) {
+    const consoleButton = el("button", "button", "Open the relay console");
+    consoleButton.type = "button";
+    consoleButton.id = "sync-console";
+    consoleButton.addEventListener("click", async () => {
+      consoleButton.disabled = true;
+      await actions.openSyncConsole();
+      consoleButton.disabled = false;
+    });
+    block.append(consoleButton);
+    block.append(
+      el(
+        "p",
+        "pane-note",
+        "The console opens in your browser, on this machine only, with a token the relay printed when it started.",
+      ),
+    );
+  }
+  if (sync.qr) block.append(qrBlock(sync.qr));
   block.append(storeNote(sync));
+  return block;
+}
+
+/**
+ * Draw the relay code the main process made.
+ *
+ * A canvas rather than an `<img>` or injected SVG: the renderer already owns its
+ * DOM, the matrix is the only thing that crosses, and no markup from main is
+ * parsed as HTML.
+ */
+function qrBlock(qr) {
+  const block = el("div", "sync-qr");
+  block.append(
+    el(
+      "p",
+      "pane-note",
+      "A phone can scan this relay. It carries the address and the certificate fingerprint, so a scanning client pins the same relay this machine does.",
+    ),
+  );
+
+  const quiet = 4;
+  const scale = 4;
+  const dimension = qr.size + quiet * 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = dimension * scale;
+  canvas.height = dimension * scale;
+  canvas.setAttribute("role", "img");
+  canvas.setAttribute("aria-label", "Suite relay code");
+  const context = canvas.getContext("2d");
+  if (context) {
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#000000";
+    qr.rows.forEach((row, y) => {
+      for (let x = 0; x < row.length; x += 1) {
+        if (row[x] !== "1") continue;
+        context.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
+      }
+    });
+  }
+  block.append(canvas);
   return block;
 }
 

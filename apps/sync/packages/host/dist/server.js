@@ -3,6 +3,7 @@ import { createServer as createHttpsServer } from "node:https";
 import { addInvite, applyRemovalRecord, applyRoleRecord, createInviteState, createRemovalState, createRoleState, encodeRelayMessage, ephemeralPayload, hasRole, isRelayCompatible, isRemoved, liveInvite, parseClientMessage, RELAY_PROTOCOL_VERSION, reinstateDevice, spendInvite, } from "@suite/sync";
 import { WebSocket, WebSocketServer } from "ws";
 import { admitFrame, FrameLog } from "./blindRoom.js";
+import { advertisedRelayUrl, createRelayConsole } from "./console.js";
 import { FileHostStore } from "./store.js";
 import { certificateFingerprint, isLoopbackHost } from "./tls.js";
 export class HostRegistry {
@@ -479,13 +480,39 @@ export async function createSyncServer(options) {
     });
     const address = httpServer.address();
     const boundPort = typeof address === "object" && address !== null ? address.port : port;
+    const fingerprint = tls === undefined ? null : certificateFingerprint(tls.cert);
+    let relayConsole = null;
+    if (options.console !== undefined && options.console !== false) {
+        try {
+            relayConsole = await createRelayConsole({
+                rooms: () => registry.list(),
+                version: options.console.version,
+                protocolVersion: RELAY_PROTOCOL_VERSION,
+                store: options.console.storePath,
+                relayUrl: advertisedRelayUrl(host, boundPort, secure),
+                bind: `${host}:${boundPort}`,
+                fingerprint,
+                now,
+            });
+        }
+        catch (error) {
+            // The mailbox still works without its window. Say so rather than taking the
+            // relay down over a second loopback listener.
+            console.warn(`[sync] the console could not start: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
     return {
         host,
         port: boundPort,
         url: `${secure ? "wss" : "ws"}://${host}:${boundPort}/sync`,
-        fingerprint: tls === undefined ? null : certificateFingerprint(tls.cert),
+        fingerprint,
         secure,
+        console: relayConsole === null
+            ? null
+            : { host: relayConsole.host, port: relayConsole.port, url: relayConsole.url },
         async close() {
+            if (relayConsole !== null)
+                await relayConsole.close();
             for (const socket of wss.clients)
                 socket.terminate();
             await new Promise((resolve) => wss.close(() => resolve()));

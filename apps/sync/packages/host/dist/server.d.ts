@@ -68,6 +68,22 @@ export interface SyncServerOptions {
      * deliberate choice, and the CLI is where a person makes it explicitly.
      */
     readonly allowPlaintext?: boolean;
+    /**
+     * Start the loopback console at `/console` on its own port.
+     *
+     * Off for an embedded host unless the caller asks: a library that opened a second
+     * listener whenever it started a server would surprise its embedder. The CLI asks.
+     */
+    readonly console?: {
+        readonly version: string;
+        readonly storePath: string;
+    } | false;
+}
+export interface RelayConsoleInfo {
+    readonly host: string;
+    readonly port: number;
+    /** The URL carrying the one-time token. */
+    readonly url: string;
 }
 export interface SyncServer {
     readonly host: string;
@@ -77,6 +93,8 @@ export interface SyncServer {
     /** SHA-256 of the serving certificate, when there is one. */
     readonly fingerprint: string | null;
     readonly secure: boolean;
+    /** The loopback console, when this server was asked to start one. */
+    readonly console: RelayConsoleInfo | null;
     close(): Promise<void>;
 }
 export declare function createSyncServer(options: SyncServerOptions): Promise<SyncServer>;
