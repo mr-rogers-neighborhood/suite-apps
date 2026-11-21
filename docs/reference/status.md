@@ -6,11 +6,12 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Area | State | Notes |
 | --- | --- | --- |
 | Hub: install | Working | The signed Flatpak remote offers an app; Start asks Flatpak to install it |
-| Hub: update | Working | Compares a deployment with its own origin; Flatpak replaces it; no rollback copy |
+| Hub: update | Working | Compares a deployment with its own origin; Flatpak replaces it; Update Start only when the hub's commit differs; no rollback copy |
+| Hub: pre-release | Working | Pre-release cards sit in their own section under one caution; each uses its stable app's mark |
 | Hub: uninstall | Working | Asks Flatpak to remove a deployment; a placed copy is forgotten; documents untouched |
 | Hub: routing | Working | `suite://` links and document files open the owning app |
 | Hub: Flatpak | Working | Start is a Flatpak; it lists, launches, updates through the store and removes Flatpak installs, including its own deployment |
-| Help | Working | Explorer over the generated index and the handbook over `docs/`; ships through Flatpak and Start shows it as a card |
+| Help | Working | Explorer and handbook over the generated index and `docs/`; ships through Flatpak and Start shows it as a card; uses `@suite/theme` and the shared headset mark |
 | Canvas | Alpha | Cards, boards, editor, library and views; opt-in sync through a host; no account or share link, and still changing shape |
 | Planner | Pre-alpha | Day and week views, inbox, capture and estimates; Upcoming, Projects, Tags, Focus and Rituals views; a task detail dialog with rich task notes; sync through a user-run relay ([Planner's Sync](../../apps/planner/docs/reference/sync.md)) |
 | Budget | Pre-alpha | Launcher, accounts, register, month grid, rollover, reconcile, backups, targets, rules, schedules, CSV/QIF import, reports; no network |

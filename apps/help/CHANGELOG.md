@@ -15,8 +15,9 @@ No changes yet.
 ### Added
 
 - **Help wears the suite's theme.** The reader now offers the shared presets and a
-  light/dark/system choice, remembered per device as `suite.theme`, instead of carrying a
-  second neutral palette of its own.
+  Brightness control — System, Light or Dark — in both navigator footers, remembered per device as
+  `suite.theme`, instead of carrying a second neutral palette of its own. The Fumadocs tokens map
+  to the suite roles, and Shiki follows the resolved light or dark mode.
 
 ### Changed
 

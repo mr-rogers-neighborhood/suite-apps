@@ -91,7 +91,8 @@ committed output has drifted. The root gate builds the same packages once before
    that owns the number.
 
 The Flatpak is built from the same unpacked tree as every app; Flatpak owns its deployment and the
-hub's own row offers **Update Start** when the store publishes a newer commit.
+hub's own row offers **Update Start** only when the installed `run.suite.start` commit differs from the
+newest commit on that deployment's own origin. A placed copy gets no update button.
 
 [Package and release](../../docs/how-to/package-and-release.md) describes the scripts and what they
 refuse; [Packaging channels](../../docs/reference/packaging-channels.md) explains the artifact forms.
@@ -112,8 +113,8 @@ The hub also ships as the Flatpak `run.suite.start`, with the same zypak wrapper
 sandbox grants the host Flatpak service (`org.freedesktop.Flatpak`, used with
 `flatpak-spawn --host`) and the folders Start owns. That host access is effectively host command
 execution; it is the trade that lets a sandboxed hub manage deployments. The hub's own row offers
-**Update Start** through Flatpak; there is no second built form, and Start cannot replace its own
-running binary.
+**Update Start** only after the installed commit and its origin's newest commit are both read and
+differ; a placed copy has no deployment Flatpak may replace, so it gets no update button.
 
 A file row offers **Copy link**, which is `suite://<app>/workspace/<file name>`. Pasting one opens that
 document in that app: the hub routes it, and the app resolves the name against its own folder. The link
@@ -142,8 +143,9 @@ remote offers an app, the card says `Not installed yet · from the store` and In
 installed deployment is compared with its own origin's commit, so a copy from `suite-local` is not
 measured against the public `suite` store; a newer commit says `update available`, and **Update**
 asks Flatpak. A card is in one of five honest states: not installed, no release found, Flatpak,
-Flatpak · update available, or from a folder. `SUITE_START_APPS_ROOT` moves the folder-copy root for
-a test.
+Flatpak · update available, or from a folder. Pre-release cards sit in their own section below the
+stable list under one shared caution, and each wears its stable app's mark. `SUITE_START_APPS_ROOT`
+moves the folder-copy root for a test.
 
 Each card carries the app's mark, including the new Help and Sync marks; the Sync pane uses the Sync
 glyph at heading size. A mark is white on the hub's ink tile, and a light theme inverts the tile and

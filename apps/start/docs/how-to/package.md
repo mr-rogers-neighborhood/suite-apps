@@ -18,8 +18,9 @@ A Flatpak deployment belongs to Flatpak, so Start lists it, launches it, reveals
 to install, update or remove it. A folder copy a person placed is not Start's either: the card offers
 Open, Reveal and Forget, and its updates are the person's to make.
 
-The hub is a Flatpak too. Its own row says `Flatpak` and offers **Update Start** when the store
-publishes a newer commit; Flatpak replaces the deployment and the new build starts next launch.
+The hub is a Flatpak too. Its own row says `Flatpak` and offers **Update Start** only when the
+installed commit differs from the newest commit on that deployment's own origin; Flatpak replaces
+the deployment and the new build starts next launch.
 
 ## Flatpak for the hub
 

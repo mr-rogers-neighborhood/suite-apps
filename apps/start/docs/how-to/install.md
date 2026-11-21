@@ -17,8 +17,8 @@ flatpak run run.suite.start
 ```
 
 A local build uses the `suite-local` remote that `node scripts/flatpak.mjs` adds. A newer hub arrives
-with `flatpak update --user`, and the hub's own row offers **Update Start** when the store publishes
-a newer commit.
+with `flatpak update --user`, and the hub's own row offers **Update Start** only when its installed
+commit differs from the newest commit on its own origin.
 
 ## 2. Open it
 
@@ -33,21 +33,25 @@ there is no download, feed or second copy to choose between.
 | `‹version›` **· Flatpak**                    | Installed from Flatpak, which is its update path.                              |
 | `‹version›` **· Flatpak · update available** | The store publishes a different build; **Update** asks Flatpak to replace it.  |
 | `‹version›` **· from a folder**              | A copy you placed; Start can open, reveal or forget it, not update it.         |
-| **slop** badge                               | A pre-release build. Its card names the risk and the separate data folder.     |
+| **slop** badge                               | A pre-release build in its own section under one shared caution.               |
 | **Switch to canary**                         | Moves the one pre-release install to another tier; it is not a second install. |
 
 A Flatpak operation shows **Installing…** on the card because Flatpak reports no percentage. A
 folder copy is first-class but not Start's to replace: it offers **Open**, **Reveal** and **Forget**,
 never Uninstall or Update.
 
-Stable and one pre-release can sit side by side: they are two ids and two cards. Every pre-release
-tier shares `run.suite.slop.<app>`, so there is one pre-release install, not one per tier. If the
-store publishes another branch, the card offers **Switch to …** rather than a second Install; the
-install and its `~/Documents/Suite Slop/<App>` data folder stay. The badge is text (`slop`, `canary`
-or `beta`) so it survives a screenshot; the sentence under it names the risk and the removal path.
+Stable and one pre-release can sit side by side: they are two ids and two cards. The pre-release cards
+sit in their own section below the stable list, under one caution that names the tier risk, the single
+install shared across tiers, and the `Suite Slop` folder; each card wears its stable app's mark. Every
+pre-release tier shares `run.suite.slop.<app>`, so there is one pre-release install, not one per tier.
+If the store publishes another branch, the card offers **Switch to …** rather than a second Install;
+the install and its `~/Documents/Suite Slop/<App>` data folder stay. The badge is text (`slop`,
+`canary` or `beta`) so it survives a screenshot.
 
-The hub's own row offers **Update Start** when its Flatpak origin has a newer commit. Flatpak replaces
-the deployment, and the new build starts next launch. Start cannot replace its own running binary.
+The hub's own row offers **Update Start** only when the installed `run.suite.start` commit differs
+from the newest commit on that deployment's own origin. A placed copy, a current build and a failed
+check offer no button. Flatpak replaces the deployment, and the new build starts next launch; Start
+cannot replace its own running binary.
 
 ## 3. Where things go
 

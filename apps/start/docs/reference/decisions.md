@@ -49,8 +49,10 @@ The rules that shape Start.
   removed. Documents are untouched, and Flatpak owns the menu entry.
 - `suite://<app>/workspace/<file name>` names a file, not an id. The hub routes it; the app resolves
   it against its own folder.
-- The hub is a Flatpak. It cannot replace its own running binary; its row says `Flatpak` and offers
-  **Update Start** through Flatpak, and the new build starts on the next launch.
+- The hub is a Flatpak. It cannot replace its own running binary. **Update Start** appears only when
+  the installed `run.suite.start` commit differs from the same origin's `remote-info` commit; a
+  placed copy, a current build and a failed check offer no button. When it is pressed, Flatpak
+  replaces the deployment and the new build starts on the next launch.
 - Flatpak installs are listed, installed from the store, launched and removable through Start. Start
   asks Flatpak to install or update; it never replaces a deployment itself.
 - The renderer is sandboxed: context isolation, sandbox, no `nodeIntegration`, no remote content.

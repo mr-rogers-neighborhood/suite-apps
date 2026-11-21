@@ -30,17 +30,19 @@ From this directory: `pnpm index`, `pnpm sync`, `pnpm dev`, `pnpm build`, `pnpm 
 
 ## What is where
 
-| Path                             | Purpose                                                                                                                                              |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/main/`                      | Electron main: window policy and the `suite-help://app/` protocol.                                                                                   |
-| `src/preload/`                   | The one `contextBridge` fact the renderer reads.                                                                                                     |
-| `src/renderer/src/explorer/`     | The three-mode explorer, tree, detail pane, search and code view.                                                                                    |
-| `src/renderer/src/handbook/`     | The handbook layout, page tree, contents and MDX components.                                                                                         |
-| `src/renderer/src/lib/source.ts` | Fumadocs headless source: the generated docs tree and MDX bodies.                                                                                    |
-| `scripts/index-code.mjs`         | TypeScript compiler index: files, declarations, imports, tests, modules.                                                                             |
-| `scripts/sync-docs.mjs`          | Mirrors `docs/` into `.generated/docs/` and writes the offline search index.                                                                         |
-| `public/data/`                   | Generated `tree.json`, `search.json`, `modules.json`, `modules/*.json`, `tours.json`, `tour-membership.json`, `handbook-search.json`. Not committed. |
-| `.generated/docs/`               | Generated handbook content for the Fumadocs source. Not committed.                                                                                   |
+| Path                                 | Purpose                                                                                                                                              |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/`                          | Electron main: window policy and the `suite-help://app/` protocol.                                                                                   |
+| `src/preload/`                       | The one `contextBridge` fact the renderer reads.                                                                                                     |
+| `src/renderer/src/explorer/`         | The three-mode explorer, tree, detail pane, search and code view.                                                                                    |
+| `src/renderer/src/handbook/`         | The handbook layout, page tree, contents and MDX components.                                                                                         |
+| `src/renderer/src/lib/source.ts`     | Fumadocs headless source: the generated docs tree and MDX bodies.                                                                                    |
+| `src/renderer/src/theme.ts`          | `@suite/theme` preset and mode resolution, the `suite.theme` store, and the `data-theme-mode` attributes Fumadocs and Shiki follow.                  |
+| `src/renderer/src/theme-control.tsx` | The preset and brightness selects in both navigator footers.                                                                                         |
+| `scripts/index-code.mjs`             | TypeScript compiler index: files, declarations, imports, tests, modules.                                                                             |
+| `scripts/sync-docs.mjs`              | Mirrors `docs/` into `.generated/docs/` and writes the offline search index.                                                                         |
+| `public/data/`                       | Generated `tree.json`, `search.json`, `modules.json`, `modules/*.json`, `tours.json`, `tour-membership.json`, `handbook-search.json`. Not committed. |
+| `.generated/docs/`                   | Generated handbook content for the Fumadocs source. Not committed.                                                                                   |
 
 Nothing under `public/data/` or `.generated/docs/` is edited by hand: `docs:index` and `docs:build`
 write them from the code and `docs/`.
@@ -54,6 +56,21 @@ missing asset is still a 404. The renderer is sandboxed: `contextIsolation`, `sa
 
 Development runs the same shell around Vite. `pnpm dev` starts both; do not run it in a headless
 gate.
+
+## Theme and mark
+
+Help paints `@suite/theme`, not a palette of its own. The footer of both navigators offers a **Theme**
+preset and a **Brightness** mode: **System**, **Light** or **Dark**. The choice is stored per device
+in `localStorage` under `suite.theme`; a record with only an old mode string still reads, and a preset
+this build does not ship falls back to the default.
+
+The preset paints the suite's role variables. `styles.css` points the Fumadocs `--color-fd-*` names at
+those roles, so the handbook and the explorer share one palette, and Shiki asks for `github-light` or
+`github-dark` from the resolved mode rather than a fixed theme.
+
+The window icon, the `electron-builder` icon, the Flatpak icons and the Help card in Start all use the
+same headset on the ink tile. The card mark is white on the hub's ink and a light theme inverts the
+tile and glyph together; the packaged icon is the same artwork.
 
 ## Index rules
 

@@ -15,6 +15,17 @@ Suite Help is one Vite + React renderer in an Electron shell. It has two surface
 The app owns no document, has no account and has no network client. The generated index, the
 handbook and the search index ship inside the bundle, so a person needs no checkout.
 
+## Theme and mark
+
+Help uses `@suite/theme` rather than a palette of its own. The footer of both navigators offers a
+**Theme** preset and a **Brightness** mode — **System**, **Light** or **Dark** — stored per device
+under `suite.theme`. The preset paints the suite role variables, the Fumadocs `--color-fd-*` names
+point at those roles, and Shiki follows the resolved mode instead of a fixed code theme.
+
+The window icon, `electron-builder` icon, Flatpak icons and Start's Help card all use the same headset
+on the ink tile. Start's card mark inverts with the tile in a light theme; the packaged icon is the
+same artwork.
+
 ## Commands
 
 ```sh

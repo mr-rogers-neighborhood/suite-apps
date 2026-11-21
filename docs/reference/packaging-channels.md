@@ -24,8 +24,9 @@ Open, Reveal and Forget, and its updates are the person's to make.
 That is why there are two writers, and neither is Start:
 
 - **The hub is a Flatpak.** Flatpak owns `run.suite.start`, and its own row offers **Update Start**
-  when the store publishes a newer commit. A hub cannot replace its own running binary; Flatpak
-  replaces the deployment and the new build starts next launch.
+  only when the installed commit differs from the newest commit on that deployment's own origin. A
+  hub cannot replace its own running binary; Flatpak replaces the deployment and the new build starts
+  next launch.
 - **The apps are Flatpaks.** Start asks Flatpak to install or update a deployment. A placed folder
   copy is first-class but separate: Start can open, reveal and forget it, not update it.
 

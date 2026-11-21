@@ -43,10 +43,12 @@ folder copy as a duplicate to remove.
 
 ## Update the hub
 
-The hub is a Flatpak. Its row says `Flatpak` and, when the store publishes a newer commit, offers
-**Update Start**. Flatpak replaces the deployment, and the new build starts on the next launch.
-`flatpak update --user run.suite.start` does the same thing without the button. A hub cannot replace
-its own running binary, and Start no longer keeps a second version to roll back to.
+The hub is a Flatpak. Its row says `Flatpak` and offers **Update Start** only when the installed
+`run.suite.start` commit differs from the newest commit on that deployment's own origin. A placed
+copy, a current build and a failed check offer no button. Flatpak replaces the deployment, and the
+new build starts on the next launch. `flatpak update --user run.suite.start` does the same thing
+without the button. A hub cannot replace its own running binary, and Start no longer keeps a second
+version to roll back to.
 
 ## Flatpak visibility
 

@@ -35,6 +35,11 @@ directory's `README.md` for the explorer and handbook model.
 - The handbook is Fumadocs headless: `fumadocs-core` provides the source loader and page tree,
   `fumadocs-mdx/vite` compiles the content, and the React Router provider supplies links. Do not
   bring back `fumadocs-ui` or a Next-specific route.
+- Theme goes through `@suite/theme` and the `suite.theme` key; never add a second palette. Presets and
+  brightness live in both navigator footers, and the Fumadocs tokens and Shiki follow the resolved
+  mode.
+- The Help mark is shared with the Start card. Replace `resources/icon.*` and the Flatpak icons
+  together so the window, package and card keep one artwork.
 - Conventional commits. A shape change updates [docs/reference/decisions.md](../../docs/reference/decisions.md).
 
 ## Commands
