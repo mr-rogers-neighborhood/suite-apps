@@ -55,6 +55,10 @@ its module; `⌘↓`/`Ctrl+↓` descends again. The breadcrumb does the same thi
 A file or symbol that appears in a curated or composed tour shows a **Tours** section with a link to
 the step, and the Browser tree marks it with a route icon.
 
+The navigator is resizable: drag the divider, or focus it and use `←`/`→` (`Shift` for a larger
+step). Below 260px the Browser / Modules / Tours tabs collapse to icons; double-click the divider to
+return to the default width. The width is stored in `localStorage`.
+
 ## What is where
 
 | Path                                | Purpose                                                                                                                      |

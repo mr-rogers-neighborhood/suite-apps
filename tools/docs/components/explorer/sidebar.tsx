@@ -37,6 +37,7 @@ type Props = {
   onSelectTour: (id: string) => void;
   onSelectTourStep: (index: number) => void;
   onSearchSelect: (entry: SearchEntry) => void;
+  compact: boolean;
 };
 
 const viewItems: { id: View; label: string; icon: typeof FolderTree }[] = [
@@ -99,6 +100,7 @@ export function ExplorerSidebar({
   onSelectTour,
   onSelectTourStep,
   onSearchSelect,
+  compact,
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -144,9 +146,11 @@ export function ExplorerSidebar({
                     : "text-fd-muted-foreground hover:text-fd-foreground"
                 }`}
                 aria-pressed={view === item.id}
+                aria-label={compact ? item.label : undefined}
+                title={compact ? item.label : undefined}
               >
                 <Icon className="size-3.5" />
-                {item.label}
+                {compact ? null : item.label}
               </button>
             );
           })}
@@ -158,7 +162,7 @@ export function ExplorerSidebar({
             ref={input}
             value={query}
             onChange={(event) => onChangeQuery(event.target.value)}
-            placeholder="Search files, symbols and tours…"
+            placeholder={compact ? "Search…" : "Search files, symbols and tours…"}
             className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-fd-muted-foreground"
             spellCheck={false}
           />

@@ -2,6 +2,11 @@
 
 import { GitBranch, Menu, X } from "lucide-react";
 import Link from "next/link";
+import type {
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DetailPane } from "@/components/explorer/detail";
 import { Note } from "@/components/explorer/note";
@@ -76,6 +81,15 @@ function docPath(path: string): string {
 }
 
 const START_EXPANDED = new Set(["", "apps", "packages", "tools"]);
+const SIDEBAR_KEY = "suite.docs.sidebarWidth";
+const SIDEBAR_DEFAULT = 320;
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 420;
+const SIDEBAR_COMPACT = 260;
+
+function clampWidth(width: number) {
+  return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width));
+}
 
 export function Explorer() {
   const [data, setData] = useState<BaseData | null>(null);
@@ -90,6 +104,9 @@ export function Explorer() {
   const [internalOpen, setInternalOpen] = useState<Set<string>>(new Set());
   const [modules, setModules] = useState<Record<string, ModuleData>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
+  const [sidebarReady, setSidebarReady] = useState(false);
+  const [resizing, setResizing] = useState(false);
   const [detailLevel, setDetailLevel] = useState<"file" | "symbol" | null>(null);
   const [playing, setPlaying] = useState(false);
   const [overlayDismissed, setOverlayDismissed] = useState(false);
@@ -139,6 +156,63 @@ export function Explorer() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
+
+  useEffect(() => {
+    const stored = Number(window.localStorage.getItem(SIDEBAR_KEY));
+    if (Number.isFinite(stored) && stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX) {
+      setSidebarWidth(stored);
+    }
+    setSidebarReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarReady) return;
+    window.localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth));
+  }, [sidebarReady, sidebarWidth]);
+
+  const beginResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = sidebarWidth;
+      setResizing(true);
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "col-resize";
+      const move = (moveEvent: PointerEvent) => {
+        setSidebarWidth(clampWidth(startWidth + moveEvent.clientX - startX));
+      };
+      const stop = () => {
+        setResizing(false);
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", stop);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", stop);
+    },
+    [sidebarWidth],
+  );
+
+  const resizeKey = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 48 : 16;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setSidebarWidth((width) => clampWidth(width - step));
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setSidebarWidth((width) => clampWidth(width + step));
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      setSidebarWidth(SIDEBAR_MIN);
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      setSidebarWidth(SIDEBAR_MAX);
+    }
+  }, []);
 
   const searchById = useMemo(
     () => new Map((data?.search ?? []).map((entry) => [entry.id, entry])),
@@ -548,7 +622,7 @@ export function Explorer() {
             Loading the code index…
           </div>
         ) : (
-          <div className="grid h-[calc(100dvh-3.5rem)] md:grid-cols-[20rem_minmax(0,1fr)]">
+          <div className="flex h-[calc(100dvh-3.5rem)]">
             {sidebarOpen ? (
               <button
                 type="button"
@@ -560,10 +634,12 @@ export function Explorer() {
             <aside
               id="explorer-sidebar"
               aria-label="Code navigator"
+              data-resizing={resizing}
+              style={{ "--explorer-sidebar": `${sidebarWidth}px` } as CSSProperties}
               className={
                 sidebarOpen
                   ? "fixed inset-y-14 left-0 z-40 w-[20rem] border-r border-fd-border bg-fd-background shadow-xl md:static md:z-auto md:shadow-none"
-                  : "hidden min-h-0 border-r border-fd-border md:block"
+                  : "relative hidden min-h-0 shrink-0 border-r border-fd-border md:block md:w-[var(--explorer-sidebar)]"
               }
             >
               <ExplorerSidebar
@@ -584,6 +660,7 @@ export function Explorer() {
                 tourIndex={tourIndex}
                 expanded={expanded}
                 internalOpen={internalOpen}
+                compact={sidebarWidth < SIDEBAR_COMPACT}
                 onSelectNode={selectNode}
                 onSelectModule={selectModule}
                 onToggle={toggle}
@@ -592,9 +669,21 @@ export function Explorer() {
                 onSelectTourStep={goToTourStep}
                 onSearchSelect={selectSearch}
               />
+              <hr
+                aria-orientation="vertical"
+                aria-label="Resize navigator"
+                aria-valuemin={SIDEBAR_MIN}
+                aria-valuemax={SIDEBAR_MAX}
+                aria-valuenow={sidebarWidth}
+                tabIndex={0}
+                onPointerDown={beginResize}
+                onKeyDown={resizeKey}
+                onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT)}
+                className="absolute right-0 top-0 z-10 m-0 hidden h-full w-1.5 cursor-col-resize border-0 bg-transparent transition-colors hover:bg-fd-primary/40 focus:bg-fd-primary/40 focus:outline-none md:block"
+              />
             </aside>
 
-            <main id="explorer-main" className="relative flex min-h-0 min-w-0 flex-col">
+            <main id="explorer-main" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <DetailPane
                   view={view}
@@ -714,7 +803,7 @@ function StatusBar({
         <>
           <span className="text-fd-border">/</span>
           <span className="truncate">{entry.label}</span>
-          {module ? (
+          {module && entry.kind !== "module" ? (
             <span className="truncate text-fd-muted-foreground">· {module.title}</span>
           ) : null}
         </>
