@@ -287,9 +287,9 @@ A contributor builds it from a checkout instead: `node scripts/flatpak.mjs --app
 The `sync-v<version>` tarball releases are retired: they remain downloadable history, and nothing in
 this repository builds, signs or documents one as an install path any more.
 
-Suite Start supervises a relay it finds through `SUITE_SYNC_BIN` or `PATH`; it never updates one, and a
-Flatpak install is neither, so Start reports no relay and stays a launcher. Each device enters the
-address and pin the app shows.
+Suite Start installs and opens the `run.suite.sync` Flatpak from the same store, and never supervises
+the relay. The tray app owns the relay, its address, relay code and fingerprint; each device enters
+that address and pin in its own Sync dialog.
 
 ## Android APK
 

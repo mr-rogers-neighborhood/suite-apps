@@ -15,7 +15,8 @@ two Canvas clients to it. It proves the transport; it is not the shipped securit
 
 ## The shape
 
-1. Start `suite-sync` — Start supervises one, or run the CLI against a store directory.
+1. Run the relay: install Suite Sync from Start's Sync tab and open it, or run the CLI against a store
+   directory.
 2. Open the document in Canvas desktop and press **Share** in the Sync dialog.
 3. Give a second device a copy of the `.canvas` file and an invitation link from the first device.
    The link carries a signed envelope naming the inviter, and the joining app resolves that name
