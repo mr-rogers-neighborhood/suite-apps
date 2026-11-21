@@ -5,28 +5,51 @@
 
 The signed Flatpak remote is the update path. This page is the human mirror of the
 [aggregate Suite 2026-11-21 release](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/suite-2026.11.21), which is the repository's
-"Latest" release on GitHub. The per-app releases below stay as history and carry no app
+"Latest" release on GitHub. The per-app releases stay as history and carry no app
 binaries.
 
-| App | Version | Released | Release | Install |
-| --- | --- | --- | --- | --- |
-| [Suite Start](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/start/CHANGELOG.md) | 0.5.1 | 2026-11-21 | [`start-v0.5.1`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/start-v0.5.1) | `flatpak install --user suite run.suite.start` |
-| [Suite Planner](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/planner/CHANGELOG.md) | 0.5.0 | 2026-11-21 | [`planner-v0.5.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/planner-v0.5.0) | `flatpak install --user suite run.suite.planner` |
-| [Suite Budget](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/budget/CHANGELOG.md) | 0.4.0 | 2026-11-21 | [`budget-v0.4.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/budget-v0.4.0) | `flatpak install --user suite run.suite.budget` |
-| [Suite Help](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/help/CHANGELOG.md) | 0.1.1 | 2026-11-21 | [`help-v0.1.1`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/help-v0.1.1) | `flatpak install --user suite run.suite.help` |
-| [Suite Canvas](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/canvas/CHANGELOG.md) | 0.1.11 | 2026-11-21 | [`canvas-v0.1.11`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/canvas-v0.1.11) | `flatpak install --user suite run.suite.canvas` |
-| [Suite Sync](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/CHANGELOG.md) | 0.11.3 | 2026-11-20 | [`sync-v0.11.3`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/sync-v0.11.3) | [relay tarball](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/docs/how-to/relay.md) |
+## Install
 
-## Update
+The signed Flatpak remote is where the desktop apps come from. Add it once, before any
+`flatpak install` line below works:
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite https://flatpak.suite.run/suite.flatpakrepo
-flatpak update --user
 ```
 
 Remote: [suite.flatpakrepo](https://flatpak.suite.run/suite.flatpakrepo)
 
-Suite Sync is a server tarball, not a Flatpak; install and verify it from its own release.
+## Desktop
+
+| App | Version | Released | Release | Install |
+| --- | --- | --- | --- | --- |
+| [Suite Start](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/start/CHANGELOG.md) | 0.5.1 | 2026-11-21 | [`start-v0.5.1`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/start-v0.5.1) | `flatpak install --user suite run.suite.start` |
+| [Suite Canvas](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/canvas/CHANGELOG.md) | 0.1.11 | 2026-11-21 | [`canvas-v0.1.11`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/canvas-v0.1.11) | `flatpak install --user suite run.suite.canvas` |
+| [Suite Planner](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/planner/CHANGELOG.md) | 0.5.0 | 2026-11-21 | [`planner-v0.5.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/planner-v0.5.0) | `flatpak install --user suite run.suite.planner` |
+| [Suite Budget](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/budget/CHANGELOG.md) | 0.4.0 | 2026-11-21 | [`budget-v0.4.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/budget-v0.4.0) | `flatpak install --user suite run.suite.budget` |
+| [Suite Sync](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/CHANGELOG.md) | 0.11.3 | 2026-11-20 | [`sync-v0.11.3`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/sync-v0.11.3) | [relay tarball](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/docs/how-to/relay.md) |
+| [Suite Help](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/help/CHANGELOG.md) | 0.1.1 | 2026-11-21 | [`help-v0.1.1`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/help-v0.1.1) | `flatpak install --user suite run.suite.help` |
+
+Suite Sync is a server tarball, not a Flatpak. It is installed and verified by hand from
+[its guide](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/docs/how-to/relay.md).
+
+## Mobile
+
+| App | Version | Released | Release | Install |
+| --- | --- | --- | --- | --- |
+| [Suite Go](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/go/CHANGELOG.md) | 0.1.0 | 2026-11-18 | `go-v0.1.0` (pending) | `suite-go-0.1.0.apk` (not uploaded yet) |
+
+Suite Go is not a Flatpak. Its debug-signed APK, `suite-go-0.1.0.apk`, is not attached to this release yet:
+`node scripts/android-release.mjs --publish` uploads it, and the link appears once it is there.
+
+## Update
+
+Once the remote is added, the desktop apps update with:
+
+```sh
+flatpak update --user
+```
+
 GitHub Packages is not used for the Flatpaks.
 
 ## Regenerate

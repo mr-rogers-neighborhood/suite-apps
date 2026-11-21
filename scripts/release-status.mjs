@@ -8,7 +8,8 @@
  *
  * - **One rolling Suite release**, tagged `suite-YYYY.MM.DD`, marked Latest. Its
  *   body is a table of every app's current version, its release date, a link to
- *   that app's own release and the command that installs it.
+ *   that app's own release and how it is installed: a Flatpak command, the relay
+ *   guide, or the debug-signed Suite Go APK attached to this same release.
  * - **One release per app**, tagged `<app>-v<version>`, kept as history and
  *   never marked Latest. It carries the changelog section and an install block;
  *   it carries no app binaries, because the signed Flatpak remote is the update
@@ -56,10 +57,21 @@ export const RELEASES_FILE = "RELEASES.md";
 export const NOTES_DIR = ".dev/releases";
 
 /**
- * Every app the table names, in the order a person reads them.
+ * Every app a table names. Each section keeps this order.
  *
- * `flatpakId` is null for the relay: it is a server tarball, not a Flatpak, and
- * its install line is the relay guide rather than `flatpak install`.
+ * `kind` says where the installed bytes come from, and `installCell` is the one
+ * place that turns it into a cell:
+ *
+ * - `flatpak` — a signed deployment on the OSTree remote.
+ * - `apk` — a debug-signed APK attached to the rolling suite release.
+ * - `relay` — a server tarball, installed from its own guide.
+ *
+ * `section` is the table a row belongs to: `desktop` or `mobile`. The table is
+ * rendered by `aggregateSection`, which takes a title and the entries to render,
+ * so a section is only a title plus its rows and the shape can be reused by a
+ * page that splits the same data differently.
+ *
+ * `flatpakId` is null outside the Flatpak rows.
  */
 export const APPS = [
   {
@@ -68,7 +80,29 @@ export const APPS = [
     packageJson: "apps/start/package.json",
     changelog: "apps/start/CHANGELOG.md",
     tagPrefix: "start-v",
+    kind: "flatpak",
+    section: "desktop",
     flatpakId: "run.suite.start",
+  },
+  {
+    id: "go",
+    name: "Suite Go",
+    packageJson: "apps/go/package.json",
+    changelog: "apps/go/CHANGELOG.md",
+    tagPrefix: "go-v",
+    kind: "apk",
+    section: "mobile",
+    flatpakId: null,
+  },
+  {
+    id: "canvas",
+    name: "Suite Canvas",
+    packageJson: "apps/canvas/desktop/package.json",
+    changelog: "apps/canvas/CHANGELOG.md",
+    tagPrefix: "canvas-v",
+    kind: "flatpak",
+    section: "desktop",
+    flatpakId: "run.suite.canvas",
   },
   {
     id: "planner",
@@ -76,6 +110,8 @@ export const APPS = [
     packageJson: "apps/planner/package.json",
     changelog: "apps/planner/CHANGELOG.md",
     tagPrefix: "planner-v",
+    kind: "flatpak",
+    section: "desktop",
     flatpakId: "run.suite.planner",
   },
   {
@@ -84,23 +120,9 @@ export const APPS = [
     packageJson: "apps/budget/package.json",
     changelog: "apps/budget/CHANGELOG.md",
     tagPrefix: "budget-v",
+    kind: "flatpak",
+    section: "desktop",
     flatpakId: "run.suite.budget",
-  },
-  {
-    id: "help",
-    name: "Suite Help",
-    packageJson: "apps/help/package.json",
-    changelog: "apps/help/CHANGELOG.md",
-    tagPrefix: "help-v",
-    flatpakId: "run.suite.help",
-  },
-  {
-    id: "canvas",
-    name: "Suite Canvas",
-    packageJson: "apps/canvas/desktop/package.json",
-    changelog: "apps/canvas/CHANGELOG.md",
-    tagPrefix: "canvas-v",
-    flatpakId: "run.suite.canvas",
   },
   {
     id: "sync",
@@ -108,7 +130,19 @@ export const APPS = [
     packageJson: "apps/sync/package.json",
     changelog: "apps/sync/CHANGELOG.md",
     tagPrefix: "sync-v",
+    kind: "relay",
+    section: "desktop",
     flatpakId: null,
+  },
+  {
+    id: "help",
+    name: "Suite Help",
+    packageJson: "apps/help/package.json",
+    changelog: "apps/help/CHANGELOG.md",
+    tagPrefix: "help-v",
+    kind: "flatpak",
+    section: "desktop",
+    flatpakId: "run.suite.help",
   },
 ];
 
@@ -136,9 +170,40 @@ export function aggregateTag(date) {
   return `suite-${date.replace(/-/gu, ".")}`;
 }
 
+/**
+ * The aggregate tag the current tree is released under.
+ *
+ * The APK is attached to the rolling release, so `android-release.mjs` has to
+ * name the same tag `--publish` picks: the newest changelog date, not the wall
+ * clock. `load` is injectable so a test needs no tree.
+ */
+export function currentAggregateTag({ load = read } = {}) {
+  const entries = [];
+  for (const app of APPS) {
+    try {
+      const version = versionFromPackage(load(app.packageJson));
+      const date = version === null ? null : changelogDate(load(app.changelog), version);
+      entries.push({ date });
+    } catch {
+      // An app whose files cannot be read cannot change the newest date.
+    }
+  }
+  return aggregateTag(aggregateDate(entries));
+}
+
 /** A release's page on GitHub. */
 export function releaseUrl(tag) {
   return `https://github.com/${RELEASE_REPO}/releases/tag/${tag}`;
+}
+
+/** The repository's Latest release, which is the rolling Suite snapshot. */
+export function latestReleaseUrl() {
+  return `https://github.com/${RELEASE_REPO}/releases/latest`;
+}
+
+/** One asset's download URL on a release. */
+export function releaseAssetUrl(tag, name) {
+  return `https://github.com/${RELEASE_REPO}/releases/download/${tag}/${name}`;
 }
 
 /** A file in the repository, for a link inside a release body. */
@@ -151,17 +216,39 @@ export function flatpakrepoUrl() {
   return remoteFlatpakrepoUrl(REMOTE_URL);
 }
 
-/** The install command for a Flatpak app, or null for the relay. */
+/** The install command for a Flatpak app, or null for anything else. */
 export function installCommand(app) {
-  return app.flatpakId === null
+  return app.kind !== "flatpak"
     ? null
     : `flatpak install --user ${REMOTE_NAME} ${app.flatpakId}`;
 }
 
-/** The table cell that says how one row is installed. */
-export function installCell(app) {
-  const command = installCommand(app);
-  if (command !== null) return `\`${command}\``;
+/** The APK a Suite Go version attaches to the rolling release. */
+export function goApkName(version) {
+  return `suite-go-${version}.apk`;
+}
+
+/** The Go APK's download URL on the aggregate release. */
+export function goApkUrl(tag, version) {
+  return releaseAssetUrl(tag, goApkName(version));
+}
+
+/**
+ * The table cell that says how one row is installed.
+ *
+ * One cell per row, whatever the artifact. `apkLive` is whether the aggregate
+ * release already carries the APK; until it does the cell names the file
+ * instead of linking a download that would 404.
+ */
+export function installCell(app, { version = null, tag = null, apkLive = false } = {}) {
+  if (app.kind === "flatpak") return `\`${installCommand(app)}\``;
+  if (app.kind === "apk") {
+    const name = version === null ? "suite-go.apk" : goApkName(version);
+    if (apkLive && tag !== null && version !== null) {
+      return `[${name}](${goApkUrl(tag, version)})`;
+    }
+    return `\`${name}\` (not uploaded yet)`;
+  }
   return `[relay tarball](${blobUrl("apps/sync/docs/how-to/relay.md")})`;
 }
 
@@ -262,21 +349,22 @@ export function relayAssetProblem(tag, assets) {
 /**
  * What a publish may do with one release, or why it must not.
  *
- * A desktop app may be created: its Flatpak is already on the signed remote.
- * The relay may not: its tarball and signature belong to
+ * A desktop app or the mobile APK release may be created: its artifact already
+ * exists elsewhere (the signed remote, or the rolling release). The relay may
+ * not: its tarball and signature belong to
  * `scripts/release.mjs sync --publish`, and an assetless `sync-v<version>`
  * release would look installable while carrying nothing. Its body is edited in
  * place, so the assets stay; `assets` is read before this decides.
  */
 export function releaseAction({ app, tag, exists, assets }) {
   if (exists) {
-    if (app.flatpakId !== null) return { action: "edit", problem: null };
+    if (app.kind !== "relay") return { action: "edit", problem: null };
     const problem = relayAssetProblem(tag, assets);
     return problem === null
       ? { action: "edit", problem: null }
       : { action: null, problem };
   }
-  if (app.flatpakId === null) {
+  if (app.kind === "relay") {
     return {
       action: null,
       problem: `no GitHub release exists for ${tag}. ${RELAY_PUBLISH_SENTENCE}`,
@@ -354,16 +442,26 @@ export function tagPlanDisposition(problem, mode) {
  * exists, so it always links. The page may be written before publication, so
  * with `markPending` it says a row is pending rather than linking a 404. An
  * entry marked `pending` by a guard is pending in either row.
+ *
+ * `tag` and `apkLive` describe the aggregate release the APK lives on. The
+ * subset passed in is the section being rendered, so callers can split desktop
+ * and mobile rows without changing this shape.
  */
-export function aggregateRows(entries, { markPending = false } = {}) {
+export function aggregateRows(
+  entries,
+  { markPending = false, tag = null, apkLive = false } = {},
+) {
   return entries.map((entry) => {
-    const { app, version, date, tag } = entry;
+    const { app, version, date, tag: appTag } = entry;
     const released = date ?? "—";
     const pending = entry.pending === true || (markPending && entry.published !== true);
-    const release = pending ? `\`${tag}\` (pending)` : `[\`${tag}\`](${releaseUrl(tag)})`;
+    const release = pending
+      ? `\`${appTag}\` (pending)`
+      : `[\`${appTag}\`](${releaseUrl(appTag)})`;
+    const install = installCell(app, { version, tag, apkLive });
     return (
       `| [${app.name}](${blobUrl(app.changelog)}) | ${version} | ${released} | ` +
-      `${release} | ${installCell(app)} |`
+      `${release} | ${install} |`
     );
   });
 }
@@ -374,23 +472,72 @@ export const AGGREGATE_TABLE_HEADER = [
   "| --- | --- | --- | --- | --- |",
 ];
 
+/**
+ * One complete table for the entries it is given.
+ *
+ * A single call renders one table. The parameters are the point: a section
+ * renderer, a README or a page that splits the data differently can each call
+ * this with its own entries, and none needs a second row implementation.
+ */
+export function aggregateTable(entries, options = {}) {
+  return [...AGGREGATE_TABLE_HEADER, ...aggregateRows(entries, options)];
+}
+
+/** The rows one table section carries, in the order the entries arrived. */
+export function entriesForSection(entries, sectionId) {
+  return entries.filter((entry) => entry.app.section === sectionId);
+}
+
+/**
+ * One table section: its title and its rows.
+ *
+ * A section is nothing but a title and the entries it renders. The release page
+ * and `RELEASES.md` both build from this, and so can a page that groups the same
+ * apps under different titles.
+ */
+export function aggregateSection(title, entries, options = {}) {
+  return [`## ${title}`, "", ...aggregateTable(entries, options)];
+}
+
 /** True when the relay's release is refused or not published yet. */
 function relayPending(entries) {
-  const relay = entries.find((entry) => entry.app.flatpakId === null) ?? null;
+  const relay = entries.find((entry) => entry.app.kind === "relay") ?? null;
   return relay !== null && relay.pending === true;
 }
 
 /**
- * The aggregate release body: every current version, one install path.
+ * The paragraph that explains the Suite Go row.
  *
- * The versions are the table's purpose and appear once each. The prose does not
- * repeat one; the release title says which day this snapshot is.
+ * The APK lives on the rolling release, so whether it is there yet is a fact
+ * about this release. Saying so in the body is what keeps the Install cell from
+ * being a dead link that looks live.
  */
-export function aggregateReleaseBody(entries, { date }) {
-  const relay = relayPending(entries)
+function goInstallNote(entries, { tag = null, apkLive = false }) {
+  const go = entries.find((entry) => entry.app.kind === "apk") ?? null;
+  if (go === null) return [];
+  const name = goApkName(go.version);
+  if (apkLive && tag !== null) {
+    return [
+      `Suite Go is not a Flatpak. This release carries its debug-signed APK, [${name}](${goApkUrl(tag, go.version)}),`,
+      "with a SHA-256 checksum beside it; sideload it with `adb install -r -t`.",
+      "",
+    ];
+  }
+  return [
+    `Suite Go is not a Flatpak. Its debug-signed APK, \`${name}\`, is not attached to this release yet:`,
+    "`node scripts/android-release.mjs --publish` uploads it, and the link appears once it is there.",
+    "",
+  ];
+}
+
+/** The paragraph that explains the Suite Sync row. */
+function relayInstallNote(entries, { pending, page }) {
+  return pending
     ? [
         "The Suite Sync relay release is pending; its tarball and `SHA256SUMS` are published by",
-        "`node scripts/release.mjs sync --publish`, and this release links it once they are.",
+        page
+          ? "`node scripts/release.mjs sync --publish`, and this page links it after that."
+          : "`node scripts/release.mjs sync --publish`, and this release links it once they are.",
         "",
       ]
     : [
@@ -398,26 +545,46 @@ export function aggregateReleaseBody(entries, { date }) {
         `[its guide](${blobUrl("apps/sync/docs/how-to/relay.md")}).`,
         "",
       ];
+}
 
+/**
+ * The aggregate release body: every current version, in two tables.
+ *
+ * The versions are the table's purpose and appear once each. The prose does not
+ * repeat one; the release title says which day this snapshot is. The remote is
+ * added before the tables, because every `flatpak install` cell needs it and a
+ * reader who starts at a table would run a command that cannot work yet.
+ */
+export function aggregateReleaseBody(entries, { date, tag = null, apkLive = false }) {
   return [
     `The current version of every Suite app on ${date}, in one place. GitHub shows one`,
     "\"Latest\" release per repository, so this is it; the per-app releases are history.",
     "",
-    ...AGGREGATE_TABLE_HEADER,
-    ...aggregateRows(entries),
+    "## Install",
     "",
-    "## Update",
-    "",
-    "The signed Flatpak remote is the update path. Add it once, then update:",
+    "The signed Flatpak remote is where the desktop apps come from. Add it once, before any",
+    "`flatpak install` line below works:",
     "",
     "```sh",
     `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
-    "flatpak update --user",
     "```",
     "",
     `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
     "",
-    ...relay,
+    ...aggregateSection("Desktop", entriesForSection(entries, "desktop"), { tag, apkLive }),
+    "",
+    ...relayInstallNote(entries, { pending: relayPending(entries), page: false }),
+    ...aggregateSection("Mobile", entriesForSection(entries, "mobile"), { tag, apkLive }),
+    "",
+    ...goInstallNote(entries, { tag, apkLive }),
+    "## Update",
+    "",
+    "Once the remote is added, the desktop apps update with:",
+    "",
+    "```sh",
+    "flatpak update --user",
+    "```",
+    "",
   ].join("\n");
 }
 
@@ -429,7 +596,7 @@ export function aggregateReleaseBody(entries, { date }) {
 export function appReleaseBody(app, section) {
   const lines = [section.trim(), "", "## Install", ""];
 
-  if (app.flatpakId === null) {
+  if (app.kind === "relay") {
     lines.push(
       "Suite Sync is a server tarball, not a Flatpak. This release carries the tarball and its",
       "signed `SHA256SUMS`; the host needs Node.js 22 or later, and the person replaces the tree",
@@ -440,6 +607,15 @@ export function appReleaseBody(app, section) {
       "```",
       "",
       `Read [Leave a relay running](${blobUrl("apps/sync/docs/how-to/relay.md")}) before exposing it.`,
+      "",
+    );
+  } else if (app.kind === "apk") {
+    lines.push(
+      "Suite Go is a mobile app, not a Flatpak. Its debug-signed APK is attached to",
+      `[the rolling Suite release](${latestReleaseUrl()}), which is the repository's Latest`,
+      "release; this entry is history and carries no binary.",
+      "",
+      `[How to sideload it](${blobUrl("apps/go/README.md")}) is in Suite Go's README.`,
       "",
     );
   } else {
@@ -473,28 +649,22 @@ export function appReleaseBody(app, section) {
  * says **pending** instead of linking a page that does not exist. `--publish`
  * rewrites the page with real links once the releases are created.
  */
-export function releasesPage(entries, { date, tag, aggregatePublished = false }) {
+export function releasesPage(
+  entries,
+  { date, tag, aggregatePublished = false, apkLive = false },
+) {
   const latest = aggregatePublished
     ? [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
         `[aggregate Suite ${date} release](${releaseUrl(tag)}), which is the repository's`,
-        "\"Latest\" release on GitHub. The per-app releases below stay as history and carry no app",
+        "\"Latest\" release on GitHub. The per-app releases stay as history and carry no app",
         "binaries.",
       ]
     : [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
         `rolling Suite ${date} release, which is not published yet. A row marked **pending**`,
         "has no release to link until `--publish` creates it and refreshes this page; the",
-        "per-app releases below stay as history and carry no app binaries.",
-      ];
-
-  const relay = relayPending(entries)
-    ? [
-        "The Suite Sync relay release is pending; `node scripts/release.mjs sync --publish`",
-        "publishes its tarball and checksums, and this page links it after that.",
-      ]
-    : [
-        "Suite Sync is a server tarball, not a Flatpak; install and verify it from its own release.",
+        "per-app releases stay as history and carry no app binaries.",
       ];
 
   return [
@@ -505,19 +675,39 @@ export function releasesPage(entries, { date, tag, aggregatePublished = false })
     "",
     ...latest,
     "",
-    ...AGGREGATE_TABLE_HEADER,
-    ...aggregateRows(entries, { markPending: true }),
+    "## Install",
     "",
-    "## Update",
+    "The signed Flatpak remote is where the desktop apps come from. Add it once, before any",
+    "`flatpak install` line below works:",
     "",
     "```sh",
     `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
-    "flatpak update --user",
     "```",
     "",
     `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
     "",
-    ...relay,
+    ...aggregateSection("Desktop", entriesForSection(entries, "desktop"), {
+      markPending: true,
+      tag,
+      apkLive,
+    }),
+    "",
+    ...relayInstallNote(entries, { pending: relayPending(entries), page: true }),
+    ...aggregateSection("Mobile", entriesForSection(entries, "mobile"), {
+      markPending: true,
+      tag,
+      apkLive,
+    }),
+    "",
+    ...goInstallNote(entries, { tag, apkLive }),
+    "## Update",
+    "",
+    "Once the remote is added, the desktop apps update with:",
+    "",
+    "```sh",
+    "flatpak update --user",
+    "```",
+    "",
     "GitHub Packages is not used for the Flatpaks.",
     "",
     "## Regenerate",
@@ -821,7 +1011,7 @@ function releaseArgs({ tag, title, notesPath, latest, action, target }) {
   ];
 }
 
-function mainPublish({ entries, aggregate, date, tag, releases, notes }) {
+function mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive }) {
   if (releases === null) {
     throw new Error("gh release list failed; refusing to publish into a repository it cannot read");
   }
@@ -862,14 +1052,36 @@ function mainPublish({ entries, aggregate, date, tag, releases, notes }) {
   );
 
   // Everything named on the page now exists, so the refresh links instead of
-  // saying "pending".
+  // saying "pending". The APK is uploaded by `android-release.mjs`, so its link
+  // is live only when this run already found the asset on the aggregate release.
   for (const entry of entries) entry.published = true;
   writeFileSync(
     join(ROOT, RELEASES_FILE),
-    releasesPage(entries, { date, tag, aggregatePublished: true }),
+    releasesPage(entries, { date, tag, aggregatePublished: true, apkLive }),
   );
   process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
   process.stdout.write(`Latest release: ${releaseUrl(tag)}\n`);
+}
+
+/**
+ * Say that the Suite Go link is not live, without failing the release.
+ *
+ * The APK is built and uploaded by `scripts/android-release.mjs` after the
+ * aggregate release exists, so a release run can legitimately see no asset
+ * yet. A dead download link that looks live is the thing this avoids: the
+ * body and the page say the file is not attached, and this names the upload.
+ */
+function warnMissingApk({ tag, goAsset, apkLive, aggregateExists, releasesKnown }) {
+  if (goAsset === null || apkLive || !releasesKnown) return;
+  const situation = aggregateExists
+    ? `${tag} carries no ${goAsset}`
+    : `${tag} does not exist yet, so ${goAsset} cannot be attached`;
+  process.stderr.write(
+    `\nwarning: ${situation}.\n` +
+      "         The Suite Go Install cell names the file instead of linking a download.\n" +
+      "         Upload it with: node scripts/android-release.mjs --publish\n" +
+      `         Then run this script again so the body and ${RELEASES_FILE} link it.\n`,
+  );
 }
 
 async function main(argv) {
@@ -895,14 +1107,13 @@ async function main(argv) {
     const exists = knownReleases.some((row) => row.tagName === entry.tag);
     entry.published = releases !== null && exists;
     if (releases === null) {
-      entry.action = entry.app.flatpakId === null ? "edit" : "create";
+      entry.action = entry.app.kind === "relay" ? "edit" : "create";
       entry.actionProblem = null;
       continue;
     }
     // The relay's body is edited in place, so its assets are what make the
     // release real; read them before deciding that "edit" is safe.
-    const assets =
-      exists && entry.app.flatpakId === null ? releaseAssets(entry.tag) : undefined;
+    const assets = exists && entry.app.kind === "relay" ? releaseAssets(entry.tag) : undefined;
     const action = releaseAction({ app: entry.app, tag: entry.tag, exists, assets });
     entry.action = action.action;
     entry.actionProblem = action.problem;
@@ -920,9 +1131,27 @@ async function main(argv) {
   const aggregate = planAggregate(tag, head);
   if (aggregate.plan.problem !== null && !options.write) throw new Error(aggregate.plan.problem);
 
-  const body = aggregateReleaseBody(entries, { date });
   const aggregatePublished = releases !== null && knownReleases.some((row) => row.tagName === tag);
-  const page = releasesPage(entries, { date, tag, aggregatePublished });
+  const aggregateExisting = knownReleases.find((row) => row.tagName === tag) ?? null;
+  // The APK belongs to the aggregate release, so whether its cell links is read
+  // from that release's assets, not assumed from the version in the tree.
+  const goEntry = entries.find((entry) => entry.app.kind === "apk") ?? null;
+  const goAsset = goEntry === null ? null : goApkName(goEntry.version);
+  const aggregateAssets = aggregateExisting === null ? null : releaseAssets(tag);
+  const apkLive =
+    goAsset !== null &&
+    aggregateAssets !== null &&
+    aggregateAssets.some((asset) => asset?.name === goAsset);
+  warnMissingApk({
+    tag,
+    goAsset,
+    apkLive,
+    aggregateExists: aggregateExisting !== null,
+    releasesKnown: releases !== null,
+  });
+
+  const body = aggregateReleaseBody(entries, { date, tag, apkLive });
+  const page = releasesPage(entries, { date, tag, aggregatePublished, apkLive });
   const notes = [
     ...entries.map((entry) => ({
       path: join(NOTES_DIR, `${entry.tag}.md`),
@@ -949,7 +1178,6 @@ async function main(argv) {
 
   for (const entry of entries) process.stdout.write(`\n${summarize(entry, releases)}\n`);
 
-  const aggregateExisting = knownReleases.find((row) => row.tagName === tag) ?? null;
   process.stdout.write(
     `\nSuite ${date} · ${tag} · aggregate\n` +
       `  release    ${
@@ -963,7 +1191,7 @@ async function main(argv) {
   );
 
   if (options.publish) {
-    mainPublish({ entries, aggregate, date, tag, releases, notes });
+    mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive });
     return;
   }
 
