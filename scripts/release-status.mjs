@@ -1,0 +1,800 @@
+#!/usr/bin/env node
+/**
+ * The Suite's GitHub releases, generated from the versions already in the tree.
+ *
+ * GitHub shows one "Latest" release per repository, and this repository ships
+ * several apps from one tag namespace. The release page therefore has two
+ * shapes:
+ *
+ * - **One rolling Suite release**, tagged `suite-YYYY.MM.DD`, marked Latest. Its
+ *   body is a table of every app's current version, its release date, a link to
+ *   that app's own release and the command that installs it.
+ * - **One release per app**, tagged `<app>-v<version>`, kept as history and
+ *   never marked Latest. It carries the changelog section and an install block;
+ *   it carries no app binaries, because the signed Flatpak remote is the update
+ *   path.
+ *
+ * The version has one home: the app's `package.json`. The date has one home: the
+ * `## [version] - YYYY-MM-DD` heading in its changelog. This script reads both,
+ * refuses a version without a matching section, and writes nothing to GitHub
+ * unless `--publish` is passed.
+ *
+ * Backfilling a tag is deliberate: a missing tag is created at the commit that
+ * added the changelog section (`git log -S`), never at HEAD, and an existing tag
+ * is never moved. When that commit cannot be found the run refuses.
+ *
+ * Usage:
+ *   node scripts/release-status.mjs            # dry run: commands and bodies
+ *   node scripts/release-status.mjs --write    # refresh RELEASES.md only
+ *   node scripts/release-status.mjs --publish  # create or update the releases
+ *   node scripts/release-status.mjs --date 2026-11-21 --publish
+ *   node scripts/release-status.mjs --help
+ */
+import { spawnSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { changelogSection, versionFromPackage } from "./release.mjs";
+
+/** The repository this page and these releases belong to. */
+export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+export const RELEASE_REPO = "mr-rogers-neighborhood/suite-apps";
+
+/** The Flatpak remote a person adds before installing; the signed update path. */
+export const REMOTE_NAME = "suite";
+export const REMOTE_URL = "http://10.28.20.200:8088";
+
+/** The generated human mirror of the Latest release, committed at the root. */
+export const RELEASES_FILE = "RELEASES.md";
+
+/** Where a publish writes each release body before handing it to `gh`. */
+export const NOTES_DIR = ".dev/releases";
+
+/**
+ * Every app the table names, in the order a person reads them.
+ *
+ * `flatpakId` is null for the relay: it is a server tarball, not a Flatpak, and
+ * its install line is the relay guide rather than `flatpak install`.
+ */
+export const APPS = [
+  {
+    id: "start",
+    name: "Suite Start",
+    packageJson: "apps/start/package.json",
+    changelog: "apps/start/CHANGELOG.md",
+    tagPrefix: "start-v",
+    flatpakId: "run.suite.start",
+  },
+  {
+    id: "planner",
+    name: "Suite Planner",
+    packageJson: "apps/planner/package.json",
+    changelog: "apps/planner/CHANGELOG.md",
+    tagPrefix: "planner-v",
+    flatpakId: "run.suite.planner",
+  },
+  {
+    id: "budget",
+    name: "Suite Budget",
+    packageJson: "apps/budget/package.json",
+    changelog: "apps/budget/CHANGELOG.md",
+    tagPrefix: "budget-v",
+    flatpakId: "run.suite.budget",
+  },
+  {
+    id: "help",
+    name: "Suite Help",
+    packageJson: "apps/help/package.json",
+    changelog: "apps/help/CHANGELOG.md",
+    tagPrefix: "help-v",
+    flatpakId: "run.suite.help",
+  },
+  {
+    id: "canvas",
+    name: "Suite Canvas",
+    packageJson: "apps/canvas/desktop/package.json",
+    changelog: "apps/canvas/CHANGELOG.md",
+    tagPrefix: "canvas-v",
+    flatpakId: "run.suite.canvas",
+  },
+  {
+    id: "sync",
+    name: "Suite Sync",
+    packageJson: "apps/sync/package.json",
+    changelog: "apps/sync/CHANGELOG.md",
+    tagPrefix: "sync-v",
+    flatpakId: null,
+  },
+];
+
+const USAGE = `usage: node scripts/release-status.mjs [options]
+
+  --dry-run            print every command and body; the default
+  --write              write ${RELEASES_FILE} and stop short of GitHub
+  --publish            create or update the releases, then write ${RELEASES_FILE}
+  --date <YYYY-MM-DD>  date for the aggregate tag (default: the newest app release)
+  --help               print this text
+
+The versions come from each app's package.json; the dates from its changelog.
+`;
+
+/** The tag one app's version is released under. */
+export function tagFor(app, version) {
+  return `${app.tagPrefix}${version}`;
+}
+
+/** The aggregate tag, dotted as the owner chose: `suite-2026.11.21`. */
+export function aggregateTag(date) {
+  return `suite-${date.replace(/-/gu, ".")}`;
+}
+
+/** A release's page on GitHub. */
+export function releaseUrl(tag) {
+  return `https://github.com/${RELEASE_REPO}/releases/tag/${tag}`;
+}
+
+/** A file in the repository, for a link inside a release body. */
+export function blobUrl(path) {
+  return `https://github.com/${RELEASE_REPO}/blob/main/${path}`;
+}
+
+/** The `.flatpakrepo` a client adds; it embeds the store's public key. */
+export function flatpakrepoUrl() {
+  return `${REMOTE_URL}/${REMOTE_NAME}.flatpakrepo`;
+}
+
+/** The install command for a Flatpak app, or null for the relay. */
+export function installCommand(app) {
+  return app.flatpakId === null
+    ? null
+    : `flatpak install --user ${REMOTE_NAME} ${app.flatpakId}`;
+}
+
+/** The table cell that says how one row is installed. */
+export function installCell(app) {
+  const command = installCommand(app);
+  if (command !== null) return `\`${command}\``;
+  return `[relay tarball](${blobUrl("apps/sync/docs/how-to/relay.md")})`;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+/**
+ * The `YYYY-MM-DD` in a `## [version] - YYYY-MM-DD` heading, or null.
+ *
+ * The date belongs beside the version, so a section without one is read as
+ * undated rather than borrowed from another section.
+ */
+export function changelogDate(changelog, version) {
+  const heading = new RegExp(`^## \\[${escapeRegExp(version)}\\]\\s*-\\s*(\\d{4}-\\d{2}-\\d{2})`, "mu");
+  const match = heading.exec(changelog);
+  return match?.[1] ?? null;
+}
+
+/** True when this is a calendar date the tag may carry. */
+export function isDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+/** Today in UTC, the shape a tag needs. */
+export function today(now = new Date()) {
+  return now.toISOString().slice(0, 10);
+}
+
+/**
+ * The date the aggregate release carries.
+ *
+ * The newest app date, not the wall clock: a rolling release is a snapshot of
+ * the apps, so a day when nothing shipped does not need a new tag and a re-run
+ * produces the same page. `--date` overrides it for a deliberate backfill.
+ */
+export function aggregateDate(entries, override = null) {
+  if (override !== null) {
+    if (!isDate(override)) throw new Error(`--date needs YYYY-MM-DD, not ${JSON.stringify(override)}`);
+    return override;
+  }
+  const dates = entries.map((entry) => entry.date).filter((date) => date !== null);
+  if (dates.length === 0) return today();
+  return dates.reduce((newest, date) => (date > newest ? date : newest));
+}
+
+/**
+ * Where a tag may be created, and what it points at.
+ *
+ * The rules are the point: an existing remote tag is authoritative and is never
+ * moved, an existing local tag is used as-is, and a missing tag is created at
+ * the commit that added the changelog section. A missing commit refuses instead
+ * of tagging HEAD, which would publish a note at a tree that never had it.
+ */
+export function planTag({ tag, version, changelog, localCommit, remoteCommit, changelogCommit }) {
+  if (localCommit !== null && remoteCommit !== null && localCommit !== remoteCommit) {
+    return {
+      tag,
+      commit: null,
+      createLocal: false,
+      problem:
+        `origin's ${tag} is ${remoteCommit.slice(0, 12)} but the local tag is ` +
+        `${localCommit.slice(0, 12)}; refusing to move either. Delete one deliberately first.`,
+    };
+  }
+
+  if (remoteCommit !== null) {
+    return { tag, commit: remoteCommit, createLocal: localCommit === null, problem: null };
+  }
+  if (localCommit !== null) {
+    return { tag, commit: localCommit, createLocal: false, problem: null };
+  }
+  if (changelogCommit !== null) {
+    return { tag, commit: changelogCommit, createLocal: true, problem: null };
+  }
+
+  return {
+    tag,
+    commit: null,
+    createLocal: false,
+    problem:
+      `no ${tag} exists and no commit adds '## [${version}]' to ${changelog}. ` +
+      "Tagging HEAD would publish a release note at a tree that never had it, so this refuses.",
+  };
+}
+
+/** The shared table rows, used by the aggregate body and by RELEASES.md. */
+export function aggregateRows(entries) {
+  return entries.map(({ app, version, date, tag }) => {
+    const released = date ?? "—";
+    return (
+      `| [${app.name}](${blobUrl(app.changelog)}) | ${version} | ${released} | ` +
+      `[\`${tag}\`](${releaseUrl(tag)}) | ${installCell(app)} |`
+    );
+  });
+}
+
+/** The header every generated table carries. */
+export const AGGREGATE_TABLE_HEADER = [
+  "| App | Version | Released | Release | Install |",
+  "| --- | --- | --- | --- | --- |",
+];
+
+/**
+ * The aggregate release body: every current version, one install path.
+ *
+ * The versions are the table's purpose and appear once each. The prose does not
+ * repeat one; the release title says which day this snapshot is.
+ */
+export function aggregateReleaseBody(entries, { date }) {
+  return [
+    `The current version of every Suite app on ${date}, in one place. GitHub shows one`,
+    "\"Latest\" release per repository, so this is it; the per-app releases are history.",
+    "",
+    ...AGGREGATE_TABLE_HEADER,
+    ...aggregateRows(entries),
+    "",
+    "## Update",
+    "",
+    "The signed Flatpak remote is the update path. Add it once, then update:",
+    "",
+    "```sh",
+    `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
+    "flatpak update --user",
+    "```",
+    "",
+    `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
+    "",
+    "Suite Sync is a server tarball, not a Flatpak. It is installed and verified by hand from",
+    `[its guide](${blobUrl("apps/sync/docs/how-to/relay.md")}).`,
+    "",
+  ].join("\n");
+}
+
+/**
+ * One app's release body: its changelog section, then how to install it.
+ *
+ * No version is restated outside the title `gh` sets; the section is the note.
+ */
+export function appReleaseBody(app, section) {
+  const lines = [section.trim(), "", "## Install", ""];
+
+  if (app.flatpakId === null) {
+    lines.push(
+      "Suite Sync is a server tarball, not a Flatpak. This release carries the tarball and its",
+      "signed `SHA256SUMS`; the host needs Node.js 22 or later, and the person replaces the tree",
+      "deliberately. There is no remote and no automatic update.",
+      "",
+      "```sh",
+      "sha256sum -c SHA256SUMS",
+      "```",
+      "",
+      `Read [Leave a relay running](${blobUrl("apps/sync/docs/how-to/relay.md")}) before exposing it.`,
+      "",
+    );
+  } else {
+    lines.push(
+      "The signed Flatpak remote is the update path. This release carries no app binaries.",
+      "",
+      "```sh",
+      `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
+      installCommand(app),
+      "flatpak update --user",
+      "```",
+      "",
+      `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
+      "",
+      "Flatpak owns the deployment; this section is the release note.",
+      "",
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * `RELEASES.md`: the same data, as the human mirror of the Latest release.
+ *
+ * The generated comment is deliberate. A version belongs in `package.json`; this
+ * file restates it because it is a mirror, and a mirror that is typed by hand
+ * drifts.
+ */
+export function releasesPage(entries, { date, tag }) {
+  return [
+    "# Suite releases",
+    "",
+    "<!-- Generated by `scripts/release-status.mjs` from each app's `package.json` and the date",
+    "     in its changelog. Do not edit the table; edit those files and regenerate. -->",
+    "",
+    "The signed Flatpak remote is the update path. This page is the human mirror of the",
+    `[aggregate Suite ${date} release](${releaseUrl(tag)}), which is the repository's`,
+    "\"Latest\" release on GitHub. The per-app releases below stay as history and carry no app",
+    "binaries.",
+    "",
+    ...AGGREGATE_TABLE_HEADER,
+    ...aggregateRows(entries),
+    "",
+    "## Update",
+    "",
+    "```sh",
+    `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
+    "flatpak update --user",
+    "```",
+    "",
+    `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
+    "",
+    "Suite Sync is a server tarball, not a Flatpak; install and verify it from its own release.",
+    "GitHub Packages is not used for the Flatpaks.",
+    "",
+    "## Regenerate",
+    "",
+    "```sh",
+    "mise exec -- node scripts/release-status.mjs --write",
+    "mise exec -- node scripts/release-status.mjs --publish",
+    "```",
+    "",
+  ].join("\n");
+}
+
+/** Parse the command line; a dry run is the default. */
+export function parseArgs(argv) {
+  const options = { publish: false, dryRun: false, write: false, date: null, help: false };
+
+  function takeValue(index, flag) {
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith("--")) {
+      throw new Error(`${flag} needs a value`);
+    }
+    return value;
+  }
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--help" || arg === "-h") options.help = true;
+    else if (arg === "--publish") options.publish = true;
+    else if (arg === "--dry-run") options.dryRun = true;
+    else if (arg === "--write") options.write = true;
+    else if (arg === "--date") {
+      options.date = takeValue(index, "--date");
+      index += 1;
+    } else if (arg.startsWith("--")) {
+      throw new Error(`unknown option ${arg}`);
+    } else {
+      throw new Error(`unexpected argument ${arg}`);
+    }
+  }
+
+  return options;
+}
+
+function quote(value) {
+  return /^[A-Za-z0-9_./:=@-]+$/u.test(value) ? value : `'${value.replace(/'/gu, "'\\''")}'`;
+}
+
+function commandText(command, args) {
+  return [command, ...args.map(quote)].join(" ");
+}
+
+function run(command, args) {
+  process.stdout.write(`\n$ ${commandText(command, args)}\n`);
+  const result = spawnSync(command, args, { cwd: ROOT, stdio: "inherit", env: process.env });
+  if (result.error) throw new Error(`${command}: ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`${command} exited ${result.status}`);
+}
+
+function git(args) {
+  return spawnSync("git", args, { cwd: ROOT, encoding: "utf8", env: process.env });
+}
+
+function read(path) {
+  return readFileSync(join(ROOT, path), "utf8");
+}
+
+function localTagCommit(tag) {
+  const result = git(["rev-parse", "-q", "--verify", `refs/tags/${tag}`]);
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+/** The remote tag's commit, `{ known: false }` when the network read failed. */
+function remoteTagCommit(tag) {
+  const result = git(["ls-remote", "--tags", "origin", `refs/tags/${tag}`]);
+  if (result.status !== 0) return { known: false, commit: null };
+  const line = result.stdout.trim().split(/\r?\n/u)[0] ?? "";
+  const [commit] = line.split(/\s+/u);
+  return { known: true, commit: commit === undefined || commit.length === 0 ? null : commit };
+}
+
+/** The commit that added `## [version]` to this changelog, or null. */
+function changelogCommit(app, version) {
+  const result = git(["log", "-1", "--format=%H", `-S## [${version}]`, "--", app.changelog]);
+  if (result.status !== 0) return null;
+  const commit = result.stdout.trim();
+  return commit.length === 0 ? null : commit;
+}
+
+/** Every release that already exists, by tag, or null when the read failed. */
+function existingReleases() {
+  const result = spawnSync(
+    "gh",
+    ["release", "list", "--limit", "200", "--json", "tagName,isLatest"],
+    { cwd: ROOT, encoding: "utf8", env: process.env },
+  );
+  if (result.error || result.status !== 0) return null;
+  try {
+    return JSON.parse(result.stdout);
+  } catch {
+    return null;
+  }
+}
+
+function currentHead() {
+  const result = git(["rev-parse", "HEAD"]);
+  if (result.status !== 0) throw new Error("could not read HEAD");
+  return result.stdout.trim();
+}
+
+/**
+ * Read the versions, sections and dates, and decide every tag.
+ *
+ * Everything that can refuse the run is collected before a single command is
+ * printed, so a dry run shows the whole picture or names every reason it stops.
+ */
+function collect() {
+  const problems = [];
+  const entries = [];
+
+  for (const app of APPS) {
+    let version = null;
+    let changelog;
+    try {
+      version = versionFromPackage(read(app.packageJson));
+      changelog = read(app.changelog);
+    } catch (error) {
+      problems.push(`${app.name}: ${error.message}`);
+      continue;
+    }
+
+    if (version === null) {
+      problems.push(`${app.packageJson} names no version`);
+      continue;
+    }
+
+    const section = changelogSection(changelog, version);
+    if (section === null) {
+      problems.push(
+        `${app.name} ${version} has no '## [${version}]' heading in ${app.changelog}. ` +
+          "A release note is what the tag promises, so it has to exist before the tag.",
+      );
+      continue;
+    }
+    if (section.length === 0) {
+      problems.push(`${app.name} ${version} has an empty changelog section in ${app.changelog}`);
+      continue;
+    }
+
+    const tag = tagFor(app, version);
+    const localCommit = localTagCommit(tag);
+    const remote = remoteTagCommit(tag);
+    const plan = planTag({
+      tag,
+      version,
+      changelog: app.changelog,
+      localCommit,
+      remoteCommit: remote.known ? remote.commit : null,
+      changelogCommit: localCommit === null && remote.commit === null
+        ? changelogCommit(app, version)
+        : null,
+    });
+    if (plan.problem !== null) problems.push(plan.problem);
+
+    entries.push({
+      app,
+      version,
+      date: changelogDate(changelog, version),
+      section,
+      tag,
+      plan,
+      localCommit,
+      remoteKnown: remote.known,
+      remoteCommit: remote.commit,
+    });
+  }
+
+  return { problems, entries };
+}
+
+function tagStatus(item, backfill) {
+  if (item.plan.problem !== null) return `REFUSED: ${item.plan.problem}`;
+  if (item.localCommit !== null && item.remoteKnown && item.remoteCommit !== null) {
+    return `exists as ${item.plan.commit.slice(0, 12)}`;
+  }
+  if (item.localCommit !== null) return `exists locally as ${item.plan.commit.slice(0, 12)}`;
+  if (item.remoteKnown && item.remoteCommit !== null) {
+    return `exists on origin as ${item.plan.commit.slice(0, 12)}`;
+  }
+  return backfill(item.plan.commit);
+}
+
+function summarize(entry, releases) {
+  const release = releases?.find((row) => row.tagName === entry.tag) ?? null;
+  const lines = [`${entry.app.name} ${entry.version} · ${entry.tag} · ${entry.date ?? "undated"}`];
+  lines.push(`  release    ${release === null ? "create" : `edit${release.isLatest ? " (currently Latest)" : ""}`}`);
+  lines.push(
+    `  tag        ${tagStatus(
+      entry,
+      (commit) =>
+        `backfill ${commit.slice(0, 12)} — the commit that added ` +
+        `'## [${entry.version}]' to ${entry.app.changelog}`,
+    )}`,
+  );
+  return lines.join("\n");
+}
+
+/** Where the aggregate tag may be created: the snapshot HEAD describes. */
+function planAggregate(tag, head) {
+  const localCommit = localTagCommit(tag);
+  const remote = remoteTagCommit(tag);
+  return {
+    tag,
+    plan: planTag({
+      tag,
+      version: tag,
+      changelog: "HEAD",
+      localCommit,
+      remoteCommit: remote.known ? remote.commit : null,
+      changelogCommit: head,
+    }),
+    localCommit,
+    remoteKnown: remote.known,
+    remoteCommit: remote.commit,
+  };
+}
+
+function releaseArgs({ tag, title, notesPath, latest, action, target }) {
+  if (action === "edit") {
+    return [
+      "release",
+      "edit",
+      tag,
+      "--title",
+      title,
+      "--notes-file",
+      notesPath,
+      latest ? "--latest" : "--latest=false",
+    ];
+  }
+  return [
+    "release",
+    "create",
+    tag,
+    "--title",
+    title,
+    "--notes-file",
+    notesPath,
+    latest ? "--latest" : "--latest=false",
+    "--target",
+    target,
+  ];
+}
+
+function mainPublish({ entries, aggregate, date, tag, page, releases, notes }) {
+  if (releases === null) {
+    throw new Error("gh release list failed; refusing to publish into a repository it cannot read");
+  }
+
+  mkdirSync(join(ROOT, NOTES_DIR), { recursive: true });
+  for (const item of notes) writeFileSync(join(ROOT, item.path), item.body);
+
+  for (const entry of entries) {
+    if (entry.plan.createLocal) run("git", ["tag", entry.tag, entry.plan.commit]);
+    const existing = releases.find((row) => row.tagName === entry.tag) ?? null;
+    run(
+      "gh",
+      releaseArgs({
+        tag: entry.tag,
+        title: `${entry.app.name} ${entry.version}`,
+        notesPath: join(NOTES_DIR, `${entry.tag}.md`),
+        latest: false,
+        action: existing === null ? "create" : "edit",
+        target: entry.plan.commit,
+      }),
+    );
+  }
+
+  if (aggregate.plan.createLocal) run("git", ["tag", tag, aggregate.plan.commit]);
+  const aggregateExisting = releases.find((row) => row.tagName === tag) ?? null;
+  run(
+    "gh",
+    releaseArgs({
+      tag,
+      title: `Suite ${date}`,
+      notesPath: join(NOTES_DIR, `${tag}.md`),
+      latest: true,
+      action: aggregateExisting === null ? "create" : "edit",
+      target: aggregate.plan.commit,
+    }),
+  );
+
+  writeFileSync(join(ROOT, RELEASES_FILE), page);
+  process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
+  process.stdout.write(`Latest release: ${releaseUrl(tag)}\n`);
+}
+
+async function main(argv) {
+  let options;
+  try {
+    options = parseArgs(argv);
+  } catch (error) {
+    process.stderr.write(`${error.message}\n\n${USAGE}`);
+    process.exit(2);
+  }
+
+  if (options.help) {
+    process.stdout.write(USAGE);
+    return;
+  }
+  if (options.publish && options.dryRun) {
+    process.stderr.write("--publish and --dry-run contradict each other\n");
+    process.exit(2);
+  }
+
+  const releases = existingReleases();
+  const { problems, entries } = collect();
+  if (problems.length > 0) throw new Error(problems.join("\n\n"));
+
+  const head = currentHead();
+  const date = aggregateDate(entries, options.date);
+  const tag = aggregateTag(date);
+  const aggregate = planAggregate(tag, head);
+  if (aggregate.plan.problem !== null) throw new Error(aggregate.plan.problem);
+
+  const body = aggregateReleaseBody(entries, { date });
+  const page = releasesPage(entries, { date, tag });
+  const notes = [
+    ...entries.map((entry) => ({
+      path: join(NOTES_DIR, `${entry.tag}.md`),
+      body: appReleaseBody(entry.app, entry.section),
+    })),
+    { path: join(NOTES_DIR, `${tag}.md`), body },
+  ];
+
+  process.stdout.write(
+    `\nSuite releases · ${options.publish ? "publish" : options.write ? "write" : "dry run"}\n`,
+  );
+  if (releases === null) {
+    process.stdout.write(
+      "\ncould not read the existing releases (gh release list failed); " +
+        "this run assumes there are none.\n",
+    );
+  } else {
+    const latest = releases.find((row) => row.isLatest);
+    process.stdout.write(
+      `\nLatest on GitHub now: ${latest === undefined ? "none" : latest.tagName} → ` +
+        `${tag} after this run\n`,
+    );
+  }
+
+  for (const entry of entries) process.stdout.write(`\n${summarize(entry, releases)}\n`);
+
+  const aggregateExisting = releases?.find((row) => row.tagName === tag) ?? null;
+  process.stdout.write(
+    `\nSuite ${date} · ${tag} · aggregate\n` +
+      `  release    ${aggregateExisting === null ? "create (Latest)" : "edit (Latest)"}\n` +
+      `  tag        ${tagStatus(aggregate, (commit) => `backfill ${commit.slice(0, 12)} — HEAD, the snapshot this page describes`)}\n`,
+  );
+
+  if (options.publish) {
+    mainPublish({ entries, aggregate, date, tag, page, releases, notes });
+    return;
+  }
+
+  if (options.write) {
+    writeFileSync(join(ROOT, RELEASES_FILE), page);
+    process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
+    return;
+  }
+
+  for (const entry of entries) {
+    if (entry.plan.createLocal) {
+      process.stdout.write(
+        `\n  $ ${commandText("git", ["tag", entry.tag, entry.plan.commit])}`,
+      );
+    }
+    const existing = releases?.find((row) => row.tagName === entry.tag) ?? null;
+    process.stdout.write(
+      `\n  $ ${commandText(
+        "gh",
+        releaseArgs({
+          tag: entry.tag,
+          title: `${entry.app.name} ${entry.version}`,
+          notesPath: join(NOTES_DIR, `${entry.tag}.md`),
+          latest: false,
+          action: existing === null ? "create" : "edit",
+          target: entry.plan.commit,
+        }),
+      )}\n`,
+    );
+  }
+
+  if (aggregate.plan.createLocal) {
+    process.stdout.write(`\n  $ ${commandText("git", ["tag", tag, aggregate.plan.commit])}`);
+  }
+  process.stdout.write(
+    `\n  $ ${commandText(
+      "gh",
+      releaseArgs({
+        tag,
+        title: `Suite ${date}`,
+        notesPath: join(NOTES_DIR, `${tag}.md`),
+        latest: true,
+        action: aggregateExisting === null ? "create" : "edit",
+        target: aggregate.plan.commit,
+      }),
+    )}\n`,
+  );
+
+  for (const entry of entries) {
+    process.stdout.write(`\n--- ${entry.app.name} ${entry.version} · body ---\n\n`);
+    process.stdout.write(appReleaseBody(entry.app, entry.section));
+  }
+
+  process.stdout.write(`\n--- ${tag} · body ---\n\n`);
+  process.stdout.write(body);
+  process.stdout.write(
+    `\n--- ${RELEASES_FILE} ---\n\n` +
+      "would be written from the same table, with the generated header and a regenerate block.\n",
+  );
+  process.stdout.write(
+    "\ndry run: nothing was tagged, published or written; the bodies above are what would be used.\n" +
+      "To publish: mise exec -- node scripts/release-status.mjs --publish\n" +
+      "To refresh the page only: mise exec -- node scripts/release-status.mjs --write\n",
+  );
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  try {
+    await main(process.argv.slice(2));
+  } catch (error) {
+    process.stderr.write(`\n${error.message}\n`);
+    process.exit(1);
+  }
+}
