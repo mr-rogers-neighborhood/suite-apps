@@ -15,33 +15,30 @@ on the path opens a network connection, and there is no bank sync to opt into.
 
 ## apps/budget/packages/core/src/schema.ts#transactionSchema
 
-A transaction is the only input the budget cannot derive. It carries an account,
-a date, a signed amount and optional payee, category, memo, flag and cleared
-state. A zero amount is refused at the schema, and the amount is an integer, so
-a record can never carry a float that later rounds differently in two places.
+A transaction is the only input the budget cannot derive: an account, a date and
+a signed integer amount, with payee, category, memo, flag and cleared optional.
+Zero is refused here, so no later projection has to defend against it. See the
+Budget core module for the record set.
 
 ## apps/budget/packages/core/src/money.ts#parseMoney
 
-Human money arrives as text and leaves as signed minor units. Parsing accepts a
-currency symbol, grouping separators, parentheses for a negative and both
-decimal conventions, then rounds once at the requested scale. It answers with a
-`Result` because an unreadable amount is a form error, not a crash, and an amount
-beyond `Number.MAX_SAFE_INTEGER` is refused rather than silently losing digits.
+Text becomes signed minor units in one place, rounded once at the currency
+scale; a bad amount is a `Result`, and an amount that would lose digits is
+refused. The Budget core module holds the parser and formatter.
 
 ### overlay: No float ever reaches the document
 
-`parseFloat` and `toFixed` are banned outside this file, and the ban is the
-reason the rest of the app can add and compare amounts without a rounding rule
-of its own. Formatting divides by the scale only at the display boundary;
-storage stays an integer.
+`parseFloat` and `toFixed` are banned outside the money file and test files,
+which is why the rest of the app can add amounts without its own rounding rule.
+Formatting divides by the scale only at the display boundary; storage stays an
+integer.
 
 ## apps/budget/src/renderer/src/accounts/TransactionDialog.tsx#TransactionDialog
 
-The dialog owns the draft, not the record. It seeds local form state from the
-snapshot when it opens, converts the typed amount through `parseMoney`, and
-writes through the replica's document only on submit. A reconciled transaction
-is locked for editing, and a split parent edits its children as a set. Nothing
-in the form is stored in Zustand or in the document until the write happens.
+The dialog owns the draft, not the record: it seeds from the snapshot, parses the
+amount through `parseMoney`, and writes through the replica only on submit. A
+reconciled row is locked, and a split parent updates its children as a set. The
+Budget renderer module covers the form.
 
 ## interlude: The rule decides, the document records
 
@@ -51,18 +48,17 @@ before a transaction is written or re-run over existing records.
 
 ## apps/budget/packages/core/src/rules/evaluate.ts#applyRules
 
-Rules are evaluated in rank order against a copy of the draft. A condition reads
-one field; an action replaces one field; the result reports the draft and the
-ids that matched. Amount conditions parse through the same money parser as the
-rest of the app, an invalid regular expression matches nothing, and a rule never
-writes to the document. That is what makes a rule testable without a workspace.
+Rules run in rank order over a copy of the draft: a condition reads one field,
+an action replaces one, and the result carries the draft and the matched ids. An
+invalid regular expression matches nothing, and the function never writes. The
+Budget core module explains evaluation; the Budget rules module owns the order.
 
 ## apps/budget/packages/core/src/rules/rank.ts#rankRules
 
-Stages run first, then specificity, then creation order and id. Broad rules run
-before specific rules so the specific action has the last word, and disabled
-rules are removed before anything runs. The ordering is total and deterministic,
-which is what makes two rules that both match produce the same result twice.
+Disabled rules drop out first; the rest sort by stage, then ascending
+specificity, then creation time and id. Broad rules therefore run before
+specific ones, which gives the specific action the last word. The Budget rules
+module explains why the order is total.
 
 ## interlude: The envelope is derived
 
@@ -73,55 +69,49 @@ core derives the envelope.
 
 ## apps/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument
 
-The typed document is the only writer of a budget. Every mutation validates
-through Zod, writes leaf keys so concurrent edits merge, and commits once per
-outer call; `batch` makes that depth explicit. Opening a snapshot assigns a
-fresh peer id. Undo is a document action too, and because it emits a normal
-delta, main records it like any other edit.
+The typed document is the only writer. Record mutations parse with Zod and set
+only the changed leaf keys, so concurrent edits merge; the outer call commits
+once, and `batch` relies on that depth. A snapshot opens with a fresh peer id,
+and undo travels as an ordinary delta. The Budget Loro module covers the
+lifecycle.
 
 ## apps/budget/packages/core/src/plan/monthState.ts#monthState
 
-The month state is the envelope arithmetic. It folds each month's assignment and
-activity into a running available balance, but only a positive balance carries
-forward: an overspent envelope closes at the boundary instead of borrowing from
-the next month. Ready to Assign is the on-budget balance minus everything
-already in envelopes, and the target status is derived from the same numbers.
+The month state is the envelope fold: only a positive balance carries forward,
+so an overspent envelope closes at the boundary instead of borrowing. Ready to
+Assign is the on-budget balance minus what is already in envelopes. The Budget
+core module covers the month fold.
 
 ## apps/budget/src/renderer/src/plan/PlanView.tsx#PlanView
 
-The plan view displays the month state and sends actions back through the
-replica. Auto-assign builds a delta map in core, the component applies it, and
-the notice reports the total and any shortfall. Collapsed groups and the open
-prompt are React state; the selected month is UI state. The view holds no
-assignment of its own, so a snapshot rebuild is enough to redraw it.
+The plan view renders the month state and sends actions back through the
+replica. Auto-assign builds its delta map in core, the component applies it, and
+the notice reports total and shortfall; collapsed groups, the prompt and the
+month are view state. The Budget renderer module covers the view.
 
 ## apps/budget/packages/core/src/reports/budgetVsActual.ts#budgetVsActual
 
-The report series is a projection, not a stored table. This function calls the
-month state and flattens its groups into one row per category, so assigned,
-activity and available are the same numbers the plan view shows. A report that
-kept its own totals would be a second source of truth and would drift on the
-first edit.
+The report is a projection over month state, one row per category, so assigned,
+activity and available are the plan's numbers and cannot drift. The Budget
+reports module covers the report series.
 
 ## apps/budget/src/renderer/src/reports/ReportsView.tsx#ReportsView
 
-Every tab rebuilds its series from the current snapshot. The range and the
-selected tab are React state; dashboard widgets are document records because a
-person arranged them, but the values inside them are computed on render. The
-caption on the page states the rule the code follows: nothing is stored twice.
+Every tab rebuilds its figures from the current snapshot. The range and the
+selected tab are React state; dashboard widgets are document records, but the
+values inside them are computed on render. The page caption states the rule:
+nothing is stored twice. The Budget renderer module covers the view.
 
 ## apps/budget/src/main/budgetStore.ts#BudgetStore
 
-Main owns the open document and the write schedule. A renderer delta is applied,
-then a debounced save copies the current file to the backups and writes the
-envelope atomically. The flush chain stays alive after a failure, and
-`saveError` is reported to the renderer rather than the save being called
-successful. The renderer never learns the path to write.
+Main applies the renderer's delta, then debounces the write: back up the current
+file, then replace it atomically. The flush chain survives a failure, `saveError`
+reaches the renderer, and the renderer never writes the file. The Budget main
+module covers the store.
 
 ## apps/budget/packages/core/src/file/budgetFile.ts#decodeBudgetFile
 
-The `.budget` file is an envelope around a base64 CRDT snapshot. Decoding
-answers with a `Result` and refuses in order: not JSON, not this format, a newer
-file version, a newer schema, then a snapshot that will not decode. Neither the
-file nor the library index is the document; the envelope is how the bytes a
-person owns are recognised before a build opens them.
+The `.budget` file is a JSON envelope around a base64 CRDT snapshot. Decoding
+refuses in order: not JSON, not this format, a newer file version, a newer
+schema, then a snapshot that will not decode. It returns bytes, not a document.
+The Budget file module covers the envelope and the records export.
