@@ -19,6 +19,7 @@ import {
   packageModeProblems,
   parseArgs,
   pkgbuildFor,
+  preReleaseBuilderConfig,
   releaseAssetBase,
   relayArchitecture,
   relayArtifactName,
@@ -71,6 +72,12 @@ describe("version and feed names", () => {
       "https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/planner",
     );
     assert.equal(tagFor(APPS.canvas, "0.1.9"), "canvas-v0.1.9");
+    assert.equal(tagFor(APPS.planner, "0.3.0", "slop"), "slop-planner-v0.3.0");
+    assert.equal(
+      releaseAssetBase(APPS.planner, "0.3.0", "canary"),
+      "https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/" +
+        "canary-planner-v0.3.0/",
+    );
     assert.equal(
       releaseAssetBase(APPS.canvas, "0.1.9"),
       "https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/canvas-v0.1.9/",
@@ -364,8 +371,16 @@ describe("arguments", () => {
   it("defaults to a dry run", () => {
     const options = parseArgs(["planner"]);
     assert.equal(options.appId, "planner");
+    assert.equal(options.channel, "stable");
     assert.equal(options.publish, false);
     assert.equal(options.build, true);
+  });
+
+  it("reads a pre-release channel and refuses one it does not know", () => {
+    assert.equal(parseArgs(["planner", "--channel", "slop"]).channel, "slop");
+    assert.equal(parseArgs(["planner", "--channel", "beta"]).channel, "beta");
+    assert.throws(() => parseArgs(["planner", "--channel", "nightly"]), /unknown channel/u);
+    assert.throws(() => parseArgs(["planner", "--channel"]), /needs a value/u);
   });
 
   it("reads the publish, tag and build flags", () => {
@@ -386,6 +401,37 @@ describe("arguments", () => {
 
   it("refuses an option with no value", () => {
     assert.throws(() => parseArgs(["planner", "--tag"]), /needs a value/u);
+  });
+});
+
+describe("pre-release builder config", () => {
+  const yml = [
+    "appId: run.suite.planner",
+    "productName: Suite Planner",
+    "artifactName: suite-planner-${version}-${arch}.${ext}",
+    "extraFiles:",
+    "  - from: suite.app.json",
+    "    to: suite.app.json",
+    "fileAssociations:",
+    "  - ext: planner",
+    "    mimeType: application/x-suite-planner",
+    "linux:",
+    "  desktop:",
+    "    entry:",
+    "      MimeType: application/x-suite-planner;",
+    "publish:",
+    "  provider: generic",
+    "",
+  ].join("\n");
+
+  it("adds the pre-release identity and removes stable MIME registrations", () => {
+    const config = preReleaseBuilderConfig(yml, { app: APPS.planner, channel: "slop" });
+    assert.match(config, /^appId: run\.suite\.slop\.planner$/mu);
+    assert.match(config, /^productName: Suite Planner \(slop\)$/mu);
+    assert.match(config, /suite-planner-slop-\$\{version\}-\$\{arch\}/u);
+    assert.doesNotMatch(config, /fileAssociations/u);
+    assert.doesNotMatch(config, /application\/x-suite-planner/u);
+    assert.match(config, /- from: suite\.channel\.json/u);
   });
 });
 

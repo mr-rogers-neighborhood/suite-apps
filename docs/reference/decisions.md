@@ -29,6 +29,11 @@ The rules that shape this repository. Each is current; the code follows it.
 - Signed manifests live at `feeds/<app>/latest-linux.yml` in this repository, served from the raw
   file host at `main` because GitHub Pages would need Actions. The artifact they name stays an asset
   on the app's `<app>-v<version>` release tag.
+- Stable and pre-release are two identities: `run.suite.<app>` and `run.suite.slop.<app>`. The tier
+  (`slop`, `canary`, `beta`) is the Flatpak branch, not part of the id, so one pre-release install
+  can move tier while stable stays installed. A pre-release is tagged
+  `<tier>-<app>-v<version>` and never writes `feeds/<app>/`; the OSTree summary is signed with the
+  store key and the AppImage manifest with the update key.
 - `scripts/release.mjs` is the release path. It refuses a dirty tree, a version with no changelog
   heading, a commit the gate has not proven, and a manifest whose artifact is missing. It is a dry
   run unless `--publish` is passed.

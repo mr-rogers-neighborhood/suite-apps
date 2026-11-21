@@ -43,6 +43,16 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
+  artifactStem,
+  channelProblem,
+  channelRecord,
+  displayName,
+  flatpakId,
+  isPreRelease,
+  preReleaseAppManifest,
+  releaseTag,
+} from "./lib/channel.mjs";
+import {
   fingerprintOf as secretFingerprint,
   groupedFingerprint,
   keyPath as secretKeyPath,
@@ -167,18 +177,20 @@ const USAGE = `usage: node scripts/release.mjs <app-id> [options]
   --publish           upload the release (an app path also commits its feed)
   --dry-run           stop before every network write; the default
   --verify            verify the published feed, or the local relay artifact
-  --tag <name>        release tag (default: <app>-v<version>)
+  --channel <tier>    stable, slop, canary or beta (default: stable)
+  --tag <name>        release tag (default: <app>-v<version>, or <tier>-<app>-v<version>)
   --notes-file <path> release notes (default: the version's changelog section)
   --feed-dir <path>   also copy the artifact, manifest and signature into a folder
   --no-build          reuse the last build in the app's release folder
   --help              print this text
 
 Known apps: ${Object.keys(APPS).join(", ")}
+Channels: stable, slop, canary, beta
 `;
 
 /** The tag a version is published under, so several apps share the repository. */
-export function tagFor(app, version) {
-  return `${app.id}-v${version}`;
+export function tagFor(app, version, channel = "stable") {
+  return releaseTag(app.id, version, channel);
 }
 
 /** The Pages folder the app's signed manifest lives in. */
@@ -197,8 +209,8 @@ export function manifestUrl(app) {
 }
 
 /** The base a manifest's artifact URLs resolve against: this app's release tag. */
-export function releaseAssetBase(app, version) {
-  return `https://github.com/${RELEASE_REPO}/releases/download/${tagFor(app, version)}/`;
+export function releaseAssetBase(app, version, channel = "stable") {
+  return `https://github.com/${RELEASE_REPO}/releases/download/${tagFor(app, version, channel)}/`;
 }
 
 /** The architecture token a relay tarball is named with. */
@@ -741,6 +753,7 @@ export function publisherKeyProblem(privateKey, { pinned = pinnedSecretPublic("u
 export function parseArgs(argv) {
   const options = {
     appId: null,
+    channel: "stable",
     publish: false,
     dryRun: false,
     verify: false,
@@ -766,7 +779,10 @@ export function parseArgs(argv) {
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--verify") options.verify = true;
     else if (arg === "--no-build") options.build = false;
-    else if (arg === "--tag") {
+    else if (arg === "--channel") {
+      options.channel = takeValue(index, "--channel");
+      index += 1;
+    } else if (arg === "--tag") {
       options.tag = takeValue(index, "--tag");
       index += 1;
     } else if (arg === "--notes-file") {
@@ -783,6 +799,9 @@ export function parseArgs(argv) {
       throw new Error(`unexpected argument ${arg}`);
     }
   }
+
+  const channelMiss = channelProblem(options.channel);
+  if (channelMiss !== null) throw new Error(channelMiss);
 
   return options;
 }
@@ -1076,6 +1095,91 @@ async function pinnedPublicKey() {
   return module.SUITE_UPDATE_PUBLIC_KEY;
 }
 
+/**
+ * Remove one top-level YAML mapping from an electron-builder config.
+ *
+ * The pre-release build reuses the app's committed config, so it has to remove
+ * the file associations rather than merge an empty list into them: electron-
+ * builder concatenates arrays, and an empty list would leave the stable MIME
+ * registrations in place.
+ */
+export function removeTopLevelBlock(text, key) {
+  const lines = text.split(/\r?\n/u);
+  const start = lines.findIndex((line) => new RegExp(`^${key}:`, "u").test(line));
+  if (start < 0) return text;
+  let end = start + 1;
+  while (end < lines.length && (/^\s/u.test(lines[end]) || lines[end].trim().length === 0)) {
+    end += 1;
+  }
+  return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+}
+
+/** The build-time config a pre-release AppImage is packaged with. */
+export function preReleaseBuilderConfig(text, { app, channel }) {
+  let config = text
+    .replace(/^appId:.*$/mu, `appId: ${flatpakId(app.id, channel)}`)
+    .replace(/^productName:.*$/mu, `productName: ${displayName(app.name, channel)}`)
+    .replace(
+      /^artifactName:.*$/mu,
+      `artifactName: ${artifactStem(app.id, channel)}-` + "${version}-${arch}.${ext}",
+    )
+    .replace(/^\s+MimeType:.*$/gmu, "");
+
+  config = removeTopLevelBlock(config, "fileAssociations");
+
+  // The tier is a build fact beside the manifest. electron-builder copies
+  // extraFiles after building the app, so this lands next to suite.app.json.
+  const extraFiles = [
+    "extraFiles:",
+    "  - from: suite.app.json",
+    "    to: suite.app.json",
+    "  - from: suite.channel.json",
+    "    to: suite.channel.json",
+  ].join("\n");
+  config = config.replace(
+    ["extraFiles:", "  - from: suite.app.json", "    to: suite.app.json"].join("\n"),
+    extraFiles,
+  );
+  return config;
+}
+
+/**
+ * Write the pre-release manifest and config into the app project, and return
+ * the restore step.
+ *
+ * The release refuses a dirty tree before this runs, and the restore is in a
+ * `finally`, so the working tree describes stable again whether the build
+ * succeeds or fails. The files are swapped rather than copied through an
+ * override because electron-builder's array merge cannot remove `fileAssociations`.
+ */
+async function stagePreReleaseBuild(app, channel) {
+  const ymlPath = join(ROOT, app.project, "electron-builder.yml");
+  const manifestPath = join(ROOT, app.manifest);
+  const channelPath = join(ROOT, app.project, "suite.channel.json");
+  const originalYml = await readFile(ymlPath, "utf8");
+  const originalManifest = await readFile(manifestPath, "utf8");
+  const channelExisted = existsSync(channelPath);
+  const originalChannel = channelExisted ? await readFile(channelPath, "utf8") : null;
+
+  const baseManifest = JSON.parse(originalManifest);
+  await writeFile(
+    manifestPath,
+    `${JSON.stringify(preReleaseAppManifest(baseManifest, channel), null, 2)}\n`,
+  );
+  await writeFile(
+    channelPath,
+    `${JSON.stringify(channelRecord({ app: app.id, channel }), null, 2)}\n`,
+  );
+  await writeFile(ymlPath, preReleaseBuilderConfig(originalYml, { app, channel }));
+
+  return async () => {
+    await writeFile(ymlPath, originalYml);
+    await writeFile(manifestPath, originalManifest);
+    if (channelExisted) await writeFile(channelPath, originalChannel);
+    else await rm(channelPath, { force: true });
+  };
+}
+
 async function readJson(path) {
   try {
     return JSON.parse(await readFile(path, "utf8"));
@@ -1186,6 +1290,9 @@ async function releaseRelay(app, options, { head, version, tag, changelog, priva
 }
 
 async function release(app, options) {
+  const channel = options.channel;
+  const preRelease = isPreRelease(channel);
+  const channelName = displayName(app.name, channel);
   const head = capture("git", ["rev-parse", "HEAD"]);
   const porcelain = capture("git", ["status", "--porcelain"]);
   const packageText = await readFile(join(ROOT, app.project, "package.json"), "utf8");
@@ -1199,6 +1306,11 @@ async function release(app, options) {
 
   const problems = [];
   if (version === null) problems.push(`${app.project}/package.json names no version`);
+  if (preRelease && app.id === "start") {
+    problems.push(
+      "Suite Start has no pre-release channel: the hub's own card is the stable hub and nothing updates it",
+    );
+  }
   const dirty = dirtyTreeProblem(porcelain);
   if (dirty !== null) problems.push(dirty);
   if (version !== null) {
@@ -1209,7 +1321,7 @@ async function release(app, options) {
   if (manifestMiss !== null) problems.push(manifestMiss);
   problems.push(...gateProblems(gateStatus, head, { range: feedOnlyRange }));
 
-  const tag = options.tag ?? (version === null ? null : tagFor(app, version));
+  const tag = options.tag ?? (version === null ? null : tagFor(app, version, channel));
   if (tag === null) problems.push("no tag to release under");
 
   if (problems.length > 0) {
@@ -1238,22 +1350,27 @@ async function release(app, options) {
     return;
   }
 
-  process.stdout.write(`\nreleasing ${app.name} ${version} as ${tag}\n`);
+  process.stdout.write(`\nreleasing ${channelName} ${version} as ${tag}\n`);
 
   if (options.build) {
     process.stdout.write("\n=== build ===\n");
     run("pnpm", ["--filter", app.package, "run", "build"]);
     process.stdout.write("\n=== package ===\n");
-    run("pnpm", [
-      "--filter",
-      app.package,
-      "exec",
-      "electron-builder",
-      "--linux",
-      "AppImage",
-      "--publish",
-      "never",
-    ]);
+    const restore = preRelease ? await stagePreReleaseBuild(app, channel) : null;
+    try {
+      run("pnpm", [
+        "--filter",
+        app.package,
+        "exec",
+        "electron-builder",
+        "--linux",
+        "AppImage",
+        "--publish",
+        "never",
+      ]);
+    } finally {
+      if (restore !== null) await restore();
+    }
   }
 
   const outputDir = join(ROOT, app.output);
@@ -1276,7 +1393,7 @@ async function release(app, options) {
   const packagePath = await packageFor(app, { version, artifactPath });
 
   // The manifest Pages serves names the release asset, not a file beside itself.
-  const publishedManifest = absoluteManifest(builtManifest, releaseAssetBase(app, version));
+  const publishedManifest = absoluteManifest(builtManifest, releaseAssetBase(app, version, channel));
   const publishedBytes = Buffer.from(publishedManifest);
   const signature = signManifest(publishedBytes, privateKey);
   const fingerprint = fingerprintOf(privateKey);
@@ -1290,7 +1407,12 @@ async function release(app, options) {
     process.stdout.write(`\nfeed written to ${feedDir}\n`);
   }
 
-  process.stdout.write(`\n  feed        ${manifestUrl(app)}\n`);
+  process.stdout.write(`\n  channel     ${channel}\n`);
+  if (preRelease) {
+    process.stdout.write("  feed        none (a pre-release never writes feeds/<app>/)\n");
+  } else {
+    process.stdout.write(`  feed        ${manifestUrl(app)}\n`);
+  }
   process.stdout.write(`  tag         ${tag}\n`);
   process.stdout.write(`  artifact    ${artifact.name}\n`);
   process.stdout.write(`  manifest    ${publishedManifest.split(/\r?\n/u).find((line) => line.startsWith("path:")) ?? ""}\n`);
@@ -1299,7 +1421,9 @@ async function release(app, options) {
 
   if (!options.publish) {
     process.stdout.write("\ndry run: nothing was tagged, uploaded, written or committed.\n");
-    process.stdout.write(`To publish: node scripts/release.mjs ${app.id} --publish\n`);
+    process.stdout.write(
+      `To publish: node scripts/release.mjs ${app.id} --channel ${channel} --publish\n`,
+    );
     return;
   }
 
@@ -1325,12 +1449,20 @@ async function release(app, options) {
       uploadSignature,
       ...(packagePath === null ? [] : [packagePath]),
       "--title",
-      `${app.name} ${version}`,
+      `${channelName} ${version}`,
       ...notes,
       "--target",
       head,
       "--latest=false",
+      ...(preRelease ? ["--prerelease"] : []),
     ]);
+
+    if (preRelease) {
+      process.stdout.write(`\npublished ${tag}\n`);
+      process.stdout.write("pre-release: no feed was written and the stable feed is untouched.\n");
+      process.stdout.write("Install it by hand from the tag; stable keeps its own update path.\n");
+      return;
+    }
 
     const feedFile = join(ROOT, feedPath(app));
     await mkdir(dirname(feedFile), { recursive: true });
@@ -1376,6 +1508,12 @@ async function main() {
   }
 
   if (options.verify) {
+    if (isPreRelease(options.channel)) {
+      throw new Error(
+        `a ${options.channel} pre-release has no committed feed to verify; ` +
+          "the artifact and its signed manifest live on the pre-release tag.",
+      );
+    }
     const packageText = await readFile(join(ROOT, app.project, "package.json"), "utf8");
     const expected = versionFromPackage(packageText);
 

@@ -22,15 +22,16 @@
  * - **Nothing is published unless `--publish` is passed.** A dry run prints the
  *   refs and the size it would upload and changes nothing.
  *
- * `--branch` names the branch a tier would publish and becomes the remote's
- * `DefaultBranch` in the `.flatpakrepo` file. The stable refs are `master`
- * today; no tier exists yet, so the script refuses a branch the repository does
- * not carry instead of inventing one.
+ * `--branch` names the branch a tier publishes and proves the repository has
+ * it. `--channel` is the same thing with the tier names checked first. The
+ * remote's `DefaultBranch` stays the stable branch (`master` today, `stable`
+ * when the repository carries one), so adding a tier does not break a stable
+ * install; a tier is installed with an explicit `//<tier>`.
  *
  * Usage:
  *   node scripts/flatpak-remote.mjs                 # dry run
  *   node scripts/flatpak-remote.mjs --publish       # sign and copy
- *   node scripts/flatpak-remote.mjs --branch beta   # tier default, when it exists
+ *   node scripts/flatpak-remote.mjs --channel beta  # dry run for a tier branch
  *   node scripts/flatpak-remote.mjs --help
  */
 import { spawnSync } from "node:child_process";
@@ -48,6 +49,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { branchFor, channelProblem } from "./lib/channel.mjs";
 import { dirtyTreeProblem, feedOnlyRange, gateProblems } from "./release.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -70,7 +72,8 @@ const USAGE = `usage: node scripts/flatpak-remote.mjs [options]
 
   --publish           sign the summary and copy the repo to the host (default: dry run)
   --dry-run           stop before signing or copying; the default
-  --branch <name>     branch the remote defaults to (default: ${DEFAULT_BRANCH})
+  --branch <name>     branch a tier publishes (default: the tier, or stable)
+  --channel <tier>    slop, canary or beta; the same as --branch <tier>
   --host <name>       ssh host (default: ${DEFAULT_HOST})
   --url <url>         public base URL (default: ${DEFAULT_REMOTE_URL})
   --help              print this text
@@ -85,6 +88,7 @@ function parseArgs(argv) {
     publish: false,
     dryRun: false,
     branch: null,
+    channel: null,
     host: null,
     url: null,
     help: false,
@@ -105,6 +109,9 @@ function parseArgs(argv) {
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--branch") {
       options.branch = takeValue(index, "--branch");
+      index += 1;
+    } else if (arg === "--channel") {
+      options.channel = takeValue(index, "--channel");
       index += 1;
     } else if (arg === "--host") {
       options.host = takeValue(index, "--host");
@@ -354,16 +361,28 @@ async function main() {
     process.env.SUITE_FLATPAK_REMOTE_DIR?.trim() || DEFAULT_REMOTE_DIR;
   const url =
     options.url?.trim() || process.env.SUITE_FLATPAK_URL?.trim() || DEFAULT_REMOTE_URL;
-  const branch = options.branch?.trim() || DEFAULT_BRANCH;
+
+  const channel = options.channel?.trim() || null;
+  if (channel !== null) {
+    const miss = channelProblem(channel);
+    if (miss !== null) throw new Error(miss);
+  }
+  const requestedBranch =
+    channel !== null ? branchFor(channel) : (options.branch?.trim() || null);
 
   const { keyId, publicKey } = storeKey();
   const { refs, appRefs, branches } = repositoryRefs();
+  // Stable stays the default branch, so adding a tier does not change what a
+  // plain `flatpak install suite run.suite.<app>` resolves to. A future repo
+  // that names stable `stable` wins over the current `master`.
+  const defaultBranch = branches.includes("stable") ? "stable" : DEFAULT_BRANCH;
+  const branch = requestedBranch ?? defaultBranch;
 
   if (!branches.includes(branch)) {
     throw new Error(
       `the repository has no app refs on branch ${branch} ` +
         `(it has: ${branches.length > 0 ? branches.join(", ") : "none"}). ` +
-        "A tier branch is published by the channel work that creates it.",
+        "A tier branch is published by `node scripts/flatpak.mjs --channel <tier>`.",
     );
   }
 
@@ -377,6 +396,7 @@ async function main() {
   process.stdout.write(`  gate proof  ${proven}\n`);
   process.stdout.write(`  commit      ${head}\n`);
   process.stdout.write(`  branch      ${branch} (${onBranch.length} app refs)\n`);
+  process.stdout.write(`  default     ${defaultBranch}\n`);
   process.stdout.write(`  target      ${host}:${remoteDir}\n`);
   process.stdout.write(`  url         ${url.replace(/\/+$/u, "")}/\n`);
   process.stdout.write(`  upload      ${files} files, ${mib(bytes)}\n`);
@@ -397,7 +417,7 @@ async function main() {
     );
     process.stdout.write(`would write ${flatpakrepoPath} and serve it as suite.flatpakrepo\n`);
     process.stdout.write("\ndry run: nothing was signed, copied or written on the host.\n");
-    process.stdout.write("To publish: node scripts/flatpak-remote.mjs --publish\n");
+    process.stdout.write(`To publish: node scripts/flatpak-remote.mjs --branch ${branch} --publish\n`);
     return;
   }
 
@@ -405,7 +425,7 @@ async function main() {
   run("flatpak", ["build-update-repo", `--gpg-sign=${keyId}`, repo]);
   verifySignedSummary();
 
-  const flatpakrepo = flatpakrepoText({ publicKey, branch, url });
+  const flatpakrepo = flatpakrepoText({ publicKey, branch: defaultBranch, url });
   writeFileSync(flatpakrepoPath, flatpakrepo);
   process.stdout.write(`\n${flatpakrepoPath}\n`);
 

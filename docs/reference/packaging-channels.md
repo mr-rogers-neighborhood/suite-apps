@@ -80,6 +80,7 @@ node scripts/flatpak.mjs                       # Canvas: package, build, publish
 node scripts/flatpak.mjs --app planner         # Planner, same path
 node scripts/flatpak.mjs --app budget          # Budget, same path
 node scripts/flatpak.mjs --app planner --no-build   # reuse release/linux-unpacked
+node scripts/flatpak.mjs --app planner --channel slop  # pre-release id on branch slop
 flatpak run run.suite.planner
 ```
 
@@ -99,7 +100,8 @@ other devices in it. Budget has no network permission: it has no bank sync and n
 
 The `.desktop` file is named for the Flatpak id, and each app's `desktopName` is that id, so Wayland
 associates the window with the entry and keeps its icon. Planner and Budget follow that rule; Canvas's
-shell still declares the older `suite-canvas.desktop` name.
+shell still declares the older `suite-canvas.desktop` name. A pre-release reuses the stable manifest's
+runtime and permissions, but generates its own id, desktop entry, metainfo and icon names.
 
 **OSTree owns updates inside Flatpak.** The sandbox sets `FLATPAK_ID`, and the app then skips its own
 feed check and writes a "not checked" report instead of offering a download. `flatpak update` replaces
@@ -152,15 +154,53 @@ and `flatpak` verifies the summary from the first fetch. `flatpak remote-ls suit
 branches the remote offers.
 
 The stable apps are on `master`, which the file names as `DefaultBranch`, so the command above needs
-no branch. A tier publishes its refs on its own branch and runs the script with `--branch <name>` to
-make that the default; install one explicitly with:
+no branch. Publishing a tier writes the same repository on branch `slop`, `canary` or `beta`; the
+default branch stays `master`, so adding a tier does not change what a stable install resolves to.
+Install a tier explicitly:
 
 ```sh
-flatpak install --user suite run.suite.planner//<branch>
+flatpak install --user suite run.suite.slop.planner//slop
 ```
 
-No tier branch exists yet. The script refuses a branch the repository does not carry instead of
-inventing one.
+`flatpak remote-ls suite` lists the stable refs and every tier branch the remote carries. The script
+refuses a branch the repository does not carry instead of inventing one.
+
+### Pre-release tiers
+
+A pre-release shares one id, `run.suite.slop.<app>`, across `slop`, `canary` and `beta`; stable keeps
+`run.suite.<app>`. The two ids are two cards and two profiles, so stable and one pre-release can be
+installed side by side. The tier is the branch, not part of the id, so moving from slop to canary
+replaces the pre-release instead of adding a third install. **One pre-release install at a time is the
+supported shape.**
+
+```sh
+node scripts/flatpak.mjs --app planner --channel slop
+flatpak install --user suite-local run.suite.slop.planner//slop
+flatpak run run.suite.slop.planner
+```
+
+`--channel` accepts `slop`, `canary` or `beta`; anything else is refused before the build. The
+generated manifest uses `run.suite.slop.<app>` for the app id, command, desktop file and icon name,
+and `NoDisplay=false` keeps the card visible beside stable. Its desktop entry carries **no**
+`MimeType` line and **no** `x-scheme-handler/*`, so it registers neither the stable documents nor
+`suite://`; stable keeps both. The pre-release `suite.app.json` gets the id `slop-<app>`, no file
+extensions and no stable update feed. A `suite.channel.json` beside it names the tier, the Flatpak id,
+the stable id and the branch for the app to read.
+
+The Flatpak and AppImage paths sign different things and keep doing so:
+
+- Flatpak signs the OSTree summary with the store key. A tier branch is published on the same remote;
+  the stable refs are not rewritten. `scripts/flatpak-remote.mjs --channel slop --publish` signs the
+  summary, verifies it and copies the repository.
+- The AppImage path signs `latest-linux.yml` with the update key. A pre-release artifact is tagged
+  `<tier>-<app>-v<version>` — `slop-planner-v0.3.0` — and its manifest and signature are attached to
+  that tag. It **never** writes `feeds/<app>/`: the stable feed and its summary are untouched.
+  `node scripts/release.mjs planner --channel slop --publish` is the publish step; without `--publish`
+  it is a dry run.
+
+`flatpak remote-ls suite` shows both identities, for example `run.suite.planner` on `master` and
+`run.suite.slop.planner` on `slop`. A pre-release is not an automatic update for stable and stable is
+not an automatic update for a pre-release.
 
 The transport is plain HTTP because no certificate exists on `suite-dev`; adding one is separate
 work. The connection is readable, and a machine on the path can deny service or stall an update. It
@@ -212,6 +252,9 @@ feeds/planner/latest-linux.yml
 feeds/budget/latest-linux.yml
 feeds/start/latest-linux.yml
 ```
+
+Only a stable release writes these files. A pre-release attaches its signed manifest to its own
+`<tier>-<app>-v<version>` tag and leaves `feeds/<app>/` alone.
 
 The manifest is committed, so it is served straight from the repository: the base URL for an app is
 `https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/<app>`. A detached

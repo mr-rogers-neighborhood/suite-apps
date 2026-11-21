@@ -64,11 +64,32 @@ Useful options:
 | Option | Effect |
 | --- | --- |
 | `--publish` | Upload and commit. Without it, the command is a dry run. |
-| `--tag <name>` | Release under another tag; the default is `<app>-v<version>`. |
+| `--channel <tier>` | Build a pre-release for `slop`, `canary` or `beta`. Default: `stable`. |
+| `--tag <name>` | Release under another tag; the default is `<app>-v<version>`, or `<tier>-<app>-v<version>`. |
 | `--notes-file <path>` | Use a file for the release notes instead of the changelog section. |
 | `--feed-dir <path>` | Copy the artifact, manifest and signature into a local folder. |
 | `--no-build` | Reuse the last build in the app's `release/` folder. |
-| `--verify` | Check the published feed instead of building anything. |
+| `--verify` | Check the published feed instead of building anything. Stable only. |
+
+## Pre-release tiers
+
+A pre-release is a build of the same app on `slop`, `canary` or `beta`. It is not a second app: it
+shares `run.suite.slop.<app>` across the three tiers and takes the tier as its Flatpak branch. Stable
+keeps `run.suite.<app>`, so both can be installed at once. One pre-release install at a time is the
+supported shape; moving tier replaces it.
+
+```sh
+node scripts/release.mjs planner --channel slop          # dry run
+node scripts/release.mjs planner --channel slop --publish
+node scripts/flatpak.mjs --app planner --channel slop
+```
+
+The AppImage for a pre-release is tagged `slop-planner-v<version>` and carries the artifact and its
+signed `latest-linux.yml`; the Flatpak is exported on branch `slop`. Neither writes
+`feeds/planner/`: a pre-release never changes the stable feed or summary, and it is not offered as an
+automatic update to a stable install. See
+[Packaging channels](../reference/packaging-channels.md#pre-release-tiers) for the identity and the
+desktop-entry rule.
 
 ## Publishing several apps on one gate
 
@@ -171,6 +192,7 @@ Run the owning app's gate first. Packaging does not run it.
 node scripts/flatpak.mjs              # package, build, publish, install
 node scripts/flatpak.mjs --no-build   # reuse release/linux-unpacked
 node scripts/flatpak.mjs --no-build --no-install   # publish, leave the client alone
+node scripts/flatpak.mjs --app planner --channel slop  # pre-release tier branch
 ```
 
 The script publishes to `~/suite-flatpak/repo` and adds it as the user remote `suite-local`. Run
@@ -200,6 +222,7 @@ it, and stamps it into the artifact.
 | What | Where the version lives | Its tag |
 | --- | --- | --- |
 | Start, Canvas, Planner, Budget | `apps/<app>/package.json` | `<app>-v<version>` |
+| A pre-release of Canvas, Planner or Budget | the same `apps/<app>/package.json` | `<tier>-<app>-v<version>` |
 | The relay (`suite-sync`) | `apps/sync/package.json` | `sync-v<version>` |
 | Suite Go | `apps/go/app.config.json` | none yet |
 | A shared package (`@suite/*`) | `packages/<name>/package.json` | none; consumed as `workspace:*` |
