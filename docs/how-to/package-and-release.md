@@ -52,6 +52,31 @@ The tier branch is published on the same signed remote; the stable refs are not 
 [Packaging channels](../reference/packaging-channels.md#pre-release-tiers) for the identity and the
 desktop-entry rule.
 
+## GitHub releases
+
+GitHub shows one "Latest" release per repository, so this repository has one rolling Suite release
+tagged `suite-YYYY.MM.DD` and marked Latest. Its body is a table of every app's current version, its
+release date, a link to that app's own release and the install command. Per-app releases
+(`start-v<version>`, `canvas-v<version>`, `sync-v<version>`) stay as history and are not marked
+Latest.
+
+Both come from the versions already in the tree. The script reads `package.json` and the
+`## [version] - YYYY-MM-DD` section of the changelog, refuses a version with no section, and does
+nothing to GitHub unless `--publish` is passed:
+
+```sh
+mise exec -- node scripts/release-status.mjs             # dry run: every command and body
+mise exec -- node scripts/release-status.mjs --write     # refresh RELEASES.md only
+mise exec -- node scripts/release-status.mjs --publish   # create or update the releases
+```
+
+A missing tag is created at the commit that added its changelog section; an existing tag is never
+moved. [`RELEASES.md`](../../RELEASES.md) is the human mirror of the Latest release and is generated
+from the same data, so do not edit its table by hand.
+
+The signed Flatpak remote above remains the update path. Per-app releases carry no app binaries, and
+GitHub Packages is not used for the Flatpaks.
+
 ## The relay
 
 ```sh
