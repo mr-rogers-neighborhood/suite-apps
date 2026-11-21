@@ -591,7 +591,8 @@ function NodeDetail({
     ? undefined
     : file?.symbols.find((candidate) => candidate.id === entry.id);
   const activeSymbol = symbol ?? focusSymbol;
-  const note = tourStep?.note ?? activeSymbol?.note ?? file?.note ?? "";
+  const durableNote = activeSymbol?.note ?? file?.note ?? "";
+  const note = tourStep?.note ?? durableNote;
   const jsdoc = !note && activeSymbol?.jsdoc ? activeSymbol.jsdoc : "";
   const moduleTitle = moduleId ? (moduleById.get(moduleId)?.title ?? moduleId) : "config";
   const title = symbol?.name ?? file?.name ?? entry.label;
@@ -653,6 +654,14 @@ function NodeDetail({
 
       <div className="mt-5 space-y-5">
         {note ? <Note>{note}</Note> : null}
+        {tourStep?.note && durableNote && durableNote !== tourStep.note ? (
+          <div className="space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-fd-muted-foreground">
+              From the module note
+            </p>
+            <Note>{durableNote}</Note>
+          </div>
+        ) : null}
         {jsdoc ? (
           <div className="space-y-1">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-fd-muted-foreground">

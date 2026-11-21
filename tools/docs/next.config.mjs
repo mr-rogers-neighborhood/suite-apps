@@ -17,6 +17,25 @@ const config = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/docs/walkthroughs",
+        destination: "/docs/tours",
+        permanent: true,
+      },
+      {
+        source: "/docs/walkthroughs/:path*",
+        destination: "/docs/tours/:path*",
+        permanent: true,
+      },
+      {
+        source: "/walkthroughs",
+        destination: "/explore?view=tours",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default withMDX(config);
