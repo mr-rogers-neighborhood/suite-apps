@@ -1,0 +1,93 @@
+---
+module: apps/canvas/src/canvas
+title: Canvas / Canvas
+summary: "The board surface: placements drawn as nodes, gestures with one owner, and a camera over a document it never writes."
+---
+
+The board is a projection of one workspace onto one surface. `board/BoardView.tsx`
+builds the hooks in the order they depend on each other and hands the result to
+two components: `board/BoardSurface.tsx` hosts the React Flow element and
+`board/BoardOverlays.tsx` holds the layers beside it. Placements become nodes,
+edges become routes, and a section is drawn in a viewport portal because it is not
+a React Flow node.
+
+Nothing in this module is document truth. Cards, placements, sections and links
+are read from the snapshot the store projects and written through `@suite/graph`;
+the directory owns the camera, folding, selection, marquee flags and the transient
+half of a drag, all of which a reload may forget. The pure geometry — snapping,
+link anchors, zoom bands, section header slots — takes data and returns data, so
+the preview and the committed result come from one function.
+`apps/canvas/docs/reference/canvas.md` owns the gesture table and the board module
+map; this page records the invariants a reader needs before changing one.
+
+## apps/canvas/src/canvas/board/BoardView.tsx#BoardView
+
+Hook order is the invariant. The projection is derived first, then the refs that
+hold gesture flags, then sections, nodes, selection, commands, keyboard and menu,
+each reading what the one before it produced. A hook moved above its dependency
+compiles and then reads an empty map for a frame, which is how a live section
+offset or a node's selectable flag goes missing mid-gesture.
+
+The board root listens for `pointerdown` on the capture phase. React Flow stops the
+pane's own `pointerdown` from propagating, so a bubble handler on the root never
+sees a press on empty canvas, and every marquee would start from "no section".
+Pointer presence is published from the same root, throttled, in flow coordinates.
+A recorded tour claims the click on the capture phase too, because the purpose has
+to decide the gesture before the card or React Flow does.
+
+## apps/canvas/src/canvas/board/BoardSurface.tsx#BoardSurface
+
+The React Flow element, configured for a document rather than a diagram.
+`onlyRenderVisibleElements` unmounts a card outside the viewport while React Flow
+keeps its measured size and handle bounds, which is why an edge still routes and a
+connector still measures when the card returns. `deleteKeyCode` is `null`: React
+Flow cannot remove a card behind the document's back, and every key is read in
+`useBoardKeyboard`.
+
+Capabilities gate the surface: `nodesDraggable`, `nodesConnectable` and
+`edgesReconnectable` follow the session, and the reader's `locked` mode is layered
+on top as a second refusal. Panning and zooming stay in every mode; selection
+leaves with the drag. Double-click on the pane creates, so `zoomOnDoubleClick` is
+off — one gesture cannot both make a card and move the camera.
+
+## apps/canvas/src/canvas/board/useBoardProjection.ts#useBoardProjection
+
+Every board-scoped map is derived once per snapshot change and nothing here
+writes. `boardPlacements` is keyed by card id, `boardOrder` is paint order (z, then
+creation time, then id), and `linkScene` carries the placements, sections, cards
+and portals a link endpoint can resolve against. A trashed card is dropped from
+`boardCards`, so it cannot anchor a line.
+
+A board endpoint has no position of its own. It is drawn through the first portal
+that opens that board, in paint order, and a board with no portal therefore has no
+line while the relationship stays in the inspector. That rule belongs here rather
+than in the edge component, because the geometry is what decides whether the link
+is drawable at all.
+
+## apps/canvas/src/canvas/board/useBoardNodes.ts#useBoardNodes
+
+Placements become React Flow nodes here. The node type is chosen from the card:
+`isWhiteboardCard` first, then `isPortalCard`, else `note`. React Flow holds the
+transient state — drag position, live selection, measured size — and this hook
+reconciles it with the snapshot whenever either side changes.
+
+A drag keeps two positions and writes one. The pointer sample updates the easing
+target and a frame loop paints the motion; the document is written once on
+release. A peer's drag is eased toward the broadcast position instead and stops
+when the payload clears, so a remote gesture never becomes a local save. A node
+whose data and position did not change is returned as the same object, which is
+what keeps a card that did not move from remounting its editor.
+
+## apps/canvas/src/canvas/board/useBoardCamera.ts#useBoardCamera
+
+The camera is reader state, one viewport per board in `useUiStore.boardViewports`.
+It is written from `onMoveEnd` and once when a board opens, so a return lands where
+the reader left rather than at a default. Nothing about it reaches the document,
+which is why two people on one board can look at different corners.
+
+Navigation is one-shot: a caller sets `viewportRequest` with a nonce, the camera
+consumes it once, and a null viewport means "fit this board's content". Focus
+requests poll for a node that React Flow has not registered yet, cap their zoom and
+arrive instantly under reduced motion. `boardHistory` records how a board was
+entered; an entry with `via: "portal"` is what makes Escape step back to the
+previous board and viewport instead of only clearing the selection.

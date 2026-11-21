@@ -1,0 +1,49 @@
+---
+module: apps/canvas/src/reader
+title: Canvas / Reader
+summary: "EPUB reading: the chapter surface, highlights as records, and the carry into a card."
+---
+
+A book is a `media` block with `kind: "epub"`, so its bytes take the same path
+every attachment takes and the workspace file carries them when it leaves. This
+module reads that archive: `BookReader` presents one chapter at a time,
+`ReaderChapter` sanitises and draws the markup, highlights are records in the
+document rather than cards, and `promote.ts` turns one into an ordinary card on a
+gesture.
+
+The reader owns its own surface state — which chapter is open, where this reader
+stopped, whether a highlight is raised — and writes none of it to the document.
+The annotations and their styles are document roots, so two readers see the same
+highlights; a reading position and a raised surface are per reader. The handbook's
+"Reading a book" section owns the user-facing rules; these notes are the two places
+where the code makes a promise.
+
+## apps/canvas/src/reader/ReaderChapter.tsx#ReaderChapter
+
+This is the one `dangerouslySetInnerHTML` site in the app, and it is one function
+in one file for that reason. `sanitiseChapter` decides what survives — no script,
+no handlers, no frames, no remote images or fonts — and this component renders the
+result. `scripts/check-shape.mjs` names the file so a second injection site cannot
+appear quietly.
+
+The chapter's markup is the source and a highlight is a wrapper around a range,
+never a second copy of the words. `paintHighlights` segments each match against the
+chapter's own text index, one range per text node, because `Range.surroundContents`
+throws when a range crosses an element. A repaint unwraps the marks already there
+before it draws, and a highlight is painted only when its `locator` names this
+chapter; one that cannot be placed is counted and reported rather than guessed.
+
+## apps/canvas/src/reader/promote.ts#promoteAnnotation
+
+A promotion reads the annotation back from the document before it decides
+anything. The caller's copy may predate a write, and a promotion that trusted it
+would make a second card and overwrite the record's link to the first. The record's
+`cardId` is therefore the single answer: an existing live card is opened, a trashed
+card is reported and not replaced, and only a record with no card makes one.
+
+Making one is a batch. `createCard`, `setTitleText`, `addField`, `setProperty` and
+`setAnnotationCard` each commit on their own, so `workspace.batch` is what makes
+one gesture one undo step. One highlight produces one card: the destinations the
+reader mapped are places on that card, not reasons for more, and a type's template
+supplies the body while promotion supplies the mapping, the read-only `annotation`
+property and the book it came from.

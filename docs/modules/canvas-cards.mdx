@@ -1,0 +1,61 @@
+---
+module: apps/canvas/src/cards
+title: Canvas / Cards
+summary: "The card face, its two editors and the field controls that write through the graph."
+---
+
+A card is identity plus types, properties, tags and two rich-text containers. This
+module draws that record on the canvas and in the inspector, and it is where a
+reader's edit becomes a document write. `NodeCard` chooses which face a card
+shows, `CardBodyEditor` mounts the one editor that owns the caret, and
+`PropertyField` is the single control set for field kinds.
+
+The module owns no record. The card it paints arrives from the projection, the
+title and body are Loro containers it binds temporarily, and every field commit
+goes through `WorkspaceDocument`. Reader preferences — which card is folded, which
+surface owns the caret — live in `useUiStore`; the body text never does.
+`apps/canvas/docs/reference/editing.md` owns the editor contract; these notes are
+the stops where the card meets it.
+
+## apps/canvas/src/cards/NodeCard.tsx#NodeCard
+
+One card, one editor. `CardBodyArea` answers with three faces, and each is a
+different thing rather than a mode: a view card presents a saved view, a book card
+draws its own cover, and everything else shows the static face until the card is
+the one being written. A pinned card keeps its editor in the shell, so the board
+paints a static face and there is still only one caret per body.
+
+The face is a layout decision, not a permission. Editing is decided above it by
+the session (`canEditContent`) and by `editingSurface`, and a read-only card passes
+`readOnly` down instead of hiding the body. That split is what lets the same
+component serve a board, an inspector and a share without three copies of the "may
+I type" rule.
+
+## apps/canvas/src/cards/CardBodyEditor.tsx#CardBodyEditor
+
+The body editor binds exactly one Loro container to one Tiptap editor. It appends
+`cardBodySchemaExtensions` for the schema and `LoroCollaboration` for the plugins,
+so the node set and the collaboration layer can be tested apart. `readOnly` leaves
+the placeholder out and never focuses the editor; it does not unmount it, because a
+read-only passage still has to draw mentions and media.
+
+One client can mount the same body twice — the canvas card and the panel — and
+`loro-prosemirror` ignores a local commit in every editor except the one that
+authored it. The local mirror rebuilds the twin from the container when the other
+surface or a workspace call writes, tagged as a non-local update so the caret store
+is untouched. The editor's own event is skipped, because its document already
+matches Loro.
+
+## apps/canvas/src/cards/PropertyField.tsx#FieldValueInput
+
+`FieldValueInput` is the one control set for `text`, `date`, `number`, `checkbox`,
+`select`, `multiSelect`, `card` and `board`. The inspector, the inline property
+block and any future cell all pass through it, which is what stops two surfaces
+from disagreeing about what a date is or what clearing means.
+
+The draft is local and the write is not per keystroke. Enter blurs and the blur
+commits; Escape restores the stored value, marks the edit cancelled and blurs; a
+blur with no change ends the edit without a write. A number or date that fails to
+parse calls `onCancel`, so an invalid value is discarded rather than stored as
+text, and an empty input commits `null`, which clears the property instead of
+storing an empty string.

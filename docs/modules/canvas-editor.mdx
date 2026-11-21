@@ -1,0 +1,60 @@
+---
+module: apps/canvas/src/editor
+title: Canvas / Editor
+summary: "The body schema, the collaboration plugins and the media nodes behind every card."
+---
+
+This module is Tiptap and ProseMirror bound to Loro. `cardEditorExtensions.ts`
+owns the node and mark schema of a card body, `LoroCollaboration.ts` adds the sync,
+undo and cursor plugins, and one file per node decides what a mention, a media
+block, an embed or a tour step stores. `CardBodyEditor` is the only component that
+mounts the result.
+
+The split is deliberate. The schema can be built without a document, so a test can
+compare it with the publish allowlist; the collaboration layer contributes plugins
+and shortcuts but no nodes, so an editor's undo stack and its content shape are
+separate decisions. Media bytes live beside the document, not inside it.
+`apps/canvas/docs/reference/editing.md` owns the editing rules; these notes are the
+seams the rest of the app depends on.
+
+## apps/canvas/src/editor/LoroCollaboration.ts#LoroCollaboration
+
+One extension instance binds one editor to one Loro container. The title and the
+body each get their own, which is why renaming a card does not touch its body and
+why the two have separate undo origins (`text:title`, `text:body`).
+
+The undo manager excludes `struct:` and `sys:init` by prefix, plus any origin the
+caller names, so a structural edit committed by the document never appears in the
+text stack. `Mod-z`, `Mod-y` and `Mod-Shift-z` are bound here rather than by the
+schema, and the cursor plugin is added only when a cursor store exists. The
+invariant is scoped undo: what a keystroke reverses is decided by which editor the
+caret is in, and no editor reaches into another card's text.
+
+## apps/canvas/src/editor/cardEditorExtensions.ts#cardBodySchemaExtensions
+
+The body schema, with no collaboration in it. StarterKit supplies the block nodes
+and marks with its own undo history disabled, because `LoroCollaboration` ships
+one. Every other node is registered here: mention, property block, slash menu,
+the `media` block new content writes, the legacy `attachment`, `image`, `video` and
+`youtube` nodes, embed and tour step. A node absent from this list cannot appear in
+a body, whatever a caller tries to insert.
+
+Adding a node or an attribute is a two-file change. `richTextSchema.ts` in the
+graph package is the publish allowlist, and the contract test fails until the
+allowlist names the new node, mark or attribute. The legacy media nodes stay
+registered on purpose: a document written before the `media` block existed must
+keep rendering, and `migrateLegacyMedia` converts it the first time the body is
+edited.
+
+## file: apps/canvas/src/editor/editorSchemaContract.test.ts
+
+The contract is the test's whole subject: build the schema the way the editor does,
+minus collaboration, and compare its node names, mark names and per-node attributes
+with the publish allowlist. A failure names what is missing and what is extra in
+both directions, so the fix is either the allowlist or the extension and never a
+guess.
+
+This is the gate on what a shared body may contain. A publish copies content into
+a different document, so a node the allowlist does not name would be dropped or
+misread on arrival. The test is inexpensive and runs without a document, which is
+why it can be required on every change instead of only on a publish path.
