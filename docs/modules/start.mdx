@@ -55,9 +55,9 @@ install can still appear as a card.
 ## apps/start/src/installs.ts#registryAt
 
 `installs.json` is Start's knowledge and the only file that names an executable.
-It lives in Start's data directory, never beside a document, and a relative
-path is refused on read as well as on write: a record that arrived from
-somewhere else is still a path this process would spawn.
+It lives under Start's own name in the suite config directory, never beside a
+document, and a relative path is refused on read as well as on write: a record
+that arrived from somewhere else is still a path this process would spawn.
 
 The record is written last during an install, so a card may only claim an
 install that is complete.
