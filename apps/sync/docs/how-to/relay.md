@@ -35,7 +35,7 @@ A contributor builds it from a checkout instead:
 node scripts/flatpak.mjs --app sync
 ```
 
-That packages the unpacked build `apps/sync/app/release/linux-unpacked`, signs the repository summary
+That packages the unpacked build `.artifacts/sync-app/linux-unpacked`, signs the repository summary
 with the store key, publishes it to `~/suite-flatpak/repo` and installs `run.suite.sync` from
 `suite-local`. The manifest is `packaging/flatpak/run.suite.sync.yml`; `--no-build` reuses an unpacked
 tree that already exists. Either install updates with `flatpak update --user`; the app has no updater
@@ -332,7 +332,7 @@ The monorepo has one release path, and the Flatpak is built by the same script a
 
 ```sh
 node scripts/flatpak.mjs --app sync              # package, sign, publish and install locally
-node scripts/flatpak.mjs --app sync --no-build   # reuse apps/sync/app/release/linux-unpacked
+node scripts/flatpak.mjs --app sync --no-build   # reuse .artifacts/sync-app/linux-unpacked
 ```
 
 The manifest packages the unpacked build `package:dir` produced, so the relay inside the app is the

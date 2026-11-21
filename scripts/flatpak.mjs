@@ -117,7 +117,9 @@ const APPS = {
     manifest: join(ROOT, "packaging", "flatpak", "run.suite.sync.yml"),
     desktop: join(ROOT, "packaging", "flatpak", "run.suite.sync.desktop"),
     metainfo: join(ROOT, "packaging", "flatpak", "run.suite.sync.metainfo.xml"),
-    unpacked: join(ROOT, "apps", "sync", "app", "release", "linux-unpacked"),
+    // Outside apps/sync: the app depends on @suite/sync-server, whose package root that is, so
+    // an output inside it would be copied into the app as a dependency.
+    unpacked: join(ROOT, ".artifacts", "sync-app", "linux-unpacked"),
   },
 };
 

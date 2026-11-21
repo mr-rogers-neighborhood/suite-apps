@@ -6,12 +6,20 @@ executableName: suite-sync
 copyright: Copyright © Suite contributors
 
 directories:
-  output: release
+  # Outside `apps/sync` on purpose. The app depends on `@suite/sync-server`, whose package root
+  # is `apps/sync`, so an output inside it is copied back in as a dependency. This path can never
+  # be an input to the build it holds.
+  output: ../../../.artifacts/sync-app
   buildResources: build
 
 files:
   - dist/**/*
   - package.json
+  - "!**/*.map"
+  # electron-builder copies a workspace dependency's whole directory. The relay needs only the
+  # server's `dist` and runtime dependencies, not the Electron shell, sources, tests or docs that
+  # live beside it. `scripts/check-package.mjs` fails the package if this regresses.
+  - "!node_modules/@suite/sync-server/{app,docs,deploy,packages,scripts,src}/**"
 
 asar: true
 

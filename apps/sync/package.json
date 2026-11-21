@@ -7,6 +7,10 @@
   "bin": {
     "suite-sync": "./dist/cli.js"
   },
+  "files": [
+    "dist/**/*",
+    "package.json"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/cli.js",
