@@ -34,7 +34,8 @@ The rules that shape Start.
   commit Flatpak reports and Open; or a problem that names why neither is possible. When Flatpak or a
   Suite remote is missing the pane says so instead of drawing a dead control. Start does not show the
   relay's address, code, fingerprint or console, because the app already does and Start would only be
-  repeating a value it does not own.
+  repeating a value it does not own. At startup Start removes the legacy `hub.json` an older Start
+  wrote, because Canvas still reads it and a stale report would claim a relay that is not running.
 - A relay may run on this machine or another. Either way Start manages no relay process, and the apps
   reach it through the address and pin entered in their own Sync dialog.
 - Start is not in the data path. It returns a path or a URL and launches a separate process. It never

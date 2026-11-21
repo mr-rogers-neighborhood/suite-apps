@@ -55,6 +55,7 @@ import {
 } from "./hostPaths.js";
 import { REGISTRY_FILENAME, type RegistryStore, registryAt } from "./installs.js";
 import { stopApproach } from "./launchCommand.js";
+import { clearLegacyHubReport, legacyHubReportPath } from "./legacyHubReport.js";
 import { type NativePackageBackend, nativePackageBackend } from "./nativePackageBackend.js";
 import { defaultRoots, nodeRegistryFileSystem } from "./nodeFileSystem.js";
 import type { PackageLaunchObserver, PackageListing } from "./packageBackend.js";
@@ -1209,6 +1210,20 @@ if (!gotLock) {
 
   void app.whenReady().then(async () => {
     dataDirectory = process.env.SUITE_START_DATA?.trim() || join(app.getPath("userData"));
+
+    // A Start that supervised a relay left `hub.json` behind, and Canvas still reads
+    // it. This Start owns no relay, so the stale claim is removed before the first
+    // window can report Sync state or a restore kit can connect to it.
+    const legacyHub = {
+      platform: process.platform,
+      home: app.getPath("home"),
+      xdgDataHome: dataHome(),
+    };
+    if (!(await clearLegacyHubReport(legacyHub))) {
+      console.warn(
+        `[sync] could not remove the legacy hub report at ${legacyHubReportPath(legacyHub)}`,
+      );
+    }
 
     // The cross-form lock in the suite config directory. Electron's own lock lives in
     // `userData`, which differs between a dev run and a Flatpak, so without this each

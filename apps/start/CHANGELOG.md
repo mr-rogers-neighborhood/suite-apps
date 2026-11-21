@@ -16,7 +16,8 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
   owns the relay and shows its own address, relay code and fingerprint; Start no longer looks for a
   `suite-sync` binary, starts or stops a child process, makes the relay's TLS pair, or draws its
   console and relay code. The Sync tab says one of three things: not installed with **Install**,
-  installed with the version, commit and **Open**, or a problem that names what is missing.
+  installed with the version, commit and **Open**, or a problem that names what is missing. Start also
+  deletes the legacy `hub.json` an older Start wrote, so Canvas cannot read a stale relay address.
 
 ## [0.5.1] - 2026-11-21
 
