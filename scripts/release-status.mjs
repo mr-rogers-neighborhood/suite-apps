@@ -8,8 +8,8 @@
  *
  * - **One rolling Suite release**, tagged `suite-YYYY.MM.DD`, marked Latest. Its
  *   body is a table of every app's current version, its release date, a link to
- *   that app's own release and how it is installed: a Flatpak command, the relay
- *   guide, or the debug-signed Suite Go APK attached to this same release.
+ *   that app's own release and how it is installed: a Flatpak command, or the
+ *   debug-signed Suite Go APK attached to this same release.
  * - **One release per app**, tagged `<app>-v<version>`, kept as history and
  *   never marked Latest. It carries the changelog section and an install block;
  *   it carries no app binaries, because the signed Flatpak remote is the update
@@ -62,9 +62,8 @@ export const NOTES_DIR = ".dev/releases";
  * `kind` says where the installed bytes come from, and `installCell` is the one
  * place that turns it into a cell:
  *
- * - `flatpak` — a signed deployment on the OSTree remote.
+ * - `flatpak` — a signed deployment on the OSTree remote, including the relay.
  * - `apk` — a debug-signed APK attached to the rolling suite release.
- * - `relay` — a server tarball, installed from its own guide.
  *
  * `section` is the table a row belongs to: `desktop` or `mobile`. The table is
  * rendered by `aggregateSection`, which takes a title and the entries to render,
@@ -130,9 +129,9 @@ export const APPS = [
     packageJson: "apps/sync/package.json",
     changelog: "apps/sync/CHANGELOG.md",
     tagPrefix: "sync-v",
-    kind: "relay",
+    kind: "flatpak",
     section: "desktop",
-    flatpakId: null,
+    flatpakId: "run.suite.sync",
   },
   {
     id: "help",
@@ -154,8 +153,7 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --date <YYYY-MM-DD>  date for the aggregate tag (default: the newest app release)
   --help               print this text
 
-Pass one of --publish, --write and --dry-run. A relay release must already exist
-(\`node scripts/release.mjs sync --publish\`); this script only edits its body.
+Pass one of --publish, --write and --dry-run.
 
 The versions come from each app's package.json; the dates from its changelog.
 `;
@@ -249,7 +247,7 @@ export function installCell(app, { version = null, tag = null, apkLive = false }
     }
     return `\`${name}\` (not uploaded yet)`;
   }
-  return `[relay tarball](${blobUrl("apps/sync/docs/how-to/relay.md")})`;
+  throw new Error(`no install cell for kind ${String(app.kind)}`);
 }
 
 function escapeRegExp(value) {
@@ -316,61 +314,17 @@ export function aggregateDate(entries, override = null) {
   return dates.reduce((newest, date) => (date > newest ? date : newest));
 }
 
-/** The one instruction a refused relay release always gives. */
-const RELAY_PUBLISH_SENTENCE =
-  "The relay's tarball and signature are published by `node scripts/release.mjs sync --publish`; " +
-  "run that first, then this edits its body.";
-
-/** True for an asset that makes a relay release installable or verifiable. */
-export function isRelayAsset(name) {
-  return /\.(?:tar|tar\.(?:gz|xz|zst)|tgz)$/iu.test(name) || /^SHA256SUMS$/u.test(name);
-}
-
-/**
- * Why an existing relay release may not be edited, or null when it may.
- *
- * The release must already carry its tarball or checksums: an existing
- * `sync-v<version>` with only a body would keep looking installable while
- * `scripts/release.mjs sync --publish` has never put the bytes there. An
- * unreadable asset list is refused too, because the guard cannot verify it.
- */
-export function relayAssetProblem(tag, assets) {
-  if (!Array.isArray(assets)) {
-    return (
-      `could not read the assets of ${tag}, so it is unknown whether its tarball and checksums ` +
-      `are there. ${RELAY_PUBLISH_SENTENCE}`
-    );
-  }
-  const names = assets.map((asset) => asset?.name ?? "");
-  if (names.some(isRelayAsset)) return null;
-  return `the GitHub release ${tag} carries no tarball or checksum asset. ${RELAY_PUBLISH_SENTENCE}`;
-}
-
 /**
  * What a publish may do with one release, or why it must not.
  *
- * A desktop app or the mobile APK release may be created: its artifact already
- * exists elsewhere (the signed remote, or the rolling release). The relay may
- * not: its tarball and signature belong to
- * `scripts/release.mjs sync --publish`, and an assetless `sync-v<version>`
- * release would look installable while carrying nothing. Its body is edited in
- * place, so the assets stay; `assets` is read before this decides.
+ * Every artifact already exists elsewhere — the signed Flatpak remote, the
+ * rolling release's APK — so a release page is created when missing and edited
+ * in place when it exists. An existing page keeps whatever assets it carries.
  */
-export function releaseAction({ app, tag, exists, assets }) {
-  if (exists) {
-    if (app.kind !== "relay") return { action: "edit", problem: null };
-    const problem = relayAssetProblem(tag, assets);
-    return problem === null
-      ? { action: "edit", problem: null }
-      : { action: null, problem };
-  }
-  if (app.kind === "relay") {
-    return {
-      action: null,
-      problem: `no GitHub release exists for ${tag}. ${RELAY_PUBLISH_SENTENCE}`,
-    };
-  }
-  return { action: "create", problem: null };
+export function releaseAction({ exists }) {
+  return exists
+    ? { action: "edit", problem: null }
+    : { action: "create", problem: null };
 }
 
 /** Why an unknown origin tag state blocks a decision, or null when it is known. */
@@ -499,12 +453,6 @@ export function aggregateSection(title, entries, options = {}) {
   return [`## ${title}`, "", ...aggregateTable(entries, options)];
 }
 
-/** True when the relay's release is refused or not published yet. */
-function relayPending(entries) {
-  const relay = entries.find((entry) => entry.app.kind === "relay") ?? null;
-  return relay !== null && relay.pending === true;
-}
-
 /**
  * The paragraph that explains the Suite Go row.
  *
@@ -528,23 +476,6 @@ function goInstallNote(entries, { tag = null, apkLive = false }) {
     "`node scripts/android-release.mjs --publish` uploads it, and the link appears once it is there.",
     "",
   ];
-}
-
-/** The paragraph that explains the Suite Sync row. */
-function relayInstallNote(entries, { pending, page }) {
-  return pending
-    ? [
-        "The Suite Sync relay release is pending; its tarball and `SHA256SUMS` are published by",
-        page
-          ? "`node scripts/release.mjs sync --publish`, and this page links it after that."
-          : "`node scripts/release.mjs sync --publish`, and this release links it once they are.",
-        "",
-      ]
-    : [
-        "Suite Sync is a server tarball, not a Flatpak. It is installed and verified by hand from",
-        `[its guide](${blobUrl("apps/sync/docs/how-to/relay.md")}).`,
-        "",
-      ];
 }
 
 /**
@@ -573,7 +504,6 @@ export function aggregateReleaseBody(entries, { date, tag = null, apkLive = fals
     "",
     ...aggregateSection("Desktop", entriesForSection(entries, "desktop"), { tag, apkLive }),
     "",
-    ...relayInstallNote(entries, { pending: relayPending(entries), page: false }),
     ...aggregateSection("Mobile", entriesForSection(entries, "mobile"), { tag, apkLive }),
     "",
     ...goInstallNote(entries, { tag, apkLive }),
@@ -599,20 +529,7 @@ export function aggregateReleaseBody(entries, { date, tag = null, apkLive = fals
 export function appReleaseBody(app, section, { tag = null, apkLive = false } = {}) {
   const lines = [section.trim(), "", "## Install", ""];
 
-  if (app.kind === "relay") {
-    lines.push(
-      "Suite Sync is a server tarball, not a Flatpak. This release carries the tarball and its",
-      "signed `SHA256SUMS`; the host needs Node.js 22 or later, and the person replaces the tree",
-      "deliberately. There is no remote and no automatic update.",
-      "",
-      "```sh",
-      "sha256sum -c SHA256SUMS",
-      "```",
-      "",
-      `Read [Leave a relay running](${blobUrl("apps/sync/docs/how-to/relay.md")}) before exposing it.`,
-      "",
-    );
-  } else if (app.kind === "apk") {
+  if (app.kind === "apk") {
     const releaseLink = tag === null ? latestReleaseUrl() : releaseUrl(tag);
     lines.push(
       "Suite Go is a mobile app, not a Flatpak.",
@@ -699,7 +616,6 @@ export function releasesPage(
       apkLive,
     }),
     "",
-    ...relayInstallNote(entries, { pending: relayPending(entries), page: true }),
     ...aggregateSection("Mobile", entriesForSection(entries, "mobile"), {
       markPending: true,
       tag,
@@ -1114,14 +1030,11 @@ async function main(argv) {
     const exists = knownReleases.some((row) => row.tagName === entry.tag);
     entry.published = releases !== null && exists;
     if (releases === null) {
-      entry.action = entry.app.kind === "relay" ? "edit" : "create";
+      entry.action = "create";
       entry.actionProblem = null;
       continue;
     }
-    // The relay's body is edited in place, so its assets are what make the
-    // release real; read them before deciding that "edit" is safe.
-    const assets = exists && entry.app.kind === "relay" ? releaseAssets(entry.tag) : undefined;
-    const action = releaseAction({ app: entry.app, tag: entry.tag, exists, assets });
+    const action = releaseAction({ exists });
     entry.action = action.action;
     entry.actionProblem = action.problem;
     if (action.problem !== null) {

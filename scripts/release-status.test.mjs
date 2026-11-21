@@ -18,10 +18,8 @@ import {
   installCell,
   installCommand,
   isDate,
-  isRelayAsset,
   parseArgs,
   planTag,
-  relayAssetProblem,
   releaseAction,
   releasesPage,
   remoteLookupProblem,
@@ -189,53 +187,12 @@ describe("tag choice", () => {
 });
 
 describe("release actions", () => {
-  it("creates a desktop app release that is missing", () => {
-    assert.deepEqual(
-      releaseAction({ app: start, tag: "start-v0.5.1", exists: false }),
-      { action: "create", problem: null },
-    );
+  it("creates a release that is missing", () => {
+    assert.deepEqual(releaseAction({ exists: false }), { action: "create", problem: null });
   });
 
-  it("edits a relay release that carries its tarball, so its assets stay", () => {
-    assert.deepEqual(
-      releaseAction({
-        app: sync,
-        tag: "sync-v0.11.3",
-        exists: true,
-        assets: [{ name: "suite-sync-0.11.3-x86_64.tar.gz" }],
-      }),
-      { action: "edit", problem: null },
-    );
-  });
-
-  it("refuses an existing but assetless relay release", () => {
-    const action = releaseAction({ app: sync, tag: "sync-v0.11.3", exists: true, assets: [] });
-    assert.equal(action.action, null);
-    assert.match(action.problem, /no tarball or checksum asset/u);
-    assert.match(action.problem, /release\.mjs sync --publish/u);
-    assert.match(action.problem, /run that first/u);
-  });
-
-  it("refuses to create an assetless relay release", () => {
-    const action = releaseAction({ app: sync, tag: "sync-v0.11.4", exists: false });
-    assert.equal(action.action, null);
-    assert.match(action.problem, /no GitHub release exists/u);
-    assert.match(action.problem, /release\.mjs sync --publish/u);
-  });
-});
-
-describe("relay assets", () => {
-  it("accepts a tarball or a checksum list", () => {
-    assert.equal(isRelayAsset("suite-sync-0.11.3-x86_64.tar.gz"), true);
-    assert.equal(isRelayAsset("SHA256SUMS"), true);
-    assert.equal(isRelayAsset("notes.txt"), false);
-    assert.equal(relayAssetProblem("sync-v0.11.3", [{ name: "SHA256SUMS" }]), null);
-  });
-
-  it("refuses an asset list it could not read", () => {
-    const problem = relayAssetProblem("sync-v0.11.3", null);
-    assert.match(problem, /could not read the assets/u);
-    assert.match(problem, /run that first/u);
+  it("edits a release that exists, so its assets stay", () => {
+    assert.deepEqual(releaseAction({ exists: true }), { action: "edit", problem: null });
   });
 });
 
@@ -270,7 +227,6 @@ describe("tag plans by mode", () => {
       aggregatePublished: true,
     });
     assert.match(page, /`sync-v0\.11\.3` \(pending\)/u);
-    assert.match(page, /relay release is pending/u);
     assert.doesNotMatch(page, /releases\/tag\/sync-v0\.11\.3/u);
     assert.match(page, /releases\/tag\/start-v0\.5\.1/u);
   });
@@ -290,12 +246,11 @@ describe("release bodies", () => {
     assert.doesNotMatch(body, /0\.5\.1/u);
   });
 
-  it("has no Flatpak command for the relay", () => {
+  it("gives the relay the same Flatpak install block as every desktop app", () => {
     const body = appReleaseBody(sync, entries[2].section);
-    assert.equal(installCommand(sync), null);
-    assert.doesNotMatch(body, /flatpak install/u);
-    assert.match(body, /server tarball/u);
-    assert.match(body, /SHA256SUMS/u);
+    assert.equal(installCommand(sync), "flatpak install --user suite run.suite.sync");
+    assert.match(body, /flatpak install --user suite run\.suite\.sync/u);
+    assert.doesNotMatch(body, /server tarball|SHA256SUMS/u);
   });
 
   it("states whether the Go APK is attached in the per-app body", () => {
@@ -327,23 +282,12 @@ describe("release bodies", () => {
     }
     assert.match(body, /releases\/tag\/start-v0\.5\.1/u);
     assert.match(body, /flatpak install --user suite run\.suite\.start/u);
-    assert.match(body, /relay tarball/u);
+    assert.match(body, /flatpak install --user suite run\.suite\.sync/u);
   });
 
-  it("renders the relay's install cell without inventing a Flatpak", () => {
-    assert.match(installCell(sync), /relay tarball/u);
-    assert.match(installCell(start), /flatpak install/u);
-  });
-
-  it("says the relay release is pending in the aggregate body when the guard refuses it", () => {
-    const pending = entries.map((entry) =>
-      entry.app.id === "sync" ? { ...entry, pending: true } : entry,
-    );
-    const body = aggregateReleaseBody(pending, { date: "2026-11-21" });
-    assert.match(body, /relay release is pending/u);
-    assert.match(body, /`sync-v0\.11\.3` \(pending\)/u);
-    assert.doesNotMatch(body, /releases\/tag\/sync-v0\.11\.3/u);
-    assert.doesNotMatch(body, /installed and verified by hand/u);
+  it("renders the relay as the Flatpak it now is", () => {
+    assert.equal(installCell(sync), "`flatpak install --user suite run.suite.sync`");
+    assert.equal(installCell(start), "`flatpak install --user suite run.suite.start`");
   });
 
   it("marks links pending before publication", () => {
