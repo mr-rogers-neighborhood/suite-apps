@@ -19,6 +19,14 @@ base-version: '25.08'
 command: run.suite.budget
 separate-locales: false
 
+# Build-time only. The Electron BaseApp's asar patchers rewrite `desktopName`
+# while the manifest builds (`patch-desktop-filename`, in Sync and Start); the
+# app commit carries a copy of the base's `/app/bin`, and nothing at runtime
+# reads either tool. `cleanup` only matches files a module installed, and these
+# came from the base, so the patterns have to run as cleanup commands.
+cleanup-commands:
+  - rm -f /app/bin/patch-desktop-filename /app/bin/patch-electron-desktop-filename
+
 finish-args:
   - --share=ipc
   - --socket=wayland

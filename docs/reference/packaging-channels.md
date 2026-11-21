@@ -49,6 +49,12 @@ The manifest packages the unpacked build `package:dir` produced, using zypak fro
 `org.electronjs.Electron2.BaseApp`. The wrapper, `.desktop`, `.metainfo.xml` and hicolor icons live
 beside the manifest.
 
+The commit carries no build-only tools: the BaseApp's asar patchers
+(`/bin/patch-desktop-filename` and `/bin/patch-electron-desktop-filename`) are cleaned from `/app`
+because only `build-commands` ever runs them. It also carries one Chromium locale, `en-US.pak`.
+Nothing in the tree has an i18n framework or a translated string, so electron-builder keeps only
+`en-US` (`electronLanguages`) and drops the other 54 `locales/*.pak`, about 7.5 MiB per app.
+
 ```sh
 node scripts/flatpak.mjs                       # Canvas: package, build, publish, install
 node scripts/flatpak.mjs --app planner         # Planner, same path
@@ -145,10 +151,19 @@ the S3 cache classes and the invalidation paths.
 
 `node scripts/flatpak-remote.mjs` is a dry run. It prints the branch, the refs and the bytes it would
 publish, and refuses a dirty tree or a HEAD that `.dev/gate-status.json` does not prove, with the same
-rule the gate uses. With `--publish` it runs `flatpak build-update-repo --gpg-sign=<store key>` on
+rule the gate uses. With `--publish` it runs
+`flatpak build-update-repo --generate-static-deltas --gpg-sign=<store key>` on
 `~/suite-flatpak/repo`, verifies the fresh summary in a throwaway Flatpak installation, writes
 `~/suite-flatpak/suite.flatpakrepo`, and publishes the same bytes. It never builds a second
 repository. Publication copies bytes and commits nothing, so the gate proof stays on HEAD.
+
+Both `flatpak.mjs` and the publisher pass `--generate-static-deltas`, so `~/suite-flatpak/repo`
+carries a `deltas/` tree and its `delta-indexes/`: an update from one build to the next downloads the
+objects that changed instead of the whole ref. A delta is named for the pair of commits it joins and
+an index for the commit it describes, so a name never describes different bytes, and a client asks
+for the index before the superblock. Deltas for the `Debug` runtime are skipped
+(`--static-delta-ignore-ref=run.suite.*.Debug`, matched against the ref's app id): it is `autodelete`
+and `no-autodownload`, so no client ever fetches one.
 
 The public store is the path a person installs from:
 
@@ -159,14 +174,14 @@ node scripts/flatpak-remote.mjs --target s3 --publish    # upload, then invalida
 
 `--target s3` needs `SUITE_FLATPAK_S3_BUCKET` and `SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION` (or
 `--bucket` and `--distribution`), and `--publish` also needs the `aws` CLI on `PATH`; it refuses
-without them. The upload syncs `objects/`, `refs/` and `summaries/` with
+without them. The upload syncs `objects/`, `refs/`, `summaries/`, `deltas/` and `delta-indexes/` with
 `Cache-Control: public,max-age=31536000,immutable`, and copies `summary`, `summary.sig`,
 `summary.idx`, `summary.idx.sig` and `suite.flatpakrepo` with `Cache-Control: no-cache`. The object
-trees never pass `--delete`: OSTree objects are content-addressed, so an old object is harmless and a
-client may still be fetching it. `summaries/` is the cached-summary tree an OSTree client fetches
-after reading `summary.idx`; publishing the index without it fails the client with a 403. After the
-upload it invalidates those five summary paths, because they are the only names that change between
-publications.
+trees never pass `--delete`: OSTree objects, static deltas and delta indexes are content-addressed, so
+an old one is harmless and a client may still be fetching it. `summaries/` is the cached-summary tree
+an OSTree client fetches after reading `summary.idx`; publishing the index without it fails the client
+with a 403. After the upload it invalidates those five summary paths, because they are the only names
+that change between publications; a new delta is a new path, so nothing invalidates it.
 
 `suite-dev` stays the local test remote, at:
 

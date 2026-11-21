@@ -23,6 +23,12 @@ files:
 
 asar: true
 
+# Only Chromium's US English locale ships. Nothing in the tree has an i18n
+# framework or a translated string, so every other `locales/*.pak` was dead
+# weight; `en-US.pak` stays because it is Chromium's fallback.
+electronLanguages:
+  - en-US
+
 # The switches an attacker cannot turn back on after packaging.
 electronFuses:
   # This app has two entry points. The window is the app; the other is the relay on an
