@@ -13,7 +13,7 @@ apps/
   help/         @suite/help documentation app: explorer and handbook
   sync/         @suite/sync-server; packages/protocol, packages/host; deploy, docs
   go/           @suite/go-app mobile container; packages/go contract; docs
-packages/       contracts, files, desktop, theme, ui
+packages/       contracts, files, document-runtime, desktop, theme, ui
 docs/           Cross-cutting documentation
 packaging/      Flatpak manifests
 scripts/        gate.mjs, flatpak.mjs, ci/, docs-check.mjs
@@ -49,6 +49,7 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/go` | `apps/go/packages/go` | Go module contract |
 | `@suite/contracts` | `packages/contracts` | Shared app and deployment contracts |
 | `@suite/files` | `packages/files` | Shared file envelopes |
+| `@suite/document-runtime` | `packages/document-runtime` | Shared document replica and atomic store |
 | `@suite/desktop` | `packages/desktop` | Shared Electron policy |
 | `@suite/theme` | `packages/theme` | Shared theme variables |
 | `@suite/ui` | `packages/ui` | Shared chrome |
@@ -56,8 +57,8 @@ owns the overrides, patches and build permissions the apps need.
 ## App-private and shared
 
 An app's private packages stay with it: `apps/canvas/packages/graph` is Canvas's, even though it is a
-workspace package. Only `@suite/contracts`, `@suite/files`, `@suite/desktop`, `@suite/theme` and
-`@suite/ui` are shared; they live at the root.
+workspace package. Only `@suite/contracts`, `@suite/files`, `@suite/document-runtime`,
+`@suite/desktop`, `@suite/theme` and `@suite/ui` are shared; they live at the root.
 
 ## Two names that look alike
 

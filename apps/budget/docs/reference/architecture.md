@@ -32,7 +32,7 @@ This page is the map. The rules are in [conventions.md](conventions.md), the rec
 │  Renderer (launcher + replica)                                                    │
 │  React 19 + Vite + Tailwind + Radix                                               │
 │    ├── Launcher: library list, new-budget wizard, import                           │
-│    ├── DocumentReplica: one observe call site → snapshot store                     │
+│    ├── DocumentReplica (@suite/document-runtime) → snapshot store                  │
 │    ├── Zustand: UI state only (view, month, selection, dialogs, notice)            │
 │    └── pure projections: monthState, targets, autoAssign, reports, importers       │
 └────────────────────────────────────────────────────────────────────────────────────┘
@@ -53,6 +53,10 @@ proven in [library.test.ts](../../src/main/library.test.ts).
 forwards it over `budget:commit` and rebuilds its derived snapshot. Main imports the delta and debounces
 an atomic write (400 ms). The same delta channel is what a relay would carry later, so the document
 layer does not change when sync arrives.
+
+The replica and the store mechanics are `@suite/document-runtime`, shared with Planner. Budget still
+supplies its own document factory (including the fresh peer id on load), `.budget` serializer,
+library path, and previous/daily backup policy.
 
 **Switch.** "All budgets" flushes main, closes the document, and re-renders the launcher. The renderer
 disposes the replica and its undo history.
