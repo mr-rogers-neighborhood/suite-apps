@@ -21,20 +21,20 @@
 
 ## Threats and mitigations
 
-| Threat                                 | Mitigation                                                                                                               |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Server reads documents                 | E2E encryption with a workspace epoch key; server stores ciphertext only.                                                |
-| Server is operated by a third party    | Same as above; the server is replaceable and sees no plaintext.                                                          |
-| Malicious member writes garbage        | Signed updates and schema validation in the app; server enforces role and membership before forwarding.                  |
-| Impersonation at join                  | An owner mints a single-use signed invitation; the relay spends it on the first key package and pins that device's key.  |
-| Stolen device                          | Owner revokes the member; epoch rotates; live connection is dropped. OS disk encryption protects the local file.         |
-| Replay of an old membership entry      | Strict `seq`, workspace binding, signature check, and an append-only log.                                                |
-| Replay of an old document update       | Loro version vectors and CRDT idempotence; an update already applied is a no-op.                                         |
-| Revoked member keeps reading           | A new epoch key is wrapped only to remaining members. Old ciphertext remains readable to old key holders; document this. |
-| Server deletes or withholds ciphertext | Availability is the operator's responsibility; members keep local copies and can export.                                 |
-| Server learns metadata                 | Accept that workspace ids, member keys, sizes and timing are visible to the relay. Minimize what is sent; document it.    |
+| Threat                                     | Mitigation                                                                                                                                                                                                                              |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Server reads documents                     | E2E encryption with a workspace epoch key; server stores ciphertext only.                                                                                                                                                               |
+| Server is operated by a third party        | Same as above; the server is replaceable and sees no plaintext.                                                                                                                                                                         |
+| Malicious member writes garbage            | Signed updates and schema validation in the app; server enforces role and membership before forwarding.                                                                                                                                 |
+| Impersonation at join                      | An owner mints a single-use signed invitation; the relay spends it on the first key package and pins that device's key.                                                                                                                 |
+| Stolen device                              | Owner revokes the member; epoch rotates; live connection is dropped. OS disk encryption protects the local file.                                                                                                                        |
+| Replay of an old membership entry          | Strict `seq`, workspace binding, signature check, and an append-only log.                                                                                                                                                               |
+| Replay of an old document update           | Loro version vectors and CRDT idempotence; an update already applied is a no-op.                                                                                                                                                        |
+| Revoked member keeps reading               | A new epoch key is wrapped only to remaining members. Old ciphertext remains readable to old key holders; document this.                                                                                                                |
+| Server deletes or withholds ciphertext     | Availability is the operator's responsibility; members keep local copies and can export.                                                                                                                                                |
+| Server learns metadata                     | Accept that workspace ids, member keys, sizes and timing are visible to the relay. Minimize what is sent; document it.                                                                                                                  |
 | Network attacker reads or alters transport | A reachable relay serves `wss://` with a self-signed certificate pinned by SHA-256; a mismatch refuses before the WebSocket opens. Loopback may stay `ws://`; a reachable plaintext bind needs `--allow-plaintext` and is warned about. |
-| Ghost cursor after a disconnect        | Presence is ephemeral with a TTL, separate from the document.                                                            |
+| Ghost cursor after a disconnect            | Presence is ephemeral with a TTL, separate from the document.                                                                                                                                                                           |
 
 ## What the relay holds
 
