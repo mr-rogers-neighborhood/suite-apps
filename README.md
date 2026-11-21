@@ -10,43 +10,52 @@ document is a file you own. There is no account, no telemetry, and no server ope
 
 ## The apps
 
-Install **Suite Start** first: it is the one piece you fetch by hand, and it installs, updates and
-opens everything else. On a phone, start with **Suite Go**. Canvas, Planner and Budget are the
-product; Sync and Help follow them.
+Install **Suite Start** first: it installs, updates and opens the other desktop apps. On a phone,
+install **Suite Go**.
+
+### Desktop
 
 | App | What it is | State | Install |
 | --- | --- | --- | --- |
 | **Suite Start** | The hub: installs, updates, opens and removes the other apps | Working | `flatpak install --user suite run.suite.start` |
-| **Suite Go** | One mobile container that hosts the domains as packs | Shell only | [Android debug build](apps/go/README.md#run-it) |
 | <img src="apps/start/build/app-icons/canvas.png" width="20" height="20" alt=""> **Suite Canvas** | Thinking and research: cards, boards, writing, links and views in one document | Alpha | `flatpak install --user suite run.suite.canvas` |
 | <img src="apps/start/build/app-icons/planner.png" width="20" height="20" alt=""> **Suite Planner** | A daily planner: inbox, estimates, capacity and a local calendar | Pre-alpha | `flatpak install --user suite run.suite.planner` |
 | <img src="apps/start/build/app-icons/budget.png" width="20" height="20" alt=""> **Suite Budget** | An envelope budget: give every dollar a job; [what it does](apps/budget/README.md) | Pre-alpha | `flatpak install --user suite run.suite.budget` |
 | **Suite Sync** | The sync protocol and a relay a person runs | Working | `flatpak install --user suite run.suite.sync` |
 | <img src="apps/start/build/app-icons/help.png" width="20" height="20" alt=""> **Suite Help** | The documentation app: the code explorer and the handbook, offline; [what it is](apps/help/README.md) | Working | `flatpak install --user suite run.suite.help` |
 
+Windows and macOS have no published build.
+
+### Mobile
+
+| App | What it is | State | Install |
+| --- | --- | --- | --- |
+| **Suite Go** | One mobile container that hosts the domains as packs | Shell only | [Android debug build](apps/go/README.md#run-it) |
+
+iOS has no published build.
+
 Canvas, Planner and Budget own their documents. Start launches them as separate processes and is not
 in the data path. Sync carries a document between devices; it never defines its schema.
 
 ## Install
 
-Every app is a Flatpak on the same signed store, so each row's command works on its own. Start is
-the recommended first install: one window that installs, updates and opens the others.
+Add the signed store once, then run the command in the row you want. Every desktop app is a Flatpak
+on that store.
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite \
   https://flatpak.suite.run/suite.flatpakrepo
-flatpak install --user suite run.suite.start
 ```
 
-[Installing Suite Start](apps/start/docs/how-to/install.md) owns the store, the first launch and what
-each card means. Open Start, install Canvas, and start with
+[Installing Suite Start](apps/start/docs/how-to/install.md) owns the first launch and what each card
+means. Open Start, install Canvas, and start with
 [Make a first workspace](docs/tutorials/02-first-workspace.md).
 
 ## Releases
 
 One rolling `suite-YYYY.MM.DD` release is the repository's GitHub Latest; per-app releases are
-history, and the signed Flatpak remote is the update path. [RELEASES.md](RELEASES.md) has each app's
-version, release date and per-app tag; this page has the install commands.
+history, and the signed Flatpak remote is the update path. [RELEASES.md](RELEASES.md) mirrors the
+same table with each app's version, release date and per-app tag.
 
 ## How it fits together
 
