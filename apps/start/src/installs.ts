@@ -51,8 +51,17 @@ function parseRecords(value: unknown): readonly InstallRecord[] {
 }
 
 export function registryStore(dataDirectory: string): RegistryStore {
-  const path = join(dataDirectory, REGISTRY_FILENAME);
+  return registryAt(join(dataDirectory, REGISTRY_FILENAME));
+}
 
+/**
+ * The same store at an exact file path.
+ *
+ * A person can point the command-line launcher at a registry of their own with
+ * `SUITE_START_REGISTRY`; the parsing and write rules still live here rather than in
+ * a second reader.
+ */
+export function registryAt(path: string): RegistryStore {
   async function write(records: readonly InstallRecord[]): Promise<void> {
     await mkdir(dirname(path), { recursive: true });
     const temp = `${path}.tmp`;

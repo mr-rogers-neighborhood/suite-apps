@@ -44,46 +44,15 @@ import {
   withInstalled,
 } from "./catalogue.js";
 import { type DocumentsFolder, indexDocuments, isInsideDocuments } from "./fileIndex.js";
-import {
-  FLATPAK_APP_PREFIX,
-  type FlatpakApp,
-  findFlatpak,
-  flatpakIdFor,
-  flatpakLocation,
-  flatpakRunArgs,
-  flatpakScopeArgs,
-  installedCommitArgs,
-  installedInfoArgs,
-  listFlatpaks,
-  parseCommitOutput,
-  parseVersionOutput,
-  runFlatpak,
-  storeInfoArgs,
-  storeInstallArgs,
-  storeRemote,
-  storeUpdateArgs,
-  withFlatpakInstalls,
-} from "./flatpak.js";
+
 import { writeHubReport } from "./hubReport.js";
-import {
-  executableInVersion,
-  installApp,
-  installedVersions,
-  repairableInstalls,
-} from "./install.js";
 import { type RegistryStore, registryStore } from "./installs.js";
-import { launchVerdict } from "./launchCheck.js";
+import { nativePackageBackend } from "./nativePackageBackend.js";
 import { defaultRoots, nodeRegistryFileSystem } from "./nodeFileSystem.js";
+import type { PackageBackend, PackageLaunchObserver, PackageListing } from "./packageBackend.js";
 import { RECENT_LIMIT, type RecentsFile, recentsFile } from "./recents.js";
 import { type RecoveryLookup, readRecoveryReports, recoveryFor } from "./recovery.js";
-import {
-  APP_MANIFEST_FILENAME,
-  appById,
-  type DiscoveredApp,
-  discoverApps,
-  type FlatpakInstall,
-  type InstallRecord,
-} from "./registry.js";
+import type { DiscoveredApp } from "./registry.js";
 import { type ReportedUpdate, readReportedUpdate, type UpdateLookup } from "./reportedUpdate.js";
 import { describeRouteRejection, routeLaunch } from "./route.js";
 import {
@@ -316,31 +285,26 @@ const installProgress = new Map<string, InstallProgress>();
  * than a failure of the window.
  */
 async function refreshCatalogue(): Promise<void> {
-  const { apps } = await discover();
+  // The listing carries what is installed and what the store offers; asking the
+  // backend to refresh re-reads both on the same occasions as the feeds: when the
+  // window opens and when a person asks it to look again. Never on a timer.
+  const listing = await discover({ refresh: true });
   const [next] = await Promise.all([
     readCatalogue({
-      installed: new Map(apps.map((entry) => [entry.manifest.id, entry.manifest.version])),
+      installed: new Map(
+        listing.packages.map((entry) => [entry.app.manifest.id, entry.app.manifest.version]),
+      ),
       feedBase: feedBase(),
       selfFeed: await selfFeed(),
       fetch: fetchFeed,
     }),
-    // The store is read on the same occasions as the feeds: when the window opens
-    // and when a person asks it to look again. Never on a timer.
-    storeCommits(true),
   ]);
   catalogue = next;
 }
 
-/** How many versions of each catalogue app are on disk here. One listing each. */
-async function versionCounts(): Promise<ReadonlyMap<string, number>> {
-  const counts = new Map<string, number>();
-  const root = applicationsRoot();
-  await Promise.all(
-    CATALOGUE_APPS.map(async (entry) => {
-      counts.set(entry.id, (await installedVersions(root, entry)).length);
-    }),
-  );
-  return counts;
+/** How many versions of each catalogue app are on disk here. */
+function versionCounts(listing: PackageListing): ReadonlyMap<string, number> {
+  return new Map([...listing.versions].map(([id, versions]) => [id, versions.length]));
 }
 
 /**
@@ -351,20 +315,16 @@ async function versionCounts(): Promise<ReadonlyMap<string, number>> {
  * really there. The installed version is the one discovery found, so this cannot disagree
  * with the version the card prints.
  */
-async function previousVersions(
-  apps: readonly DiscoveredApp[],
-): Promise<ReadonlyMap<string, string | null>> {
-  const root = applicationsRoot();
-  const installed = new Map(apps.map((app) => [app.manifest.id, app.manifest.version]));
-  const previous = new Map<string, string | null>();
-  await Promise.all(
-    CATALOGUE_APPS.map(async (entry) => {
-      const here = installed.get(entry.id);
-      const versions = await installedVersions(root, entry);
-      previous.set(entry.id, versions.find((version) => version !== here) ?? null);
-    }),
+function previousVersions(listing: PackageListing): ReadonlyMap<string, string | null> {
+  const installed = new Map(
+    listing.packages.map((entry) => [entry.app.manifest.id, entry.app.manifest.version]),
   );
-  return previous;
+  return new Map(
+    [...listing.versions].map(([id, versions]) => [
+      id,
+      versions.find((version) => version !== installed.get(id)) ?? null,
+    ]),
+  );
 }
 
 /** Send the progress list, which is the only thing that changes while a bar moves. */
@@ -438,99 +398,22 @@ function documentFolders(): readonly DocumentsFolder[] {
 }
 
 /**
- * What Flatpak has installed, cached for a moment.
+ * The one way Start touches an installed package.
  *
- * `state()` runs on every broadcast, including once per download chunk's
- * screen. The listing changes only when Flatpak does something, so a short
- * cache keeps the window honest without spawning a process per redraw. Start
- * clears it after it has just changed the answer.
+ * Discovery, Flatpak and the managed AppImage writer live behind `PackageBackend`
+ * (§packageBackend). Main asks for a listing, an install or a launch and never picks
+ * a binary or a process itself, so a Start packaged as a Flatpak can swap the native
+ * backend for a host agent without the window learning a second way.
  */
-const FLATPAK_CACHE_MS = 30_000;
+let backend: PackageBackend;
 
-let flatpakCache: { readonly at: number; readonly apps: readonly FlatpakApp[] } | null = null;
-
-async function flatpakInstalls(): Promise<readonly FlatpakApp[]> {
-  if (findFlatpak() === null) return [];
-  const now = Date.now();
-  if (flatpakCache !== null && now - flatpakCache.at < FLATPAK_CACHE_MS) {
-    return flatpakCache.apps;
-  }
-  const listed = await listFlatpaks();
-  // `flatpak list` does not carry the commit, and the commit is the only stable
-  // way to say "the store has a different build": `remote-info` does not publish
-  // the app's version. One extra query per suite app, cached with the listing.
-  const apps = await Promise.all(
-    listed.map(async (app): Promise<FlatpakApp> => {
-      if (!app.applicationId.startsWith(FLATPAK_APP_PREFIX)) return app;
-      try {
-        const commit = parseCommitOutput(
-          await runFlatpak(
-            installedCommitArgs({
-              application: app.applicationId,
-              installation: app.installation,
-            }),
-          ),
-        );
-        return commit === null ? app : { ...app, commit };
-      } catch {
-        return app;
-      }
-    }),
-  );
-  flatpakCache = { at: now, apps };
-  return apps;
+async function discover(options: { readonly refresh?: boolean } = {}): Promise<PackageListing> {
+  return backend.list(options);
 }
 
-/** What `suite-local` offers, by catalogue app id. Empty when the store is not there. */
-let storeCache: { readonly at: number; readonly commits: ReadonlyMap<string, string> } | null =
-  null;
-
-const STORE_CACHE_MS = 60_000;
-const NO_STORE: ReadonlyMap<string, string> = new Map();
-
-async function storeCommits(force = false): Promise<ReadonlyMap<string, string>> {
-  if (findFlatpak() === null) return NO_STORE;
-  const now = Date.now();
-  if (!force && storeCache !== null && now - storeCache.at < STORE_CACHE_MS) {
-    return storeCache.commits;
-  }
-
-  const remote = storeRemote();
-  const commits = new Map<string, string>();
-  await Promise.all(
-    CATALOGUE_APPS.map(async (entry) => {
-      try {
-        const commit = parseCommitOutput(
-          await runFlatpak(storeInfoArgs(remote, flatpakIdFor(entry.id))),
-        );
-        if (commit !== null) commits.set(entry.id, commit);
-      } catch {
-        // Not in this store is the ordinary answer for an app nobody published.
-      }
-    }),
-  );
-  storeCache = { at: now, commits };
-  return commits;
-}
-
-async function discover(): Promise<{
-  apps: readonly DiscoveredApp[];
-  refused: readonly { path: string; reason: string }[];
-}> {
-  const [result, installs] = await Promise.all([
-    discoverApps({
-      roots: roots(),
-      records: await registry.list(),
-      fileSystem: nodeRegistryFileSystem(),
-    }),
-    flatpakInstalls(),
-  ]);
-  const executable = findFlatpak();
-  const merged =
-    executable === null
-      ? result
-      : withFlatpakInstalls(result, installs, CATALOGUE_APPS, executable);
-  return { apps: merged.apps, refused: merged.rejected };
+/** The app with this id, as the listing reports it. */
+function installedApp(listing: PackageListing, id: string): DiscoveredApp | null {
+  return listing.packages.find((entry) => entry.app.manifest.id === id)?.app ?? null;
 }
 
 /**
@@ -618,7 +501,8 @@ async function reportHub(): Promise<void> {
 }
 
 async function state(): Promise<LauncherState> {
-  const { apps, refused } = await discover();
+  const listing = await discover();
+  const apps = listing.packages.map((entry) => entry.app);
   const recent = await recents.list();
   const files = await indexDocuments(
     documentFolders(),
@@ -641,16 +525,16 @@ async function state(): Promise<LauncherState> {
   const self = catalogue.find((entry) => entry.id === SELF_ID);
   const cards = appCards({
     apps,
-    rejected: refused,
+    rejected: listing.rejected,
     files,
     recents: recent,
     updates,
     catalogue,
-    versions: await versionCounts(),
-    previous: await previousVersions(apps),
+    versions: versionCounts(listing),
+    previous: previousVersions(listing),
     running: liveRunning(),
     appsRoot: applicationsRoot(),
-    store: storeCache?.commits ?? NO_STORE,
+    store: listing.offers,
   });
 
   const recentCards: RecentCard[] = recent
@@ -691,15 +575,6 @@ async function state(): Promise<LauncherState> {
 }
 
 /**
- * The variable that tells an app it was started by the hub.
- *
- * An app launched this way leaves its own updating alone, because Start is the process
- * that downloads, verifies and replaces it (D45). A copy run from a folder gets no such
- * promise and keeps its own updater — which is what the release notes have always said.
- */
-const MANAGED_BY_ENV = "SUITE_MANAGED_BY";
-
-/**
  * Launch failures, by app id, since the window opened.
  *
  * A launch is not an install, so this is not `installProgress`: it is a sentence the card
@@ -709,93 +584,53 @@ const MANAGED_BY_ENV = "SUITE_MANAGED_BY";
 const launchFailures = new Map<string, string>();
 
 /**
- * Start a process and let go of it — watching the first moment before letting go.
+ * What the backend's launch lifecycle does to the window.
  *
- * Detached, `unref`, and output discarded, so an app outlives the launcher the way a
- * browser tab outlives the window that opened it. The cost of discarding output is that a
- * binary which dies immediately is indistinguishable from one that opened and stayed:
- * the card still says Open and nothing moved. So stderr is kept for the first second and
- * a half, which is long enough to catch a missing library and short enough to stay
- * invisible for an app that started.
- *
- * A failure to mount is retried once with `APPIMAGE_EXTRACT_AND_RUN=1` instead of being
- * reported. The person pressed Open; they did not ask to learn about FUSE.
+ * The backend owns the child and the first moment of its life (§launchVerdict); this is
+ * the launcher's bookkeeping: a running dot while the pid lives, and the sentence a card
+ * shows when it did not open.
  */
-function spawnExecutable(executable: string, argv: readonly string[], appId?: string): void {
-  const child = spawn(executable, [...argv], {
-    detached: true,
-    stdio: ["ignore", "ignore", "pipe"],
-    // The app is being started by the thing that also updates it. Only a launch Start
-    // performs carries this; a desktop entry or a shell run does not.
-    env: appId === undefined ? process.env : { ...process.env, [MANAGED_BY_ENV]: "start" },
-  });
-
-  let stderr = "";
-  child.stderr?.setEncoding("utf8");
-  child.stderr?.on("data", (chunk: string) => {
-    if (stderr.length < 8192) stderr += chunk;
-  });
-
-  if (appId !== undefined && child.pid !== undefined) runningPids.set(appId, child.pid);
-
-  let settled = false;
-  const settle = (): void => {
-    settled = true;
-    child.stderr?.removeAllListeners("data");
-    child.stderr?.destroy();
-    child.unref();
-    if (appId !== undefined && launchFailures.delete(appId)) void broadcast();
-  };
-  setTimeout(settle, 1_500);
-
-  // Always: a window that closes is news even if it opened fine, because the card says
-  // "running" and nobody else is going to redraw it.
-  child.once("exit", () => {
-    if (appId !== undefined && runningPids.get(appId) === child.pid) {
-      runningPids.delete(appId);
+function launchObserver(appId: string): PackageLaunchObserver {
+  return {
+    started(pid) {
+      if (pid !== null) runningPids.set(appId, pid);
+    },
+    settled() {
+      if (launchFailures.delete(appId)) void broadcast();
+    },
+    exited(pid) {
+      if (pid !== null && runningPids.get(appId) === pid) {
+        runningPids.delete(appId);
+        void broadcast();
+      }
+    },
+    failed(reason) {
+      launchFailures.set(appId, reason);
       void broadcast();
-    }
-  });
-
-  child.once("exit", (code) => {
-    if (settled) return;
-    settled = true;
-    const verdict = launchVerdict({ executable, exitCode: code, stderr });
-
-    if (verdict.kind === "retry-without-fuse") {
-      console.warn(`[launch] ${executable}: ${verdict.reason}; retrying without FUSE 2`);
-      spawn(executable, [...argv], {
-        detached: true,
-        stdio: "ignore",
-        env: {
-          ...process.env,
-          APPIMAGE_EXTRACT_AND_RUN: "1",
-          ...(appId === undefined ? {} : { [MANAGED_BY_ENV]: "start" }),
-        },
-      }).unref();
-      child.unref();
-      return;
-    }
-
-    child.unref();
-    if (appId === undefined || verdict.kind === "ok") return;
-    console.warn(`[launch] ${executable}: ${verdict.reason}`);
-    launchFailures.set(appId, verdict.reason);
-    void broadcast();
-  });
+    },
+  };
 }
 
-function spawnApp(app_: DiscoveredApp, argv: readonly string[]): void {
-  // A Flatpak is started by the CLI that owns it; everything after `run <id>` is
-  // the app's own argument, exactly as an AppImage would receive it.
-  const args = app_.flatpak === undefined ? argv : flatpakRunArgs(app_.flatpak.application, argv);
-  spawnExecutable(app_.executable, args, app_.manifest.id);
+/** Start one installed app through the one backend that knows how. */
+function launchApp(app_: DiscoveredApp, argv: readonly string[]): void {
+  backend.launch(
+    {
+      executable: app_.executable,
+      argv,
+      ...(app_.flatpak === undefined ? {} : { flatpak: app_.flatpak }),
+      appId: app_.manifest.id,
+    },
+    launchObserver(app_.manifest.id),
+  );
 }
 
 /** Resolve one target and start the app that owns it. */
 async function open(target: string): Promise<void> {
-  const { apps } = await discover();
-  const routed = routeLaunch(target, apps);
+  const listing = await discover();
+  const routed = routeLaunch(
+    target,
+    listing.packages.map((entry) => entry.app),
+  );
   if (!routed.ok) {
     const message = describeRouteRejection(routed.reason);
     if (window) {
@@ -803,7 +638,7 @@ async function open(target: string): Promise<void> {
     }
     return;
   }
-  spawnApp(routed.plan.app, routed.plan.argv);
+  launchApp(routed.plan.app, routed.plan.argv);
   if (routed.plan.why === "file") {
     await recents.remember({ path: target.trim(), appId: routed.plan.app.manifest.id });
   }
@@ -825,17 +660,10 @@ async function addApp(): Promise<void> {
   const executable = picked.filePaths[0];
   if (picked.canceled || !executable) return;
 
-  // A packaged Suite app ships its manifest beside its own executable, so the
-  // record that knows the binary knows where to read what it is.
-  const manifestPath = join(dirname(executable), "suite.app.json");
-  let record: InstallRecord = { executable, id: "", manifestPath };
-  try {
-    const text = await nodeRegistryFileSystem().readText(manifestPath);
-    const parsed: unknown = JSON.parse(text);
-    const id = (parsed as { id?: unknown }).id;
-    if (typeof id !== "string" || id.length === 0) throw new Error("no id");
-    record = { ...record, id, installedAt: new Date().toISOString() };
-  } catch {
+  // The backend reads the manifest beside the binary and writes the record; main only
+  // decides what to say when it is not a Suite app.
+  const adopted = await backend.adopt(executable);
+  if (!adopted) {
     await dialog.showMessageBox(window, {
       type: "error",
       title: "Not a Suite app",
@@ -845,8 +673,6 @@ async function addApp(): Promise<void> {
     });
     return;
   }
-
-  await registry.add(record);
   await broadcast();
 }
 
@@ -970,8 +796,7 @@ function refreshIconCache(): Promise<void> {
  */
 async function reconcileShortcuts(): Promise<void> {
   try {
-    const records = await registry.list();
-    const repairable = repairableInstalls(records, applicationsRoot(), (path) => existsSync(path));
+    const repairable = await backend.repairable();
     for (const record of repairable) {
       const entry = CATALOGUE_APPS.find((candidate) => candidate.id === record.id);
       if (entry !== undefined) await writeShortcut(entry, record.executable);
@@ -1034,71 +859,19 @@ function describeInstallFailure(error: unknown): string {
     ? error.message
     : "the install did not finish, and nothing was replaced";
 }
-
-/** The version a deployment reports, or null when Flatpak will not say. */
-async function flatpakVersionOf(install: FlatpakInstall): Promise<string | null> {
-  try {
-    return parseVersionOutput(await runFlatpak(installedInfoArgs(install)));
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Finish a Flatpak install or update.
+ * Finish a package change that has no AppImage to place.
  *
- * The listing and the store are both re-read, because either may have changed:
- * the app now exists, and the commit the store offers is the one that was just
- * installed. The card then has one answer rather than a stale one.
+ * The backend re-reads the deployment's version and the store before it returns; main only
+ * records the answer on the card. A running app keeps running the old commit until it
+ * restarts: Flatpak swaps the deployment underneath it, and closing the window would be
+ * Start doing a job it does not own.
  */
-async function finishFlatpak(id: string, install: FlatpakInstall): Promise<void> {
-  flatpakCache = null;
-  const version = await flatpakVersionOf(install);
+async function finishPackage(id: string, version: string | null): Promise<void> {
   if (version !== null) catalogue = withInstalled(catalogue, id, version);
-  await storeCommits(true);
   installProgress.delete(id);
   sendProgress();
   await broadcast();
-}
-
-/** Install one app from the store, with the card saying Flatpak is working. */
-async function installFromFlatpak(id: string): Promise<void> {
-  reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
-  try {
-    await runFlatpak(storeInstallArgs(storeRemote(), flatpakIdFor(id)));
-    await finishFlatpak(id, { application: flatpakIdFor(id), installation: "user" });
-  } catch (error) {
-    reportProgress({
-      id,
-      phase: "failed",
-      received: 0,
-      total: null,
-      reason: describeInstallFailure(error),
-    });
-  }
-}
-
-/**
- * Replace a deployment Flatpak already owns.
- *
- * A running app keeps running the old commit until it restarts; Flatpak swaps the
- * deployment underneath it. That is the writer's rule, and closing the window
- * would be Start doing a job it does not own.
- */
-async function replaceWithFlatpak(id: string, install: FlatpakInstall): Promise<void> {
-  reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
-  try {
-    await runFlatpak(storeUpdateArgs(install));
-    await finishFlatpak(id, install);
-  } catch (error) {
-    reportProgress({
-      id,
-      phase: "failed",
-      received: 0,
-      total: null,
-      reason: describeInstallFailure(error),
-    });
-  }
 }
 
 /**
@@ -1112,18 +885,46 @@ async function installOne(id: string): Promise<void> {
   const entry = catalogue.find((app) => app.id === id);
   if (entry === undefined) return;
 
+  const listing = await discover();
+  const found = listing.packages.find((candidate) => candidate.app.manifest.id === id) ?? null;
+  const installed = found?.app ?? null;
+
   // Flatpak owns its installs, so when it is the writer Start asks it and waits.
-  // The store is also the install channel for an app it offers, which is what
-  // makes a fresh machine's Install button work without an AppImage feed.
-  const { apps } = await discover();
-  const installed = appById(apps, id);
+  // A running app keeps running the old commit until it restarts; closing it would
+  // be Start doing a job it does not own.
   if (installed?.flatpak !== undefined) {
-    await replaceWithFlatpak(entry.id, installed.flatpak);
+    reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
+    try {
+      const result = await backend.update({ entry, flatpak: installed.flatpak });
+      await finishPackage(id, result.version);
+    } catch (error) {
+      reportProgress({
+        id,
+        phase: "failed",
+        received: 0,
+        total: null,
+        reason: describeInstallFailure(error),
+      });
+    }
     return;
   }
-  const store = await storeCommits();
-  if (installed === null && store.has(id)) {
-    await installFromFlatpak(entry.id);
+
+  // The store is also the install channel for an app it offers, which is what makes a
+  // fresh machine's Install button work without an AppImage feed.
+  if (installed === null && listing.offers.has(id)) {
+    reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
+    try {
+      const result = await backend.install({ entry });
+      await finishPackage(id, result.version);
+    } catch (error) {
+      reportProgress({
+        id,
+        phase: "failed",
+        received: 0,
+        total: null,
+        reason: describeInstallFailure(error),
+      });
+    }
     return;
   }
 
@@ -1174,16 +975,14 @@ async function installOne(id: string): Promise<void> {
   reportProgress({ id, phase: "downloading", received: 0, total: artifact.size, reason: null });
 
   try {
-    const installed = await installApp({
+    // The backend decides the format from the same listing; passing the verified
+    // artifact is the AppImage shape it places itself.
+    const request = {
       entry,
       version,
       artifact,
       feed: entry.feed,
-      appsRoot: applicationsRoot(),
-      registry,
-      fetch: installFetch,
-      prune: updating,
-      onProgress: (received, total) => {
+      onProgress: (received: number, total: number | null) => {
         const percent = total === null || total === 0 ? -1 : Math.floor((received / total) * 100);
         const at = Date.now();
         // A bar does not need every chunk, and the window is not the thing being written.
@@ -1191,17 +990,20 @@ async function installOne(id: string): Promise<void> {
         emitted = { at, percent };
         reportProgress({ id, phase: "downloading", received, total, reason: null });
       },
-    });
+    };
+    const result = updating ? await backend.update(request) : await backend.install(request);
 
     installProgress.delete(id);
     sendProgress();
-    await writeShortcut(entry, installed.executable);
     // The feed answer is still the last check's; only what is on disk changed.
-    catalogue = withInstalled(catalogue, id, installed.version);
+    if (result.installed !== undefined) await writeShortcut(entry, result.installed.executable);
+    catalogue = withInstalled(catalogue, id, result.version);
     await broadcast();
     // A replace should finish where it started: the app a person was using is running
     // again, from the version they just agreed to.
-    if (updating) spawnExecutable(installed.executable, []);
+    if (updating && result.installed !== undefined) {
+      backend.launch({ executable: result.installed.executable, argv: [] });
+    }
   } catch (error) {
     reportProgress({
       id,
@@ -1365,10 +1167,9 @@ function registerIpc(): void {
 
   onIpc(START_IPC.launch, async (_event, id: unknown) => {
     if (typeof id !== "string") return;
-    const { apps } = await discover();
-    const target = appById(apps, id);
+    const target = installedApp(await discover(), id);
     if (!target) return;
-    spawnApp(target, []);
+    launchApp(target, []);
     await broadcast();
   });
 
@@ -1389,7 +1190,7 @@ function registerIpc(): void {
   onIpc(START_IPC.removeApp, async (_event, id: unknown) => {
     if (typeof id !== "string") return;
     // A refusal that cannot be launched leaves a record and nothing else to delete.
-    await registry.remove(id);
+    await backend.forget(id);
     await removeShortcut(id);
     await broadcast();
   });
@@ -1402,17 +1203,17 @@ function registerIpc(): void {
    */
   onIpc(START_IPC.revealApp, async (_event, id: unknown) => {
     if (typeof id !== "string") return;
-    const { apps } = await discover();
-    const target = appById(apps, id);
-    if (target === null) return;
+    const found =
+      (await discover()).packages.find((candidate) => candidate.app.manifest.id === id) ?? null;
+    if (found === null) return;
     // A Flatpak has no file of its own to show. The deployment directory is the
-    // closest true answer, and it is the one `flatpak info` already knows.
-    if (target.flatpak !== undefined) {
-      const location = await flatpakLocation(target.flatpak);
+    // closest true answer, and it is the one the backend asks `flatpak info` for.
+    if (found.app.flatpak !== undefined) {
+      const location = await backend.location(found);
       if (location !== null) await shell.openPath(location);
       return;
     }
-    shell.showItemInFolder(target.executable);
+    shell.showItemInFolder(found.app.executable);
   });
 
   /**
@@ -1427,8 +1228,10 @@ function registerIpc(): void {
     const entry = CATALOGUE_APPS.find((candidate) => candidate.id === id);
     if (entry === undefined) return;
 
-    const found = appById((await discover()).apps, id);
-    if (found?.flatpak !== undefined) {
+    const listing = await discover();
+    const found = listing.packages.find((candidate) => candidate.app.manifest.id === id) ?? null;
+    const flatpak = found?.app.flatpak;
+    if (found !== null && flatpak !== undefined) {
       // Flatpak owns these files, so Start asks Flatpak to remove them and then
       // stops describing itself as installed. Nothing under ~/Applications is
       // touched: there may be an AppImage there that is somebody else's.
@@ -1437,8 +1240,8 @@ function registerIpc(): void {
         title: "Uninstall",
         message: `Uninstall ${entry.name} from Flatpak?`,
         detail:
-          `This asks Flatpak to remove ${found.flatpak.application} from the ` +
-          `${found.flatpak.installation} installation. Documents are not touched.`,
+          `This asks Flatpak to remove ${flatpak.application} from the ` +
+          `${flatpak.installation} installation. Documents are not touched.`,
         buttons: ["Cancel", "Uninstall"],
         defaultId: 0,
         cancelId: 0,
@@ -1451,14 +1254,9 @@ function registerIpc(): void {
         runningPids.delete(id);
       }
       try {
-        await runFlatpak([
-          ...flatpakScopeArgs(found.flatpak.installation),
-          "uninstall",
-          "--noninteractive",
-          found.flatpak.application,
-        ]);
+        await backend.remove({ entry, package: found });
       } catch (error) {
-        console.warn(`[flatpak] could not uninstall ${found.flatpak.application}`, error);
+        console.warn(`[flatpak] could not uninstall ${flatpak.application}`, error);
         await dialog.showMessageBox(window, {
           type: "error",
           title: "Uninstall",
@@ -1467,13 +1265,12 @@ function registerIpc(): void {
         });
         return;
       }
-      flatpakCache = null;
       catalogue = withInstalled(catalogue, id, null);
       await broadcast();
       return;
     }
 
-    const versions = await installedVersions(applicationsRoot(), entry);
+    const versions = listing.versions.get(id) ?? [];
     const answer = await dialog.showMessageBox(window, {
       type: "warning",
       title: "Uninstall",
@@ -1495,10 +1292,9 @@ function registerIpc(): void {
       await waitForExit(id);
       runningPids.delete(id);
     }
-    await rm(join(applicationsRoot(), entry.folder), { recursive: true, force: true });
+    await backend.remove({ entry, ...(found === null ? {} : { package: found }) });
     catalogue = withInstalled(catalogue, id, null);
     await removeShortcut(id);
-    await registry.remove(id);
     await broadcast();
   });
 
@@ -1518,15 +1314,10 @@ function registerIpc(): void {
     const entry = CATALOGUE_APPS.find((candidate) => candidate.id === id);
     if (entry === undefined) return;
 
-    const { apps } = await discover();
-    const current = appById(apps, id);
-    const versions = await installedVersions(applicationsRoot(), entry);
-    const target = versions.find((version) => version !== current?.manifest.version);
-    if (target === undefined) return;
-
-    const executable = await executableInVersion(applicationsRoot(), entry, target);
-    if (executable === null) {
-      console.warn(`[rollback] no executable in ${entry.name} ${target}`);
+    // The backend reads the disk, picks the version this install replaced and moves
+    // the one record path to it. Main only stops the running copy and relaunches.
+    const installed = await backend.rollback(entry);
+    if (installed === null) {
       await broadcast();
       return;
     }
@@ -1538,18 +1329,12 @@ function registerIpc(): void {
       runningPids.delete(id);
     }
 
-    await registry.add({
-      id,
-      executable,
-      manifestPath: join(dirname(executable), APP_MANIFEST_FILENAME),
-      installedAt: new Date().toISOString(),
-    });
-    catalogue = withInstalled(catalogue, id, target);
-    await writeShortcut(entry, executable);
+    catalogue = withInstalled(catalogue, id, installed.version);
+    await writeShortcut(entry, installed.executable);
     await broadcast();
 
     // Same courtesy an update pays: finish where it started.
-    spawnExecutable(executable, [], id);
+    backend.launch({ executable: installed.executable, argv: [], appId: id }, launchObserver(id));
   });
 
   /**
@@ -1693,6 +1478,13 @@ if (!gotLock) {
     nativeTheme.themeSource = themeChoice.mode;
     registry = registryStore(dataDirectory);
     recents = recentsFile(dataDirectory);
+    backend = nativePackageBackend({
+      appsRoot: applicationsRoot(),
+      roots: roots(),
+      registry,
+      catalogue: CATALOGUE_APPS,
+      fetch: installFetch,
+    });
     app.setAppUserModelId("run.suite.start");
 
     // The hub owns `suite://`; every other app is reached through it. An

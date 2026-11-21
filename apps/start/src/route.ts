@@ -1,6 +1,6 @@
 import type { DeepLinkRejection } from "@suite/contracts";
 import { formatDeepLink, parseDeepLink } from "@suite/contracts";
-import { flatpakRunArgs } from "./flatpak.js";
+import { launchCommand } from "./launchCommand.js";
 import { appById, appForExtension, type DiscoveredApp } from "./registry.js";
 
 /**
@@ -90,16 +90,7 @@ export function spawnCommand(plan: LaunchPlan): {
   readonly command: string;
   readonly args: readonly string[];
 } {
-  // A Flatpak install is started through the CLI that owns it, so the app id
-  // goes between `run` and whatever the person opened. That is the only place
-  // the difference lives: routing still speaks in one plan shape.
-  if (plan.app.flatpak !== undefined) {
-    return {
-      command: plan.app.executable,
-      args: flatpakRunArgs(plan.app.flatpak.application, plan.argv),
-    };
-  }
-  return { command: plan.app.executable, args: plan.argv };
+  return launchCommand(plan.app, plan.argv);
 }
 
 /** One sentence for a refusal, for a dialog or a log line. */

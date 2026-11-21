@@ -1,5 +1,6 @@
 import type { SuiteAppManifest } from "@suite/contracts";
 import { describeIssues, manifestFitsHub, parseAppManifest } from "@suite/contracts";
+import type { AppSource } from "./shared.js";
 
 /**
  * What is installed, and what may be launched.
@@ -239,4 +240,18 @@ export function appForExtension(
 /** The app with this id, if installed. */
 export function appById(apps: readonly DiscoveredApp[], id: string): DiscoveredApp | null {
   return apps.find((app) => app.manifest.id === id) ?? null;
+}
+
+/**
+ * Who owns this install, which is also who may replace it.
+ *
+ * The path is the proof for a copy Start placed: only installs land under the
+ * applications root. A Flatpak deployment is owned by Flatpak's own database even
+ * though the executable discovery records is the `flatpak` CLI. Kept here so the
+ * cards and the package backend cannot disagree about ownership.
+ */
+export function packageSource(app: DiscoveredApp, appsRoot: string): AppSource {
+  if (app.flatpak !== undefined) return "flatpak";
+  const root = appsRoot.endsWith("/") ? appsRoot : `${appsRoot}/`;
+  return app.executable.startsWith(root) ? "managed" : "folder";
 }

@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
+import { launchCommand } from "./launchCommand.js";
 import type { LaunchPlan } from "./route.js";
-import { spawnCommand } from "./route.js";
 
 /**
  * Start a process and let go of it.
@@ -11,7 +11,7 @@ import { spawnCommand } from "./route.js";
  * the arguments come from a plan that already passed routing.
  */
 export function launchPlan(plan: LaunchPlan): number | null {
-  const { command, args } = spawnCommand(plan);
+  const { command, args } = launchCommand(plan.app, plan.argv);
   const child = spawn(command, [...args], { detached: true, stdio: "ignore" });
   child.unref();
   return child.pid ?? null;

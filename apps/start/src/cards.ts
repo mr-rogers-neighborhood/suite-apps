@@ -4,8 +4,9 @@ import { type CatalogueApp, isNewer, SELF_ID } from "./catalogue.js";
 import type { IndexedFile } from "./fileIndex.js";
 import type { RecentEntry } from "./recents.js";
 import type { DiscoveredApp, RejectedInstall } from "./registry.js";
+import { packageSource } from "./registry.js";
 import { type ReportedUpdate, UNREPORTED } from "./reportedUpdate.js";
-import type { AppCard, AppCardState, AppSource, FileCard } from "./shared.js";
+import type { AppCard, AppCardState, FileCard } from "./shared.js";
 
 /**
  * One card per app the suite offers, one per app it does not know, and one per
@@ -45,25 +46,6 @@ export interface CardInput {
    * information" rather than "nothing available".
    */
   readonly store?: ReadonlyMap<string, string> | undefined;
-}
-
-/** Whether an executable is one Start placed.
- *
- * The path is the proof: only installs land under the applications root, so an app there was
- * put there by Start and Start replaces it. Reading that from the disk rather than from the
- * catalogue matters in the moment before the feeds answer — a card that said "from a folder,
- * updates itself" about an app Start installed would be telling a person the opposite of the
- * truth, and inviting them to do the thing that breaks it.
- */
-function isManaged(executable: string, appsRoot: string): boolean {
-  const root = appsRoot.endsWith("/") ? appsRoot : `${appsRoot}/`;
-  return executable.startsWith(root);
-}
-
-/** Who owns this install, which is also who may replace it. */
-function sourceOf(app: DiscoveredApp, appsRoot: string): AppSource {
-  if (app.flatpak !== undefined) return "flatpak";
-  return isManaged(app.executable, appsRoot) ? "managed" : "folder";
 }
 
 /** The folder name a refused install is known by. */
@@ -135,7 +117,7 @@ export function appCards(input: CardInput): readonly AppCard[] {
       const fromFlatpak = found?.flatpak !== undefined;
       const storeCommit = input.store?.get(entry.id) ?? null;
       const installChannel: "appimage" | "flatpak" = storeCommit !== null ? "flatpak" : "appimage";
-      const source = found === null ? "managed" : sourceOf(found, input.appsRoot);
+      const source = found === null ? "managed" : packageSource(found, input.appsRoot);
       const flatpakUpdate =
         fromFlatpak &&
         found?.flatpak?.commit !== undefined &&
@@ -177,7 +159,7 @@ export function appCards(input: CardInput): readonly AppCard[] {
   // (D44 makes it first-class) or a managed install whose feed has not answered yet. Only
   // the first is "from a folder"; the second is Start's, and says so.
   const local: AppCard[] = [...byId.values()].map((entry) => {
-    const source = sourceOf(entry, input.appsRoot);
+    const source = packageSource(entry, input.appsRoot);
     return {
       id: entry.manifest.id,
       name: entry.manifest.name,
