@@ -1,3 +1,6 @@
 #!/usr/bin/env sh
 # The gate that a CI service would have run.
+# Git exports GIT_DIR to hooks. A test or script that initializes its own repository
+# must discover it from its working directory, not inherit the caller's checkout.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE GIT_PREFIX
 node scripts/gate.mjs

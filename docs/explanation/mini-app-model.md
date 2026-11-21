@@ -46,8 +46,9 @@ standard; the white paper documents the capability tiers in its security and pri
 - **No platform review tier.** A hosted catalogue and human review cannot exist without operating a
   platform, which the product does not do. Declared capabilities are enforced by the host; the
   user-authorisation tier is still missing.
-- **No hosted identity.** There is no account and no social graph. Collaboration is scoped to a
-  document, not to a contact list.
+- **No hosted identity.** There is no account and no directory to look a person up in. A contact list
+  is local to each app, and the relay stores neither it nor a friend code; [Status](../reference/status.md)
+  owns what that exchange does today.
 - **No shared runtime.** Each Loro-using pack carries its own React and Loro. A host-side document
   engine would force a second copy of the document, or a round trip per keystroke, because the editor
   binds to the DOM.
