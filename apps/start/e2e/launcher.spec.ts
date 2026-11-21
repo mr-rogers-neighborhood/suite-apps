@@ -4,7 +4,6 @@ import { expect, test } from "@playwright/test";
 import {
   fakeApp,
   fakeFlatpak,
-  fakeRelay,
   install,
   launch,
   launchedWith,
@@ -238,27 +237,63 @@ test("renders every section with nothing installed", async () => {
       await expect(run.page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
     }
 
-    // The relay is its own program. With none installed the pane says what to
-    // install and offers no dead control.
+    // Suite Sync is a Flatpak deployment. With none installed and no Flatpak on the
+    // machine, the pane says why it cannot offer a control rather than drawing one
+    // that would fail.
     await expect(run.page.locator("#panel-sync .pane-note").first()).toHaveText(
-      "Relay not installed. Sync stays off until Suite Sync is installed.",
+      "Suite Sync is not ready on this machine.",
     );
-    await expect(run.page.locator("#sync-toggle")).toHaveCount(0);
+    await expect(run.page.locator("#sync-open")).toHaveCount(0);
+    await expect(run.page.locator("#sync-install")).toHaveCount(0);
+    await expect(run.page.locator("#panel-sync .pane-note").nth(1)).toContainText(
+      "Flatpak is not available",
+    );
   } finally {
     await run.close();
   }
 });
 
-test("starts the Suite Sync relay it was given and shows its address", async () => {
-  const relay = await fakeRelay(box);
-  const run = await launch(box, [], { SUITE_SYNC_BIN: relay.executable });
+test("detects the Suite Sync deployment and opens it through Flatpak", async () => {
+  const flatpak = await fakeFlatpak(box, {
+    installed: false,
+    sync: { installed: true, version: "0.11.3", commit: "b".repeat(64) },
+  });
+  const run = await launch(box, [], { SUITE_START_FLATPAK: flatpak.executable });
+  try {
+    // Installed is a deployment fact, not a relay Start found on PATH.
+    await expect(run.page.locator("#panel-sync .pane-note").first()).toHaveText(
+      "Installed. Open Suite Sync to run the relay.",
+    );
+    await expect(run.page.locator("#sync-version")).toHaveText("0.11.3");
+    await expect(run.page.locator("#sync-commit")).toContainText("bbbbbbbbbbbb");
+    await expect(run.page.locator("#sync-install")).toHaveCount(0);
+
+    await run.page.locator("#sync-open").click();
+    // The tray app is the relay; Start only asks Flatpak to run it.
+    await expect
+      .poll(async () => launchedWith(flatpak.logPath), { timeout: 15_000 })
+      .toEqual(["run.suite.sync"]);
+  } finally {
+    await run.close();
+  }
+});
+
+test("installs Suite Sync from the store when Flatpak does not have it", async () => {
+  const flatpak = await fakeFlatpak(box, { installed: false, sync: { installed: false } });
+  const run = await launch(box, [], { SUITE_START_FLATPAK: flatpak.executable });
   try {
     await expect(run.page.locator("#panel-sync .pane-note").first()).toHaveText(
-      "On. Other devices can reach this machine.",
+      "Not installed. Start can install Suite Sync from the store.",
     );
-    await expect(run.page.locator("#sync-address")).toHaveText("ws://127.0.0.1:18787/sync");
-    await expect(run.page.locator("#sync-toggle")).toHaveText("Turn sync off");
-    await expect.poll(async () => readFile(relay.logPath, "utf8")).toContain("serve");
+    await expect(run.page.locator("#sync-open")).toHaveCount(0);
+
+    await run.page.locator("#sync-install").click();
+    await expect
+      .poll(async () => launchedWith(flatpak.logPath), { timeout: 15_000 })
+      .toContain("install run.suite.sync");
+    // The next listing is the authority: the deployment now offers Open.
+    await expect(run.page.locator("#sync-open")).toBeVisible();
+    await expect(run.page.locator("#sync-version")).toHaveText("0.11.3");
   } finally {
     await run.close();
   }
