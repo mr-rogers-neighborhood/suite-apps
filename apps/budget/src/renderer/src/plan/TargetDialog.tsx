@@ -1,6 +1,19 @@
-import { formatMoney, formatMoneyPlain, parseMoney, type TargetKind } from "@suite/budget-core";
+import {
+  addMonths,
+  buildLedger,
+  ceilDivide,
+  type DebtPayoffProjection,
+  formatMoney,
+  formatMoneyPlain,
+  type MonthKey,
+  monthLabel,
+  monthsRemaining,
+  parseMoney,
+  projectDebtPayoff,
+  type TargetKind,
+} from "@suite/budget-core";
 import { Button } from "@suite/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Field, TextInput } from "../components/Field";
 import { Modal } from "../components/Modal";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
@@ -21,7 +34,7 @@ const KINDS: { id: TargetKind; name: string; hint: string }[] = [
   {
     id: "debt_payoff",
     name: "Debt payoff",
-    hint: "Pay an account's balance down by a date (no interest math yet)",
+    hint: "Pay an account's balance down by a date",
   },
 ];
 
@@ -32,6 +45,7 @@ export function TargetDialog() {
   const month = useUiStore((state) => state.month);
   const snapshot = useWorkspaceSnapshot();
   const replica = useReplica();
+  const ledger = useMemo(() => buildLedger(snapshot, month), [snapshot, month]);
   const category = snapshot.categories.find((candidate) => candidate.id === categoryId);
 
   const [kind, setKind] = useState<TargetKind>("monthly");
@@ -56,6 +70,22 @@ export function TargetDialog() {
   const accounts = snapshot.accounts.filter(
     (account) => !account.closedAt && (account.type === "credit" || account.type === "loan"),
   );
+
+  const linkedAccount = accountId
+    ? snapshot.accounts.find((account) => account.id === accountId)
+    : undefined;
+  const debtMinor = accountId
+    ? Math.max(0, -(ledger.balanceByMonth.get(month)?.get(accountId) ?? 0))
+    : 0;
+  const monthlyNeedMinor = ceilDivide(debtMinor, monthsRemaining(month, dueMonth));
+  const projection =
+    kind === "debt_payoff" && accountId
+      ? projectDebtPayoff({
+          balanceMinor: debtMinor,
+          annualRateBps: linkedAccount?.loan?.interestRateBps ?? 0,
+          monthlyPaymentMinor: monthlyNeedMinor,
+        })
+      : null;
 
   const save = (): void => {
     const parsed = parseMoney(amount, snapshot.settings.currency, snapshot.settings.currencyScale);
@@ -174,8 +204,63 @@ export function TargetDialog() {
           </Field>
         ) : null}
 
+        {projection ? (
+          <DebtEstimate
+            projection={projection}
+            monthlyNeedMinor={monthlyNeedMinor}
+            month={month}
+            currency={snapshot.settings.currency}
+            scale={snapshot.settings.currencyScale}
+          />
+        ) : null}
+
         {error ? <p className="text-[12px] text-danger">{error}</p> : null}
       </div>
     </Modal>
+  );
+}
+
+function DebtEstimate({
+  projection,
+  monthlyNeedMinor,
+  month,
+  currency,
+  scale,
+}: {
+  projection: DebtPayoffProjection;
+  monthlyNeedMinor: number;
+  month: MonthKey;
+  currency: string;
+  scale: number;
+}) {
+  const money = (value: number) => formatMoney(value, currency, undefined, scale);
+  return (
+    <div className="rounded-md border border-line bg-raised px-3 py-2 text-[12px] leading-relaxed">
+      {projection.status === "already-paid-off" ? (
+        <p className="text-ink">This account has no balance left to pay off.</p>
+      ) : projection.status === "never-pays-off" ? (
+        <p className="text-danger">
+          {projection.reason === "beyond-horizon"
+            ? `At ${money(monthlyNeedMinor)} a month this balance would take more than 100 years to clear.`
+            : `At ${money(monthlyNeedMinor)} a month this balance never goes down; about ${money(projection.monthlyInterestMinor)} a month goes to interest.`}
+        </p>
+      ) : (
+        <>
+          <p className="text-ink">
+            Estimated payoff in {projection.monthsToPayoff}{" "}
+            {projection.monthsToPayoff === 1 ? "month" : "months"}, around{" "}
+            {monthLabel(addMonths(month, projection.monthsToPayoff - 1))} at{" "}
+            {money(monthlyNeedMinor)} a month.
+          </p>
+          <p className="text-muted">
+            Estimated interest {money(projection.totalInterestMinor)}; total paid{" "}
+            {money(projection.totalPaidMinor)}.
+          </p>
+        </>
+      )}
+      <p className="mt-1 text-[11px] text-faint">
+        An estimate only. New charges and rate changes are not modelled.
+      </p>
+    </div>
   );
 }
