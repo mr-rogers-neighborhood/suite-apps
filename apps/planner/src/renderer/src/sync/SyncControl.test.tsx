@@ -95,4 +95,19 @@ describe("SyncControl", () => {
 
     expect(bridge.syncDisable).toHaveBeenCalled();
   });
+
+  it("should ask for the certificate fingerprint on a wss relay", async () => {
+    render(<SyncControl />);
+    fireEvent.click(await screen.findByTestId("sync-status"));
+
+    fireEvent.change(screen.getByLabelText("Relay address"), {
+      target: { value: "wss://192.168.1.9:8787/sync" },
+    });
+    fireEvent.change(screen.getByLabelText("Relay certificate fingerprint"), {
+      target: { value: "AB:CD:EF" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Share this workspace" }));
+
+    expect(bridge.syncEnable).toHaveBeenCalledWith("wss://192.168.1.9:8787/sync", "AB:CD:EF");
+  });
 });

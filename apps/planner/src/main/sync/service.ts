@@ -17,6 +17,7 @@ import {
   type InviteRecord,
   inviteRecordPayload,
   joinWorkspaceGroup,
+  normaliseFingerprint,
   open as openMessage,
   parseInvite,
   type RelayClient,
@@ -27,11 +28,18 @@ import {
   seal,
   signFrame,
 } from "@suite/sync";
+import {
+  createNodeWebSocketFactory,
+  PIN_MALFORMED_MESSAGE,
+  PIN_REQUIRED_MESSAGE,
+  RelayPinError,
+} from "@suite/sync/node";
 
 import { loadCursor, saveCursor } from "./cursorStore";
 import { isOwned, loadGroup, markOwned, saveGroup } from "./groupStore";
 import { type DeviceIdentity, loadOrCreateIdentity } from "./identity";
 import { clearPending, loadPending, type PendingJoin, savePending } from "./pendingStore";
+import { loadRelayConfig, saveRelayConfig } from "./relayConfig";
 
 /**
  * One Planner workspace's sync, owned by the main process.
@@ -45,7 +53,7 @@ import { clearPending, loadPending, type PendingJoin, savePending } from "./pend
  */
 export interface PlannerSyncService {
   /** Share this workspace through a relay, or reconnect to one it already belongs to. */
-  connect(url: string): Promise<SyncState>;
+  connect(url: string, fingerprint?: string): Promise<SyncState>;
   /** Stop syncing this copy. Membership and the file stay where they are. */
   disconnect(): Promise<void>;
   status(): SyncState;
@@ -57,7 +65,7 @@ export interface PlannerSyncService {
   /** Write an invitation and hand back the link to give someone. */
   createInvite(role: "editor" | "viewer"): Promise<string>;
   /** Ask to join from a link somebody shared. Resolves once this device has asked. */
-  join(link: string): Promise<SyncState>;
+  join(link: string, fingerprint?: string): Promise<SyncState>;
   /** Pick up a join that was still waiting when the app closed. */
   resume(): Promise<SyncState>;
   /** Hand out document updates from other devices. */
@@ -102,6 +110,10 @@ export async function createPlannerSyncService(
   const identity = await loadOrCreateIdentity(options.dataDir);
   const deviceName = options.deviceName ?? "Planner";
   let group = await loadGroup(options.dataDir, options.workspaceId);
+  /** The relay this workspace last used, and the certificate it must present. */
+  const storedRelay = await loadRelayConfig(options.dataDir, options.workspaceId);
+  let relayHost: string | null = storedRelay?.host ?? null;
+  let pinnedFingerprint: string | null = storedRelay?.fingerprint ?? null;
   let relay: RelayClient | null = null;
   let status: SyncState = { state: "off" };
   let updateHandler: ((update: Uint8Array) => void) | null = null;
@@ -158,6 +170,47 @@ export async function createPlannerSyncService(
     status = next;
     statusHandler?.(next);
   };
+
+  /**
+   * Decide which certificate this connection must present, and remember it.
+   *
+   * Plaintext is only for loopback, and a `wss://` address has no fallback: without a pin
+   * there is nothing to trust, so the answer is a refusal with the line a person can copy.
+   * A supplied pin wins over the stored one, which is how a rotated certificate is entered.
+   */
+  async function resolvePin(
+    url: string,
+    supplied: string | undefined,
+  ): Promise<
+    | { readonly ok: true; readonly fingerprint: string | null }
+    | { readonly ok: false; readonly reason: string }
+  > {
+    const secure = url.trim().toLowerCase().startsWith("wss://");
+    if (!secure) {
+      relayHost = url;
+      pinnedFingerprint = null;
+      await saveRelayConfig(options.dataDir, options.workspaceId, {
+        host: url,
+        fingerprint: null,
+      });
+      return { ok: true, fingerprint: null };
+    }
+
+    const typed = supplied?.trim() ?? "";
+    let fingerprint: string | null = null;
+    if (typed.length > 0) {
+      fingerprint = normaliseFingerprint(typed);
+      if (fingerprint === null) return { ok: false, reason: PIN_MALFORMED_MESSAGE };
+    } else if (relayHost === url && pinnedFingerprint !== null) {
+      fingerprint = pinnedFingerprint;
+    }
+    if (fingerprint === null) return { ok: false, reason: PIN_REQUIRED_MESSAGE };
+
+    relayHost = url;
+    pinnedFingerprint = fingerprint;
+    await saveRelayConfig(options.dataDir, options.workspaceId, { host: url, fingerprint });
+    return { ok: true, fingerprint };
+  }
 
   function enqueue(work: () => Promise<void>): Promise<void> {
     queue = queue.then(work).catch(() => undefined);
@@ -378,7 +431,7 @@ export async function createPlannerSyncService(
     reconnectAttempt += 1;
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
-      void connectTo(hostUrl ?? "");
+      void connectTo(hostUrl ?? "", pinnedFingerprint);
     }, wait);
   }
 
@@ -457,7 +510,7 @@ export async function createPlannerSyncService(
     };
   }
 
-  async function connectTo(url: string): Promise<SyncState> {
+  async function connectTo(url: string, fingerprint: string | null): Promise<SyncState> {
     if (relay !== null) return status;
     stopped = false;
     removedByOwner = false;
@@ -474,7 +527,14 @@ export async function createPlannerSyncService(
           publicKey: identity.publicKey,
           name: deviceName,
           sign: identity.sign,
-          ...(options.webSocket === undefined ? {} : { webSocket: options.webSocket }),
+          ...(options.webSocket === undefined
+            ? {
+                webSocket:
+                  fingerprint === null
+                    ? createNodeWebSocketFactory()
+                    : createNodeWebSocketFactory({ fingerprint }),
+              }
+            : { webSocket: options.webSocket }),
         },
         handlersFor(connection),
       );
@@ -488,11 +548,15 @@ export async function createPlannerSyncService(
     } catch (error) {
       if (connection !== generation) return status;
       relay = null;
-      publishStatus({
-        state: "asleep",
-        reason: error instanceof Error ? error.message : "the relay is not answering",
-      });
-      scheduleReconnect();
+      publishStatus(
+        error instanceof RelayPinError
+          ? { state: "refused", reason: error.message }
+          : {
+              state: "asleep",
+              reason: error instanceof Error ? error.message : "the relay is not answering",
+            },
+      );
+      if (!(error instanceof RelayPinError)) scheduleReconnect();
     }
     return status;
   }
@@ -504,7 +568,12 @@ export async function createPlannerSyncService(
    * this device, in the first epoch. That is also what makes this device the owner.
    * Joining somebody else's does not come through here — that group arrives in the welcome.
    */
-  async function share(url: string): Promise<SyncState> {
+  async function share(url: string, fingerprint?: string): Promise<SyncState> {
+    const pin = await resolvePin(url, fingerprint);
+    if (!pin.ok) {
+      publishStatus({ state: "refused", reason: pin.reason });
+      return status;
+    }
     if (group === null) {
       group = await createWorkspaceGroup(
         options.workspaceId,
@@ -514,7 +583,7 @@ export async function createPlannerSyncService(
       await markOwned(options.dataDir, options.workspaceId);
       startedHere = true;
     }
-    return connectTo(url);
+    return connectTo(url, pin.fingerprint);
   }
 
   return {
@@ -571,7 +640,12 @@ export async function createPlannerSyncService(
      */
     async resume() {
       if (pending === null || relay !== null) return status;
-      await connectTo(pending.host);
+      const pin = await resolvePin(pending.host, undefined);
+      if (!pin.ok) {
+        publishStatus({ state: "refused", reason: pin.reason });
+        return status;
+      }
+      await connectTo(pending.host, pin.fingerprint);
       if (relay === null) return status;
       publishStatus({ state: "waiting" });
       return status;
@@ -586,7 +660,7 @@ export async function createPlannerSyncService(
      * and the welcome would otherwise leave the other person adding a device that never
      * appears.
      */
-    async join(link) {
+    async join(link, fingerprint) {
       const parsed = parseInvite(link);
       // A link this device cannot read is a thing to say where it was pasted, not a state for
       // the whole service. The caller shows the sentence and leaves the local face in place.
@@ -598,7 +672,10 @@ export async function createPlannerSyncService(
       }
       if (group !== null) throw new Error("This device is already in this workspace.");
 
-      await connectTo(parsed.value.host);
+      const pin = await resolvePin(parsed.value.host, fingerprint);
+      if (!pin.ok) throw new Error(pin.reason);
+
+      await connectTo(parsed.value.host, pin.fingerprint);
       if (relay === null) return status;
 
       // The group's credential is the device id, not the name: names are cosmetic and two

@@ -22,6 +22,8 @@ const relayUrlSchema = z
 
 const inviteRoleSchema = z.enum(["editor", "viewer"]);
 
+const relayFingerprintSchema = z.string().trim().min(1).optional();
+
 const inviteLinkSchema = z.string().trim().min(1);
 
 /**
@@ -121,11 +123,15 @@ export function registerIpc(getStore: () => WorkspaceStore, sync: PlannerSyncCon
   // opens a socket. Every payload is parsed here before it reaches the service.
   onIpc("sync:status", () => sync.status());
 
-  onIpc("sync:enable", (_event, url: unknown) => sync.enable(relayUrlSchema.parse(url)));
+  onIpc("sync:enable", (_event, url: unknown, fingerprint: unknown) =>
+    sync.enable(relayUrlSchema.parse(url), relayFingerprintSchema.parse(fingerprint)),
+  );
 
   onIpc("sync:disable", () => sync.disable());
 
   onIpc("sync:invite", (_event, role: unknown) => sync.invite(inviteRoleSchema.parse(role)));
 
-  onIpc("sync:join", (_event, link: unknown) => sync.join(inviteLinkSchema.parse(link)));
+  onIpc("sync:join", (_event, link: unknown, fingerprint: unknown) =>
+    sync.join(inviteLinkSchema.parse(link), relayFingerprintSchema.parse(fingerprint)),
+  );
 }

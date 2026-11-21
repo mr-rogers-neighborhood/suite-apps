@@ -18,7 +18,16 @@ export interface RelayWebSocket {
         data: unknown;
     }) => void): void;
     addEventListener(type: "close", listener: () => void): void;
-    addEventListener(type: "error", listener: () => void): void;
+    /**
+     * `error` carries the cause when the transport has one.
+     *
+     * A TLS pin refusal is decided below this interface, where the certificate is visible, and
+     * the sentence it produces has to reach the person. A browser error event has no detail,
+     * so the cause is optional.
+     */
+    addEventListener(type: "error", listener: (event: {
+        error?: Error;
+    }) => void): void;
 }
 export type RelayWebSocketFactory = (url: string) => RelayWebSocket;
 export interface RelayClientOptions {

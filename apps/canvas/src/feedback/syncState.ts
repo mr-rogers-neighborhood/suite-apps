@@ -96,7 +96,15 @@ export function refusalSentence(reason: string | null | undefined): string {
     case "wrong-workspace":
       return "That invitation is for a different workspace.";
     default:
-      return "Sync stopped. This workspace is still saved here.";
+      // Some refusals are already sentences written for the person holding the device — a
+      // certificate pin that does not match, for one. Passing those through is what makes
+      // the answer actionable; a protocol code still gets the plain fallback.
+      if (reason === null || reason === undefined) {
+        return "Sync stopped. This workspace is still saved here.";
+      }
+      return reason.includes(" ") && reason.length > 24
+        ? reason
+        : "Sync stopped. This workspace is still saved here.";
   }
 }
 

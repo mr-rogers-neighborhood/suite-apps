@@ -62,7 +62,7 @@ contextBridge.exposeInMainWorld("suiteDesktop", {
   // Sync. The page hands over an exported update and receives one back; the keys and
   // the socket stay in main, which is the whole reason these are the only two doors.
   syncStatus: () => ipcRenderer.invoke(CHANNELS.syncStatus),
-  syncEnable: (url) => ipcRenderer.invoke(CHANNELS.syncEnable, url),
+  syncEnable: (url, fingerprint) => ipcRenderer.invoke(CHANNELS.syncEnable, url, fingerprint),
   syncDisable: () => ipcRenderer.invoke(CHANNELS.syncDisable),
   syncPublish: (update) => ipcRenderer.invoke(CHANNELS.syncPublish, update),
   onSyncIncoming: (listener) => {
@@ -72,7 +72,7 @@ contextBridge.exposeInMainWorld("suiteDesktop", {
     ipcRenderer.on(CHANNELS.syncChanged, (_event, info) => listener(info));
   },
   syncInvite: (role) => ipcRenderer.invoke(CHANNELS.syncInvite, role),
-  syncJoin: (link) => ipcRenderer.invoke(CHANNELS.syncJoin, link),
+  syncJoin: (link, fingerprint) => ipcRenderer.invoke(CHANNELS.syncJoin, link, fingerprint),
   onSyncSnapshotWanted: (listener) => {
     ipcRenderer.on(CHANNELS.syncSnapshotWanted, () => listener());
   },

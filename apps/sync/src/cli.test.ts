@@ -17,6 +17,9 @@ describe("arguments", () => {
       store: ".suite-sync",
       trustAll: false,
       trustAllRemote: false,
+      tlsCert: null,
+      tlsKey: null,
+      allowPlaintext: false,
     });
   });
 
@@ -45,6 +48,26 @@ describe("arguments", () => {
     expect(parseServeOptions(["--trust-all-remote"])).toEqual({
       ok: false,
       error: "--trust-all-remote only means something with --trust-all",
+    });
+  });
+
+  it("takes a certificate and key together", () => {
+    const parsed = parseServeOptions([
+      "--tls-cert",
+      "/tmp/cert.pem",
+      "--tls-key",
+      "/tmp/key.pem",
+      "--allow-plaintext",
+    ]);
+    expect(parsed.ok && parsed.value.tlsCert).toBe("/tmp/cert.pem");
+    expect(parsed.ok && parsed.value.tlsKey).toBe("/tmp/key.pem");
+    expect(parsed.ok && parsed.value.allowPlaintext).toBe(true);
+  });
+
+  it("refuses half a TLS pair rather than serving something that cannot start", () => {
+    expect(parseServeOptions(["--tls-cert", "/tmp/cert.pem"])).toEqual({
+      ok: false,
+      error: "--tls-cert and --tls-key go together",
     });
   });
 });
@@ -76,6 +99,18 @@ describe("the command line", () => {
     const result = await runCli(["serve"]);
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("no device keys");
+  });
+
+  it("refuses to serve plaintext on an address other machines can reach, even when asked why", async () => {
+    const result = await runCli([
+      "serve",
+      "--host",
+      "0.0.0.0",
+      "--trust-all",
+      "--trust-all-remote",
+    ]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/needs TLS|--tls-cert/u);
   });
 
   it("refuses to admit any device on an address other machines can reach", async () => {
@@ -117,9 +152,36 @@ describe("the status line", () => {
       store: ".suite-sync",
       trustAll: true,
       trustAllRemote: false,
+      tlsCert: null,
+      tlsKey: null,
+      allowPlaintext: false,
     });
     expect(text).toContain("127.0.0.1:8787");
     expect(text).toContain(".suite-sync");
     expect(text).toContain("not checked");
+  });
+
+  it("says when a reachable address is plaintext and whether that was chosen", () => {
+    const base = {
+      host: "0.0.0.0",
+      port: 8787,
+      store: ".suite-sync",
+      trustAll: true,
+      trustAllRemote: true,
+    };
+    expect(formatStatus({ ...base, tlsCert: null, tlsKey: null, allowPlaintext: false })).toContain(
+      "refused:",
+    );
+    expect(formatStatus({ ...base, tlsCert: null, tlsKey: null, allowPlaintext: true })).toContain(
+      "warning:",
+    );
+    expect(
+      formatStatus({
+        ...base,
+        tlsCert: "/etc/suite/cert.pem",
+        tlsKey: "/etc/suite/key.pem",
+        allowPlaintext: false,
+      }),
+    ).toContain("wss (certificate pinned)");
   });
 });

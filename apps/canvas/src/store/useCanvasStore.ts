@@ -27,6 +27,8 @@ export interface SyncInfo {
   readonly deviceId: string;
   readonly status: SyncState;
   readonly members: readonly SyncMember[];
+  /** The SHA-256 fingerprint this workspace pins for its relay certificate. */
+  readonly fingerprint?: string | null;
   /** What this device has said about its way back in; null until anybody asked. */
   readonly kit?: "made" | "declined" | null;
   /** What went wrong when something did, in the words of whatever refused. */
@@ -59,12 +61,12 @@ export type KitImportResult =
   | { readonly ok: false; readonly reason: "message"; readonly message: string };
 
 interface SyncBridge {
-  syncEnable(url: string): Promise<unknown>;
+  syncEnable(url: string, fingerprint?: string): Promise<unknown>;
   syncDisable(): Promise<unknown>;
   syncStatus(): Promise<SyncInfo | null>;
   syncPublish(update: number[]): Promise<unknown>;
   syncInvite(role: "editor" | "viewer"): Promise<string | null>;
-  syncJoin(link: string): Promise<unknown>;
+  syncJoin(link: string, fingerprint?: string): Promise<unknown>;
   onSyncIncoming(listener: (update: number[]) => void): void;
   onSyncChanged(listener: (info: SyncInfo) => void): void;
   onSyncSnapshotWanted(listener: () => void): void;
@@ -149,7 +151,7 @@ interface CanvasState {
   /** Ask main what sync is doing, for the first paint and after a change. */
   refreshSync: () => Promise<void>;
   /** Opt in: share this workspace from the machine at `url`. */
-  enableSync: (url: string) => Promise<void>;
+  enableSync: (url: string, fingerprint?: string) => Promise<void>;
   /** Stop syncing. The local document is untouched. */
   disableSync: () => Promise<void>;
   /** Hand back a link to give someone. Null when sync is not on. */
@@ -166,7 +168,7 @@ interface CanvasState {
   /** Say no, and stop being asked for this workspace. */
   declineKit: () => Promise<void>;
   /** Join from a link somebody shared. */
-  joinWorkspace: (link: string) => Promise<void>;
+  joinWorkspace: (link: string, fingerprint?: string) => Promise<void>;
   /**
    * Persist locally and wait until the room has the latest local version.
    * Publishes call this so the server never reads a draft the transport has
@@ -264,8 +266,8 @@ export const useCanvasStore = create<CanvasState>((set) => {
       const info = await sync?.syncStatus();
       set({ sync: info ?? null });
     },
-    enableSync: async (url) => {
-      await sync?.syncEnable(url);
+    enableSync: async (url, fingerprint) => {
+      await sync?.syncEnable(url, fingerprint);
       const info = await sync?.syncStatus();
       if (info != null) set({ sync: info });
     },
@@ -288,8 +290,8 @@ export const useCanvasStore = create<CanvasState>((set) => {
     declineKit: async () => {
       await sync?.syncDeclineKit();
     },
-    joinWorkspace: async (link) => {
-      await sync?.syncJoin(link);
+    joinWorkspace: async (link, fingerprint) => {
+      await sync?.syncJoin(link, fingerprint);
       const info = await sync?.syncStatus();
       if (info != null) set({ sync: info });
     },

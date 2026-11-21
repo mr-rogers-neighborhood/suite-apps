@@ -107,6 +107,13 @@ export interface SyncInfo {
    */
   readonly members: readonly SyncMember[];
   /**
+   * The SHA-256 fingerprint this workspace pins for its relay certificate.
+   *
+   * Public by design: it is the trust anchor copied from the relay's startup line, not key
+   * material. Null when the relay is plaintext loopback or nothing is shared yet.
+   */
+  readonly fingerprint?: string | null;
+  /**
    * What went wrong, when something did, in the words of whatever refused.
    *
    * Carried beside the state rather than folded into it: "syncing" is still true when a

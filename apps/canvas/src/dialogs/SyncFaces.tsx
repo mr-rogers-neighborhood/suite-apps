@@ -13,9 +13,14 @@ export interface LocalFaceProps {
   host: string;
   hubRunning: boolean;
   pasted: string;
+  /** The certificate the person copied from the relay's startup line. */
+  fingerprint: string;
+  /** True when the address or the invitation is `wss://`. */
+  showFingerprint: boolean;
   busy: boolean;
   onHost: (value: string) => void;
   onPasted: (value: string) => void;
+  onFingerprint: (value: string) => void;
   onShare: () => Promise<void>;
   onJoin: () => Promise<void>;
   onRestore: () => Promise<void>;
@@ -26,9 +31,12 @@ export function LocalFace({
   host,
   hubRunning,
   pasted,
+  fingerprint,
+  showFingerprint,
   busy,
   onHost,
   onPasted,
+  onFingerprint,
   onShare,
   onJoin,
   onRestore,
@@ -59,6 +67,26 @@ export function LocalFace({
             Share
           </button>
         </div>
+        {showFingerprint ? (
+          <div className="mt-2">
+            <label className="block text-[11px] text-[var(--ink-muted)]" htmlFor="sync-fingerprint">
+              Relay certificate fingerprint
+            </label>
+            <input
+              id="sync-fingerprint"
+              value={fingerprint}
+              onChange={(event) => onFingerprint(event.target.value)}
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="AB:CD:EF:…"
+              className="mt-1 w-full rounded-md border border-[var(--hairline)] bg-transparent px-2 py-1 font-mono text-xs"
+            />
+            <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+              Copy the SHA-256 line suite-sync prints when it starts. A different certificate stops
+              sync; there is no plaintext fallback.
+            </p>
+          </div>
+        ) : null}
       </section>
 
       <section>
@@ -101,6 +129,7 @@ export function LocalFace({
 export interface SyncedFaceProps {
   members: readonly SyncMember[];
   deviceId: string;
+  fingerprint?: string | null;
   link: string | null;
   busy: boolean;
   /** Whether to offer a way back in: true only while nobody has answered the question. */
@@ -124,6 +153,7 @@ const ROLE_WORDS: Record<string, string> = {
 export function SyncedFace({
   members,
   deviceId,
+  fingerprint,
   link,
   busy,
   offerKit,
@@ -190,6 +220,21 @@ export function SyncedFace({
           ))}
         </ul>
       </section>
+
+      {fingerprint ? (
+        <section>
+          <h3 className="text-xs font-semibold">Relay certificate</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+            This device only syncs with a relay whose certificate matches this fingerprint.
+          </p>
+          <output
+            data-testid="sync-fingerprint-pinned"
+            className="mt-1 block select-all break-all rounded-md border border-[var(--hairline)] px-2 py-1 font-mono text-[11px]"
+          >
+            {fingerprint}
+          </output>
+        </section>
+      ) : null}
 
       {offerKit ? (
         <section className="rounded-md border border-[var(--hairline)] p-2">

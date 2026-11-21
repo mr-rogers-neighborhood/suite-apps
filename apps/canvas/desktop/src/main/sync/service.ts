@@ -19,6 +19,7 @@ import {
   joinWorkspaceGroup,
   leafIndexOf,
   type MemberRole,
+  normaliseFingerprint,
   open as openMessage,
   parseInvite,
   type RelayClient,
@@ -31,6 +32,12 @@ import {
   seal,
   signFrame,
 } from "@suite/sync";
+import {
+  createNodeWebSocketFactory,
+  PIN_MALFORMED_MESSAGE,
+  PIN_REQUIRED_MESSAGE,
+  RelayPinError,
+} from "@suite/sync/node";
 import type { SyncState } from "../../shared/ipc.js";
 import { loadCursor, saveCursor } from "./cursorStore.js";
 import { isOwned, loadGroup, markOwned, saveGroup } from "./groupStore.js";
@@ -44,6 +51,7 @@ import {
 import { exportKit, importKit } from "./kit.js";
 import { recordKit } from "./kitReport.js";
 import { clearPending, loadPending, type PendingJoin, savePending } from "./pendingStore.js";
+import { loadRelayConfig, saveRelayConfig } from "./relayConfig.js";
 import { createGenesis, readRootFile, writeRootFile } from "./rootStore.js";
 
 /**
@@ -82,7 +90,7 @@ export interface SyncServiceOptions {
 
 export interface SyncService {
   /** Connect to a host this device already belongs to. */
-  connect(url: string): Promise<SyncStatus>;
+  connect(url: string, fingerprint?: string): Promise<SyncStatus>;
   disconnect(): Promise<void>;
   status(): SyncStatus;
   /** The device id and public key the host pins, for a pairing string. */
@@ -92,7 +100,7 @@ export interface SyncService {
   /** Write an invitation and hand back the link to give someone. */
   createInvite(role: "editor" | "viewer"): Promise<string>;
   /** Ask to join from a link somebody shared. Resolves once this device is in. */
-  join(link: string): Promise<SyncStatus>;
+  join(link: string, fingerprint?: string): Promise<SyncStatus>;
   /**
    * Pick up a join that was still waiting when the app closed.
    *
@@ -146,6 +154,8 @@ export interface SyncService {
   /** Hand out document updates from other devices. */
   onUpdate(handler: (update: Uint8Array) => void): void;
   onStatus(handler: (status: SyncStatus) => void): void;
+  /** The certificate fingerprint this workspace requires, when the relay uses TLS. */
+  relayFingerprint(): string | null;
 }
 
 /** How many times a revoke resends a commit the host refused as stale before giving up. */
@@ -178,6 +188,10 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
   /** What the other person's screen calls this device. */
   const deviceName = options.deviceName ?? "a Suite app";
   let group = await loadGroup(options.dataDir, options.workspaceId);
+  /** The relay this workspace last used, and the certificate it must present. */
+  const storedRelay = await loadRelayConfig(options.dataDir, options.workspaceId);
+  let relayHost: string | null = storedRelay?.host ?? null;
+  let pinnedFingerprint: string | null = storedRelay?.fingerprint ?? null;
   let relay: RelayClient | null = null;
   let status: SyncStatus = { state: "off" };
   let updateHandler: ((update: Uint8Array) => void) | null = null;
@@ -220,6 +234,47 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
 
   /** Frames applied, for a status line. The cursor is what a catch-up uses. */
   const applied = (): number => (cursor === null ? 0 : cursor + 1);
+
+  /**
+   * Decide which certificate this connection must present, and remember it.
+   *
+   * Plaintext is only for loopback, and a `wss://` address has no fallback: without a pin
+   * there is nothing to trust, so the answer is a refusal with the line a person can copy.
+   * A supplied pin wins over the stored one, which is how a rotated certificate is entered.
+   */
+  async function resolvePin(
+    url: string,
+    supplied: string | undefined,
+  ): Promise<
+    | { readonly ok: true; readonly fingerprint: string | null }
+    | { readonly ok: false; readonly reason: string }
+  > {
+    const secure = url.trim().toLowerCase().startsWith("wss://");
+    if (!secure) {
+      relayHost = url;
+      pinnedFingerprint = null;
+      await saveRelayConfig(options.dataDir, options.workspaceId, {
+        host: url,
+        fingerprint: null,
+      });
+      return { ok: true, fingerprint: null };
+    }
+
+    const typed = supplied?.trim() ?? "";
+    let fingerprint: string | null = null;
+    if (typed.length > 0) {
+      fingerprint = normaliseFingerprint(typed);
+      if (fingerprint === null) return { ok: false, reason: PIN_MALFORMED_MESSAGE };
+    } else if (relayHost === url && pinnedFingerprint !== null) {
+      fingerprint = pinnedFingerprint;
+    }
+    if (fingerprint === null) return { ok: false, reason: PIN_REQUIRED_MESSAGE };
+
+    relayHost = url;
+    pinnedFingerprint = fingerprint;
+    await saveRelayConfig(options.dataDir, options.workspaceId, { host: url, fingerprint });
+    return { ok: true, fingerprint };
+  }
 
   const publishStatus = (next: SyncStatus): void => {
     status = next;
@@ -588,7 +643,12 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
    * signs. A workspace shared before this existed has a group and no root, and nothing here
    * migrates it: it opens exactly as it did.
    */
-  async function share(url: string): Promise<SyncStatus> {
+  async function share(url: string, fingerprint?: string): Promise<SyncStatus> {
+    const pin = await resolvePin(url, fingerprint);
+    if (!pin.ok) {
+      publishStatus({ state: "refused", reason: pin.reason });
+      return status;
+    }
     if (group === null) {
       group = await createWorkspaceGroup(
         options.workspaceId,
@@ -607,10 +667,10 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
         });
       }
     }
-    return connectTo(url);
+    return connectTo(url, pin.fingerprint);
   }
 
-  async function connectTo(url: string): Promise<SyncStatus> {
+  async function connectTo(url: string, fingerprint: string | null): Promise<SyncStatus> {
     if (relay !== null) return status;
     publishStatus({ state: "connecting" });
     hostUrl = url;
@@ -623,7 +683,14 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
           publicKey: identity.publicKey,
           name: deviceName,
           sign: identity.sign,
-          ...(options.webSocket === undefined ? {} : { webSocket: options.webSocket }),
+          ...(options.webSocket === undefined
+            ? {
+                webSocket:
+                  fingerprint === null
+                    ? createNodeWebSocketFactory()
+                    : createNodeWebSocketFactory({ fingerprint }),
+              }
+            : { webSocket: options.webSocket }),
         },
         handlers,
       );
@@ -634,10 +701,14 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
       catchUpFrom = null;
       requestCatchUp();
     } catch (error) {
-      publishStatus({
-        state: "asleep",
-        reason: error instanceof Error ? error.message : "the host is not answering",
-      });
+      publishStatus(
+        error instanceof RelayPinError
+          ? { state: "refused", reason: error.message }
+          : {
+              state: "asleep",
+              reason: error instanceof Error ? error.message : "the host is not answering",
+            },
+      );
     }
     return status;
   }
@@ -652,6 +723,8 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
     },
 
     status: () => status,
+
+    relayFingerprint: () => pinnedFingerprint,
 
     identity: async () => ({ deviceId: identity.deviceId, publicKey: identity.publicKey }),
 
@@ -691,7 +764,12 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
      */
     async resume() {
       if (pending === null || relay !== null) return status;
-      await connectTo(pending.host);
+      const pin = await resolvePin(pending.host, undefined);
+      if (!pin.ok) {
+        publishStatus({ state: "refused", reason: pin.reason });
+        return status;
+      }
+      await connectTo(pending.host, pin.fingerprint);
       if (relay === null) return status;
       publishStatus({ state: "waiting" });
       return status;
@@ -705,7 +783,7 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
      * spent when the host stores this key package, so quitting between here and the welcome
      * would otherwise leave the other person adding a device that never appears.
      */
-    async join(link) {
+    async join(link, fingerprint) {
       const parsed = parseInvite(link);
       if (!parsed.ok) {
         publishStatus({ state: "refused", reason: parsed.reason });
@@ -716,7 +794,13 @@ export async function createSyncService(options: SyncServiceOptions): Promise<Sy
         return status;
       }
 
-      await connectTo(parsed.value.host);
+      const pin = await resolvePin(parsed.value.host, fingerprint);
+      if (!pin.ok) {
+        publishStatus({ state: "refused", reason: pin.reason });
+        return status;
+      }
+
+      await connectTo(parsed.value.host, pin.fingerprint);
       if (relay === null) return status;
 
       // The group's credential is the device id, not the name: names are cosmetic and two

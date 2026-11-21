@@ -1,5 +1,6 @@
 export { decodeBase64, encodeBase64 } from "./base64.js";
 export { canonicalJson } from "./canonical.js";
+export { formatFingerprint, normaliseFingerprint } from "./fingerprint.js";
 export {
   type Frame,
   type FrameHeader,

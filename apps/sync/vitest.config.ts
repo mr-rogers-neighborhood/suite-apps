@@ -7,12 +7,14 @@ import { defineConfig } from "vitest/config";
  * committed output check protects.
  */
 const protocolRoot = fileURLToPath(new URL("./packages/protocol/src/index.ts", import.meta.url));
+const protocolNode = fileURLToPath(new URL("./packages/protocol/src/node.ts", import.meta.url));
 const hostRoot = fileURLToPath(new URL("./packages/host/src/index.ts", import.meta.url));
 
 export default defineConfig({
   resolve: {
     alias: [
       { find: /^@suite\/sync$/u, replacement: protocolRoot },
+      { find: /^@suite\/sync\/node$/u, replacement: protocolNode },
       { find: /^@suite\/host$/u, replacement: hostRoot },
     ],
   },

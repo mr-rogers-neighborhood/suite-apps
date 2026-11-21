@@ -59,6 +59,7 @@ function SyncDialog({
 }) {
   const [host, setHost] = useState(LOCAL_RELAY);
   const [pasted, setPasted] = useState("");
+  const [fingerprint, setFingerprint] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -72,6 +73,9 @@ function SyncDialog({
 
   const status = info?.status ?? { state: "off" as const };
   const shared = status.state !== "off" && status.state !== "waiting" && status.state !== "removed";
+  // Only a wss:// relay has a certificate to pin. One field serves both errands, read from
+  // whichever box is being used, so the two cannot disagree about which relay is meant.
+  const secureTarget = /^wss:\/\//iu.test(host.trim()) || /wss(%3A|:)/iu.test(pasted);
 
   async function run(work: () => Promise<void>): Promise<void> {
     setBusy(true);
@@ -87,14 +91,22 @@ function SyncDialog({
 
   function share(): void {
     void run(async () => {
-      const next = await getBridge().syncEnable?.(host);
+      const pin = fingerprint.trim();
+      const next =
+        pin === ""
+          ? await getBridge().syncEnable?.(host)
+          : await getBridge().syncEnable?.(host, pin);
       if (next !== undefined) onInfo(next);
     });
   }
 
   function join(): void {
     void run(async () => {
-      const next = await getBridge().syncJoin?.(pasted);
+      const pin = fingerprint.trim();
+      const next =
+        pin === ""
+          ? await getBridge().syncJoin?.(pasted)
+          : await getBridge().syncJoin?.(pasted, pin);
       if (next !== undefined) onInfo(next);
     });
   }
@@ -154,9 +166,12 @@ function SyncDialog({
           <LocalBody
             host={host}
             pasted={pasted}
+            fingerprint={fingerprint}
+            showFingerprint={secureTarget}
             busy={busy}
             onHost={setHost}
             onPasted={setPasted}
+            onFingerprint={setFingerprint}
             onShare={share}
             onJoin={join}
           />
@@ -175,17 +190,23 @@ function SyncDialog({
 function LocalBody({
   host,
   pasted,
+  fingerprint,
+  showFingerprint,
   busy,
   onHost,
   onPasted,
+  onFingerprint,
   onShare,
   onJoin,
 }: {
   readonly host: string;
   readonly pasted: string;
+  readonly fingerprint: string;
+  readonly showFingerprint: boolean;
   readonly busy: boolean;
   readonly onHost: (value: string) => void;
   readonly onPasted: (value: string) => void;
+  readonly onFingerprint: (value: string) => void;
   readonly onShare: () => void;
   readonly onJoin: () => void;
 }) {
@@ -198,6 +219,16 @@ function LocalBody({
           hint="The machine running suite-sync. Loopback is the safe default."
           onChange={(event) => onHost(event.target.value)}
         />
+        {showFingerprint ? (
+          <div className="mt-3">
+            <Field
+              label="Relay certificate fingerprint"
+              value={fingerprint}
+              hint="Copy the SHA-256 line suite-sync prints at startup. A different certificate stops sync; there is no plaintext fallback."
+              onChange={(event) => onFingerprint(event.target.value)}
+            />
+          </div>
+        ) : null}
         <div className="mt-3 flex justify-end">
           <Button size="sm" variant="primary" disabled={busy} onClick={onShare}>
             Share this workspace

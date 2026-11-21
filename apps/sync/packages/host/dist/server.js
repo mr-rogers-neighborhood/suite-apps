@@ -1,8 +1,10 @@
-import { createServer } from "node:http";
+import { createServer as createHttpServer, } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import { addInvite, applyRemovalRecord, applyRoleRecord, createInviteState, createRemovalState, createRoleState, encodeRelayMessage, ephemeralPayload, hasRole, isRelayCompatible, isRemoved, liveInvite, parseClientMessage, RELAY_PROTOCOL_VERSION, reinstateDevice, spendInvite, } from "@suite/sync";
 import { WebSocket, WebSocketServer } from "ws";
 import { admitFrame, FrameLog } from "./blindRoom.js";
 import { FileHostStore } from "./store.js";
+import { certificateFingerprint, isLoopbackHost } from "./tls.js";
 export class HostRegistry {
     rooms = new Map();
     add(room) {
@@ -26,7 +28,15 @@ export async function createSyncServer(options) {
     const now = options.now ?? (() => new Date());
     const retentionDays = options.retentionDays ?? DEFAULT_RETENTION_DAYS;
     const registry = options.registry;
-    const httpServer = createServer((request, response) => {
+    const tls = options.tls;
+    const secure = tls !== undefined;
+    if (!secure && !isLoopbackHost(host) && options.allowPlaintext !== true) {
+        // The host is the last place this can be caught. A relay embedded in another process
+        // must not expose a plaintext mailbox just because it forgot to pass a CLI flag.
+        throw new Error(`refusing to serve ws:// on ${host}: an address other machines can reach needs TLS. ` +
+            "Pass --tls-cert and --tls-key, or --allow-plaintext to accept a plaintext relay.");
+    }
+    const handleRequest = (request, response) => {
         if (request.url === "/health") {
             response.writeHead(200, { "content-type": "application/json" });
             response.end(JSON.stringify({
@@ -38,7 +48,10 @@ export async function createSyncServer(options) {
         }
         response.writeHead(404, { "content-type": "text/plain" });
         response.end("not found\n");
-    });
+    };
+    const httpServer = tls === undefined
+        ? createHttpServer(handleRequest)
+        : createHttpsServer({ cert: tls.cert, key: tls.key }, handleRequest);
     const wss = new WebSocketServer({ server: httpServer, path: "/sync" });
     const contexts = new WeakMap();
     const loading = new Map();
@@ -469,7 +482,9 @@ export async function createSyncServer(options) {
     return {
         host,
         port: boundPort,
-        url: `ws://${host}:${boundPort}/sync`,
+        url: `${secure ? "wss" : "ws"}://${host}:${boundPort}/sync`,
+        fingerprint: tls === undefined ? null : certificateFingerprint(tls.cert),
+        secure,
         async close() {
             for (const socket of wss.clients)
                 socket.terminate();
