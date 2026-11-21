@@ -22,6 +22,7 @@ import {
   friendInvitePayload,
   type InviteRecord,
   inviteRecordPayload,
+  isLoopbackRelayUrl,
   joinWorkspaceGroup,
   type NewContact,
   normaliseFingerprint,
@@ -124,6 +125,14 @@ const INVITE_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_RECONNECT_DELAY_MS = 1_000;
 const DEFAULT_RECONNECT_MAX_DELAY_MS = 15_000;
 
+/** Plaintext is local only; an address that leaves this machine needs TLS and a pin. */
+const PLAINTEXT_REMOTE_MESSAGE =
+  "Plaintext sync is only for a relay on this machine. Ask for a wss:// address and its certificate fingerprint.";
+
+/** A legacy link carries no signature, so only the local demo may still use one. */
+const LEGACY_REMOTE_MESSAGE =
+  "That is an old invitation without a signature. Ask for a new signed invitation.";
+
 export async function createPlannerSyncService(
   options: PlannerSyncOptions,
 ): Promise<PlannerSyncService> {
@@ -208,8 +217,13 @@ export async function createPlannerSyncService(
     | { readonly ok: true; readonly fingerprint: string | null }
     | { readonly ok: false; readonly reason: string }
   > {
-    const secure = url.trim().toLowerCase().startsWith("wss://");
+    const trimmed = url.trim();
+    const lower = trimmed.toLowerCase();
+    const secure = lower.startsWith("wss://");
     if (!secure) {
+      if (!lower.startsWith("ws://") || !isLoopbackRelayUrl(trimmed)) {
+        return { ok: false, reason: PLAINTEXT_REMOTE_MESSAGE };
+      }
       relayHost = url;
       pinnedFingerprint = null;
       await saveRelayConfig(options.dataDir, options.workspaceId, {
@@ -734,6 +748,12 @@ export async function createPlannerSyncService(
         );
       }
       if (group !== null) throw new Error("This device is already in this workspace.");
+
+      // Deleting `e` must not turn a signed link into a legacy one that skips every check.
+      // Legacy links stay useful for the local demo, and nowhere that leaves this machine.
+      if (parsed.value.friend === undefined && !isLoopbackRelayUrl(parsed.value.host)) {
+        throw new Error(LEGACY_REMOTE_MESSAGE);
+      }
 
       // A new link carries an envelope. Verify it, and decide whether the person who sent
       // it is one this installation chose to know. An unknown code is refused, not trusted

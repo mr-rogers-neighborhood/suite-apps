@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addContact,
   contactForCode,
+  contactsFileSchema,
   learnContact,
   removeContact,
   resolveFriendInvite,
@@ -64,6 +65,47 @@ describe("a contact added by code", () => {
     expect(() =>
       addContact([], { code: deriveFriendCode(key()), name: "Ada", publicKey: key() }),
     ).toThrow(/does not belong/u);
+  });
+
+  it("refuses a device id that arrives without the key that proves it", () => {
+    const code = deriveFriendCode(key());
+    expect(() => addContact([], { code, name: "Ada", deviceId: "a".repeat(64) })).toThrow(
+      /needs its public key/u,
+    );
+  });
+
+  it("treats padded and unpadded spellings of one key as the same device", () => {
+    const publicKey = key();
+    const code = deriveFriendCode(publicKey);
+    const unpadded = publicKey.replace(/=+$/u, "");
+    const first = addContact([], { code, name: "Ada", publicKey: unpadded });
+
+    expect(() => addContact(first, { code, name: "Ada Lovelace", publicKey })).not.toThrow();
+    const second = addContact(first, { code, name: "Ada Lovelace", publicKey });
+    expect(second[0]).toMatchObject({ name: "Ada Lovelace", publicKey: unpadded });
+  });
+
+  it("normalises a display form when a contacts file is read", () => {
+    const code = deriveFriendCode(key());
+    const parsed = contactsFileSchema.parse({
+      version: 1,
+      contacts: [
+        {
+          code: formatFriendCode(code).toLowerCase(),
+          name: "Ada",
+          addedAt: at.toISOString(),
+          trusted: true,
+        },
+      ],
+    });
+    expect(parsed.contacts[0]?.code).toBe(code);
+
+    expect(
+      contactsFileSchema.safeParse({
+        version: 1,
+        contacts: [{ code: "not a code", name: "Ada", addedAt: at.toISOString(), trusted: true }],
+      }).success,
+    ).toBe(false);
   });
 
   it("never replaces an existing key with a different one", () => {
@@ -137,6 +179,47 @@ describe("what an invitation from a contact means", () => {
       status: "key-mismatch",
       code,
     });
+  });
+
+  it("accepts the same key written without padding", () => {
+    const publicKey = key();
+    const code = deriveFriendCode(publicKey);
+    const contacts: SyncContact[] = [
+      {
+        code,
+        name: "Ada",
+        publicKey: publicKey.replace(/=+$/u, ""),
+        addedAt: at.toISOString(),
+        trusted: true,
+      },
+    ];
+    expect(resolveFriendInvite(inviteFrom(publicKey), contacts, ownCode)).toMatchObject({
+      status: "known",
+      code,
+    });
+  });
+
+  it("never completes a contact with a key that is not the one saved", () => {
+    const publicKey = key();
+    const code = deriveFriendCode(publicKey);
+    const stored: SyncContact = {
+      code,
+      name: "Ada",
+      publicKey: key(),
+      addedAt: at.toISOString(),
+      trusted: true,
+    };
+    const learned = learnContact([stored], inviteFrom(publicKey), at);
+    expect(learned[0]).toEqual(stored);
+
+    const idOnly: SyncContact = {
+      code,
+      name: "Ada",
+      deviceId: "f".repeat(64),
+      addedAt: at.toISOString(),
+      trusted: true,
+    };
+    expect(learnContact([idOnly], inviteFrom(publicKey), at)[0]).toEqual(idOnly);
   });
 
   it("refuses a contact the person has not marked trusted", () => {

@@ -58,8 +58,16 @@ export function encodeBase64Url(bytes: Uint8Array): string {
   return encodeBase64(bytes).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
 }
 
-/** Decode URL-safe base64, or null when the text is not one. */
+/**
+ * Decode URL-safe base64, or null when the text is not the canonical encoding.
+ *
+ * The standard decoder is deliberately forgiving about leftover bits; a link is not.
+ * Re-encoding and comparing rejects a value whose trailing bits another spelling could
+ * have produced, so one payload has exactly one link form.
+ */
 export function decodeBase64Url(value: string): Uint8Array | null {
   if (/[^A-Za-z0-9_-]/u.test(value)) return null;
-  return decodeBase64(value.replaceAll("-", "+").replaceAll("_", "/"));
+  const bytes = decodeBase64(value.replaceAll("-", "+").replaceAll("_", "/"));
+  if (bytes === null) return null;
+  return encodeBase64Url(bytes) === value ? bytes : null;
 }

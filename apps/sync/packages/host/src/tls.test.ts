@@ -150,4 +150,10 @@ describe("a pinned wss relay", () => {
       /fingerprint is required/u,
     );
   });
+
+  it("refuses a pin that is not a SHA-256 digest before it dials", () => {
+    expect(() => createNodeWebSocketFactory({ fingerprint: "not a fingerprint" })).toThrow(
+      /not a certificate fingerprint/u,
+    );
+  });
 });

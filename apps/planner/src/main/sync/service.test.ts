@@ -245,6 +245,32 @@ describe("friend codes and contacts", () => {
     await second.disconnect();
   });
 
+  it("lets a legacy invitation through only on loopback", async () => {
+    const fake = fakeRelay();
+    const service = await createPlannerSyncService({
+      dataDir: await folder(),
+      workspaceId,
+      webSocket: () => fake.socket,
+    });
+    const link = `suite://join?h=${encodeURIComponent("ws://127.0.0.1:8787/sync")}&w=${workspaceId}&i=${"b".repeat(64)}`;
+
+    const joining = service.join(link);
+    fake.open();
+    await joining;
+
+    expect(service.status()).toEqual({ state: "waiting" });
+    expect(fake.sent.some((message) => message.type === "keypackage")).toBe(true);
+    await service.disconnect();
+  });
+
+  it("refuses a legacy invitation that would leave this machine", async () => {
+    const service = await createPlannerSyncService({ dataDir: await folder(), workspaceId });
+    const link = `suite://join?h=${encodeURIComponent("ws://192.168.1.20:8787/sync")}&w=${workspaceId}&i=${"b".repeat(64)}`;
+
+    await expect(service.join(link)).rejects.toThrow(/new signed invitation/u);
+    await service.disconnect();
+  });
+
   it("refuses a signed invitation from a code this installation has not added", async () => {
     const service = await createPlannerSyncService({ dataDir: await folder(), workspaceId });
 
@@ -285,6 +311,17 @@ function deviceIdOf(rawPublicKey: Buffer): string {
 }
 
 describe("pinning a relay certificate", () => {
+  it("refuses plaintext sync to another machine", async () => {
+    const service = await createPlannerSyncService({ dataDir: await folder(), workspaceId });
+
+    const status = await service.connect("ws://192.168.1.20:8787/sync");
+
+    expect(status).toMatchObject({ state: "refused" });
+    expect(status.state === "refused" ? status.reason : "").toMatch(
+      /only for a relay on this machine/u,
+    );
+  });
+
   it("refuses a wss relay until a fingerprint is entered", async () => {
     const service = await createPlannerSyncService({ dataDir: await folder(), workspaceId });
 

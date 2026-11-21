@@ -5,6 +5,7 @@ import { canonicalJson } from "./canonical.js";
 import { normaliseFingerprint } from "./fingerprint.js";
 import { isFriendCode } from "./friendCode.js";
 import { deviceIdSchema, inviteIdSchema, workspaceIdSchema } from "./ids.js";
+import { isLoopbackRelayUrl } from "./relayAddress.js";
 
 /**
  * An invitation that says who sent it, and carries the key to prove it.
@@ -20,6 +21,23 @@ import { deviceIdSchema, inviteIdSchema, workspaceIdSchema } from "./ids.js";
  * sees it and learns no friend code it was not given.
  */
 const friendCodeSchema = z.string().refine(isFriendCode, "a friend code is 16 Crockford symbols");
+
+/**
+ * A full ISO-8601 timestamp with an explicit zone.
+ *
+ * The string comparison an earlier build used only agreed with the calendar when both
+ * sides were `toISOString()` output. A zone offset, or a value that merely looks like a
+ * date, would compare as text; requiring a parseable timestamp and comparing instants is
+ * what makes "expired" mean expired.
+ */
+const isoDateTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
+
+const expiresAtSchema = z
+  .string()
+  .refine(
+    (value) => isoDateTime.test(value) && !Number.isNaN(Date.parse(value)),
+    "expiresAt is an ISO-8601 timestamp",
+  );
 
 export const friendInviteSchema = z
   .object({
@@ -44,7 +62,7 @@ export const friendInviteSchema = z
     /** Optional: the friend code this invitation was written for, as a hint to the app. */
     to: friendCodeSchema.optional(),
     /** ISO-8601. The relay refuses the invite, and a reader refuses the envelope. */
-    expiresAt: z.string().min(1),
+    expiresAt: expiresAtSchema,
     /** Random and single-use. It makes two envelopes for one invite distinguishable. */
     nonce: z.string().min(1),
     signature: z.string().min(1),
@@ -94,8 +112,9 @@ export function friendInvitePayload(record: FriendInviteBody): string {
  *
  * The caller still decides two things: whether the workspace is the one this device has
  * open, and whether the inviter is a contact it trusts. This function establishes that
- * the signer holds the key it names, that the key is the device id it claims, that a
- * `wss://` relay carries a usable pin, and that the invitation has not expired.
+ * the signer holds the key it names, that the key is the device id it claims, that the
+ * relay is either plaintext loopback or `wss://` with a usable pin, and that the
+ * invitation has not expired.
  */
 export function verifyFriendInvite(
   record: FriendInvite,
@@ -106,15 +125,9 @@ export function verifyFriendInvite(
   if (deviceId === null) return { ok: false, reason: "malformed-key" };
   if (deviceId !== record.from.deviceId) return { ok: false, reason: "device-key-mismatch" };
 
-  if (record.relay.url.startsWith("wss://")) {
-    if (record.relay.fingerprint === null) return { ok: false, reason: "unpinned-relay" };
-    if (normaliseFingerprint(record.relay.fingerprint) === null) {
-      return { ok: false, reason: "unpinned-relay" };
-    }
-  }
-
-  if (record.expiresAt <= now.toISOString()) return { ok: false, reason: "expired" };
-
+  // The signature comes before every field it covers. A tampered pin or expiry is a forged
+  // envelope, not a policy decision about an honest one, so it must read as a bad signature
+  // rather than as "unpinned" or "expired".
   let signed = "";
   try {
     signed = friendInvitePayload(record);
@@ -123,6 +136,35 @@ export function verifyFriendInvite(
   }
   if (!verify(signed, record.signature, record.from.publicKey)) {
     return { ok: false, reason: "invalid-signature" };
+  }
+
+  // A plaintext relay is a loopback convenience, not something an invitation may extend to
+  // another machine. Those carry `wss://`, and only a usable pin makes that trustworthy.
+  let relay: URL;
+  try {
+    relay = new URL(record.relay.url);
+  } catch {
+    return { ok: false, reason: "unpinned-relay" };
+  }
+  if (relay.protocol === "ws:") {
+    if (!isLoopbackRelayUrl(record.relay.url)) {
+      return { ok: false, reason: "unpinned-relay" };
+    }
+    if (record.relay.fingerprint !== null) return { ok: false, reason: "unpinned-relay" };
+  } else if (relay.protocol === "wss:") {
+    if (record.relay.fingerprint === null) return { ok: false, reason: "unpinned-relay" };
+    if (normaliseFingerprint(record.relay.fingerprint) === null) {
+      return { ok: false, reason: "unpinned-relay" };
+    }
+  } else {
+    return { ok: false, reason: "unpinned-relay" };
+  }
+
+  const expiresAt = Date.parse(record.expiresAt);
+  // Fail closed on a value that is not a date. A signed envelope should never carry one,
+  // and treating it as "not yet expired" would make a garbage string a permanent invite.
+  if (Number.isNaN(expiresAt) || expiresAt <= now.getTime()) {
+    return { ok: false, reason: "expired" };
   }
   return { ok: true, record };
 }

@@ -499,9 +499,31 @@ describe("inviting someone in", () => {
     const parsed = parseInvite(link);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) throw new Error(parsed.reason);
+    expect(parsed.value.inviteId).toMatch(/^[0-9a-f]{64}$/u);
     expect(parsed.value.friend).toBeDefined();
     if (parsed.value.friend === undefined) throw new Error("no envelope");
     expect(verifyFriendInvite(parsed.value.friend, verifyEd25519).ok).toBe(true);
+    expect(parsed.value.friend.nonce).toMatch(/^[0-9a-f]{32}$/u);
+
+    // The envelope is out of band: the relay's record carries only the fields it understands.
+    const sent = fake.sent.find((message) => message.type === "invite") as
+      | { record: Record<string, unknown> }
+      | undefined;
+    expect(Object.keys(sent?.record ?? {}).sort()).toEqual([
+      "expiresAt",
+      "inviteId",
+      "role",
+      "signature",
+      "signerId",
+      "workspaceId",
+    ]);
+
+    // A second invitation is a second bearer token, not a repeat of the first.
+    const second = parseInvite(await service.createInvite("editor"));
+    expect(second.ok).toBe(true);
+    if (!second.ok) throw new Error(second.reason);
+    expect(second.value.inviteId).not.toBe(parsed.value.inviteId);
+    expect(second.value.friend?.nonce).not.toBe(parsed.value.friend.nonce);
   });
 
   it("gives this installation a code that matches its key, and remembers contacts", async () => {
@@ -528,7 +550,7 @@ describe("inviting someone in", () => {
     await expect(service.createInvite("editor")).rejects.toThrow();
   });
 
-  it("asks to join, and says it is waiting", async () => {
+  it("lets a legacy loopback invitation ask to join, and says it is waiting", async () => {
     const dataDir = await folder();
     const fake = fakeHost();
     const service = await createSyncService({
@@ -538,6 +560,8 @@ describe("inviting someone in", () => {
       webSocket: () => fake.socket,
     });
 
+    // No `e` envelope: the local demo still uses the old form, and loopback is the one place
+    // where that form cannot be redirected to somebody else's machine.
     const joining = service.join(
       `suite://join?h=ws%3A%2F%2F127.0.0.1%3A8787%2Fsync&w=${workspaceId}&i=${"b".repeat(64)}`,
     );
@@ -547,6 +571,17 @@ describe("inviting someone in", () => {
     expect(service.status()).toEqual({ state: "waiting" });
     const keyPackage = fake.sent.find((message) => message.type === "keypackage");
     expect(keyPackage).toMatchObject({ deviceId: expect.any(String), name: "the desktop" });
+  });
+
+  it("refuses a legacy invitation that would leave this machine", async () => {
+    const service = await createSyncService({ dataDir: await folder(), workspaceId });
+    await service.join(
+      `suite://join?h=${encodeURIComponent("ws://192.168.1.20:8787/sync")}&w=${workspaceId}&i=${"b".repeat(64)}`,
+    );
+
+    expect(service.status()).toMatchObject({ state: "refused" });
+    const status = service.status();
+    expect(status.state === "refused" ? status.reason : "").toMatch(/new signed invitation/u);
   });
 
   it("keeps waiting across a restart, because the invitation is already spent", async () => {
@@ -1087,6 +1122,17 @@ describe("the identity root of a new workspace", () => {
 });
 
 describe("pinning a relay certificate", () => {
+  it("refuses plaintext sync to another machine", async () => {
+    const service = await createSyncService({ dataDir: await folder(), workspaceId });
+
+    const status = await service.connect("ws://192.168.1.20:8787/sync");
+
+    expect(status).toMatchObject({ state: "refused" });
+    expect(status.state === "refused" ? status.reason : "").toMatch(
+      /only for a relay on this machine/u,
+    );
+  });
+
   it("refuses a wss relay until a fingerprint is entered", async () => {
     const service = await createSyncService({ dataDir: await folder(), workspaceId });
 
