@@ -26,6 +26,24 @@ extraResources:
 files:
   - dist/**/*
   - package.json
+  # Production payload only. `tsc` emits declarations and maps for the modules it
+  # compiles; no process loads them, and changelogs and other registry markdown
+  # are not shipped.
+  - "!**/*.map"
+  - "!**/*.d.ts"
+  - "!**/*.d.mts"
+  - "!**/*.d.cts"
+  - "!**/CHANGELOG*"
+  - "!**/*.md"
+  # A dependency's licence and notice must travel with it. Electron-builder takes
+  # the last matching pattern, so these re-include what the `.md` negation drops.
+  - "**/README*"
+  - "**/LICENSE*"
+  - "!**/test/**"
+  - "!**/tests/**"
+  - "!**/__tests__/**"
+  - "!**/*.test.*"
+  - "!**/*.spec.*"
 
 asar: true
 
