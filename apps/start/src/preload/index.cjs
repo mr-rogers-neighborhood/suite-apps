@@ -23,9 +23,10 @@ contextBridge.exposeInMainWorld("suiteStart", {
   setTheme: (source) => ipcRenderer.invoke("suite:start:theme", source),
   // An app id, never a path: main resolves it against its own records.
   revealApp: (id) => ipcRenderer.invoke("suite:start:reveal", id),
-  // Install or update one app from its signed feed. The bar arrives on its own
-  // channel below, because a download moves far more often than a window redraws.
-  installApp: (id) => ipcRenderer.invoke("suite:start:install", id),
+  // Install or update one app from its signed feed, or switch one pre-release
+  // install to another tier. The bar arrives on its own channel below, because a
+  // download moves far more often than a window redraws.
+  installApp: (id, channel) => ipcRenderer.invoke("suite:start:install", id, channel),
   recents: () => ipcRenderer.invoke("suite:start:recents"),
   forgetRecent: (path) => ipcRenderer.invoke("suite:start:forget", path),
   openFile: (path) => ipcRenderer.invoke("suite:start:open-file", path),

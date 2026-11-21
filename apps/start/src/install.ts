@@ -21,7 +21,8 @@ import {
   SUITE_PROTOCOL_PREFIX,
 } from "@suite/contracts";
 import type { FeedArtifact } from "@suite/desktop";
-import type { CatalogueEntry } from "./catalogue.js";
+import { type CatalogueEntry, installFolderFor } from "./catalogue.js";
+import type { PackageChannel } from "./channels.js";
 import type { RegistryStore } from "./installs.js";
 import { APP_MANIFEST_FILENAME } from "./registry.js";
 
@@ -61,6 +62,8 @@ export interface InstallRequest {
   readonly artifact: FeedArtifact;
   /** The feed to download from; it is also what the written manifest records. */
   readonly feed: string;
+  /** The release channel this install belongs to. Stable when none is named. */
+  readonly channel?: PackageChannel;
   /** The applications root, `<home>/Applications/Suite` by default. */
   readonly appsRoot: string;
   readonly registry: RegistryStore;
@@ -95,7 +98,7 @@ export interface InstalledApp {
 
 /** Where one version of one app lives. */
 export function appDirectory(appsRoot: string, entry: CatalogueEntry, version: string): string {
-  return join(appsRoot, entry.folder, version);
+  return join(appsRoot, installFolderFor(entry), version);
 }
 
 /** The manifest an install leaves beside its executable. */
@@ -124,7 +127,7 @@ export async function installedVersions(
 ): Promise<readonly string[]> {
   let found: Dirent[];
   try {
-    found = await readdir(join(appsRoot, entry.folder), { withFileTypes: true });
+    found = await readdir(join(appsRoot, installFolderFor(entry)), { withFileTypes: true });
   } catch {
     return [];
   }
@@ -332,6 +335,7 @@ export async function installApp(request: InstallRequest): Promise<InstalledApp>
         executable,
         manifestPath,
         installedAt: now().toISOString(),
+        channel: request.channel ?? (entry.preRelease === true ? "slop" : "stable"),
       });
       if (request.prune === true) await pruneOtherVersions(appsRoot, entry, version);
       installed = { id: entry.id, version, executable, manifestPath };

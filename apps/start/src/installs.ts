@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
+import { isPackageChannel } from "./channels.js";
 import type { InstallRecord } from "./registry.js";
 
 /**
@@ -35,6 +36,7 @@ function parseRecords(value: unknown): readonly InstallRecord[] {
     const executable: unknown = (entry as { executable?: unknown }).executable;
     const manifestPath: unknown = (entry as { manifestPath?: unknown }).manifestPath;
     const installedAt: unknown = (entry as { installedAt?: unknown }).installedAt;
+    const channel: unknown = (entry as { channel?: unknown }).channel;
     if (typeof id !== "string" || typeof executable !== "string") return [];
     // A relative executable is refused on read, not only on write: a record that
     // arrived from somewhere else is still a path this process would spawn.
@@ -45,6 +47,7 @@ function parseRecords(value: unknown): readonly InstallRecord[] {
         executable,
         ...(typeof manifestPath === "string" && isAbsolute(manifestPath) ? { manifestPath } : {}),
         ...(typeof installedAt === "string" ? { installedAt } : {}),
+        ...(isPackageChannel(channel) ? { channel } : {}),
       },
     ];
   });

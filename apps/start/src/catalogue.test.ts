@@ -166,10 +166,23 @@ describe("readCatalogue", () => {
       platform: "linux",
     });
 
-    expect(catalogue.map((entry) => entry.id)).toEqual(["canvas", "planner", "budget", SELF_ID]);
-    expect(catalogue.every((entry) => entry.available !== null)).toBe(true);
-    expect(catalogue.every((entry) => entry.installed === null)).toBe(true);
-    expect(catalogue.every((entry) => entry.newer === false)).toBe(true);
+    expect(catalogue.map((entry) => entry.id)).toEqual([
+      "canvas",
+      "planner",
+      "budget",
+      "slop.canvas",
+      "slop.planner",
+      "slop.budget",
+      SELF_ID,
+    ]);
+    // Stable reads a feed; the pre-release entries have none by design.
+    const stable = catalogue.filter((entry) => entry.preRelease !== true);
+    expect(stable.every((entry) => entry.available !== null)).toBe(true);
+    expect(stable.every((entry) => entry.installed === null)).toBe(true);
+    expect(stable.every((entry) => entry.newer === false)).toBe(true);
+    const preRelease = catalogue.filter((entry) => entry.preRelease === true);
+    expect(preRelease.every((entry) => entry.feed === "")).toBe(true);
+    expect(preRelease.every((entry) => entry.available === null)).toBe(true);
   });
 
   it("says which installed app the feed is ahead of", async () => {

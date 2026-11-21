@@ -35,6 +35,26 @@ describe("registryStore", () => {
     expect((await registry.list())[0]?.manifestPath).toBe("/opt/suite/suite.app.json");
   });
 
+  it("keeps the channel a pre-release record came from", async () => {
+    const registry = registryStore(directory);
+    await registry.add({
+      id: "slop.canvas",
+      executable: "/opt/suite/canvas",
+      channel: "canary",
+    });
+    expect((await registry.list())[0]?.channel).toBe("canary");
+  });
+
+  it("drops a channel it does not know instead of guessing one", async () => {
+    await writeFile(
+      join(directory, REGISTRY_FILENAME),
+      JSON.stringify({
+        apps: [{ id: "canvas", executable: "/opt/canvas", channel: "nightly" }],
+      }),
+    );
+    expect((await registryStore(directory).list())[0]?.channel).toBeUndefined();
+  });
+
   it("refuses to write a relative executable", async () => {
     await expect(
       registryStore(directory).add({ id: "canvas", executable: "canvas" }),

@@ -264,6 +264,13 @@ h3 {
   margin-left: auto;
 }
 
+/* The risk and removal path are prose, not colour: the badge is the label, this is
+   the sentence that makes it a warning. */
+.card-channel-notice {
+  border-left: 2px solid var(--hairline);
+  padding-left: 8px;
+}
+
 .card-version,
 .card-meta,
 .row-meta {

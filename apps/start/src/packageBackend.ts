@@ -1,6 +1,6 @@
-import type { SuiteReleaseChannel } from "@suite/contracts";
 import type { FeedArtifact } from "@suite/desktop";
 import type { CatalogueEntry } from "./catalogue.js";
+import type { PackageChannel, ReleaseTier } from "./channels.js";
 import type { DownloadProgress, InstalledApp } from "./install.js";
 import type { DiscoveredApp, FlatpakInstall, InstallRecord, RejectedInstall } from "./registry.js";
 import type { AppSource } from "./shared.js";
@@ -23,12 +23,22 @@ import type { AppSource } from "./shared.js";
 /**
  * The release channel a package came from.
  *
- * Reserved. The native backend reads the channel the manifest records and installs
- * the one feed it has always installed; nothing switches on this value yet. It is on
- * the record and the request so a future backend can answer "where did this come
- * from?" and "where should this go?" without changing the seam.
+ * Kept on the record and the request so a backend can answer "where did this
+ * come from?" and "where should this go?" without the window knowing a channel.
  */
-export type PackageChannel = SuiteReleaseChannel;
+export type { PackageChannel } from "./channels.js";
+
+/**
+ * One build a store publishes for a pre-release id.
+ *
+ * The id is shared by `slop`, `canary` and `beta`; the branch is the tier. Start
+ * reads all of them at once so it can offer a switch instead of a second install.
+ */
+export interface StoreChannel {
+  readonly tier: ReleaseTier;
+  readonly branch: string;
+  readonly commit: string;
+}
 
 /** One installed app, with who owns its files and the channel it came from. */
 export interface InstalledPackage {
@@ -36,7 +46,7 @@ export interface InstalledPackage {
   readonly app: DiscoveredApp;
   /** Who may replace the files. The same names the cards use. */
   readonly ownership: AppSource;
-  /** The channel this install came from. Reserved; see `PackageChannel`. */
+  /** The channel this install came from: stable, or the pre-release tier. */
   readonly channel: PackageChannel;
 }
 
@@ -59,6 +69,13 @@ export interface PackageListing {
    * The card reads it as "which channel would Install use", not as a promise.
    */
   readonly offers: ReadonlyMap<string, string>;
+  /**
+   * Every tier branch the store publishes for a pre-release id.
+   *
+   * Keyed by the pre-release id (`slop.<app>`), because the id is shared and the
+   * branch is what differs. Empty for an app with no pre-release deployment.
+   */
+  readonly channels: ReadonlyMap<string, readonly StoreChannel[]>;
 }
 
 export interface PackageListOptions {
@@ -70,8 +87,9 @@ export interface PackageListOptions {
  * One install request.
  *
  * The version, artifact and feed are present for an AppImage and absent when the
- * backend is asked to install from a store it owns. `channel` is reserved: a native
- * backend accepts it and keeps today's single behaviour.
+ * backend is asked to install from a store it owns. `channel` names the target
+ * tier for a pre-release; stable ignores it. A pre-release that is already
+ * installed is switched, never installed a second time.
  */
 export interface PackageInstallRequest {
   readonly entry: CatalogueEntry;
@@ -81,7 +99,7 @@ export interface PackageInstallRequest {
   readonly artifact?: FeedArtifact;
   /** The feed an AppImage download reads. */
   readonly feed?: string;
-  /** Reserved. Native installs the one channel it has always installed. */
+  /** The target tier for a pre-release switch or first install. */
   readonly channel?: PackageChannel;
   /** Called as bytes arrive; only the card's progress bar consumes it. */
   readonly onProgress?: DownloadProgress;

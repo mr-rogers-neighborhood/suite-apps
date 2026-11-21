@@ -81,11 +81,19 @@ You get one window with a card per app the suite offers:
 | **0.1.0 · newer version available**    | Installed, with **Update to …** as the main button.                            |
 | **0.1.0 · Flatpak**                    | Flatpak installed it, and Flatpak is its update path.                          |
 | **0.1.0 · Flatpak · update available** | The store publishes a different build; **Update** asks Flatpak to replace it.  |
+| **slop** badge                         | A pre-release build. Its card names the risk and the separate data folder.     |
+| **Switch to canary**                   | Moves the one pre-release install to another tier; it is not a second install. |
 
 A download shows a bar **on the card**, in place of the button, and a failure says what went wrong in
 the same place. An install through Flatpak shows **Installing…** there instead, because Flatpak does
 not report a percentage. Nothing installs itself: Start reads a version when the window opens, and
 fetches a file only when you press something.
+
+Stable and one pre-release can sit side by side: they are two ids and two cards. Every pre-release
+tier shares `run.suite.slop.<app>`, so there is one pre-release install, not one per tier. If the
+store publishes another branch, the card offers **Switch to …** rather than a second Install; the
+install stays and its data folder changes. The badge is text (`slop`, `canary` or `beta`) so it
+survives a screenshot; the sentence under it names the risk and the removal path.
 
 The last row is Start itself. It cannot replace its own running binary, so when a newer Start exists
 that row links to the release page instead of offering a button.
@@ -98,8 +106,9 @@ that row links to the release page instead of offering a button.
   Linux). It is the only place an executable path lives.
 - Documents stay in `~/Documents/Suite/<App>`. Start never opens or edits them.
 
-**Remove** on a card forgets the install without deleting the files; delete the app's folder under
-`~/Applications/Suite` to free the space.
+**Uninstall** on a card removes the versions Start placed, its menu entry and its install record;
+documents are not touched. A pre-release asks separately whether to delete its channel's data in
+`~/Documents/Suite Slop/<App>`; the stable folder is never inside that path.
 
 ## 6. What is published today
 

@@ -7,6 +7,7 @@ import {
   type SuiteReleaseChannel,
 } from "@suite/contracts";
 import { checkSignedFeed, type FeedArtifact, type FeedFetch } from "@suite/desktop";
+import { preReleaseIdFor } from "./channels.js";
 
 /**
  * What the suite offers, whether or not it is on this machine.
@@ -38,9 +39,23 @@ export interface CatalogueEntry {
   readonly folder: SuiteAppName;
   readonly extensions: readonly string[];
   readonly capabilities: readonly SuiteCapability[];
-  /** The app's own declared feed. Blank for the hub, whose feed is read at runtime. */
+  /** The app's own declared feed. Blank for the hub and every pre-release entry. */
   readonly feed: string;
   readonly channel: SuiteReleaseChannel;
+  /**
+   * Whether this entry is the one pre-release identity for its app.
+   *
+   * Stable is the default: a build with no pre-release identity is stable. The
+   * pre-release id is `slop.<app>` and every tier shares it.
+   */
+  readonly preRelease?: boolean;
+  /**
+   * Where an AppImage for this entry is placed, when it differs from `folder`.
+   *
+   * A pre-release must not share a version directory with stable, or removing one
+   * would delete the other. A Flatpak deployment has no version directory here.
+   */
+  readonly installFolder?: string;
   /**
    * Where a person can fetch a newer build by hand.
    *
@@ -94,6 +109,36 @@ export const CATALOGUE_APPS = [
     channel: "alpha",
   },
 ] as const satisfies readonly CatalogueEntry[];
+
+/**
+ * The one pre-release entry per app.
+ *
+ * Every tier shares `slop.<app>` and therefore one card; the tier is the Flatpak
+ * ref branch, not the id. These entries carry no feed on purpose: a pre-release
+ * AppImage is a manual download and the tier's update path is its Flatpak branch
+ * ([docs/explanation/channels.md](../../../docs/explanation/channels.md)).
+ */
+export const PRE_RELEASE_CATALOGUE_APPS = CATALOGUE_APPS.map(
+  (entry): CatalogueEntry => ({
+    ...entry,
+    id: preReleaseIdFor(entry.id),
+    name: `${entry.name} (pre-release)`,
+    feed: "",
+    preRelease: true,
+    installFolder: preReleaseIdFor(entry.id),
+  }),
+);
+
+/** Stable first, then the pre-release identity of each app. */
+export const ALL_CATALOGUE_APPS: readonly CatalogueEntry[] = [
+  ...CATALOGUE_APPS,
+  ...PRE_RELEASE_CATALOGUE_APPS,
+];
+
+/** The folder under the applications root where this entry's AppImage is placed. */
+export function installFolderFor(entry: Pick<CatalogueEntry, "folder" | "installFolder">): string {
+  return entry.installFolder ?? entry.folder;
+}
 
 /** Whether the catalogue still says the same thing `SUITE_APPS` does. */
 export function catalogueMatchesContracts(): readonly string[] {
@@ -165,6 +210,9 @@ export interface CatalogueOptions {
  * folder per app, and rewriting a feed-host path would describe a server that does not exist.
  */
 export function feedFor(entry: CatalogueEntry, feedBase?: string | undefined): string | null {
+  // A pre-release has no AppImage feed by design: its update path is its Flatpak
+  // branch. A local release folder must not quietly invent one.
+  if (entry.preRelease === true) return null;
   const base = feedBase?.trim().replace(/\/+$/u, "");
   if (base !== undefined && base.length > 0) return `${base}/${entry.id}`;
   return entry.feed.length > 0 ? entry.feed : null;
@@ -189,7 +237,10 @@ async function readEntry(entry: CatalogueEntry, options: CatalogueOptions): Prom
       ...entry,
       feed: "",
       available: null,
-      reason: "this build was packaged without a feed",
+      reason:
+        entry.preRelease === true
+          ? "a pre-release updates through its Flatpak branch, not an AppImage feed"
+          : "this build was packaged without a feed",
       installed,
       newer: false,
       artifact: null,
@@ -244,7 +295,7 @@ export function withInstalled(
  * binary, so it is shown as a fact rather than as a button.
  */
 export async function readCatalogue(options: CatalogueOptions): Promise<readonly CatalogueApp[]> {
-  const apps = await Promise.all(CATALOGUE_APPS.map((entry) => readEntry(entry, options)));
+  const apps = await Promise.all(ALL_CATALOGUE_APPS.map((entry) => readEntry(entry, options)));
   const self = await readEntry({ ...SELF_ENTRY, feed: options.selfFeed ?? "" }, options);
   return [...apps, self];
 }

@@ -2,6 +2,7 @@ import { parseAppManifest } from "@suite/contracts";
 import { describe, expect, it } from "vitest";
 import type { CatalogueEntry } from "./catalogue.js";
 import {
+  commitsMatch,
   FLATPAK_APP_PREFIX,
   flatpakIdFor,
   flatpakManifest,
@@ -11,7 +12,10 @@ import {
   installedInfoArgs,
   parseCommitOutput,
   parseFlatpakList,
+  parseRemoteList,
   parseVersionOutput,
+  remoteListArgs,
+  storeBranchArgs,
   storeInfoArgs,
   storeInstallArgs,
   storeUpdateArgs,
@@ -148,7 +152,7 @@ describe("withFlatpakInstalls", () => {
     expect(merged.apps[0]).toMatchObject({
       executable: "/usr/bin/flatpak",
       installedAt: null,
-      flatpak: { application: "run.suite.canvas", installation: "user" },
+      flatpak: { application: "run.suite.canvas", installation: "user", branch: "master" },
     });
     expect(merged.apps[0]?.manifest.version).toBe("0.1.0");
   });
@@ -184,6 +188,64 @@ describe("withFlatpakInstalls", () => {
     const rejected = [{ path: "/installs/budget/suite.app.json", reason: "no manifest" }];
     const merged = withFlatpakInstalls({ apps: [], rejected }, [], [CANVAS], "/usr/bin/flatpak");
     expect(merged.rejected).toEqual(rejected);
+  });
+});
+
+describe("the store's branches", () => {
+  const COMMIT = "a".repeat(64);
+
+  it("reads the application, branch and commit of each published ref", () => {
+    const refs = parseRemoteList(
+      JSON.stringify([
+        {
+          application_id: "run.suite.slop.canvas",
+          branch: "canary",
+          commit: COMMIT,
+        },
+        { application_id: "run.suite.canvas", branch: "stable" },
+      ]),
+    );
+    expect(refs).toEqual([
+      { applicationId: "run.suite.slop.canvas", branch: "canary", commit: COMMIT },
+    ]);
+  });
+
+  it("drops a row that cannot name a tier and a build", () => {
+    expect(parseRemoteList("not json")).toEqual([]);
+    expect(parseRemoteList(JSON.stringify([{ application_id: "run.suite.slop.canvas" }]))).toEqual(
+      [],
+    );
+  });
+
+  it("asks one remote for every app ref at once, including the abbreviated commit", () => {
+    expect(remoteListArgs("suite-local")).toEqual([
+      "remote-ls",
+      "--user",
+      "--app",
+      "--json",
+      "--columns=application,branch,commit",
+      "suite-local",
+    ]);
+  });
+
+  it("matches an abbreviated store commit to the deployment's full one", () => {
+    expect(commitsMatch("97319cc24eb8", "97319cc24eb8aaaa")).toBe(true);
+    expect(commitsMatch("97319cc24eb8aaaa", "97319cc24eb8")).toBe(true);
+    expect(commitsMatch("97319cc24eb8", "000000000000")).toBe(false);
+    expect(commitsMatch("", "97319cc24eb8")).toBe(false);
+  });
+
+  it("installs a pre-release branch, and switches with --reinstall", () => {
+    expect(storeBranchArgs("suite-local", "run.suite.slop.canvas", "canary")).toEqual([
+      "install",
+      "--user",
+      "--noninteractive",
+      "suite-local",
+      "run.suite.slop.canvas//canary",
+    ]);
+    expect(storeBranchArgs("suite-local", "run.suite.slop.canvas", "beta", true)).toContain(
+      "--reinstall",
+    );
   });
 });
 

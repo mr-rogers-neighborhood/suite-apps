@@ -36,13 +36,25 @@ import {
 import { resolveAppIcon } from "./appIconFile.js";
 import { appCards, fileCards, selfCard } from "./cards.js";
 import {
+  ALL_CATALOGUE_APPS,
   CATALOGUE_APPS,
   type CatalogueApp,
   type CatalogueEntry,
+  installFolderFor,
   readCatalogue,
   SELF_ID,
   withInstalled,
 } from "./catalogue.js";
+import {
+  isPreReleaseDataPath,
+  isPreReleaseId,
+  isPreReleaseTier,
+  type PreReleaseTier,
+  preReleaseDataDirectory,
+  preReleaseRemovalCopy,
+  stableRemovalCopy,
+  tierForInstall,
+} from "./channels.js";
 import { type DocumentsFolder, indexDocuments, isInsideDocuments } from "./fileIndex.js";
 
 import { writeHubReport } from "./hubReport.js";
@@ -535,6 +547,7 @@ async function state(): Promise<LauncherState> {
     running: liveRunning(),
     appsRoot: applicationsRoot(),
     store: listing.offers,
+    storeChannels: listing.channels,
   });
 
   const recentCards: RecentCard[] = recent
@@ -853,6 +866,21 @@ async function waitForExit(id: string, timeoutMs = 5_000): Promise<boolean> {
   return false;
 }
 
+/**
+ * Delete a pre-release channel's data, after the person explicitly chose that.
+ *
+ * The confirmation is the only caller, and the path is checked against the
+ * pre-release tree first: a stable document folder is never inside it, so this
+ * cannot become "uninstall stable and take the documents with it".
+ */
+async function removeChannelData(path: string): Promise<void> {
+  if (!isPreReleaseDataPath(documentsRoot(), path)) {
+    console.warn(`[uninstall] refused to delete a path outside the pre-release tree: ${path}`);
+    return;
+  }
+  await rm(path, { recursive: true, force: true });
+}
+
 /** The sentence a failed install shows, which is what the step that failed wrote. */
 function describeInstallFailure(error: unknown): string {
   return error instanceof Error && error.message.length > 0
@@ -881,9 +909,12 @@ async function finishPackage(id: string, version: string | null): Promise<void> 
  * verified manifest named, and only then placed. So a download that fails, or a file that
  * is not the one the publisher signed, leaves the previous install exactly as it was.
  */
-async function installOne(id: string): Promise<void> {
+async function installOne(id: string, channel?: unknown): Promise<void> {
   const entry = catalogue.find((app) => app.id === id);
   if (entry === undefined) return;
+  // Only a pre-release has a branch to choose; a stable card's button names none.
+  const target: PreReleaseTier | undefined =
+    isPreReleaseId(id) && isPreReleaseTier(channel) ? channel : undefined;
 
   const listing = await discover();
   const found = listing.packages.find((candidate) => candidate.app.manifest.id === id) ?? null;
@@ -895,7 +926,11 @@ async function installOne(id: string): Promise<void> {
   if (installed?.flatpak !== undefined) {
     reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
     try {
-      const result = await backend.update({ entry, flatpak: installed.flatpak });
+      const result = await backend.update({
+        entry,
+        flatpak: installed.flatpak,
+        ...(target === undefined ? {} : { channel: target }),
+      });
       await finishPackage(id, result.version);
     } catch (error) {
       reportProgress({
@@ -911,10 +946,13 @@ async function installOne(id: string): Promise<void> {
 
   // The store is also the install channel for an app it offers, which is what makes a
   // fresh machine's Install button work without an AppImage feed.
-  if (installed === null && listing.offers.has(id)) {
+  if (installed === null && (listing.offers.has(id) || listing.channels.has(id))) {
     reportProgress({ id, phase: "installing", received: 0, total: null, reason: null });
     try {
-      const result = await backend.install({ entry });
+      const result = await backend.install({
+        entry,
+        ...(target === undefined ? {} : { channel: target }),
+      });
       await finishPackage(id, result.version);
     } catch (error) {
       reportProgress({
@@ -982,6 +1020,7 @@ async function installOne(id: string): Promise<void> {
       version,
       artifact,
       feed: entry.feed,
+      ...(target === undefined ? {} : { channel: target }),
       onProgress: (received: number, total: number | null) => {
         const percent = total === null || total === 0 ? -1 : Math.floor((received / total) * 100);
         const at = Date.now();
@@ -1182,9 +1221,9 @@ function registerIpc(): void {
    * because they asked it to look again, and this runs only because they pressed the
    * button the card drew.
    */
-  onIpc(START_IPC.installApp, async (_event, id: unknown) => {
+  onIpc(START_IPC.installApp, async (_event, id: unknown, channel: unknown) => {
     if (typeof id !== "string") return;
-    await installOne(id);
+    await installOne(id, channel);
   });
 
   onIpc(START_IPC.removeApp, async (_event, id: unknown) => {
@@ -1225,28 +1264,50 @@ function registerIpc(): void {
    */
   onIpc(START_IPC.uninstallApp, async (_event, id: unknown) => {
     if (typeof id !== "string" || window === null) return;
-    const entry = CATALOGUE_APPS.find((candidate) => candidate.id === id);
+    const entry =
+      catalogue.find((candidate) => candidate.id === id) ??
+      ALL_CATALOGUE_APPS.find((candidate) => candidate.id === id);
     if (entry === undefined) return;
 
     const listing = await discover();
     const found = listing.packages.find((candidate) => candidate.app.manifest.id === id) ?? null;
     const flatpak = found?.app.flatpak;
+    const preRelease = isPreReleaseId(id);
+    const tier = tierForInstall({
+      id,
+      branch: flatpak?.branch,
+      channel: found?.app.channel ?? found?.app.manifest.update?.channel,
+    });
+    const channelData = preRelease ? preReleaseDataDirectory(documentsRoot(), entry.folder) : null;
+
     if (found !== null && flatpak !== undefined) {
       // Flatpak owns these files, so Start asks Flatpak to remove them and then
       // stops describing itself as installed. Nothing under ~/Applications is
       // touched: there may be an AppImage there that is somebody else's.
+      const copy = preRelease
+        ? preReleaseRemovalCopy({
+            name: entry.name,
+            tier,
+            dataDirectory: channelData ?? "",
+            flatpak,
+          })
+        : {
+            message: `Uninstall ${entry.name} from Flatpak?`,
+            detail:
+              `This asks Flatpak to remove ${flatpak.application} from the ` +
+              `${flatpak.installation} installation. Documents are not touched.`,
+            buttons: ["Cancel", "Uninstall"],
+          };
       const confirm = await dialog.showMessageBox(window, {
         type: "warning",
         title: "Uninstall",
-        message: `Uninstall ${entry.name} from Flatpak?`,
-        detail:
-          `This asks Flatpak to remove ${flatpak.application} from the ` +
-          `${flatpak.installation} installation. Documents are not touched.`,
-        buttons: ["Cancel", "Uninstall"],
+        message: copy.message,
+        detail: copy.detail,
+        buttons: [...copy.buttons],
         defaultId: 0,
         cancelId: 0,
       });
-      if (confirm.response !== 1) return;
+      if (confirm.response === 0) return;
 
       if (runningPids.has(id)) {
         stopApp(id);
@@ -1265,27 +1326,36 @@ function registerIpc(): void {
         });
         return;
       }
+      if (preRelease && confirm.response === 2 && channelData !== null) {
+        await removeChannelData(channelData);
+      }
       catalogue = withInstalled(catalogue, id, null);
       await broadcast();
       return;
     }
 
     const versions = listing.versions.get(id) ?? [];
+    const copy = preRelease
+      ? preReleaseRemovalCopy({
+          name: entry.name,
+          tier,
+          dataDirectory: channelData ?? "",
+        })
+      : stableRemovalCopy({
+          name: entry.name,
+          versions: versions.length,
+          folder: `${applicationsRoot()}/${installFolderFor(entry)}`,
+        });
     const answer = await dialog.showMessageBox(window, {
       type: "warning",
       title: "Uninstall",
-      message: `Uninstall ${entry.name}?`,
-      detail:
-        versions.length === 0
-          ? "No files are installed here; this only forgets the app."
-          : `This deletes ${versions.length} version${versions.length === 1 ? "" : "s"} ` +
-            `from ${applicationsRoot()}/${entry.folder}, its menu entry, and its install ` +
-            "record. Documents are not touched.",
-      buttons: ["Cancel", "Uninstall"],
+      message: copy.message,
+      detail: copy.detail,
+      buttons: [...copy.buttons],
       defaultId: 0,
       cancelId: 0,
     });
-    if (answer.response !== 1) return;
+    if (answer.response === 0) return;
 
     if (runningPids.has(id)) {
       stopApp(id);
@@ -1293,6 +1363,9 @@ function registerIpc(): void {
       runningPids.delete(id);
     }
     await backend.remove({ entry, ...(found === null ? {} : { package: found }) });
+    if (preRelease && answer.response === 2 && channelData !== null) {
+      await removeChannelData(channelData);
+    }
     catalogue = withInstalled(catalogue, id, null);
     await removeShortcut(id);
     await broadcast();

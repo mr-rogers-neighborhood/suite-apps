@@ -1,5 +1,6 @@
 import type { SuiteAppManifest } from "@suite/contracts";
 import { describeIssues, manifestFitsHub, parseAppManifest } from "@suite/contracts";
+import type { PackageChannel } from "./channels.js";
 import type { AppSource } from "./shared.js";
 
 /**
@@ -39,6 +40,13 @@ export interface InstallRecord {
    */
   readonly manifestPath?: string;
   readonly installedAt?: string;
+  /**
+   * The release channel this record came from.
+   *
+   * Reserved by the package-backend seam and written now, so a pre-release install
+   * keeps its identity even when its manifest predates the channel field.
+   */
+  readonly channel?: PackageChannel;
 }
 
 export interface RegistryFileSystem {
@@ -64,6 +72,8 @@ export interface FlatpakInstall {
   readonly application: string;
   /** `user` or `system`. */
   readonly installation: string;
+  /** The ref branch. A pre-release names its tier here: `slop`, `canary` or `beta`. */
+  readonly branch?: string;
   /** The deployed commit, when Start resolved it. */
   readonly commit?: string;
 }
@@ -73,6 +83,8 @@ export interface DiscoveredApp {
   readonly manifestPath: string;
   readonly executable: string;
   readonly installedAt: string | null;
+  /** The channel its install record names, when one did. */
+  readonly channel?: PackageChannel;
   /**
    * Set when Flatpak owns this install rather than Start or a person.
    *
@@ -222,6 +234,7 @@ export async function discoverApps(options: DiscoverOptions): Promise<DiscoveryR
       manifestPath,
       executable: record.executable,
       installedAt: record.installedAt ?? null,
+      ...(record.channel === undefined ? {} : { channel: record.channel }),
     });
   }
 

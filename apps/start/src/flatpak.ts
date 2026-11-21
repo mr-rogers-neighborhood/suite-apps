@@ -162,6 +162,7 @@ export function withFlatpakInstalls(
       flatpak: {
         application: install.applicationId,
         installation: install.installation,
+        ...(install.branch.length === 0 ? {} : { branch: install.branch }),
         ...(install.commit === undefined ? {} : { commit: install.commit }),
       },
     });
@@ -292,6 +293,84 @@ export function parseVersionOutput(text: string): string | null {
 /** What the store says it offers for one catalogue app. */
 export function storeInfoArgs(remote: string, application: string): readonly string[] {
   return ["remote-info", "--user", "--show-commit", remote, application];
+}
+
+/** One app ref the store publishes. */
+export interface RemoteRef {
+  readonly applicationId: string;
+  readonly branch: string;
+  readonly commit: string;
+}
+
+/**
+ * Read `flatpak remote-ls --app --json <remote>`.
+ *
+ * The columns are Flatpak's own. A row without an application id, a branch and a
+ * commit cannot answer "which tier and which build", so it is dropped rather
+ * than guessed.
+ */
+export function parseRemoteList(text: string): readonly RemoteRef[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((row): RemoteRef[] => {
+    if (typeof row !== "object" || row === null) return [];
+    const fields = row as Record<string, unknown>;
+    const applicationId = fields.application_id;
+    const branch = fields.branch;
+    const commit = fields.commit;
+    if (
+      typeof applicationId !== "string" ||
+      applicationId.length === 0 ||
+      typeof branch !== "string" ||
+      branch.length === 0 ||
+      typeof commit !== "string" ||
+      commit.length === 0
+    ) {
+      return [];
+    }
+    return [{ applicationId, branch, commit }];
+  });
+}
+
+/** List every app ref one remote publishes, so a pre-release card can see its tiers. */
+export function remoteListArgs(remote: string): readonly string[] {
+  // Without `--columns`, the JSON has no commit. `remote-ls` abbreviates it, so
+  // comparisons use `commitsMatch` rather than string equality.
+  return ["remote-ls", "--user", "--app", "--json", "--columns=application,branch,commit", remote];
+}
+
+/** Whether two commit ids name the same build; `remote-ls` abbreviates its column. */
+export function commitsMatch(left: string, right: string): boolean {
+  return left.length > 0 && right.length > 0 && (left.startsWith(right) || right.startsWith(left));
+}
+
+/**
+ * Install one pre-release branch by ref.
+ *
+ * The ref is `application//branch`: the arch is whatever this machine asks for,
+ * and naming the branch is what keeps one pre-release id on one tier. `reinstall`
+ * is the switch: Flatpak replaces the deployment rather than adding a second one.
+ */
+export function storeBranchArgs(
+  remote: string,
+  application: string,
+  branch: string,
+  reinstall = false,
+): readonly string[] {
+  return [
+    "install",
+    "--user",
+    "--noninteractive",
+    ...(reinstall ? ["--reinstall"] : []),
+    remote,
+    `${application}//${branch}`,
+  ];
 }
 
 /** The commit of the deployment on this machine. */

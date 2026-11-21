@@ -2,7 +2,15 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { CatalogueEntry } from "./catalogue.js";
+import { type CatalogueEntry, installFolderFor } from "./catalogue.js";
+import {
+  isPreReleaseId,
+  isPreReleaseTier,
+  type PackageChannel,
+  PRE_RELEASE_TIERS,
+  type PreReleaseTier,
+  tierFromBranch,
+} from "./channels.js";
 import {
   FLATPAK_APP_PREFIX,
   type FlatpakApp,
@@ -14,8 +22,11 @@ import {
   installedInfoArgs,
   parseCommitOutput,
   parseFlatpakList,
+  parseRemoteList,
   parseVersionOutput,
+  remoteListArgs,
   runFlatpak,
+  storeBranchArgs,
   storeInfoArgs,
   storeInstallArgs,
   storeRemote,
@@ -37,7 +48,6 @@ import { nodeRegistryFileSystem } from "./nodeFileSystem.js";
 import type {
   InstalledPackage,
   PackageBackend,
-  PackageChannel,
   PackageCommand,
   PackageInstallRequest,
   PackageInstallResult,
@@ -47,6 +57,7 @@ import type {
   PackageListOptions,
   PackageRemoveRequest,
   PackageUpdateRequest,
+  StoreChannel,
 } from "./packageBackend.js";
 import {
   APP_MANIFEST_FILENAME,
@@ -95,9 +106,18 @@ const NO_STORE: ReadonlyMap<string, string> = new Map();
 /** The variable that tells an app it was started by the hub (D45). */
 const MANAGED_BY_ENV = "SUITE_MANAGED_BY";
 
-/** The channel a manifest records, or the contract's default when it says nothing. */
+/**
+ * The channel an install belongs to.
+ *
+ * A Flatpak's ref branch is the tier and wins; an install record or the manifest
+ * is the fallback for an AppImage. A stable build stays stable whatever its feed
+ * channel says.
+ */
 function channelOf(app: DiscoveredApp): PackageChannel {
-  return app.manifest.update?.channel ?? "stable";
+  if (isPreReleaseId(app.manifest.id)) {
+    return tierFromBranch(app.flatpak?.branch) ?? app.channel ?? "slop";
+  }
+  return app.channel ?? app.manifest.update?.channel ?? "stable";
 }
 
 export function nativePackageBackend(options: NativePackageBackendOptions): PackageBackend {
@@ -171,19 +191,70 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
     const remote = storeRemote();
     const commits = new Map<string, string>();
     await Promise.all(
-      catalogue.map(async (entry) => {
-        try {
-          const commit = parseCommitOutput(
-            await runFlatpak(storeInfoArgs(remote, flatpakIdFor(entry.id)), executable),
-          );
-          if (commit !== null) commits.set(entry.id, commit);
-        } catch {
-          // Not in this store is the ordinary answer for an app nobody published.
-        }
-      }),
+      catalogue
+        .filter((entry) => !isPreReleaseId(entry.id))
+        .map(async (entry) => {
+          try {
+            const commit = parseCommitOutput(
+              await runFlatpak(storeInfoArgs(remote, flatpakIdFor(entry.id)), executable),
+            );
+            if (commit !== null) commits.set(entry.id, commit);
+          } catch {
+            // Not in this store is the ordinary answer for an app nobody published.
+          }
+        }),
     );
     storeCache = { at: now, commits };
     return commits;
+  }
+
+  const NO_CHANNELS: ReadonlyMap<string, readonly StoreChannel[]> = new Map();
+
+  /** The tier branches one pre-release id publishes. Cached with the listing. */
+  let channelCache: {
+    readonly at: number;
+    readonly channels: ReadonlyMap<string, readonly StoreChannel[]>;
+  } | null = null;
+
+  async function storeChannels(
+    force = false,
+  ): Promise<ReadonlyMap<string, readonly StoreChannel[]>> {
+    const executable = binary();
+    if (executable === null) return NO_CHANNELS;
+    const now = Date.now();
+    if (!force && channelCache !== null && now - channelCache.at < STORE_CACHE_MS) {
+      return channelCache.channels;
+    }
+
+    let refs: readonly { applicationId: string; branch: string; commit: string }[];
+    try {
+      refs = parseRemoteList(await runFlatpak(remoteListArgs(storeRemote()), executable));
+    } catch {
+      // No store means no switch to offer, not a failed card.
+      refs = [];
+    }
+
+    const channels = new Map<string, StoreChannel[]>();
+    for (const ref of refs) {
+      if (!ref.applicationId.startsWith(FLATPAK_APP_PREFIX)) continue;
+      const id = ref.applicationId.slice(FLATPAK_APP_PREFIX.length);
+      if (!isPreReleaseId(id)) continue;
+      const tier = tierFromBranch(ref.branch);
+      if (tier === null) continue;
+      const list = channels.get(id) ?? [];
+      if (list.some((candidate) => candidate.tier === tier)) continue;
+      list.push({ tier, branch: ref.branch, commit: ref.commit });
+      channels.set(id, list);
+    }
+    for (const list of channels.values()) {
+      list.sort(
+        (left, right) =>
+          PRE_RELEASE_TIERS.indexOf(left.tier as PreReleaseTier) -
+          PRE_RELEASE_TIERS.indexOf(right.tier as PreReleaseTier),
+      );
+    }
+    channelCache = { at: now, channels };
+    return channels;
   }
 
   async function versionsFor(): Promise<ReadonlyMap<string, readonly string[]>> {
@@ -212,15 +283,35 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
     const discovery =
       executable === null ? result : withFlatpakInstalls(result, installs, catalogue, executable);
 
+    const packages = discovery.apps.map((app) => ({
+      app,
+      ownership: packageSource(app, appsRoot),
+      channel: channelOf(app),
+    }));
+
+    // A pre-release card needs the branches its one id publishes, so it can offer
+    // a switch rather than a second install. No pre-release install means there is
+    // no card to draw and no reason to read the store a second time.
+    const preReleaseInstalled = packages.some((entry) => isPreReleaseId(entry.app.manifest.id));
+    const channels = preReleaseInstalled ? await storeChannels(forceOffers) : NO_CHANNELS;
+
+    // The offer for a pre-release is the branch it already runs, when the store has
+    // one. A different branch is a switch, not an update on this branch.
+    const offered = new Map(offers);
+    for (const entry of packages) {
+      if (!isPreReleaseId(entry.app.manifest.id)) continue;
+      const installedTier = tierFromBranch(entry.app.flatpak?.branch);
+      const list = channels.get(entry.app.manifest.id) ?? [];
+      const match = list.find((candidate) => candidate.tier === installedTier) ?? null;
+      if (match !== null) offered.set(entry.app.manifest.id, match.commit);
+    }
+
     return {
-      packages: discovery.apps.map((app) => ({
-        app,
-        ownership: packageSource(app, appsRoot),
-        channel: channelOf(app),
-      })),
+      packages,
       rejected: discovery.rejected,
       versions,
-      offers,
+      offers: offered,
+      channels,
     };
   }
 
@@ -230,11 +321,20 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
 
   /** The version a deployment reports, or null when Flatpak will not say. */
   async function flatpakVersionOf(install: FlatpakInstall): Promise<string | null> {
+    const executable = binary();
+    if (executable === null) return null;
     try {
-      return parseVersionOutput(await runFlatpak(installedInfoArgs(install)));
+      return parseVersionOutput(await runFlatpak(installedInfoArgs(install), executable));
     } catch {
       return null;
     }
+  }
+
+  /** Run one Flatpak command through the binary this backend was given. */
+  function flatpak(args: readonly string[]): Promise<string> {
+    const executable = binary();
+    if (executable === null) return Promise.reject(new Error("Flatpak is not available"));
+    return runFlatpak(args, executable);
   }
 
   /**
@@ -245,20 +345,62 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
    */
   async function finishFlatpak(install: FlatpakInstall): Promise<string | null> {
     flatpakCache = null;
+    channelCache = null;
     const version = await flatpakVersionOf(install);
     await storeCommits(true);
     return version;
   }
 
-  async function installFromStore(id: string): Promise<PackageInstallResult> {
-    const install: FlatpakInstall = { application: flatpakIdFor(id), installation: "user" };
-    await runFlatpak(storeInstallArgs(storeRemote(), install.application));
+  /** The first tier the store publishes for a pre-release id, in promotion order. */
+  async function preferredTier(id: string): Promise<PreReleaseTier | null> {
+    const list = (await storeChannels()).get(id) ?? [];
+    const first = list[0];
+    if (first === undefined || !isPreReleaseTier(first.branch)) return null;
+    return first.branch;
+  }
+
+  async function installFromStore(
+    id: string,
+    channel?: PackageChannel,
+  ): Promise<PackageInstallResult> {
+    const application = flatpakIdFor(id);
+    if (isPreReleaseId(id)) {
+      const tier = isPreReleaseTier(channel) ? channel : await preferredTier(id);
+      if (tier === null) throw new Error("the store publishes no pre-release branch for this app");
+      await flatpak(storeBranchArgs(storeRemote(), application, tier));
+      return {
+        id,
+        version: await finishFlatpak({ application, installation: "user", branch: tier }),
+      };
+    }
+    const install: FlatpakInstall = { application, installation: "user" };
+    await flatpak(storeInstallArgs(storeRemote(), install.application));
     return { id, version: await finishFlatpak(install) };
   }
 
   async function updateFlatpak(id: string, install: FlatpakInstall): Promise<PackageInstallResult> {
-    await runFlatpak(storeUpdateArgs(install));
+    await flatpak(storeUpdateArgs(install));
     return { id, version: await finishFlatpak(install) };
+  }
+
+  /**
+   * Move one pre-release deployment to another tier.
+   *
+   * Flatpak replaces the deployment under the same id, so the install stays and
+   * the branch (and therefore the data folder) changes. A second deployment of
+   * `run.suite.slop.<app>` is never created.
+   */
+  async function switchFlatpak(
+    id: string,
+    install: FlatpakInstall,
+    tier: PreReleaseTier,
+  ): Promise<PackageInstallResult> {
+    const application = install.application;
+    await flatpak(storeBranchArgs(storeRemote(), application, tier, true));
+    return {
+      id,
+      version: await finishFlatpak({ ...install, branch: tier }),
+    };
   }
 
   async function installAppImage(
@@ -276,6 +418,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
       feed,
       appsRoot,
       registry,
+      ...(request.channel === undefined ? {} : { channel: request.channel }),
       ...(options.download === undefined ? {} : { download: options.download }),
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
       ...(request.onProgress === undefined ? {} : { onProgress: request.onProgress }),
@@ -319,13 +462,24 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
     async install(request) {
       const list = await listing();
       const found = findPackage(list, request.entry.id);
+      const requested = isPreReleaseTier(request.channel) ? request.channel : null;
       // Flatpak owns its installs, so when it is the writer Start asks it and waits.
-      if (found?.app.flatpak !== undefined)
+      if (found?.app.flatpak !== undefined) {
+        const current = tierFromBranch(found.app.flatpak.branch);
+        // One pre-release id, one deployment: a different tier is a switch, never a
+        // second install beside it.
+        if (requested !== null && current !== null && requested !== current) {
+          return switchFlatpak(request.entry.id, found.app.flatpak, requested);
+        }
         return updateFlatpak(request.entry.id, found.app.flatpak);
+      }
       // The store is also the install channel for an app it offers, which is what makes
       // a fresh machine's Install button work without an AppImage feed.
-      if (found === null && list.offers.has(request.entry.id)) {
-        return installFromStore(request.entry.id);
+      if (
+        found === null &&
+        (list.offers.has(request.entry.id) || list.channels.has(request.entry.id))
+      ) {
+        return installFromStore(request.entry.id, request.channel);
       }
       return installAppImage(request, false);
     },
@@ -333,7 +487,14 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
     async update(request: PackageUpdateRequest) {
       const chosen =
         request.flatpak ?? findPackage(await listing(), request.entry.id)?.app.flatpak ?? null;
-      if (chosen !== null) return updateFlatpak(request.entry.id, chosen);
+      if (chosen !== null) {
+        const requested = isPreReleaseTier(request.channel) ? request.channel : null;
+        const current = tierFromBranch(chosen.branch);
+        if (requested !== null && current !== null && requested !== current) {
+          return switchFlatpak(request.entry.id, chosen, requested);
+        }
+        return updateFlatpak(request.entry.id, chosen);
+      }
       return installAppImage(request, true);
     },
 
@@ -343,16 +504,17 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
         // Flatpak owns these files, so Start asks Flatpak to remove them. Nothing under
         // the applications root is touched: there may be an AppImage there that is
         // somebody else's.
-        await runFlatpak([
+        await flatpak([
           ...flatpakScopeArgs(owned.installation),
           "uninstall",
           "--noninteractive",
           owned.application,
         ]);
         flatpakCache = null;
+        channelCache = null;
         return;
       }
-      await rm(join(appsRoot, request.entry.folder), { recursive: true, force: true });
+      await rm(join(appsRoot, installFolderFor(request.entry)), { recursive: true, force: true });
       await registry.remove(request.entry.id);
     },
 

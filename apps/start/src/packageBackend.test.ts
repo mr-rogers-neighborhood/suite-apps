@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { appCards } from "./cards.js";
-import type { CatalogueEntry } from "./catalogue.js";
+import { type CatalogueEntry, PRE_RELEASE_CATALOGUE_APPS } from "./catalogue.js";
 import type { Download } from "./install.js";
 import { registryStore } from "./installs.js";
 import { nativePackageBackend } from "./nativePackageBackend.js";
@@ -125,6 +125,7 @@ function listingOf(app: DiscoveredApp, offers: ReadonlyMap<string, string> = new
     rejected: [],
     versions: new Map([["canvas", ["0.1.0"]]]),
     offers,
+    channels: new Map(),
   } satisfies PackageListing;
 }
 
@@ -257,6 +258,7 @@ describe("the native PackageBackend", () => {
           executable: result.installed?.executable,
           manifestPath: join(appsRoot, "Canvas", "0.1.0", "suite.app.json"),
           installedAt: "2026-11-20T00:00:00.000Z",
+          channel: "stable",
         },
       ]);
 
@@ -264,7 +266,7 @@ describe("the native PackageBackend", () => {
       expect(listing.packages).toHaveLength(1);
       expect(listing.packages[0]).toMatchObject({
         ownership: "managed",
-        channel: "alpha",
+        channel: "stable",
         app: { manifest: { id: "canvas", version: "0.1.0" } },
       });
       expect(listing.versions.get("canvas")).toEqual(["0.1.0"]);
@@ -272,6 +274,90 @@ describe("the native PackageBackend", () => {
         command: "/tmp/app",
         args: ["suite://canvas/x"],
       });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("switches one pre-release deployment to another branch instead of installing a second", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "suite-switch-"));
+    try {
+      const appsRoot = join(directory, "apps");
+      const registry = registryStore(join(directory, "data"));
+      const state = join(directory, "state");
+      const log = join(directory, "flatpak.log");
+      const entry = PRE_RELEASE_CATALOGUE_APPS.find((candidate) => candidate.id === "slop.canvas");
+      if (entry === undefined) throw new Error("the pre-release Canvas entry is missing");
+
+      await writeFile(join(directory, "state-branch"), "slop");
+      await writeFile(join(directory, "state-commit"), "a".repeat(64));
+      const flatpak = join(directory, "flatpak");
+      await writeFile(
+        flatpak,
+        `#!/bin/sh
+STATE="${state}"
+LOG="${log}"
+case "$1" in
+  list)
+    printf '[{"name":"Suite Canvas (pre-release)","application_id":"run.suite.slop.canvas","version":"0.2.0","branch":"%s","origin":"suite-local","installation":"user"}]\\n' "$(cat "$STATE-branch")"
+    exit 0
+    ;;
+  remote-ls)
+    printf '[{"application_id":"run.suite.slop.canvas","branch":"slop","commit":"%s"},{"application_id":"run.suite.slop.canvas","branch":"canary","commit":"%s"}]\\n' "$(cat "$STATE-commit")" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    exit 0
+    ;;
+esac
+if [ "$1" = "--user" ] || [ "$1" = "--system" ]; then
+  shift
+fi
+case "$1" in
+  info)
+    shift
+    case "$1" in
+      --show-commit) cat "$STATE-commit" ;;
+      *)
+        printf '\\nSuite Canvas\\n\\n       Version: 0.2.0\\n'
+        ;;
+    esac
+    ;;
+  install)
+    printf '%s\\n' "$*" >>"$LOG"
+    ref="$6"
+    case "$ref" in
+      *//canary) printf 'canary' >"$STATE-branch" ;;
+      *//beta) printf 'beta' >"$STATE-branch" ;;
+      *) printf 'slop' >"$STATE-branch" ;;
+    esac
+    ;;
+esac
+exit 0
+`,
+        { mode: 0o755 },
+      );
+
+      const backend = nativePackageBackend({
+        appsRoot,
+        roots: [join(directory, "installs")],
+        registry,
+        catalogue: [entry],
+        flatpak,
+      });
+
+      const result = await backend.update({ entry, channel: "canary" });
+      expect(result).toMatchObject({ id: "slop.canvas", version: "0.2.0" });
+
+      const commands = (await readFile(log, "utf8")).trim().split("\n");
+      expect(commands).toHaveLength(1);
+      expect(commands[0]).toContain("--reinstall");
+      expect(commands[0]).toContain("run.suite.slop.canvas//canary");
+      expect(commands[0]).not.toMatch(/--noninteractive suite-local run\.suite\.slop\.canvas$/u);
+
+      const listing = await backend.list();
+      expect(listing.channels.get("slop.canvas")).toEqual([
+        expect.objectContaining({ tier: "slop", branch: "slop" }),
+        expect.objectContaining({ tier: "canary", branch: "canary" }),
+      ]);
+      expect(listing.packages[0]?.app.flatpak?.branch).toBe("canary");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

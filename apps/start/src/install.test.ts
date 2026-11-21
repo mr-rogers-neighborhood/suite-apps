@@ -84,6 +84,7 @@ describe("installApp", () => {
         executable: installed.executable,
         manifestPath: installed.manifestPath,
         installedAt: "2026-11-07T12:00:00.000Z",
+        channel: "stable",
       },
     ]);
   });

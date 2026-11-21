@@ -172,6 +172,20 @@ export interface AppCard {
    */
   readonly running: boolean;
   readonly channel: SuiteReleaseChannel;
+  /**
+   * The tier this card names: `stable`, or the pre-release branch (`slop`,
+   * `canary`, `beta`). Text, never a colour alone.
+   */
+  readonly tier: "stable" | "slop" | "canary" | "beta";
+  /**
+   * The other pre-release branch this card can switch to, when one is published.
+   *
+   * A switch keeps the single pre-release install and changes its data folder. It
+   * is never a second install of `run.suite.slop.<app>`.
+   */
+  readonly switchTier: "slop" | "canary" | "beta" | null;
+  /** The risk and removal path a pre-release card states in words. */
+  readonly channelNotice: string | null;
   /** What the app says about its own updating, or `unknown` before it has asked. */
   readonly update: ReportedUpdate;
   readonly executable: string | null;

@@ -1,7 +1,18 @@
 import { workspaceLink } from "@suite/contracts";
 import { APP_ICONS } from "./appIcons.js";
 import { type CatalogueApp, isNewer, SELF_ID } from "./catalogue.js";
+import {
+  isPreReleaseId,
+  PRE_RELEASE_TIERS,
+  type PreReleaseTier,
+  preReleaseNotice,
+  type ReleaseTier,
+  tierForInstall,
+  tierFromBranch,
+} from "./channels.js";
 import type { IndexedFile } from "./fileIndex.js";
+import { commitsMatch } from "./flatpak.js";
+import type { StoreChannel } from "./packageBackend.js";
 import type { RecentEntry } from "./recents.js";
 import type { DiscoveredApp, RejectedInstall } from "./registry.js";
 import { packageSource } from "./registry.js";
@@ -46,6 +57,13 @@ export interface CardInput {
    * information" rather than "nothing available".
    */
   readonly store?: ReadonlyMap<string, string> | undefined;
+  /**
+   * The tier branches the store publishes for a pre-release id.
+   *
+   * A pre-release card uses this to offer a switch and to know whether the branch
+   * that is installed has a newer commit. Absent means "no information".
+   */
+  readonly storeChannels?: ReadonlyMap<string, readonly StoreChannel[]> | undefined;
 }
 
 /** The folder name a refused install is known by. */
@@ -96,6 +114,9 @@ export function appCards(input: CardInput): readonly AppCard[] {
     running: false,
     releases: null,
     channel: "stable",
+    tier: "stable",
+    switchTier: null,
+    channelNotice: null,
     update: UNREPORTED,
     executable: null,
     fileExtensions: [],
@@ -108,51 +129,95 @@ export function appCards(input: CardInput): readonly AppCard[] {
 
   const offered: AppCard[] = input.catalogue
     .filter((entry) => entry.id !== SELF_ID)
-    .map((entry) => {
+    .flatMap((entry): AppCard[] => {
       const found = byId.get(entry.id) ?? null;
       byId.delete(entry.id);
+      const isPre = entry.preRelease === true || isPreReleaseId(entry.id);
+      const storeChannels = input.storeChannels?.get(entry.id) ?? [];
+      const storeCommit = input.store?.get(entry.id) ?? null;
+
+      // A pre-release card exists when its id exists on this machine or in the
+      // store. A machine with neither still gets only the stable card, as before.
+      if (isPre && found === null && storeChannels.length === 0 && storeCommit === null) {
+        return [];
+      }
+
       // A Flatpak answers to its remote, not to the AppImage feed. Saying
       // "newer version available" from a feed this install cannot read would
       // offer an Update button that installs a second copy in another format.
       const fromFlatpak = found?.flatpak !== undefined;
-      const storeCommit = input.store?.get(entry.id) ?? null;
-      const installChannel: "appimage" | "flatpak" = storeCommit !== null ? "flatpak" : "appimage";
+      const installChannel: "appimage" | "flatpak" =
+        fromFlatpak || storeCommit !== null || storeChannels.length > 0 ? "flatpak" : "appimage";
       const source = found === null ? "managed" : packageSource(found, input.appsRoot);
+
+      const installedBranch = tierFromBranch(found?.flatpak?.branch);
+      const tier: ReleaseTier = isPre
+        ? tierForInstall({
+            id: entry.id,
+            branch: found?.flatpak?.branch,
+            channel: found?.manifest.update?.channel ?? entry.channel,
+          })
+        : "stable";
+      const branchOffer =
+        installedBranch === null
+          ? null
+          : (storeChannels.find((candidate) => candidate.tier === installedBranch) ?? null);
       const flatpakUpdate =
         fromFlatpak &&
         found?.flatpak?.commit !== undefined &&
-        storeCommit !== null &&
-        found.flatpak.commit !== storeCommit;
-      return {
-        id: entry.id,
-        name: found?.manifest.name ?? entry.name,
-        source,
-        installChannel,
-        icon: APP_ICONS[entry.id] ?? null,
-        state: fromFlatpak
-          ? flatpakUpdate
-            ? "update-available"
-            : "current"
-          : source === "folder"
-            ? // A copy a person placed updates itself. Reading the hub's feed into its
-              // state would offer an Update that installs a second copy in another format.
-              "local"
-            : stateFor(found?.manifest.version ?? null, entry.available, installChannel),
-        version: found?.manifest.version ?? null,
-        available: fromFlatpak ? null : entry.available,
-        reason: fromFlatpak ? null : entry.reason,
-        versions: fromFlatpak ? 1 : (input.versions.get(entry.id) ?? (found === null ? 0 : 1)),
-        previousVersion: fromFlatpak ? null : (input.previous?.get(entry.id) ?? null),
-        running: input.running.has(entry.id),
-        releases: fromFlatpak ? null : (entry.releases ?? null),
-        channel: found?.manifest.update?.channel ?? entry.channel,
-        update: input.updates.get(entry.id) ?? UNREPORTED,
-        executable: found?.executable ?? null,
-        fileExtensions: found?.manifest.fileExtensions ?? entry.extensions,
-        lastOpenedAt: input.recents.find((row) => row.appId === entry.id)?.openedAt ?? null,
-        fileCount: input.files.filter((file) => file.appId === entry.id).length,
-        health: { ok: true },
-      };
+        (installedBranch !== null
+          ? branchOffer !== null && !commitsMatch(found.flatpak.commit, branchOffer.commit)
+          : storeCommit !== null && !commitsMatch(found.flatpak.commit, storeCommit));
+
+      // One pre-release id, so a second branch is never a second install. The card
+      // offers the other branch as a switch; the backend replaces the deployment.
+      const switchTier: PreReleaseTier | null =
+        isPre && installedBranch !== null
+          ? (PRE_RELEASE_TIERS.find(
+              (candidate) =>
+                candidate !== installedBranch &&
+                storeChannels.some((offer) => offer.tier === candidate),
+            ) ?? null)
+          : null;
+
+      return [
+        {
+          id: entry.id,
+          name: found?.manifest.name ?? entry.name,
+          source,
+          installChannel,
+          icon: APP_ICONS[entry.id] ?? null,
+          state: fromFlatpak
+            ? flatpakUpdate
+              ? "update-available"
+              : "current"
+            : source === "folder"
+              ? // A copy a person placed updates itself. Reading the hub's feed into its
+                // state would offer an Update that installs a second copy in another format.
+                "local"
+              : stateFor(found?.manifest.version ?? null, entry.available, installChannel),
+          version: found?.manifest.version ?? null,
+          available: fromFlatpak ? null : entry.available,
+          reason: fromFlatpak ? null : entry.reason,
+          versions: fromFlatpak ? 1 : (input.versions.get(entry.id) ?? (found === null ? 0 : 1)),
+          previousVersion: fromFlatpak ? null : (input.previous?.get(entry.id) ?? null),
+          running: input.running.has(entry.id),
+          releases: fromFlatpak ? null : (entry.releases ?? null),
+          channel: found?.manifest.update?.channel ?? entry.channel,
+          tier,
+          switchTier,
+          channelNotice:
+            isPre && tier !== "stable"
+              ? preReleaseNotice(tier as PreReleaseTier, switchTier)
+              : null,
+          update: input.updates.get(entry.id) ?? UNREPORTED,
+          executable: found?.executable ?? null,
+          fileExtensions: found?.manifest.fileExtensions ?? entry.extensions,
+          lastOpenedAt: input.recents.find((row) => row.appId === entry.id)?.openedAt ?? null,
+          fileCount: input.files.filter((file) => file.appId === entry.id).length,
+          health: { ok: true },
+        },
+      ];
     });
 
   // Discovery found an app the catalogue does not name — either a copy this person placed
@@ -175,6 +240,23 @@ export function appCards(input: CardInput): readonly AppCard[] {
       running: input.running.has(entry.manifest.id),
       releases: null,
       channel: entry.manifest.update?.channel ?? "stable",
+      tier: isPreReleaseId(entry.manifest.id)
+        ? tierForInstall({
+            id: entry.manifest.id,
+            branch: entry.flatpak?.branch,
+            channel: entry.channel ?? entry.manifest.update?.channel,
+          })
+        : "stable",
+      switchTier: null,
+      channelNotice: isPreReleaseId(entry.manifest.id)
+        ? preReleaseNotice(
+            tierForInstall({
+              id: entry.manifest.id,
+              branch: entry.flatpak?.branch,
+              channel: entry.channel ?? entry.manifest.update?.channel,
+            }) as PreReleaseTier,
+          )
+        : null,
       update: input.updates.get(entry.manifest.id) ?? UNREPORTED,
       executable: entry.executable,
       fileExtensions: entry.manifest.fileExtensions,
@@ -214,6 +296,9 @@ export function selfCard(entry: CatalogueApp, version: string): AppCard {
     running: false,
     releases: entry.releases ?? null,
     channel: entry.channel,
+    tier: "stable",
+    switchTier: null,
+    channelNotice: null,
     update: UNREPORTED,
     executable: null,
     fileExtensions: [],

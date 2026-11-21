@@ -89,7 +89,11 @@ function cardActions(card, actions) {
   };
 
   if (card.state === "not-installed" && card.id !== null) {
-    buttons.append(button(`Install ${card.name}`, "primary", () => actions.install(card.id)));
+    buttons.append(
+      button(`Install ${card.name}`, "primary", () =>
+        actions.install(card.id, card.switchTier ?? undefined),
+      ),
+    );
     return buttons;
   }
 
@@ -116,6 +120,15 @@ function cardActions(card, actions) {
   }
 
   if (card.source === "flatpak") {
+    // One pre-release id, one deployment: another tier is a switch, never a second
+    // install. The backend replaces the deployment and keeps the install.
+    if (card.switchTier !== null) {
+      buttons.append(
+        button(`Switch to ${card.switchTier}`, "quiet", () =>
+          actions.install(card.id, card.switchTier),
+        ),
+      );
+    }
     // Flatpak owns the deployment. Start can say where it is and ask Flatpak to remove
     // it; replacing the files is the one thing it must not do (ADR-0001).
     buttons.append(button("Reveal", "quiet", () => actions.reveal(card.id)));
@@ -152,10 +165,12 @@ function appCard(card, actions, progress, launchError) {
     title.append(mark);
   }
   title.append(el("span", "card-name", card.name));
-  // What the app honestly is, said quietly. A release channel is a promise about how much
-  // to trust the thing; hiding it until someone reads the release notes is not a favour.
-  if (card.channel !== "stable") {
-    title.append(el("span", "card-channel", card.channel));
+  // What the app honestly is, said in words. A tier is a promise about how much to
+  // trust the thing, and a badge must survive a screenshot without relying on colour.
+  if (card.tier !== "stable") {
+    const badge = el("span", "card-channel", card.tier);
+    badge.title = `${card.tier} pre-release tier`;
+    title.append(badge);
   }
   node.append(title);
 
@@ -170,6 +185,12 @@ function appCard(card, actions, progress, launchError) {
   const line = el("p", "card-meta card-state", problem ?? stateLine(card));
   if (problem !== null) line.dataset.state = "failed";
   node.append(line);
+
+  // A badge is not a warning. A pre-release says the risk and the removal path in
+  // words, on the card, before anything is pressed.
+  if (card.channelNotice !== null) {
+    node.append(el("p", "card-meta card-channel-notice", card.channelNotice));
+  }
 
   const reported = reportedLine(card);
   if (reported !== null) node.append(el("p", "card-meta card-update", reported));
