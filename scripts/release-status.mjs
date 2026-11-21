@@ -115,6 +115,9 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --date <YYYY-MM-DD>  date for the aggregate tag (default: the newest app release)
   --help               print this text
 
+Pass one of --publish, --write and --dry-run. A relay release must already exist
+(\`node scripts/release.mjs sync --publish\`); this script only edits its body.
+
 The versions come from each app's package.json; the dates from its changelog.
 `;
 
@@ -186,6 +189,21 @@ export function today(now = new Date()) {
 }
 
 /**
+ * Why a changelog date cannot become a tag, or null when it can.
+ *
+ * The heading is the only source of the aggregate date, so a typo such as
+ * `2026-02-31` would otherwise become an equally invalid `suite-2026.02.31` tag.
+ */
+export function changelogDateProblem(changelog, version) {
+  const date = changelogDate(changelog, version);
+  if (date === null || isDate(date)) return null;
+  return (
+    `${changelog} dates ${version} as '${date}', which is not a real calendar date. ` +
+    "Fix the heading before it becomes an invalid suite-YYYY.MM.DD tag."
+  );
+}
+
+/**
  * The date the aggregate release carries.
  *
  * The newest app date, not the wall clock: a rolling release is a snapshot of
@@ -194,12 +212,46 @@ export function today(now = new Date()) {
  */
 export function aggregateDate(entries, override = null) {
   if (override !== null) {
-    if (!isDate(override)) throw new Error(`--date needs YYYY-MM-DD, not ${JSON.stringify(override)}`);
+    if (!isDate(override)) {
+      throw new Error(
+        `--date needs a real YYYY-MM-DD calendar date, not ${JSON.stringify(override)}`,
+      );
+    }
     return override;
   }
   const dates = entries.map((entry) => entry.date).filter((date) => date !== null);
   if (dates.length === 0) return today();
   return dates.reduce((newest, date) => (date > newest ? date : newest));
+}
+
+/**
+ * What a publish may do with one release, or why it must not.
+ *
+ * A desktop app may be created: its Flatpak is already on the signed remote.
+ * The relay may not: its tarball and signature belong to
+ * `scripts/release.mjs sync --publish`, and an assetless `sync-v<version>`
+ * release would look installable while carrying nothing. Its body is edited in
+ * place, so the assets stay.
+ */
+export function releaseAction({ app, tag, exists }) {
+  if (exists) return { action: "edit", problem: null };
+  if (app.flatpakId === null) {
+    return {
+      action: null,
+      problem:
+        `no GitHub release exists for ${tag}. The relay's tarball and signature are published by ` +
+        "`node scripts/release.mjs sync --publish`; run that first, then this edits its body.",
+    };
+  }
+  return { action: "create", problem: null };
+}
+
+/** Why an unknown origin tag state blocks a decision, or null when it is known. */
+export function remoteLookupProblem(tag) {
+  return (
+    "could not read tags from origin (`git ls-remote` failed), so it is unknown whether " +
+    `${tag} exists. Refusing rather than creating a tag or a release over one.`
+  );
 }
 
 /**
@@ -242,13 +294,24 @@ export function planTag({ tag, version, changelog, localCommit, remoteCommit, ch
   };
 }
 
-/** The shared table rows, used by the aggregate body and by RELEASES.md. */
-export function aggregateRows(entries) {
-  return entries.map(({ app, version, date, tag }) => {
+/**
+ * The shared table rows, used by the aggregate body and by RELEASES.md.
+ *
+ * The release body is written by `--publish`, after every per-app release
+ * exists, so it always links. The page may be written before publication, so
+ * with `markPending` it says a row is pending rather than linking a 404.
+ */
+export function aggregateRows(entries, { markPending = false } = {}) {
+  return entries.map((entry) => {
+    const { app, version, date, tag } = entry;
     const released = date ?? "—";
+    const release =
+      markPending && entry.published !== true
+        ? `\`${tag}\` (pending)`
+        : `[\`${tag}\`](${releaseUrl(tag)})`;
     return (
       `| [${app.name}](${blobUrl(app.changelog)}) | ${version} | ${released} | ` +
-      `[\`${tag}\`](${releaseUrl(tag)}) | ${installCell(app)} |`
+      `${release} | ${installCell(app)} |`
     );
   });
 }
@@ -337,21 +400,36 @@ export function appReleaseBody(app, section) {
  * The generated comment is deliberate. A version belongs in `package.json`; this
  * file restates it because it is a mirror, and a mirror that is typed by hand
  * drifts.
+ *
+ * The page can be written before publication, so a row that has no release yet
+ * says **pending** instead of linking a page that does not exist. `--publish`
+ * rewrites the page with real links once the releases are created.
  */
-export function releasesPage(entries, { date, tag }) {
+export function releasesPage(entries, { date, tag, aggregatePublished = false }) {
+  const latest = aggregatePublished
+    ? [
+        "The signed Flatpak remote is the update path. This page is the human mirror of the",
+        `[aggregate Suite ${date} release](${releaseUrl(tag)}), which is the repository's`,
+        "\"Latest\" release on GitHub. The per-app releases below stay as history and carry no app",
+        "binaries.",
+      ]
+    : [
+        "The signed Flatpak remote is the update path. This page is the human mirror of the",
+        `rolling Suite ${date} release, which is not published yet. A row marked **pending**`,
+        "has no release to link until `--publish` creates it and refreshes this page; the",
+        "per-app releases below stay as history and carry no app binaries.",
+      ];
+
   return [
     "# Suite releases",
     "",
     "<!-- Generated by `scripts/release-status.mjs` from each app's `package.json` and the date",
     "     in its changelog. Do not edit the table; edit those files and regenerate. -->",
     "",
-    "The signed Flatpak remote is the update path. This page is the human mirror of the",
-    `[aggregate Suite ${date} release](${releaseUrl(tag)}), which is the repository's`,
-    "\"Latest\" release on GitHub. The per-app releases below stay as history and carry no app",
-    "binaries.",
+    ...latest,
     "",
     ...AGGREGATE_TABLE_HEADER,
-    ...aggregateRows(entries),
+    ...aggregateRows(entries, { markPending: true }),
     "",
     "## Update",
     "",
@@ -375,7 +453,7 @@ export function releasesPage(entries, { date, tag }) {
   ].join("\n");
 }
 
-/** Parse the command line; a dry run is the default. */
+/** Parse the command line; a dry run is the default and one mode at a time. */
 export function parseArgs(argv) {
   const options = { publish: false, dryRun: false, write: false, date: null, help: false };
 
@@ -401,6 +479,15 @@ export function parseArgs(argv) {
     } else {
       throw new Error(`unexpected argument ${arg}`);
     }
+  }
+
+  const modes = [
+    options.publish ? "--publish" : null,
+    options.write ? "--write" : null,
+    options.dryRun ? "--dry-run" : null,
+  ].filter((mode) => mode !== null);
+  if (modes.length > 1) {
+    throw new Error(`${modes.join(" and ")} pick different modes; pass at most one`);
   }
 
   return options;
@@ -477,8 +564,10 @@ function currentHead() {
  *
  * Everything that can refuse the run is collected before a single command is
  * printed, so a dry run shows the whole picture or names every reason it stops.
+ * `strictTags` is false for `--write`, which refreshes the page and needs no
+ * tag decision, so an offline origin lookup does not block it.
  */
-function collect() {
+function collect({ strictTags = true } = {}) {
   const problems = [];
   const entries = [];
 
@@ -511,9 +600,16 @@ function collect() {
       continue;
     }
 
+    const dateProblem = changelogDateProblem(changelog, version);
+    if (dateProblem !== null) {
+      problems.push(`${app.name}: ${dateProblem}`);
+      continue;
+    }
+
     const tag = tagFor(app, version);
     const localCommit = localTagCommit(tag);
     const remote = remoteTagCommit(tag);
+    if (strictTags && !remote.known) problems.push(`${tag}: ${remoteLookupProblem(tag)}`);
     const plan = planTag({
       tag,
       version,
@@ -536,6 +632,7 @@ function collect() {
       localCommit,
       remoteKnown: remote.known,
       remoteCommit: remote.commit,
+      published: false,
     });
   }
 
@@ -551,13 +648,25 @@ function tagStatus(item, backfill) {
   if (item.remoteKnown && item.remoteCommit !== null) {
     return `exists on origin as ${item.plan.commit.slice(0, 12)}`;
   }
+  if (!item.remoteKnown) return "unknown: origin tag lookup failed";
   return backfill(item.plan.commit);
 }
 
 function summarize(entry, releases) {
   const release = releases?.find((row) => row.tagName === entry.tag) ?? null;
+  const action =
+    releases === null
+      ? null
+      : releaseAction({ app: entry.app, tag: entry.tag, exists: release !== null });
+  let releaseLine = "unknown (gh release list failed)";
+  if (action !== null) {
+    releaseLine =
+      action.problem === null
+        ? `${action.action}${release?.isLatest === true ? " (currently Latest)" : ""}`
+        : `REFUSED: ${action.problem}`;
+  }
   const lines = [`${entry.app.name} ${entry.version} · ${entry.tag} · ${entry.date ?? "undated"}`];
-  lines.push(`  release    ${release === null ? "create" : `edit${release.isLatest ? " (currently Latest)" : ""}`}`);
+  lines.push(`  release    ${releaseLine}`);
   lines.push(
     `  tag        ${tagStatus(
       entry,
@@ -573,16 +682,19 @@ function summarize(entry, releases) {
 function planAggregate(tag, head) {
   const localCommit = localTagCommit(tag);
   const remote = remoteTagCommit(tag);
+  const plan = remote.known
+    ? planTag({
+        tag,
+        version: tag,
+        changelog: "HEAD",
+        localCommit,
+        remoteCommit: remote.commit,
+        changelogCommit: head,
+      })
+    : { tag, commit: null, createLocal: false, problem: `${tag}: ${remoteLookupProblem(tag)}` };
   return {
     tag,
-    plan: planTag({
-      tag,
-      version: tag,
-      changelog: "HEAD",
-      localCommit,
-      remoteCommit: remote.known ? remote.commit : null,
-      changelogCommit: head,
-    }),
+    plan,
     localCommit,
     remoteKnown: remote.known,
     remoteCommit: remote.commit,
@@ -616,7 +728,7 @@ function releaseArgs({ tag, title, notesPath, latest, action, target }) {
   ];
 }
 
-function mainPublish({ entries, aggregate, date, tag, page, releases, notes }) {
+function mainPublish({ entries, aggregate, date, tag, releases, notes }) {
   if (releases === null) {
     throw new Error("gh release list failed; refusing to publish into a repository it cannot read");
   }
@@ -625,8 +737,10 @@ function mainPublish({ entries, aggregate, date, tag, page, releases, notes }) {
   for (const item of notes) writeFileSync(join(ROOT, item.path), item.body);
 
   for (const entry of entries) {
+    if (entry.action === null) {
+      throw new Error(entry.actionProblem ?? `${entry.tag} has no release action`);
+    }
     if (entry.plan.createLocal) run("git", ["tag", entry.tag, entry.plan.commit]);
-    const existing = releases.find((row) => row.tagName === entry.tag) ?? null;
     run(
       "gh",
       releaseArgs({
@@ -634,7 +748,7 @@ function mainPublish({ entries, aggregate, date, tag, page, releases, notes }) {
         title: `${entry.app.name} ${entry.version}`,
         notesPath: join(NOTES_DIR, `${entry.tag}.md`),
         latest: false,
-        action: existing === null ? "create" : "edit",
+        action: entry.action,
         target: entry.plan.commit,
       }),
     );
@@ -654,7 +768,13 @@ function mainPublish({ entries, aggregate, date, tag, page, releases, notes }) {
     }),
   );
 
-  writeFileSync(join(ROOT, RELEASES_FILE), page);
+  // Everything named on the page now exists, so the refresh links instead of
+  // saying "pending".
+  for (const entry of entries) entry.published = true;
+  writeFileSync(
+    join(ROOT, RELEASES_FILE),
+    releasesPage(entries, { date, tag, aggregatePublished: true }),
+  );
   process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
   process.stdout.write(`Latest release: ${releaseUrl(tag)}\n`);
 }
@@ -672,23 +792,36 @@ async function main(argv) {
     process.stdout.write(USAGE);
     return;
   }
-  if (options.publish && options.dryRun) {
-    process.stderr.write("--publish and --dry-run contradict each other\n");
-    process.exit(2);
-  }
 
   const releases = existingReleases();
-  const { problems, entries } = collect();
+  const { problems, entries } = collect({ strictTags: !options.write });
+
+  const knownReleases = releases ?? [];
+  for (const entry of entries) {
+    const exists = knownReleases.some((row) => row.tagName === entry.tag);
+    entry.published = releases !== null && exists;
+    if (releases === null) {
+      entry.action = entry.app.flatpakId === null ? "edit" : "create";
+      entry.actionProblem = null;
+      continue;
+    }
+    const action = releaseAction({ app: entry.app, tag: entry.tag, exists });
+    entry.action = action.action;
+    entry.actionProblem = action.problem;
+    if (action.problem !== null && !options.write) problems.push(action.problem);
+  }
+
   if (problems.length > 0) throw new Error(problems.join("\n\n"));
 
   const head = currentHead();
   const date = aggregateDate(entries, options.date);
   const tag = aggregateTag(date);
   const aggregate = planAggregate(tag, head);
-  if (aggregate.plan.problem !== null) throw new Error(aggregate.plan.problem);
+  if (aggregate.plan.problem !== null && !options.write) throw new Error(aggregate.plan.problem);
 
   const body = aggregateReleaseBody(entries, { date });
-  const page = releasesPage(entries, { date, tag });
+  const aggregatePublished = releases !== null && knownReleases.some((row) => row.tagName === tag);
+  const page = releasesPage(entries, { date, tag, aggregatePublished });
   const notes = [
     ...entries.map((entry) => ({
       path: join(NOTES_DIR, `${entry.tag}.md`),
@@ -703,7 +836,7 @@ async function main(argv) {
   if (releases === null) {
     process.stdout.write(
       "\ncould not read the existing releases (gh release list failed); " +
-        "this run assumes there are none.\n",
+        "this run assumes there are none and cannot publish.\n",
     );
   } else {
     const latest = releases.find((row) => row.isLatest);
@@ -715,15 +848,21 @@ async function main(argv) {
 
   for (const entry of entries) process.stdout.write(`\n${summarize(entry, releases)}\n`);
 
-  const aggregateExisting = releases?.find((row) => row.tagName === tag) ?? null;
+  const aggregateExisting = knownReleases.find((row) => row.tagName === tag) ?? null;
   process.stdout.write(
     `\nSuite ${date} · ${tag} · aggregate\n` +
-      `  release    ${aggregateExisting === null ? "create (Latest)" : "edit (Latest)"}\n` +
+      `  release    ${
+        releases === null
+          ? "unknown (gh release list failed)"
+          : aggregateExisting === null
+            ? "create (Latest)"
+            : "edit (Latest)"
+      }\n` +
       `  tag        ${tagStatus(aggregate, (commit) => `backfill ${commit.slice(0, 12)} — HEAD, the snapshot this page describes`)}\n`,
   );
 
   if (options.publish) {
-    mainPublish({ entries, aggregate, date, tag, page, releases, notes });
+    mainPublish({ entries, aggregate, date, tag, releases, notes });
     return;
   }
 
@@ -739,7 +878,6 @@ async function main(argv) {
         `\n  $ ${commandText("git", ["tag", entry.tag, entry.plan.commit])}`,
       );
     }
-    const existing = releases?.find((row) => row.tagName === entry.tag) ?? null;
     process.stdout.write(
       `\n  $ ${commandText(
         "gh",
@@ -748,7 +886,7 @@ async function main(argv) {
           title: `${entry.app.name} ${entry.version}`,
           notesPath: join(NOTES_DIR, `${entry.tag}.md`),
           latest: false,
-          action: existing === null ? "create" : "edit",
+          action: entry.action ?? "edit",
           target: entry.plan.commit,
         }),
       )}\n`,

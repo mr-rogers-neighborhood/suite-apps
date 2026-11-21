@@ -61,8 +61,9 @@ release date, a link to that app's own release and the install command. Per-app 
 Latest.
 
 Both come from the versions already in the tree. The script reads `package.json` and the
-`## [version] - YYYY-MM-DD` section of the changelog, refuses a version with no section, and does
-nothing to GitHub unless `--publish` is passed:
+`## [version] - YYYY-MM-DD` section of the changelog, refuses a version with no section or a date
+that is not a real calendar day, and does nothing to GitHub unless `--publish` is passed. Pass one
+of `--publish`, `--write` and `--dry-run`; they are modes, not flags to combine:
 
 ```sh
 mise exec -- node scripts/release-status.mjs             # dry run: every command and body
@@ -71,8 +72,12 @@ mise exec -- node scripts/release-status.mjs --publish   # create or update the 
 ```
 
 A missing tag is created at the commit that added its changelog section; an existing tag is never
-moved. [`RELEASES.md`](../../RELEASES.md) is the human mirror of the Latest release and is generated
-from the same data, so do not edit its table by hand.
+moved. The relay's release is the exception: `scripts/release.mjs sync --publish` owns its tarball,
+so this script only edits that release's body and refuses when no relay release exists.
+
+[`RELEASES.md`](../../RELEASES.md) is the human mirror of the Latest release. It can be written
+before publication, so a row whose release does not exist yet says **pending** instead of linking a
+page that is not there; `--publish` rewrites the page with real links once the releases exist.
 
 The signed Flatpak remote above remains the update path. Per-app releases carry no app binaries, and
 GitHub Packages is not used for the Flatpaks.
