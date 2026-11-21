@@ -221,9 +221,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      electron-updater:
-        specifier: ^6.6.2
-        version: 6.8.11(supports-color@7.2.0)
       fuzzysort:
         specifier: ^4.0.2
         version: 4.0.2

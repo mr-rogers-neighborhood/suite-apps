@@ -198,7 +198,13 @@ async function bootstrap(initialFile: string | null): Promise<void> {
   // A dev run has no feed, so it does not ask, and a Flatpak launch leaves its
   // bytes to OSTree rather than checking at all.
   void checkForUpdates({
-    dataDir: app.getPath("userData"),
+    // Start reads the report beside the app's other data, as `@suite/contracts` defines it.
+    // `app.getPath("userData")` is a different directory on Linux, so the report went unseen.
+    dataDir: suitePaths("Planner", {
+      platform: process.platform,
+      home: app.getPath("home"),
+      xdgDataHome: process.env.XDG_DATA_HOME,
+    }).data,
     version: app.getVersion(),
     channel: "alpha",
     packaged: app.isPackaged,

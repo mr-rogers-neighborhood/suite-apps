@@ -1,6 +1,45 @@
+import { createId } from "@suite/budget-core";
 import { describe, expect, it } from "vitest";
 
-import { budgetFromArgv, budgetFromLink, slopBudgetsFolder } from "./budgetLocation";
+import {
+  type AppPaths,
+  backupDir,
+  budgetFromArgv,
+  budgetFromLink,
+  budgetPath,
+  slopBudgetsFolder,
+} from "./budgetLocation";
+
+const paths: AppPaths = {
+  root: "/home/me/.local/share/suite/budget",
+  libraryFile: "/home/me/.local/share/suite/budget/library.json",
+  budgetsDir: "/home/me/Documents/Suite/Budget",
+  backupsDir: "/home/me/Documents/Suite/Budget/.backups",
+  recoveredDir: "/home/me/.local/share/suite/budget/recovered",
+  channel: "stable",
+};
+
+describe("budgetPath and backupDir", () => {
+  it("builds a file and a backup folder for a normal id", () => {
+    expect(budgetPath(paths, "b1")).toBe("/home/me/Documents/Suite/Budget/b1.budget");
+    expect(backupDir(paths, "b1")).toBe("/home/me/Documents/Suite/Budget/.backups/b1");
+    // The id helper's own shape has to pass, or every new budget would be refused.
+    expect(() => budgetPath(paths, createId("budget"))).not.toThrow();
+  });
+
+  it.each([
+    ["../escape", "a parent directory"],
+    ["/tmp/escape", "an absolute path"],
+    ["a/b", "a separator"],
+    ["", "an empty id"],
+    [".hidden", "a leading dot"],
+    ["x".repeat(129), "an overlong id"],
+    ["UPPER", "upper case"],
+  ])("refuses %j, which is %s", (id) => {
+    expect(() => budgetPath(paths, id)).toThrow(/unsafe budget id/iu);
+    expect(() => backupDir(paths, id)).toThrow(/unsafe budget id/iu);
+  });
+});
 
 describe("slopBudgetsFolder", () => {
   it("puts a pre-release budget beside the stable folder, never inside it", () => {

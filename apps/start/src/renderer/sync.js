@@ -118,7 +118,7 @@ function scopeBlock(sync, actions) {
       "p",
       "pane-note",
       sync.scope === "network"
-        ? "Listening on every interface. Frames are encrypted, but anyone on the network can try to knock."
+        ? "Listening on every interface. Any device that can reach this port can join, and can write frames and membership. Roles are not verified here."
         : "Listening on this machine only. A device elsewhere needs the network switch, or a tunnel you already trust.",
     ),
   );

@@ -9,7 +9,6 @@ import { installMenu } from "./menu";
 import { appPaths } from "./paths";
 import { registerAppScheme, serveRenderer } from "./protocol";
 import { closeSession, openSession } from "./session";
-import { checkForUpdates } from "./updateCheck";
 import { applyContentSecurityPolicy, createMainWindow, pageCsp } from "./window";
 
 app.setName("Suite Budget");
@@ -87,18 +86,6 @@ async function bootstrap(): Promise<void> {
   registerIpc();
   installMenu();
   openWindow();
-
-  // One check per launch, in the background: it writes the report the hub reads.
-  // A dev run has no feed, so it does not ask, and a Flatpak launch leaves its
-  // bytes to OSTree rather than checking at all.
-  void checkForUpdates({
-    dataDir: paths.root,
-    version: app.getVersion(),
-    channel: "alpha",
-    packaged: app.isPackaged,
-  }).then(({ error }) => {
-    if (error !== null && app.isPackaged) console.warn(`[update] ${error}`);
-  });
 
   for (const path of pendingFiles.splice(0)) await openExternal(path);
 }

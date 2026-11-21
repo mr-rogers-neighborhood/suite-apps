@@ -2,11 +2,20 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { BudgetDocument, encodeBudgetFile } from "@suite/budget-core";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { type AppPaths, legacyBudgetsDir } from "./budgetLocation";
+import { type AppPaths, isSafeBudgetId, legacyBudgetsDir } from "./budgetLocation";
 import type { DocumentChannel } from "./channel";
-import { adoptLegacyBudgets, createBudget, listEntries, openBudget, openFromPath } from "./library";
+import {
+  adoptLegacyBudgets,
+  backupCurrent,
+  createBudget,
+  importFromPath,
+  listEntries,
+  openBudget,
+  openFromPath,
+} from "./library";
 
 const cleanups: string[] = [];
 
@@ -175,5 +184,96 @@ describe("pre-release isolation", () => {
 
     expect(opened.entry.path).toBe(join(slop.budgetsDir, `${created.entry.id}.budget`));
     expect(await readFile(created.entry.path, "utf8")).toBe(original);
+  });
+});
+
+/** A document whose own id is the value a supplied file chose. */
+async function writeBudgetWithId(path: string, budgetId: string): Promise<void> {
+  const base = BudgetDocument.create({ name: "Imported" }).getSnapshot();
+  const doc = BudgetDocument.fromRecords({
+    ...base,
+    meta: { ...base.meta, budgetId },
+  });
+  await writeFile(path, encodeBudgetFile(doc), "utf8");
+}
+
+describe("an imported id that becomes a filename", () => {
+  it("mints a safe id for a document that names a path traversal", async () => {
+    const paths = await sandbox();
+    const source = join(paths.root, "from-elsewhere.budget");
+    await writeBudgetWithId(source, "../escape");
+
+    const imported = await importFromPath(paths, source);
+
+    expect(imported.entry.id).not.toBe("../escape");
+    expect(isSafeBudgetId(imported.entry.id)).toBe(true);
+    expect(imported.entry.path).toBe(join(paths.budgetsDir, `${imported.entry.id}.budget`));
+    expect(imported.entry.path.startsWith(`${paths.budgetsDir}/`)).toBe(true);
+    expect((await stat(imported.entry.path)).isFile()).toBe(true);
+    expect((await listEntries(paths)).some((entry) => entry.id === "../escape")).toBe(false);
+
+    await backupCurrent(paths, imported.entry.id, imported.entry.path);
+    const backup = join(paths.backupsDir, imported.entry.id, "previous.budget");
+    expect(backup.startsWith(`${paths.backupsDir}/`)).toBe(true);
+    expect((await stat(backup)).isFile()).toBe(true);
+  });
+
+  it.each(["/tmp/escape", "a/b", ".hidden", "x".repeat(129), "UPPER"])(
+    "mints a safe id for %j",
+    async (unsafeId) => {
+      const paths = await sandbox();
+      const source = join(paths.root, "from-elsewhere.budget");
+      await writeBudgetWithId(source, unsafeId);
+
+      const imported = await importFromPath(paths, source);
+
+      expect(imported.entry.id).not.toBe(unsafeId);
+      expect(isSafeBudgetId(imported.entry.id)).toBe(true);
+      expect((await readdir(paths.budgetsDir)).filter((name) => name.endsWith(".budget"))).toEqual([
+        `${imported.entry.id}.budget`,
+      ]);
+    },
+  );
+
+  it("keeps an id that is already safe", async () => {
+    const paths = await sandbox();
+    const source = join(paths.root, "from-elsewhere.budget");
+    const doc = BudgetDocument.create({ name: "Normal" });
+    const budgetId = doc.getMeta().budgetId;
+    await writeFile(source, encodeBudgetFile(doc), "utf8");
+
+    const imported = await importFromPath(paths, source);
+
+    expect(imported.entry.id).toBe(budgetId);
+    expect(imported.entry.path).toBe(join(paths.budgetsDir, `${budgetId}.budget`));
+  });
+
+  it("refuses an unsafe id read from the library instead of moving the file", async () => {
+    const paths = await sandbox();
+    await mkdir(paths.budgetsDir, { recursive: true });
+    const real = join(paths.budgetsDir, "real.budget");
+    await writeFile(real, encodeBudgetFile(BudgetDocument.create({ name: "Real" })), "utf8");
+    await writeFile(
+      paths.libraryFile,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: "../escape",
+            name: "Real",
+            path: real,
+            currency: "USD",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            lastOpenedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    await expect(openBudget(paths, "../escape")).rejects.toThrow(/unsafe budget id/iu);
+    // The file did not move, and the entry still names it.
+    expect((await stat(real)).isFile()).toBe(true);
+    expect((await listEntries(paths))[0]?.id).toBe("../escape");
   });
 });

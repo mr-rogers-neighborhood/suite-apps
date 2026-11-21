@@ -55,6 +55,15 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
    */
   let kitState: "made" | "declined" | null = null;
 
+  /**
+   * The recovery-file paths this shell has handed out.
+   *
+   * The renderer may ask to retry one of these, because a sealed file needs its passphrase
+   * after the file itself is chosen. Anything else is a path the page made up: the picker
+   * opens instead, so a document can never steer a read.
+   */
+  const kitPaths = new Set<string>();
+
   const info = (status: SyncInfo["status"]): SyncInfo => ({
     workspaceId,
     deviceId: service === null ? "" : deviceIdCache,
@@ -197,9 +206,15 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
       typeof request === "object" && request !== null
         ? (request as { path?: unknown; passphrase?: unknown })
         : {};
+    // Only a path this shell produced is accepted. A page that names its own path gets the
+    // picker, which is the one place a person chooses a file.
+    const supplied = typeof wanted.path === "string" ? wanted.path : null;
     const path =
-      typeof wanted.path === "string" ? wanted.path : await options.kitFiles.pickOpenPath();
+      supplied !== null && kitPaths.has(supplied)
+        ? supplied
+        : await options.kitFiles.pickOpenPath();
     if (path === null) return { ok: false, reason: "cancelled" };
+    kitPaths.add(path);
 
     const current = await ensureService();
     if (current === null) return { ok: false, reason: "message", message: "No workspace is open." };

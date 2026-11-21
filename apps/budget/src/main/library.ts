@@ -29,8 +29,10 @@ import { z } from "zod";
 
 import {
   type AppPaths,
+  assertSafeBudgetId,
   backupDir,
   budgetPath,
+  isSafeBudgetId,
   legacyBudgetsDir,
   relativeTo,
 } from "./budgetLocation";
@@ -233,6 +235,9 @@ export async function openBudget(
   const found = file.entries.find((candidate) => candidate.id === id);
   if (!found) throw new LibraryError("missing", "That budget is no longer in the library");
 
+  // The index is machine state and can be older or copied. An id that is not one path component
+  // stays refused rather than being rewritten into a move nobody asked for.
+  assertSafeBudgetId(found.id);
   const entry = await adoptEntry(paths, found);
   const loaded = await loadWithFallback(paths, entry);
   const next = { ...entry, lastOpenedAt: now.toISOString() };
@@ -286,7 +291,12 @@ export async function importFromPath(
 
   const library = await readLibrary(paths);
   const metaId = doc.getMeta().budgetId;
-  const id = library.entries.some((entry) => entry.id === metaId) ? createId("budget") : metaId;
+  // A document supplies its own id, and that id becomes a filename. An unsafe one gets a fresh
+  // id; so does one this library already holds, which keeps the import from replacing a budget.
+  const id =
+    isSafeBudgetId(metaId) && !library.entries.some((entry) => entry.id === metaId)
+      ? metaId
+      : createId("budget");
   const path = budgetPath(paths, id);
   await mkdir(paths.budgetsDir, { recursive: true });
   await writeTextAtomic(path, sourceText);

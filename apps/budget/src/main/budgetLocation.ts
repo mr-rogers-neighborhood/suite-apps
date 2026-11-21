@@ -38,12 +38,35 @@ export function slopBudgetsFolder(documentsRoot: string, app = "Budget"): string
   return join(documentsRoot, SLOP_DOCUMENTS_FOLDER, app);
 }
 
+/**
+ * The shape of an id that may become one path component.
+ *
+ * A budget id is also a filename: `<id>.budget` under the budgets folder and a folder of its own
+ * under `.backups`. Lower-case letters, digits, `-` and the `_` the id helper uses keep it to one
+ * component, with no separators, no leading dot and no empty name. The bound keeps a document from
+ * supplying a name no filesystem will accept.
+ */
+const SAFE_BUDGET_ID = /^[a-z0-9][a-z0-9_-]{0,127}$/u;
+
+/** Whether an id can be used as one path component without escaping its parent. */
+export function isSafeBudgetId(id: string): boolean {
+  return SAFE_BUDGET_ID.test(id);
+}
+
+/** The same rule, for a caller that is about to build a path. */
+export function assertSafeBudgetId(id: string): string {
+  if (!isSafeBudgetId(id)) {
+    throw new Error(`Refusing an unsafe budget id: ${JSON.stringify(id)}`);
+  }
+  return id;
+}
+
 export function budgetPath(paths: Pick<AppPaths, "budgetsDir">, id: string): string {
-  return join(paths.budgetsDir, `${id}.budget`);
+  return join(paths.budgetsDir, `${assertSafeBudgetId(id)}.budget`);
 }
 
 export function backupDir(paths: AppPaths, id: string): string {
-  return join(paths.backupsDir, id);
+  return join(paths.backupsDir, assertSafeBudgetId(id));
 }
 
 /** Where budgets lived before they followed the convention, for the one-time move. */
