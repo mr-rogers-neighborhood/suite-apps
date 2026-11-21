@@ -108,9 +108,7 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
 Start the relay with both files:
 
 ```sh
-suite-sync serve --host 0.0.0.0 --port 8787 \
-  --trust-all --trust-all-remote \
-  --tls-cert relay-cert.pem --tls-key relay-key.pem
+suite-sync serve --host 0.0.0.0 --port 8787 --trust-all --trust-all-remote --tls-cert relay-cert.pem --tls-key relay-key.pem
 ```
 
 The status line says `wss`, and the startup output ends with the line to copy into each app:
@@ -138,11 +136,10 @@ that is a different decision, the CLI refuses it until you say so:
 
 ```sh
 # refused: --trust-all on an address other machines can reach
-suite-sync serve --host 0.0.0.0 --trust-all
+# suite-sync serve --host 0.0.0.0 --trust-all
 
 # accepted, and the status line says what it now is
-suite-sync serve --host 0.0.0.0 --trust-all --trust-all-remote \
-  --tls-cert relay-cert.pem --tls-key relay-key.pem
+suite-sync serve --host 0.0.0.0 --trust-all --trust-all-remote --tls-cert relay-cert.pem --tls-key relay-key.pem
 ```
 
 Put that relay on a network you trust, or behind a VPN, and keep the port closed at the router. The
