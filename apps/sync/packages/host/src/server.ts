@@ -194,6 +194,17 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
       : createHttpsServer({ cert: tls.cert, key: tls.key }, handleRequest);
 
   const wss = new WebSocketServer({ server: httpServer, path: "/sync" });
+  /**
+   * A failed bind must reach the caller, not the process.
+   *
+   * `ws` subscribes to the HTTP server's `error` and re-emits it on its own emitter. With no
+   * listener there the emit throws from inside the event chain, before the listener that
+   * rejects the bind promise runs — so an address that is already taken used to end as an
+   * uncaught exception instead of the sentence the CLI and an embedded host both print.
+   */
+  wss.on("error", (error: Error) => {
+    console.warn(`[sync] the relay's listener reported: ${error.message}`);
+  });
   const contexts = new WeakMap<WebSocket, SocketContext>();
   const loading = new Map<string, Promise<HostedRoom>>();
 
@@ -696,13 +707,21 @@ export async function createSyncServer(options: SyncServerOptions): Promise<Sync
     }
   }
 
-  await new Promise<void>((resolve, reject) => {
-    httpServer.once("error", reject);
-    httpServer.listen(port, host, () => {
-      httpServer.removeListener("error", reject);
-      resolve();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      httpServer.once("error", reject);
+      httpServer.listen(port, host, () => {
+        httpServer.removeListener("error", reject);
+        resolve();
+      });
     });
-  });
+  } catch (error) {
+    // The listener never came up, so nothing will close it. Dropping the WebSocket server
+    // also removes the listeners it put on this HTTP server, which a caller retrying another
+    // port would otherwise leave behind.
+    await new Promise<void>((resolve) => wss.close(() => resolve()));
+    throw error;
+  }
 
   const address = httpServer.address();
   const boundPort = typeof address === "object" && address !== null ? address.port : port;

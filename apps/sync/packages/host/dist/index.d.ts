@@ -3,5 +3,5 @@ export { advertisedRelayUrl, type ConsoleMember, type ConsoleState, type Console
 export { deviceIdFromPublicKey, ed25519Verifier } from "./crypto.js";
 export { createSyncServer, type HostedRoom, HostRegistry, type RelayConsoleInfo, type SyncServer, type SyncServerOptions, } from "./server.js";
 export { FileHostStore, type HostStore, MemoryHostStore, type PinnedKey, type StoredFrame, } from "./store.js";
-export { certificateFingerprint, fingerprintLine, isLoopbackHost, type TlsMaterial, } from "./tls.js";
+export { certificateFingerprint, ensureSelfSignedPair, fingerprintLine, isLoopbackHost, type RelayCertificatePair, type TlsMaterial, } from "./tls.js";
 //# sourceMappingURL=index.d.ts.map

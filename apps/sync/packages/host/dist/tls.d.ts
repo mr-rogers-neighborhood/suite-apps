@@ -24,4 +24,29 @@ export declare function isLoopbackHost(host: string): boolean;
 export declare function certificateFingerprint(cert: string | Buffer): string;
 /** The one startup line a person copies into an app. */
 export declare function fingerprintLine(fingerprint: string): string;
+/** Where a pair the host made for itself lives, and what a device pins. */
+export interface RelayCertificatePair {
+    readonly certPath: string;
+    readonly keyPath: string;
+    /** The SHA-256 of the certificate's DER bytes, as `openssl` prints it. */
+    readonly fingerprint: string;
+}
+/**
+ * Read the pair this store already keeps, or make one and write both halves mode 0600.
+ *
+ * An app that embeds a relay owns the pair for the same reason it owns the store: the
+ * fingerprint every device pins has to survive a restart, and a certificate minted on each
+ * launch would silently unpin them all.
+ *
+ * Neither half is replaced on its own. A certificate whose key is missing cannot serve, and
+ * guessing a replacement would rotate the fingerprint without anybody asking for it, so the
+ * caller gets a sentence instead.
+ *
+ * The pair is made here rather than by shelling out to `openssl`: the Flatpak this serves
+ * carries no `openssl`, and Node's crypto can make the one key and certificate shape a
+ * self-signed TLS server needs.
+ */
+export declare function ensureSelfSignedPair(directory: string, options?: {
+    readonly commonName?: string;
+}): RelayCertificatePair;
 //# sourceMappingURL=tls.d.ts.map

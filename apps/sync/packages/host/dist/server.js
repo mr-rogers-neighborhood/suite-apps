@@ -54,6 +54,17 @@ export async function createSyncServer(options) {
         ? createHttpServer(handleRequest)
         : createHttpsServer({ cert: tls.cert, key: tls.key }, handleRequest);
     const wss = new WebSocketServer({ server: httpServer, path: "/sync" });
+    /**
+     * A failed bind must reach the caller, not the process.
+     *
+     * `ws` subscribes to the HTTP server's `error` and re-emits it on its own emitter. With no
+     * listener there the emit throws from inside the event chain, before the listener that
+     * rejects the bind promise runs — so an address that is already taken used to end as an
+     * uncaught exception instead of the sentence the CLI and an embedded host both print.
+     */
+    wss.on("error", (error) => {
+        console.warn(`[sync] the relay's listener reported: ${error.message}`);
+    });
     const contexts = new WeakMap();
     const loading = new Map();
     /**
@@ -471,13 +482,22 @@ export async function createSyncServer(options) {
             send(socket, { type: "frame", index: entry.index, frame: entry.frame });
         }
     }
-    await new Promise((resolve, reject) => {
-        httpServer.once("error", reject);
-        httpServer.listen(port, host, () => {
-            httpServer.removeListener("error", reject);
-            resolve();
+    try {
+        await new Promise((resolve, reject) => {
+            httpServer.once("error", reject);
+            httpServer.listen(port, host, () => {
+                httpServer.removeListener("error", reject);
+                resolve();
+            });
         });
-    });
+    }
+    catch (error) {
+        // The listener never came up, so nothing will close it. Dropping the WebSocket server
+        // also removes the listeners it put on this HTTP server, which a caller retrying another
+        // port would otherwise leave behind.
+        await new Promise((resolve) => wss.close(() => resolve()));
+        throw error;
+    }
     const address = httpServer.address();
     const boundPort = typeof address === "object" && address !== null ? address.port : port;
     const fingerprint = tls === undefined ? null : certificateFingerprint(tls.cert);

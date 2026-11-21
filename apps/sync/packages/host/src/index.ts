@@ -33,7 +33,9 @@ export {
 } from "./store.js";
 export {
   certificateFingerprint,
+  ensureSelfSignedPair,
   fingerprintLine,
   isLoopbackHost,
+  type RelayCertificatePair,
   type TlsMaterial,
 } from "./tls.js";
