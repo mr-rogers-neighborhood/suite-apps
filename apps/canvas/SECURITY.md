@@ -48,8 +48,9 @@ workspace a device runs, or a file, so there is no share token to mint or authen
 ## Known and accepted for Beta
 
 - No encryption at rest. A `.canvas` file is readable by anyone who has it.
-- No TLS on the sync transport yet. A host belongs on a private network or behind a tunnel, and the
-  host sees device ids, roles and timing even though it cannot read the document.
+- TLS is pinned, not authority-issued. A reachable host serves `wss://` with a self-signed certificate,
+  and the app pins its SHA-256 fingerprint; a different certificate is refused with no plaintext
+  fallback. The host still sees device ids, roles and timing even though it cannot read the document.
 - The host keeps a retention window of sealed frames. A device away longer asks a peer for a snapshot,
   because the host cannot hand out a document it cannot read.
 - Roles belong to devices, not people: no per-person attribution and no audit log.

@@ -88,8 +88,9 @@ schema versions since the legacy `suite.workspace` kind and migrates that kind o
 
 The apps do not encrypt their files. Anyone with a `.canvas`, `.planner` or `.budget` file can read
 it; use OS disk encryption. Backups are the app's rolling copies plus whatever the person keeps
-elsewhere. The sync relay stores sealed frames, but it has no TLS and binds to loopback by default;
-the header and the signed records beside the frames are visible to it.
+elsewhere. The sync relay stores sealed frames and binds to loopback by default; off loopback it
+serves `wss://` with a self-signed certificate the app pins, so the header and the signed records
+beside the frames are visible to the relay but not to a passive network attacker.
 
 Details per app: [Canvas desktop](../../apps/canvas/docs/reference/desktop.md),
 [Planner data model](../../apps/planner/docs/reference/data-model.md), and the

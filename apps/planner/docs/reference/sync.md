@@ -11,12 +11,15 @@ This page is the seam. The protocol is owned by
 ## What a person does
 
 1. One machine opens **Sync** in the menu bar and shares the workspace at
-   `ws://127.0.0.1:8787/sync`, the loopback address Start's relay listens on.
+   `ws://127.0.0.1:8787/sync`, the loopback address Start's relay listens on. A relay other devices
+   reach is `wss://`; paste its `certificate SHA-256 fingerprint:` line into **Relay certificate
+   fingerprint** when the address or invitation is `wss://`.
 2. The other machine opens a **copy of the same `.planner` file**. The sync identity of a workspace
    is derived from the id inside the file, so a copy is what makes both devices name the same relay
    room. Nothing migrates and no schema field is added.
 3. The sharing machine makes an invitation: one use, one person, good for a day.
-4. The joining machine pastes it under **Join with an invitation** and waits. The sharing machine
+4. The joining machine pastes it under **Join with an invitation**, enters the relay's fingerprint if
+   the invitation is `wss://` and this device has not pinned it, and waits. The sharing machine
    admits the device without a second question — the invitation already named the role — and hands
    over a snapshot of the workspace.
 5. **Leave** stops the connection. The file, the group and the membership stay; sharing again
@@ -52,6 +55,7 @@ with an unrelated one.
 | `src/main/sync/service.ts`      | The relay connection, the MLS group, admission and catch-up             |
 | `src/main/sync/identity.ts`     | This install's Ed25519 key; its fingerprint is the device id            |
 | `src/main/sync/groupStore.ts`   | The group and the "this device founded it" marker                       |
+| `src/main/sync/relayConfig.ts`  | The relay address and certificate pin for this workspace                |
 | `src/main/sync/cursorStore.ts`  | The last frame applied, as the relay numbered it                        |
 | `src/main/sync/pendingStore.ts` | A join that was still waiting when the app closed                       |
 | `src/main/sync/workspaceId.ts`  | The 64-hex sync name derived from the document's own id                 |
@@ -59,9 +63,11 @@ with an unrelated one.
 | `src/main/ipc.ts`               | The validated `sync:*` channels and the commit that publishes a delta   |
 | `src/renderer/src/sync`         | The pill, the dialog and their wording                                  |
 
-Identity, group state, cursors and a pending join sit in `sync/` beside the workspace file. The
-folder is not part of the `.planner` file and is not copied with it. Losing it leaves the document
-intact but means asking for a fresh invitation; there is no recovery kit yet.
+Identity, group state, cursors, a pending join and the relay pin sit in `sync/` beside the workspace
+file. The pin is `sync/relays/<workspaceId>.json`, written mode 0600: it is this installation's trust
+decision, never a field of `.planner` and never sent to the renderer. The folder is not part of the
+`.planner` file and is not copied with it. Losing it leaves the document intact but means asking for a
+fresh invitation or entering the relay's fingerprint again; there is no recovery kit yet.
 
 ## A local edit
 
@@ -93,9 +99,12 @@ merges the result, so two devices handing each other a snapshot converge instead
 
 ## Limits
 
-- **No TLS and loopback by default.** The relay speaks `ws://` and binds to `127.0.0.1`. It must not
-  be exposed beyond a trusted network. A network attacker sees the header, timing and availability
-  even though the payload stays sealed.
+- **Loopback is plaintext; a reachable relay is pinned TLS.** The default relay is `ws://127.0.0.1`.
+  A relay on any address other machines reach must serve `wss://` with a self-signed certificate;
+  Planner requires its SHA-256 fingerprint in the Sync dialog and keeps it in
+  `sync/relays/<workspaceId>.json` (0600). A wrong or missing pin refuses the connection, with no
+  plaintext fallback. TLS is transport-only: the relay still sees the header, timing and
+  availability, and the payload stays sealed.
 - **The relay reads metadata, never a document.** It keeps workspace and device ids, epochs, frame
   kinds, sizes, timing and the signed roles, invitations, pinned keys and removals. It has no Loro
   dependency and no snapshot to hand back.

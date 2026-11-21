@@ -94,6 +94,41 @@ protocol version; the relay refuses a client that speaks a different one.
 The default is `127.0.0.1`, which only this machine can reach. That is the right default and the wrong
 setting for a relay whose purpose is to be reached.
 
+**Off loopback, the relay needs TLS.** A bind on any address other machines can reach refuses to start
+without `--tls-cert` and `--tls-key`. Both flags or neither. The certificate is normally self-signed:
+there is no authority to ask, and each app pins the SHA-256 fingerprint instead of trusting a chain.
+Make the pair once and keep the key private:
+
+```sh
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+  -keyout relay-key.pem -out relay-cert.pem -days 825 \
+  -subj "/CN=suite-sync relay"
+```
+
+Start the relay with both files:
+
+```sh
+suite-sync serve --host 0.0.0.0 --port 8787 \
+  --trust-all --trust-all-remote \
+  --tls-cert relay-cert.pem --tls-key relay-key.pem
+```
+
+The status line says `wss`, and the startup output ends with the line to copy into each app:
+
+```text
+listening on wss://0.0.0.0:8787/sync
+certificate SHA-256 fingerprint: AB:CD:EF:…
+```
+
+Enter it in the app's **Relay certificate fingerprint** field when the address or invitation is
+`wss://`. The app stores the pin in its main process; a certificate that does not match is refused
+with no plaintext fallback.
+
+**Loopback may stay plaintext.** `ws://127.0.0.1:8787/sync` is the default and needs no certificate,
+because only this machine can connect. A reachable bind without TLS is refused unless
+`--allow-plaintext` says that is intended; the relay then prints a warning about the exposed metadata.
+That flag is an explicit escape hatch, not a mode to leave running.
+
 **`--trust-all` is required today.** The relay checks device signatures, and there is no device
 registry yet, so a relay with nothing to check against refuses to start rather than admit everything
 by accident. On loopback, `--trust-all` means "the only caller is a process on this machine".
@@ -106,15 +141,17 @@ that is a different decision, the CLI refuses it until you say so:
 suite-sync serve --host 0.0.0.0 --trust-all
 
 # accepted, and the status line says what it now is
-suite-sync serve --host 0.0.0.0 --trust-all --trust-all-remote
+suite-sync serve --host 0.0.0.0 --trust-all --trust-all-remote \
+  --tls-cert relay-cert.pem --tls-key relay-key.pem
 ```
 
 Put that relay on a network you trust, or behind a VPN, and keep the port closed at the router. The
 store is encrypted frame bytes with no integrity story against a hostile stranger who can write to it;
 `--trust-all-remote` is the flag that says you know that.
 
-`suite-sync status` prints the configuration a `serve` would use without starting one, which is the
-cheapest way to check a unit file before restarting it.
+`suite-sync status` prints the configuration a `serve` would use without starting one, including
+whether the transport is `ws` or `wss`, which is the cheapest way to check a unit file before
+restarting it.
 
 ## 3. Run it under systemd
 
@@ -126,8 +163,23 @@ install -d /etc/suite-sync
 install -m 0600 deploy/relay.env.example /etc/suite-sync/relay.env
 ```
 
-Edit `/etc/suite-sync/relay.env` and set `SUITE_SYNC_ARGS` (the example file shows both the loopback
-and the LAN variant). Then:
+If the relay serves TLS, install the pair beside the unit too:
+
+```sh
+install -m 0644 relay-cert.pem /etc/suite-sync/relay-cert.pem
+install -m 0600 relay-key.pem /etc/suite-sync/relay-key.pem
+```
+
+Edit `/etc/suite-sync/relay.env` and set `SUITE_SYNC_ARGS`. The example file's loopback line is ready
+to use; for a relay other devices reach, add the TLS pair and the reachable address:
+
+```sh
+SUITE_SYNC_ARGS=--store /var/lib/suite-sync --trust-all --trust-all-remote \
+  --host 0.0.0.0 --tls-cert /etc/suite-sync/relay-cert.pem \
+  --tls-key /etc/suite-sync/relay-key.pem
+```
+
+Then:
 
 ```sh
 systemctl daemon-reload
@@ -142,11 +194,18 @@ stable account, replace `DynamicUser=yes` with `User=suite-sync` and create that
 
 ## 4. Check it is actually up
 
-The relay answers a health probe that says nothing about any document:
+The relay answers a health probe that says nothing about any document. On a plaintext relay:
 
 ```sh
 curl -sS http://127.0.0.1:8787/health
 # {"ok":true,"workspaces":0,"clients":0}
+```
+
+A `wss://` relay uses HTTPS for the same probe; `-k` accepts the self-signed certificate for this
+local check:
+
+```sh
+curl -sSk https://192.168.1.20:8787/health
 ```
 
 `workspaces` counts stores it has created; `clients` counts live connections. Neither names a
@@ -155,9 +214,11 @@ document, an author or a change.
 ## 5. Point devices at it
 
 Open the app's Sync dialog and enter the relay address, for example
-`ws://192.168.1.20:8787/sync`. On a phone, the address has to be one the phone can route to — a LAN
-address works, `127.0.0.1` is the phone itself. Nothing syncs while the app is closed; see
-`suite-go`'s decisions.
+`wss://192.168.1.20:8787/sync`, then paste the relay's `certificate SHA-256 fingerprint:` line into
+**Relay certificate fingerprint**. The field appears for a `wss://` address or invitation; the app
+keeps the pin in its main process, and a different certificate is refused with no plaintext fallback.
+A loopback address may stay `ws://` and needs no fingerprint. Nothing syncs while the app is closed;
+see `suite-go`'s decisions.
 
 ## Running the relay somewhere else
 
@@ -166,9 +227,12 @@ leave it running; the machine with Start does not need a relay of its own.
 
 Start's Sync pane manages only a relay it can find: `SUITE_SYNC_BIN`, a copy shipped beside Start,
 then `suite-sync` on `PATH`. When it finds none it says so and stays a launcher; nothing else in
-Start depends on the relay. To use the remote one, enter that address in each app's Sync dialog. A
-relay on `127.0.0.1` is private to the machine that runs it, which is the right default and the wrong
-setting for one that exists to be reached.
+Start depends on the relay. To use the remote one, enter that `wss://` address and its fingerprint in
+each app's Sync dialog. A relay on `127.0.0.1` is private to the machine that runs it, which is the
+right default and the wrong setting for one that exists to be reached.
+
+The certificate pair belongs on the relay machine too. The pin each app stores is that certificate's
+SHA-256, so replacing the pair means entering the new fingerprint once on every device.
 
 The relay's store belongs to that machine — back up `/var/lib/suite-sync`, not the laptop — and
 Start's pane shows the store of a relay it started, not the store of one across the network.
@@ -210,6 +274,8 @@ document — devices hold the truth — it only loses frames that had not been d
 ## What this relay still does not do
 
 - **No push.** A device with the app closed learns nothing until it is opened (`suite-go` decisions).
+- **No certificate authority.** The certificate is self-signed and the app pins its fingerprint; there
+  is no chain, hostname validation or renewal service to trust.
 - **No device registry.** `--trust-all` is the only mode a `serve` will accept, which is why the
   acknowledgement flag exists.
 - **No search, projection or rendering.** It cannot decrypt, so it cannot answer anything about a

@@ -121,6 +121,13 @@ The plaintext dev transport was removed with the room it talked to. The page
 policy below makes that structural rather than a promise: `connect-src 'self'`, with no environment
 variable that can widen it.
 
+A relay on loopback may stay `ws://`. A `wss://` relay uses a self-signed certificate and a SHA-256
+pin: the dialog shows **Relay certificate fingerprint** when the address or invitation is `wss://`,
+the main process writes the pin to `sync/relays/<workspaceId>.json` (mode 0600) beside the group and
+cursor, and it never enters the document or renderer storage. A wrong or missing pin refuses the
+connection with a sentence, and there is no plaintext fallback. TLS is transport-only: the host still
+sees sealed frames and the signed metadata, not the document.
+
 ## The page policy
 
 `app://canvas` is a real, secure origin, so a document keeps the query-parameter routes it already has

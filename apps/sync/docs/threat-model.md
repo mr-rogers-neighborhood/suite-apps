@@ -32,7 +32,8 @@
 | Replay of an old document update       | Loro version vectors and CRDT idempotence; an update already applied is a no-op.                                         |
 | Revoked member keeps reading           | A new epoch key is wrapped only to remaining members. Old ciphertext remains readable to old key holders; document this. |
 | Server deletes or withholds ciphertext | Availability is the operator's responsibility; members keep local copies and can export.                                 |
-| Server learns metadata                 | Accept that workspace ids, member keys, sizes and timing are visible. Minimize what is sent; document it.                |
+| Server learns metadata                 | Accept that workspace ids, member keys, sizes and timing are visible to the relay. Minimize what is sent; document it.    |
+| Network attacker reads or alters transport | A reachable relay serves `wss://` with a self-signed certificate pinned by SHA-256; a mismatch refuses before the WebSocket opens. Loopback may stay `ws://`; a reachable plaintext bind needs `--allow-plaintext` and is warned about. |
 | Ghost cursor after a disconnect        | Presence is ephemeral with a TTL, separate from the document.                                                            |
 
 ## What the relay holds
@@ -46,21 +47,19 @@ holds.
 
 ## Accepted limits
 
-- **No transport security.** The URL is `ws://` and both the CLI and the relay Start starts bind to `127.0.0.1`
-  by default. A network attacker sees the header, timing and connection metadata and can drop or
-  replay traffic. The payload stays sealed.
 - **Metadata.** Workspace and device ids, device names, public keys, epochs, kinds, payload lengths,
-  arrival order and timing, cursors, roles, invitations and removals are visible. The list is in
-  [the blind relay record](reference/blind-relay.md#what-the-relay-may-learn).
+  arrival order and timing, cursors, roles, invitations and removals are visible to the relay. TLS
+  hides them from a passive network attacker, not from the machine that stores the frames. The list is
+  in [the blind relay record](reference/blind-relay.md#what-the-relay-may-learn).
 - **A bearer invitation.** An invitation is a signed, single-use token. Whoever spends it first gets
   the role it named; the relay pins that device's key, but there is no fingerprint confirmation yet.
 - **Availability is the operator's.** The relay can delete or withhold frames. Every device keeps a
   local copy, but a device away longer than the retention window (30 days by default) needs a
   snapshot from a peer, because the relay cannot produce one.
 - **The CLI needs `--trust-all`.** It has no device-key verifier yet, so `serve` refuses to start
-  without it; on a non-loopback address that is an open mailbox until `--trust-all-remote` says so.
-  Start runs the same CLI, passes `--trust-all` on loopback, and requires that acknowledgement before
-  widening the scope. It records each device's key on join but does not verify with it yet.
+  without it. Start runs the same CLI on loopback. A relay on a reachable address is run directly with
+  its TLS pair and `--trust-all-remote`. It records each device's key on join but does not verify with
+  it yet.
 
 ## Non-goals
 

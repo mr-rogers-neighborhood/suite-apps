@@ -4,8 +4,8 @@ The sync relay is run by a person, not by the project. This tutorial runs one lo
 two Canvas clients to it. It proves the transport; it is not the shipped security model.
 
 > The relay stores sealed frames it cannot read, plus the signed roles, invitations, pinned keys and
-> removals it needs to admit them. It has no TLS and binds to `127.0.0.1` by default; do not expose it
-> beyond a trusted machine.
+> removals it needs to admit them. It serves `ws://` on `127.0.0.1` by default; a relay other devices
+> reach uses `wss://` with a self-signed certificate the app pins by SHA-256.
 
 ## What you need
 
@@ -34,8 +34,10 @@ rather than retyping the commands here.
 
 ## What this does not prove
 
-- No TLS. The relay speaks `ws://` and binds to `127.0.0.1` by default, so a network attacker sees the
-  header, timing and availability even though the payload is sealed.
+- Transport is pinned, not authority-issued. This tutorial stays on loopback `ws://`; a reachable
+  relay uses `wss://` with a self-signed certificate and the app pins its SHA-256 fingerprint. A
+  network attacker cannot read the header or timing of a pinned connection, but can still drop it,
+  and the relay still sees that metadata.
 - The relay sees metadata: workspace and device ids, epoch, kind, size and timing, plus the signed
   roles, invitations, pinned keys and removals. See [the threat model](../../apps/sync/docs/threat-model.md).
 - No background delivery. Both clients are open and connected.

@@ -42,7 +42,9 @@ No account, no telemetry, no crash upload, no remote code, and no share link. Th
 network requests: the dev build talks to a Vite server on localhost and the packaged renderer talks to
 nothing. Sync is the one network path, it is opt-in, and it belongs to the shell's main process, which
 holds the group keys and the socket to a `suite-sync` host. The host carries sealed frames it cannot
-read. [Decisions](decisions.md#sharing) records what replaced the hosted tier.
+read, and a `wss://` host is pinned by the SHA-256 fingerprint of its self-signed certificate. A
+reachable plaintext host needs an explicit flag on the relay and is never the default.
+[Decisions](decisions.md#sharing) records what replaced the hosted tier.
 
 ## Reporting
 

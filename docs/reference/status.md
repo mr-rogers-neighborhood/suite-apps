@@ -13,7 +13,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Canvas | Alpha | Cards, boards, editor, library and views; opt-in sync through a host; no account or share link, and still changing shape |
 | Planner | Pre-alpha | Day view, inbox, capture and estimates; Upcoming, Projects, Tags, Focus and Rituals views; a task detail dialog; sync through a user-run relay ([Planner's Sync](../../apps/planner/docs/reference/sync.md)) |
 | Budget | Pre-alpha | Launcher, accounts, register, month grid, rollover, reconcile, backups, targets, rules, schedules, CSV/QIF import, reports; no network |
-| Sync | Working | Phase 4 demo: protocol, membership, invite/join, relay, CLI and the Canvas and Planner clients work; the relay is a separate `suite-sync` service Start supervises when installed; it stores sealed frames, not a document; loopback by default, no TLS |
+| Sync | Working | Phase 4 demo: protocol, membership, invite/join, relay, CLI and the Canvas and Planner clients work; the relay is a separate `suite-sync` service Start supervises when installed; it stores sealed frames, not a document; loopback by default, and a reachable relay serves `wss://` with a pinned self-signed certificate |
 | Sync: invite and join | Working | An invitation link in the Sync dialog; the relay records the joining device's key and spends the invitation |
 | Sync: blind relay | Working | One append-only file per workspace: sealed frames, roles, invites, pinned keys and removals; no code path reads a document |
 | Go | v0 container | Android debug build installs; Scratch proves capture and documents, Canvas is a placeholder, and an installed pack appears on home; [Planner's state](../../apps/go/docs/reference/planner.md); iOS unbuilt; no sync transport |

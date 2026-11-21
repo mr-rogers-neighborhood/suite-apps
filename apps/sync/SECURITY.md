@@ -15,9 +15,12 @@ server is a role a person runs on a device they control.
 - **A join is a single-use invitation.** The relay spends the signed invitation on the first key
   package it admits and pins that device's key. The invitation link is a bearer token, so whoever
   spends it first gets the role it named.
-- **No transport security yet.** The relay speaks `ws://` with no TLS and binds to `127.0.0.1` by
-  default. Frames protect content from the relay and from disk; they do not protect the header, timing
-  or availability from the network. Do not expose it beyond a trusted network.
+- **Off loopback, the transport is pinned TLS.** The relay serves `ws://` on `127.0.0.1` by default.
+  A bind on any address other machines reach serves `wss://` from `--tls-cert` and `--tls-key`; the
+  certificate is self-signed and each app pins its SHA-256 fingerprint. A mismatch refuses before the
+  WebSocket opens. A reachable plaintext bind needs `--allow-plaintext` and is warned about. TLS
+  protects the header and timing from a passive network attacker; frames still protect content from
+  the relay and from disk. An attacker can still drop traffic.
 - **The CLI needs `--trust-all`.** It has no device-key verifier yet, so `serve` refuses to start
   without it. Start runs the same CLI, passes `--trust-all` on loopback, and requires the network
   acknowledgement before widening the scope; it records keys but does not verify with them yet.

@@ -57,7 +57,8 @@ and a server a person runs on a device they control. It never defines an app sch
 - A device seals one document update into one frame, and the relay numbers, stores and forwards it.
 - One active relay per workspace in v1; there is no server-to-server federation.
 - The relay stores sealed frames it cannot read, plus the signed metadata it needs to admit them. It
-  is loopback by default and has no TLS yet.
+  is loopback by default; a reachable relay serves `wss://` with a self-signed certificate the app
+  pins by SHA-256.
 
 ## The desktop superapp boundary
 

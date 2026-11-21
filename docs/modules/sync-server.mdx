@@ -1,7 +1,7 @@
 ---
 module: apps/sync
 title: Sync Server
-summary: "The suite-sync CLI: a thin command surface over the host, with a deliberate loopback-only development mode."
+summary: "The suite-sync CLI: a thin command surface over the host, with a loopback default and pinned TLS when it faces a network."
 ---
 
 `suite-sync` is the process a person runs on a machine they own. The CLI builds a store, a registry
@@ -9,20 +9,26 @@ and a host, and offers three commands: `serve`, `status` and `--version`. It def
 its own; the package above it owns the wire vocabulary and the host package owns admission and
 storage.
 
-The default address is `127.0.0.1` and there is no TLS. The relay is a mailbox whose payloads are
-sealed, not a network service with a certificate story. `serve` also refuses to start without
-`--trust-all`, because this build has no device registry to check a frame signature against; the
-flag is the explicit acknowledgement of that gap, not a production setting.
+The default address is `127.0.0.1`, where the relay may serve `ws://`. A `--host` other machines can
+reach serves `wss://` from `--tls-cert` and `--tls-key`; a plaintext bind there is refused unless
+`--allow-plaintext` makes the exposure explicit. The relay is a mailbox whose payloads are sealed, not
+a network service with an authority-issued certificate: the pair is self-signed and each app pins its
+SHA-256 fingerprint. `serve` also refuses to start without `--trust-all`, because this build has no
+device registry to check a frame signature against; the flag is the explicit acknowledgement of that
+gap, not a production setting.
 
 ## apps/sync/src/cli.ts#runCli
 
-The command parser reads the store path, the bind address, the port and the two development flags.
-`serve` fails when `--trust-all` is absent, so a mailbox that would admit anything does not start
-quietly. When the address is not loopback it also requires `--trust-all-remote`; exposing an
-open mailbox to every device that can route to the address has to be a separate decision.
+The command parser reads the store path, the bind address, the port, the certificate pair and the two
+development flags. `serve` fails when `--trust-all` is absent, so a mailbox that would admit anything
+does not start quietly. When the address is not loopback it also requires `--trust-all-remote`;
+exposing an open mailbox to every device that can route to the address has to be a separate decision.
+It serves `wss://` when given `--tls-cert` and `--tls-key`, and prints the certificate's SHA-256
+fingerprint for each app to pin; without the pair, a reachable address is refused unless
+`--allow-plaintext` says the exposure is intended.
 
 `--version` reads the version from the built package rather than a second constant, because the two
-drifted once. `status` prints the same facts a serve would use. `cli.test.ts` covers the refusals,
-the option parsing and the reported version. The loopback check names `localhost`, `::1` and a
-valid `127.x.x.x` address; a wildcard or an unrecognised address counts as reachable, because
-guessing wrong in that direction opens a relay to the network.
+drifted once. `status` prints the same facts a serve would use, including whether the transport is
+`ws` or `wss`. `cli.test.ts` covers the refusals, the option parsing and the reported version. The
+loopback check names `localhost`, `::1` and a valid `127.x.x.x` address; a wildcard or an unrecognised
+address counts as reachable, because guessing wrong in that direction opens a relay to the network.

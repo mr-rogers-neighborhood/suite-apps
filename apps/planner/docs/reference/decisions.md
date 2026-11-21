@@ -24,5 +24,6 @@ The rules that shape Planner.
 - The gate is local: `pnpm check` to edit, `pnpm verify` for the full gate.
 - Sync is a relay a person runs, not a Suite service. A workspace is carried by sealed MLS frames
   over `@suite/sync`; the relay stores ciphertext and signed metadata and never reads a document.
-  The main process holds the keys and the socket, the renderer holds neither, and the file stays the
-  only document. There is no TLS and the default is loopback. See [sync.md](sync.md).
+  The main process holds the keys, the socket and the certificate pin, the renderer holds none of
+  them, and the file stays the only document. A reachable relay serves `wss://` with a self-signed
+  certificate the main process pins by SHA-256; the default remains loopback. See [sync.md](sync.md).

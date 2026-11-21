@@ -30,10 +30,12 @@ and stays a launcher when the relay is absent or runs somewhere else.
 > plus signed roles, invitations, pinned device keys and removals. It cannot read a frame, merge two
 > or answer a question about a document; `apps/sync` has no Loro dependency.
 >
-> **Not shippable yet.** There is no TLS: `ws://`, not `wss://`. A relay Start starts binds to
-> `127.0.0.1` by default and must not be exposed beyond a trusted network. The metadata the
-> threat model accepts — workspace and device ids, epochs, kinds, sizes and timing — is still visible
-> to the relay.
+> **TLS is required off loopback.** Loopback may stay `ws://`; a relay on any address other machines
+> can reach serves `wss://` with `--tls-cert` and `--tls-key`. The certificate is normally self-signed,
+> and each app pins the SHA-256 fingerprint the relay prints at startup. A reachable plaintext bind is
+> refused unless `--allow-plaintext` makes that choice explicit, and that choice prints a warning. The
+> relay still sees the metadata the threat model accepts — workspace and device ids, epochs, kinds,
+> sizes and timing — though TLS hides it from a passive network attacker.
 
 ---
 
@@ -73,8 +75,10 @@ embed the relay and keeps no frames of its own. The store is a directory of
 
 A relay does not have to live on the computer running Start. Install `suite-sync` on the always-on
 machine and leave it running under systemd — [Leave a relay running](docs/how-to/relay.md) has the
-binary, the address choice and the unit file. On each device, enter the relay address in the app's
-Sync dialog, for example `ws://192.168.1.20:8787/sync`.
+binary, the address choice, the certificate pair and the unit file. On each device, enter the relay
+address in the app's Sync dialog, for example `wss://192.168.1.20:8787/sync`, and paste the
+`certificate SHA-256 fingerprint:` line the relay printed at startup into **Relay certificate
+fingerprint**.
 
 Nothing else changes: the apps keep their documents, and Start remains a launcher that manages no
 relay when the relay is elsewhere. The address must be one the device can route to; `127.0.0.1` is

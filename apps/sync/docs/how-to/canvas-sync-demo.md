@@ -2,8 +2,9 @@
 
 This is the end-to-end demo: two Canvas clients, one user-run `suite-sync` relay, account-free
 devices, real document updates. The relay stores sealed frames and the signed records beside them; it
-cannot read a document. It is still a development path: loopback by default, no TLS, and no push. Do
-not expose it beyond a trusted machine.
+cannot read a document. It is still a development path: loopback by default and no push. A relay that
+other devices reach uses `wss://` with a self-signed certificate the app pins; do not expose it
+without that.
 
 ## 1. Start a relay
 
@@ -25,6 +26,24 @@ curl http://127.0.0.1:8787/health
 The CLI needs `--trust-all` because it has no device-key verifier yet. On loopback that admits
 processes on this machine; it is not the flag to use on a network address without understanding that
 the relay is then an open mailbox.
+
+Loopback is `ws://` and needs no certificate. A relay on an address other machines reach refuses to
+serve without TLS. Make a self-signed pair, pass both files, and copy the fingerprint it prints:
+
+```sh
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+  -keyout relay-key.pem -out relay-cert.pem -days 825 \
+  -subj "/CN=suite-sync relay"
+
+node dist/cli.js serve --host 0.0.0.0 --port 8787 \
+  --trust-all --trust-all-remote \
+  --tls-cert relay-cert.pem --tls-key relay-key.pem
+# certificate SHA-256 fingerprint: AB:CD:EF:…
+```
+
+The app's **Relay certificate fingerprint** field appears when the address or invitation is `wss://`;
+paste that line there. A reachable plaintext bind is refused unless `--allow-plaintext` is passed
+explicitly.
 
 ## 2. Share on the first device
 
@@ -71,9 +90,11 @@ cannot read what is sealed after the commit; a fresh invitation is the only way 
 
 ## Known limits
 
-- **No TLS.** The relay speaks `ws://` and binds to `127.0.0.1` by default. Frames protect content
-  from the relay and from disk; they do not protect the header, timing or availability from the
-  network. See [the threat model](../threat-model.md).
+- **TLS is pinned, not CA-issued.** A reachable relay serves `wss://` with a self-signed certificate,
+  and each app pins its SHA-256 fingerprint. A different certificate is refused with no plaintext
+  fallback; loopback may stay `ws://`. Frames protect content from the relay and from disk, while the
+  pin protects the header and timing from the network; an attacker can still drop traffic. See
+  [the threat model](../threat-model.md).
 - **Metadata is visible.** The relay reads the workspace and device ids, epoch, frame kind, payload
   length and arrival time, plus the signed roles, invitations, pinned keys and removals. It reads no
   document content.
@@ -81,5 +102,5 @@ cannot read what is sealed after the commit; a fresh invitation is the only way 
 - **Retention is finite.** Frames older than 30 days are dropped by default. A device away longer
   needs a snapshot from a peer; the relay never had a document to hand back.
 - **The CLI is the relay Start runs.** It records device keys, but there is no device registry yet, so
-  `serve` still needs `--trust-all`; Start passes it on loopback and requires the network
-  acknowledgement before it will pass it to a reachable address.
+  `serve` still needs `--trust-all`; Start passes it on loopback. A relay on a reachable address is run
+  directly with the TLS pair and `--trust-all-remote`.

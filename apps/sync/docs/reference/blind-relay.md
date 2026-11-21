@@ -432,12 +432,22 @@ in a window produce one wake, and a wake causes `since` and a sync and names no 
 `membership.json` and `snapshot.loro` from the CLI and the pages. Re-create the Canvas demo under S2
 and S3. Done when a plaintext store is refused and two clients sync a document the relay cannot read.
 
+## Transport
+
+The relay serves `wss://` when it is given `--tls-cert` and `--tls-key`, and prints the certificate's
+SHA-256 fingerprint at startup. The certificate is self-signed because a person runs the relay, not a
+certificate authority: the client does not trust a chain, it pins that fingerprint. A certificate that
+does not match the pin destroys the socket before the WebSocket opens, and there is no plaintext
+fallback. Loopback may stay `ws://`; a bind on any reachable address is refused without TLS unless
+`--allow-plaintext` makes the exposure explicit, and that choice prints a warning.
+
+TLS is transport-only. Frames still protect content from the relay and from disk, and the relay still
+sees the metadata it needs to admit them. What the pin adds is protection for the header and timing
+from a passive network attacker, and refusal of an unpinned man in the middle; it does not stop an
+attacker from dropping traffic.
+
 ## What this does not settle
 
-- **TLS.** The relay protocol is `ws://`, and the guide says there is no TLS. Frames protect content
-  from the relay and from disk; they do not protect the header, timing or availability from the
-  network. A network attacker sees workspace, device, epoch, kind, size and time, and can drop or
-  replay. `wss://` and certificate trust are a deployment decision, not this record.
 - **Group growth.** MLS handles small groups. There is no measured bound, no pagination for a large
   ratchet tree, no per-person multi-device key, and no re-invite at scale. Adding a device is a
   commit, so the join cost grows with the tree.

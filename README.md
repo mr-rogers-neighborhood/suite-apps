@@ -37,7 +37,8 @@ launch, for Arch and every other distribution. Open Start, install Canvas, and s
   never proxies document bytes.
 - **Sync is yours.** A person runs the relay on a NAS, a Raspberry Pi or a laptop. It stores sealed
   frames it cannot read, plus the signed roles, invitations, pinned keys and removals it needs to
-  admit them. It is loopback by default and has no TLS yet.
+  admit them. It is loopback by default; a relay other devices reach serves `wss://` with a
+  self-signed certificate the app pins by SHA-256.
 - **The mobile container follows the mini-app model.** A manifest, declared capabilities, one
   instance per app, and a document the container never parses. The desktop hub shares the manifest
   and the one-instance rule.
@@ -53,7 +54,7 @@ met and which are still partial.
 | --- | --- |
 | Platforms | Linux x86_64. AppImage and Flatpak for the apps and the hub; an Arch package for the hub; no macOS or Windows build. |
 | Sync | Canvas and Planner sync through a user-run relay. Budget has no network client. |
-| Security | No account or telemetry. Document files are unencrypted; use disk encryption. The sync relay holds sealed frames, but has no TLS and is loopback by default. |
+| Security | No account or telemetry. Document files are unencrypted; use disk encryption. The sync relay holds sealed frames; off loopback it uses `wss://` with a pinned self-signed certificate, and it is loopback by default. |
 | Mobile | Suite Go installs on Android as a debug build. No domain ships; iOS is unbuilt. |
 | Gate | Local, at the repository root. No CI service gates a pull request. |
 

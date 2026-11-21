@@ -39,5 +39,7 @@ remembered.
 has to accept it.
 
 Every one of these is a read of what the machine sharing the workspace already knows. The dialog
-never sends anything on its own, and nothing in it shows a fingerprint, a frame count or an epoch —
-those are how it works, not what anyone is being asked to do.
+never sends anything on its own. When the relay is `wss://`, it asks for the **Relay certificate
+fingerprint** the relay prints at startup and, once connected, shows the pinned value; a different
+certificate stops sync. A frame count or an epoch stays out of the dialog — those are how it works,
+not what anyone is being asked to do.

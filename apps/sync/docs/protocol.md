@@ -207,10 +207,16 @@ The transport is a WebSocket at `/sync` with a `/health` HTTP route.
   written down.
 - `error` codes: `protocol-version`, `not-joined`, `malformed`, `unknown`. A refused frame, role,
   invite or removal is answered with `refused` and its reason.
-- The relay binds to `127.0.0.1` by default; `--host` is explicit. There is no TLS: the URL is `ws://`.
-  The CLI's `serve` also requires `--trust-all` because it has no device-key verifier; Start runs that
-  same CLI, passing `--trust-all` on loopback and requiring the network acknowledgement when the
-  scope widens.
+- The relay binds to `127.0.0.1` by default; `--host` is explicit. Loopback may serve `ws://`. Any
+  address other machines can reach serves `wss://` with `--tls-cert` and `--tls-key`; the relay
+  refuses a plaintext bind there unless `--allow-plaintext` makes that exposure explicit. TLS is
+  transport-only: the certificate is self-signed, so clients pin its SHA-256 fingerprint rather than
+  trust a chain, and a different certificate is refused before the WebSocket opens. Frames still
+  protect content from the relay, while the pin protects the header and timing from a passive network
+  attacker or an unpinned MITM; an attacker can still drop traffic.
+- The CLI's `serve` also requires `--trust-all` because it has no device-key verifier; Start runs that
+  same CLI on loopback. A relay on a reachable address is run directly with its TLS pair and
+  `--trust-all-remote`.
 
 The store is one append-only file per workspace for frames, and one each for roles, invites, pinned
 keys and removals. A frame file holds the sealed frame with the position the relay assigned, plus a
@@ -229,9 +235,10 @@ are in [the blind relay record](reference/blind-relay.md).
 7. A server operator can deny service or delete ciphertext; the threat model says so.
 
 The relay satisfies 1–7 for the frames it stores: it holds no group key, opens no payload, and keeps
-only the signed metadata it needs to admit or refuse a frame. The demo path is still loopback-only
-without TLS, so a network attacker sees the header, timing and availability even though the payload
-stays sealed.
+only the signed metadata it needs to admit or refuse a frame. A `wss://` relay changes the network
+exposure rather than the content boundary: the self-signed certificate is pinned by SHA-256, so a
+passive attacker no longer sees the header, timing or availability and a substituted certificate is
+refused, while frames keep the payload sealed from the relay itself.
 
 ## Open questions
 
