@@ -10,7 +10,7 @@ export default {
   summary: "One seam from the shared contract to the document layer, at four altitudes.",
   intro:
     "This tour is a map, not a manual. It follows one boundary from the smallest shared contract to the package that owns the document, and it changes altitude deliberately: a module, a file, one declaration, then a curated path. Use it when you want to see how the pieces fit before opening any one of them in depth.",
-  order: 50,
+  order: 60,
   steps: [
     {
       kind: "interlude",
