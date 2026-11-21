@@ -6,6 +6,17 @@ Suite operates no server. A person runs `suite-sync` on a device they control �
 an always-on computer, a laptop — and their other devices sync with it. The document stays a file the
 app owns; this repository owns the wire protocol, the membership model and the headless server.
 
+## Two roles in one product
+
+- **The relay** (`suite-sync serve`) is optional and may face the network. It stores sealed frames
+  and the signed metadata it needs to admit them, and cannot read or merge a document. It owns its
+  store and never joins a group.
+- **The local transport** is the part each app runs: a cursor and a queue, no keys and no listener.
+  It carries frames between the document and whatever relay the person points it at.
+
+Start is neither. It supervises a relay it can find on this machine — start, stop, address, store —
+and stays a launcher when the relay is absent or runs somewhere else.
+
 > **Status: working, two apps deep.** The protocol, the MLS group and frame types, the membership state machine,
 > the blind relay with its file store, and the relay client are here. Two Canvas clients can sync one
 > workspace, and two Planner clients can sync one `.planner` file, through a relay on a machine a
@@ -19,8 +30,8 @@ app owns; this repository owns the wire protocol, the membership model and the h
 > plus signed roles, invitations, pinned device keys and removals. It cannot read a frame, merge two
 > or answer a question about a document; `apps/sync` has no Loro dependency.
 >
-> **Not shippable yet.** There is no TLS: `ws://`, not `wss://`. Both `serve` and Start's relay bind
-> to `127.0.0.1` by default and must not be exposed beyond a trusted network. The metadata the
+> **Not shippable yet.** There is no TLS: `ws://`, not `wss://`. A relay Start starts binds to
+> `127.0.0.1` by default and must not be exposed beyond a trusted network. The metadata the
 > threat model accepts — workspace and device ids, epochs, kinds, sizes and timing — is still visible
 > to the relay.
 
@@ -52,9 +63,25 @@ curl http://127.0.0.1:8787/health
 ```
 
 `--trust-all` is the CLI's development mode: it has no device-key verifier to check against, so it
-refuses to start without it. Start runs the same server with the Ed25519 verifier and pins each
-device's key on its first join. The store is a directory of `<workspaceId>.frames.jsonl` files; there
-is no `workspace init`, `membership.json` or `snapshot.loro`.
+refuses to start without it. Start locates a `suite-sync` binary (`SUITE_SYNC_BIN`, a bundled copy,
+then `PATH`), runs `serve` as its own child process, and stops it when Start quits. Start does not
+embed the relay and keeps no frames of its own. The store is a directory of
+`<workspaceId>.frames.jsonl` files; there is no `workspace init`, `membership.json` or
+`snapshot.loro`.
+
+## Run the relay on another machine
+
+A relay does not have to live on the computer running Start. Install `suite-sync` on the always-on
+machine and leave it running under systemd — [Leave a relay running](docs/how-to/relay.md) has the
+binary, the address choice and the unit file. On each device, point the app at it:
+
+```sh
+SUITE_SYNC_URL=ws://192.168.1.20:8787/sync
+```
+
+Nothing else changes: the apps keep their documents, and Start remains a launcher that manages no
+relay when the relay is elsewhere. The address must be one the device can route to; `127.0.0.1` is
+always the device itself.
 
 ## Working in the monorepo
 

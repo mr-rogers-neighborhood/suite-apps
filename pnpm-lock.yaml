@@ -859,9 +859,6 @@ importers:
       '@suite/desktop':
         specifier: workspace:*
         version: link:../../packages/desktop
-      '@suite/host':
-        specifier: workspace:*
-        version: link:../sync/packages/host
       '@suite/sync':
         specifier: workspace:*
         version: link:../sync/packages/protocol

@@ -3,13 +3,9 @@ import { el } from "./format.js";
 /**
  * The Sync pane: what this machine is holding, and who is connected to it.
  *
- * There is no document here to show, and that is the design rather than a limitation. What
- * a person can act on is: is it running, can other devices reach it, which workspaces does
- * it carry, and which devices are in them.
- *
- * The words are deliberately plain. "Frames", "epochs" and "keys" are how this works; none
- * of them is anything a person is being asked to do, and a pane that explains the machinery
- * instead of the state makes the state harder to find.
+ * The relay is its own program now. This pane tells a person whether Start found it,
+ * whether it is running, and where it keeps its store; it does not pretend to be the
+ * relay and it does not offer a control that cannot work when the binary is missing.
  */
 
 /** What to say about a way back in, in a person's words. */
@@ -26,6 +22,10 @@ const ROLE_WORDS = {
   null: "no role yet",
 };
 
+const MISSING_WORDS =
+  "Suite Sync is not installed. Install the suite-sync relay and put it on PATH, or set " +
+  "SUITE_SYNC_BIN to its path.";
+
 export function renderSync(state, actions) {
   const panel = document.getElementById("panel-sync");
   if (!panel) return;
@@ -39,9 +39,11 @@ export function renderSync(state, actions) {
     el(
       "p",
       "pane-note",
-      sync.running
-        ? "On. Other devices can reach this machine."
-        : "Off. Nothing can reach this machine.",
+      !sync.installed
+        ? "Relay not installed. Sync stays off until Suite Sync is installed."
+        : sync.running
+          ? "On. Other devices can reach this machine."
+          : "Off. Nothing can reach this machine.",
     ),
   );
   panel.append(head);
@@ -60,6 +62,15 @@ export function renderSync(state, actions) {
 
 function addressBlock(sync, actions) {
   const block = el("div", "switch-block");
+  block.append(el("h3", null, "This machine\u2019s address"));
+
+  if (!sync.installed) {
+    block.append(el("p", "pane-note", MISSING_WORDS));
+    if (sync.problem) block.append(el("p", "pane-note", sync.problem));
+    block.append(storeNote(sync));
+    return block;
+  }
+
   const value = el("code", null, sync.address ?? "not listening");
   value.id = "sync-address";
 
@@ -71,13 +82,24 @@ function addressBlock(sync, actions) {
     await (sync.running ? actions.stopSync() : actions.startSync());
   });
 
-  block.append(el("h3", null, "This machine\u2019s address"), value, toggle);
+  block.append(value, toggle);
+  if (sync.problem) block.append(el("p", "pane-note", sync.problem));
+  block.append(storeNote(sync));
   return block;
+}
+
+function storeNote(sync) {
+  return el("p", "pane-note", `The relay keeps its frames in ${sync.store}.`);
 }
 
 function scopeBlock(sync, actions) {
   const block = el("div", "switch-block");
   block.append(el("h3", null, "Who can reach it"));
+
+  if (!sync.installed) {
+    block.append(el("p", "pane-note", "Available once Suite Sync is installed."));
+    return block;
+  }
 
   const label = el("label", "switch");
   const box = el("input");
@@ -107,6 +129,10 @@ function workspaceBlock(sync) {
   const block = el("div", "switch-block");
   block.append(el("h3", null, "Workspaces"));
 
+  if (!sync.installed) {
+    block.append(el("p", "pane-note", "Install Suite Sync to see what this machine is carrying."));
+    return block;
+  }
   if (!sync.running) {
     block.append(el("p", "pane-note", "Turn sync on to see what this machine is carrying."));
     return block;

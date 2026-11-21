@@ -107,6 +107,20 @@ SUITE_SYNC_URL=ws://192.168.1.20:8787/sync
 On a phone, the address has to be one the phone can route to — a LAN address works, `127.0.0.1` is
 the phone itself. Nothing syncs while the app is closed; see `suite-go`'s decisions.
 
+## Running the relay somewhere else
+
+A relay on a NAS, a Raspberry Pi or a spare desktop is the ordinary shape. Do steps 1–4 there and
+leave it running; the machine with Start does not need a relay of its own.
+
+Start's Sync pane manages only a relay it can find: `SUITE_SYNC_BIN`, a copy shipped beside Start,
+then `suite-sync` on `PATH`. When it finds none it says so and stays a launcher; nothing else in
+Start depends on the relay. To use the remote one, point every app at it with `SUITE_SYNC_URL`
+above. A relay on `127.0.0.1` is private to the machine that runs it, which is the right default and
+the wrong setting for one that exists to be reached.
+
+The relay's store belongs to that machine — back up `/var/lib/suite-sync`, not the laptop — and
+Start's pane shows the store of a relay it started, not the store of one across the network.
+
 ## Signing, and what the artifact in `dist/release` is
 
 ```sh

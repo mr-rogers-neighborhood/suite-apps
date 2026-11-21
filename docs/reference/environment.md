@@ -10,7 +10,8 @@ portable install; they are not configuration a normal user needs.
 | `SUITE_START_DOCUMENTS` | the shared documents root, `~/Documents/Suite` |
 | `SUITE_START_DATA` | the hub's data directory |
 | `SUITE_START_USER_DATA` | Electron's `userData` for the hub |
-| `SUITE_START_SYNC_PORT` | the port the hub's sync host listens on, `8787`; `0` asks for a free one |
+| `SUITE_START_SYNC_PORT` | the port the Suite Sync relay Start supervises listens on, `8787`; `0` asks for a free one |
+| `SUITE_SYNC_BIN` | the `suite-sync` binary Start runs; without it Start looks beside itself and on `PATH` |
 | `SUITE_START_APPS_ROOT` | the managed app root, `~/Applications/Suite` |
 | `SUITE_START_FEED_BASE` | the base URL of the release feed |
 | `SUITE_START_REGISTRY` | the install registry file |

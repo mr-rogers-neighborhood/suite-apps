@@ -221,6 +221,29 @@ exit 0
   return { executable, logPath, location };
 }
 
+/**
+ * A stand-in `suite-sync` binary.
+ *
+ * Start runs it as its own process. The script records the arguments it was given and
+ * prints the one line the lifecycle adapter needs, so the pane can be checked against a
+ * real spawn without opening a socket or running the relay.
+ */
+export async function fakeRelay(box: Sandbox): Promise<{ executable: string; logPath: string }> {
+  const executable = join(box.apps, "suite-sync");
+  const logPath = join(box.root, "suite-sync-args.txt");
+  await writeFile(
+    executable,
+    `#!/bin/sh
+printf '%s\\n' "$@" >>"${logPath}"
+printf 'suite-sync 0.0.0-e2e (relay protocol 1)\\n'
+printf 'listening on ws://127.0.0.1:18787/sync\\n'
+exec sleep 3600
+`,
+    { mode: 0o755 },
+  );
+  return { executable, logPath };
+}
+
 export interface Launched {
   readonly app: ElectronApplication;
   readonly page: Page;
@@ -254,9 +277,13 @@ export async function launch(
       SUITE_START_APPS_ROOT: box.installedApps,
       // No published feed: a spec that wants one supplies its own base.
       SUITE_START_FEED_BASE: box.feeds,
-      // The hub's own port, 8787, belongs to whoever is running a hub. Zero asks
-      // the kernel for a free one, so a second run never competes for it.
+      // The relay's port, 8787, belongs to whoever is running one. Zero asks the
+      // kernel for a free one, so a second run never competes for it.
       SUITE_START_SYNC_PORT: "0",
+      // Hermetic: a machine that happens to have suite-sync installed must not make
+      // a spec depend on it. A spec that wants the relay points SUITE_SYNC_BIN at
+      // its own stand-in.
+      SUITE_SYNC_BIN: join(box.root, "no-suite-sync"),
       // Hermetic on a machine that has Flatpak and a real suite app installed:
       // only a spec that supplies a stand-in may see a Flatpak.
       SUITE_START_FLATPAK: "",

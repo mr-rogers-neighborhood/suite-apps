@@ -67,6 +67,9 @@ async function launchPackaged(box: Sandbox): Promise<Running> {
       SUITE_START_USER_DATA: box.userData,
       SUITE_START_DATA: box.data,
       SUITE_START_SYNC_PORT: "0",
+      // A packaged hub on a machine with suite-sync installed must still be the
+      // same test every time; a spec that wants a relay names its own stand-in.
+      SUITE_SYNC_BIN: join(box.root, "no-suite-sync"),
       // The fake lives under `box.apps`, so this is the root that makes the
       // record a managed install rather than a copy the person placed.
       SUITE_START_APPS_ROOT: box.apps,

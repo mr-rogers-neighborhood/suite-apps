@@ -7,10 +7,10 @@ not expose it beyond a trusted machine.
 
 ## 1. Start a relay
 
-Start supervises a `suite-sync` relay. Open Start's **Sync** pane, turn sync on, and read **This
-machine's address** — normally `ws://127.0.0.1:8787/sync`. The relay binds to loopback unless somebody
-changes the scope, and Start runs it with the Ed25519 verifier, so it pins each device's key when that
-device first joins.
+Start supervises a `suite-sync` relay it can find. Open Start's **Sync** pane, turn sync on, and read
+**This machine's address** — normally `ws://127.0.0.1:8787/sync`. The relay binds to loopback unless
+somebody changes the scope. There is no device registry yet, so the CLI's `--trust-all` means
+signatures are not checked; the relay still records each device's key when that device first joins.
 
 From a checkout, the same server is the CLI:
 
@@ -80,5 +80,6 @@ cannot read what is sealed after the commit; a fresh invitation is the only way 
 - **No push.** A device with the app closed learns nothing until it is opened and reconnects.
 - **Retention is finite.** Frames older than 30 days are dropped by default. A device away longer
   needs a snapshot from a peer; the relay never had a document to hand back.
-- **The CLI is not the shipped relay.** Start's server verifies device signatures; `serve` currently
-  needs `--trust-all`.
+- **The CLI is the relay Start runs.** It records device keys, but there is no device registry yet, so
+  `serve` still needs `--trust-all`; Start passes it on loopback and requires the network
+  acknowledgement before it will pass it to a reachable address.

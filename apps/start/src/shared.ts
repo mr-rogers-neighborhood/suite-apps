@@ -262,12 +262,20 @@ export interface LauncherState {
   readonly self: AppCard | null;
 }
 
-/** What the Sync pane shows. No document content, because the host has none. */
+/** What the Sync pane shows. No document content, because the relay has none. */
 export interface SyncState {
+  /** Whether a `suite-sync` binary was found. False is a state the pane explains. */
+  readonly installed: boolean;
   readonly running: boolean;
   readonly scope: "loopback" | "network";
   readonly address: string | null;
   readonly port: number;
+  /** Where the relay keeps its frames and role records. */
+  readonly store: string;
+  /** The binary Start runs, or null when none was found. */
+  readonly binary: string | null;
+  /** Why the relay is not installed or why its last start failed. Null when all is well. */
+  readonly problem: string | null;
   readonly workspaces: readonly SyncWorkspace[];
 }
 
@@ -279,7 +287,7 @@ export interface SyncWorkspace {
   /**
    * Whether any app on this machine kept a way back in for this workspace.
    *
-   * Read from the apps' own reports, not from the host: the hub carries frames and cannot
+   * Read from the apps' own reports, not from the relay: the relay carries frames and cannot
    * know what a device saved, and a pane that guessed would be worse than one that is quiet.
    */
   readonly recovery: "made" | "declined" | "none";

@@ -64,7 +64,6 @@ import {
   storeUpdateArgs,
   withFlatpakInstalls,
 } from "./flatpak.js";
-import { StartHost } from "./host.js";
 import { writeHubReport } from "./hubReport.js";
 import {
   executableInVersion,
@@ -106,6 +105,7 @@ import {
   shortcutPath,
   shortcutText,
 } from "./shortcuts.js";
+import { isAddressInUse, SuiteSyncRelay } from "./syncRelay.js";
 import {
   isThemeChoice,
   loadThemeChoice,
@@ -200,7 +200,7 @@ function resolvedTheme(): ResolvedTheme {
     values: cssVariables(preset, mode),
   };
 }
-let syncHost: StartHost | null = null;
+let syncRelay: SuiteSyncRelay | null = null;
 /** The report already on disk, so a restart is visible as a new `startedAt` rather than a new one. */
 let previousHub: SuiteHub | null = null;
 
@@ -534,15 +534,9 @@ async function discover(): Promise<{
 }
 
 /**
- * The host's state, or a stopped one before it exists.
+ * The port the relay listens on.
  *
- * Start is the mailbox, not a member: it holds encrypted frames and the role records that
- * decide who may write, and it can show that without ever reading a document.
- */
-/**
- * The port the host listens on.
- *
- * 8787 unless something says otherwise: a test needs a free port, and two hosts on one
+ * 8787 unless something says otherwise: a test needs a free port, and two relays on one
  * machine would otherwise take turns failing to bind.
  */
 function syncPort(): number {
@@ -551,22 +545,36 @@ function syncPort(): number {
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 65535 ? parsed : 8787;
 }
 
+/** The relay Start supervises, created once the data directory is known. */
+function relay(port = syncPort()): SuiteSyncRelay {
+  syncRelay ??= new SuiteSyncRelay({
+    dataDir: dataDirectory,
+    port,
+    onExit: () => void broadcast(),
+  });
+  return syncRelay;
+}
+
 /**
- * The sync pane's state, with the one thing the host cannot know.
+ * The sync pane's state, with the one thing the relay cannot know.
  *
- * The host carries frames and knows who may write; whether anybody kept a way back in is a
- * fact about the apps on this machine, so it is read from their own reports and folded in
- * here rather than pretended to by the mailbox.
+ * The relay carries frames and knows who may write; whether anybody kept a way back in is
+ * a fact about the apps on this machine, so it is read from their own reports and folded
+ * in here rather than pretended to by the mailbox.
  */
 async function syncState(): Promise<SyncState> {
-  const host = syncHost?.state() ?? null;
+  const current = syncRelay === null ? null : await syncRelay.snapshot();
   const reports = await readRecoveryReports(recoveryLookup(), nodeRegistryFileSystem());
   return {
-    running: host?.running ?? false,
-    scope: host?.scope ?? "loopback",
-    address: host?.address ?? null,
-    port: host?.port ?? 8787,
-    workspaces: (host?.workspaces ?? []).map((workspace) => ({
+    installed: current?.installed ?? false,
+    running: current?.running ?? false,
+    scope: current?.scope ?? "loopback",
+    address: current?.address ?? null,
+    port: current?.port ?? syncPort(),
+    store: current?.store ?? join(dataDirectory, "sync"),
+    binary: current?.binary ?? null,
+    problem: current?.problem ?? null,
+    workspaces: (current?.workspaces ?? []).map((workspace) => ({
       ...workspace,
       recovery: recoveryFor(reports, workspace.workspaceId),
     })),
@@ -584,22 +592,21 @@ function recoveryLookup(): RecoveryLookup {
 /**
  * Tell the other apps where this machine listens, in the one place they can read it.
  *
- * Written whenever the host changes, because a stale address is worse than none: an app that
- * prefilled a share field from a hub that has since stopped would hand out a link to nothing.
+ * Written whenever the relay changes, because a stale address is worse than none: an app
+ * that prefilled a share field from a relay that has since stopped would hand out a link
+ * to nothing.
  */
 async function reportHub(): Promise<void> {
-  const state =
-    syncHost === null
-      ? { running: false, scope: "loopback" as const, address: null, port: syncPort() }
-      : syncHost.state();
+  const current = syncRelay === null ? null : await syncRelay.snapshot();
   const now = new Date().toISOString();
+  const port = current !== null && current.port > 0 ? current.port : syncPort() || 8787;
   const report: SuiteHub = {
     format: "suite.hub",
-    running: state.running,
-    scope: state.scope,
-    port: state.port,
-    address: state.address,
-    startedAt: state.running
+    running: current?.running ?? false,
+    scope: current?.scope ?? "loopback",
+    port,
+    address: current?.address ?? null,
+    startedAt: current?.running
       ? previousHub?.running === true
         ? (previousHub.startedAt ?? now)
         : now
@@ -1207,29 +1214,41 @@ async function installOne(id: string): Promise<void> {
 }
 
 /**
- * Bring the sync host up, off the startup path, and say so if it cannot.
+ * Bring the sync relay up, off the startup path, and say so if it cannot.
  *
- * The port is the interesting part: only one process can hold 8787, so a second launcher — or
- * the packaged hub already running from the application menu — would otherwise take the
- * launcher down with it. A later port is as good as the first, because the address is written
- * into the hub's report and apps read it from there rather than assuming.
+ * The port is the interesting part: only one process can hold 8787, so a second relay
+ * would otherwise make this one fail. A later port is as good as the first, because the
+ * address is written into the hub's report and apps read it from there rather than
+ * assuming. Only a real collision is retried; a missing binary or a broken one is a
+ * sentence for the pane, not ten failed processes.
  */
 const SYNC_PORT_ATTEMPTS = 10;
 
-async function startRefreshHost(): Promise<void> {
-  for (let attempt = 0; attempt < SYNC_PORT_ATTEMPTS; attempt += 1) {
-    const port = syncPort() + attempt;
-    const host = new StartHost({ dataDir: dataDirectory, port });
-    try {
-      await host.start();
-      syncHost = host;
+async function startRefreshRelay(): Promise<void> {
+  const configured = syncPort();
+  const attempts = configured === 0 ? 1 : SYNC_PORT_ATTEMPTS;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const candidate = new SuiteSyncRelay({
+      dataDir: dataDirectory,
+      port: configured + attempt,
+      onExit: () => void broadcast(),
+    });
+    syncRelay = candidate;
+    const started = await candidate.start();
+    if (
+      started.running ||
+      !started.installed ||
+      !isAddressInUse(started.problem) ||
+      attempt === attempts - 1
+    ) {
       break;
-    } catch (error) {
-      if (attempt === SYNC_PORT_ATTEMPTS - 1) {
-        console.warn(`[sync] the host could not start on ${syncPort0Label()}:`, error);
-        return;
-      }
     }
+  }
+
+  const state = syncRelay === null ? null : await syncRelay.snapshot();
+  if (state !== null && !state.running && state.installed) {
+    console.warn(`[sync] the relay is not running: ${state.problem ?? "no reason given"}`);
   }
 
   // An app that reads this at launch should find today's answer.
@@ -1237,10 +1256,6 @@ async function startRefreshHost(): Promise<void> {
     console.warn("[sync] could not report the hub's address", error);
   });
   await broadcast();
-}
-
-function syncPort0Label(): string {
-  return `${syncPort()}–${syncPort() + SYNC_PORT_ATTEMPTS - 1}`;
 }
 
 /** Read the feeds again and redraw, which is what the menu item and the button both do. */
@@ -1584,8 +1599,7 @@ function registerIpc(): void {
    * reading, and installing remains the app's business.
    */
   onIpc(START_IPC.startSync, async () => {
-    syncHost ??= new StartHost({ dataDir: dataDirectory, port: syncPort() });
-    await syncHost.start();
+    await relay().start();
     await reportHub().catch((error: unknown) => {
       console.warn("[sync] could not report the hub's address", error);
     });
@@ -1594,7 +1608,7 @@ function registerIpc(): void {
   });
 
   onIpc(START_IPC.stopSync, async () => {
-    await syncHost?.stop();
+    await syncRelay?.stop();
     await reportHub().catch((error: unknown) => {
       console.warn("[sync] could not report the hub's address", error);
     });
@@ -1604,8 +1618,7 @@ function registerIpc(): void {
 
   onIpc(START_IPC.setSyncScope, async (_event, scope: unknown) => {
     if (scope !== "loopback" && scope !== "network") return syncState();
-    syncHost ??= new StartHost({ dataDir: dataDirectory, port: syncPort() });
-    await syncHost.setScope(scope);
+    await relay().setScope(scope);
     await reportHub().catch((error: unknown) => {
       console.warn("[sync] could not report the hub's address", error);
     });
@@ -1733,13 +1746,17 @@ if (!gotLock) {
       ]),
     );
 
-    // The window first, the mailbox second. A host that cannot bind — a second Start, or the
-    // packaged copy already running — used to stop startup dead: no window, no error, just a
+    // Locate the relay before the first state is drawn, so "not installed" is a fact
+    // rather than the empty gap before a search.
+    relay();
+
+    // The window first, the relay second. A relay that cannot start — a missing binary,
+    // or a port already taken — used to stop startup dead: no window, no error, just a
     // launcher that never appeared.
     window = createWindow();
     await show();
 
-    void startRefreshHost();
+    void startRefreshRelay();
 
     // After the window, never before it: this is housekeeping, and a person opening the
     // launcher should not wait for three icons.
@@ -1777,8 +1794,8 @@ if (!gotLock) {
   });
 
   app.on("before-quit", () => {
-    // Best effort: a report that says the hub is still up would be a lie a reader acts on.
-    void syncHost
+    // Best effort: a report that says the relay is still up would be a lie a reader acts on.
+    void syncRelay
       ?.stop()
       .then(() => reportHub())
       .catch(() => undefined);

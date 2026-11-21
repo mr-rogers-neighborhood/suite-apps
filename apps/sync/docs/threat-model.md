@@ -46,7 +46,7 @@ holds.
 
 ## Accepted limits
 
-- **No transport security.** The URL is `ws://` and both the CLI and Start's relay bind to `127.0.0.1`
+- **No transport security.** The URL is `ws://` and both the CLI and the relay Start starts bind to `127.0.0.1`
   by default. A network attacker sees the header, timing and connection metadata and can drop or
   replay traffic. The payload stays sealed.
 - **Metadata.** Workspace and device ids, device names, public keys, epochs, kinds, payload lengths,
@@ -59,7 +59,8 @@ holds.
   snapshot from a peer, because the relay cannot produce one.
 - **The CLI needs `--trust-all`.** It has no device-key verifier yet, so `serve` refuses to start
   without it; on a non-loopback address that is an open mailbox until `--trust-all-remote` says so.
-  Start runs the same server with the Ed25519 verifier and pins each key on join.
+  Start runs the same CLI, passes `--trust-all` on loopback, and requires that acknowledgement before
+  widening the scope. It records each device's key on join but does not verify with it yet.
 
 ## Non-goals
 

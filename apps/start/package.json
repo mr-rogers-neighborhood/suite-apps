@@ -30,7 +30,6 @@
   "dependencies": {
     "@suite/contracts": "workspace:*",
     "@suite/desktop": "workspace:*",
-    "@suite/host": "workspace:*",
     "@suite/sync": "workspace:*",
     "@suite/theme": "workspace:*",
     "electron-updater": "^6.6.2"

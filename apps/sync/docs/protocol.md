@@ -208,8 +208,9 @@ The transport is a WebSocket at `/sync` with a `/health` HTTP route.
 - `error` codes: `protocol-version`, `not-joined`, `malformed`, `unknown`. A refused frame, role,
   invite or removal is answered with `refused` and its reason.
 - The relay binds to `127.0.0.1` by default; `--host` is explicit. There is no TLS: the URL is `ws://`.
-  The CLI's `serve` also requires `--trust-all` because it has no device-key verifier; Start runs the
-  same server with the Ed25519 verifier.
+  The CLI's `serve` also requires `--trust-all` because it has no device-key verifier; Start runs that
+  same CLI, passing `--trust-all` on loopback and requiring the network acknowledgement when the
+  scope widens.
 
 The store is one append-only file per workspace for frames, and one each for roles, invites, pinned
 keys and removals. A frame file holds the sealed frame with the position the relay assigned, plus a

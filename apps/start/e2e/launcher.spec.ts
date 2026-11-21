@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import {
   fakeApp,
   fakeFlatpak,
+  fakeRelay,
   install,
   launch,
   launchedWith,
@@ -237,12 +238,27 @@ test("renders every section with nothing installed", async () => {
       await expect(run.page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
     }
 
-    // The hub supervises the sync host and starts it on loopback, so the pane says
-    // what is true and the control offers the action that applies.
+    // The relay is its own program. With none installed the pane says what to
+    // install and offers no dead control.
+    await expect(run.page.locator("#panel-sync .pane-note").first()).toHaveText(
+      "Relay not installed. Sync stays off until Suite Sync is installed.",
+    );
+    await expect(run.page.locator("#sync-toggle")).toHaveCount(0);
+  } finally {
+    await run.close();
+  }
+});
+
+test("starts the Suite Sync relay it was given and shows its address", async () => {
+  const relay = await fakeRelay(box);
+  const run = await launch(box, [], { SUITE_SYNC_BIN: relay.executable });
+  try {
     await expect(run.page.locator("#panel-sync .pane-note").first()).toHaveText(
       "On. Other devices can reach this machine.",
     );
+    await expect(run.page.locator("#sync-address")).toHaveText("ws://127.0.0.1:18787/sync");
     await expect(run.page.locator("#sync-toggle")).toHaveText("Turn sync off");
+    await expect.poll(async () => readFile(relay.logPath, "utf8")).toContain("serve");
   } finally {
     await run.close();
   }

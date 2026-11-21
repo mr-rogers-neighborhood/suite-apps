@@ -19,7 +19,8 @@ server is a role a person runs on a device they control.
   default. Frames protect content from the relay and from disk; they do not protect the header, timing
   or availability from the network. Do not expose it beyond a trusted network.
 - **The CLI needs `--trust-all`.** It has no device-key verifier yet, so `serve` refuses to start
-  without it. Start runs the same server with the Ed25519 verifier.
+  without it. Start runs the same CLI, passes `--trust-all` on loopback, and requires the network
+  acknowledgement before widening the scope; it records keys but does not verify with them yet.
 - **Ids are fingerprints.** Workspace, device and member ids are 64 lower-case hex characters. The
   protocol layer treats them as opaque; the workspace id is the document's own id, which the root
   signs at first share.
