@@ -287,7 +287,7 @@ function Row({
       <span className="flex justify-end">
         <button
           type="button"
-          aria-label="Cleared"
+          aria-label={`Cleared: ${transaction.payeeName || "transaction"} on ${shortDate(transaction.date)}`}
           aria-pressed={transaction.cleared !== "uncleared"}
           title={
             transaction.cleared === "reconciled"

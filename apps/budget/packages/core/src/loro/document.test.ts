@@ -20,6 +20,28 @@ function base() {
 }
 
 describe("BudgetDocument", () => {
+  it("should take the currency's scale when the caller does not state one", () => {
+    const now = new Date("2026-01-01T12:00:00.000Z");
+    expect(BudgetDocument.create({ currency: "jpy", now }).getSettings()).toMatchObject({
+      currency: "JPY",
+      currencyScale: 0,
+    });
+    expect(BudgetDocument.create({ currency: "KWD", now }).getSettings().currencyScale).toBe(3);
+    expect(
+      BudgetDocument.create({ currency: "USD", currencyScale: 3, now }).getSettings().currencyScale,
+    ).toBe(3);
+  });
+
+  it("should move the scale with a currency change unless one is stated", () => {
+    const { doc } = base();
+    expect(doc.updateSettings({ currency: "jpy" })).toMatchObject({
+      currency: "JPY",
+      currencyScale: 0,
+    });
+    expect(doc.updateSettings({ currency: "kwd", currencyScale: 2 }).currencyScale).toBe(2);
+    expect(doc.getSettings()).toMatchObject({ currency: "KWD", currencyScale: 2 });
+  });
+
   it("should round-trip a snapshot", () => {
     const { doc, one } = base();
     doc.setAssigned("2026-01", one.id, 10_000);

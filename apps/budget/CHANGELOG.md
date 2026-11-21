@@ -10,6 +10,28 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 ### Fixed
 
+- **A transfer's unlocked side cannot rewrite a reconciled one.** Editing or deleting the other leg
+  of a transfer now checks both legs, so a reconciliation stays locked. The same guard covers a split
+  whose children are locked, and a transfer amount must be a whole positive number of minor units.
+- **A payee rename moves history and its learned rule, not its categories.** The register and the
+  payee list agreed only after a rules pass before. A rename now updates every row that carries the
+  payee, retargets the learned category rule, and keeps the import mapping; renaming into a name
+  another payee holds is refused instead of making name-typed rules ambiguous.
+- **Category and account rule conditions match what the editor shows.** A condition typed as
+  `category is Groceries` compared against the category id and never matched. Both the id and the
+  visible name now count, a negative condition needs every name to differ, and an `amount is one of`
+  list parses each value instead of only the first.
+- **Run rules leaves internal transfers alone.** A rule that set a category on a transfer between two
+  on-budget accounts turned a moved dollar into spending; those rows are skipped. The learned rename
+  rule also reads only an imported row's bank text, so it cannot rewrite a hand-entered row.
+- **A scheduled occurrence on a month end keeps its anchor.** A bill on the 31st posts on the 28th or
+  29th in February and returns to the 31st afterwards, including across a year boundary and a horizon
+  skip. Entering a schedule past its end date is refused.
+- **Malformed amounts are refused.** A misplaced minus (`12-34`) or broken grouping (`1.2.3`,
+  `1,23,456`) used to be stripped into a larger amount. Rounding at the currency scale is covered at
+  the half-up boundary and for zero- and three-decimal currencies.
+- **The currency decides the scale when the caller does not.** A budget created in JPY no longer
+  starts with two decimal places, and changing the currency moves the scale with it.
 - **A transfer between two of your accounts no longer asks for a category.** Moving money from
   checking to savings counted as two uncategorized transactions in the Plan banner. It is one
   movement, and the banner now names only rows that really need a category.
@@ -28,8 +50,9 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 ### Accessibility
 
-See [ACCESSIBILITY.md](ACCESSIBILITY.md) for what is machine-checked, what is still unverified, and
-the remaining known gaps.
+The register's cleared control names its row, and component tests hold the focus after a cleared
+toggle, a split expand, and an amount commit. See [ACCESSIBILITY.md](ACCESSIBILITY.md) for what is
+machine-checked, what is still unverified, and the remaining known gaps.
 
 ## [0.4.0] - 2026-11-21
 

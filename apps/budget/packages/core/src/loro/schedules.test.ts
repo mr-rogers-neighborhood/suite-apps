@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { addDays, decodeRecords, todayKey } from "../index";
 import { BudgetDocument } from "./BudgetDocument";
-import { AUTO_ENTER_HORIZON_DAYS } from "./schedules";
+import { AUTO_ENTER_HORIZON_DAYS, ScheduleError } from "./schedules";
 
 const NOW = new Date(2026, 2, 15, 12, 0, 0, 0);
 const TODAY = todayKey(NOW);
@@ -248,5 +248,105 @@ describe("schedule auto-enter", () => {
     // A second undo is a no-op and cannot delete anything else.
     const again = reopened.undoScheduleBatch(batchId, NOW);
     expect(again.undoneAt).not.toBeNull();
+  });
+});
+
+describe("schedule boundaries and edits", () => {
+  it("should post month-end occurrences on the last day of a short month", () => {
+    const { doc, account, category } = setup();
+    const schedule = addSchedule(doc, account.id, category.id, { anchorDate: "2026-01-31" });
+    doc.updateSchedule(schedule.id, { nextDate: "2026-01-31" }, NOW);
+
+    const result = doc.autoEnterSchedules(NOW);
+
+    expect(result.postedCount).toBe(2);
+    expect(doc.listTransactions().map((transaction) => transaction.date)).toEqual([
+      "2026-01-31",
+      "2026-02-28",
+    ]);
+    // The anchor returns after February rather than sticking to the 28th.
+    expect(doc.listSchedules()[0]?.nextDate).toBe("2026-03-31");
+  });
+
+  it("should carry an anchor across a year boundary", () => {
+    const february = new Date(2026, 1, 1, 12, 0, 0, 0);
+    const { doc, account, category } = setup(february);
+    const schedule = addSchedule(doc, account.id, category.id, { anchorDate: "2025-12-31" });
+    doc.updateSchedule(schedule.id, { nextDate: "2025-12-31" }, february);
+
+    const result = doc.autoEnterSchedules(february);
+
+    expect(result.postedCount).toBe(2);
+    expect(doc.listTransactions().map((transaction) => transaction.date)).toEqual([
+      "2025-12-31",
+      "2026-01-31",
+    ]);
+    expect(doc.listSchedules()[0]?.nextDate).toBe("2026-02-28");
+  });
+
+  it("should skip the occurrences an interval steps over", () => {
+    const { doc, account, category } = setup();
+    const schedule = addSchedule(doc, account.id, category.id, {
+      frequency: "monthly",
+      interval: 2,
+      anchorDate: "2026-01-15",
+    });
+    doc.updateSchedule(schedule.id, { nextDate: "2026-01-15" }, NOW);
+
+    expect(doc.autoEnterSchedules(NOW).postedCount).toBe(2);
+    expect(doc.listTransactions().map((transaction) => transaction.date)).toEqual([
+      "2026-01-15",
+      "2026-03-15",
+    ]);
+    expect(doc.listSchedules()[0]?.nextDate).toBe("2026-05-15");
+  });
+
+  it("should keep the next date when an amount is edited after a run", () => {
+    const { doc, account, category } = setup();
+    const schedule = addSchedule(doc, account.id, category.id);
+    doc.updateSchedule(schedule.id, { nextDate: "2026-01-15" }, NOW);
+    expect(doc.autoEnterSchedules(NOW).postedCount).toBe(3);
+    expect(doc.listSchedules()[0]?.nextDate).toBe("2026-04-15");
+
+    doc.updateSchedule(schedule.id, { amountMinor: -120_000 }, NOW);
+    expect(doc.listSchedules()[0]?.nextDate).toBe("2026-04-15");
+    expect(doc.autoEnterSchedules(NOW).postedCount).toBe(0);
+    expect(doc.listTransactions()[0]?.amountMinor).toBe(-100_000);
+  });
+
+  it("should refuse a manual entry after the end date", () => {
+    const { doc, account, category } = setup();
+    const schedule = addSchedule(doc, account.id, category.id, { endDate: "2026-02-20" });
+    doc.updateSchedule(schedule.id, { nextDate: "2026-03-15" }, NOW);
+
+    expect(() => doc.enterSchedule(schedule.id, NOW)).toThrow(ScheduleError);
+    expect(doc.listTransactions()).toEqual([]);
+    expect(doc.listSchedules()[0]?.nextDate).toBe("2026-03-15");
+  });
+
+  it("should post an occurrence that lands on the end date itself", () => {
+    const { doc, account, category } = setup();
+    const schedule = addSchedule(doc, account.id, category.id, { endDate: "2026-03-15" });
+    doc.updateSchedule(schedule.id, { nextDate: "2026-03-15" }, NOW);
+
+    expect(doc.autoEnterSchedules(NOW).postedCount).toBe(1);
+    expect(doc.listTransactions()[0]?.date).toBe("2026-03-15");
+  });
+
+  it("should keep a month-end anchor across a horizon skip", () => {
+    const { doc, account, category } = setup();
+    const schedule = addSchedule(doc, account.id, category.id, { anchorDate: "2025-01-31" });
+    doc.updateSchedule(schedule.id, { nextDate: "2025-01-31" }, NOW);
+
+    const result = doc.autoEnterSchedules(NOW);
+
+    expect(result.skippedBefore).toBe(11);
+    expect(result.postedCount).toBe(3);
+    expect(doc.listTransactions().map((transaction) => transaction.date)).toEqual([
+      "2025-12-31",
+      "2026-01-31",
+      "2026-02-28",
+    ]);
+    expect(doc.listSchedules()[0]?.nextDate).toBe("2026-03-31");
   });
 });

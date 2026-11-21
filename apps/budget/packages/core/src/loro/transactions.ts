@@ -163,6 +163,13 @@ export function updateTransaction(
     );
   }
   if (patch.amountMinor === 0) throw new TransactionError("zero", "A transaction cannot be zero");
+  if (current.transferId) {
+    const pair = transferPair(doc, current);
+    if (pair) assertUnlocked([pair]);
+  }
+  if (current.parentId === null && hasChildren(doc, id)) {
+    assertUnlocked(childrenOf(doc, id));
+  }
 
   const next = updateRecord(doc, ROOTS.transactions, id, transactionSchema, patch, {
     key: "updatedAt",
@@ -170,10 +177,7 @@ export function updateTransaction(
   });
 
   if (current.transferId) {
-    const pair = listTransactions(doc).find(
-      (transaction) =>
-        transaction.transferId === current.transferId && transaction.id !== current.id,
-    );
+    const pair = transferPair(doc, current);
     if (pair) {
       const pairPatch: Partial<Transaction> = { updatedAt: next.updatedAt };
       if (patch.date !== undefined) pairPatch.date = next.date;
@@ -211,15 +215,20 @@ export function deleteTransaction(doc: LoroDoc, id: string): void {
   }
 
   if (current.transferId) {
-    for (const transaction of listTransactions(doc)) {
-      if (transaction.transferId === current.transferId) {
-        deleteRecord(doc, ROOTS.transactions, transaction.id);
-      }
+    const legs = listTransactions(doc).filter(
+      (transaction) => transaction.transferId === current.transferId,
+    );
+    // Deleting either leg deletes both. A reconciled leg on the far side still protects the
+    // pair, even when this side is unlocked.
+    assertUnlocked(legs);
+    for (const transaction of legs) {
+      deleteRecord(doc, ROOTS.transactions, transaction.id);
     }
     return;
   }
 
   const children = childrenOf(doc, id);
+  assertUnlocked(children);
   for (const child of children) deleteRecord(doc, ROOTS.transactions, child.id);
   deleteRecord(doc, ROOTS.transactions, id);
 
@@ -241,7 +250,7 @@ export function createTransfer(
   if (input.fromAccount.id === input.toAccount.id) {
     throw new TransactionError("transfer", "A transfer needs two different accounts");
   }
-  if (input.amountMinor <= 0) {
+  if (input.amountMinor <= 0 || !Number.isInteger(input.amountMinor)) {
     throw new TransactionError("transfer", "A transfer amount must be positive");
   }
   const bothOnBudget = input.fromAccount.onBudget && input.toAccount.onBudget;
@@ -369,6 +378,7 @@ export function replaceSplits(
   if (parent.parentId !== null) {
     throw new TransactionError("split-child", "A split line cannot itself be split");
   }
+  assertUnlocked(childrenOf(doc, parentId));
   if (splits.length < 2) throw new TransactionError("split-total", "A split needs two lines");
   const total = splits.reduce((sum, split) => sum + split.amountMinor, 0);
   if (total === 0) throw new TransactionError("split-total", "A split cannot total zero");
@@ -454,6 +464,19 @@ export function unlockAccount(
 
 function childrenOf(doc: LoroDoc, parentId: string): Transaction[] {
   return listTransactions(doc).filter((transaction) => transaction.parentId === parentId);
+}
+
+function transferPair(doc: LoroDoc, leg: Transaction): Transaction | undefined {
+  if (!leg.transferId) return undefined;
+  return listTransactions(doc).find(
+    (transaction) => transaction.transferId === leg.transferId && transaction.id !== leg.id,
+  );
+}
+
+function assertUnlocked(rows: readonly Transaction[]): void {
+  if (rows.some((row) => row.cleared === "reconciled")) {
+    throw new TransactionError("reconciled", "Unlock the reconciliation before changing this row");
+  }
 }
 
 function hasChildren(doc: LoroDoc, id: string): boolean {

@@ -84,11 +84,26 @@ export function RulesView() {
           const account = snapshot.accounts.find(
             (candidate) => candidate.id === transaction.accountId,
           );
+          // An internal transfer has no category by design. A rule that set one would turn a
+          // moved dollar into spending, so those rows are not candidates for a category rule.
+          if (transaction.transferId) {
+            const other = snapshot.transactions.find(
+              (candidate) =>
+                candidate.transferId === transaction.transferId && candidate.id !== transaction.id,
+            );
+            const otherAccount = snapshot.accounts.find(
+              (candidate) => candidate.id === other?.accountId,
+            );
+            if (account?.onBudget && otherAccount?.onBudget) continue;
+          }
           const draft: RuleDraft = {
             accountId: transaction.accountId,
             accountName: account?.name ?? "",
             payeeName: transaction.payeeName,
-            importedPayee: transaction.imported?.originalPayee ?? transaction.payeeName,
+            // The field is the bank's text, not the payee someone chose. Falling back to the
+            // current name let a learned rename rule rewrite history and then match another
+            // payee's learned category rule.
+            importedPayee: transaction.imported?.originalPayee ?? "",
             categoryId: transaction.categoryId,
             categoryName:
               transaction.categoryId === "rta"

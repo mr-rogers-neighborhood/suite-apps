@@ -2,6 +2,7 @@ import { LoroDoc, UndoManager } from "loro-crdt";
 import { err, ok, type Result } from "neverthrow";
 
 import type { MonthKey } from "../dates";
+import { currencyScale } from "../money";
 import type { StarterTemplateId } from "../ports";
 import {
   accountSchema,
@@ -66,7 +67,15 @@ import {
   listMonthlyBudgets,
   setAssigned,
 } from "./months";
-import { createPayee, deletePayee, getPayee, listPayees, mergePayees, updatePayee } from "./payees";
+import {
+  createPayee,
+  deletePayee,
+  getPayee,
+  listPayees,
+  mergePayees,
+  renamePayee,
+  updatePayee,
+} from "./payees";
 import {
   clearedBalance,
   listReconciliations,
@@ -118,8 +127,15 @@ import {
 
 const initialSettings = (options: CreateBudgetOptions): Partial<Settings> => {
   const settings: Partial<Settings> = {};
-  if (options.currency) settings.currency = options.currency.toUpperCase();
-  if (options.currencyScale !== undefined) settings.currencyScale = options.currencyScale;
+  if (options.currency) {
+    const currency = options.currency.toUpperCase();
+    settings.currency = currency;
+    // The scale follows the currency unless the caller states one. `create({currency: "JPY"})`
+    // must not leave a two-decimal yen in the document.
+    settings.currencyScale = options.currencyScale ?? currencyScale(currency);
+  } else if (options.currencyScale !== undefined) {
+    settings.currencyScale = options.currencyScale;
+  }
   if (options.firstDayOfWeek !== undefined) settings.firstDayOfWeek = options.firstDayOfWeek;
   return settings;
 };
@@ -482,6 +498,10 @@ export class BudgetDocument {
 
   mergePayees(sourceId: string, targetId: string) {
     return this.#mutate(() => mergePayees(this.#doc, sourceId, targetId));
+  }
+
+  renamePayee(id: string, name: string, now?: Date) {
+    return this.#mutate(() => renamePayee(this.#doc, id, name, now));
   }
 
   deletePayee(id: string) {
