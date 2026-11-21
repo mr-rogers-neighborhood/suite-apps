@@ -18,19 +18,19 @@ product; Sync and Help follow them.
 | --- | --- | --- | --- |
 | **Suite Start** | The hub: installs, updates, opens and removes the other apps | Working | `flatpak install --user suite run.suite.start` |
 | **Suite Go** | One mobile container that hosts the domains as packs | Shell only | [Android debug build](apps/go/README.md#run-it) |
-| <img src="apps/start/build/app-icons/canvas.png" width="20" height="20" alt=""> **Suite Canvas** | Thinking and research: cards, boards, writing, links and views in one document | Alpha | In Start, or `flatpak install --user suite run.suite.canvas` |
-| <img src="apps/start/build/app-icons/planner.png" width="20" height="20" alt=""> **Suite Planner** | A daily planner: inbox, estimates, capacity and a local calendar | Pre-alpha | In Start, or `flatpak install --user suite run.suite.planner` |
-| <img src="apps/start/build/app-icons/budget.png" width="20" height="20" alt=""> **Suite Budget** | An envelope budget: give every dollar a job; [what it does](apps/budget/README.md) | Pre-alpha | In Start, or `flatpak install --user suite run.suite.budget` |
-| **Suite Sync** | The sync protocol and a relay a person runs | Working | [Run the relay](apps/sync/docs/how-to/relay.md) |
-| <img src="apps/start/build/app-icons/help.png" width="20" height="20" alt=""> **Suite Help** | The documentation app: the code explorer and the handbook, offline; [what it is](apps/help/README.md) | Working | In Start, or `flatpak install --user suite run.suite.help` |
+| <img src="apps/start/build/app-icons/canvas.png" width="20" height="20" alt=""> **Suite Canvas** | Thinking and research: cards, boards, writing, links and views in one document | Alpha | `flatpak install --user suite run.suite.canvas` |
+| <img src="apps/start/build/app-icons/planner.png" width="20" height="20" alt=""> **Suite Planner** | A daily planner: inbox, estimates, capacity and a local calendar | Pre-alpha | `flatpak install --user suite run.suite.planner` |
+| <img src="apps/start/build/app-icons/budget.png" width="20" height="20" alt=""> **Suite Budget** | An envelope budget: give every dollar a job; [what it does](apps/budget/README.md) | Pre-alpha | `flatpak install --user suite run.suite.budget` |
+| **Suite Sync** | The sync protocol and a relay a person runs | Working | `flatpak install --user suite run.suite.sync` |
+| <img src="apps/start/build/app-icons/help.png" width="20" height="20" alt=""> **Suite Help** | The documentation app: the code explorer and the handbook, offline; [what it is](apps/help/README.md) | Working | `flatpak install --user suite run.suite.help` |
 
 Canvas, Planner and Budget own their documents. Start launches them as separate processes and is not
 in the data path. Sync carries a document between devices; it never defines its schema.
 
 ## Install
 
-The table's commands need the signed store once. Start is the only piece you fetch by hand; every
-app it manages arrives through it as a Flatpak.
+Every app is a Flatpak on the same signed store, so each row's command works on its own. Start is
+the recommended first install: one window that installs, updates and opens the others.
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite \
