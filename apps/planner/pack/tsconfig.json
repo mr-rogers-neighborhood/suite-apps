@@ -6,7 +6,7 @@
     "types": [],
     "paths": {
       "@suite/planner-core": ["../packages/core/src/index.ts"],
-      "@renderer/*": ["../desktop/src/renderer/src/*"]
+      "@renderer/*": ["../src/renderer/src/*"]
     }
   },
   "include": ["src/**/*.ts", "vite.config.ts"]
