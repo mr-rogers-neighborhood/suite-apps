@@ -1,121 +1,78 @@
 # Package and release
 
-The suite has one repository and several artifacts. Each app keeps its own version and release notes;
-the root owns the gate, the feed host and `scripts/release.mjs`.
+The suite has one repository and two artifact forms: Flatpaks for Linux desktop apps and a tarball
+for the relay. Each app keeps its own version and release notes; the root owns the gate and the two
+publishing paths.
 
 ## What a release is
 
-A release is three things that must describe the same commit:
+A desktop release is a Flatpak deployment on the signed OSTree remote, built from a commit the gate
+has proven, with a changelog section for the version in the app's `CHANGELOG.md`. The relay release is
+a tarball on `sync-v<version>` with a signed `SHA256SUMS`.
 
-- an artifact attached to a release tag named `<app>-v<version>`;
-- a signed manifest committed at `feeds/<app>/latest-linux.yml`;
-- a changelog section for the version in the app's `CHANGELOG.md`.
+There is no app update feed, AppImage, Arch package or second copy to roll back to. Flatpak owns the
+deployment and the remote is the update channel.
 
-The manifest is committed, so it is fetched straight from the repository at
-`https://raw.githubusercontent.com/mr-rogers-neighborhood/suite-apps/main/feeds/<app>/latest-linux.yml`.
-Its detached signature sits beside it as `latest-linux.yml.sig`. The artifact stays a release asset;
-the manifest names it by absolute URL on the app's tag, so the manifest can move while the bytes stay
-where a release put them.
+## Desktop apps
 
-The host is the raw file server rather than GitHub Pages because a Pages build needs GitHub Actions,
-and Actions is not available on this account. A signed manifest does not need a build step: the bytes
-in the repository are the bytes served, and the signature is the trust anchor.
-
-## One command per app
-
-Run a dry run first. It builds, verifies and prints what it would publish, and stops before every
-network write. A dry run is the default:
+Run the local build first:
 
 ```sh
-node scripts/release.mjs planner
+node scripts/flatpak.mjs --app planner
 ```
 
-Publish the same release. This uploads the artifact, manifest and signature, then commits the feed:
+That builds the unpacked tree, exports it to `~/suite-flatpak/repo`, signs the repository summary with
+the store key, adds the remote and installs. `--no-build` reuses `release/linux-unpacked`;
+`--no-install` publishes without touching the client.
+
+Publish to the shared remote:
 
 ```sh
-node scripts/release.mjs planner --publish
+node scripts/flatpak-remote.mjs                 # dry run: branch, refs and bytes
+node scripts/flatpak-remote.mjs --publish       # sign, verify and copy to suite-dev
 ```
 
-Re-read the published feed and prove it is signed by the key the apps pin, names the version in the
-tree, and points at an artifact that answers:
+The publish refuses a dirty tree or a HEAD that `.dev/gate-status.json` does not prove. It publishes
+the repository the local flow built; it never builds a second one. Publication copies bytes and
+commits nothing, so the gate proof stays on HEAD.
+
+## Pre-release tiers
+
+A pre-release is a build of the same app on the `slop`, `canary` or `beta` branch. It is not a second
+app: it shares `run.suite.slop.<app>` across the three tiers and takes the tier as its Flatpak branch.
+Stable keeps `run.suite.<app>`, so both can be installed at once. One pre-release install at a time is
+the supported shape; moving tier replaces it.
 
 ```sh
-node scripts/release.mjs planner --verify
+node scripts/flatpak.mjs --app planner --channel slop
+node scripts/flatpak-remote.mjs --channel slop --publish
 ```
 
-The hub has an Arch package as well as its AppImage, and a Flatpak built separately. `start` builds the
-Arch package when `makepkg` is available and uploads it with the other files:
+The tier branch is published on the same signed remote; the stable refs are not rewritten. See
+[Packaging channels](../reference/packaging-channels.md#pre-release-tiers) for the identity and the
+desktop-entry rule.
+
+## The relay
 
 ```sh
-node scripts/release.mjs start --publish
+node scripts/release.mjs sync              # dry run
+node scripts/release.mjs sync --publish    # upload tarball, checksums and signature
+node scripts/release.mjs sync --verify     # read the published assets back
 ```
 
-The relay is a server tarball rather than an AppImage, and goes through the same gate and key checks:
-
-```sh
-node scripts/release.mjs sync --publish
-```
-
-Its assets, checksum and signature are described in
+The relay is a server tarball, not a desktop app. It has no Flatpak and no update feed; the person
+replaces the tree deliberately. Its assets, checksum and signature are described in
 [Leave a relay running](../../apps/sync/docs/how-to/relay.md#building-and-publishing-a-release).
 
 Useful options:
 
 | Option | Effect |
 | --- | --- |
-| `--publish` | Upload and commit. Without it, the command is a dry run. |
-| `--channel <tier>` | Build a pre-release for `slop`, `canary` or `beta`. Default: `stable`. |
-| `--tag <name>` | Release under another tag; the default is `<app>-v<version>`, or `<tier>-<app>-v<version>`. |
-| `--notes-file <path>` | Use a file for the release notes instead of the changelog section. |
-| `--feed-dir <path>` | Copy the artifact, manifest and signature into a local folder. |
-| `--no-build` | Reuse the last build in the app's `release/` folder. |
-| `--verify` | Check the published feed instead of building anything. Stable only. |
-
-## Pre-release tiers
-
-A pre-release is a build of the same app on `slop`, `canary` or `beta`. It is not a second app: it
-shares `run.suite.slop.<app>` across the three tiers and takes the tier as its Flatpak branch. Stable
-keeps `run.suite.<app>`, so both can be installed at once. One pre-release install at a time is the
-supported shape; moving tier replaces it.
-
-```sh
-node scripts/release.mjs planner --channel slop          # dry run
-node scripts/release.mjs planner --channel slop --publish
-node scripts/flatpak.mjs --app planner --channel slop
-```
-
-The AppImage for a pre-release is tagged `slop-planner-v<version>` and carries the artifact and its
-signed `latest-linux.yml`; the Flatpak is exported on branch `slop`. Neither writes
-`feeds/planner/`: a pre-release never changes the stable feed or summary, and it is not offered as an
-automatic update to a stable install. See
-[Packaging channels](../reference/packaging-channels.md#pre-release-tiers) for the identity and the
-desktop-entry rule.
-
-## Publishing several apps on one gate
-
-Publishing commits `feeds/<app>/`, so HEAD moves after every app. That does not cost another gate. A
-publish accepts a HEAD that descends from the commit `.dev/gate-status.json` names when every commit
-in between changes only paths under `feeds/`. The check reads the trees — `git rev-list` plus each
-commit's changed paths — and never the commit message, so a message prefix cannot claim the proof.
-
-The inheritance is narrow on purpose:
-
-- a commit touching any path outside `feeds/` does not inherit, and needs a `--fresh` gate;
-- a merge commit inherits only when every path it contributes, against each parent, is under `feeds/`;
-- the gate must still be `ok` and `fresh`, and the tree must still be clean.
-
-So four publishes need one fresh gate:
-
-```sh
-mise exec -- node scripts/gate.mjs --fresh
-node scripts/release.mjs canvas --publish
-node scripts/release.mjs planner --publish
-node scripts/release.mjs budget --publish
-node scripts/release.mjs start --publish
-```
-
-If anything outside `feeds/` changed since the gate, commit it, run `--fresh` again, and publish from
-that commit. Do not reset to the proven commit to get past the check.
+| `--publish` | Upload the relay assets. Without it, the command is a dry run. |
+| `--tag <name>` | Release under another tag; the default is `sync-v<version>`. |
+| `--feed-dir <path>` | Copy the artifact, checksums and signature into a local folder. |
+| `--no-build` | Reuse the last build in the relay's output folder. |
+| `--verify` | Check the published assets instead of building anything. |
 
 ## What the script refuses
 
@@ -123,131 +80,50 @@ It stops before building when any of these is true, and prints every reason it f
 
 1. The tree has uncommitted changes.
 2. The version in the app's `package.json` has no `## [version]` heading in its changelog.
-3. `.dev/gate-status.json` does not name this commit or a feed-only descendant of it, does not say
-   `ok`, or came from a working-tree run rather than a clean export.
-4. The app's `suite.app.json` names a different version from its `package.json`.
+3. `.dev/gate-status.json` does not name this commit, does not say `ok`, or came from a working-tree
+   run rather than a clean export.
 
-After packaging it also refuses a manifest whose version disagrees with `package.json`, or that names
-an artifact that is not in the release folder. It does not bump a version and it does not read tags to
-guess one.
+It does not bump a version and it does not read tags to guess one.
 
 ## Before you publish
 
 ```sh
 mise exec -- node scripts/gate.mjs --fresh      # writes .dev/gate-status.json for this commit
 mise exec -- node scripts/docs-check.mjs       # if docs changed
-pnpm keys status                               # the publisher key matches the pin the apps trust
-node scripts/release.mjs <app>                # a clean dry run
-node scripts/release.mjs <app> --publish
-node scripts/release.mjs <app> --verify
+pnpm keys status                               # the publisher key matches the pin
+node scripts/flatpak-remote.mjs                # a clean dry run
+node scripts/flatpak-remote.mjs --publish
 ```
 
-Later apps in the same batch reuse that gate as long as they only commit feeds; see
-[Publishing several apps on one gate](#publishing-several-apps-on-one-gate).
-
-Packaging is not proven until the built app runs. Install the artifact and open a document after the
+Packaging is not proven until the built app runs. Install the Flatpak and open a document after the
 release, not before the gate.
-
-The packaged hub has one check that runs on request, after its unpacked build exists:
-
-```sh
-pnpm --filter @suite/start run package:dir
-pnpm --filter @suite/start run e2e:packaged
-```
-
-It starts `apps/start/release/linux-unpacked/suite-start` itself, connects to the window over the
-Chromium DevTools endpoint, and waits for Canvas's card to offer `Update to <version>` where
-`<version>` is the one the published `feeds/canvas/latest-linux.yml` names. That is the path
-Playwright's `_electron.launch` cannot take: the shipped build turns CLI inspect arguments off with an
-Electron fuse, so Playwright waits for an inspector line that never arrives, while the binary itself
-opens normally. A test build with the fuse flipped would not be the artifact that ships. The check
-reads the real host, so it runs after a publish and never in the gate.
 
 ## Build without publishing
 
-The release script is the publishing path. For a local build:
-
 ```sh
-pnpm --filter @suite/start run package:dir
-pnpm --filter @suite/start exec electron-builder --linux AppImage --publish never
+node scripts/flatpak.mjs --app start              # package, build, install locally
+node scripts/flatpak.mjs --app planner --no-build # reuse the unpacked tree
 ```
 
-The unpacked build keeps the Electron sandbox. The AppImage may need `--no-sandbox` because
-`chrome-sandbox` cannot be setuid on a read-only mount. The Arch package repackages the published
-AppImage, so the package and the feed describe the same release.
-
-Each app has its own packaging path:
-
-```sh
-pnpm --filter @suite/canvas-desktop run build   # then electron-builder in apps/canvas/desktop
-pnpm --filter @suite/planner run package
-pnpm --filter @suite/budget run package
-```
-
-Run the owning app's gate first. Packaging does not run it.
-
-## Flatpak
-
-```sh
-node scripts/flatpak.mjs              # package, build, publish, install
-node scripts/flatpak.mjs --app start  # the hub, stable only
-node scripts/flatpak.mjs --no-build   # reuse release/linux-unpacked
-node scripts/flatpak.mjs --no-build --no-install   # publish, leave the client alone
-node scripts/flatpak.mjs --app planner --channel slop  # pre-release tier branch
-```
-
-The script publishes to `~/suite-flatpak/repo` and adds it as the user remote `suite-local`. Run
-`scripts/store-key.sh` once to make the store's signing key: the script then signs the repository
-summary and adds the remote with the public key, so `flatpak update` verifies what it downloads. With
-no key the remote is added with `--no-gpg-verify` for local testing only, and the script says so. See
-[Packaging channels](../reference/packaging-channels.md).
-
-To watch Start update from the store, publish a second commit without installing it, then ask Start
-to look again (with `XDG_DATA_HOME` pointing at the real user installation). A new commit needs a
-changed payload, so make a visible source change first and rebuild:
-
-```sh
-node scripts/flatpak.mjs --no-install
-```
-
-The app's card says `update available` after **Check for updates**; **Update** asks Flatpak to
-replace the deployment. Revert the change and run `node scripts/flatpak.mjs` again to publish the
-clean build and bring the client back to it.
+Each app has its own packaging path inside the shared script. Run the owning app's gate first; the
+Flatpak script does not run it.
 
 ## Version ownership
 
 A version has one home: the app's entry `package.json`. Nothing else restates it — not this page, not
-a README, not a tag name. The app's release path reads it, refuses a changelog without a section for
-it, and stamps it into the artifact.
+a README, not a tag name. The release path reads it, refuses a changelog without a section for it, and
+stamps it into the artifact.
 
 | What | Where the version lives | Its tag |
 | --- | --- | --- |
-| Start, Planner, Budget | `apps/<app>/package.json` | `<app>-v<version>` |
+| Start, Planner, Budget, Help | `apps/<app>/package.json` | `<app>-v<version>` |
 | Canvas | `apps/canvas/desktop/package.json` | `canvas-v<version>` |
-| A pre-release of Canvas, Planner or Budget | the same app entry above | `<tier>-<app>-v<version>` |
 | The relay (`suite-sync`) | `apps/sync/package.json` | `sync-v<version>` |
 | Suite Go | `apps/go/app.config.json` | none yet |
 | A shared package (`@suite/*`) | `packages/<name>/package.json` | none; consumed as `workspace:*` |
 
-A tag names one app's release, not the repository's. The relay is three packages that ship as one
-artifact: `apps/sync/package.json` carries the release version and
-`apps/sync/packages/{protocol,host}/package.json` mirror it, so they move together. Its wire protocol
-has its own integer, `RELAY_PROTOCOL_VERSION` in
-[`apps/sync/packages/protocol/src/relay.ts`](../../apps/sync/packages/protocol/src/relay.ts), and a
-protocol change does not rename the package release. Suite Go needs its version in `app.config.json`,
-`package.json` and Gradle because the Android build reads all three; `app.config.json` is the home and
-a test fails when the copies disagree.
+## Signing
 
-The `v0.1.0`–`v0.1.8` tags predate this monorepo. They are Canvas releases from when Canvas was the
-repository — not shared-package tags and not Start releases. They stay where GitHub put them; a new
-release uses its app prefix.
-
-A changelog is the release notes for a version, not a second version store. Every release adds its
-`## [version]` section before it is tagged, and each app's `CHANGELOG.md` names the tag prefix that is
-its own. Where a version shipped without written notes, the changelog says so in one sentence rather
-than inventing a section.
-
-The manifest's signature is made with the publisher key at `SUITE_UPDATE_KEY`, or
-`~/.config/suite/keys/update-key.pem` by default. The private half never enters this repository, and
-`scripts/release.mjs` refuses a key that does not match the pin before it builds anything.
-[Manage signing keys](keys.md) covers the directory, the fingerprints and rotation.
+The Flatpak store key signs the OSTree summary; the remote's `.flatpakrepo` carries its public half.
+The relay's update key signs `SHA256SUMS`, and `release.mjs` refuses a key that does not match the pin.
+[Manage signing keys](keys.md) owns both procedures.

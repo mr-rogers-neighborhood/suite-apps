@@ -57,5 +57,5 @@ pnpm verify
 
 ## 5. Tag the release
 
-The manual path in [Release and roll back](release.md) is unchanged by publishing; it is the same
-build, tag and digest record. `v0.1.0-alpha.1` is the first tag on this history.
+The manual path in [Release](release.md) is unchanged by publishing; it is the same build, install
+and publishing record. `v0.1.0-alpha.1` is the first tag on this history.

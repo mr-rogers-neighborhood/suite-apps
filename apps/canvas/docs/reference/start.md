@@ -40,7 +40,7 @@ button that cannot work is worse than a sentence.
 | Install records | `installs.json` under `~/.config/suite/start` |
 | Recent files | `recents.json` in the data directory |
 | Documents | `~/Documents/Suite/<App>`, one level deep |
-| Release feeds | The signed `latest-linux.yml` each app's catalogue entry names |
+| Flatpak store | The signed OSTree remote Start asks for installs and updates |
 
 The documents root is the convention every app writes to, so the hub lists a planner's files without
 importing a line of planner. A file whose app is not installed is still listed, and the row says so.

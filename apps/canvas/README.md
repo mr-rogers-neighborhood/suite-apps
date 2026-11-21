@@ -46,8 +46,9 @@ pnpm dev:desktop    # Electron shell around the same renderer
 pnpm --filter @suite/canvas-desktop package:dir   # an unpacked binary in desktop/release
 ```
 
-On Linux, Canvas ships as an AppImage and as the Flatpak `run.suite.canvas`. A pre-release build
-keeps its documents in `~/Documents/Suite Slop/Canvas`, separate from the stable library.
+On Linux, Canvas ships as the Flatpak `run.suite.canvas`. A pre-release build is a separate Flatpak
+branch, `slop`, `canary` or `beta`, and keeps its documents in `~/Documents/Suite Slop/Canvas`,
+separate from the stable library.
 
 ## How it is built
 

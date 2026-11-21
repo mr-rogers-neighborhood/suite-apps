@@ -39,32 +39,24 @@ The rules that shape this repository. Each is current; the code follows it.
 
 ## Packaging
 
-- Start replaces only a file it can write. It installs, updates and removes the apps it placed, and
-  asks Flatpak to install or update a deployment. It does not update a copy a person placed.
-- The three document apps and the hub ship as AppImage and Flatpak; the hub also ships an Arch
-  package. Help ships only as a Flatpak, with no AppImage feed. `deb` is not a configured target,
-  and `rpm` and `snap` were never built.
-- Flatpak is a second channel: Start lists and launches installs, installs from the store, updates a
-  deployment whose commit is behind, and removes through Flatpak. Flatpak is the writer, never Start.
-  The hub can be a Flatpak too, with its own `run.suite.start` deployment.
-- Signed manifests live at `feeds/<app>/latest-linux.yml` in this repository, served from the raw
-  file host at `main` because GitHub Pages would need Actions. The artifact they name stays an asset
-  on the app's `<app>-v<version>` release tag.
+- Flatpak is the only Linux desktop form: Canvas, Planner, Budget, Help and Start. The relay is a
+  server tarball. There is no AppImage, Arch package, `deb`, `rpm` or `snap`.
+- Start never writes a deployment. It installs, updates and removes by asking Flatpak, launches with
+  `flatpak run`, and reveals a deployment. A folder copy a person places is first-class but not
+  Start's: the card offers Open, Reveal and Forget, and Start does not update it.
+- An installed deployment is compared with its own `origin` remote's commit, so a copy from
+  `suite-local` is not measured against the public `suite` store. A fresh install probes `suite`
+  first, then `suite-local`.
 - Stable and pre-release are two identities: `run.suite.<app>` and `run.suite.slop.<app>`. The tier
   (`slop`, `canary`, `beta`) is the Flatpak branch, not part of the id, so one pre-release install
-  can move tier while stable stays installed. A pre-release is tagged
-  `<tier>-<app>-v<version>` and never writes `feeds/<app>/`; the OSTree summary is signed with the
-  store key and the AppImage manifest with the update key. The AppImage manifest id is `slop-<app>`;
-  the older `slop.<app>` id is still read for an installed build.
-- `scripts/release.mjs` is the release path. It refuses a dirty tree, a version with no changelog
-  heading, a commit the gate has not proven, and a manifest whose artifact is missing. It is a dry
-  run unless `--publish` is passed.
+  can move tier while stable stays installed.
+- `scripts/flatpak.mjs` builds the local deployment and signs the repository summary with the store
+  key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to `suite-dev`.
+  `scripts/release.mjs` releases only the relay tarball.
 - A version lives in one place and a tag names one app's release. [Version ownership](../how-to/package-and-release.md#version-ownership)
   states which file owns it and which prefix the tag uses.
-- An installed AppImage verifies a feed with the update key it was built with; a Flatpak verifies the
-  OSTree summary with the store key. A key rotation therefore ships a new Start first — AppImage,
-  Arch package or Flatpak — and a feed signed with the new key is published only after that build
-  exists.
+- The Flatpak store key signs the OSTree summary; the relay's update key signs its `SHA256SUMS`.
+  Flatpak verifies the summary and every object's content hash on install and update.
 - Private signing keys live outside the repository, in `~/.config/suite/keys/` or wherever
   `SUITE_KEYS_DIR` points. A public half is pinned in the source that verifies it, and
   `pnpm keys status` proves the two agree. No secret is stored in a generated directory such as

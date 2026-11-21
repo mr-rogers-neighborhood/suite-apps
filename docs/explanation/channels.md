@@ -32,10 +32,9 @@ checks are the evidence, not an automatic promotion.
 `unstable` is not a tier and not a colour between `slop` and `canary`. `slop` already is unstable. A
 build does not move up by being called unstable, and no boundary checks for it.
 
-Unstable does not mean unverified. A stable AppImage verifies its signed manifest with the update
-key; a Flatpak tier verifies the signed OSTree summary with the store key; a pre-release AppImage tag
-carries its artifact and checksum. Unstable means the code may change or break, not that the bytes
-are unaccounted for.
+Unstable does not mean unverified. A Flatpak tier verifies the signed OSTree summary with the store
+key, and the relay's checksum list is signed with the update key. Unstable means the code may change
+or break, not that the bytes are unaccounted for.
 
 Unstable does not mean shared. A pre-release runs under one pre-release id and profile, in its own
 pre-release data folder, and cannot write a stable document. [Distribution](#distribution) states the
@@ -67,36 +66,26 @@ stable folder rather than overwriting it; it is not a merge.
 A pre-release registers no stable MIME type and no `suite://` handler, so a double-clicked `.canvas`
 or a `suite://` link still reaches the stable app. A tier is opened from its card.
 
-AppImage is the alternate form, with its own feed. A stable AppImage lives under `~/Applications` and
-updates from `feeds/<app>/`, as [Packaging channels](../reference/packaging-channels.md) describes.
-Only stable writes that feed: a pre-release tag carries its artifact and checksum, but never writes
-`feeds/<app>/`. A tier's update path is its Flatpak branch.
-
 Flathub hosts stable only. It builds a manifest a reviewer accepts and publishes the stable id; it is
 not a host for nightly or tier builds, and it cannot carry slop. The tiers therefore live on the
 self-hosted OSTree remote, where the branch names the tier. Flathub could later carry the stable id
 as a second distribution; it is not the tier host.
 
-## Two signatures
+## The signature
 
-Both distributions are signed, with different keys and different scopes.
+Flatpak is the only desktop distribution, so the OSTree summary is the app-side signature boundary.
 
 | Form | What is signed | Key | How it is verified |
 | --- | --- | --- | --- |
-| AppImage feed | `latest-linux.yml` | the update key, compiled into the build | Start checks the manifest signature, then the artifact's sha512. |
 | Flatpak | the OSTree summary | the store key, public half in the `.flatpakrepo` | `flatpak install` and `flatpak update` verify the summary and every object's content hash. |
 
-An AppImage build verifies the manifest with the update key compiled into it; [the update
-key](../reference/packaging-channels.md#the-update-key) states what a rotation does to an installed
-copy. A Flatpak client verifies the summary with the store key, and every object is named by a
-content hash inside that signed summary. [The signed
-remote](../reference/packaging-channels.md#the-signed-remote-on-suite-dev) describes the transport
-and its accepted limit.
+A Flatpak client verifies the summary with the store key, and every object is named by a content hash
+inside that signed summary. [The signed
+remote](../reference/packaging-channels.md#the-signed-remote-on-suite-dev) describes the transport and
+its accepted limit.
 
-A tier adds no third signature scheme. It is another branch under the same signed summary. A
-pre-release AppImage carries its signed `latest-linux.yml` on its own `<tier>-<app>-v<version>` tag
-rather than under `feeds/<app>/`; the AppImage is a manual download rather than an auto-updating
-install.
+A tier adds no third signature scheme. It is another branch under the same signed summary. The relay
+tarball is separate: its `SHA256SUMS` is signed with the update key.
 
 ## What a tier cannot undo
 
@@ -110,9 +99,9 @@ machine is where it was. These steps are not.
   export back refuses the stable folder rather than overwriting it, and is not a merge.
 - **Removing the pre-release data deletes the pre-release documents.** Start removes the channel's
   data directory only after a confirmation; the stable folder is never in that path.
-- **A key rotation does not reach an installed copy.** A build keeps verifying with the key it was
-  built with, so a feed signed with a new key is invisible to it until a build carrying the new key
-  is installed.
+- **A store-key rotation does not reach an installed remote.** The remote carries the public half
+  Flatpak verifies; a new store key needs the remote re-added with the new `.flatpakrepo` before a
+  later update can verify.
 
 ## The badge
 
@@ -129,8 +118,8 @@ card has no badge: stable is the default and the baseline the others are compare
 
 ## Reading
 
-- [Packaging channels](../reference/packaging-channels.md) for the delivery forms, file ownership and
-  the update key.
+- [Packaging channels](../reference/packaging-channels.md) for the delivery form, file ownership and
+  the signed remote.
 - [File formats](../reference/file-formats.md) for how a newer document is refused.
 - [Status](../reference/status.md) for what the tree ships today.
 - [Architecture](architecture.md) for why the desktop shell is separate apps.

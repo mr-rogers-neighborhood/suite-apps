@@ -32,7 +32,7 @@ Read [docs/README.md](docs/README.md) for the four documentation sections, and
 
 The relay, control plane, hosted site and the account/billing services are **gone**, not moved: sync
 now runs through a host that a device in the workspace runs itself (see `suite-sync`), and the apps are
-distributed as signed AppImages that Suite Start installs and updates.
+distributed as Flatpaks that Suite Start installs and updates.
 
 ## Commands
 

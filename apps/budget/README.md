@@ -30,7 +30,8 @@ For the product story and the influences behind it, read
   Import CSV, QIF, native JSON, or another `.budget`.
 - **Offline by design.** No network client, no updater, no analytics. Bank sync is deliberately
   absent; Start's catalogue is what checks Budget's feed.
-- **Two shipped forms.** Budget ships as an AppImage and as the Flatpak `run.suite.budget`.
+- **One shipped form.** Budget ships as the Flatpak `run.suite.budget`. A pre-release is a separate
+  branch with its own id and data folder.
 
 ## Run it
 

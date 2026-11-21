@@ -53,7 +53,7 @@ met and which are still partial.
 
 | | |
 | --- | --- |
-| Platforms | Linux x86_64. AppImage and Flatpak for the apps and the hub; an Arch package for the hub; no macOS or Windows build. |
+| Platforms | Linux x86_64. Flatpak for Canvas, Planner, Budget, Help and Start; the relay ships as a tarball; no macOS or Windows build. |
 | Sync | Canvas and Planner sync through a user-run relay; Start shows the relay's fingerprint and opens its console. Budget has no network client. |
 | Security | No account or telemetry. Document files are unencrypted; use disk encryption. The sync relay holds sealed frames; off loopback it uses `wss://` with a pinned self-signed certificate, and it is loopback by default. |
 | Mobile | Suite Go installs on Android as a debug build. No domain ships; iOS is unbuilt. |

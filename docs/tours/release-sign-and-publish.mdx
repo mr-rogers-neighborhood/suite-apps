@@ -1,16 +1,16 @@
 ---
 id: release-sign-and-publish
 title: Sign and publish a release
-summary: "A version, a proven commit, a signed feed and an artifact that all describe one thing."
+summary: "A version, a proven commit, a signed Flatpak remote and a relay tarball that describe one thing."
 order: 51
 ---
 
 A release is not just a build. It is a version with release notes, a commit the
-gate has proven, a manifest signed with the publisher's key and an artifact the
-manifest names. This tour follows the order the release script uses: what it
-refuses before it builds, what it signs, what an installed app accepts, and how
-a stable release and a pre-release keep separate identities. The path is also
-the order to read a failed publish in, because each stop is a refusal that
+gate has proven, a signed OSTree summary for the Flatpak remote, and — for the
+relay — a tarball whose checksum list is signed. This tour follows the two
+publishing paths: what they refuse before building, what they sign, and how a
+stable deployment and a pre-release branch keep separate identities. The path is
+also the order to read a failed publish in, because each stop is a refusal that
 happens earlier than the damage would.
 
 ## scripts/release.mjs#versionFromPackage
@@ -29,81 +29,63 @@ publish.
 
 The gate proof is a commit, not a working tree. The status file has to say the
 run passed, came from a clean export, and names this commit. A warm checkout that
-happens to pass is not evidence for the bytes about to upload.
-
-## scripts/release.mjs#feedOnlyRange
-
-Publishing commits `feeds/<app>/`, so HEAD moves after each app. A later publish
-inherits the proof only while every commit in between changes feed paths alone.
-Anything outside that folder needs a fresh gate.
-
-### overlay: A message cannot claim the proof
-
-The inheritance check reads `git rev-list` and each commit's changed paths, not
-the commit message. A prefix that says "release" is not a proof; the tree is.
+happens to pass is not evidence for the bytes about to publish.
 
 ## scripts/release.mjs#publisherKeyProblem
 
-The publisher key is checked against the pin before the build. An installed app
-verifies a feed with the key compiled into that build, so a manifest signed with
-another key reaches nobody. Finding that after upload and a feed commit is too
-late to be useful.
+The relay's checksum list is signed with the update key, and the key is checked
+against the pin before the build. Finding that after upload is too late to be
+useful.
 
-## scripts/release.mjs#signManifest
+## scripts/release.mjs#buildRelayArtifact
 
-The manifest is signed after its artifact URLs have been rewritten to the release
-tag, and the signature covers those exact bytes. A signature over a normalised
-copy would verify a document nobody downloads.
+The relay is a server, not an app: the tarball carries the CLI, its JavaScript
+dependencies and a launcher, but not a Node runtime. Building it from the gated
+tree is what makes the checksum describe the bytes a person installs.
 
-## scripts/release.mjs#absoluteManifest
+## scripts/release.mjs#releaseRelay
 
-The committed manifest stays small and points at the artifact on the app's tag.
-That is what lets the feed live in the repository while the bytes stay a release
-asset, and it is why a single monorepo `releases/latest` cannot serve several
-apps.
+The relay release uploads the tarball, `SHA256SUMS`, the detached signature and
+the public key on `sync-v<version>`. `--publish` is required; without it the same
+command is a dry run.
 
-## scripts/release.mjs#manifestProblems
+## scripts/flatpak.mjs#run
 
-After packaging, the manifest still has to name the version in the tree and an
-artifact that is actually in the output folder. A build that produced neither is
-not published.
+The desktop path starts with `node scripts/flatpak.mjs`. It packages the unpacked
+tree, exports the repository, signs the summary with the store key and installs
+from the local remote.
+
+## scripts/flatpak-remote.mjs#checkGitProof
+
+Publishing the shared repository checks the same gate proof: a dirty tree or a
+HEAD the status file does not name is refused before any byte is copied.
+
+## scripts/flatpak-remote.mjs#verifySignedSummary
+
+The fresh summary is verified in a throwaway Flatpak installation before it is
+published. A repository that only looks signed is not enough.
+
+## scripts/flatpak-remote.mjs#flatpakrepoText
+
+The `.flatpakrepo` file embeds the store's public key. That is what lets a person
+add the remote with `--from` and have Flatpak verify the summary from the first
+fetch.
 
 ## interlude: Two keys, two writers
 
-The AppImage path and the Flatpak path sign different things. An AppImage update
-manifest is signed with the update key an app carries; a Flatpak repository
-summary is signed with the store key and verified by OSTree. Replacing one does
-not replace the other, and a rotation order that ignores that leaves installed
-copies refusing a feed they cannot yet verify.
+The Flatpak path signs the OSTree summary with the store key; the relay path signs
+`SHA256SUMS` with the update key. Replacing one does not replace the other. The
+store key is the trust root for the remote, and the update key is the trust root
+for the relay tarball.
 
-## packages/desktop/src/releaseFeed.ts#checkSignedFeed
+## scripts/lib/channel.mjs#flatpakId
 
-The hub and the apps share one reader so they cannot disagree about what is
-newest. It fetches the manifest and its signature, verifies the served bytes,
-and parses the artifact only from the manifest that verified. An unsigned or
-tampered feed is reported, not treated as "no update".
+Stable keeps `run.suite.<app>`; a pre-release takes `run.suite.slop.<app>`. That
+id is the card and the profile, so stable and a pre-release can coexist without
+sharing documents or an update path.
 
-## scripts/release.mjs#verifyPublishedFeed
+## scripts/lib/channel.mjs#branchFor
 
-This is the read-back after a publish: the manifest is reachable, the signature
-is the publisher's, the version is the one in the tree, and the artifact
-answers. A release is public when those four agree, not when the upload command
-exits zero.
-
-## interlude: Stable is an identity, a tier is a branch
-
-A pre-release is another build of the same app, not a second app. It keeps one
-identity across the tiers so a machine can hold stable and one pre-release side
-by side, and the tier is what changes when the build is promoted.
-
-## scripts/lib/channel.mjs#releaseTag
-
-The tag names one app's release, not the repository's. Stable is
-`<app>-v<version>`; a pre-release is `<tier>-<app>-v<version>`. The prefix is
-what keeps four apps' releases independent in one repository.
-
-## scripts/lib/channel.mjs#suiteAppId
-
-Stable keeps the app id an installed build already has; a pre-release takes
-`slop-<app>`. That id is the card and the profile, so stable and a pre-release
-can coexist without sharing documents or an update path.
+The tier is the Flatpak branch, not part of the id. One pre-release id across
+`slop`, `canary` and `beta` means a tier move replaces the deployment instead of
+adding a second install.

@@ -6,9 +6,9 @@ summary: "The Flatpak manifests that package the same unpacked builds with their
 
 These are build recipes, not a package. Each Flatpak manifest packages the
 unpacked tree `package:dir` produced, through `org.electronjs.Electron2.BaseApp`
-and zypak, so the Flatpak carries the same bytes as the AppImage and the sandbox
-gets Electron's sandbox without a setuid `chrome-sandbox`. The manifests live
-beside the wrapper, desktop entry, AppStream record and icons.
+and zypak, so the sandbox gets Electron's sandbox without a setuid
+`chrome-sandbox`. The manifests live beside the wrapper, desktop entry, AppStream
+record and icons.
 
 The grants are the product boundary in another form. An app reaches one
 documents folder and, where it syncs, the network; the hub reaches the host's

@@ -7,11 +7,10 @@ server on a device they control.
 ## Install it
 
 Suite Start is the one app you fetch by hand; every other app in the suite arrives through it.
-[Installing Suite Start](docs/how-to/install.md) owns the Arch package, the AppImage, the Flatpak,
-the checksum and the error messages worth recognising. [Packaging](docs/how-to/package.md) explains
-the Linux forms and why the hub is packaged while the apps it installs come through Start or Flatpak:
-Start can only replace a file it is allowed to write, or ask Flatpak to. Everything below describes the code rather than the
-download.
+[Installing Suite Start](docs/how-to/install.md) owns the signed Flatpak remote, `flatpak install`,
+the first launch and the card states worth recognising. [Packaging](docs/how-to/package.md) explains
+why Flatpak is the only Linux desktop form: Start asks the writer that owns each deployment and never
+replaces one itself. Everything below describes the code rather than the download.
 
 ## What exists
 
@@ -85,18 +84,17 @@ committed output has drifted. The root gate builds the same packages once before
 1. `pnpm check` — green; `pnpm build:verify` — the committed shared `dist` has not drifted.
 2. Run the root gate with `--fresh`, so `.dev/gate-status.json` proves the commit rather than the
    working tree.
-3. `node scripts/release.mjs start --publish`. It builds the AppImage, writes the signed feed under
-   `feeds/start/`, builds the Arch package when `makepkg` is present, uploads them, and commits the
-   manifest.
-4. Keep the `start-` tag prefix: a hub release is tagged `start-v<version>` so it cannot collide with
-   another app's release. [Version ownership](../../docs/how-to/package-and-release.md#version-ownership)
-   names the tag for every app.
+3. `node scripts/flatpak.mjs --app start` builds the hub and installs the local deployment.
+4. `node scripts/flatpak-remote.mjs --app start --publish` signs and copies the store. The hub is
+   tagged `start-v<version>`, so it cannot collide with another app's version.
+   [Version ownership](../../docs/how-to/package-and-release.md#version-ownership) names the file
+   that owns the number.
 
-The Flatpak is built from the same unpacked tree with `node scripts/flatpak.mjs --app start`; the
-signed store publishes it beside the apps.
+The Flatpak is built from the same unpacked tree as every app; Flatpak owns its deployment and the
+hub's own row offers **Update Start** when the store publishes a newer commit.
 
-[Package and release](../../docs/how-to/package-and-release.md) describes the script and what it
-refuses; [Packaging channels](../../docs/reference/packaging-channels.md) explains the artifact forms.
+[Package and release](../../docs/how-to/package-and-release.md) describes the scripts and what they
+refuse; [Packaging channels](../../docs/reference/packaging-channels.md) explains the artifact forms.
 
 ## Working in the monorepo
 
@@ -113,9 +111,9 @@ documents, or run its code.
 The hub also ships as the Flatpak `run.suite.start`, with the same zypak wrapper as the apps. Its
 sandbox grants the host Flatpak service (`org.freedesktop.Flatpak`, used with
 `flatpak-spawn --host`) and the folders Start owns. That host access is effectively host command
-execution; it is the trade that lets a sandboxed hub manage deployments. A Flatpak hub's own row
-offers an update through Flatpak; an AppImage hub still updates the apps it placed but cannot replace
-itself.
+execution; it is the trade that lets a sandboxed hub manage deployments. The hub's own row offers
+**Update Start** through Flatpak; there is no second built form, and Start cannot replace its own
+running binary.
 
 A file row offers **Copy link**, which is `suite://<app>/workspace/<file name>`. Pasting one opens that
 document in that app: the hub routes it, and the app resolves the name against its own folder. The link
@@ -129,27 +127,27 @@ a launch.
 **Add app…** runs a file picker in the main process, reads the manifest beside the chosen executable and
 writes the record — the same handoff a packaged install has, for a copy you built or placed yourself.
 
-A managed install also earns a menu entry: `~/.local/share/applications/suite-<id>.desktop`, user scope,
-written on install and rewritten on update, so the app can be opened without Start. That is the point of
-the hub — it does not keep the apps to itself.
+Flatpak exports each app's menu entry, so Start no longer writes one. A folder copy is launched by
+Start, so it needs no entry of its own. That is still the point of the hub — it does not keep the apps
+to itself.
 
-**One copy per app, and its owner is decided at install.** A copy Start installed is Start's to replace
-and to delete: the card offers **Update** and **Uninstall**, and says **running** when the process Start
-started is still alive, asking before it closes and replaces it. A copy you placed is first-class but
-Start does not update it — the card offers Open, Reveal and Forget, never Uninstall, and its updates
-are yours to make. Two copies of one app share a profile and its single-instance lock, so only one can
-run. When discovery finds both an AppImage and a Flatpak deployment, the Flatpak is the one Start
-shows; the AppImage is listed as a duplicate to remove. A per-app switch is not built yet.
+**One copy per app.** A Flatpak deployment is the app. A folder copy a person places is listed
+separately and offers Open, Reveal and Forget; Start does not update it. Two copies of one app share a
+profile and its single-instance lock, so only one can run. When discovery finds both, the Flatpak is
+the card Start shows and the folder copy is listed as a duplicate to remove.
 
-**Install** is Start's own job. `catalogue.ts` names the document apps and Suite Help, and the feed
-each document app declares, then asks every feed what version it has when the window opens or when
-you press _Check for updates_. Help has no feed: Flatpak is its only channel. When a Flatpak store (`suite` or `suite-local`) offers an app, Install asks Flatpak instead,
-and the card says `from the store` before you press anything; a deployment whose commit is behind the
-store's says `update available`. A card is then in one of four honest states: not installed, no
-release found, an update available, or up to date. Pressing the button downloads the artifact named by
-the **verified** manifest, checks its sha512 against that manifest, places it in `~/Applications/Suite/<App>/<version>/`,
-makes it executable, writes the manifest and the install record — and nothing is unpacked, ever.
-`SUITE_START_APPS_ROOT` and `SUITE_START_FEED_BASE` move those two roots for a test.
+**Install is a Flatpak operation.** `catalogue.ts` names the document apps, Suite Help and Start, and
+the store decides what it offers. A fresh install probes `suite` first, then `suite-local`; when a
+remote offers an app, the card says `Not installed yet · from the store` and Install asks Flatpak. An
+installed deployment is compared with its own origin's commit, so a copy from `suite-local` is not
+measured against the public `suite` store; a newer commit says `update available`, and **Update**
+asks Flatpak. A card is in one of five honest states: not installed, no release found, Flatpak,
+Flatpak · update available, or from a folder. `SUITE_START_APPS_ROOT` moves the folder-copy root for
+a test.
+
+Each card carries the app's mark, including the new Help and Sync marks; the Sync pane uses the Sync
+glyph at heading size. A mark is white on the hub's ink tile, and a light theme inverts the tile and
+the glyph together so the same asset stays legible.
 
 ```sh
 pnpm build && pnpm --filter @suite/start start   # the launcher

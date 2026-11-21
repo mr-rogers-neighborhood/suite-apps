@@ -179,8 +179,8 @@ rather than leaving the order to whoever remembers.
 
 ## Packaging
 
-`electron-builder.yml`. The AppImage is the published Linux build; it registers the `.canvas` MIME
-association at runtime, so it works without an installer and without root.
+`electron-builder.yml`. The Flatpak is the published Linux build; it registers the `.canvas` MIME
+association through the packaged desktop entry, so a document opens without a separate installer.
 
 The app claims no URL scheme of its own. `suite://` belongs to Suite Start, which routes a link by
 launching this app with it, and a second scheme that nothing registers would be a promise the app does

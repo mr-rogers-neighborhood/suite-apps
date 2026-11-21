@@ -6,8 +6,8 @@ piece you fetch by hand.
 **You need:** a Linux desktop. The published builds are x86_64.
 
 The install procedure has one owner: [Installing Suite Start](../../apps/start/docs/how-to/install.md).
-It covers the Arch package, the AppImage, the Flatpak, the checksum, the first launch and the error
-messages worth recognising.
+It covers the signed Flatpak remote, `flatpak install`, the first launch and the card states worth
+recognising.
 
 ## Next
 

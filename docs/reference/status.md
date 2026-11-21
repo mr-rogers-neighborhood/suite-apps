@@ -5,11 +5,11 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 
 | Area | State | Notes |
 | --- | --- | --- |
-| Hub: install | Working | Signed feed, checksum, binary placed, menu entry written |
-| Hub: update and rollback | Working | Replaces the managed copy and relaunches; one step back from disk |
-| Hub: uninstall | Working | Versions, entry, icon and record removed; documents untouched |
+| Hub: install | Working | The signed Flatpak remote offers an app; Start asks Flatpak to install it |
+| Hub: update | Working | Compares a deployment with its own origin; Flatpak replaces it; no rollback copy |
+| Hub: uninstall | Working | Asks Flatpak to remove a deployment; a placed copy is forgotten; documents untouched |
 | Hub: routing | Working | `suite://` links and document files open the owning app |
-| Hub: Flatpak | Working | Lists, installs from the store, updates, launches and removes Flatpak installs, including its own deployment |
+| Hub: Flatpak | Working | Start is a Flatpak; it lists, launches, updates through the store and removes Flatpak installs, including its own deployment |
 | Help | Working | Explorer over the generated index and the handbook over `docs/`; ships through Flatpak and Start shows it as a card |
 | Canvas | Alpha | Cards, boards, editor, library and views; opt-in sync through a host; no account or share link, and still changing shape |
 | Planner | Pre-alpha | Day and week views, inbox, capture and estimates; Upcoming, Projects, Tags, Focus and Rituals views; a task detail dialog with rich task notes; sync through a user-run relay ([Planner's Sync](../../apps/planner/docs/reference/sync.md)) |
@@ -19,8 +19,8 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Sync: blind relay | Working | One append-only file per workspace: sealed frames, roles, invites, pinned keys and removals; no code path reads a document |
 | Go | v0 container | Android debug build installs; Scratch proves capture and documents, Canvas is a placeholder, and an installed pack appears on home; [Planner's state](../../apps/go/docs/reference/planner.md); iOS unbuilt; no sync transport |
 | Shared packages | Working | `@suite/contracts`, `files`, `desktop`, `theme`, `ui` are consumed as workspace packages |
-| Linux packaging | Working | AppImage and Flatpak for the document apps and the hub; Help is Flatpak-only; the hub also has an Arch package |
-| Flatpak | Experimental | Local signed store and a published `suite-dev` remote: the hub, the three document apps and Help install and update through Flatpak; [Packaging channels](packaging-channels.md#flatpak) owns the remote |
+| Linux packaging | Working | Flatpak for Canvas, Planner, Budget, Help and Start; the relay ships as a tarball; no AppImage or Arch package |
+| Flatpak | Working | Signed local store and a published `suite-dev` remote: Canvas, Planner, Budget, Help and Start install and update through Flatpak; Start compares a deployment with its own origin; [Packaging channels](packaging-channels.md#flatpak) owns the remote |
 | macOS and Windows | Not built | No signing identity, so nothing is published |
 | Accessibility | Partial | Contrast and start screens are machine-checked; no full manual pass recorded |
 | The gate | Working | Local, at the root; `--fresh` proves a commit rather than a working tree |

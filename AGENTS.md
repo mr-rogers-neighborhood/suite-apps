@@ -33,18 +33,14 @@ See `scripts/ci/` and the README.
 - `vm` is the independent gate. Push the commit you want gated:
   `git push origin main && git push vm main`.
 - `suite-dev` is archived on GitHub; this repository is its successor and owns the
-  build and release scripts. `suite-go` is archived too (no releases, no feed
-  references).
+  build and release scripts. `suite-go` is archived too.
 - `suite-planner`, `suite-budget`, `suite-start` and `suite-sync` are still
-  active. The first three carry the `releases/latest/download` URLs compiled into
-  installed apps; `suite-sync` is the server's separate trust boundary.
+  active. Desktop apps now ship as Flatpaks from the signed OSTree remote;
+  `suite-sync` is the server's separate trust boundary and ships as a tarball.
 - Archiving a repository **keeps its release assets downloadable**; it only
-  stops new releases. That was verified before proposing any archive. So the
-  feed repositories can be archived once the monorepo publishes its own feeds,
-  and doing so does not break an installed app's update path.
-- A single monorepo `releases/latest` cannot serve four different
-  `latest-linux.yml` files. Per-app feeds need per-app tags or a static feed
-  host, and the manifests must point at the new location.
+  stops new releases. There are no per-app `latest-linux.yml` feeds to preserve:
+  the Flatpak remote is the desktop update path, and the relay tarball is the
+  other release artifact.
 
 ## Monorepo rules
 

@@ -9,10 +9,11 @@ answered is narrow: **is the key on this machine the key this tree trusts?** `pn
 | Key | Signs | Algorithm | Private half | Public half pinned in |
 | --- | --- | --- | --- | --- |
 | Pack signing | a domain pack the phone installs | Ed25519 | `pack-key` | `PACK_PUBLIC_KEY`, `apps/go/src/host/packs.ts` |
-| Update signing | a release feed's manifest | Ed25519 | `update-key.pem` | `SUITE_UPDATE_PUBLIC_KEY`, `packages/desktop/src/updateSignature.ts` |
+| Update signing | a relay tarball's `SHA256SUMS` | Ed25519 | `update-key.pem` | `SUITE_UPDATE_PUBLIC_KEY`, `packages/desktop/src/updateSignature.ts` |
 
-The Android release keystore is a third secret with a different job and a separate set of variables;
-[Android](../../apps/go/docs/reference/android.md) owns it and this page does not restate it.
+The Flatpak store key is a third secret with a different job; [Packaging
+channels](../reference/packaging-channels.md#signing) owns it and this page does not restate it. The
+Android release keystore is a fourth, and [Android](../../apps/go/docs/reference/android.md) owns it.
 
 ## Where they live
 
@@ -80,13 +81,11 @@ working: the signature was checked when they were installed, and the pin only de
 installed next. A pack signed with the old key is refused after the pin moves, so the two ship
 together.
 
-**Update key.** Order is the whole problem: an installed build verifies with the key compiled into
-it, so a feed signed with a new key is invisible to every copy already on a machine. Ship a build
-that carries the new pin first, then publish with the new key.
-[Packaging channels](../reference/packaging-channels.md#the-update-key) states the recovery path for
-a rotation that happened in the wrong order, and the decision record says why the order is what it
-is. `scripts/release.mjs` refuses to sign with a key that does not match the pin, before it builds
-anything.
+**Update key.** It signs the relay's checksum list. The relay is installed by hand, so a new tarball
+can carry the new key and the release notes name the fingerprint to compare. `scripts/release.mjs`
+refuses to sign with a key that does not match the pin, before it builds anything. The Flatpak store
+key is separate and rotates on the remote; see [Packaging
+channels](../reference/packaging-channels.md#signing).
 
 ## Back up
 
@@ -96,9 +95,9 @@ same; a key that produces a different one is a different trust root, however sim
 
 What losing each key costs:
 
-- **Update signing key** — nothing can be published that an installed app accepts. Recovery is a new
-  key, a build carrying its pin, one manual install of that build, and only then a feed signed with
-  it.
+- **Update signing key** — the relay tarball cannot be verified against the old pin. Recovery is a new
+  key, a relay release that names the new public half, and that key's fingerprint recorded with the
+  release.
 - **Pack signing key** — a new key and a new pin; packs signed with the old one stop being
   installable, and anything already installed keeps working.
 

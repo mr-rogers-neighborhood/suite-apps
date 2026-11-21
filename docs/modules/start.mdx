@@ -23,15 +23,13 @@ where routing becomes a separate process, and the renderer only ever sees a
 ## apps/start/src/catalogue.ts#CATALOGUE_APPS
 
 The catalogue is the list of apps Start can offer, not a list of what it found.
-A new machine still gets cards that say what exists and what the feed offers,
+A new machine still gets cards that say what exists and what the store offers,
 which is the one answer a front door cannot leave empty.
 
-Each entry names a contract id, a folder and a feed. It does not name a local
-binary; the version and artifact come from the signed feed, and the executable
-comes from the install record. The feed URL is repeated here on purpose because
-an app that is not installed has no manifest to read it from. Suite Help is the
-one entry with no feed: Flatpak installs and updates it, so its card says
-`Flatpak` before the store has answered.
+Each entry names a contract id, a folder and its extensions. It does not name a
+local binary or a feed; Flatpak is the install and update writer, and a folder
+copy is discovered from its own manifest and record. Suite Help is an entry that
+ships only through Flatpak. A pre-release entry shares one id across every tier.
 
 ## apps/start/src/catalogue.ts#catalogueMatchesContracts
 
@@ -69,23 +67,25 @@ install that is complete.
 Every package operation crosses this interface: list, install, update, remove,
 launch, and the record operations the window needs. The window and the
 catalogue consume its data; the native backend is the one module that spawns
-`flatpak` or writes a managed AppImage.
+`flatpak`, reads its list and asks it to change a deployment.
 
 The seam exists because a Flatpak-hosted Start has no writable applications root
 and no `flatpak` binary. It reaches the host through `flatpak-spawn --host`
 behind the same interface, so that grant stays one transport rather than a
 second implementation of installing.
 
-## file: apps/start/src/install.ts
+## file: apps/start/src/flatpak.ts
 
-The order in this file is the safety property. Nothing enters the install
-directory until the download matches the SHA-512 the signed manifest named; the
-new version is staged beside the target and moved into place; the record is
-written only after the executable and manifest exist.
+Flatpak is the writer for every desktop deployment. The top half of this file is
+pure: parse `flatpak list --app --json`, map a suite id to `run.suite.<app>`, and
+build the `flatpak run` argv. The bottom half is the three subprocess calls that
+list, locate and resolve a deployment.
 
-A failed replace puts the previous version back, and an update keeps exactly one
-replaced version for a rollback. An install that fails therefore leaves the
-previous install or nothing, never half of both.
+Start reads the deployment's own `origin` and compares that remote's commit, so a
+copy from `suite-local` is not measured against the public `suite` store. It never
+writes into a Flatpak install tree; install, update, switch and remove are all
+`flatpak` commands. A folder copy a person placed stays a record with Open,
+Reveal and Forget, not a second update path.
 
 ## apps/start/src/route.ts#routeLaunch
 

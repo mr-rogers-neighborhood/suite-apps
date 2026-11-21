@@ -1,7 +1,7 @@
 ---
 id: install-and-launch
 title: Install and launch
-summary: "From the signed manifest to an app process that owns its document."
+summary: "From the suite.app.json shape to a Flatpak launch that owns its document."
 order: 1
 ---
 
@@ -25,9 +25,10 @@ truth the catalogue is later checked against rather than a store of installs.
 
 ## apps/start/src/catalogue.ts#CATALOGUE_APPS
 
-Only now does Start state what it offers. The catalogue adds the channel and the
-signed feed to each contract entry, which is what gives a new machine a card for
-an app that is not installed; its note owns why the feed is compiled in.
+Only now does Start state what it offers. The catalogue adds the release channel
+to each contract entry, which is what gives a new machine a card for an app that
+is not installed. There is no feed here: Flatpak is the install and update writer,
+and the store decides what it offers.
 
 ## apps/start/src/catalogue.ts#catalogueMatchesContracts
 
@@ -36,12 +37,13 @@ The next stop is the guard between those two tables, not a new fact.
 failure names the catalogue entry rather than producing a card for the wrong
 folder.
 
-## apps/start/src/install.ts
+## apps/start/src/flatpak.ts#withFlatpakInstalls
 
-Installation is the first step that writes bytes, which is why it follows the
-offer. Its file note owns the ordering invariant; the test worth knowing is the
-fingerprint mismatch, which must leave the install directory and the record
-exactly as they were.
+Installation belongs to Flatpak, which is why it follows the offer. Discovery
+reads `flatpak list`, maps a suite id to its deployment, and keeps the
+deployment's origin and commit. The invariant is that Start never writes into the
+install tree: install, update, switch and remove are `flatpak` commands, and a
+folder copy is only a record with Open, Reveal and Forget.
 
 ## apps/start/src/registry.ts#discoverApps
 

@@ -17,8 +17,7 @@ No changes yet.
 
 - **Linux ships Flatpak only.** The AppImage and Arch forms are retired, with their signed update
   feeds. Start no longer downloads an AppImage, checks a feed for one, or keeps a second version to
-  roll back to. A copy a person places in a folder still opens, reveals and forgets; Start just does
-  not replace it.
+  roll back to. A placed folder copy keeps Open, Reveal and Forget; Start does not replace it.
 - **An update follows the deployment's own origin.** Start reads the `origin` Flatpak reports for an
   installed app and compares that remote's commit, so a copy installed from `suite-local` is not
   measured against the public `suite` store. The update itself is `flatpak update`, which uses the

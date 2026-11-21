@@ -32,10 +32,10 @@ The owning instructions are in [apps/help/AGENTS.md](../../apps/help/AGENTS.md) 
 
 ## Packaging
 
-Help is Flatpak-only. `packaging/flatpak/run.suite.help.yml` packages the unpacked
-`electron-builder --dir` output, and `node scripts/flatpak.mjs --app help` builds and publishes it
-to the local OSTree repository. There is no AppImage feed: Flatpak installs, updates and removes
-the deployment, and Start lists it like the other apps.
+Help is Flatpak-only, like every desktop app in the suite. `packaging/flatpak/run.suite.help.yml`
+packages the unpacked `electron-builder --dir` output, and `node scripts/flatpak.mjs --app help`
+builds and publishes it to the local OSTree repository. Flatpak installs, updates and removes the
+deployment, and Start lists it like the other apps.
 
 The production renderer is served from `suite-help://app/` with SPA fallback to `index.html`. There
 is no loopback HTTP server and no `next start`.
