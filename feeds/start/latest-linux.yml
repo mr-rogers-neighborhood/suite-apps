@@ -1,9 +1,9 @@
-version: 0.3.14
+version: 0.3.15
 files:
-  - url: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/start-v0.3.14/suite-start-0.3.14-x86_64.AppImage
-    sha512: 2xIDuo90PwNpRiP+bDCEKv/AERS/MevyZRm+BFzsETaCH9+IUTfQrgNOYNrYJ9oIbXLhmIYuQXIOeb3sDr00Lw==
-    size: 127892465
-    blockMapSize: 134149
-path: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/start-v0.3.14/suite-start-0.3.14-x86_64.AppImage
-sha512: 2xIDuo90PwNpRiP+bDCEKv/AERS/MevyZRm+BFzsETaCH9+IUTfQrgNOYNrYJ9oIbXLhmIYuQXIOeb3sDr00Lw==
-releaseDate: '2026-11-20T11:02:36.142Z'
+  - url: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/start-v0.3.15/suite-start-0.3.15-x86_64.AppImage
+    sha512: oKqe5o/Fc4eZIlufg1wzvWlDDWbweMkL2HeQ1UJX2fdOgb5IgBF0tRpMDxpe73HBSMce1wwMLpHeB2yyEDekpg==
+    size: 127867879
+    blockMapSize: 134139
+path: https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/start-v0.3.15/suite-start-0.3.15-x86_64.AppImage
+sha512: oKqe5o/Fc4eZIlufg1wzvWlDDWbweMkL2HeQ1UJX2fdOgb5IgBF0tRpMDxpe73HBSMce1wwMLpHeB2yyEDekpg==
+releaseDate: '2026-11-21T06:17:51.507Z'
