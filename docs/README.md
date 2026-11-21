@@ -22,14 +22,15 @@ Current rules are in [reference/decisions.md](reference/decisions.md). App-speci
 `apps/<app>/docs/`; the app README is the way in. The Canvas handbook remains the user-facing
 interface guide.
 
-## Local reader
+## Suite Help
 
-`pnpm docs:dev` starts the reader at <http://localhost:3001>. It is a development tool: it is not
-deployed, has no telemetry, and is not part of a release.
+`pnpm docs:dev` starts Suite Help, the shipped documentation app. It is offline, has no telemetry,
+and updates through Flatpak.
 
-The explorer indexes every file and declaration and offers the three views above. The notes stay
-plain Markdown and remain readable on GitHub. The explorer is the primary interface; the notes are
-the fallback for facts that cannot be derived.
+The explorer indexes every file and declaration and offers the three views above. The Handbook
+renders these pages with the Fumadocs look. The notes stay plain Markdown and remain readable on
+GitHub. The explorer is the primary interface; the notes are the fallback for facts that cannot be
+derived.
 
 ## App documentation
 
@@ -39,6 +40,7 @@ the fallback for facts that cannot be derived.
 | Planner | [README](../apps/planner/README.md) · [docs](../apps/planner/docs/reference/architecture.md) |
 | Budget | [README](../apps/budget/README.md) · [docs](../apps/budget/docs/reference/architecture.md) |
 | Start | [README](../apps/start/README.md) · [install](../apps/start/docs/how-to/install.md) · [packaging](../apps/start/docs/how-to/package.md) |
+| Help | [README](../apps/help/README.md) · [AGENTS](../apps/help/AGENTS.md) |
 | Sync | [README](../apps/sync/README.md) · [protocol](../apps/sync/docs/protocol.md) · [threat model](../apps/sync/docs/threat-model.md) |
 | Go | [README](../apps/go/README.md) · [contract](../apps/go/docs/reference/contract.md) |
 
@@ -91,8 +93,9 @@ Never restate a version in prose here. Link to the file that holds it.
   duplicates a source file.
 - **One module MDX, not one file MDX.** A module's narrative and its `## <node-id>` notes live in one
   `docs/modules/*.mdx`. The explorer splits it by file and declaration at render time.
-- **The reader is local.** `tools/docs` is a development tool, not an app. It is excluded from the
-  root build and release and never becomes the canonical copy of a page.
+- **The reader is local.** Suite Help (`apps/help`) is the shipped documentation app. It is
+  offline, keeps no canonical copy of a page, and reads the generated index plus `docs/`; Flatpak
+  owns updates.
 - **Neutral voice.** State the fact. No first person, no marketing cadence, no section summary that
   repeats the heading.
 

@@ -1,0 +1,55 @@
+# Suite Help as a Flatpak.
+#
+# Build the unpacked app first, then let this manifest package it:
+#
+#   pnpm --filter @suite/help run package:dir
+#   node scripts/flatpak.mjs --app help
+#
+# The manifest packages what electron-builder produced rather than rebuilding it
+# inside flatpak-builder. `org.electronjs.Electron2.BaseApp` supplies zypak,
+# which gives Electron its sandbox without a setuid chrome-sandbox.
+app-id: run.suite.help
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: run.suite.help
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  # Help reads its generated data and handbook from its own bundle. It has no
+  # network client and no document folder, so the sandbox grants neither.
+
+modules:
+  - name: suite-help
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/help
+      - cp -a app/. /app/help/
+      - install -Dm755 run.suite.help /app/bin/run.suite.help
+      - install -Dm644 run.suite.help.desktop /app/share/applications/run.suite.help.desktop
+      - install -Dm644 run.suite.help.metainfo.xml /app/share/metainfo/run.suite.help.metainfo.xml
+      - install -Dm644 icons/run.suite.help-48.png /app/share/icons/hicolor/48x48/apps/run.suite.help.png
+      - install -Dm644 icons/run.suite.help-64.png /app/share/icons/hicolor/64x64/apps/run.suite.help.png
+      - install -Dm644 icons/run.suite.help-128.png /app/share/icons/hicolor/128x128/apps/run.suite.help.png
+      - install -Dm644 icons/run.suite.help-256.png /app/share/icons/hicolor/256x256/apps/run.suite.help.png
+      - install -Dm644 icons/run.suite.help-512.png /app/share/icons/hicolor/512x512/apps/run.suite.help.png
+    sources:
+      - type: dir
+        path: ../../apps/help/release/linux-unpacked
+        dest: app
+      - type: file
+        path: run.suite.help
+      - type: file
+        path: run.suite.help.desktop
+      - type: file
+        path: run.suite.help.metainfo.xml
+      - type: dir
+        path: icons
+        dest: icons

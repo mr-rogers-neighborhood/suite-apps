@@ -29,7 +29,7 @@
  */
 
 /** The display name an app uses under `~/Documents/Suite` and in its data directory. */
-export type SuiteAppName = "Canvas" | "Planner" | "Budget" | "Start";
+export type SuiteAppName = "Canvas" | "Planner" | "Budget" | "Start" | "Help";
 
 export interface SuitePaths {
   /** Where this app's documents live. */

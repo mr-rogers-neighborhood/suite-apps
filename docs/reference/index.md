@@ -14,6 +14,7 @@ Facts to look up. These pages describe the repository as it is today.
 | [Bridges](bridges.md) | What each renderer's host bridge must provide |
 | [Accessibility](accessibility/wcag-22-map.md) | The WCAG 2.2 criterion map and the manual testing protocol |
 | [Glossary](glossary.md) | The words shared across apps: app, domain, pack, document, workspace |
+| [Suite Help](help.md) | The documentation app: explorer, handbook and Flatpak packaging |
 | [Status](status.md) | What works, per subsystem, and what is missing |
 
 Versions are not listed here. They live in `package.json` and each app's `CHANGELOG.md`.

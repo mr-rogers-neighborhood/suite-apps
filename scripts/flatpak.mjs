@@ -10,6 +10,7 @@
  *   node scripts/flatpak.mjs --app planner   # Planner stable, same path
  *   node scripts/flatpak.mjs --app budget    # Budget stable, same path
  *   node scripts/flatpak.mjs --app start     # Start (the hub) stable, same path
+ *   node scripts/flatpak.mjs --app help      # Help stable, same path
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
  *   node scripts/flatpak.mjs --app planner --channel slop
  *                                            # pre-release id on the slop branch
@@ -80,6 +81,18 @@ const APPS = {
     desktop: join(ROOT, "packaging", "flatpak", "run.suite.budget.desktop"),
     metainfo: join(ROOT, "packaging", "flatpak", "run.suite.budget.metainfo.xml"),
     unpacked: join(ROOT, "apps", "budget", "release", "linux-unpacked"),
+  },
+  help: {
+    id: "run.suite.help",
+    name: "Suite Help",
+    package: "@suite/help",
+    project: join(ROOT, "apps", "help"),
+    folder: "help",
+    binary: "suite-help",
+    manifest: join(ROOT, "packaging", "flatpak", "run.suite.help.yml"),
+    desktop: join(ROOT, "packaging", "flatpak", "run.suite.help.desktop"),
+    metainfo: join(ROOT, "packaging", "flatpak", "run.suite.help.metainfo.xml"),
+    unpacked: join(ROOT, "apps", "help", "release", "linux-unpacked"),
   },
   start: {
     id: "run.suite.start",

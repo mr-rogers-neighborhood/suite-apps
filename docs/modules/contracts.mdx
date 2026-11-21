@@ -53,12 +53,13 @@ the app would silently misread.
 
 ## packages/contracts/src/suiteApps.ts#SUITE_APPS
 
-The table of document apps: id, display name, documents folder and claimed
-extension. It is how Start lists a planner's files without importing Planner,
-and how `~/Documents/Suite/<folder>` and the catalogue stay in agreement.
+The table of apps: id, display name, documents folder and claimed extension.
+It is how Start lists a planner's files without importing Planner, and how
+`~/Documents/Suite/<folder>` and the catalogue stay in agreement.
 
-It is not a store and not a registry. An entry says where a kind of file lives,
-never that an app is installed or which version is present.
+An app that owns no document, such as Suite Help, carries a null extension. The
+table is not a store and not a registry. An entry says where a kind of file
+lives, never that an app is installed or which version is present.
 
 ## packages/contracts/src/paths.ts#suitePaths
 

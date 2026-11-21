@@ -18,8 +18,8 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Sync: blind relay | Working | One append-only file per workspace: sealed frames, roles, invites, pinned keys and removals; no code path reads a document |
 | Go | v0 container | Android debug build installs; Scratch proves capture and documents, Canvas is a placeholder, and an installed pack appears on home; [Planner's state](../../apps/go/docs/reference/planner.md); iOS unbuilt; no sync transport |
 | Shared packages | Working | `@suite/contracts`, `files`, `desktop`, `theme`, `ui` are consumed as workspace packages |
-| Linux packaging | Working | AppImage and Flatpak for the apps and the hub; the hub also has an Arch package |
-| Flatpak | Experimental | Local signed store and a published `suite-dev` remote: the hub and the three apps install and update through Flatpak; [Packaging channels](packaging-channels.md#flatpak) owns the remote |
+| Linux packaging | Working | AppImage and Flatpak for the document apps and the hub; Help is Flatpak-only; the hub also has an Arch package |
+| Flatpak | Experimental | Local signed store and a published `suite-dev` remote: the hub, the three document apps and Help install and update through Flatpak; [Packaging channels](packaging-channels.md#flatpak) owns the remote |
 | macOS and Windows | Not built | No signing identity, so nothing is published |
 | Accessibility | Partial | Contrast and start screens are machine-checked; no full manual pass recorded |
 | The gate | Working | Local, at the root; `--fresh` proves a commit rather than a working tree |

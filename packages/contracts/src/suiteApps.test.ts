@@ -5,13 +5,18 @@ import { appDocumentsFolder, SUITE_APPS, suiteDocumentsRoot } from "./suiteApps.
 const HOME = "/home/me";
 
 describe("SUITE_APPS", () => {
-  it("lists the three document apps once each", () => {
-    expect(SUITE_APPS.map((entry) => entry.id)).toEqual(["canvas", "planner", "budget"]);
-    expect(new Set(SUITE_APPS.map((entry) => entry.folder)).size).toBe(3);
+  it("lists the document apps and the document-free Help app once each", () => {
+    expect(SUITE_APPS.map((entry) => entry.id)).toEqual(["canvas", "planner", "budget", "help"]);
+    expect(new Set(SUITE_APPS.map((entry) => entry.folder)).size).toBe(4);
   });
 
-  it("claims an extension per app that is not the app's own name twice over", () => {
-    expect(SUITE_APPS.map((entry) => entry.extension)).toEqual(["canvas", "planner", "budget"]);
+  it("claims an extension per document app and none for Help", () => {
+    expect(SUITE_APPS.map((entry) => entry.extension)).toEqual([
+      "canvas",
+      "planner",
+      "budget",
+      null,
+    ]);
   });
 });
 

@@ -11,10 +11,11 @@ The rules that shape this repository. Each is current; the code follows it.
 - The gate is local. `--fresh` proves a commit, not the working tree. No CI service gates a pull
   request.
 - `@suite/desktop` is shared Electron policy. Canvas's shell is `@suite/canvas-desktop`.
-- `tools/docs` is the local documentation reader, not an app and not a shipped surface. It indexes
-  every file and declaration, generates its reference tree from `docs/`, and keeps module notes in
-  `docs/modules/` and tours in `docs/tours/`. It is excluded from the root build and release. `docs/`
-  and each app's `docs/` remain the source of truth.
+- Suite Help (`apps/help`) is the documentation reader and it is a shipped app. It indexes every
+  file and declaration, renders the handbook from `docs/`, and keeps module notes in
+  `docs/modules/` and tours in `docs/tours/`. It is Vite + React Router + Fumadocs headless in an
+  Electron shell, served from `suite-help://app/`; Flatpak owns updates. `docs/` and each app's
+  `docs/` remain the source of truth.
 - The reader is not organized by Diátaxis. Browser, Modules and Tours are the structure over one code
   index; reference facts are generated, and module MDX plus tours are the prose layer. Prose is
   authored only after a person reviews it and adds `reviewed: human` to the module or tour
@@ -40,8 +41,9 @@ The rules that shape this repository. Each is current; the code follows it.
 
 - Start replaces only a file it can write. It installs, updates and removes the apps it placed, and
   asks Flatpak to install or update a deployment. It does not update a copy a person placed.
-- The three apps and the hub ship as AppImage and Flatpak; the hub also ships an Arch package. `deb`
-  is not a configured target, and `rpm` and `snap` were never built.
+- The three document apps and the hub ship as AppImage and Flatpak; the hub also ships an Arch
+  package. Help ships only as a Flatpak, with no AppImage feed. `deb` is not a configured target,
+  and `rpm` and `snap` were never built.
 - Flatpak is a second channel: Start lists and launches installs, installs from the store, updates a
   deployment whose commit is behind, and removes through Flatpak. Flatpak is the writer, never Start.
   The hub can be a Flatpak too, with its own `run.suite.start` deployment.

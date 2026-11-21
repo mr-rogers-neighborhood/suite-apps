@@ -10,8 +10,8 @@ including who is allowed to update it.
 | **Arch package** | deploying into the host's package registry      | **root**, under `/opt`                     | the package manager         | yes                                 |
 | **Flatpak**      | a container runtime for desktop apps            | Flatpak (user or system), inside a sandbox | an OSTree remote            | no for `--user`, yes for `--system` |
 
-The three apps and the hub ship as AppImage and Flatpak; only the hub has the Arch package. `deb` is
-no longer a configured target, and `rpm` and `snap` were never built.
+The three document apps and the hub ship as AppImage and Flatpak; only the hub has the Arch package.
+Help is Flatpak-only. `deb` is no longer a configured target, and `rpm` and `snap` were never built.
 
 ## The rule this repository is built on
 

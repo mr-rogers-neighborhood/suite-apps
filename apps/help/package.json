@@ -1,0 +1,69 @@
+{
+  "name": "@suite/help",
+  "productName": "Suite Help",
+  "desktopName": "run.suite.help",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Suite Help: the repository's handbook and code explorer, shipped as a local-first desktop app.",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "index": "node scripts/index-code.mjs",
+    "index:check": "node scripts/index-code.mjs --check",
+    "sync": "node scripts/sync-docs.mjs",
+    "coverage": "node scripts/coverage.mjs",
+    "explain": "node scripts/explain.mjs",
+    "clean": "node scripts/clean.mjs",
+    "build": "node scripts/index-code.mjs && node scripts/sync-docs.mjs && electron-vite build",
+    "dev": "node scripts/index-code.mjs && node scripts/sync-docs.mjs && electron-vite dev",
+    "preview": "electron-vite preview",
+    "start": "electron .",
+    "package:dir": "pnpm build && electron-builder --dir",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "check": "biome check . && pnpm typecheck && vitest run",
+    "check:full": "pnpm check && pnpm build"
+  },
+  "dependencies": {
+    "@suite/desktop": "workspace:*",
+    "fumadocs-core": "16.19.5",
+    "fumadocs-mdx": "15.6.4",
+    "lucide-react": "^1.71.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-markdown": "^10.1.0",
+    "react-router": "^8.5.1",
+    "remark-gfm": "^4.0.1",
+    "shiki": "^4.6.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "@tailwindcss/vite": "^4.3.4",
+    "@types/mdx": "^2.0.14",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "electron": "^45.2.2",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^6.0.0",
+    "jsdom": "^30.1.3",
+    "tailwindcss": "^4.3.4",
+    "ts-morph": "^28.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "5.1.0",
+    "yaml": "^2.9.1"
+  },
+  "author": {
+    "name": "Suite contributors",
+    "email": "maintainers@suite.run"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@12.17.0",
+  "engines": {
+    "node": ">=22"
+  }
+}
