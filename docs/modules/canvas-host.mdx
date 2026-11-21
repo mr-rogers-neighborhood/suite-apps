@@ -70,7 +70,7 @@ happened is a control that silently does nothing.
 
 ## apps/canvas/src/host/bridge.ts#REQUIRED_BRIDGE_METHODS
 
-The list is literally what this build calls, not every method the current
+The list is what this build requires from the bridge, not every method the current
 preload happens to publish. A window keeps the preload it loaded at launch, so a
 method added since then is absent while the marker is still present. Adding a
 method to the bridge means adding it here; otherwise the renderer can call

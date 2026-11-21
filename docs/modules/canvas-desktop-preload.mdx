@@ -12,7 +12,7 @@ second way in.
 
 It deliberately does not own what a channel does. The handlers, the sender check
 and the file rules live in `src/main`; the channel constants live in
-`src/shared/ipc.ts`; the TypeScript shape the renderer sees lives in
+`src/shared/ipc.ts`; the document bridge's TypeScript shape lives in
 `src/host/bridge.ts`. The preload is CommonJS on purpose: a sandboxed preload has
 no ESM and only a small set of built-ins, so it cannot import the shared
 constants and must spell the names out.
