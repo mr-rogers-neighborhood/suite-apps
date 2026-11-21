@@ -288,11 +288,17 @@ h3 {
   margin-left: auto;
 }
 
-/* The risk and removal path are prose, not colour: the badge is the label, this is
-   the sentence that makes it a warning. */
-.card-channel-notice {
-  border-left: 2px solid var(--hairline);
-  padding-left: 8px;
+/* The pre-release section's one caution, written once for the group rather than
+   repeated on every card. */
+.section-note {
+  margin: 0 0 12px;
+  max-width: 72ch;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.section-note code {
+  font-size: inherit;
 }
 
 .card-version,

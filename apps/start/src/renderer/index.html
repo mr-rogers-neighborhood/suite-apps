@@ -95,6 +95,22 @@
             Nothing to show yet. Use <strong>Add app…</strong> to pick an application's
             executable.
           </p>
+          <section
+            id="apps-pre-release"
+            class="app-section"
+            aria-labelledby="apps-pre-release-title"
+            hidden
+          >
+            <h3 id="apps-pre-release-title">Pre-release</h3>
+            <p class="section-note">
+              Pre-release builds may be broken, incomplete, or change shape without notice.
+              Each app has one pre-release install shared by the slop, canary and beta tiers:
+              switching tiers keeps that install and changes its data folder. Pre-release
+              documents live in <code>Suite Slop</code>, separate from stable, and
+              uninstalling asks before deleting them.
+            </p>
+            <ul id="apps-pre-release-list" class="cards"></ul>
+          </section>
         </section>
 
         <section id="panel-files" role="tabpanel" aria-labelledby="tab-files" hidden>

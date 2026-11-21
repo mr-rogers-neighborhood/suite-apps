@@ -506,8 +506,10 @@ async function state(): Promise<LauncherState> {
 
   // The hub cannot replace its own running binary, so it says what it is rather than
   // offering a button that would fail. A Flatpak deployment is the one exception:
-  // Flatpak is its writer, so the row can ask Flatpak for the newest build.
+  // Flatpak is its writer, so the row can ask Flatpak for the newest build. The
+  // button appears only when that deployment's own origin publishes another commit.
   const flatpakId = sandboxId();
+  const selfUpdateCheck = await backend.checkSelfUpdate();
   return {
     apps: cards,
     recents: recentCards,
@@ -526,9 +528,10 @@ async function state(): Promise<LauncherState> {
         ? null
         : selfCard(self, app.getVersion(), {
             ...(flatpakId === null ? {} : { flatpak: true }),
-            ...(flatpakId === SELF_FLATPAK_ID ? { canUpdate: true } : {}),
+            ...(selfUpdateCheck.checked ? { checked: true } : {}),
+            ...(selfUpdateCheck.available ? { canUpdate: true } : {}),
             updated: selfUpdate.done,
-            error: selfUpdate.error,
+            error: selfUpdate.error ?? selfUpdateCheck.error,
           }),
     installing: [...installProgress.values()],
     launchErrors: Object.fromEntries(launchFailures),

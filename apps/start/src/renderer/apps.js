@@ -141,12 +141,6 @@ function appCard(card, actions, progress, launchError) {
   if (problem !== null) line.dataset.state = "failed";
   node.append(line);
 
-  // A badge is not a warning. A pre-release says the risk and the removal path in
-  // words, on the card, before anything is pressed.
-  if (card.channelNotice !== null) {
-    node.append(el("p", "card-meta card-channel-notice", card.channelNotice));
-  }
-
   if (card.version !== null) {
     const opens = card.fileExtensions.join(", ") || "no files";
     node.append(el("p", "card-meta", `Opens ${opens} · ${relativeTime(card.lastOpenedAt)}`));
@@ -173,13 +167,23 @@ function selfRow(card) {
   title.append(el("span", "card-name", card.name), el("span", "card-version", card.version));
   node.append(title);
 
-  const why = card.reason ?? "no release found";
-  const sentence = `${why.charAt(0).toUpperCase()}${why.slice(1)}.`;
+  const reason = card.reason ?? null;
+  const sentence = reason === null ? "" : `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`;
   const canUpdate = card.source === "flatpak" && card.state === "update-available";
 
-  const says = canUpdate
-    ? `${sentence} Update asks Flatpak for the newest build.`
-    : `${sentence} Start cannot replace its own running binary.`;
+  let says;
+  if (canUpdate) {
+    says = `${sentence} Update asks Flatpak for the newest build.`.trim();
+  } else if (card.source === "flatpak") {
+    // A Flatpak that is current, unchecked or failed says only what it knows.
+    says = sentence;
+  } else {
+    // A copy Start did not install has no writer it may ask to replace it.
+    says =
+      sentence.length > 0
+        ? `${sentence} Start cannot replace its own running binary.`
+        : "Start cannot replace its own running binary.";
+  }
   const note = el("p", "card-meta card-self-note", says);
 
   if (canUpdate) {
@@ -190,6 +194,23 @@ function selfRow(card) {
   }
   node.append(note);
   return node;
+}
+
+/** The two pre-release id forms, current and the one older builds wrote. */
+const PRE_RELEASE_PREFIXES = ["slop-", "slop."];
+
+/** Whether a card belongs in the pre-release section rather than the stable list. */
+export function isPreReleaseCard(card) {
+  const id = card.id ?? "";
+  return PRE_RELEASE_PREFIXES.some((prefix) => id.startsWith(prefix) && id.length > prefix.length);
+}
+
+/** Split the (already filtered) cards into the stable list and the pre-release section. */
+export function partitionCards(cards) {
+  const stable = [];
+  const preRelease = [];
+  for (const card of cards) (isPreReleaseCard(card) ? preRelease : stable).push(card);
+  return { stable, preRelease };
 }
 
 /**
@@ -205,11 +226,17 @@ export function renderApps(state, actions) {
   if (!list || !empty) return;
   list.replaceChildren();
 
+  const section = document.getElementById("apps-pre-release");
+  const preReleaseList = document.getElementById("apps-pre-release-list");
+  if (section && preReleaseList) preReleaseList.replaceChildren();
+
   const progressById = new Map((state.installing ?? []).map((entry) => [entry.id, entry]));
   const launchErrors = state.launchErrors ?? {};
+  const { stable, preRelease } = partitionCards(state.apps);
   empty.hidden = state.apps.length > 0;
-  for (const card of state.apps) {
-    list.append(
+
+  const draw = (parent, card) =>
+    parent.append(
       appCard(
         card,
         actions,
@@ -217,6 +244,19 @@ export function renderApps(state, actions) {
         card.id === null ? null : (launchErrors[card.id] ?? null),
       ),
     );
-  }
+
+  // Stable cards stay a plain list; the hub's own row closes it.
+  for (const card of stable) draw(list, card);
   if (state.self) list.append(selfRow(state.self));
+
+  // Pre-release cards get one heading and one caution between them, and no
+  // section at all when the filter leaves none.
+  if (section && preReleaseList) {
+    for (const card of preRelease) draw(preReleaseList, card);
+    section.hidden = preRelease.length === 0;
+  } else {
+    // The page always ships the section; a caller without it still gets every card
+    // rather than silently dropping the pre-release ones.
+    for (const card of preRelease) draw(list, card);
+  }
 }
