@@ -57,19 +57,44 @@ function matches(draft: RuleDraft, condition: RuleCondition, context: RuleContex
   if (condition.field === "amount") {
     return matchesAmount(draft.amountMinor, condition, context);
   }
-  const actual = fieldValue(draft, condition.field);
-  return compare(actual, condition.op, condition.value);
+  return matchAny(fieldValues(draft, condition.field), condition);
 }
 
-function fieldValue(draft: RuleDraft, field: RuleCondition["field"]): string {
-  if (field === "importedPayee") return draft.importedPayee;
-  if (field === "payee") return draft.payeeName;
-  if (field === "account") return draft.accountId || draft.accountName;
-  if (field === "category") return draft.categoryId || draft.categoryName;
-  if (field === "date") return draft.date;
-  if (field === "memo") return draft.memo;
-  if (field === "cleared") return draft.cleared;
-  return "";
+/**
+ * A record can be named by id or by the text a person sees. The rule editor takes the id for a
+ * category action but a typed name for a condition, so both have to count for `category` and
+ * `account`; matching only the id made every name-typed condition silently false.
+ */
+function fieldValues(draft: RuleDraft, field: RuleCondition["field"]): string[] {
+  if (field === "importedPayee") return [draft.importedPayee];
+  if (field === "payee") return [draft.payeeName];
+  if (field === "account") return identifiers(draft.accountId, draft.accountName);
+  if (field === "category") return identifiers(draft.categoryId, draft.categoryName);
+  if (field === "date") return [draft.date];
+  if (field === "memo") return [draft.memo];
+  if (field === "cleared") return [draft.cleared];
+  return [""];
+}
+
+function identifiers(...values: (string | null)[]): string[] {
+  const present = values.filter((value): value is string => Boolean(value && value.length > 0));
+  return present.length > 0 ? present : [""];
+}
+
+/**
+ * Positive operators match when any candidate does; negative ones only when every candidate
+ * does. `account isNot Checking` must stay false for a record whose name is Checking even
+ * though its id differs from the typed text.
+ */
+function matchAny(values: readonly string[], condition: RuleCondition): boolean {
+  const positive =
+    condition.op === "is" ||
+    condition.op === "contains" ||
+    condition.op === "oneOf" ||
+    condition.op === "matches";
+  return positive
+    ? values.some((value) => compare(value, condition.op, condition.value))
+    : values.every((value) => compare(value, condition.op, condition.value));
 }
 
 function matchesAmount(
@@ -77,6 +102,17 @@ function matchesAmount(
   condition: RuleCondition,
   context: RuleContext,
 ): boolean {
+  if (condition.op === "oneOf" || condition.op === "notOneOf") {
+    const values = condition.value
+      .split("|")
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0)
+      .map((part) => parseMoney(part, context.currency, context.currencyScale));
+    if (values.length > 0 && values.every((parsed) => parsed.isOk())) {
+      const match = values.some((parsed) => parsed.isOk() && parsed.value === amountMinor);
+      return condition.op === "oneOf" ? match : !match;
+    }
+  }
   const parsed = parseMoney(condition.value, context.currency, context.currencyScale);
   if (parsed.isOk()) return compareNumber(amountMinor, condition.op, parsed.value);
   return compare(String(amountMinor), condition.op, condition.value);

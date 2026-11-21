@@ -237,17 +237,15 @@ function PayeeDialog({
                     defaultCategoryId,
                   });
                 } else if (record) {
-                  const nextName = name.trim();
                   replica.document.batch(() => {
+                    // Rename first: it is the call that can refuse (a duplicate name), and a
+                    // refused rename must not leave the other fields applied.
+                    replica.document.renamePayee(record.id, name.trim());
                     replica.document.updatePayee(record.id, {
-                      name: nextName,
                       defaultCategoryId,
                       learn,
                       archivedAt: archived ? (record.archivedAt ?? new Date().toISOString()) : null,
                     });
-                    if (nextName !== record.name) {
-                      replica.document.learnPayeeName(record.name, nextName);
-                    }
                   });
                 }
                 onClose();

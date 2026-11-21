@@ -66,13 +66,16 @@ export function upsertLearnedCategoryRule(
   categoryId: string,
   now: Date = new Date(),
 ): Rule {
+  const needle = payeeName.trim().toLowerCase();
   const existing = listRules(doc).find(
     (rule) =>
       rule.source === "learned" &&
       rule.conditions.length === 1 &&
       rule.conditions[0]?.field === "payee" &&
       rule.conditions[0]?.op === "is" &&
-      rule.conditions[0]?.value === payeeName,
+      // Rule matching compares names case-insensitively, so learning one must not add a second
+      // rule for "shop" beside "Shop".
+      rule.conditions[0]?.value.trim().toLowerCase() === needle,
   );
   if (existing) {
     return updateRule(

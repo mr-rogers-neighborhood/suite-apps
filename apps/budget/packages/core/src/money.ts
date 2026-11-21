@@ -49,8 +49,10 @@ export function parseMoney(
   const parenthesised = trimmed.startsWith("(") && trimmed.endsWith(")");
   const cleaned = trimmed.replace(/[^\d.,-]/g, "");
   const negative = parenthesised || cleaned.startsWith("-");
-  const unsigned = cleaned.replace(/-/g, "");
-  if (unsigned.length === 0) {
+  // A minus is a sign only in the leading position. `1-2`, `--5` and `(12-00)` are typos,
+  // not amounts, and must not be read as if the stray sign were not there.
+  const unsigned = cleaned.startsWith("-") ? cleaned.slice(1) : cleaned;
+  if (unsigned.length === 0 || unsigned.includes("-")) {
     return err(new MoneyError("not-a-number", `"${input}" is not an amount`));
   }
 
@@ -77,6 +79,18 @@ export function parseMoney(
       decimalIndex = index;
     } else {
       thousands = separator;
+    }
+  }
+
+  if (thousands) {
+    // A thousands separator has to group the integer part in threes: `1,234,567` or
+    // `1.234.567`, not `1,23,456` or `1.2.3`. Without this check the separators are stripped
+    // and a typo becomes a much larger amount.
+    const integerEnd = decimalIndex >= 0 ? decimalIndex : unsigned.length;
+    const groups = unsigned.slice(0, integerEnd).split(thousands);
+    const [lead = "", ...rest] = groups;
+    if (lead.length < 1 || lead.length > 3 || rest.some((group) => group.length !== 3)) {
+      return err(new MoneyError("not-a-number", `"${input}" is not an amount`));
     }
   }
 

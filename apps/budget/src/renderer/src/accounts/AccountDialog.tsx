@@ -1,4 +1,4 @@
-import { type AccountType, parseMoney } from "@suite/budget-core";
+import { type AccountType, formatMoneyPlain, parseMoney } from "@suite/budget-core";
 import { Button } from "@suite/ui";
 import { useEffect, useRef, useState } from "react";
 import { Field, TextInput } from "../components/Field";
@@ -50,7 +50,7 @@ export function AccountDialog() {
     setNote(account?.note ?? "");
     setCreditLimit(
       account?.creditLimitMinor
-        ? String(account.creditLimitMinor / 10 ** snapshot.settings.currencyScale)
+        ? formatMoneyPlain(account.creditLimitMinor, snapshot.settings.currencyScale)
         : "",
     );
     setError(null);

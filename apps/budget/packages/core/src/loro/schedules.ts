@@ -128,6 +128,11 @@ export function enterSchedule(
   now: Date = new Date(),
 ): { schedule: Schedule; transactionId: string } {
   const schedule = requireSchedule(doc, id);
+  // The upcoming list already hides dates past the end, but a stale window can still ask.
+  // Entering an ended schedule would post beyond the plan and then keep advancing.
+  if (schedule.endDate && schedule.nextDate > schedule.endDate) {
+    throw new ScheduleError("ended", "This schedule ended before its next date");
+  }
   const transaction = createTransaction(
     doc,
     {
