@@ -29,12 +29,14 @@ import { spawnSync } from "node:child_process";
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import {
+  chmod,
   copyFile,
   mkdir,
   mkdtemp,
   readdir,
   readFile,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -60,6 +62,44 @@ export const FEED_FILE = "latest-linux.yml";
  * proof only when everything between the proven commit and HEAD stays here.
  */
 export const FEED_ROOT = "feeds/";
+
+/** The relay's artifact id, and the name its launcher installs as. */
+export const RELAY_ARTIFACT_ID = "suite-sync";
+
+/** The architecture token in a relay tarball name, from Node's `process.arch`. */
+const RELAY_ARCHES = { x64: "x86_64", arm64: "aarch64" };
+
+/**
+ * A `pnpm deploy` tree carries the workspace's source, scripts and lockfiles.
+ *
+ * The relay needs the built CLI and its runtime dependencies; the rest either
+ * describes a checkout the target does not have, or would invite a reader to
+ * think the artifact was assembled by hand.
+ */
+const RELAY_DROP = [
+  "src",
+  "packages",
+  "scripts",
+  "dist/release",
+  "node_modules/.pnpm",
+  "node_modules/.modules.yaml",
+  "node_modules/.pnpm-workspace-state-v1.json",
+  ".husky",
+  "docs",
+  "deploy",
+  "tsconfig.json",
+  "tsconfig.build.json",
+  "tsconfig.base.json",
+  "biome.json",
+  "vitest.config.ts",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  ".gitignore",
+  "CHANGELOG.md",
+  "SECURITY.md",
+  "ACCESSIBILITY.md",
+  "README.md",
+];
 
 /**
  * Every app this repository publishes.
@@ -109,13 +149,24 @@ export const APPS = {
     manifest: "apps/budget/suite.app.json",
     pkgbuild: null,
   },
+  sync: {
+    id: "sync",
+    name: "Suite Sync",
+    package: "@suite/sync-server",
+    project: "apps/sync",
+    changelog: "apps/sync/CHANGELOG.md",
+    output: "apps/sync/dist/release",
+    manifest: null,
+    pkgbuild: null,
+    kind: "relay",
+  },
 };
 
 const USAGE = `usage: node scripts/release.mjs <app-id> [options]
 
-  --publish           upload the release and commit the feed (default: dry run)
+  --publish           upload the release (an app path also commits its feed)
   --dry-run           stop before every network write; the default
-  --verify            re-read the published feed and verify its signature
+  --verify            verify the published feed, or the local relay artifact
   --tag <name>        release tag (default: <app>-v<version>)
   --notes-file <path> release notes (default: the version's changelog section)
   --feed-dir <path>   also copy the artifact, manifest and signature into a folder
@@ -148,6 +199,186 @@ export function manifestUrl(app) {
 /** The base a manifest's artifact URLs resolve against: this app's release tag. */
 export function releaseAssetBase(app, version) {
   return `https://github.com/${RELEASE_REPO}/releases/download/${tagFor(app, version)}/`;
+}
+
+/** The architecture token a relay tarball is named with. */
+export function relayArchitecture(arch = process.arch) {
+  const token = RELAY_ARCHES[arch];
+  if (token === undefined) {
+    throw new Error(`no relay artifact for ${arch}; build on x86_64 or aarch64`);
+  }
+  return token;
+}
+
+/** `suite-sync-<version>-<arch>.tar.gz`, the one naming scheme the docs and the script share. */
+export function relayArtifactName(version, arch = process.arch) {
+  return `${RELAY_ARTIFACT_ID}-${version}-${relayArchitecture(arch)}.tar.gz`;
+}
+
+/**
+ * The checksum list the update key signs.
+ *
+ * `sha256sum -c` reads this format directly, so a person verifies the tarball
+ * with the tool they already have rather than a script this project invented.
+ */
+export function relayChecksumList({ name, sha256 }) {
+  if (!/^[0-9a-f]{64}$/u.test(sha256)) throw new Error(`not a sha256 digest: ${sha256}`);
+  if (!/^[A-Za-z0-9._-]+$/u.test(name)) throw new Error(`not a plain artifact name: ${name}`);
+  return `${sha256}  ${name}\n`;
+}
+
+/**
+ * The launcher the tarball installs as `suite-sync`.
+ *
+ * Start spawns the binary directly, so this has to be an executable that finds
+ * its own tree. It also has to be honest about the runtime: the artifact ships
+ * JavaScript, not Node.
+ */
+export function relayLauncher() {
+  return [
+    "#!/bin/sh",
+    "# Suite Sync relay launcher.",
+    "#",
+    "# The relay is JavaScript. This tarball does not bundle a Node runtime: the host",
+    "# needs Node.js 22 or later. The checks below name that instead of failing with a",
+    "# module error someone has to decode.",
+    "set -eu",
+    "",
+    "self=$0",
+    "# Follow the link `/usr/local/bin/suite-sync -> /opt/suite-sync/bin/suite-sync`.",
+    "if command -v readlink >/dev/null 2>&1; then",
+    '  resolved=$(readlink -f -- "$self" 2>/dev/null || true)',
+    '  if [ -n "$resolved" ]; then self=$resolved; fi',
+    "fi",
+    'root=$(CDPATH= cd -- "$(dirname -- "$self")/.." && pwd)',
+    "",
+    "if ! command -v node >/dev/null 2>&1; then",
+    '  echo "suite-sync: Node.js 22 or later is required, but no node was found on PATH." >&2',
+    '  echo "Install Node.js 22 or later and run this launcher again." >&2',
+    "  exit 127",
+    "fi",
+    "",
+    "major=$(node -p \"process.versions.node.split('.')[0]\" 2>/dev/null || echo 0)",
+    'case "$major" in',
+    "  ''|*[!0-9]*) major=0 ;;",
+    "esac",
+    'if [ "$major" -lt 22 ]; then',
+    '  echo "suite-sync: Node.js 22 or later is required; this node is $(node --version 2>/dev/null || echo unknown)." >&2',
+    "  exit 1",
+    "fi",
+    "",
+    'exec node "$root/dist/cli.js" "$@"',
+    "",
+  ].join("\n");
+}
+
+/** The README inside the tarball, whose runtime section is part of the contract. */
+export function relayReadme(version, arch = process.arch) {
+  return [
+    `# Suite Sync relay ${version}`,
+    "",
+    "`suite-sync` is the blind mailbox two Suite devices sync through. It stores",
+    "encrypted frames and cannot read, merge or render a document.",
+    "",
+    "## Runtime requirement",
+    "",
+    "This tarball contains the built CLI and its JavaScript dependencies. It does **not**",
+    "contain a Node.js runtime: install **Node.js 22 or later** on this machine. The",
+    "launcher refuses to start, with a message that says so, when `node` is missing or",
+    "older than 22.",
+    "",
+    "## Run it",
+    "",
+    "```sh",
+    "./bin/suite-sync --version",
+    "./bin/suite-sync status",
+    "./bin/suite-sync serve --host 127.0.0.1 --trust-all --store ./store",
+    "```",
+    "",
+    "`--trust-all` is required until there is a device registry. On any address other",
+    "than loopback it also needs `--trust-all-remote`; read the relay guide before",
+    "exposing it.",
+    "",
+    "## Install",
+    "",
+    "```sh",
+    "sudo install -d /opt/suite-sync",
+    `sudo tar -xzf ${relayArtifactName(version, arch)} -C /opt`,
+    "sudo ln -sf /opt/suite-sync/bin/suite-sync /usr/local/bin/suite-sync",
+    "```",
+    "",
+    "The repository's `apps/sync/docs/how-to/relay.md` has the download, checksum and",
+    "signature verification steps, the systemd unit, and how Suite Start finds the",
+    "binary through `SUITE_SYNC_BIN` or `PATH`.",
+    "",
+  ].join("\n");
+}
+
+/**
+ * Verify a local relay release folder the way the docs tell a person to.
+ *
+ * The update key signs `SHA256SUMS`; the tarball is verified by the checksum the
+ * signed list names. Nothing here trusts the filename the tarball arrived under.
+ */
+export async function verifyRelayArtifact({
+  dir,
+  version,
+  publicKey,
+  arch = process.arch,
+}) {
+  const name = relayArtifactName(version, arch);
+  let checksums;
+  try {
+    checksums = await readFile(join(dir, "SHA256SUMS"), "utf8");
+  } catch {
+    return { ok: false, reason: "SHA256SUMS is missing", artifact: null };
+  }
+
+  let signatureText;
+  try {
+    signatureText = await readFile(join(dir, "SHA256SUMS.sig"), "utf8");
+  } catch {
+    return { ok: false, reason: "SHA256SUMS.sig is missing", artifact: null };
+  }
+
+  const bytes = Buffer.from(checksums);
+  const signature = Buffer.from(signatureText.trim(), "base64");
+  if (!signatureVerifies(bytes, signature, publicKey)) {
+    return {
+      ok: false,
+      reason: "SHA256SUMS is not signed by the publisher's key",
+      artifact: null,
+    };
+  }
+
+  const line = checksums.split(/\r?\n/u).find((entry) => entry.trim().length > 0);
+  const match = /^([0-9a-f]{64}) [ *](.+)$/u.exec(line ?? "");
+  if (match === null) {
+    return { ok: false, reason: "SHA256SUMS names no checksum", artifact: null };
+  }
+  const [, expected, listed] = match;
+  if (listed !== name) {
+    return {
+      ok: false,
+      reason: `SHA256SUMS names ${String(listed)}, not ${name}`,
+      artifact: null,
+    };
+  }
+
+  const artifactPath = join(dir, name);
+  if (!existsSync(artifactPath)) {
+    return { ok: false, reason: `${name} is missing`, artifact: null };
+  }
+  const actual = await sha256OfFile(artifactPath);
+  if (actual !== expected) {
+    return {
+      ok: false,
+      reason: `${name} has sha256 ${actual}, not ${String(expected)}`,
+      artifact: name,
+    };
+  }
+
+  return { ok: true, reason: null, artifact: name };
 }
 
 /** The version a `package.json` names, or null when it names none. */
@@ -579,6 +810,92 @@ async function sha256OfFile(path) {
 }
 
 /**
+ * Assemble the relay tarball from a deployed tree.
+ *
+ * `pnpm deploy` is what makes the artifact runnable on a machine with no
+ * workspace: it copies `@suite/host`, `@suite/sync` and their dependencies into
+ * one tree. The hoisted linker is deliberate; the default layout leaves
+ * symlinks into `.pnpm`, and an archive that keeps a link and drops its target
+ * starts here and fails there.
+ */
+async function buildRelayArtifact({ app, version, outputDir, arch = process.arch }) {
+  const work = await mkdtemp(join(tmpdir(), "suite-relay-"));
+  const stage = join(work, RELAY_ARTIFACT_ID);
+
+  try {
+    run("pnpm", [
+      "--config.node-linker=hoisted",
+      "deploy",
+      "--filter",
+      app.package,
+      "--prod",
+      stage,
+    ]);
+    if (!existsSync(join(stage, "dist/cli.js"))) {
+      throw new Error("the deploy produced no dist/cli.js");
+    }
+
+    for (const unwanted of RELAY_DROP) {
+      await rm(join(stage, unwanted), { recursive: true, force: true });
+    }
+
+    if (!existsSync(join(stage, "LICENSE"))) {
+      await copyFile(join(ROOT, app.project, "LICENSE"), join(stage, "LICENSE"));
+    }
+
+    // The deployed package.json still names the workspace paths it was built
+    // from. The artifact needs the version and the module type, not a map of
+    // the publisher's disk.
+    const deployed = JSON.parse(await readFile(join(stage, "package.json"), "utf8"));
+    await writeFile(
+      join(stage, "package.json"),
+      `${JSON.stringify(
+        {
+          name: RELAY_ARTIFACT_ID,
+          version,
+          description: deployed.description,
+          type: "module",
+          bin: { [RELAY_ARTIFACT_ID]: "./dist/cli.js" },
+          license: "MIT",
+          engines: deployed.engines ?? { node: ">=22" },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await writeFile(join(stage, "README.md"), relayReadme(version, arch));
+
+    await mkdir(join(stage, "bin"), { recursive: true });
+    const launcher = join(stage, "bin", RELAY_ARTIFACT_ID);
+    await writeFile(launcher, relayLauncher());
+    await chmod(launcher, 0o755);
+    await chmod(join(stage, "dist/cli.js"), 0o755);
+
+    await mkdir(outputDir, { recursive: true });
+    const name = relayArtifactName(version, arch);
+    const artifactPath = join(outputDir, name);
+    // Same inputs, same bytes: sort entries and pin the metadata tar and gzip
+    // would otherwise take from the machine that happened to build it.
+    run("tar", [
+      "--sort=name",
+      "--mtime=@0",
+      "--owner=0",
+      "--group=0",
+      "--numeric-owner",
+      "-czf",
+      artifactPath,
+      "-C",
+      work,
+      RELAY_ARTIFACT_ID,
+    ]);
+    return { name, path: artifactPath };
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
+}
+
+/**
  * A PKGBUILD with the version and checksum of the artifact just built.
  *
  * The committed PKGBUILD records the release it was written for; a release builds
@@ -767,6 +1084,107 @@ async function readJson(path) {
   }
 }
 
+/**
+ * Build, sign and publish the relay tarball.
+ *
+ * The relay is a server, not an app: it has no update feed and no electron
+ * manifest. The update key signs the checksum list, and that list is what
+ * verifies the tarball. The tag, the version and the changelog section are the
+ * same facts the app path uses, so they are checked before this runs.
+ */
+async function releaseRelay(app, options, { head, version, tag, changelog, privateKey, keyPath }) {
+  const outputDir = join(ROOT, app.output);
+  const arch = process.arch;
+  const name = relayArtifactName(version, arch);
+  const artifactPath = join(outputDir, name);
+
+  process.stdout.write(`\nreleasing ${app.name} ${version} as ${tag}\n`);
+
+  if (options.build) {
+    process.stdout.write("\n=== build ===\n");
+    // The CLI imports @suite/host and @suite/sync through their dist output, so
+    // all three packages have to be built, not just the server entry point.
+    run("pnpm", ["--filter", app.package, "run", "build:all"]);
+    process.stdout.write("\n=== package ===\n");
+    await buildRelayArtifact({ app, version, outputDir, arch });
+  } else if (!existsSync(artifactPath)) {
+    throw new Error(`${artifactPath} is missing; run once without --no-build to build it`);
+  }
+
+  const sha256 = await sha256OfFile(artifactPath);
+  const size = (await stat(artifactPath)).size;
+  const checksums = relayChecksumList({ name, sha256 });
+  const checksumBytes = Buffer.from(checksums);
+  const signature = signManifest(checksumBytes, privateKey);
+  const publicKey = publicFromPrivate("update", privateKey).publicText;
+  const fingerprint = fingerprintOf(privateKey);
+
+  const files = [
+    { name, path: artifactPath },
+    { name: "SHA256SUMS", text: checksums },
+    { name: "SHA256SUMS.sig", text: `${signature}\n` },
+    { name: "SHA256SUMS.pub", text: `${publicKey}\n` },
+  ];
+
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(join(outputDir, "SHA256SUMS"), checksums);
+  await writeFile(join(outputDir, "SHA256SUMS.sig"), `${signature}\n`);
+  await writeFile(join(outputDir, "SHA256SUMS.pub"), `${publicKey}\n`);
+
+  if (options.feedDir !== null) {
+    await mkdir(options.feedDir, { recursive: true });
+    for (const file of files) {
+      if (file.path !== undefined) {
+        await copyFile(file.path, join(options.feedDir, file.name));
+      } else {
+        await writeFile(join(options.feedDir, file.name), file.text);
+      }
+    }
+    process.stdout.write(`\nrelease files written to ${options.feedDir}\n`);
+  }
+
+  process.stdout.write(`\n  artifact    ${name}\n`);
+  process.stdout.write(`  size        ${size} bytes\n`);
+  process.stdout.write(`  sha256      ${sha256}\n`);
+  process.stdout.write("  checksums   SHA256SUMS\n");
+  process.stdout.write("  signature   SHA256SUMS.sig\n");
+  process.stdout.write("  public key  SHA256SUMS.pub\n");
+  process.stdout.write(`  key         ${keyPath}\n`);
+  process.stdout.write(`  fingerprint ${fingerprint}\n`);
+  process.stdout.write(`\nwould upload to ${tag}:\n`);
+  for (const file of files) process.stdout.write(`  ${file.name}\n`);
+
+  if (!options.publish) {
+    process.stdout.write(
+      "\ndry run: nothing was tagged, uploaded or committed; the artifact above is only local.\n",
+    );
+    process.stdout.write(`To publish: node scripts/release.mjs ${app.id} --publish\n`);
+    return;
+  }
+
+  const notes =
+    options.notesFile === null
+      ? ["--notes", changelogSection(changelog, version) || `${app.name} ${version}`]
+      : ["--notes-file", options.notesFile];
+
+  process.stdout.write(`\n=== publish ${tag} ===\n`);
+  run("gh", [
+    "release",
+    "create",
+    tag,
+    ...files.map((file) => file.path ?? join(outputDir, file.name)),
+    "--title",
+    `${app.name} ${version}`,
+    ...notes,
+    "--target",
+    head,
+    "--latest=false",
+  ]);
+
+  process.stdout.write(`\npublished ${tag}\n`);
+  process.stdout.write(`assets ${releaseAssetBase(app, version)}\n`);
+}
+
 async function release(app, options) {
   const head = capture("git", ["rev-parse", "HEAD"]);
   const porcelain = capture("git", ["status", "--porcelain"]);
@@ -813,6 +1231,11 @@ async function release(app, options) {
   const keyProblem = publisherKeyProblem(privateKey);
   if (keyProblem !== null) {
     throw new Error(`${keyProblem}\n  at        ${keyPath}`);
+  }
+
+  if (app.kind === "relay") {
+    await releaseRelay(app, options, { head, version, tag, changelog, privateKey, keyPath });
+    return;
   }
 
   process.stdout.write(`\nreleasing ${app.name} ${version} as ${tag}\n`);
@@ -955,6 +1378,23 @@ async function main() {
   if (options.verify) {
     const packageText = await readFile(join(ROOT, app.project, "package.json"), "utf8");
     const expected = versionFromPackage(packageText);
+
+    if (app.kind === "relay") {
+      const publicKey = pinnedSecretPublic("update");
+      if (publicKey === null) {
+        throw new Error("SUITE_UPDATE_PUBLIC_KEY is missing from packages/desktop/src/updateSignature.ts");
+      }
+      const result = await verifyRelayArtifact({
+        dir: join(ROOT, app.output),
+        version: expected,
+        publicKey,
+      });
+      if (!result.ok) throw new Error(result.reason ?? "the relay artifact did not verify");
+      process.stdout.write(`verified ${app.name} ${expected}\n`);
+      process.stdout.write(`  artifact ${join(app.output, result.artifact)}\n`);
+      return;
+    }
+
     const result = await verifyPublishedFeed({
       feed: feedUrl(app),
       publicKey: await pinnedPublicKey(),

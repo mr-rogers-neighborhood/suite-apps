@@ -50,6 +50,15 @@ uploads it with the other files:
 node scripts/release.mjs start --publish
 ```
 
+The relay is a server tarball rather than an AppImage, and goes through the same gate and key checks:
+
+```sh
+node scripts/release.mjs sync --publish
+```
+
+Its assets, checksum and signature are described in
+[Leave a relay running](../../apps/sync/docs/how-to/relay.md#building-and-publishing-a-release).
+
 Useful options:
 
 | Option | Effect |

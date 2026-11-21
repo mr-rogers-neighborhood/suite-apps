@@ -10,24 +10,80 @@ network that you did not put there.
 ## What you need
 
 - A machine on the same network as the devices you want to sync (or reachable over a VPN).
-- Node 22 or later.
-- The `suite-sync` release artifact, or a build from this repository.
+- **Node.js 22 or later.** The relay is JavaScript. The release tarball carries the CLI and its
+  dependencies, but not a Node runtime.
+- The `suite-sync` release tarball for your architecture: `x86_64`, or `aarch64` on 64-bit ARM.
 
-## 1. Install the binary
+## 1. Install the relay
 
-From a release, the artifact is a single signed `suite-sync` executable and a `.minisig` beside it.
-Verify it before running it:
+The relay is published as release assets on the `sync-v<version>` tag. That tag carries
+`suite-sync-<version>-<arch>.tar.gz`, the `SHA256SUMS` list it is checked against, a detached
+`SHA256SUMS.sig`, and `SHA256SUMS.pub` to verify that signature.
+
+Set `VERSION` to the release you are installing, download all four files, and check the signature
+before trusting the checksum. The signature covers `SHA256SUMS` byte for byte; the signed list is
+what verifies the tarball.
 
 ```sh
-minisign -Vm suite-sync -x suite-sync.minisig -P "$(cat suite-sync.pub)"
-install -m 0755 suite-sync /usr/local/bin/suite-sync
+VERSION=<version>
+ARCH=x86_64
+BASE="https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/sync-v$VERSION"
+
+curl -fLO "$BASE/suite-sync-$VERSION-$ARCH.tar.gz"
+curl -fLO "$BASE/SHA256SUMS"
+curl -fLO "$BASE/SHA256SUMS.sig"
+curl -fLO "$BASE/SHA256SUMS.pub"
+
+# 1. Verify SHA256SUMS with the publisher's update key.
+base64 -d SHA256SUMS.sig > SHA256SUMS.sig.bin
+openssl pkeyutl -verify \
+  -pubin -inkey SHA256SUMS.pub \
+  -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig.bin
+
+# 2. The signed list verifies the tarball's bytes.
+sha256sum -c SHA256SUMS
 ```
 
-From a checkout, build it and use the same path:
+`SHA256SUMS.pub` is the same update key the Suite apps pin, so it can be compared by fingerprint:
 
 ```sh
-pnpm --filter @suite/sync-server build
-install -m 0755 dist/cli.js /usr/local/bin/suite-sync
+openssl pkey -pubin -in SHA256SUMS.pub -outform DER | sha256sum
+```
+
+The first 32 hex characters are the fingerprint `pnpm keys status` prints on the publisher's machine.
+
+Install the whole tree under `/opt`, then put the launcher on `PATH`:
+
+```sh
+sudo install -d /opt/suite-sync
+sudo tar -xzf "suite-sync-$VERSION-$ARCH.tar.gz" -C /opt
+sudo ln -sf /opt/suite-sync/bin/suite-sync /usr/local/bin/suite-sync
+
+suite-sync --version
+suite-sync status
+```
+
+Keep `/opt/suite-sync` in one piece: the launcher runs `dist/cli.js` and resolves its dependencies
+from that tree. Copying only the launcher leaves a command that cannot find the server.
+
+### How Start finds it
+
+Suite Start spawns `suite-sync serve` directly. It looks in this order:
+
+1. `SUITE_SYNC_BIN`, if it is set. It has to point at the executable; Start does not fall back to
+   another copy when the named path is missing.
+2. a `suite-sync` beside Start's own binary (or in its resources directory);
+3. `suite-sync` on `PATH`.
+
+`/usr/local/bin` is normally on `PATH`, so the symlink above is enough. If you keep the tree
+elsewhere, add its `bin` directory to `PATH`, or set
+`SUITE_SYNC_BIN=/path/to/suite-sync/bin/suite-sync` in the environment Start inherits.
+
+From a checkout, build the three sync packages and run the CLI through the workspace:
+
+```sh
+pnpm --filter @suite/sync-server run build:all
+node apps/sync/dist/cli.js --version
 ```
 
 `suite-sync --version` prints the server and relay-protocol versions. Two devices need the same
@@ -121,24 +177,26 @@ the wrong setting for one that exists to be reached.
 The relay's store belongs to that machine — back up `/var/lib/suite-sync`, not the laptop — and
 Start's pane shows the store of a relay it started, not the store of one across the network.
 
-## Signing, and what the artifact in `dist/release` is
+## Building and publishing a release
+
+The monorepo has one release path for the relay:
 
 ```sh
-export SUITE_SYNC_RELEASE_KEY='…'          # base64 32-byte Ed25519 seed; a release secret
-export SUITE_SYNC_RELEASE_PUBLIC='…'       # its public half, base64
-pnpm release:relay                          # deploy, tar, hash, sign, write the manifest
-pnpm release:verify                         # re-check hash, fingerprint and both signatures
-pnpm verify:relay                           # unpack, start headless, join two devices
+node scripts/release.mjs sync            # build, sign, print what it would upload
+node scripts/release.mjs sync --publish  # upload the assets on sync-v<version>
+node scripts/release.mjs sync --verify   # re-check the local tarball, checksum and signature
 ```
 
-`release:verify` re-reads the artifact rather than trusting the run that made it: it checks each file's
-hash and size, that the manifest's fingerprint matches the key you gave, and that the manifest **and**
-the tarball each verify. That is three separate failures, because each has been the one that broke.
+A dry run is the default; `--publish` is required to create the tag or upload anything. The script
+refuses a dirty tree, a commit `.dev/gate-status.json` has not proven, and a `package.json` version
+without a `## [version]` changelog section. It builds from the proven commit and signs `SHA256SUMS`
+with the update key at `SUITE_UPDATE_KEY` or `~/.config/suite/keys/update-key.pem`; a key that does
+not match the pin in `packages/desktop/src/updateSignature.ts` is refused before the build.
 
-The artifact currently in `dist/release` was signed with a **development** key so the pipeline could be
-exercised end to end. Its fingerprint is `aac3a4417a508af8834d86a8f967640d`, and nothing should pin it.
-A real release is the same two commands with the release key, and the public half pinned wherever the
-installer looks.
+The tarball carries the built CLI, its JavaScript dependencies, a `suite-sync` launcher, the runtime
+requirement in its README and the licence. It has no update feed: the relay is a server binary, and
+a person replaces the tree deliberately. Re-check the release with the same commands shown in
+[Install the relay](#1-install-the-relay).
 
 ## Upgrading
 

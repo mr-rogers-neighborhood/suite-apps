@@ -19,8 +19,8 @@
     "lint": "biome check .",
     "test": "vitest run",
     "verify": "pnpm check",
-    "release:relay": "node scripts/release.mjs",
-    "release:verify": "node scripts/release.mjs --verify dist/release --public $SUITE_SYNC_RELEASE_PUBLIC",
+    "release:relay": "node ../../scripts/release.mjs sync",
+    "release:verify": "node ../../scripts/release.mjs sync --verify",
     "verify:relay": "node scripts/verify-relay.mjs"
   },
   "dependencies": {

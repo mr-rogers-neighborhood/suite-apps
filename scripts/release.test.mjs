@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import {
   absoluteManifest,
@@ -17,9 +20,15 @@ import {
   parseArgs,
   pkgbuildFor,
   releaseAssetBase,
+  relayArchitecture,
+  relayArtifactName,
+  relayChecksumList,
+  relayLauncher,
+  relayReadme,
   signManifest,
   signatureVerifies,
   tagFor,
+  verifyRelayArtifact,
   versionFromManifest,
   versionFromPackage,
   verifyPublishedFeed,
@@ -467,5 +476,97 @@ describe("verifyPublishedFeed", () => {
     });
     assert.equal(result.ok, false);
     assert.match(result.reason, /artifact answered 404/u);
+  });
+});
+
+describe("relay artifact", () => {
+  const version = "0.11.3";
+  const digest = "a".repeat(64);
+
+  it("names the tarball for the architecture and refuses one it cannot name", () => {
+    assert.equal(relayArchitecture("x64"), "x86_64");
+    assert.equal(relayArtifactName(version, "x64"), "suite-sync-0.11.3-x86_64.tar.gz");
+    assert.equal(relayArtifactName(version, "arm64"), "suite-sync-0.11.3-aarch64.tar.gz");
+    assert.throws(() => relayArtifactName(version, "riscv64"), /x86_64 or aarch64/u);
+  });
+
+  it("writes the checksum list in the form sha256sum -c reads", () => {
+    assert.equal(
+      relayChecksumList({ name: "suite-sync-0.11.3-x86_64.tar.gz", sha256: digest }),
+      `${digest}  suite-sync-0.11.3-x86_64.tar.gz\n`,
+    );
+    assert.throws(() => relayChecksumList({ name: "x", sha256: "ABC" }), /sha256/u);
+    assert.throws(() => relayChecksumList({ name: "../x", sha256: digest }), /plain artifact/u);
+  });
+
+  it("says in the launcher and README that the runtime is not bundled", () => {
+    const launcher = relayLauncher();
+    assert.match(launcher, /Node\.js 22/u);
+    assert.match(launcher, /dist\/cli\.js/u);
+    const readme = relayReadme(version, "x64");
+    assert.match(readme, /does \*\*not\*\*/u);
+    assert.match(readme, /Node\.js 22/u);
+    assert.match(readme, /suite-sync-0\.11\.3-x86_64\.tar\.gz/u);
+  });
+
+  it("verifies the signed checksum list, then the tarball through it", async () => {
+    const pair = keyPair();
+    const dir = mkdtempSync(join(tmpdir(), "suite-relay-test-"));
+    try {
+      const name = relayArtifactName(version, "x64");
+      const bytes = Buffer.from("relay tarball bytes");
+      writeFileSync(join(dir, name), bytes);
+      const sha256 = createHash("sha256").update(bytes).digest("hex");
+      const checksums = relayChecksumList({ name, sha256 });
+      writeFileSync(join(dir, "SHA256SUMS"), checksums);
+      writeFileSync(
+        join(dir, "SHA256SUMS.sig"),
+        `${signManifest(Buffer.from(checksums), pair.privateKey)}\n`,
+      );
+
+      assert.deepEqual(
+        await verifyRelayArtifact({ dir, version, arch: "x64", publicKey: pair.publicKey }),
+        { ok: true, reason: null, artifact: name },
+      );
+
+      writeFileSync(join(dir, name), Buffer.from("tampered"));
+      const tampered = await verifyRelayArtifact({
+        dir,
+        version,
+        arch: "x64",
+        publicKey: pair.publicKey,
+      });
+      assert.equal(tampered.ok, false);
+      assert.match(tampered.reason, /sha256/u);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a checksum list signed by another key", async () => {
+    const pair = keyPair();
+    const other = keyPair();
+    const dir = mkdtempSync(join(tmpdir(), "suite-relay-test-"));
+    try {
+      const name = relayArtifactName(version, "x64");
+      writeFileSync(join(dir, name), Buffer.from("relay tarball bytes"));
+      const checksums = relayChecksumList({ name, sha256: digest });
+      writeFileSync(join(dir, "SHA256SUMS"), checksums);
+      writeFileSync(
+        join(dir, "SHA256SUMS.sig"),
+        `${signManifest(Buffer.from(checksums), other.privateKey)}\n`,
+      );
+
+      const result = await verifyRelayArtifact({
+        dir,
+        version,
+        arch: "x64",
+        publicKey: pair.publicKey,
+      });
+      assert.equal(result.ok, false);
+      assert.match(result.reason, /not signed/u);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

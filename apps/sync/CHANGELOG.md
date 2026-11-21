@@ -9,8 +9,25 @@ is tagged with: `sync-v<version>` here, `v<version>` in the standalone repositor
 imported from. The wire protocol has its own integer and is not this version; the rules are in
 [Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
 
-Entries stop at 0.4.0. Versions 0.5.0 through 0.11.3 carry tags in the standalone repository but no
-written notes, and this file does not invent them; every release from here adds its section first.
+Entries stop at 0.4.0 and resume at 0.11.3, the first version released from this repository.
+Versions 0.5.0 through 0.11.2 carry tags in the standalone repository but no written notes here, and
+this file does not invent them; every release from here adds its section first.
+
+## [0.11.3] - 2026-11-20
+
+The first relay artifact published from the monorepo.
+
+### Added
+
+- **A checksummed `suite-sync-<version>-<arch>.tar.gz`.** It carries the built CLI, a `suite-sync`
+  launcher, the runtime requirement in its README and the licence. The launcher says plainly that
+  the tarball needs Node.js 22 or later, because no runtime is bundled.
+- **`node scripts/release.mjs sync`**, which builds the tarball from the gated commit, signs
+  `SHA256SUMS` with the update key and publishes the tarball, checksum list, signature and public
+  key on the `sync-v<version>` tag. A dry run is still the default.
+- **An install section in [`docs/how-to/relay.md`](docs/how-to/relay.md)** with the download,
+  checksum and signature checks, where to install the tree, and how Suite Start finds the binary
+  through `SUITE_SYNC_BIN` or `PATH`.
 
 ## [0.4.0] - 2026-11-18
 

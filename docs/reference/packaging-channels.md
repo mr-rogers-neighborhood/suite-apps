@@ -8,6 +8,7 @@ owns the installed files**, and that decides who may update them.
 | AppImage | the user, under `~/Applications` | Suite Start, from the signed feed | no |
 | Arch package | root, under `/opt` | the package manager | yes |
 | Flatpak | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
+| Relay tarball | the person, under `/opt` | the person replaces the tree | yes |
 | deb / rpm / snap | root, or the store | the package manager or store | yes |
 
 ## The rule
@@ -46,6 +47,17 @@ so the package and the feed cannot describe different releases. It extracts with
 `--appimage-extract`, which removes the FUSE dependency.
 
 The hub is the only app packaged this way.
+
+## Relay tarball
+
+`suite-sync` is a server binary, not an app: it has no Electron shell, no Flatpak and no update
+feed. It ships as `suite-sync-<version>-<arch>.tar.gz` on `sync-v<version>`, with a `SHA256SUMS` list
+signed by the same update key. The tarball carries the CLI, its JavaScript dependencies and a
+launcher, but not a Node runtime; the launcher needs Node.js 22 or later on the host.
+
+Suite Start supervises a relay it finds through `SUITE_SYNC_BIN` or `PATH`; it never updates one.
+The download, checksum and signature checks are in
+[Leave a relay running](../../apps/sync/docs/how-to/relay.md#1-install-the-relay).
 
 ## Flatpak
 
