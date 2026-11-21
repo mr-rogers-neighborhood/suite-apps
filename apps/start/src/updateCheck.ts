@@ -35,6 +35,15 @@ export interface UpdateCheckOptions {
   readonly resourcesPath?: string;
   /** A feed to read instead of the recorded one. Tests use this. */
   readonly feed?: string;
+  /**
+   * True when Flatpak deployed this build.
+   *
+   * Then there is no feed to check: Flatpak's remote is the update channel, and the
+   * app inside the sandbox cannot replace its own deployment. Asking anyway would
+   * either fail on a network the manifest does not grant or claim an answer nobody
+   * can use, so the check is skipped and the card says so.
+   */
+  readonly sandboxed?: boolean;
   readonly updater?: UpdaterLike;
   readonly fetch?: FeedFetch;
   readonly platform?: string;
@@ -59,6 +68,13 @@ export interface UpdateCheckResult {
 export async function checkForUpdates(options: UpdateCheckOptions): Promise<UpdateCheckResult> {
   const now = options.now ?? (() => new Date());
   const platform = options.platform ?? process.platform;
+
+  // Flatpak owns the deployment. There is no feed to read and no network grant to
+  // read it with, so saying "not checked" is the only true answer.
+  if (options.sandboxed === true) {
+    return { state: null, error: "not checked (Flatpak)", verified: false };
+  }
+
   const feed = options.feed ?? (await recordedFeed(options));
 
   if (feed === null) {

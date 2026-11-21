@@ -506,6 +506,57 @@ describe("selfCard", () => {
     expect(card.state).toBe("no-release");
     expect(card.reason).toBe("no signature");
   });
+
+  it("reports a Flatpak deployment as Flatpak's to update, not as a feed answer", () => {
+    const card = selfCard(
+      offered({
+        id: "start",
+        name: "Suite Start",
+        reason: "this build was packaged without a feed",
+      }),
+      "0.3.0",
+      { flatpak: true, canUpdate: true },
+    );
+    expect(card).toMatchObject({
+      id: "start",
+      source: "flatpak",
+      installChannel: "flatpak",
+      state: "update-available",
+      version: "0.3.0",
+      available: null,
+      releases: null,
+      reason: "not checked (Flatpak)",
+    });
+  });
+
+  it("loses the action, and keeps the fact, when the id is not Start's own", () => {
+    const card = selfCard(offered({ id: "start" }), "0.3.0", { flatpak: true, canUpdate: false });
+    expect(card).toMatchObject({
+      source: "flatpak",
+      state: "no-release",
+      releases: null,
+      reason: "not checked (Flatpak)",
+    });
+  });
+
+  it("says the deployed build starts next launch, because the running one keeps its code", () => {
+    const card = selfCard(offered({ id: "start" }), "0.3.0", {
+      flatpak: true,
+      canUpdate: true,
+      updated: true,
+    });
+    expect(card.reason).toContain("starts next launch");
+    expect(card.available).toBeNull();
+  });
+
+  it("shows what Flatpak said when the update did not happen", () => {
+    const card = selfCard(offered({ id: "start" }), "0.3.0", {
+      flatpak: true,
+      canUpdate: true,
+      error: "error: app run.suite.start not installed",
+    });
+    expect(card.reason).toBe("error: app run.suite.start not installed");
+  });
 });
 
 describe("fileCards", () => {

@@ -75,6 +75,27 @@ describe("checkForUpdates", () => {
     expect(result.state).toBeNull();
   });
 
+  it("does not ask from a Flatpak sandbox, and says it did not check", async () => {
+    const dataDir = await folder();
+    const fake = updater();
+    const result = await checkForUpdates({
+      dataDir,
+      version: "0.1.0",
+      channel: "alpha",
+      packaged: true,
+      feed: FEED,
+      fetch: unsignedFeed(),
+      updater: fake,
+      sandboxed: true,
+      now,
+    });
+    expect(result.error).toBe("not checked (Flatpak)");
+    expect(result.state).toBeNull();
+    expect(fake.calls).toBe(0);
+    // No report: Flatpak's remote is the update channel, not an AppImage feed.
+    await expect(readFile(join(dataDir, "update-state.json"), "utf8")).rejects.toThrow();
+  });
+
   it("never downloads unasked, when the update is real", async () => {
     // The manifest here is signed by the pinned publisher key, so this path needs the
     // real signature; the accepting path is covered in `@suite/desktop`. What matters

@@ -264,17 +264,18 @@ test("starts the Suite Sync relay it was given and shows its address", async () 
   }
 });
 
-test("says a copied install updates itself, not from the hub's feed", async () => {
+test("says a copied install is not updated by the hub", async () => {
   const app = await fakeApp(box);
   await install(box, { id: "canvas", executable: app.executable, manifestPath: app.manifestPath });
 
   const run = await launch(box);
   try {
-    // The signed feed is the only update source now. A copied install keeps its own
-    // updater, so the card says that rather than inventing a version.
+    // Nothing in the hub calls a placed copy's updater, so the card says whose job
+    // the next build is rather than promising a download that never happens.
     const card = run.page.locator('.card[data-app-id="canvas"]');
     await expect(card.locator(".card-state")).toContainText("0.1.0");
-    await expect(card.locator(".card-state")).toContainText("updates itself");
+    await expect(card.locator(".card-state")).toContainText("Start does not update it");
+    await expect(card.locator(".card-state")).not.toContainText("updates itself");
   } finally {
     await run.close();
   }

@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -11,7 +10,6 @@ import {
   SUITE_APPS,
   type SuiteAppEntry,
   type SuiteHub,
-  suiteApplicationsRoot,
   suiteDocumentsRoot,
   suitePaths,
 } from "@suite/contracts";
@@ -57,11 +55,23 @@ import {
 } from "./channels.js";
 import { type DocumentsFolder, indexDocuments, isInsideDocuments } from "./fileIndex.js";
 
+import { defaultHost, SELF_FLATPAK_ID, sandboxId, toolRunner } from "./host.js";
+import {
+  adoptLegacyRegistry,
+  type HostPaths,
+  hostPaths,
+  hubLockPath,
+  registryPathFor,
+  releaseHubLock,
+  removePreReleaseTree,
+  takeHubLock,
+} from "./hostPaths.js";
 import { writeHubReport } from "./hubReport.js";
-import { type RegistryStore, registryStore } from "./installs.js";
-import { nativePackageBackend } from "./nativePackageBackend.js";
+import { REGISTRY_FILENAME, type RegistryStore, registryAt } from "./installs.js";
+import { stopApproach } from "./launchCommand.js";
+import { type NativePackageBackend, nativePackageBackend } from "./nativePackageBackend.js";
 import { defaultRoots, nodeRegistryFileSystem } from "./nodeFileSystem.js";
-import type { PackageBackend, PackageLaunchObserver, PackageListing } from "./packageBackend.js";
+import type { PackageLaunchObserver, PackageListing } from "./packageBackend.js";
 import { RECENT_LIMIT, type RecentsFile, recentsFile } from "./recents.js";
 import { type RecoveryLookup, readRecoveryReports, recoveryFor } from "./recovery.js";
 import type { DiscoveredApp } from "./registry.js";
@@ -82,8 +92,8 @@ import {
 import {
   isIconOf,
   shortcutIconName,
-  shortcutIconPath,
-  shortcutPath,
+  shortcutIconPathIn,
+  shortcutPathIn,
   shortcutText,
 } from "./shortcuts.js";
 import { isAddressInUse, SuiteSyncRelay } from "./syncRelay.js";
@@ -123,6 +133,31 @@ app.setName("Suite Start");
 const userDataOverride = process.env.SUITE_START_USER_DATA?.trim();
 if (userDataOverride !== undefined && userDataOverride.length > 0) {
   app.setPath("userData", userDataOverride);
+}
+
+/**
+ * Where processes run, and the host paths Start shares with the rest of the suite.
+ *
+ * One seam for the whole process: the backend, the icon cache and a planned launch
+ * all use it, so a sandboxed Start cannot reach the host one way and the sandbox
+ * another. `hostPaths` answers from the host home rather than from Electron's
+ * re-rooted XDG directories, because the manifest grants those host paths.
+ */
+const host = defaultHost();
+const tools = toolRunner(host);
+
+function hostPathTable(): HostPaths {
+  return hostPaths({
+    platform: process.platform,
+    home: app.getPath("home"),
+    appsRootOverride: process.env.SUITE_START_APPS_ROOT,
+  });
+}
+
+/** The suite's data home on the host, which a sandboxed XDG value must not displace. */
+function dataHome(): string | undefined {
+  if (sandboxId() === null) return process.env.XDG_DATA_HOME;
+  return dirname(hostPathTable().suiteData);
 }
 
 function appDir(): string {
@@ -205,14 +240,11 @@ function documentsRoot(): string {
  * Where this hub puts an app it installs.
  *
  * `~/Applications/Suite` unless `SUITE_START_APPS_ROOT` says otherwise, which is how a
- * test installs into a directory it can throw away.
+ * test installs into a directory it can throw away. The host path table owns the answer
+ * in both forms, because a Flatpak re-roots its own XDG roots but is granted this one.
  */
 function applicationsRoot(): string {
-  return suiteApplicationsRoot(
-    process.platform,
-    app.getPath("home"),
-    process.env.SUITE_START_APPS_ROOT,
-  );
+  return hostPathTable().appsRoot;
 }
 
 /**
@@ -231,8 +263,12 @@ function feedBase(): string | undefined {
 /**
  * The hub's own feed, from the `app-update.yml` electron-builder writes beside a
  * packaged binary. A dev run has no such file, so its row says the build has no feed.
+ *
+ * A Flatpak build has no feed check at all: Flatpak's remote is its update channel,
+ * the sandbox is not granted a network, and the row says "not checked (Flatpak)".
  */
 async function selfFeed(): Promise<string | null> {
+  if (sandboxId() !== null) return null;
   if (!app.isPackaged) return null;
   try {
     return feedUrlFromAppUpdateYml(
@@ -242,6 +278,17 @@ async function selfFeed(): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * What the last self-update did, for the row that asked for it.
+ *
+ * In memory only: it describes a request made in this session, and a restart is the
+ * moment a new build starts, so the sentence has done its work by then.
+ */
+let selfUpdate: { readonly done: boolean; readonly error: string | null } = {
+  done: false,
+  error: null,
+};
 
 /**
  * One request per feed, and none of them may hold the window.
@@ -267,6 +314,19 @@ const installFetch: typeof globalThis.fetch = (url, init) =>
  */
 const runningPids = new Map<string, number>();
 
+/**
+ * The Flatpak application id behind a running app, when Start launched one.
+ *
+ * Inside a Flatpak the pid above belongs to `flatpak-spawn`; the application id is
+ * what `flatpak kill` can address on the host.
+ */
+const runningFlatpak = new Map<string, string>();
+
+function forgetRunning(id: string): void {
+  runningPids.delete(id);
+  runningFlatpak.delete(id);
+}
+
 function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -280,7 +340,7 @@ function liveRunning(): ReadonlySet<string> {
   const live = new Set<string>();
   for (const [id, pid] of runningPids) {
     if (isAlive(pid)) live.add(id);
-    else runningPids.delete(id);
+    else forgetRunning(id);
   }
   return live;
 }
@@ -360,7 +420,7 @@ function updateLookup(): UpdateLookup {
   return {
     platform: process.platform,
     home: app.getPath("home"),
-    xdgDataHome: process.env.XDG_DATA_HOME,
+    xdgDataHome: dataHome(),
   };
 }
 
@@ -387,8 +447,7 @@ function appLocations(apps: readonly DiscoveredApp[]): readonly AppLocation[] {
         version: installed.manifest.version,
         executable: installed.executable,
         documents: appDocumentsFolder(entry, { platform, home, rootOverride }),
-        data: suitePaths(entry.folder, { platform, home, xdgDataHome: process.env.XDG_DATA_HOME })
-          .data,
+        data: suitePaths(entry.folder, { platform, home, xdgDataHome: dataHome() }).data,
       },
     ];
   });
@@ -404,7 +463,7 @@ function documentFolders(): readonly DocumentsFolder[] {
       platform,
       home,
       rootOverride,
-      xdgDataHome: process.env.XDG_DATA_HOME,
+      xdgDataHome: dataHome(),
     }),
   }));
 }
@@ -414,10 +473,10 @@ function documentFolders(): readonly DocumentsFolder[] {
  *
  * Discovery, Flatpak and the managed AppImage writer live behind `PackageBackend`
  * (§packageBackend). Main asks for a listing, an install or a launch and never picks
- * a binary or a process itself, so a Start packaged as a Flatpak can swap the native
- * backend for a host agent without the window learning a second way.
+ * a binary or a process itself, so a Start packaged as a Flatpak reaches the host through
+ * the seam without the window learning a second way.
  */
-let backend: PackageBackend;
+let backend: NativePackageBackend;
 
 async function discover(options: { readonly refresh?: boolean } = {}): Promise<PackageListing> {
   return backend.list(options);
@@ -480,7 +539,7 @@ function recoveryLookup(): RecoveryLookup {
   return {
     platform: process.platform,
     home: app.getPath("home"),
-    xdgDataHome: process.env.XDG_DATA_HOME,
+    xdgDataHome: dataHome(),
   };
 }
 
@@ -523,7 +582,7 @@ async function state(): Promise<LauncherState> {
   );
 
   // What each app says about its own updating. Still read, because an app Start did not
-  // install updates itself and the card should be able to say what it found.
+  // install may check its own feed, and the card should be able to say what it found.
   const updates = new Map<string, ReportedUpdate>();
   await Promise.all(
     apps.map(async (entry) => {
@@ -534,7 +593,7 @@ async function state(): Promise<LauncherState> {
     }),
   );
 
-  const self = catalogue.find((entry) => entry.id === SELF_ID);
+  const self = catalogue.find((entry) => entry.id === SELF_ID) ?? undefined;
   const cards = appCards({
     apps,
     rejected: listing.rejected,
@@ -566,6 +625,10 @@ async function state(): Promise<LauncherState> {
     })
     .slice(0, RECENT_LIMIT);
 
+  // The hub cannot replace its own running binary, so it says what it is rather than
+  // offering a button that would fail. A Flatpak deployment is the one exception:
+  // Flatpak is its writer, so the row can ask Flatpak for the newest build.
+  const flatpakId = sandboxId();
   return {
     apps: cards,
     recents: recentCards,
@@ -579,9 +642,15 @@ async function state(): Promise<LauncherState> {
     },
     version: app.getVersion(),
     sync: await syncState(),
-    // The hub cannot replace its own running binary, so it says what it is rather than
-    // offering a button that would fail.
-    self: self === undefined ? null : selfCard(self, app.getVersion()),
+    self:
+      self === undefined
+        ? null
+        : selfCard(self, app.getVersion(), {
+            ...(flatpakId === null ? {} : { flatpak: true }),
+            ...(flatpakId === SELF_FLATPAK_ID ? { canUpdate: true } : {}),
+            updated: selfUpdate.done,
+            error: selfUpdate.error,
+          }),
     installing: [...installProgress.values()],
     launchErrors: Object.fromEntries(launchFailures),
   };
@@ -613,7 +682,7 @@ function launchObserver(appId: string): PackageLaunchObserver {
     },
     exited(pid) {
       if (pid !== null && runningPids.get(appId) === pid) {
-        runningPids.delete(appId);
+        forgetRunning(appId);
         void broadcast();
       }
     },
@@ -626,6 +695,11 @@ function launchObserver(appId: string): PackageLaunchObserver {
 
 /** Start one installed app through the one backend that knows how. */
 function launchApp(app_: DiscoveredApp, argv: readonly string[]): void {
+  if (app_.flatpak === undefined) {
+    runningFlatpak.delete(app_.manifest.id);
+  } else {
+    runningFlatpak.set(app_.manifest.id, app_.flatpak.application);
+  }
   backend.launch(
     {
       executable: app_.executable,
@@ -689,13 +763,18 @@ async function addApp(): Promise<void> {
   await broadcast();
 }
 
-/** Where a user-scope application entry lives, and where its icon goes. */
+/**
+ * Where a user-scope application entry lives, and where its icon goes.
+ *
+ * The host path table rather than Electron's XDG view: a Flatpak's
+ * `~/.local/share` is its own private directory, and a menu entry written there
+ * would be one no desktop reads.
+ */
 function shortcutDirs(): { entry: (id: string) => string; icon: (name: string) => string } {
-  const platform = process.platform;
-  const home = app.getPath("home");
+  const paths = hostPathTable();
   return {
-    entry: (id) => shortcutPath(platform, home, id),
-    icon: (name) => shortcutIconPath(platform, home, name),
+    entry: (id) => shortcutPathIn(paths.applications, id, process.platform),
+    icon: (name) => shortcutIconPathIn(paths.icons, name, 256, process.platform),
   };
 }
 
@@ -743,9 +822,7 @@ async function writeShortcut(entry: CatalogueEntry, executable: string): Promise
     );
     // Best effort: the cache is a convenience, and a machine without the tool still finds
     // a freshly written file on its next scan.
-    const refresh = spawn("update-desktop-database", [dirname(path)], { stdio: "ignore" });
-    refresh.on("error", () => undefined);
-    refresh.unref();
+    void tools("update-desktop-database", [dirname(path)]);
   } catch (error) {
     console.warn(`[shortcut] could not write the entry for ${entry.id}`, error);
   }
@@ -787,16 +864,12 @@ async function pruneIcons(id: string, keep: string): Promise<void> {
  *
  * Awaited rather than fire-and-forget, unlike `update-desktop-database` below: this tool
  * writes into the same tree the PNG was just placed in, so a cache built before the file
- * lands is a stale cache. It resolves on `error` too, so a machine without the tool costs
- * one failed spawn and nothing else.
+ * lands is a stale cache. The host seam runs it on the host when Start is sandboxed, and
+ * a machine without the tool costs one failed invocation and nothing else.
  */
 function refreshIconCache(): Promise<void> {
-  const themeDir = join(app.getPath("home"), ".local", "share", "icons", "hicolor");
-  return new Promise((done) => {
-    const refresh = spawn("gtk-update-icon-cache", ["-f", "-t", themeDir], { stdio: "ignore" });
-    refresh.on("error", () => done());
-    refresh.on("close", () => done());
-  });
+  const themeDir = join(hostPathTable().icons, "hicolor");
+  return tools("gtk-update-icon-cache", ["-f", "-t", themeDir]);
 }
 
 /**
@@ -838,13 +911,12 @@ async function removeShortcut(id: string): Promise<void> {
 }
 
 /**
- * Ask an app Start started to close, and wait a moment for it.
+ * Signal the process Start can see on the host.
  *
  * SIGTERM first, because that is a request an app can answer — a document can be flushed.
- * The caller decides what to do if it is still there afterwards; this never escalates on
- * its own.
+ * This is the AppImage/Arch path and it is unchanged.
  */
-function stopApp(id: string): void {
+function signalApp(id: string): void {
   const pid = runningPids.get(id);
   if (pid === undefined) return;
   try {
@@ -867,6 +939,86 @@ async function waitForExit(id: string, timeoutMs = 5_000): Promise<boolean> {
 }
 
 /**
+ * Ask a person to close an app Start cannot signal from inside the sandbox.
+ *
+ * The loop is the retry: Continue waits for the pid Start does have (the helper's)
+ * to go away, and asks again if it is still there. Cancel leaves the app running,
+ * so the caller must not replace or remove its files.
+ */
+async function waitForPersonToClose(id: string, name: string, reason: string): Promise<boolean> {
+  // The window may have closed while Start was deciding; never ask about a gone app.
+  if (await waitForExit(id, 500)) return true;
+  if (window === null) return false;
+  for (;;) {
+    const answer = await dialog.showMessageBox(window, {
+      type: "question",
+      title: `Close ${name}`,
+      message: `Close ${name} to continue.`,
+      detail: `${reason} Start will wait until it has exited.`,
+      buttons: ["Cancel", "Continue"],
+      defaultId: 1,
+      cancelId: 0,
+    });
+    if (answer.response !== 1) return false;
+    if (await waitForExit(id, 15_000)) return true;
+  }
+}
+
+/**
+ * Close a running app before Start replaces or removes it.
+ *
+ * The host form is exactly what it was: SIGTERM the pid Start knows, then wait. In
+ * a Flatpak sandbox that pid belongs to `flatpak-spawn`, so a Flatpak is closed by
+ * application id on the host and an AppImage is handed to the person. `requireExit`
+ * keeps the removal flows' existing host behaviour, where the timeout did not stop
+ * the removal; an update has always refused to write under a live process.
+ */
+async function closeRunning(
+  id: string,
+  name: string,
+  options: { readonly requireExit: boolean },
+): Promise<boolean> {
+  if (!runningPids.has(id)) return true;
+  const approach = stopApproach({
+    sandboxed: sandboxId() !== null,
+    flatpak: runningFlatpak.has(id),
+  });
+
+  if (approach === "signal") {
+    signalApp(id);
+    const gone = await waitForExit(id);
+    return options.requireExit ? gone : true;
+  }
+
+  if (approach === "flatpak-kill") {
+    const application = runningFlatpak.get(id);
+    if (application === undefined) {
+      return waitForPersonToClose(id, name, "Start cannot name this Flatpak.");
+    }
+    try {
+      // The seam runs `flatpak kill <id>` on the host; no pid is signalled here.
+      await backend.stopFlatpak(application);
+    } catch (error) {
+      // A race can make `flatpak kill` report "not running" for an app that has
+      // already gone, which is the state Start wanted; only ask a person otherwise.
+      if (await waitForExit(id, 1_000)) return true;
+      console.warn(`[flatpak] could not close ${application}`, error);
+      return waitForPersonToClose(id, name, `Flatpak could not close ${application}.`);
+    }
+    if (await waitForExit(id, 15_000)) return true;
+    return waitForPersonToClose(id, name, "Flatpak did not close it.");
+  }
+
+  // A sandboxed AppImage: the pid is the helper's, and there is no safe host-wide
+  // signal that identifies this app. Never fall back to pkill.
+  return waitForPersonToClose(
+    id,
+    name,
+    "Start is inside a Flatpak, so it cannot close this AppImage for you.",
+  );
+}
+
+/**
  * Delete a pre-release channel's data, after the person explicitly chose that.
  *
  * The confirmation is the only caller, and the path is checked against the
@@ -874,11 +1026,27 @@ async function waitForExit(id: string, timeoutMs = 5_000): Promise<boolean> {
  * cannot become "uninstall stable and take the documents with it".
  */
 async function removeChannelData(path: string): Promise<void> {
-  if (!isPreReleaseDataPath(documentsRoot(), path)) {
-    console.warn(`[uninstall] refused to delete a path outside the pre-release tree: ${path}`);
+  // The host form keeps its direct deletion and its documents-root guard.
+  if (sandboxId() === null) {
+    if (!isPreReleaseDataPath(documentsRoot(), path)) {
+      console.warn(`[uninstall] refused to delete a path outside the pre-release tree: ${path}`);
+      return;
+    }
+    await rm(path, { recursive: true, force: true });
     return;
   }
-  await rm(path, { recursive: true, force: true });
+
+  // Documents are granted read-only to the Flatpak, so only the host can delete
+  // this folder. The helper resolves the path and proves it sits under
+  // `<home>/Documents/Suite Slop/` before running `rm` through the seam.
+  const removed = await removePreReleaseTree({
+    home: app.getPath("home"),
+    path,
+    host,
+  });
+  if (!removed) {
+    console.warn(`[uninstall] refused to delete a path outside Documents/Suite Slop: ${path}`);
+  }
 }
 
 /** The sentence a failed install shows, which is what the step that failed wrote. */
@@ -910,6 +1078,24 @@ async function finishPackage(id: string, version: string | null): Promise<void> 
  * is not the one the publisher signed, leaves the previous install exactly as it was.
  */
 async function installOne(id: string, channel?: unknown): Promise<void> {
+  // The hub's own row is the one package Start may update through a writer that is
+  // not itself. Flatpak owns the deployment, so asking it is the whole operation;
+  // the new build appears at the next launch because a running process keeps the
+  // code it started with.
+  if (id === SELF_ID && sandboxId() === SELF_FLATPAK_ID) {
+    try {
+      await backend.updateSelf();
+      selfUpdate = { done: true, error: null };
+    } catch (error) {
+      selfUpdate = { done: false, error: describeInstallFailure(error) };
+    }
+    await broadcast();
+    return;
+  }
+  // Any other id under Flatpak has no deployment this hub may name, so the row
+  // offers no action; a stray request is not a second way in.
+  if (id === SELF_ID && sandboxId() !== null) return;
+
   const entry = catalogue.find((app) => app.id === id);
   if (entry === undefined) return;
   // Only a pre-release has a branch to choose; a stable card's button names none.
@@ -997,8 +1183,7 @@ async function installOne(id: string, channel?: unknown): Promise<void> {
     });
     if (answer.response !== 1) return;
 
-    stopApp(id);
-    if (!(await waitForExit(id))) {
+    if (!(await closeRunning(id, entry.name, { requireExit: true }))) {
       reportProgress({
         id,
         phase: "failed",
@@ -1310,9 +1495,10 @@ function registerIpc(): void {
       if (confirm.response === 0) return;
 
       if (runningPids.has(id)) {
-        stopApp(id);
-        await waitForExit(id);
-        runningPids.delete(id);
+        // A sandboxed Flatpak is closed by id; a sandboxed AppImage asks the person.
+        // If it is still running, nothing is removed: the files are in use.
+        if (!(await closeRunning(id, entry.name, { requireExit: false }))) return;
+        forgetRunning(id);
       }
       try {
         await backend.remove({ entry, package: found });
@@ -1358,9 +1544,8 @@ function registerIpc(): void {
     if (answer.response === 0) return;
 
     if (runningPids.has(id)) {
-      stopApp(id);
-      await waitForExit(id);
-      runningPids.delete(id);
+      if (!(await closeRunning(id, entry.name, { requireExit: false }))) return;
+      forgetRunning(id);
     }
     await backend.remove({ entry, ...(found === null ? {} : { package: found }) });
     if (preRelease && answer.response === 2 && channelData !== null) {
@@ -1397,9 +1582,13 @@ function registerIpc(): void {
 
     // A running copy is the version being replaced; it goes the same way an update sends it.
     if (runningPids.has(id)) {
-      stopApp(id);
-      await waitForExit(id);
-      runningPids.delete(id);
+      if (!(await closeRunning(id, entry.name, { requireExit: false }))) {
+        // The record already points at the version it replaced; show that rather
+        // than relaunching over a window the person chose not to close.
+        await broadcast();
+        return;
+      }
+      forgetRunning(id);
     }
 
     catalogue = withInstalled(catalogue, id, installed.version);
@@ -1547,16 +1736,50 @@ if (!gotLock) {
 
   void app.whenReady().then(async () => {
     dataDirectory = process.env.SUITE_START_DATA?.trim() || join(app.getPath("userData"));
+
+    // The same lock whether this is the AppImage or the Flatpak. Electron's own lock
+    // lives in `userData`, which differs between the two, so without this each form
+    // could open beside the other. A live holder wins; a stale pid is taken over.
+    const launched = await takeHubLock(hubLockPath(hostPathTable()), process.pid, isAlive).catch(
+      (error: unknown) => {
+        console.warn("[start] the cross-form lock could not be read", error);
+        return { kind: "free" as const };
+      },
+    );
+    if (launched.kind === "held") {
+      console.warn(
+        `[start] another Start is already running (pid ${launched.holder.pid}); this one will exit`,
+      );
+      app.quit();
+      return;
+    }
+
     themeChoice = await loadThemeChoice(dataDirectory);
     nativeTheme.themeSource = themeChoice.mode;
-    registry = registryStore(dataDirectory);
+    const paths = hostPathTable();
+    const registryPath = registryPathFor(paths);
+    const registryOverride = process.env.SUITE_START_REGISTRY?.trim();
+    // A build from before the shared config directory kept its records in the data
+    // directory — Electron's `userData`, unless `SUITE_START_DATA` named another one.
+    // Copy them once, and only when nothing has written the new file.
+    if (registryOverride === undefined || registryOverride.length === 0) {
+      const adoption = await adoptLegacyRegistry({
+        legacy: join(dataDirectory, REGISTRY_FILENAME),
+        next: registryPath,
+      });
+      if (adoption.adopted) {
+        console.log(`[registry] adopted ${adoption.source} at ${adoption.destination}`);
+      }
+    }
+    registry = registryAt(registryPath);
     recents = recentsFile(dataDirectory);
     backend = nativePackageBackend({
-      appsRoot: applicationsRoot(),
+      appsRoot: paths.appsRoot,
       roots: roots(),
       registry,
       catalogue: CATALOGUE_APPS,
       fetch: installFetch,
+      host,
     });
     app.setAppUserModelId("run.suite.start");
 
@@ -1635,15 +1858,18 @@ if (!gotLock) {
     await broadcast();
 
     // The hub updates itself like any app: its own feed, its own report. A dev run
-    // has no feed, so it does not ask.
-    void checkForUpdates({
-      dataDir: dataDirectory,
-      version: app.getVersion(),
-      channel: "alpha",
-      packaged: app.isPackaged,
-    }).then(({ error }) => {
-      if (error !== null && app.isPackaged) console.warn(`[update] ${error}`);
-    });
+    // has no feed, so it does not ask. A Flatpak is Flatpak's to update, and the
+    // sandbox has no network grant, so its row says "not checked (Flatpak)" instead.
+    if (sandboxId() === null) {
+      void checkForUpdates({
+        dataDir: dataDirectory,
+        version: app.getVersion(),
+        channel: "alpha",
+        packaged: app.isPackaged,
+      }).then(({ error }) => {
+        if (error !== null && app.isPackaged) console.warn(`[update] ${error}`);
+      });
+    }
 
     const coldStart = targetFromArgv(process.argv);
     if (coldStart) pendingTargets.push(coldStart);
@@ -1664,6 +1890,7 @@ if (!gotLock) {
       ?.stop()
       .then(() => reportHub())
       .catch(() => undefined);
+    void releaseHubLock(hubLockPath(hostPathTable()), process.pid).catch(() => undefined);
   });
 
   app.on("window-all-closed", () => {

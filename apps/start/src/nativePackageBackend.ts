@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -27,6 +26,7 @@ import {
   parseVersionOutput,
   remoteListArgs,
   runFlatpak,
+  selfUpdateArgs,
   storeBranchArgs,
   storeInfoArgs,
   storeInstallArgs,
@@ -34,6 +34,7 @@ import {
   storeUpdateArgs,
   withFlatpakInstalls,
 } from "./flatpak.js";
+import { defaultHost, type Host, SELF_FLATPAK_ID, sandboxId } from "./host.js";
 import {
   type Download,
   executableInVersion,
@@ -44,7 +45,7 @@ import {
 } from "./install.js";
 import type { RegistryStore } from "./installs.js";
 import { launchVerdict } from "./launchCheck.js";
-import { launchCommand } from "./launchCommand.js";
+import { launchIntent, MANAGED_BY_ENV } from "./launchCommand.js";
 import { nodeRegistryFileSystem } from "./nodeFileSystem.js";
 import type {
   InstalledPackage,
@@ -74,9 +75,9 @@ import {
  *
  * It is the same work the window used to do inline: `discoverApps` over the install
  * roots, `flatpak list` for what Flatpak owns, the managed AppImage writer for what
- * Start placed, and one detached spawn for a launch. Nothing here invents a channel
- * or a second way to write a binary; it is the native side of the seam, and the only
- * module that has to change when Start itself is packaged as a Flatpak.
+ * Start placed, and one detached launch. Nothing here invents a channel or a second
+ * way to write a binary; it is the native side of the seam, and `host.ts` is the one
+ * module that decides whether a process runs here or on the host.
  */
 
 export interface NativePackageBackendOptions {
@@ -98,14 +99,38 @@ export interface NativePackageBackendOptions {
    * what a hermetic test needs on a machine that has one installed.
    */
   readonly flatpak?: string | null;
+  /**
+   * Where processes run. The host by default; a test hands in a fake so the argv a
+   * sandbox would build is a value rather than a spawned process.
+   */
+  readonly host?: Host;
 }
 
 const FLATPAK_CACHE_MS = 30_000;
 const STORE_CACHE_MS = 60_000;
 const NO_STORE: ReadonlyMap<string, string> = new Map();
 
-/** The variable that tells an app it was started by the hub (D45). */
-const MANAGED_BY_ENV = "SUITE_MANAGED_BY";
+/**
+ * The native backend, plus the one operation only a Flatpak deployment has.
+ *
+ * Kept off `PackageBackend` because it is not a general package operation: an
+ * AppImage cannot replace its own running binary, and a backend without Flatpak
+ * has no deployment to name. Main asks this concrete backend, which owns the seam,
+ * so the window still never learns a second way to run `flatpak`.
+ */
+export interface NativePackageBackend extends PackageBackend {
+  /** Ask Flatpak to replace this hub. Throws when this build is not that deployment. */
+  updateSelf(): Promise<void>;
+  /**
+   * Close a running Flatpak by application id.
+   *
+   * `flatpak kill` is the one signal that reaches the app when Start is sandboxed,
+   * where the pid Start saw belongs to `flatpak-spawn`. It runs on the host through
+   * the seam in both forms; main chooses it only for the sandbox, so the host's
+   * existing SIGTERM path is unchanged.
+   */
+  stopFlatpak(application: string): Promise<void>;
+}
 
 /**
  * The channel an install belongs to.
@@ -121,11 +146,13 @@ function channelOf(app: DiscoveredApp): PackageChannel {
   return app.channel ?? app.manifest.update?.channel ?? "stable";
 }
 
-export function nativePackageBackend(options: NativePackageBackendOptions): PackageBackend {
+export function nativePackageBackend(options: NativePackageBackendOptions): NativePackageBackend {
   const { appsRoot, roots, registry, catalogue } = options;
+  const host = options.host ?? defaultHost();
 
-  const binary = (): string | null =>
-    options.flatpak !== undefined ? options.flatpak : findFlatpak();
+  /** The Flatpak CLI, resolved once through the seam's cached probe. */
+  const binary = async (): Promise<string | null> =>
+    options.flatpak !== undefined ? options.flatpak : findFlatpak(host);
 
   /**
    * What Flatpak has installed, cached for a moment.
@@ -138,7 +165,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
   let flatpakCache: { readonly at: number; readonly apps: readonly FlatpakApp[] } | null = null;
 
   async function flatpakInstalls(): Promise<readonly FlatpakApp[]> {
-    const executable = binary();
+    const executable = await binary();
     if (executable === null) return [];
     const now = Date.now();
     if (flatpakCache !== null && now - flatpakCache.at < FLATPAK_CACHE_MS) {
@@ -146,7 +173,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
     }
     let listed: readonly FlatpakApp[];
     try {
-      listed = parseFlatpakList(await runFlatpak(["list", "--app", "--json"], executable));
+      listed = parseFlatpakList(await runFlatpak(host, ["list", "--app", "--json"], executable));
     } catch {
       // A broken Flatpak must not break the launcher.
       listed = [];
@@ -160,6 +187,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
         try {
           const commit = parseCommitOutput(
             await runFlatpak(
+              host,
               installedCommitArgs({
                 application: app.applicationId,
                 installation: app.installation,
@@ -177,19 +205,36 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
     return apps;
   }
 
-  /** What `suite-local` offers, by catalogue app id. Empty when the store is not there. */
+  /** The store remote, probed once per cache window; null when the machine has none. */
+  let remoteCache: { readonly at: number; readonly remote: string | null } | null = null;
+
+  async function remote(): Promise<string | null> {
+    const executable = await binary();
+    if (executable === null) return null;
+    const now = Date.now();
+    if (remoteCache !== null && now - remoteCache.at < STORE_CACHE_MS) return remoteCache.remote;
+    const found = await storeRemote((args) => runFlatpak(host, args, executable));
+    remoteCache = { at: now, remote: found };
+    return found;
+  }
+
+  /** What the store offers, by catalogue app id. Empty when the store is not there. */
   let storeCache: { readonly at: number; readonly commits: ReadonlyMap<string, string> } | null =
     null;
 
   async function storeCommits(force = false): Promise<ReadonlyMap<string, string>> {
-    const executable = binary();
+    const executable = await binary();
     if (executable === null) return NO_STORE;
     const now = Date.now();
     if (!force && storeCache !== null && now - storeCache.at < STORE_CACHE_MS) {
       return storeCache.commits;
     }
 
-    const remote = storeRemote();
+    const remoteName = await remote();
+    if (remoteName === null) {
+      storeCache = { at: now, commits: NO_STORE };
+      return NO_STORE;
+    }
     const commits = new Map<string, string>();
     await Promise.all(
       catalogue
@@ -197,7 +242,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
         .map(async (entry) => {
           try {
             const commit = parseCommitOutput(
-              await runFlatpak(storeInfoArgs(remote, flatpakIdFor(entry.id)), executable),
+              await runFlatpak(host, storeInfoArgs(remoteName, flatpakIdFor(entry.id)), executable),
             );
             if (commit !== null) commits.set(entry.id, commit);
           } catch {
@@ -220,19 +265,24 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
   async function storeChannels(
     force = false,
   ): Promise<ReadonlyMap<string, readonly StoreChannel[]>> {
-    const executable = binary();
+    const executable = await binary();
     if (executable === null) return NO_CHANNELS;
     const now = Date.now();
     if (!force && channelCache !== null && now - channelCache.at < STORE_CACHE_MS) {
       return channelCache.channels;
     }
 
+    const remoteName = await remote();
     let refs: readonly { applicationId: string; branch: string; commit: string }[];
-    try {
-      refs = parseRemoteList(await runFlatpak(remoteListArgs(storeRemote()), executable));
-    } catch {
-      // No store means no switch to offer, not a failed card.
+    if (remoteName === null) {
       refs = [];
+    } else {
+      try {
+        refs = parseRemoteList(await runFlatpak(host, remoteListArgs(remoteName), executable));
+      } catch {
+        // No store means no switch to offer, not a failed card.
+        refs = [];
+      }
     }
 
     const channels = new Map<string, StoreChannel[]>();
@@ -279,7 +329,7 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
       storeCommits(forceOffers),
       versionsFor(),
     ]);
-    const executable = binary();
+    const executable = await binary();
     const discovery =
       executable === null ? result : withFlatpakInstalls(result, installs, catalogue, executable);
 
@@ -321,20 +371,20 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
 
   /** The version a deployment reports, or null when Flatpak will not say. */
   async function flatpakVersionOf(install: FlatpakInstall): Promise<string | null> {
-    const executable = binary();
+    const executable = await binary();
     if (executable === null) return null;
     try {
-      return parseVersionOutput(await runFlatpak(installedInfoArgs(install), executable));
+      return parseVersionOutput(await runFlatpak(host, installedInfoArgs(install), executable));
     } catch {
       return null;
     }
   }
 
   /** Run one Flatpak command through the binary this backend was given. */
-  function flatpak(args: readonly string[]): Promise<string> {
-    const executable = binary();
-    if (executable === null) return Promise.reject(new Error("Flatpak is not available"));
-    return runFlatpak(args, executable);
+  async function flatpak(args: readonly string[]): Promise<string> {
+    const executable = await binary();
+    if (executable === null) throw new Error("Flatpak is not available");
+    return runFlatpak(host, args, executable);
   }
 
   /**
@@ -364,17 +414,19 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
     channel?: PackageChannel,
   ): Promise<PackageInstallResult> {
     const application = flatpakIdFor(id);
+    const remoteName = await remote();
+    if (remoteName === null) throw new Error("this machine has no Suite Flatpak remote");
     if (isPreReleaseId(id)) {
       const tier = isPreReleaseTier(channel) ? channel : await preferredTier(id);
       if (tier === null) throw new Error("the store publishes no pre-release branch for this app");
-      await flatpak(storeBranchArgs(storeRemote(), application, tier));
+      await flatpak(storeBranchArgs(remoteName, application, tier));
       return {
         id,
         version: await finishFlatpak({ application, installation: "user", branch: tier }),
       };
     }
     const install: FlatpakInstall = { application, installation: "user" };
-    await flatpak(storeInstallArgs(storeRemote(), install.application));
+    await flatpak(storeInstallArgs(remoteName, install.application));
     return { id, version: await finishFlatpak(install) };
   }
 
@@ -396,7 +448,9 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
     tier: PreReleaseTier,
   ): Promise<PackageInstallResult> {
     const application = install.application;
-    await flatpak(storeBranchArgs(storeRemote(), application, tier, true));
+    const remoteName = await remote();
+    if (remoteName === null) throw new Error("this machine has no Suite Flatpak remote");
+    await flatpak(storeBranchArgs(remoteName, application, tier, true));
     return {
       id,
       version: await finishFlatpak({ ...install, branch: tier }),
@@ -519,72 +573,94 @@ export function nativePackageBackend(options: NativePackageBackendOptions): Pack
     },
 
     command(request: PackageLaunchRequest): PackageCommand {
-      return launchCommand(request, request.argv);
+      // The dry run shows what would actually run here, `flatpak-spawn --host`
+      // prefix included, because that is the answer a sandboxed user needs.
+      const planned = host.plan(launchIntent(request, request.argv));
+      return { command: planned.file, args: planned.args };
     },
 
     launch(request: PackageLaunchRequest, observer: PackageLaunchObserver = {}) {
-      const { command, args } = launchCommand(request, request.argv);
       const appId = request.appId;
-      const child = spawn(command, [...args], {
-        detached: true,
-        stdio: ["ignore", "ignore", "pipe"],
-        // The app is being started by the thing that also updates it. Only a launch
-        // Start performs carries this; a desktop entry or a shell run does not.
-        env: appId === undefined ? process.env : { ...process.env, [MANAGED_BY_ENV]: "start" },
-      });
+      // The app is being started by the thing that also updates it. Only a launch
+      // Start performs carries this; a desktop entry or a shell run does not.
+      const intent = launchIntent(request, request.argv, { managed: appId !== undefined });
+      const child = host.spawn(intent);
 
       let stderr = "";
-      child.stderr?.setEncoding("utf8");
-      child.stderr?.on("data", (chunk: string) => {
+      child.onStderr((chunk) => {
         if (stderr.length < 8192) stderr += chunk;
       });
 
-      const pid = child.pid ?? null;
+      const pid = child.pid;
       observer.started?.(pid);
 
       let settled = false;
       const settle = (): void => {
         settled = true;
-        child.stderr?.removeAllListeners("data");
-        child.stderr?.destroy();
-        child.unref();
+        child.release();
         observer.settled?.();
       };
       setTimeout(settle, 1_500);
 
       // Always: a window that closes is news even if it opened fine, because the card
       // says "running" and nobody else is going to redraw it.
-      child.once("exit", (code) => {
+      child.onExit((code) => {
         observer.exited?.(pid);
         if (settled) return;
         settled = true;
-        const verdict = launchVerdict({ executable: command, exitCode: code, stderr });
+        const verdict = launchVerdict({ executable: intent.file, exitCode: code, stderr });
 
         if (verdict.kind === "retry-without-fuse") {
-          console.warn(`[launch] ${command}: ${verdict.reason}; retrying without FUSE 2`);
-          spawn(command, [...args], {
-            detached: true,
-            stdio: "ignore",
+          console.warn(`[launch] ${intent.file}: ${verdict.reason}; retrying without FUSE 2`);
+          const retry = host.spawn({
+            ...intent,
             env: {
-              ...process.env,
+              ...(intent.env ?? {}),
               APPIMAGE_EXTRACT_AND_RUN: "1",
               ...(appId === undefined ? {} : { [MANAGED_BY_ENV]: "start" }),
             },
-          }).unref();
-          child.unref();
+          });
+          retry.release();
+          child.release();
           return;
         }
 
-        child.unref();
+        child.release();
         if (appId === undefined || verdict.kind === "ok") return;
-        console.warn(`[launch] ${command}: ${verdict.reason}`);
+        console.warn(`[launch] ${intent.file}: ${verdict.reason}`);
         observer.failed?.(verdict.reason);
       });
     },
 
     async location(package_: InstalledPackage) {
       if (package_.app.flatpak === undefined) return null;
-      return flatpakLocation(package_.app.flatpak);
+      return flatpakLocation(package_.app.flatpak, host);
+    },
+
+    /**
+     * Ask Flatpak to replace this hub.
+     *
+     * Only the Flatpak form has one: an AppImage Start cannot replace its own running
+     * binary, and the CLI never reaches here. The id check is the guard — a build
+     * running under some other application id has no deployment this may name.
+     */
+    async updateSelf() {
+      if (sandboxId() !== SELF_FLATPAK_ID) {
+        throw new Error("this build is not managed by Flatpak as run.suite.start");
+      }
+      await flatpak(selfUpdateArgs());
+    },
+
+    /**
+     * Close a running Flatpak by its application id.
+     *
+     * `flatpak kill` addresses the instance rather than the process, which is what
+     * a sandboxed Start needs: its child is `flatpak-spawn`, not the app. A build
+     * too old to know `kill` rejects here, and main falls back to asking the person
+     * to close the app rather than pretending it did.
+     */
+    async stopFlatpak(application) {
+      await flatpak(["kill", application]);
     },
 
     async adopt(executable) {
