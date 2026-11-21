@@ -10,8 +10,8 @@ import type { InstallRecord } from "./registry.js";
  * one, so a tampered manifest cannot redirect a launch; the worst it can do is
  * describe itself wrongly, and discovery refuses an id that has no record.
  *
- * `installs.json` sits in the data directory, under Start's own name, because it
- * is Start's knowledge rather than any app's.
+ * `installs.json` sits in Start's config directory, under its own name, because
+ * it is Start's knowledge rather than any app's.
  */
 
 export const REGISTRY_FILENAME = "installs.json";
