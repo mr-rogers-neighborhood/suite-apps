@@ -42,6 +42,19 @@ See `scripts/ci/` and the README.
   the Flatpak remote is the desktop update path, and the relay tarball is the
   other release artifact.
 
+## Releases and pull requests
+
+The signed Flatpak remote is the update path. GitHub Releases are a human mirror:
+per-app releases are `<app>-v<version>` and are not marked Latest, and one rolling
+`suite-YYYY.MM.DD` release is marked Latest. `RELEASES.md` is generated from the same versions by
+`scripts/release-status.mjs`. There is no GitHub Packages channel for the Flatpaks; a relay
+container, if it ever exists, is a separate decision.
+
+Every change lands through a branch or worktree and a pull request. A review-only agent reviews the
+diff and runs headless checks; it may comment or request changes but never merges. The coordinator
+runs the owning gate and the VM gate, then merges. A direct push to `main` is only an explicit owner
+checkpoint.
+
 ## Monorepo rules
 
 - Shared packages are `workspace:*`. Never reintroduce a `git+https://…#vX`

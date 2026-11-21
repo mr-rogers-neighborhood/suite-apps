@@ -26,6 +26,7 @@ const APPS = ["canvas", "planner", "budget", "start", "sync", "go"];
 const ROOT_PAGES = [
   "README.md",
   "AGENTS.md",
+  "RELEASES.md",
   ...APPS.map((app) => `apps/${app}/README.md`),
 ];
 const BANNED = [

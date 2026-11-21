@@ -40,6 +40,22 @@ belongs in its README and changelog.
 A task that cannot name its verification command is not ready to start. A task that changes a product
 claim moves the owning doc in the same change.
 
+## Pull requests and review
+
+A change lands through a branch, a pull request and a review; it does not land from a worktree
+straight to `main`.
+
+1. Branch from `main` and keep the change to one intent, with its tests and docs.
+2. Open the pull request with the repository template. Name the app or package, the checks you ran,
+   and the exact evidence: the command and what it printed.
+3. Ask for a review-only Orca worker. It reads the diff and runs the owning app's headless checks.
+   It may comment or request changes, and it does not merge, push to `main`, or publish.
+4. The coordinator runs the owning gate and the VM gate on the pull request's head, then merges.
+5. A direct push to `main` is only an explicit owner checkpoint.
+
+No GitHub Actions workflow is assumed. The gate is the command in [Verify](#verify); a pull request
+that names no command is not evidence.
+
 ## Documentation
 
 - A behaviour change updates the page that owns the fact in the same change.
