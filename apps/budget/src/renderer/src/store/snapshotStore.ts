@@ -1,79 +1,38 @@
 import { BudgetDocument, type BudgetSnapshot } from "@suite/budget-core";
+import { DocumentReplica as SharedDocumentReplica } from "@suite/document-runtime";
 import { createContext, useContext, useSyncExternalStore } from "react";
 
 import { getBridge } from "../platform/bridge";
 
 /**
- * The renderer's replica of the open budget. This file owns the single `observe` call site:
- * edits are merged locally, forwarded to main as CRDT updates, and the UI reads a snapshot.
+ * The renderer's replica of the open budget. `@suite/document-runtime` owns the single `observe`
+ * call site: edits are merged locally, forwarded to main as CRDT updates, and the UI reads a
+ * rebuilt snapshot. This file names Budget's document and bridge for that runtime.
  */
-export class DocumentReplica {
-  #doc: BudgetDocument;
-  #snapshot: BudgetSnapshot;
-  #listeners = new Set<() => void>();
-  #detach: () => void;
-
+export class DocumentReplica extends SharedDocumentReplica<BudgetDocument, BudgetSnapshot> {
   constructor(doc: BudgetDocument) {
-    this.#doc = doc;
-    this.#snapshot = doc.getSnapshot();
-    this.#detach = this.watch();
-  }
-
-  get document(): BudgetDocument {
-    return this.#doc;
-  }
-
-  getSnapshot = (): BudgetSnapshot => this.#snapshot;
-
-  subscribe = (listener: () => void): (() => void) => {
-    this.#listeners.add(listener);
-    return () => {
-      this.#listeners.delete(listener);
-    };
-  };
-
-  refresh(): void {
-    this.#snapshot = this.#doc.getSnapshot();
-    for (const listener of this.#listeners) listener();
-  }
-
-  replace(bytes: Uint8Array): void {
-    this.#detach();
-    this.#doc = BudgetDocument.fromSnapshot(bytes);
-    this.#detach = this.watch();
-    this.refresh();
-  }
-
-  dispose(): void {
-    this.#detach();
-    this.#listeners.clear();
+    super({
+      doc,
+      load: BudgetDocument.fromSnapshot,
+      commit: (update) => getBridge().commit(update),
+      errorLabel: "Suite Budget",
+    });
   }
 
   undo(): void {
-    this.#doc.undo();
+    this.document.undo();
   }
 
   redo(): void {
-    this.#doc.redo();
+    this.document.redo();
   }
 
   canUndo(): boolean {
-    return this.#doc.canUndo();
+    return this.document.canUndo();
   }
 
   canRedo(): boolean {
-    return this.#doc.canRedo();
-  }
-
-  private watch(): () => void {
-    return this.#doc.observe((update) => {
-      void getBridge()
-        .commit(update)
-        .catch((error: unknown) =>
-          console.error("Suite Budget: could not commit an update", error),
-        );
-      this.refresh();
-    });
+    return this.document.canRedo();
   }
 }
 

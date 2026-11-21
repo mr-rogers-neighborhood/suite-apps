@@ -30,7 +30,7 @@ This page is the map. The rules are in [conventions.md](conventions.md), the rec
 ┌───────────────────────────────────▼───────────────────────────────────────────┐
 │  Renderer (replica)                                                           │
 │  React 19 + Vite + Tailwind + Radix                                           │
-│    ├── WorkspaceDocument replica, one observe call site → snapshot store      │
+│    ├── WorkspaceDocument replica (@suite/document-runtime) → snapshot store   │
 │    ├── Zustand: UI state only (view, selected date, capture focus, notice)    │
 │    └── pure projections: dayPlan, capacityFor, occurrencesBetween, parseCapture│
 └───────────────────────────────────────────────────────────────────────────────┘
@@ -58,6 +58,10 @@ re-renders. Main imports the delta and debounces an atomic write (400 ms). The s
 into a relay frame when sync is on, so document code did not change when sync arrived. Incoming
 frames are applied to the authority and reach the renderer through `workspace:replaced`, the same
 replacement path an import uses; [sync.md](sync.md) is the seam.
+
+The replica and the atomic store are the two pieces Planner shares with Budget through
+`@suite/document-runtime`. Planner still supplies its own document factory (including the fresh peer
+id on load), `.planner` serializer, workspace directory and rolling backup.
 
 **Import.** Main decodes the file, builds a fresh document, validates every record, replaces the
 authority and writes it, then broadcasts `workspace:replaced` with a new snapshot. The renderer

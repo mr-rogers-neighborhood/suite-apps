@@ -37,6 +37,9 @@ The rules that shape this repository. Each is current; the code follows it.
 - Apps live under `apps/<name>`. Each app owns its private packages: Canvas has `desktop/` and
   `packages/graph`, Planner has `pack/` and `packages/core`, and so on.
 - Packages used by two or more apps live at the root `packages/`.
+- Planner and Budget share `@suite/document-runtime`: one renderer replica owns the `observe` call
+  site, and one main-process store owns the debounced temp-file rename. Each app keeps its document
+  factory, schema, file format, directory and backup policy.
 - The top bar is a host–app contract: the host keeps `mark` and `controls`, and the active app takes
   over the middle. [Menu bar](menu-bar.md) names the seven zones.
 

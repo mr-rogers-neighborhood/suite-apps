@@ -9,128 +9,73 @@ import {
   encodeBudgetFile,
   type LibraryEntry,
 } from "@suite/budget-core";
+import { MainDocumentStore } from "@suite/document-runtime/node";
 import type { AppPaths } from "./budgetLocation";
-import { backupCurrent, exportRecordsText, writeBudgetDocument } from "./library";
+import { backupCurrent, exportRecordsText } from "./library";
 
 /**
  * Owns the authoritative document while a budget is open. Renderer edits arrive as CRDT
- * updates and are written to disk on a debounce; the write is atomic and keeps backups.
+ * updates and are written to disk on a debounce through `@suite/document-runtime`; Budget keeps
+ * its own file format, library path and previous/daily backups.
  */
-export class BudgetStore {
-  readonly #doc: BudgetDocument;
-  readonly #paths: AppPaths;
+export class BudgetStore extends MainDocumentStore<BudgetDocument, BudgetSnapshot> {
   #entry: LibraryEntry;
-  #saveTimer: NodeJS.Timeout | null = null;
-  #flushing: Promise<void> = Promise.resolve();
-  #saveError: string | null = null;
 
   private constructor(paths: AppPaths, entry: LibraryEntry, doc: BudgetDocument) {
-    this.#paths = paths;
+    super({
+      doc,
+      path: entry.path,
+      serialize: encodeBudgetFile,
+      prepareDirectory: async (path) => {
+        await mkdir(dirname(path), { recursive: true });
+      },
+      backup: () => backupCurrent(paths, entry.id, entry.path),
+      // Budget copies the previous file and its daily backup before it writes the temp file.
+      backupOrder: "before-temp",
+      logWriteError: (error) => {
+        console.error(
+          "Suite Budget: could not write the budget",
+          error instanceof Error ? error.message : String(error),
+        );
+      },
+    });
     this.#entry = entry;
-    this.#doc = doc;
   }
 
   static fromDocument(paths: AppPaths, entry: LibraryEntry, doc: BudgetDocument): BudgetStore {
     return new BudgetStore(paths, entry, doc);
   }
 
-  get document(): BudgetDocument {
-    return this.#doc;
-  }
-
   get entry(): LibraryEntry {
     return this.#entry;
   }
 
-  get path(): string {
-    return this.#entry.path;
-  }
-
   get saveError(): string | null {
-    return this.#saveError;
-  }
-
-  snapshot(): Uint8Array {
-    return this.#doc.snapshot();
-  }
-
-  getSnapshot(): BudgetSnapshot {
-    return this.#doc.getSnapshot();
+    return this.lastError;
   }
 
   info(): BudgetInfo {
-    const settings = this.#doc.getSettings();
+    const settings = this.document.getSettings();
     return {
       id: this.#entry.id,
-      name: this.#doc.getMeta().name,
+      name: this.document.getMeta().name,
       path: this.#entry.path,
-      schemaVersion: this.#doc.getMeta().schemaVersion,
+      schemaVersion: this.document.getMeta().schemaVersion,
       currency: settings.currency,
       currencyScale: settings.currencyScale,
     };
   }
 
-  commit(update: Uint8Array): void {
-    this.#doc.applyUpdate(update);
-    this.scheduleSave();
-  }
-
-  mutate<T>(mutation: (doc: BudgetDocument) => T): T {
-    const result = mutation(this.#doc);
-    this.scheduleSave();
-    return result;
-  }
-
-  scheduleSave(): void {
-    if (this.#saveTimer) clearTimeout(this.#saveTimer);
-    this.#saveTimer = setTimeout(() => {
-      this.#saveTimer = null;
-      void this.flush();
-    }, 400);
-  }
-
-  flush(): Promise<void> {
-    if (this.#saveTimer) {
-      clearTimeout(this.#saveTimer);
-      this.#saveTimer = null;
-    }
-    this.#flushing = this.#flushing.then(
-      () => this.#writeCurrent(),
-      () => this.#writeCurrent(),
-    );
-    return this.#flushing;
-  }
-
-  async close(): Promise<void> {
-    await this.flush();
-  }
-
-  async exportTo(target: string): Promise<void> {
-    await writeFile(target, encodeBudgetFile(this.#doc), "utf8");
-  }
-
   async exportRecords(format: ExportFormat, target: string): Promise<void> {
-    const contents = await exportRecordsText(this.#doc.getSnapshot(), format);
+    const contents = await exportRecordsText(this.getSnapshot(), format);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, contents, "utf8");
   }
 
   async rename(name: string): Promise<LibraryEntry> {
-    this.#doc.rename(name);
+    this.document.rename(name);
     this.#entry = { ...this.#entry, name };
     this.scheduleSave();
     return this.#entry;
-  }
-
-  async #writeCurrent(): Promise<void> {
-    try {
-      await backupCurrent(this.#paths, this.#entry.id, this.#entry.path);
-      await writeBudgetDocument(this.#entry.path, this.#doc);
-      this.#saveError = null;
-    } catch (error) {
-      this.#saveError = error instanceof Error ? error.message : String(error);
-      // Keep the chain alive: a transient failure must not stop every later save.
-      console.error("Suite Budget: could not write the budget", this.#saveError);
-    }
   }
 }

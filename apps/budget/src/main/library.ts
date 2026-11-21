@@ -364,7 +364,7 @@ export function toOpenInfo(entry: LibraryEntry, doc: BudgetDocument): OpenBudget
   return { entry, snapshot: doc.snapshot() };
 }
 
-export async function writeBudgetDocument(
+async function writeBudgetDocument(
   path: string,
   doc: BudgetDocument,
   now: Date = new Date(),

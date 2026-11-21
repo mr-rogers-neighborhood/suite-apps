@@ -108,8 +108,8 @@ day timeline geometry.
 Function components with hooks, no classes.
 
 Read document data through `useWorkspaceSnapshot` and never a `useState` copy. Never call
-`WorkspaceDocument.observe` from a component: `store/snapshotStore.ts` owns the single subscription
-and selectors stay atomic.
+`WorkspaceDocument.observe` from a component: `@suite/document-runtime` owns the single subscription,
+`store/snapshotStore.ts` names Planner's document and bridge for it, and selectors stay atomic.
 
 Keep components small and split presentational pieces into the feature folder.
 

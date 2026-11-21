@@ -125,6 +125,7 @@ Only code used by more than one app belongs in a shared package:
 | --- | --- | --- |
 | `@suite/contracts` | Start, apps | `suite.app`, deployment, deep-link parsing, contract versioning |
 | `@suite/files` | Start, apps | Envelope mechanics, base64, size limits, backup naming |
+| `@suite/document-runtime` | Planner, Budget | Renderer replica with the single `observe` site, and the atomic main-process store |
 | `@suite/desktop` | Desktop apps | Electron security policy: sandbox, context isolation, fuses |
 | `@suite/theme` | Desktop apps | Shared theme variables |
 | `@suite/ui` | Desktop apps | Menu bar, modal, sync status and other shared chrome |
