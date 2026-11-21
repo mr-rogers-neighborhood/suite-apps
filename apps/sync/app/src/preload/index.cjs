@@ -17,6 +17,10 @@ contextBridge.exposeInMainWorld("suiteSync", {
   // Main copies the link and the fingerprint it computed; the page never handles them.
   copyLink: () => ipcRenderer.invoke("suite:sync:copy-link"),
   copyFingerprint: () => ipcRenderer.invoke("suite:sync:copy-fingerprint"),
+  // One of "loopback", "tailnet", "network". `true` is the confirmation the network scope
+  // requires; main refuses the change without it, so a hidden page cannot widen the bind.
+  setScope: (scope, acknowledged) =>
+    ipcRenderer.invoke("suite:sync:scope", scope, acknowledged === true),
   // The console URL carries a one-time token, so the page asks main to open it.
   openConsole: () => ipcRenderer.invoke("suite:sync:console"),
   setAutostart: (enabled) => ipcRenderer.invoke("suite:sync:autostart", enabled === true),

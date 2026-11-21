@@ -94,9 +94,11 @@ The two ways to use the same build are:
 
 - **A desktop app.** `flatpak run run.suite.sync` starts a tray item and a small window. The relay runs
   in the app's own main process, so closing the window hides it to the tray and the relay keeps
-  serving; **Quit** stops it. The window shows the address another device needs, a `suite://relay` code
-  carrying that address and the certificate pin, the fingerprint to paste into an app, and the
-  read-only console. It also starts and stops the relay and can add it to login.
+  serving; **Quit** stops it. It listens on loopback until you widen it — the tailnet, or the whole
+  network behind a confirmation — and the window remembers that choice. The window shows the address
+  another device needs, a `suite://relay` code carrying that address and the certificate pin, the
+  fingerprint to paste into an app, and the read-only console. It also starts and stops the relay and
+  can add it to login.
 - **The headless relay.** The same install runs the CLI on a machine with no desktop:
 
   ```sh

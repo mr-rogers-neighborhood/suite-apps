@@ -21,6 +21,19 @@
         </div>
       </section>
 
+      <section class="block" aria-labelledby="scope-label">
+        <h2 id="scope-label" class="label">Who can reach it</h2>
+        <div id="scopes" class="scopes" role="radiogroup" aria-labelledby="scope-label"></div>
+        <p id="scope-note" class="note" hidden></p>
+        <div id="scope-confirm" class="confirm" hidden>
+          <p id="scope-warning" class="confirm-text"></p>
+          <div class="actions">
+            <button id="scope-cancel" type="button">Cancel</button>
+            <button id="scope-continue" class="danger" type="button">Use this network</button>
+          </div>
+        </div>
+      </section>
+
       <section class="code" aria-labelledby="code-label">
         <h2 id="code-label" class="label">Relay code</h2>
         <canvas id="qr" width="480" height="480" role="img" aria-label="Relay code"></canvas>

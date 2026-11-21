@@ -67,11 +67,35 @@ command is the ordinary CLI: `serve`, `status`, `--version`.
 flatpak run run.suite.sync
 ```
 
-The relay starts with the app and serves `wss://` on `0.0.0.0:8787`, so another device on the network
-can reach it. The window shows the address it advertises, the certificate fingerprint, a code to scan
-and a link to the console. Closing the window hides it to the tray and leaves the relay serving;
-**Quit** from the tray or the menu stops the relay and exits. The tray offers the address, **Copy
-relay link**, **Open console** and **Quit**.
+The relay starts with the app and **listens on `127.0.0.1:8787` until you widen it**. The window's
+**Who can reach it** selector is that choice, stored in the app's own config
+(`$XDG_CONFIG_HOME/suite-sync/relay.json`) so a restart, including a login launch with `--hidden`,
+starts the same way:
+
+| Scope                      | Bind                           | What the window says                                 |
+| -------------------------- | ------------------------------ | ---------------------------------------------------- |
+| This device only (default) | `127.0.0.1`                    | "Only this device can reach the relay."              |
+| My tailnet                 | the first IPv4 on `tailscale0` | "Only devices on your tailnet can reach it."         |
+| This network               | `0.0.0.0`                      | "Any device on this network can write to the relay." |
+
+The tailnet scope reads the interface Tailscale creates. The Flatpak shares the host's network
+namespace, so no grant and no `flatpak-spawn` is involved; if Tailscale is not running, the option is
+disabled with **Tailscale is not running on this machine.**, and a stored tailnet choice refuses that
+bind and keeps the relay on loopback rather than widening.
+
+The network scope is the acknowledgement `--trust-all-remote` asks for on the CLI, so selecting it
+shows a warning and waits for **Use this network**; the relay only rebinds after that. Nothing is
+stored until the confirmation, and the main process refuses an unacknowledged change even if a page
+asked for one. Changing scope stops and restarts the relay, so the address, the code and the link are
+the ones the new bind actually serves.
+
+The window shows the address it advertises, the certificate fingerprint, a code to scan and a link to
+the console. Closing the window hides it to the tray and leaves the relay serving; **Quit** from the
+tray or the menu stops the relay and exits. The tray offers the address, **Copy relay link**,
+**Open console** and **Quit**.
+
+`SUITE_SYNC_BIND` still wins over the stored scope for a test, a smoke run or a unit that names an
+address; the window then says the reach is fixed by the environment and disables the selector.
 
 **Start the relay when I log in** writes one XDG autostart entry,
 `~/.config/autostart/run.suite.sync.desktop`, whose command is `flatpak run run.suite.sync --hidden`.
@@ -102,6 +126,9 @@ flatpak run --command=suite-sync run.suite.sync serve \
 `--store` has to name a path the sandbox can write: the app's own data directory is the one that
 always is. `/var/lib` is not, so the host-install unit below is for a `suite-sync` binary on the host,
 not for the Flatpak.
+
+The reach scopes belong to the tray app. The headless command binds exactly what `--host` says, and
+the loopback/TLS rules above decide whether that bind is allowed.
 
 From a checkout, the same CLI runs through the workspace:
 

@@ -62,6 +62,10 @@ The rules that shape this repository. Each is current; the code follows it.
 - The relay app's store and certificate pair live under the app's own data directory
   (`$XDG_DATA_HOME/suite-sync`), not in a documents folder, and its one host grant outside the
   sandbox is `xdg-config/autostart` for the login entry it writes when asked.
+- The relay's reach is a stored choice, not a bind the build ships: `loopback` by default, `tailnet`
+  when Tailscale is running, and `network` only after a confirmation in the window — the app's form
+  of the CLI's `--trust-all-remote`. `SUITE_SYNC_BIND` overrides it for a test or a host unit, and
+  the window says the reach is fixed rather than pretending the selector decides.
 - A version lives in one place and a tag names one app's release. [Version ownership](../how-to/package-and-release.md#version-ownership)
   states which file owns it and which prefix the tag uses.
 - The Flatpak store key signs the OSTree summary; the relay's update key signs its `SHA256SUMS`.

@@ -197,3 +197,87 @@ input:focus-visible {
   margin-top: auto;
   overflow-wrap: anywhere;
 }
+
+.scopes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scope {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.scope.warning {
+  border-color: #5b2b2b;
+}
+
+.scope input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.scope input:disabled {
+  opacity: 0.5;
+}
+
+.scope-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scope-name {
+  font-weight: 600;
+}
+
+.scope-sentence,
+.scope-detail {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scope.warning .scope-name,
+.scope-detail {
+  color: var(--danger);
+}
+
+#status.warning {
+  color: var(--danger);
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #5b2b2b;
+  border-radius: 8px;
+  background: #1d1214;
+}
+
+.confirm[hidden] {
+  display: none;
+}
+
+.confirm-text {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+button.danger {
+  background: #7a2f2f;
+  border-color: #7a2f2f;
+  color: #ffffff;
+}

@@ -4,6 +4,9 @@
  * It draws what main sends and asks main for everything else. There is no network client
  * here, no relay client and no camera: the code is drawn from rows main computed, and the
  * only thing this page can do to a link is hand it back to be copied.
+ *
+ * The reach selector is drawn from `view.options`, including which option needs a confirmation.
+ * That flag is main's decision, so a page that skipped the confirmation would still be refused.
  */
 
 const bridge = window.suiteSync;
@@ -21,6 +24,19 @@ const consoleButton = document.getElementById("console");
 const autostartBox = document.getElementById("autostart");
 const problemNode = document.getElementById("problem");
 const storeNode = document.getElementById("store");
+const scopesNode = document.getElementById("scopes");
+const scopeNote = document.getElementById("scope-note");
+const scopeConfirm = document.getElementById("scope-confirm");
+const scopeWarning = document.getElementById("scope-warning");
+const scopeCancel = document.getElementById("scope-cancel");
+const scopeContinue = document.getElementById("scope-continue");
+
+/** The last view drawn, so cancelling a confirmation can put the radios back. */
+let current = null;
+/** The scope waiting for confirmation, if a confirmation is open. */
+let pending = null;
+/** True while a scope change is restarting the relay. */
+let busy = false;
 
 /** A copy button says it copied, then says what it does again. */
 function acknowledge(button, text) {
@@ -65,11 +81,91 @@ function drawCode(code) {
   }
 }
 
+/** Put the radios back on the scope in force, which is what cancelling a confirmation does. */
+function restoreRadios() {
+  if (current === null) return;
+  for (const input of scopesNode.querySelectorAll("input")) {
+    input.checked = input.value === current.scope;
+  }
+}
+
+function closeConfirmation() {
+  pending = null;
+  scopeConfirm.hidden = true;
+  restoreRadios();
+}
+
+function renderScopes(view) {
+  scopesNode.replaceChildren();
+  for (const option of view.options) {
+    const label = document.createElement("label");
+    label.className = option.warning ? "scope warning" : "scope";
+
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "scope";
+    input.value = option.id;
+    input.checked = option.id === view.scope;
+    input.disabled = busy || view.scopeLocked || !option.available;
+    input.addEventListener("change", () => chooseScope(option));
+
+    const text = document.createElement("span");
+    text.className = "scope-text";
+    const name = document.createElement("span");
+    name.className = "scope-name";
+    name.textContent = option.label;
+    const sentence = document.createElement("span");
+    sentence.className = "scope-sentence";
+    sentence.textContent = option.sentence;
+    text.append(name, sentence);
+
+    if (option.detail !== null) {
+      const detail = document.createElement("span");
+      detail.className = "scope-detail";
+      detail.textContent = option.detail;
+      text.append(detail);
+    }
+
+    label.append(input, text);
+    scopesNode.append(label);
+  }
+}
+
+async function applyScope(scope, acknowledged) {
+  busy = true;
+  for (const input of scopesNode.querySelectorAll("input")) input.disabled = true;
+  let next = null;
+  try {
+    // Main stops the relay, stores the choice and starts it on the new bind before it answers.
+    next = await bridge.setScope(scope, acknowledged);
+  } finally {
+    busy = false;
+  }
+  // Draw with `busy` already false, or the rebuilt radios would stay disabled.
+  if (next) render(next);
+}
+
+function chooseScope(option) {
+  if (option.needsConfirmation) {
+    // The warning is on screen before anything changes; the change itself waits for Continue.
+    pending = option.id;
+    scopeWarning.textContent = `${option.sentence} A device that can reach the port can claim a role in a workspace whose id it knows. Choose this only on a network you trust.`;
+    scopeConfirm.hidden = false;
+    restoreRadios();
+    scopeContinue.focus();
+    return;
+  }
+  void applyScope(option.id, false);
+}
+
 function render(view) {
+  current = view;
   const running = view.running === true;
+  const sentence = view.options.find((option) => option.id === view.effective)?.sentence ?? "";
   statusNode.textContent = running
-    ? "Running. Other devices on this network can reach it."
+    ? `Running. ${sentence}`
     : "Stopped. Nothing can reach this machine.";
+  statusNode.classList.toggle("warning", running && view.effective === "network");
 
   addressNode.textContent = view.address ?? "Not listening";
   copyLinkButton.disabled = view.link === null;
@@ -81,6 +177,20 @@ function render(view) {
   consoleButton.disabled = view.consoleUrl === null;
 
   autostartBox.checked = view.autostart === true;
+
+  renderScopes(view);
+  if (view.scopeLocked) {
+    scopeNote.hidden = false;
+    scopeNote.textContent =
+      "The address is set by SUITE_SYNC_BIND, so the reach cannot be changed here.";
+  } else {
+    scopeNote.hidden = true;
+    scopeNote.textContent = "";
+  }
+  if (pending !== null && view.scope === pending) {
+    // The change landed (another window, or a retry): the confirmation has nothing left to do.
+    closeConfirmation();
+  }
 
   const empty = view.code === null;
   codeSection.classList.toggle("empty", empty);
@@ -119,6 +229,16 @@ consoleButton.addEventListener("click", () => {
 autostartBox.addEventListener("change", async () => {
   const next = await bridge.setAutostart(autostartBox.checked);
   if (next) render(next);
+});
+
+scopeCancel.addEventListener("click", () => closeConfirmation());
+
+scopeContinue.addEventListener("click", async () => {
+  const scope = pending;
+  if (scope === null) return;
+  scopeConfirm.hidden = true;
+  pending = null;
+  await applyScope(scope, true);
 });
 
 bridge.onChanged(render);

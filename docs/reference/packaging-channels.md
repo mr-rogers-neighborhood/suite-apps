@@ -262,6 +262,12 @@ entry points:
   hidden. It shows the address, the relay code and the certificate fingerprint, starts and stops the
   relay, and can write the one autostart entry that starts it at login. The store lives in the app's
   own data directory, `~/.var/app/run.suite.sync/data/suite-sync`.
+
+  Who can reach it is a stored choice: loopback by default, the machine's tailnet when Tailscale is
+  running, or the whole network after a confirmation in the window. The manifest needs no grant for
+  the wider two — `--share=network` already shares the host's network namespace, which is also what
+  makes `tailscale0` visible. The choice is `$XDG_CONFIG_HOME/suite-sync/relay.json` in the app's own
+  config; `SUITE_SYNC_BIND` overrides the bind for a test or a host unit.
 - **The headless CLI.** `flatpak run --command=suite-sync run.suite.sync serve …` is the same relay
   without a window, for a machine that has no desktop. The launcher runs the app's binary with
   `ELECTRON_RUN_AS_NODE=1`, because the Flatpak base carries no Node runtime.

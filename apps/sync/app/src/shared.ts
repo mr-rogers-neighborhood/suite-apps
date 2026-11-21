@@ -1,14 +1,17 @@
+import type { RelayScope, ScopeOption } from "./scope.js";
+
 /**
  * What the window asks the main process for, and what comes back.
  *
- * The page never names a path, a URL or a command it wants run: it asks for the relay's
- * state, and main decides what the state is.
+ * The page never names a path, a URL, a bind or a command it wants run: it asks for the relay's
+ * state and for a scope by id, and main decides what both mean.
  */
 
 export const SYNC_IPC = {
   state: "suite:sync:state",
   start: "suite:sync:start",
   stop: "suite:sync:stop",
+  setScope: "suite:sync:scope",
   copyLink: "suite:sync:copy-link",
   copyFingerprint: "suite:sync:copy-fingerprint",
   console: "suite:sync:console",
@@ -34,6 +37,14 @@ export interface RelayView {
   readonly store: string;
   readonly bind: string;
   readonly port: number;
+  /** The chosen reach. */
+  readonly scope: RelayScope;
+  /** What the bind exposes, which is `loopback` when the tailnet is not running. */
+  readonly effective: RelayScope;
+  /** True when `SUITE_SYNC_BIND` decides the bind, so the selector cannot. */
+  readonly scopeLocked: boolean;
+  /** The three options, with the copy and the confirmation flag decided in main. */
+  readonly options: readonly ScopeOption[];
   readonly problem: string | null;
   readonly autostart: boolean;
   readonly version: string;

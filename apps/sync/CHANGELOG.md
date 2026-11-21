@@ -25,6 +25,11 @@ this file does not invent them; every release from here adds its section first.
   `node scripts/flatpak.mjs --app sync` until the release that publishes the app to the store lands.
 - **Starting at login** writes one XDG autostart entry and nothing else outside the sandbox. The
   manifest grants exactly `--filesystem=xdg-config/autostart:create` for it.
+- **Who can reach the relay is a choice, loopback by default.** The window's selector offers this
+  device (the default), the tailnet (`tailscale0`, read from the shared network namespace), and the
+  whole network. The network scope is the acknowledgement the CLI's `--trust-all-remote` asks for:
+  it warns before it applies, the main process refuses an unconfirmed change, and the choice is
+  stored in the app's own config so a login launch keeps it. `SUITE_SYNC_BIND` overrides the bind.
 - **`@suite/host` can make the TLS pair it serves** (`ensureSelfSignedPair`), so an app that embeds a
   relay keeps one fingerprint across restarts. A bind that fails now rejects with the listen error
   instead of surfacing as an uncaught exception from the WebSocket server.

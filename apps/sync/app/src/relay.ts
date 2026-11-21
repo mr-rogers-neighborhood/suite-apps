@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import {
   advertisedRelayUrl,
@@ -8,6 +9,12 @@ import {
   HostRegistry,
   type SyncServer,
 } from "@suite/host";
+import {
+  type InterfaceTable,
+  type RelayScope,
+  type RelayTarget,
+  resolveRelayTarget,
+} from "./scope.js";
 
 /**
  * The relay this app owns.
@@ -21,7 +28,8 @@ import {
  * There is no device registry yet, so — exactly like the CLI's `--trust-all`, which is the
  * only mode `serve` accepts — the signature check is the host's business and this passes the
  * invitation-only policy the host already enforces: a known device id with a pinned key, a
- * role, and a live invitation to join.
+ * role, and a live invitation to join. Because that check admits any writer that can reach
+ * the port, the reach scope is the admission control; see `scope.ts`.
  */
 
 /** How many ports to try before giving up on "something else is already there". */
@@ -31,7 +39,11 @@ export interface RelayOptions {
   /** The store directory. The certificate pair lives in `<storeDir>/tls`. */
   readonly storeDir: string;
   /** The address to bind. `0.0.0.0` is what lets another device reach it. */
-  readonly bind: string;
+  readonly scope: RelayScope;
+  /** `SUITE_SYNC_BIND`: a literal bind that wins over the stored scope. */
+  readonly envBind?: string | null;
+  /** The interface table, injectable so a test can stand Tailscale up or leave it out. */
+  readonly interfaces?: () => InterfaceTable;
   /** The first port to try. `0` asks the OS for a free one, which is what tests use. */
   readonly port: number;
   /** What the console reports as the relay's version. */
@@ -40,13 +52,20 @@ export interface RelayOptions {
 
 export interface RelayState {
   readonly running: boolean;
-  /** The address a device is given: the LAN address when the bind is a wildcard. */
+  /** The address a device is given: the LAN or tailnet address when the bind is not literal. */
   readonly address: string | null;
+  /** The address actually bound. */
   readonly bind: string;
   readonly port: number;
   readonly fingerprint: string | null;
   readonly consoleUrl: string | null;
   readonly store: string;
+  /** The chosen reach. */
+  readonly scope: RelayScope;
+  /** What the bind exposes, which is `loopback` when the tailnet is not running. */
+  readonly effective: RelayScope;
+  readonly locked: boolean;
+  /** Why the chosen scope is not the effective one, or why the bind failed. */
   readonly problem: string | null;
 }
 
@@ -68,16 +87,47 @@ function describe(error: unknown): string {
 
 export class RelayService {
   readonly #options: RelayOptions;
+  #scope: RelayScope;
+  #target: RelayTarget;
   #server: SyncServer | null = null;
   #fingerprint: string | null = null;
   #problem: string | null = null;
 
   constructor(options: RelayOptions) {
     this.#options = options;
+    this.#scope = options.scope;
+    this.#target = this.#resolve();
+  }
+
+  #resolve(): RelayTarget {
+    return resolveRelayTarget({
+      scope: this.#scope,
+      envBind: this.#options.envBind ?? null,
+      interfaces: (this.#options.interfaces ?? (() => networkInterfaces()))(),
+    });
   }
 
   get running(): boolean {
     return this.#server !== null;
+  }
+
+  get scope(): RelayScope {
+    return this.#scope;
+  }
+
+  /** What the current choice would bind, without starting anything. */
+  get target(): RelayTarget {
+    return this.#target;
+  }
+
+  /**
+   * Choose the reach. A running relay keeps the bind it started with: the caller stops and starts,
+   * so the window never shows a scope the socket is not honouring.
+   */
+  setScope(scope: RelayScope): RelayTarget {
+    this.#scope = scope;
+    this.#target = this.#resolve();
+    return this.#target;
   }
 
   get state(): RelayState {
@@ -85,12 +135,15 @@ export class RelayService {
     return {
       running: server !== null,
       address: server === null ? null : advertisedRelayUrl(server.host, server.port, server.secure),
-      bind: this.#options.bind,
+      bind: server?.host ?? this.#target.bind,
       port: server?.port ?? this.#options.port,
       fingerprint: server?.fingerprint ?? this.#fingerprint,
       consoleUrl: server?.console?.url ?? null,
       store: this.#options.storeDir,
-      problem: this.#problem,
+      scope: this.#scope,
+      effective: this.#target.effective,
+      locked: this.#target.locked,
+      problem: this.#problem ?? this.#target.problem,
     };
   }
 
@@ -103,6 +156,7 @@ export class RelayService {
   async start(): Promise<RelayState> {
     if (this.#server !== null) return this.state;
 
+    this.#target = this.#resolve();
     const pair = ensureSelfSignedPair(join(this.#options.storeDir, "tls"), {
       commonName: "Suite Sync relay",
     });
@@ -119,7 +173,7 @@ export class RelayService {
       try {
         this.#server = await createSyncServer({
           registry: new HostRegistry(),
-          host: this.#options.bind,
+          host: this.#target.bind,
           port: this.#options.port + attempt,
           store: new FileHostStore(this.#options.storeDir),
           verifyFrame: () => true,

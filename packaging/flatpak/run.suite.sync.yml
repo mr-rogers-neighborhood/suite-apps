@@ -28,7 +28,10 @@ separate-locales: false
 
 finish-args:
   - --share=ipc
-  # The whole point: other devices connect to this machine's relay over the network.
+  # The relay listens on loopback by default, but the tailnet and network scopes bind a real
+  # interface: the sandbox has to share the host's network namespace for both. That is also what
+  # makes `tailscale0` visible to the tailnet scope, so enumerating it needs no grant and no
+  # `flatpak-spawn`. Which scope is in force is the app's own stored choice.
   - --share=network
   - --socket=wayland
   - --socket=fallback-x11

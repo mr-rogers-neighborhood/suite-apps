@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -27,7 +27,17 @@ import {
   disableAutostart,
   enableAutostart,
 } from "./autostart.js";
+import { readScope, relayConfigPath, writeScope } from "./config.js";
 import { RelayService, type RelayState } from "./relay.js";
+import {
+  checkScopeChange,
+  DEFAULT_SCOPE,
+  isRelayScope,
+  type RelayScope,
+  type RelayTarget,
+  resolveRelayTarget,
+  scopeOptions,
+} from "./scope.js";
 import { type RelayView, SYNC_CHANGED, SYNC_IPC } from "./shared.js";
 import {
   closeAction,
@@ -70,6 +80,10 @@ let window: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let relay: RelayService | null = null;
 let location: AutostartLocation | null = null;
+/** The app's own config, where the chosen reach scope is kept. */
+let configPath: string | null = null;
+/** The chosen reach. Loaded from the config at launch; `--hidden` uses the same one. */
+let scope: RelayScope = DEFAULT_SCOPE;
 let quitting = false;
 let cleanedUp = false;
 
@@ -87,20 +101,29 @@ function storeDir(): string {
 }
 
 /**
- * The address to bind.
+ * `SUITE_SYNC_BIND`, the test and host override.
  *
- * `0.0.0.0` is the app's point: a relay only this machine can reach is a relay no other
- * device can sync through. TLS is always on, so the exposure is a pinned `wss://` listener
- * that still only stores sealed frames.
+ * It wins over the stored scope: a machine, a smoke test or a unit that names an address gets that
+ * address, and the window says the reach is fixed by the environment rather than pretending the
+ * selector decides.
  */
-function bindHost(): string {
-  return process.env.SUITE_SYNC_BIND?.trim() || "0.0.0.0";
+function envBind(): string | null {
+  const value = process.env.SUITE_SYNC_BIND?.trim();
+  return value === undefined || value.length === 0 ? null : value;
 }
 
 function bindPort(): number {
   const raw = process.env.SUITE_SYNC_PORT?.trim();
   const parsed = raw === undefined || raw.length === 0 ? Number.NaN : Number.parseInt(raw, 10);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 65535 ? parsed : 8787;
+}
+
+/** What the relay would bind right now, without starting it. */
+function currentTarget(): RelayTarget {
+  return (
+    relay?.target ??
+    resolveRelayTarget({ scope, envBind: envBind(), interfaces: networkInterfaces() })
+  );
 }
 
 function appRoot(): string {
@@ -132,12 +155,15 @@ function view(): RelayView {
   const state = relay?.state ?? {
     running: false,
     address: null,
-    bind: bindHost(),
+    bind: currentTarget().bind,
     port: bindPort(),
     fingerprint: null,
     consoleUrl: null,
     store: storeDir(),
-    problem: null,
+    scope,
+    effective: currentTarget().effective,
+    locked: currentTarget().locked,
+    problem: currentTarget().problem,
   };
   const shell = shellState(state);
   return {
@@ -145,6 +171,14 @@ function view(): RelayView {
     store: state.store,
     bind: state.bind,
     port: state.port,
+    scope: state.scope,
+    effective: state.effective,
+    scopeLocked: state.locked,
+    options: scopeOptions({
+      scope: state.scope,
+      locked: state.locked,
+      interfaces: networkInterfaces(),
+    }),
     autostart: location !== null && autostartEnabled(location),
     version: app.getVersion(),
     link: relayLink(shell),
@@ -319,6 +353,43 @@ function registerIpc(): void {
     return view();
   });
 
+  /**
+   * Choose who can reach the relay.
+   *
+   * The window shows the warning and asks for confirmation; this is where the choice is enforced.
+   * An unacknowledged switch to the network scope is refused here rather than trusted to the page,
+   * and a bind fixed by `SUITE_SYNC_BIND` cannot be overridden at all.
+   */
+  onIpc(SYNC_IPC.setScope, async (_event, next: unknown, acknowledged: unknown) => {
+    if (!isRelayScope(next) || relay === null) return view();
+    if (relay.target.locked) return view();
+    const change = checkScopeChange({
+      from: scope,
+      to: next,
+      acknowledged: acknowledged === true,
+    });
+    if (!change.ok) return view();
+    if (next === scope) return view();
+
+    if (configPath !== null) {
+      try {
+        writeScope(configPath, next);
+      } catch (error) {
+        // A choice that cannot be stored would revert on the next launch, which is worse than
+        // saying so: keep the running state and report the failure.
+        console.warn("[sync] the reach scope could not be saved", error);
+        return view();
+      }
+    }
+
+    await relay.stop();
+    scope = next;
+    relay.setScope(next);
+    await relay.start();
+    await broadcast();
+    return view();
+  });
+
   onIpc(SYNC_IPC.copyLink, () => copy(view().link));
 
   onIpc(SYNC_IPC.copyFingerprint, () => copy(view().fingerprint));
@@ -406,9 +477,13 @@ if (!gotLock) {
       home: app.getPath("home"),
       env: process.env,
     });
+    configPath = relayConfigPath({ env: process.env, home: app.getPath("home") });
+    // The last choice, including the one a login launch (`--hidden`) inherits.
+    scope = readScope(configPath);
     relay = new RelayService({
       storeDir: storeDir(),
-      bind: bindHost(),
+      scope,
+      envBind: envBind(),
       port: bindPort(),
       version: app.getVersion(),
     });

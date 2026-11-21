@@ -1,15 +1,16 @@
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { type NetworkInterfaceInfo, networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { RelayService } from "./relay.js";
+import type { RelayScope } from "./scope.js";
 
 /**
  * The relay as the app runs it.
  *
- * These are real listeners on loopback, not a stand-in: the points worth checking are that
- * the pair exists before the first connection, that the pin survives a restart, and that a
- * port somebody else holds becomes the next port rather than a dead app.
+ * These are real listeners, not a stand-in: the points worth checking are that the pair exists
+ * before the first connection, that the pin survives a restart, that a port somebody else holds
+ * becomes the next port rather than a dead app, and that each reach binds what it says it does.
  */
 
 const stores: string[] = [];
@@ -20,10 +21,39 @@ async function storeDir(): Promise<string> {
   return dir;
 }
 
-function service(options: { store: string; port?: number; bind?: string }): RelayService {
+function iface(address: string): NetworkInterfaceInfo {
+  return {
+    address,
+    netmask: "255.255.255.0",
+    family: "IPv4",
+    mac: "00:00:00:00:00:00",
+    internal: false,
+    cidr: `${address}/24`,
+  };
+}
+
+/** The machine's own non-internal IPv4, when it has one, for a bind that can actually happen. */
+function lanAddress(): string | null {
+  for (const entries of Object.values(networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      if (entry.family === "IPv4" && !entry.internal) return entry.address;
+    }
+  }
+  return null;
+}
+
+function service(options: {
+  store: string;
+  port?: number;
+  scope?: RelayScope;
+  envBind?: string;
+  interfaces?: Record<string, NetworkInterfaceInfo[]>;
+}): RelayService {
   return new RelayService({
     storeDir: options.store,
-    bind: options.bind ?? "127.0.0.1",
+    scope: options.scope ?? "loopback",
+    ...(options.envBind === undefined ? {} : { envBind: options.envBind }),
+    ...(options.interfaces === undefined ? {} : { interfaces: () => options.interfaces ?? {} }),
     port: options.port ?? 0,
     version: "0.0.0-test",
   });
@@ -104,7 +134,7 @@ describe("the embedded relay", () => {
   });
 
   it("reports a sentence instead of throwing when it cannot bind", async () => {
-    const relay = service({ store: await storeDir(), bind: "203.0.113.1", port: 8787 });
+    const relay = service({ store: await storeDir(), envBind: "203.0.113.1", port: 8787 });
     const state = await relay.start();
 
     expect(state.running).toBe(false);
@@ -117,6 +147,115 @@ describe("the embedded relay", () => {
     const relay = service({ store });
     const state = await relay.start();
     expect(state.store).toBe(store);
+    await relay.stop();
+  });
+});
+
+describe("the reach each scope binds", () => {
+  it("defaults to loopback, and says so in the address", async () => {
+    const relay = service({ store: await storeDir() });
+    const state = await relay.start();
+
+    expect(state.scope).toBe("loopback");
+    expect(state.effective).toBe("loopback");
+    expect(state.bind).toBe("127.0.0.1");
+    expect(state.address).toBe(`wss://127.0.0.1:${state.port}/sync`);
+    expect(state.problem).toBeNull();
+
+    await relay.stop();
+  });
+
+  it("binds every interface only for the network scope", async () => {
+    const relay = service({ store: await storeDir(), scope: "network" });
+    const state = await relay.start();
+
+    expect(state.scope).toBe("network");
+    expect(state.effective).toBe("network");
+    expect(state.bind).toBe("0.0.0.0");
+    // The address a device is given is never the wildcard itself.
+    expect(state.address).not.toContain("0.0.0.0");
+    expect(state.address).toMatch(/^wss:\/\/\S+:\d+\/sync$/u);
+
+    await relay.stop();
+  });
+
+  it("binds the tailnet address when Tailscale is up", async () => {
+    const ipv4 = lanAddress();
+    if (ipv4 === null) return; // A machine with no usable IPv4 cannot host this check.
+    const relay = service({
+      store: await storeDir(),
+      scope: "tailnet",
+      interfaces: { tailscale0: [iface(ipv4)] },
+    });
+    const state = await relay.start();
+
+    expect(state.effective).toBe("tailnet");
+    expect(state.bind).toBe(ipv4);
+    expect(state.address).toBe(`wss://${ipv4}:${state.port}/sync`);
+    expect(state.problem).toBeNull();
+
+    await relay.stop();
+  });
+
+  it("serves loopback and reports why when Tailscale is not running", async () => {
+    const relay = service({
+      store: await storeDir(),
+      scope: "tailnet",
+      interfaces: { lo: [iface("127.0.0.1")] },
+    });
+    const state = await relay.start();
+
+    expect(state.running).toBe(true);
+    expect(state.scope).toBe("tailnet");
+    expect(state.effective).toBe("loopback");
+    expect(state.bind).toBe("127.0.0.1");
+    expect(state.problem).toBe("Tailscale is not running on this machine.");
+
+    await relay.stop();
+  });
+
+  it("lets SUITE_SYNC_BIND decide, and says the choice is locked", async () => {
+    const relay = service({
+      store: await storeDir(),
+      scope: "network",
+      envBind: "127.0.0.1",
+    });
+    const state = await relay.start();
+
+    expect(state.bind).toBe("127.0.0.1");
+    expect(state.effective).toBe("loopback");
+    expect(state.locked).toBe(true);
+    expect(state.address).toBe(`wss://127.0.0.1:${state.port}/sync`);
+
+    await relay.stop();
+  });
+
+  it("keeps the old bind until it is restarted after a scope change", async () => {
+    const relay = service({ store: await storeDir() });
+    const first = await relay.start();
+
+    const target = relay.setScope("network");
+    expect(target.bind).toBe("0.0.0.0");
+    // A running socket cannot change its bind; the window shows what is actually serving.
+    expect(relay.state.bind).toBe("127.0.0.1");
+    expect(relay.state.address).toBe(first.address);
+
+    await relay.stop();
+    const restarted = await relay.start();
+    expect(restarted.bind).toBe("0.0.0.0");
+    expect(restarted.scope).toBe("network");
+    await relay.stop();
+  });
+
+  it("keeps the same pin across a scope change", async () => {
+    const store = await storeDir();
+    const relay = service({ store });
+    const first = await relay.start();
+    await relay.stop();
+
+    relay.setScope("network");
+    const second = await relay.start();
+    expect(second.fingerprint).toBe(first.fingerprint);
     await relay.stop();
   });
 });
