@@ -123,9 +123,11 @@ is not spending. A split parent is a container. A schedule is a template. A targ
 Radix primitives first. Every icon-only control has an accessible name and a title. Focus is visible and
 defined once. The register and the plan draw column headers as text over a row layout, not a native
 table, so those headers are visual rather than announced; [ACCESSIBILITY.md](../../ACCESSIBILITY.md)
-owns that gap and the rest. Amounts use tabular numerals. State is never colour alone: **Overspent**,
-**Funded**, **Left**, **Reconciled** are words. The SVG charts have a role, an accessible name, and a
-data table. `prefers-reduced-motion` is respected. Storybook runs the a11y addon.
+owns that gap and the rest. Report tabs expose their selected state, the range picker has a label, and
+Budget vs actual carries table, row, header and cell roles. Amounts use tabular numerals. State is
+never colour alone: **Overspent**, **Funded**, **Left**, **Reconciled** are words. The SVG charts have
+a role, an accessible name, and a data table. `prefers-reduced-motion` is respected. Storybook runs
+the a11y addon.
 
 ## Theme
 

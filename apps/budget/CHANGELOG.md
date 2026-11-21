@@ -21,6 +21,15 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 - **A QIF export cannot be broken by a line break.** A payee, memo, category or account name
   containing a newline used to become a new QIF field line; it is now flattened to a space, and the
   QIF `N` reference id survives the round trip.
+- **Escape in an assigned amount cancels the edit.** Blurring after Escape used to commit the text
+  the person had just cancelled; the previous amount stays, and the field keeps the grid's focus.
+
+### Accessibility
+
+- **Budget vs actual reads as a table.** The report's header and rows now carry table, row, header
+  and cell roles, so a screen reader can associate a figure with its column. Component tests pin the
+  range label, a tab's selected state, a chart's name and data table, and the register row's own
+  Enter and Space.
 
 ## [0.4.1] - 2026-11-21
 

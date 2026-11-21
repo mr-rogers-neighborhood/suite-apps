@@ -22,9 +22,14 @@ what it finds without failing a build.
   not the gate: a violation is visible but does not fail `pnpm verify`, and only the two stories
   (`Button`, `Charts`) exist so far.
 - **The register and plan controls, on every change.** Component tests assert that a register row's
-  cleared control and split expand control keep focus after they act, that Enter in an assigned
-  amount moves focus to the next envelope, and that each cleared control names its own row rather
-  than repeating one label.
+  cleared control and split expand control keep focus after they act, that a row itself opens the
+  editor with Enter or Space while the controls inside it do not, that Enter in an assigned amount
+  moves focus to the next envelope, that Escape restores the previous amount instead of assigning
+  the cancelled text, and that each cleared control names its own row rather than repeating one
+  label.
+- **The reports, on every change.** Component tests assert that the range picker has a label, a report
+  tab exposes whether it is selected, a chart has an accessible name and a data table, and Budget vs
+  actual is a table whose headers and cells a screen reader can read.
 
 There is no axe run against the running application. The end-to-end suite covers the launcher and
 the phone widths (360, 390 and 430 CSS pixels), not an accessibility rule set.

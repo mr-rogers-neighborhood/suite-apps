@@ -65,6 +65,48 @@ describe("plan envelope rows", () => {
     expect(fixture.doc.assignedFor("2026-03", fixture.food.id)).toBe(1234);
   });
 
+  it("should cancel an edit with Escape without assigning the typed amount", () => {
+    const fixture = setup();
+    replica = fixture.replica;
+
+    render(
+      <WorkspaceContext.Provider value={fixture.replica}>
+        <PlanView />
+      </WorkspaceContext.Provider>,
+    );
+
+    const food = screen.getByLabelText("Assigned to Food");
+    food.focus();
+    fireEvent.change(food, { target: { value: "12.34" } });
+    fireEvent.keyDown(food, { key: "Escape" });
+
+    expect(fixture.doc.assignedFor("2026-03", fixture.food.id)).toBe(0);
+    expect(food).toHaveValue("0.00");
+  });
+
+  it("should say an envelope is overspent in words, not only colour", () => {
+    const fixture = setup();
+    replica = fixture.replica;
+    fixture.doc.createTransaction(
+      {
+        accountId: fixture.account.id,
+        date: "2026-03-05",
+        amountMinor: -1_000,
+        categoryId: fixture.food.id,
+        payeeName: "Market",
+      },
+      NOW,
+    );
+
+    render(
+      <WorkspaceContext.Provider value={fixture.replica}>
+        <PlanView />
+      </WorkspaceContext.Provider>,
+    );
+
+    expect(screen.getByText("Overspent")).toBeInTheDocument();
+  });
+
   it("should make the group control's expanded state match its action", () => {
     const fixture = setup();
     replica = fixture.replica;
