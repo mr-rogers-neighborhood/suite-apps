@@ -1,0 +1,33 @@
+---
+module: apps/budget/packages/core/src/plan
+title: Budget plan projections
+summary: "The ledger, month fold and target arithmetic behind a budget's plan."
+---
+
+The plan module is the fold behind the plan view. `buildLedger` turns transactions
+into account and envelope balances, `monthState` closes each envelope at the month
+boundary, and `targetStatus` derives a suggestion from those numbers. Nothing here
+stores a total or holds a document: the functions take records and a month and
+return plain data, so the plan view and the reports read the same arithmetic.
+
+The notes below cover the rules worth stating. The ledger and month fold are tested
+against a hand-computed month and a generated invariant; debt payoff adds a
+fixed-rate projection over the target's payment.
+
+## apps/budget/packages/core/src/plan/amortization.ts#projectDebtPayoff
+
+The target editor can say what a fixed payment does to a debt without moving money.
+`projectDebtPayoff` runs the month loop in integers: add interest, take the
+payment, and stop when the balance reaches zero or the horizon is reached. The rate
+is basis points and every amount is minor units, so the result cannot drift through
+a float.
+
+Three rules keep the projection honest. Interest rounds half up once per month; the
+final payment is the balance plus that month's interest, never the full payment;
+and a payment at or below the first month's interest returns "never pays off"
+instead of an endless schedule. A balance still open after 100 years is also a
+failure, so the loop has a bound. The tests pin a zero-interest loan, a multi-year
+loan, the half-up case, the clamped final payment and both refusal paths.
+
+The function is a pure projection: it does not read the document, change the
+target's suggestion, or model new charges and rate changes.

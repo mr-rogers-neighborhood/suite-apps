@@ -186,8 +186,18 @@ on/off-budget transfer, a split, a refund, and an uncategorized row.
 | `savings_balance`     | `(amountMinor − available) / monthsRemaining`, rounded up | `available ≥ amountMinor` by `dueMonth`  |
 | `debt_payoff`         | `linkedAccountDebt / monthsRemaining`, rounded up         | linked account balance ≤ 0 by `dueMonth` |
 
-`monthsRemaining` counts the current month through the due month. Debt payoff ignores interest in v1 and
-says so in the editor; `loan.interestRateBps` is stored for a later amortizing version.
+`monthsRemaining` counts the current month through the due month. A debt payoff's suggestion is still
+the balance divided by those months; the projection does not change it or the funding check, which
+reads the linked account's balance.
+
+The target editor projects that fixed payment against the linked account's `loan.interestRateBps`
+(zero when the account has no loan terms) and shows the months to payoff, the month the balance
+reaches zero, total interest and total paid. The projection is an estimate, not a second suggestion:
+new charges and rate changes are not modelled. Amounts stay integer minor units and the rate integer
+basis points; monthly interest is rounded half up to the nearest minor unit, and the final payment is
+clamped to the balance plus that month's interest, so it never charges more than the debt. A payment
+at or below the monthly interest is reported as never paying off, as is a balance still open after
+100 years.
 
 ## Auto-assign
 

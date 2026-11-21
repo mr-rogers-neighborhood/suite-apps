@@ -43,3 +43,18 @@ Widgets are document records because a person arranged them; their values are
 not. Adding, moving or removing a widget is a typed document write, and the next
 snapshot rebuilds every figure from the ledger. A report that cached its numbers
 would be the second source of truth this view is written to avoid.
+
+## apps/budget/src/renderer/src/plan/TargetDialog.tsx#TargetDialog
+
+The dialog is where a debt target becomes a date and a payment. For a debt
+payoff it reads the linked account's balance from the current ledger and the
+rate from its loan terms, divides the balance by the months left to get the
+monthly need, and calls `projectDebtPayoff`. The panel under the form shows the
+payoff month, total interest and total paid that payment implies; it is computed
+on render from the same snapshot as the plan, so no projection is stored.
+
+The panel states its limits: new charges and rate changes are not modelled. A
+payment that cannot cover the month's interest, or a balance that would outlast
+100 years, is reported as never paying off instead of drawn as a very long
+schedule. Saving still writes only the record the schema holds: kind, amount,
+due month and account.

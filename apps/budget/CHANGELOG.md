@@ -14,16 +14,18 @@ No changes yet.
 
 ### Added
 
-- **A debt payoff target now estimates its interest.** The target editor shows how many months the
-  current monthly need takes, the month the balance reaches zero, and the total interest, using the
-  rate stored on the linked loan or card. The estimate says it is an estimate and that new charges
-  and rate changes are not modelled; a payment that cannot cover the monthly interest is called out
-  instead of pretending the debt clears.
+- **A debt payoff target now estimates its interest.** The target editor shows how long the current
+  monthly need takes, the month the balance reaches zero, and the total interest, using the rate
+  stored in the linked account's loan terms (zero when it has none). The panel says it is only an
+  estimate: new charges and rate changes are not modelled. A payment that cannot cover the monthly
+  interest is called out instead of pretending the debt clears.
 
 ### Changed
 
-- **Interest rounds explicitly.** Monthly interest rounds half up to the nearest minor unit, and the
-  final payment never exceeds the balance plus that month's interest.
+- **Interest rounds half up, and the last payment is smaller.** Each month's interest rounds to the
+  nearest minor unit, and the final payment is clamped to the balance plus that month's interest, so
+  the estimate never charges more than the debt. A balance still open after 100 years is reported as
+  never paying off.
 
 ## [0.2.5] - 2026-11-20
 

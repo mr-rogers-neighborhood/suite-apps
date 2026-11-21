@@ -141,7 +141,7 @@ imports React or Electron.
 - Shared or household budgets.
 - Investment/tracking accounts and manual valuations.
 - Auto-entering schedules while the app is closed.
-- Loan amortization and interest splitting.
+- Splitting a payment into principal and interest.
 - Privacy/scramble mode.
 - A web build at `budget.suite.run`, mobile, and the suite switcher.
 - Multiple windows.
