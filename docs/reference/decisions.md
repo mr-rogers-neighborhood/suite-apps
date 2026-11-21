@@ -13,15 +13,18 @@ The rules that shape this repository. Each is current; the code follows it.
 - `@suite/desktop` is shared Electron policy. Canvas's shell is `@suite/canvas-desktop`.
 - `tools/docs` is the local documentation reader, not an app and not a shipped surface. It indexes
   every file and declaration, generates its reference tree from `docs/`, and keeps module notes in
-  `docs/modules/` and ordered walkthroughs in `docs/walkthroughs/`. It is excluded from the root
-  build and release. `docs/` and each app's `docs/` remain the source of truth.
-- The reader is not organized by Diátaxis. Browser, Modules and Walkthroughs are the structure over
-  one code index; reference facts are generated, and module MDX plus walks are the authored layer.
-  The old tutorials, how-to, reference and explanation pages remain a notes archive; new content
-  goes to `docs/modules/` or `docs/walkthroughs/`.
-- A normal walk is already a tour; `docs/walkthroughs/*.tour.mjs` exists only for a composed path
-  that crosses modules, files, symbols, walks or docs. The index resolves every target and
-  `docs:index:check` fails on an unknown one, so a tour cannot rot into a list of dead links.
+  `docs/modules/` and tours in `docs/tours/`. It is excluded from the root build and release. `docs/`
+  and each app's `docs/` remain the source of truth.
+- The reader is not organized by Diátaxis. Browser, Modules and Tours are the structure over one code
+  index; reference facts are generated, and module MDX plus tours are the authored layer. The old
+  tutorials, how-to, reference and explanation pages remain a notes archive; new content goes to
+  `docs/modules/` or `docs/tours/`.
+- A tour is one concept with two authoring forms: `docs/tours/*.mdx` for a linear prose path and
+  `docs/tours/*.tour.mjs` for a composed path that crosses modules, files, symbols, tours or docs.
+  The MDX preamble is the intro; `## interlude: <title>` is a chapter; `### overlay: <title>` adds a
+  dismissible commentary card. The index resolves every target, so a tour cannot rot into dead links.
+- Tour membership is data: the index records which curated and composed tours target a file or
+  symbol, and the file view lists them. `Full descent`, interludes and overlays do not mark a file.
 
 ## Layout
 

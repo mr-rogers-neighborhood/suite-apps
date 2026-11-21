@@ -78,8 +78,8 @@ took the desktop down. The layout and package ownership are in
 
 The primary reader is the explorer. Run `pnpm docs:dev` at the repository root and open
 <http://localhost:3001/explore>. It indexes every file and declaration and offers three views:
-**Browser** (the file tree), **Modules** (one narrative per module) and **Walkthroughs** (ordered
-paths through the code). Reference facts are derived; module notes and walks carry the prose.
+**Browser** (the file tree), **Modules** (one narrative per module) and **Tours** (ordered paths
+through the code). Reference facts are derived; module notes and tours carry the prose.
 
 This is a development tool, not a hosted site. The older notes stay in [docs](docs/README.md):
 decisions, architecture, commands and the app-specific docs. They are a notes archive, not a

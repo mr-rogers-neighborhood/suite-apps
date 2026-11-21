@@ -9,15 +9,14 @@ are the durable notes that cannot be derived from the code.
 
 ## Notes archive
 
-The reader is not organized by Diátaxis. Its structure is **Browser / Modules / Walkthroughs** over
-one code index. Reference facts come from the compiler, module narratives live in
-`docs/modules/*.mdx`, ordered paths live in `docs/walkthroughs/*.mdx`, and a cross-module tour lives
-in `docs/walkthroughs/*.tour.mjs`.
+The reader is not organized by Diátaxis. Its structure is **Browser / Modules / Tours** over one code
+index. Reference facts come from the compiler, module narratives live in `docs/modules/*.mdx`, linear
+tours live in `docs/tours/*.mdx`, and a composed tour lives in `docs/tours/*.tour.mjs`.
 
 The older notes keep their historical grouping so links do not rot. Do not add new pages to them:
 [tutorials](tutorials/index.md), [how-to](how-to/index.md), [reference](reference/index.md),
 [explanation](explanation/index.md). A new explanation belongs in a module MDX; a new guided path
-belongs in a walkthrough.
+belongs in a tour.
 
 Current rules are in [reference/decisions.md](reference/decisions.md). App-specific notes stay in
 `apps/<app>/docs/`; the app README is the way in. The Canvas handbook remains the user-facing
@@ -73,10 +72,10 @@ Never restate a version in prose here. Link to the file that holds it.
 
 ## Editing rules
 
-- **The explorer is the structure.** Browser, Modules and Walkthroughs are the reading model.
-  Reference facts are generated; do not create a parallel section by hand.
+- **The explorer is the structure.** Browser, Modules and Tours are the reading model. Reference
+  facts are generated; do not create a parallel section by hand.
 - **Do not add a new Diátaxis page.** The four old sections are a notes archive. A new explanation
-  goes in `docs/modules/`; a new guided path goes in `docs/walkthroughs/`.
+  goes in `docs/modules/`; a new guided path goes in `docs/tours/`.
 - **Link, do not copy.** Duplicated paragraphs drift, and the reader cannot tell which one is true.
 - **Name the local command.** Every verification claim names the command that produced it.
 - **Docs change with the code.** A change that alters behaviour, ownership or the shape of a
@@ -86,10 +85,10 @@ Never restate a version in prose here. Link to the file that holds it.
 - **No history in the reading path.** Current pages describe today. Git history is the archive.
 - **Reference is plain Markdown.** A `.md` page uses relative links and no site-only shortcodes, so
   it renders on GitHub and in the local reader.
-- **Walkthroughs are views, not copies.** A walkthrough is an ordered list of real node IDs with
-  optional prose. A composed tour may cross modules, files, symbols, walks or doc pages, but it points
-  at content and never restates it. The code index does the linking; the walkthrough never restates a
-  signature or duplicates a source file.
+- **Tours are views, not copies.** A tour is an ordered list of real node IDs with optional prose. A
+  composed tour may cross modules, files, symbols, tours or doc pages, but it points at content and
+  never restates it. The code index does the linking; the tour never restates a signature or
+  duplicates a source file.
 - **One module MDX, not one file MDX.** A module's narrative and its `## <node-id>` notes live in one
   `docs/modules/*.mdx`. The explorer splits it by file and declaration at render time.
 - **The reader is local.** `tools/docs` is a development tool, not an app. It is excluded from the

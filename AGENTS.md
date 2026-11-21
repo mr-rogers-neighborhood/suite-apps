@@ -77,9 +77,8 @@ These still hold, from the old workspace skill:
 
 ## Documentation
 
-- Cross-app docs live in `docs/`: module narratives in `docs/modules/`, walks in
-  `docs/walkthroughs/`, and the older pages as a notes archive. Each app keeps
-  `apps/<app>/docs/` beside its code.
+- Cross-app docs live in `docs/`: module narratives in `docs/modules/`, tours in `docs/tours/`, and
+  the older pages as a notes archive. Each app keeps `apps/<app>/docs/` beside its code.
 - One fact has one home. Fix the owning page and link from the rest. Never restate a version; link
   to `package.json` or the changelog.
 - Docs describe the tree as it is. The flattened layout is a proposal in
