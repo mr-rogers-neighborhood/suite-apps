@@ -25,10 +25,16 @@ in the data path. Sync carries a document between devices; it never defines its 
 
 ## Install
 
-Suite Start is the only piece you fetch by hand. Every other app arrives through it.
-[Installing Suite Start](apps/start/docs/how-to/install.md) owns the download, checksum and first
-launch, for Arch and every other distribution. Open Start, install Canvas, and start with
+Suite Start ships as the Flatpak `run.suite.start`; every other app arrives through it.
+[Installing Suite Start](apps/start/docs/how-to/install.md) owns the signed remote, the checksum and
+the first launch. Open Start, install Canvas, and start with
 [Make a first workspace](docs/tutorials/02-first-workspace.md).
+
+## Releases
+
+One rolling `suite-YYYY.MM.DD` release is the repository's GitHub Latest; per-app releases are
+history, and the signed Flatpak remote is the update path. [RELEASES.md](RELEASES.md) mirrors the
+current versions and install commands.
 
 ## How it fits together
 
