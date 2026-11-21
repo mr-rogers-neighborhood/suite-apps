@@ -42,15 +42,15 @@ It covers six passes per screen:
 
 ## Known gaps
 
-These are real and tracked. Each has a row in the
-[criterion map](../../docs/reference/accessibility/wcag-22-map.md) naming its success criterion.
+Start has no axe or Playwright accessibility sweep, and no manual pass has been recorded. The gaps
+below are the ones a code review can name; the manual protocol is what would confirm them. Each has a
+row in the [criterion map](../../docs/reference/accessibility/wcag-22-map.md) naming its success
+criterion.
 
-| Area             | What is missing                                                                                                                                                               | Level |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| Shortcuts        | Canvas single-key shortcuts are not remappable or disableable (SC 2.1.4).                                                                                                     | A     |
-| Board navigation | The Canvas board has no complete keyboard model for moving between cards.                                                                                                     | AA    |
-| Dragging         | Most drag actions have a menu or arrow-key equivalent. Three do not: resizing a section to an arbitrary size, re-pointing a section link, and bending a connector (SC 2.5.7). | AA    |
-| Status messages  | The markup is correct. Whether a screen reader hears a confirmation has not been listened to yet.                                                                             | AA    |
+| Area | What is missing | Level |
+| --- | --- | --- |
+| Reflow | The rail is a fixed 208px column and an app card has a 320px minimum, with no breakpoint. At 200% zoom, or a 320 CSS px viewport, the content column is narrower than a card and the page overflows instead of reflowing (SC 1.4.10). | AA |
+| Status messages | Install progress is a `role="status"` region created and filled at the same moment. Install failures, launch errors and the update-check result are plain text with no live region, and the copy-link confirmation is only a button label change, so a screen reader may miss them (SC 4.1.3). | AA |
 
 ## What does not apply
 
