@@ -6,49 +6,104 @@
  * manifest packages what `package:dir` produced, so the binary under test is
  * the one the other artifact forms carry.
  *
- *   node scripts/flatpak.mjs                 # Canvas: package, build, install
- *   node scripts/flatpak.mjs --app planner   # Planner, same path
- *   node scripts/flatpak.mjs --app budget    # Budget, same path
+ *   node scripts/flatpak.mjs                 # Canvas stable: package, build, install
+ *   node scripts/flatpak.mjs --app planner   # Planner stable, same path
+ *   node scripts/flatpak.mjs --app budget    # Budget stable, same path
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
+ *   node scripts/flatpak.mjs --app planner --channel slop
+ *                                            # pre-release id on the slop branch
  *
  * The repository lives outside the checkout, at ~/suite-flatpak/repo, and is
  * added as the user remote `suite-local`. When scripts/store-key.sh has made a
  * key, the repo summary is signed and the remote verifies it; without a key the
  * remote is added with --no-gpg-verify for local testing only.
+ *
+ * A pre-release is generated from the stable manifest beside it: the id is
+ * `run.suite.slop.<app>`, the branch is the tier, the display name names the
+ * tier, and the desktop entry registers no MIME type and no scheme handler.
+ * The stable flow reads the committed manifest and is otherwise unchanged.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  branchFor,
+  channelProblem,
+  desktopEntry,
+  displayName,
+  flatpakId,
+  isPreRelease,
+  launcherScript,
+  preReleaseAppManifest,
+  preReleaseMetainfo,
+  channelRecord,
+} from "./lib/channel.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const APPS = {
   canvas: {
     id: "run.suite.canvas",
+    name: "Suite Canvas",
     package: "@suite/canvas-desktop",
+    project: join(ROOT, "apps", "canvas", "desktop"),
+    folder: "canvas",
+    binary: "suite-canvas",
     manifest: join(ROOT, "packaging", "flatpak", "run.suite.canvas.yml"),
+    desktop: join(ROOT, "packaging", "flatpak", "run.suite.canvas.desktop"),
+    metainfo: join(ROOT, "packaging", "flatpak", "run.suite.canvas.metainfo.xml"),
     unpacked: join(ROOT, "apps", "canvas", "desktop", "release", "linux-unpacked"),
   },
   planner: {
     id: "run.suite.planner",
+    name: "Suite Planner",
     package: "@suite/planner",
+    project: join(ROOT, "apps", "planner"),
+    folder: "planner",
+    binary: "suite-planner",
     manifest: join(ROOT, "packaging", "flatpak", "run.suite.planner.yml"),
+    desktop: join(ROOT, "packaging", "flatpak", "run.suite.planner.desktop"),
+    metainfo: join(ROOT, "packaging", "flatpak", "run.suite.planner.metainfo.xml"),
     unpacked: join(ROOT, "apps", "planner", "release", "linux-unpacked"),
   },
   budget: {
     id: "run.suite.budget",
+    name: "Suite Budget",
     package: "@suite/budget",
+    project: join(ROOT, "apps", "budget"),
+    folder: "budget",
+    binary: "suite-budget",
     manifest: join(ROOT, "packaging", "flatpak", "run.suite.budget.yml"),
+    desktop: join(ROOT, "packaging", "flatpak", "run.suite.budget.desktop"),
+    metainfo: join(ROOT, "packaging", "flatpak", "run.suite.budget.metainfo.xml"),
     unpacked: join(ROOT, "apps", "budget", "release", "linux-unpacked"),
   },
 };
 
+function argumentValue(argv, flag) {
+  const index = argv.indexOf(flag);
+  if (index < 0) return null;
+  const value = argv[index + 1];
+  if (value === undefined || value.startsWith("--")) {
+    process.stderr.write(`${flag} needs a value\n`);
+    process.exit(2);
+  }
+  return value;
+}
+
 const argv = process.argv.slice(2);
-const appName = argv.includes("--app") ? argv[argv.indexOf("--app") + 1] : "canvas";
+const appName = argumentValue(argv, "--app") ?? "canvas";
+const channel = argumentValue(argv, "--channel") ?? "stable";
 const build = !argv.includes("--no-build");
 const install = !argv.includes("--no-install");
+
+const channelMiss = channelProblem(channel);
+if (channelMiss !== null) {
+  process.stderr.write(`${channelMiss}\n`);
+  process.exit(2);
+}
 
 const app = APPS[appName];
 if (!app) {
@@ -56,9 +111,14 @@ if (!app) {
   process.exit(2);
 }
 
+const id = flatpakId(appName, channel);
+const branch = branchFor(channel);
+const preRelease = isPreRelease(channel);
+const name = displayName(app.name, channel);
 const stateDir = join(homedir(), "suite-flatpak");
 const repo = process.env.SUITE_FLATPAK_REPO ?? join(stateDir, "repo");
-const buildDir = join(ROOT, "packaging", "flatpak", ".build", app.id);
+const buildDir = join(ROOT, "packaging", "flatpak", ".build", id);
+const sourceDir = join(ROOT, "packaging", "flatpak", ".build", `${id}-sources`);
 
 // The store's signing key, when one has been made. The fingerprint is not a
 // secret; the private key stays in ~/.gnupg and never enters the repository.
@@ -116,15 +176,134 @@ function probe(command, args) {
   return result.status === 0 ? result.stdout.trim().split("\n")[0] : null;
 }
 
+/** Read one `Key=value` line from a desktop entry. */
+function desktopField(text, key) {
+  const match = new RegExp(`^${key}=(.*)$`, "mu").exec(text);
+  return match?.[1]?.trim() ?? "";
+}
+
+/**
+ * Write the pre-release manifest and the files it packages.
+ *
+ * The stable manifest supplies the runtime, finish arguments and module shape;
+ * only the identity, branch, desktop entry and channels differ. Keeping the
+ * finish arguments in one place means a permission decided for stable is not
+ * silently different for a tier.
+ */
+function generatePreReleaseManifest() {
+  const stableManifest = readFileSync(app.manifest, "utf8");
+  const finishStart = stableManifest.indexOf("finish-args:");
+  const modulesStart = stableManifest.indexOf("modules:");
+  if (finishStart < 0 || modulesStart < finishStart) {
+    throw new Error(`${app.manifest} has no finish-args or modules block to reuse`);
+  }
+
+  mkdirSync(sourceDir, { recursive: true });
+
+  const header = stableManifest
+    .slice(0, finishStart)
+    .replace(/^app-id:.*$/mu, `app-id: ${id}`)
+    .replace(/^command:.*$/mu, `command: ${id}`);
+  const finishArgs = stableManifest.slice(finishStart, modulesStart);
+
+  const stableDesktop = readFileSync(app.desktop, "utf8");
+  const desktop = desktopEntry({
+    id,
+    name,
+    comment: desktopField(stableDesktop, "Comment"),
+    categories: desktopField(stableDesktop, "Categories") || "Office;",
+    startupClass: id,
+  });
+  writeFileSync(join(sourceDir, `${id}.desktop`), desktop);
+
+  const metainfo = preReleaseMetainfo(readFileSync(app.metainfo, "utf8"), {
+    stableId: app.id,
+    id,
+    name,
+  });
+  writeFileSync(join(sourceDir, `${id}.metainfo.xml`), metainfo);
+
+  writeFileSync(
+    join(sourceDir, id),
+    launcherScript({ id, folder: app.folder, binary: app.binary }),
+    { mode: 0o755 },
+  );
+
+  const baseManifest = JSON.parse(readFileSync(join(app.project, "suite.app.json"), "utf8"));
+  const appManifest = preReleaseAppManifest(baseManifest, channel);
+  writeFileSync(join(sourceDir, "suite.app.json"), `${JSON.stringify(appManifest, null, 2)}\n`);
+  writeFileSync(
+    join(sourceDir, "suite.channel.json"),
+    `${JSON.stringify(channelRecord({ app: appName, channel }), null, 2)}\n`,
+  );
+
+  const icons = [48, 64, 128, 256, 512]
+    .map(
+      (size) =>
+        `      - install -Dm644 icons/${app.id}-${size}.png ` +
+        `/app/share/icons/hicolor/${size}x${size}/apps/${id}.png`,
+    )
+    .join("\n");
+
+  const manifest = [
+    `# Generated by scripts/flatpak.mjs --channel ${channel}.`,
+    "# The stable manifest is the source of the runtime and sandbox permissions.",
+    header.trimEnd(),
+    "",
+    finishArgs.trimEnd(),
+    "",
+    "modules:",
+    `  - name: suite-${appName}-${channel}`,
+    "    buildsystem: simple",
+    "    build-commands:",
+    `      - mkdir -p /app/${app.folder}`,
+    `      - cp -a app/. /app/${app.folder}/`,
+    `      - install -Dm644 suite.app.json /app/${app.folder}/suite.app.json`,
+    `      - install -Dm644 suite.channel.json /app/${app.folder}/suite.channel.json`,
+    `      - install -Dm755 ${id} /app/bin/${id}`,
+    `      - install -Dm644 ${id}.desktop /app/share/applications/${id}.desktop`,
+    `      - install -Dm644 ${id}.metainfo.xml /app/share/metainfo/${id}.metainfo.xml`,
+    icons,
+    "    sources:",
+    "      - type: dir",
+    `        path: ${app.unpacked}`,
+    "        dest: app",
+    "      - type: file",
+    `        path: ${join(sourceDir, id)}`,
+    "      - type: file",
+    `        path: ${join(sourceDir, `${id}.desktop`)}`,
+    "      - type: file",
+    `        path: ${join(sourceDir, `${id}.metainfo.xml`)}`,
+    "      - type: file",
+    `        path: ${join(sourceDir, "suite.app.json")}`,
+    "      - type: file",
+    `        path: ${join(sourceDir, "suite.channel.json")}`,
+    "      - type: dir",
+    "        path: ../../icons",
+    "        dest: icons",
+    "",
+  ].join("\n");
+
+  const manifestPath = join(sourceDir, `${id}.yml`);
+  writeFileSync(manifestPath, manifest);
+  return manifestPath;
+}
+
 const builder = probe("flatpak-builder", ["--version"]);
 if (builder === null) {
   process.stderr.write("flatpak-builder is not installed\n");
   process.exit(1);
 }
-process.stdout.write(`flatpak-builder ${builder} · ${app.id}\n`);
+process.stdout.write(`flatpak-builder ${builder} · ${id}${preRelease ? ` (${branch})` : ""}\n`);
 process.stdout.write(`user installation · ${join(dataHome, "flatpak")}\n`);
 
 if (build) {
+  if (!existsSync(app.manifest)) {
+    process.stderr.write(
+      `missing ${app.manifest}; Flatpak needs the stable manifest before a tier can reuse it\n`,
+    );
+    process.exit(1);
+  }
   run("pnpm", ["--filter", app.package, "run", "package:dir"]);
 }
 
@@ -133,15 +312,17 @@ if (!existsSync(app.unpacked)) {
   process.exit(1);
 }
 
+const manifestPath = preRelease ? generatePreReleaseManifest() : app.manifest;
 mkdirSync(buildDir, { recursive: true });
 run("flatpak-builder", [
   "--user",
   ...(keyId.length > 0 ? [`--gpg-sign=${keyId}`] : []),
   "--force-clean",
+  ...(preRelease ? [`--default-branch=${branch}`] : []),
   `--repo=${repo}`,
   `--state-dir=${join(stateDir, "builder")}`,
   buildDir,
-  app.manifest,
+  manifestPath,
 ]);
 
 if (keyId.length === 0) {
@@ -184,15 +365,28 @@ if (!hasRemote) {
 // so the app's updates come from the same place a marketplace client reads.
 const installed = (spawnSync("flatpak", ["list", "--user", "--app", "--columns=application"], { encoding: "utf8" }).stdout ?? "")
   .split("\n")
-  .includes(app.id);
+  .includes(id);
 if (install) {
-  run("flatpak", installed ? ["update", "--user", "-y", app.id] : ["install", "--user", "-y", "suite-local", app.id]);
+  if (preRelease) {
+    // `--or-update` installs the tier branch, and replaces an existing
+    // pre-release install when the branch moved from slop to canary to beta.
+    run("flatpak", [
+      "install",
+      "--user",
+      "-y",
+      "--or-update",
+      "suite-local",
+      `${id}//${branch}`,
+    ]);
+  } else {
+    run("flatpak", installed ? ["update", "--user", "-y", id] : ["install", "--user", "-y", "suite-local", id]);
+  }
 }
 
-process.stdout.write(`\n${app.id} is in ${repo}\n`);
-process.stdout.write(`run it with: flatpak run ${app.id}\n`);
+process.stdout.write(`\n${name} is in ${repo} as ${id}${preRelease ? ` on branch ${branch}` : ""}\n`);
+process.stdout.write(`run it with: flatpak run ${id}\n`);
 if (sessionDataHome !== undefined && sessionDataHome !== dataHome) {
   process.stdout.write(
-    `this session's XDG_DATA_HOME is elsewhere, so use:\n  XDG_DATA_HOME=${dataHome} flatpak run ${app.id}\n`,
+    `this session's XDG_DATA_HOME is elsewhere, so use:\n  XDG_DATA_HOME=${dataHome} flatpak run ${id}\n`,
   );
 }
