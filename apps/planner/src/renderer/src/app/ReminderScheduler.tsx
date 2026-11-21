@@ -4,7 +4,8 @@ import { getBridge } from "../platform/bridge";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore } from "../store/uiStore";
 
-const BLOCKED = "Reminders are off: notifications are blocked for Suite Go in system settings.";
+const BLOCKED =
+  "Reminders are off: notifications are blocked for Suite Planner in system settings.";
 const UNAVAILABLE = "Reminders are not available on this device.";
 
 /**

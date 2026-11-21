@@ -82,6 +82,20 @@ describe("ReminderScheduler", () => {
     expect(mocks.setNotice).not.toHaveBeenCalled();
   });
 
+  it("should hand a cleared reminder to the bridge so the platform cancels it", async () => {
+    mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
+    mocks.syncReminders.mockResolvedValue({ permission: "granted" });
+
+    const { rerender } = render(<ReminderScheduler />);
+    await waitFor(() => expect(mocks.syncReminders).toHaveBeenCalledTimes(1));
+
+    mocks.tasks = [];
+    rerender(<ReminderScheduler />);
+
+    await waitFor(() => expect(mocks.syncReminders).toHaveBeenCalledTimes(2));
+    expect(mocks.syncReminders).toHaveBeenLastCalledWith([]);
+  });
+
   it("should ask once, record the ask, and schedule after a grant", async () => {
     mocks.tasks = [task({ id: "a", remindAt: FUTURE })];
     mocks.syncReminders
@@ -130,4 +144,4 @@ describe("ReminderScheduler", () => {
 });
 
 const BLOCKED_MESSAGE =
-  "Reminders are off: notifications are blocked for Suite Go in system settings.";
+  "Reminders are off: notifications are blocked for Suite Planner in system settings.";

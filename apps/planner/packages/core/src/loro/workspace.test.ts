@@ -37,6 +37,33 @@ describe("WorkspaceDocument", () => {
     expect(workspace.getTask(task.id)?.title).toBe("Draft");
   });
 
+  it("should treat a new reminder time as a new reminder", () => {
+    const workspace = createWorkspace();
+    const task = workspace.createTask(
+      { title: "Draft", scheduledFor: "2026-01-05", remindAt: "2026-01-05T10:00:00.000Z" },
+      now,
+    );
+    // The scheduler writes `remindedAt` when the first reminder is delivered.
+    workspace.updateTask(task.id, { remindedAt: "2026-01-05T10:00:01.000Z" }, now);
+
+    workspace.updateTask(task.id, { remindAt: "2026-01-05T11:00:00.000Z" }, now);
+
+    expect(workspace.getTask(task.id)?.remindedAt).toBeNull();
+  });
+
+  it("should forget a delivered reminder when it is cleared", () => {
+    const workspace = createWorkspace();
+    const task = workspace.createTask(
+      { title: "Draft", scheduledFor: "2026-01-05", remindAt: "2026-01-05T10:00:00.000Z" },
+      now,
+    );
+    workspace.updateTask(task.id, { remindedAt: "2026-01-05T10:00:01.000Z" }, now);
+
+    workspace.updateTask(task.id, { remindAt: null }, now);
+
+    expect(workspace.getTask(task.id)?.remindedAt).toBeNull();
+  });
+
   it("should move a task between days and back to the inbox", () => {
     const workspace = createWorkspace();
     const task = workspace.createTask({ title: "Draft", scheduledFor: "2026-01-05" }, now);

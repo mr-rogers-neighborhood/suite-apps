@@ -8,7 +8,16 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 ## [Unreleased]
 
-No changes yet.
+### Fixed
+
+- **A reminder given a new time rings again.** The app remembered that an earlier reminder had
+  already fired, so moving or clearing a reminder and choosing a new time left it silent. Changing
+  the time now starts the reminder over.
+- **The phone pack delivers and cancels reminders.** The pack asked for no alarms, so a reminder in
+  the Android build went nowhere and a completed or cleared task kept ringing. It now schedules
+  through the container, cancels what is no longer pending, and reports a denied permission.
+- **The blocked notice names Planner.** It said notifications were blocked for Suite Go, which is
+  the container, not the app in front of the person.
 
 ## [0.5.1] - 2026-11-21
 

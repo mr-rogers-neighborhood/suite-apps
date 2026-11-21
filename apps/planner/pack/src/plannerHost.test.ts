@@ -16,7 +16,46 @@ interface FakeHost extends ModuleHost {
   readonly writes: number;
 }
 
-function fakeHost(seed: ReadonlyMap<string, Uint8Array> = new Map()): FakeHost {
+type Permission = "granted" | "denied" | "prompt" | "unsupported";
+
+function fakeNotifications(initial: Permission = "granted") {
+  const scheduled = new Map<string, { id: string; title: string; at: number }>();
+  const cancelled: string[] = [];
+  let permission = initial;
+
+  return {
+    scheduled,
+    cancelled,
+    setPermission(next: Permission) {
+      permission = next;
+    },
+    async permission() {
+      return permission;
+    },
+    async request() {
+      return permission;
+    },
+    async schedule(notification: { id: string; title: string; at: number }) {
+      if (permission !== "granted") {
+        return { ok: false as const, permission, reason: "denied" as const };
+      }
+      scheduled.set(notification.id, notification);
+      return { ok: true as const, permission };
+    },
+    async cancel(id: string) {
+      cancelled.push(id);
+      scheduled.delete(id);
+    },
+    async cancelAll() {
+      scheduled.clear();
+    },
+  };
+}
+
+function fakeHost(
+  seed: ReadonlyMap<string, Uint8Array> = new Map(),
+  notifications = fakeNotifications(),
+): FakeHost {
   const files = new Map<string, Uint8Array>(seed);
   const titles = new Map<string, string>();
   const kv = new Map<string, string>();
@@ -89,6 +128,7 @@ function fakeHost(seed: ReadonlyMap<string, Uint8Array> = new Map()): FakeHost {
         return { ok: false as const, reason: "cancelled" as const };
       },
     },
+    notifications,
     theme: { scheme: "light" as const, density: "cozy" as const, cssVariables: {} },
   } as unknown as FakeHost;
 }
@@ -192,6 +232,63 @@ describe("the pack's Planner bridge", () => {
     expect(await bridge.exportWorkspace()).toEqual({ canceled: true });
     expect(await bridge.importWorkspace()).toEqual({ canceled: true });
     expect(await bridge.platform()).toBe("suite-go");
+    bridge.dispose();
+  });
+
+  it("schedules a pending reminder and replaces a moved one rather than stacking", async () => {
+    const notifications = fakeNotifications();
+    const bridge = createPlannerHost(fakeHost(new Map(), notifications));
+
+    expect(await bridge.syncReminders?.([{ id: "a", title: "Send the draft", at: 1_000 }])).toEqual(
+      {
+        permission: "granted",
+      },
+    );
+    expect(notifications.scheduled.get("a")?.at).toBe(1_000);
+
+    await bridge.syncReminders?.([{ id: "a", title: "Send the draft", at: 2_000 }]);
+
+    expect(notifications.scheduled.size).toBe(1);
+    expect(notifications.scheduled.get("a")?.at).toBe(2_000);
+    expect(notifications.cancelled).toEqual([]);
+    bridge.dispose();
+  });
+
+  it("cancels a reminder that is no longer pending", async () => {
+    const notifications = fakeNotifications();
+    const bridge = createPlannerHost(fakeHost(new Map(), notifications));
+
+    await bridge.syncReminders?.([
+      { id: "a", title: "Send the draft", at: 1_000 },
+      { id: "b", title: "Book the room", at: 2_000 },
+    ]);
+    await bridge.syncReminders?.([{ id: "a", title: "Send the draft", at: 1_000 }]);
+
+    expect(notifications.cancelled).toEqual(["b"]);
+    expect([...notifications.scheduled.keys()]).toEqual(["a"]);
+    bridge.dispose();
+  });
+
+  it("reports a denied permission instead of scheduling into silence", async () => {
+    const notifications = fakeNotifications("denied");
+    const bridge = createPlannerHost(fakeHost(new Map(), notifications));
+
+    expect(await bridge.syncReminders?.([{ id: "a", title: "Send the draft", at: 1_000 }])).toEqual(
+      {
+        permission: "denied",
+      },
+    );
+    expect(notifications.scheduled.size).toBe(0);
+    bridge.dispose();
+  });
+
+  it("asks the platform for permission through the bridge", async () => {
+    const notifications = fakeNotifications("prompt");
+    const bridge = createPlannerHost(fakeHost(new Map(), notifications));
+
+    expect(await bridge.requestNotifications?.()).toBe("prompt");
+    notifications.setPermission("granted");
+    expect(await bridge.requestNotifications?.()).toBe("granted");
     bridge.dispose();
   });
 });
