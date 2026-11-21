@@ -1,0 +1,61 @@
+---
+module: apps/budget/packages/core
+title: Budget core
+summary: "The record shapes, integer money and the ledger projections an envelope budget reads."
+---
+
+Budget's core package is the document layer and the arithmetic. It owns the Zod
+records, `BudgetDocument`, the money parser, rule evaluation and ranking, month
+math, import adapters, record exports, report series and the `.budget` envelope.
+It exists so a component never constructs a Loro value, never touches a float
+amount and never keeps a report total of its own.
+
+It does not own the open document, the library index, the file path or the
+window. Main holds the authority and the file; the renderer holds a replica and
+UI state. This package has no DOM, no Electron and no `fs`, and only `src/loro`
+imports `loro-crdt`.
+
+The important shape is a fold, not an update. The document stores transactions,
+assignments and targets; `buildLedger` and `monthState` turn them into the
+numbers a month shows, and the report series call the same projection. A stale
+total therefore cannot survive an edit, because no total is stored.
+
+## apps/budget/packages/core/src/money.ts#parseMoney
+
+Money enters as text and leaves as a signed integer in minor units. The parser
+accepts currency symbols, grouping separators, both decimal conventions and
+parentheses for a negative, then rounds once at the currency's scale. It answers
+with a `Result`: an empty field, an unreadable string and an amount beyond
+`Number.MAX_SAFE_INTEGER` are three distinct refusals, not exceptions.
+
+The scale comes from the currency and is clamped to 0–3, so a zero-decimal
+currency does not gain a fraction and a three-decimal one keeps it. Formatting is
+the display boundary and divides by the same scale. `parseFloat` and `toFixed`
+are banned outside this file, which is what keeps a sum of amounts exact.
+
+## apps/budget/packages/core/src/rules/evaluate.ts#applyRules
+
+A rule run is a pure function over a copy of the draft, not a write. Each
+condition reads one field; each action replaces one field; the result carries
+the new draft and the ids of the rules that matched. Amount conditions go
+through `parseMoney`, so a rule compares the same integer the transaction will
+store, and an invalid regular expression matches nothing rather than throwing.
+
+Because the input is a draft, the same function serves an import preview, a
+manual re-run and a test. The caller decides whether to write the result, and
+the document validates the patch it finally receives.
+
+## apps/budget/packages/core/src/plan/monthState.ts#monthState
+
+An envelope's available balance is a running fold, and its carry rule is the
+decision in this function. Each month adds assignment and activity to the
+previous balance, but only a positive balance carries forward; an overspent
+envelope is closed at the month boundary instead of borrowing from the next
+month. That is why the same category can be over in one month and funded in the
+next without a corrective record.
+
+Ready to Assign is the on-budget balance minus every available envelope, so it
+is derived from the same ledger rather than tracked as a separate account.
+Target status is computed from the available amount and, for a debt target, the
+linked account's balance. The result is plain data with no Loro handle, which is
+what lets the plan view and the report share one set of numbers.

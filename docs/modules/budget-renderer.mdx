@@ -1,0 +1,45 @@
+---
+module: apps/budget/src/renderer
+title: Budget renderer
+summary: "The replica, the forms and the plan and report surfaces over a budget snapshot."
+---
+
+The renderer is the launcher and the budget window. It lists the library,
+creates and imports a budget, holds a replica of the open document, and renders
+the plan, accounts, reports, rules, schedules and payees. The launcher and the
+budget are separate surfaces: no budget is open until a person chooses one.
+
+It does not own document truth. `DocumentReplica` owns the single `observe` call
+site and refreshes a cached snapshot; Zustand holds the month, the active view,
+selections, open dialogs and a notice. A form owns its draft in React state and
+writes through the replica only on submit.
+
+Two boundaries are worth keeping. Money is parsed and formatted through core,
+never with a local float; and every report value is computed from the snapshot
+on render, while only a dashboard's widget arrangement is stored. That is why a
+closed budget clears its undo history with the replica and nothing else needs to
+be reset.
+
+## apps/budget/src/renderer/src/accounts/TransactionDialog.tsx#TransactionDialog
+
+The dialog is a form over a record, not a second record. It seeds local state
+from the snapshot when it opens, converts the typed amount with `parseMoney`,
+and calls `createTransaction`, `updateTransaction`, `createSplit` or
+`replaceSplits` only on submit. Reopening the same transaction reseeds from the
+document rather than trusting the fields left behind.
+
+A reconciled transaction is locked, and a split parent is edited as a set of
+children. The dialog keeps those rules at the point of entry, so an edit that
+the document would refuse is not offered as a control that silently fails.
+
+## apps/budget/src/renderer/src/reports/ReportsView.tsx#ReportsView
+
+The reports view owns the selected tab and the range; it owns no totals. Each
+panel calls a core series over the current snapshot, and the dashboard calls the
+same functions per widget. The currency and scale come from settings, so every
+panel formats through one `moneyFormatter`.
+
+Widgets are document records because a person arranged them; their values are
+not. Adding, moving or removing a widget is a typed document write, and the next
+snapshot rebuilds every figure from the ledger. A report that cached its numbers
+would be the second source of truth this view is written to avoid.

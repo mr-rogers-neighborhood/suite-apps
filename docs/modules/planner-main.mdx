@@ -1,0 +1,50 @@
+---
+module: apps/planner/src/main
+title: Planner main
+summary: "The authoritative workspace, its file, the IPC boundary and reminder delivery."
+---
+
+Planner's main process is the authority. It holds the open `WorkspaceDocument`,
+writes the `.planner` file, answers the renderer's IPC channels, keeps the tray
+alive and runs the reminder scheduler. The renderer is sandboxed and its lifetime
+is a window; putting the document here is what lets autosave survive a renderer
+crash and lets a reminder fire while the window is hidden.
+
+It does not own the record shapes, the projections or the capture grammar; those
+are `@suite/planner-core`. It does not own the view or the form state; those are
+the renderer. The file path is main's, and the renderer receives a snapshot or a
+result, never a writable destination it chose itself.
+
+The seams are the IPC registration, the store that schedules a write, and the
+scheduler that delivers a reminder. Sync adds a transport beside them: the same
+delta a local edit produced is what a relay carries, so the document layer did
+not change when sync arrived.
+
+## apps/planner/src/main/ipc.ts#registerIpc
+
+This function is the renderer's whole capability set. It answers a snapshot
+request, accepts a binary CRDT update on commit, and owns the native import and
+export dialogs. Every handler is wrapped by `onIpc`, which refuses a sender that
+is not the page this shell loaded; every payload is parsed before it reaches the
+store. A compromised or stale renderer therefore has no path to a file it was
+not handed.
+
+The registration takes a getter rather than a store because an import or a
+hub-opened file replaces the workspace, and `ipcMain.handle` refuses a second
+registration for the same channel. Import publishes `workspace:replaced` to every
+window after the store has been replaced and validated, so no window keeps a
+replica of the closed document.
+
+## apps/planner/src/main/workspaceStore.ts#WorkspaceStore
+
+The store owns the authoritative document and the save schedule. An edit is
+applied immediately, then a 400 ms debounce coalesces a burst into one write:
+temporary file, copy the current file to the backup, rename the temporary file
+into place. The flush chain is serialised, so a second save waits for the first
+rather than interleaving two renames.
+
+Opening is the recovery path. It tries the workspace and then its backup; a
+damaged candidate is logged and skipped, while a newer file version or schema is
+terminal. Falling through to a fresh workspace would let this build write its
+older schema over a document it cannot read, so the person is told which version
+they need instead.

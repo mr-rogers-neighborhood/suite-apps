@@ -1,0 +1,46 @@
+---
+module: apps/planner/src/renderer
+title: Planner renderer
+summary: "The replica, the UI store and the views that read a workspace snapshot."
+---
+
+The renderer is the person's side of Planner. It holds a replica of the open
+workspace, a Zustand store for what the view is showing, and the React surfaces
+that read a derived snapshot. It talks to main only through `PlannerBridge`, and
+its bundle has no network client.
+
+It does not own document truth. Every task, project, tag and setting lives in
+the replica's `WorkspaceDocument`; the store holds the selected date, the active
+view, the selected task, the capture focus signal and a notice. A local edit is
+merged into the replica and forwarded as a CRDT delta; an import or a synced
+replacement swaps the replica and re-subscribes.
+
+Two rules keep the boundary visible. The single `observe` call site lives in the
+snapshot store, so no component subscribes to the document directly. And the
+views registry is the one list of surfaces, so the shell and the compact view
+menu render the same entries.
+
+## apps/planner/src/renderer/src/store/snapshotStore.ts#DocumentReplica
+
+This class is the renderer's replica and its only `observe` call site. A local
+update is forwarded to main, then the cached snapshot is rebuilt and listeners
+are notified, which is what makes a component read a value rather than subscribe
+to a CRDT. The document is exposed for mutations; the snapshot is what the UI
+renders.
+
+`replace` is the boundary for import and sync. It detaches the old subscription
+before opening the new document, so an observer of the closed workspace cannot
+keep committing edits. `dispose` clears both the subscription and the listeners,
+which is the path a closed window takes.
+
+## apps/planner/src/renderer/src/app/Shell.tsx#Shell
+
+The shell composes the shared menu bar with the active view. It reads the view
+id from the UI store, resolves the component from the views registry, and asks
+the bridge for the workspace file's name for the bar's context. The rail is the
+full navigation; below `md` the same entries move into a drawer.
+
+The shell holds no document state and makes no projection. A new surface is an
+entry in the registry and its component, not an edit here. The native menu is
+auto-hidden on Linux and Windows, so this in-app bar stays the visible menu
+rather than drawing a second copy beside it.

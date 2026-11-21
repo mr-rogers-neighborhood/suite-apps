@@ -1,0 +1,47 @@
+---
+module: apps/budget/src/main
+title: Budget main
+summary: "The library, the open budget, its backups and the no-overwrite recovery path."
+---
+
+Budget's main process owns the library index, the open `BudgetDocument` and the
+files behind both. It creates, opens, imports, renames and removes budgets;
+answers the renderer's IPC channels; schedules atomic writes and backups; and
+keeps a damaged file aside instead of replacing it. The renderer asks to open an
+id and receives a snapshot.
+
+It does not own the record shapes, money, rules or report series; those are
+`@suite/budget-core`. It does not own the view, the month or a dialog's draft.
+There is no network client here or in the renderer, and no updater or analytics
+call: a budget is a file a person owns.
+
+The library is machine state, not the document. It maps an id to a path and a
+display name; the document inside the file supplies its own id and schema
+version. That separation is what lets an import choose a fresh id without
+rewriting the record it copied.
+
+## apps/budget/src/main/library.ts#openBudget
+
+Opening is library lookup, then path safety, then load. The id must be one safe
+path component; an entry that names a file outside this channel's folder is
+copied in first, so a pre-release build never writes the stable file. The live
+file is tried before any backup, and an unreadable live file falls back to the
+newest backup with a warning the renderer can show.
+
+The version refusal is not a corruption case. A newer file or schema stops the
+open and names the build that is needed; treating it as damaged would invite a
+backup restore and then an older schema written over the newer document. When
+every candidate fails, the damaged file is copied aside and the open is refused
+rather than replaced with an empty budget.
+
+## apps/budget/src/main/recovery.ts#recoverFile
+
+Recovery copies, it does not repair. The damaged file is copied into
+`recovered/<timestamp>-<id>/` and this function returns that folder; the caller
+then raises an error that names it. The original, its backups and its temporary
+file stay exactly where they were, so a person can inspect the bytes or bring in
+a newer build.
+
+That rule is the reason there is no "repair and continue" branch. A build that
+cannot parse a document does not know which records were valid, and an
+in-place rewrite would destroy the evidence along with the data.

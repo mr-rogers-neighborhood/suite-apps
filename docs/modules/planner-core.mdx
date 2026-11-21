@@ -1,0 +1,72 @@
+---
+module: apps/planner/packages/core
+title: Planner core
+summary: "The record shapes, typed document, projections and .planner file Planner builds on."
+---
+
+Planner's core package is the document layer the rest of the app calls. It owns
+the Zod records, the only writer of a workspace, the pure projections that turn
+tasks into a day, the one-line capture parser and the `.planner` file envelope.
+It exists so a React component never constructs a Loro value and a workspace
+file can outlive the build that wrote it.
+
+It does not own the window, the form state, the file path or the reminder
+delivery. Main holds the authoritative document and the file; the renderer holds
+a replica and UI state. Dependencies point inward: this package has no DOM, no
+Electron and no `fetch`, and only `src/loro` imports `loro-crdt`.
+
+The public surface is `src/index.ts`. A consumer outside the package sees
+schemas, pure functions, the `WorkspaceDocument` facade and the file helpers
+there, and does not reach into a domain module for a write.
+
+## apps/planner/packages/core/src/schema.ts#taskSchema
+
+A task is the record every other projection starts from, and this schema is the
+only description of it. Every read parses through it, so a malformed value fails
+at the boundary that read it instead of reaching React. Defaults make a new
+field additive: an older document still parses, and the missing keys arrive with
+their defaults rather than requiring a migration over every task.
+
+The task owns `scheduledFor` and `order`; a day is a date that tasks point at,
+not a container. `estimateMinutes` is a positive integer or null, and a date is
+a `yyyy-MM-dd` key rather than an instant, which is why the same task means the
+same day without a timezone conversion.
+
+## apps/planner/packages/core/src/capture/parse.ts#parseCapture
+
+Capture is a pure one-line parser: input, today and an optional implied date go
+in, a draft comes out. It removes the tokens it recognises and leaves everything
+else in the title, so a mistyped token is visible rather than silently lost. A
+clock time with no date borrows the implied date; a day with no time schedules
+the task on that day.
+
+The parser deliberately returns names, not ids. Resolving a project or tag may
+create a record, and that write belongs to the caller with a document in hand.
+A test for this function needs no workspace, which is the property that keeps
+the capture grammar cheap to change.
+
+## apps/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument
+
+The facade is the only writer of a workspace. Each mutation validates its input
+through Zod, sets the leaf keys that changed and lets its domain module commit
+once, so two people editing different fields of one task keep both writes
+instead of replacing the record.
+
+`fromSnapshot` assigns a fresh peer id, because reusing the id baked into a
+snapshot makes the first local edit collide with the document that produced it.
+It also upgrades or refuses the schema before any caller can read a record;
+`migratedFrom` is how a host learns that the upgrade was a local commit which
+would otherwise never travel to the renderer as an update.
+
+## apps/planner/packages/core/src/file/workspaceFile.ts#decodeWorkspaceFile
+
+The `.planner` file is a small JSON envelope around an opaque base64 CRDT
+snapshot. The envelope carries a format name, a format version, a schema version
+and an export time, so a build can refuse a file by name before it opens
+anything. The payload stays opaque here: only the document layer interprets it.
+
+Decoding answers with a `Result` because the person chose the file and needs a
+sentence they can act on. The refusals are ordered and distinct, and none of
+them falls back to an empty workspace. `workspaceFile.test.ts` pins the reload
+contract and the refusals; `migration.test.ts` opens fixtures written by older
+builds.
