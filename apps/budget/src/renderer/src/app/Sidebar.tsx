@@ -134,6 +134,7 @@ export function Sidebar({
             <div className="mt-4">
               <button
                 type="button"
+                aria-expanded={showClosed}
                 onClick={() => setShowClosed((value) => !value)}
                 className="flex w-full items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-faint hover:text-muted"
               >

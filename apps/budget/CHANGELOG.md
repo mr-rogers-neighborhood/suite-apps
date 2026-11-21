@@ -8,7 +8,28 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 ## [Unreleased]
 
-No changes yet.
+### Fixed
+
+- **A transfer between two of your accounts no longer asks for a category.** Moving money from
+  checking to savings counted as two uncategorized transactions in the Plan banner. It is one
+  movement, and the banner now names only rows that really need a category.
+- **Editing a schedule no longer skips a due occurrence.** Changing the payee, amount or memo of a
+  schedule whose next date had passed reset that date to a future one. The stored date now stays put
+  unless the repeat itself changed.
+
+### Changed
+
+- **The reports and register say their state out loud.** Report tabs expose which one is selected,
+  the closed-account group says whether it is open, and a register row's cleared control is a
+  labelled pressed state rather than a colour. A dashboard widget's move, remove and range controls
+  name the widget they act on.
+- **A hub that lists Budget sees the version it actually runs.** The manifest beside the executable
+  had stayed at the previous release's number.
+
+### Accessibility
+
+See [ACCESSIBILITY.md](ACCESSIBILITY.md) for what is machine-checked, what is still unverified, and
+the remaining known gaps.
 
 ## [0.4.0] - 2026-11-21
 

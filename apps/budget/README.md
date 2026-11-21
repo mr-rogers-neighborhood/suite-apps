@@ -29,7 +29,8 @@ For the product story and the influences behind it, read
 - **Nothing is trapped.** Export a `.budget` file, plain JSON records, transactions as CSV, or QIF.
   Import CSV, QIF, native JSON, or another `.budget`.
 - **Offline by design.** No network client, no updater, no analytics. Bank sync is deliberately
-  absent; Start's catalogue is what checks Budget's feed.
+  absent. Updates arrive through the Flatpak remote; Suite Start asks Flatpak, and never replaces a
+  deployment itself.
 - **One shipped form.** Budget ships as the Flatpak `run.suite.budget`. A pre-release is a separate
   branch with its own id and data folder.
 

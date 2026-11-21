@@ -144,6 +144,15 @@ describe("monthState", () => {
     expect(march.readyToAssignMinor).toBe(167_000);
   });
 
+  it("should not count a transfer between on-budget accounts as uncategorized", () => {
+    const { doc } = setup();
+    const state = monthState(doc.getSnapshot(), "2026-01");
+
+    // The checking-to-savings transfer carries no category on either side, but it moves
+    // money rather than leaving a transaction that needs one.
+    expect(state.uncategorized).toEqual({ count: 0, amountMinor: 0 });
+  });
+
   it("should keep off-budget accounts out of Ready to Assign", () => {
     const { doc, loan } = setup();
     const balance = doc.accountBalance(loan.id);

@@ -236,6 +236,9 @@ function Row({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(event) => {
+        // The cleared and expand controls sit inside the row. Their own Enter or Space must not
+        // bubble up and open the transaction editor as a second action.
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onClick();
@@ -251,6 +254,7 @@ function Row({
           <button
             type="button"
             aria-label={expanded ? "Collapse split" : "Expand split"}
+            title={expanded ? "Collapse split" : "Expand split"}
             onClick={(event) => {
               event.stopPropagation();
               onToggleExpand();
@@ -283,12 +287,14 @@ function Row({
       <span className="flex justify-end">
         <button
           type="button"
-          aria-label={
+          aria-label="Cleared"
+          aria-pressed={transaction.cleared !== "uncleared"}
+          title={
             transaction.cleared === "reconciled"
-              ? "Reconciled"
+              ? "Reconciled. Unlock the reconciliation to change it."
               : transaction.cleared === "cleared"
-                ? "Cleared"
-                : "Uncleared"
+                ? "Mark uncleared"
+                : "Mark cleared"
           }
           onClick={(event) => {
             event.stopPropagation();

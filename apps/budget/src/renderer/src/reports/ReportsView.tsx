@@ -85,6 +85,7 @@ export function ReportsView() {
           <button
             key={tab.id}
             type="button"
+            aria-pressed={kind === tab.id}
             onClick={() => setKind(tab.id)}
             className={
               kind === tab.id
@@ -386,6 +387,7 @@ function DashboardGrid() {
             key={widget.id}
             widget={widget}
             money={money}
+            position={index + 1}
             canMoveUp={index > 0}
             canMoveDown={index < widgets.length - 1}
           />
@@ -398,16 +400,19 @@ function DashboardGrid() {
 function WidgetCard({
   widget,
   money,
+  position,
   canMoveUp,
   canMoveDown,
 }: {
   widget: Widget;
   money: (value: number) => string;
+  position: number;
   canMoveUp: boolean;
   canMoveDown: boolean;
 }) {
   const snapshot = useWorkspaceSnapshot();
   const replica = useReplica();
+  const widgetName = `${widget.kind.replaceAll("_", " ")} widget ${position}`;
   const months = useMemo(
     () => monthsForRange(snapshot, widget.range, new Date()),
     [snapshot, widget.range],
@@ -429,7 +434,7 @@ function WidgetCard({
                   range: event.target.value as ReportRange,
                 })
               }
-              aria-label="Widget range"
+              aria-label={`Range for ${widgetName}`}
               className="h-6 rounded border border-line bg-raised px-1 text-[10px] text-muted"
             >
               {RANGES.map((range) => (
@@ -441,29 +446,32 @@ function WidgetCard({
           ) : null}
           <button
             type="button"
-            aria-label="Move up"
+            aria-label={`Move ${widgetName} up`}
+            title={`Move ${widgetName} up`}
             disabled={!canMoveUp}
             onClick={() => replica.document.moveWidget(widget.id, -1)}
             className="rounded p-0.5 text-faint hover:text-ink disabled:opacity-30"
           >
-            <ArrowUp size={12} />
+            <ArrowUp size={12} aria-hidden="true" />
           </button>
           <button
             type="button"
-            aria-label="Move down"
+            aria-label={`Move ${widgetName} down`}
+            title={`Move ${widgetName} down`}
             disabled={!canMoveDown}
             onClick={() => replica.document.moveWidget(widget.id, 1)}
             className="rounded p-0.5 text-faint hover:text-ink disabled:opacity-30"
           >
-            <ArrowDown size={12} />
+            <ArrowDown size={12} aria-hidden="true" />
           </button>
           <button
             type="button"
-            aria-label="Remove widget"
+            aria-label={`Remove ${widgetName}`}
+            title={`Remove ${widgetName}`}
             onClick={() => replica.document.deleteWidget(widget.id)}
             className="rounded p-0.5 text-faint hover:text-danger"
           >
-            <X size={12} />
+            <X size={12} aria-hidden="true" />
           </button>
         </div>
       </div>

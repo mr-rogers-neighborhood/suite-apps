@@ -244,11 +244,21 @@ function ScheduleDialog({
       return;
     }
     const signed = direction === "outflow" ? -Math.abs(parsed.value) : Math.abs(parsed.value);
-    let nextDate = anchorDate;
+    // Editing the payee or amount must not swallow an occurrence that is already due. Only a
+    // changed recurrence earns a new next date; otherwise the stored one stays where it is.
+    const recurrenceChanged =
+      record === undefined ||
+      record.frequency !== frequency ||
+      record.interval !== interval ||
+      record.anchorDate !== anchorDate;
+    let nextDate = record?.nextDate ?? anchorDate;
     let guard = 0;
-    while (nextDate < todayKey() && guard < 1000) {
-      nextDate = nextOccurrence(nextDate, frequency, interval, anchorDate);
-      guard += 1;
+    if (recurrenceChanged) {
+      nextDate = anchorDate;
+      while (nextDate < todayKey() && guard < 1000) {
+        nextDate = nextOccurrence(nextDate, frequency, interval, anchorDate);
+        guard += 1;
+      }
     }
     try {
       if (isNew) {
