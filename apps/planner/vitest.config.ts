@@ -19,6 +19,15 @@ export default defineConfig({
         },
       },
       {
+        // The shared runtime has no app of its own, so Planner's gate runs its contract tests:
+        // the replica and the store are the pieces both apps depend on.
+        test: {
+          name: "document-runtime",
+          environment: "node",
+          include: ["../../packages/document-runtime/src/**/*.test.ts"],
+        },
+      },
+      {
         resolve: { alias: { "@suite/planner-core": core } },
         test: {
           name: "main",
