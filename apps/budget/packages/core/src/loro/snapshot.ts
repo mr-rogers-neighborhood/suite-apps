@@ -9,7 +9,7 @@ import { listMonthlyBudgets } from "./months";
 import { listPayees } from "./payees";
 import { listReconciliations } from "./reconciliations";
 import { listRules } from "./rules";
-import { listSchedules } from "./schedules";
+import { listScheduleBatches, listSchedules } from "./schedules";
 import { readSettings } from "./settings";
 import { listTargets } from "./targets";
 import { listTransactions } from "./transactions";
@@ -27,6 +27,7 @@ export function readBudgetSnapshot(doc: LoroDoc): BudgetSnapshot {
     payees: listPayees(doc),
     rules: listRules(doc),
     schedules: listSchedules(doc),
+    scheduleBatches: listScheduleBatches(doc),
     reconciliations: listReconciliations(doc),
     dashboards: listDashboards(doc),
     widgets: listWidgets(doc),

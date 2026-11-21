@@ -53,6 +53,26 @@ export function App() {
     return () => next.dispose();
   }, [openInfo]);
 
+  useEffect(() => {
+    if (!replica) return;
+    // Main catches up on opening. This keeps checking while the app stays open so a
+    // date that passes during the session still posts. Auto-entry is idempotent
+    // because each posted occurrence advances nextDate inside the document.
+    const run = (): void => {
+      try {
+        replica.document.autoEnterSchedules();
+      } catch (cause) {
+        console.error("Suite Budget: could not auto-enter schedules", cause);
+      }
+    };
+    const timer = setInterval(run, 60_000);
+    window.addEventListener("focus", run);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", run);
+    };
+  }, [replica]);
+
   const openBudget = useCallback(
     async (id: string) => {
       setBusy(true);

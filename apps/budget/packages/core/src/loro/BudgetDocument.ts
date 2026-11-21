@@ -15,6 +15,7 @@ import {
   reconciliationSchema,
   ruleSchema,
   type Settings,
+  scheduleBatchSchema,
   scheduleSchema,
   type Target,
   targetSchema,
@@ -83,11 +84,15 @@ import {
   upsertLearnedPayeeRule,
 } from "./rules";
 import {
+  autoEnterSchedules,
   createSchedule,
   deleteSchedule,
   enterSchedule,
+  latestScheduleBatch,
+  listScheduleBatches,
   listSchedules,
   type NewScheduleInput,
+  undoScheduleBatch,
   updateSchedule,
 } from "./schedules";
 import { ensureSettings, readSettings, updateSettings } from "./settings";
@@ -190,6 +195,9 @@ export class BudgetDocument {
     for (const rule of records.rules) insertRecord(doc, ROOTS.rules, ruleSchema, rule);
     for (const schedule of records.schedules) {
       insertRecord(doc, ROOTS.schedules, scheduleSchema, schedule);
+    }
+    for (const batch of records.scheduleBatches) {
+      insertRecord(doc, ROOTS.scheduleBatches, scheduleBatchSchema, batch);
     }
     for (const reconciliation of records.reconciliations) {
       insertRecord(doc, ROOTS.reconciliations, reconciliationSchema, reconciliation);
@@ -531,6 +539,22 @@ export class BudgetDocument {
 
   enterSchedule(id: string, now?: Date) {
     return this.#mutate(() => enterSchedule(this.#doc, id, now));
+  }
+
+  autoEnterSchedules(now?: Date, options: { horizonDays?: number } = {}) {
+    return this.#mutate(() => autoEnterSchedules(this.#doc, now, options));
+  }
+
+  listScheduleBatches() {
+    return listScheduleBatches(this.#doc);
+  }
+
+  latestScheduleBatch() {
+    return latestScheduleBatch(this.#doc);
+  }
+
+  undoScheduleBatch(id: string, now?: Date) {
+    return this.#mutate(() => undoScheduleBatch(this.#doc, id, now));
   }
 
   // Reconciliation

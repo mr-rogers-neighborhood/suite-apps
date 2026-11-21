@@ -238,8 +238,29 @@ export const scheduleSchema = z.object({
   anchorDate: dateKeySchema,
   nextDate: dateKeySchema,
   endDate: dateKeySchema.nullable().default(null),
+  autoEnter: z.boolean().default(false),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
+});
+
+/** One schedule's share of an automatic-entry batch, enough to undo it after a restart. */
+export const scheduleBatchRunSchema = z.object({
+  scheduleId: z.string().min(1),
+  nextDateBefore: dateKeySchema,
+  postedCount: z.number().int().nonnegative(),
+});
+
+/**
+ * A document-owned record of what auto-entry posted, so the review notice and its undo
+ * survive closing the app. `undoneAt` keeps an undo from being applied twice.
+ */
+export const scheduleBatchSchema = z.object({
+  id: z.string().min(1),
+  createdAt: timestampSchema,
+  transactionIds: z.array(z.string().min(1)),
+  totalAmountMinor: amountMinorSchema,
+  runs: z.array(scheduleBatchRunSchema),
+  undoneAt: timestampSchema.nullable().default(null),
 });
 
 export const reconciliationSchema = z.object({
@@ -312,6 +333,8 @@ export type RuleCondition = z.infer<typeof ruleConditionSchema>;
 export type RuleAction = z.infer<typeof ruleActionSchema>;
 export type Rule = z.infer<typeof ruleSchema>;
 export type Schedule = z.infer<typeof scheduleSchema>;
+export type ScheduleBatchRun = z.infer<typeof scheduleBatchRunSchema>;
+export type ScheduleBatch = z.infer<typeof scheduleBatchSchema>;
 export type Reconciliation = z.infer<typeof reconciliationSchema>;
 export type Dashboard = z.infer<typeof dashboardSchema>;
 export type Widget = z.infer<typeof widgetSchema>;
@@ -330,6 +353,7 @@ export type BudgetSnapshot = {
   payees: Payee[];
   rules: Rule[];
   schedules: Schedule[];
+  scheduleBatches: ScheduleBatch[];
   reconciliations: Reconciliation[];
   dashboards: Dashboard[];
   widgets: Widget[];
