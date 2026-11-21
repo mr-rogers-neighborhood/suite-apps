@@ -256,6 +256,9 @@ const status = {
   // desktop run must not read as proof of the e2e step.
   e2e: e2eRan,
   e2eRequested: e2e,
+  // A partial run proves one repository, not the suite. `release.mjs` refuses
+  // to publish on it; the field is null for a full run.
+  only,
   results,
 };
 const statusPath = join(ROOT, ".dev", "gate-status.json");

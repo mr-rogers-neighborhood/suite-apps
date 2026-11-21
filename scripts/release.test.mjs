@@ -107,6 +107,20 @@ describe("release refusals", () => {
     );
   });
 
+  it("refuses a status left by a partial --only run", () => {
+    const head = "abcdef1234567890";
+    const problems = gateProblems(
+      { ok: true, fresh: true, commit: "abcdef1", only: "canvas" },
+      head,
+    );
+    assert.match(problems.join(), /--only canvas/u);
+
+    assert.deepEqual(
+      gateProblems({ ok: true, fresh: true, commit: "abcdef1", only: null }, head),
+      [],
+    );
+  });
+
   it("accepts a fresh, passing gate that names HEAD", () => {
     assert.deepEqual(
       gateProblems({ ok: true, fresh: true, commit: "abcdef1" }, "abcdef1234567890"),
