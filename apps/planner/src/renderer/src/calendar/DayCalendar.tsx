@@ -19,7 +19,9 @@ export function DayCalendar() {
     return () => clearInterval(timer);
   }, []);
 
-  const events = snapshot.events.filter((event) => event.dateKey === date);
+  const events = snapshot.events.filter(
+    (event) => event.dateKey === date && overlapsVisibleDay(event),
+  );
   const isToday = date === todayKey();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const showNow = isToday && nowMinutes >= DAY_START && nowMinutes <= DAY_END;
@@ -73,7 +75,9 @@ export function DayCalendar() {
 
             {events.length === 0 && (
               <div className="absolute inset-x-0 top-24 text-center">
-                <p className="text-xs text-faint">No events today.</p>
+                <p className="text-xs text-faint">
+                  {isToday ? "No events today." : "No events on this day."}
+                </p>
                 <p className="mt-1 text-[11px] text-faint/80">
                   Suite Planner keeps its calendar on this machine.
                 </p>
@@ -110,6 +114,11 @@ function hours(): number[] {
 
 function minutesOf(time: string): number {
   return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+}
+
+/** An event outside 07:00–21:00 has no hour to sit at; clipping it to an edge would lie. */
+function overlapsVisibleDay(event: CalendarEvent): boolean {
+  return minutesOf(event.endTime) > DAY_START && minutesOf(event.startTime) < DAY_END;
 }
 
 function percentOf(minutes: number): number {

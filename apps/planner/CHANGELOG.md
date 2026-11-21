@@ -22,6 +22,12 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
   it, removed the field and dropped focus on the page; focus returns to the task title.
 - **Back to today keeps focus on the day.** The button removed itself and left focus nowhere; the
   new day's heading now takes it.
+- **The calendar no longer puts an out-of-hours event at 7:00.** An event entirely before 07:00 or
+  after 21:00 was clamped to the edge and looked like it happened there; it is left out, and an
+  event that straddles an edge is clipped. The empty state also says "this day" when the selected
+  day is not today.
+- **Blurring an unchanged due or reminder time leaves the record alone.** The field shows minutes,
+  so a stored timestamp with seconds was rewritten shorter just by leaving the field.
 
 ## [0.5.1] - 2026-11-21
 

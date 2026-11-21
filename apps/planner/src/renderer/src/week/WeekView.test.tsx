@@ -212,6 +212,46 @@ describe("WeekView", () => {
     );
   });
 
+  it("should step a week across the end of a month", () => {
+    useUiStore.setState({ selectedDate: "2026-01-31" });
+    render(<WeekView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+
+    // 2026-01-31 is a Saturday; its Monday week starts on 26 January.
+    expect(useUiStore.getState().selectedDate).toBe("2026-02-02");
+  });
+
+  it("should step a week across the end of a year", () => {
+    useUiStore.setState({ selectedDate: "2026-12-28" });
+    render(<WeekView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    expect(useUiStore.getState().selectedDate).toBe("2027-01-04");
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
+    expect(useUiStore.getState().selectedDate).toBe("2026-12-28");
+  });
+
+  it("should refuse a move past the last day of the week", () => {
+    const lastDay = addDaysToKey(weekStart, 6);
+    mocks.snapshot.current = snapshot({
+      tasks: [task({ id: "task-1", title: "Last day", scheduledFor: lastDay })],
+    });
+
+    render(<WeekView />);
+
+    fireEvent.keyDown(within(columnFor(lastDay)).getByRole("button", { name: "Last day" }), {
+      key: "ArrowRight",
+      altKey: true,
+    });
+
+    expect(mocks.scheduleTask).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Last day is already on the last day of this week.",
+    );
+  });
+
   it("should say when a task is already on the first day of the week", () => {
     mocks.snapshot.current = snapshot({
       tasks: [task({ id: "task-1", title: "Plan the week", scheduledFor: weekStart })],

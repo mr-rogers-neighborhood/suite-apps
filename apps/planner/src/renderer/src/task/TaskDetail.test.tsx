@@ -280,6 +280,27 @@ describe("TaskDetail", () => {
     expect(doc.getTask(task.id)?.remindAt).toBeNull();
   });
 
+  it("should leave a timestamp the field cannot show whole alone", () => {
+    const { doc, replica } = makeDocument();
+    const now = new Date("2026-11-01T09:00:00.000Z");
+    const task = doc.createTask(
+      {
+        title: "A task",
+        scheduledFor: "2026-11-20",
+        dueAt: "2026-11-20T17:00:30.000Z",
+      },
+      now,
+    );
+    open(task.id);
+    renderDetail(replica);
+
+    const due = screen.getByLabelText("Due");
+    fireEvent.blur(due);
+
+    expect(doc.getTask(task.id)?.dueAt).toBe("2026-11-20T17:00:30.000Z");
+    expect(doc.getTask(task.id)?.updatedAt).toBe(now.toISOString());
+  });
+
   it("should return focus to the row when it closes", async () => {
     const { doc, replica } = makeDocument();
     const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
