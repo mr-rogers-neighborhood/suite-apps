@@ -13,12 +13,15 @@ import {
   installCell,
   installCommand,
   isDate,
+  isRelayAsset,
   parseArgs,
   planTag,
+  relayAssetProblem,
   releaseAction,
   releasesPage,
   remoteLookupProblem,
   tagFor,
+  tagPlanDisposition,
 } from "./release-status.mjs";
 
 const start = APPS.find((app) => app.id === "start");
@@ -177,11 +180,24 @@ describe("release actions", () => {
     );
   });
 
-  it("edits a release that already exists, so its assets stay", () => {
+  it("edits a relay release that carries its tarball, so its assets stay", () => {
     assert.deepEqual(
-      releaseAction({ app: sync, tag: "sync-v0.11.3", exists: true }),
+      releaseAction({
+        app: sync,
+        tag: "sync-v0.11.3",
+        exists: true,
+        assets: [{ name: "suite-sync-0.11.3-x86_64.tar.gz" }],
+      }),
       { action: "edit", problem: null },
     );
+  });
+
+  it("refuses an existing but assetless relay release", () => {
+    const action = releaseAction({ app: sync, tag: "sync-v0.11.3", exists: true, assets: [] });
+    assert.equal(action.action, null);
+    assert.match(action.problem, /no tarball or checksum asset/u);
+    assert.match(action.problem, /release\.mjs sync --publish/u);
+    assert.match(action.problem, /run that first/u);
   });
 
   it("refuses to create an assetless relay release", () => {
@@ -189,6 +205,58 @@ describe("release actions", () => {
     assert.equal(action.action, null);
     assert.match(action.problem, /no GitHub release exists/u);
     assert.match(action.problem, /release\.mjs sync --publish/u);
+  });
+});
+
+describe("relay assets", () => {
+  it("accepts a tarball or a checksum list", () => {
+    assert.equal(isRelayAsset("suite-sync-0.11.3-x86_64.tar.gz"), true);
+    assert.equal(isRelayAsset("SHA256SUMS"), true);
+    assert.equal(isRelayAsset("notes.txt"), false);
+    assert.equal(relayAssetProblem("sync-v0.11.3", [{ name: "SHA256SUMS" }]), null);
+  });
+
+  it("refuses an asset list it could not read", () => {
+    const problem = relayAssetProblem("sync-v0.11.3", null);
+    assert.match(problem, /could not read the assets/u);
+    assert.match(problem, /run that first/u);
+  });
+});
+
+describe("tag plans by mode", () => {
+  const problem =
+    "no start-v0.5.1 exists and no commit adds '## [0.5.1]' to apps/start/CHANGELOG.md.";
+
+  it("marks the row pending for --write instead of refusing", () => {
+    assert.deepEqual(tagPlanDisposition(problem, "write"), { problem: null, pending: true });
+  });
+
+  it("still refuses a tag-plan problem for --publish and the dry run", () => {
+    assert.deepEqual(tagPlanDisposition(problem, "publish"), { problem, pending: false });
+    assert.deepEqual(tagPlanDisposition(problem, "dry-run"), { problem, pending: false });
+  });
+
+  it("keeps a resolved plan unpending in every mode", () => {
+    for (const mode of ["write", "publish", "dry-run"]) {
+      assert.deepEqual(tagPlanDisposition(null, mode), { problem: null, pending: false });
+    }
+  });
+
+  it("writes a pending row for --write even when the release exists", () => {
+    const pending = entries.map((entry) => ({
+      ...entry,
+      published: true,
+      pending: entry.app.id === "sync",
+    }));
+    const page = releasesPage(pending, {
+      date: "2026-11-21",
+      tag: "suite-2026.11.21",
+      aggregatePublished: true,
+    });
+    assert.match(page, /`sync-v0\.11\.3` \(pending\)/u);
+    assert.match(page, /relay release is pending/u);
+    assert.doesNotMatch(page, /releases\/tag\/sync-v0\.11\.3/u);
+    assert.match(page, /releases\/tag\/start-v0\.5\.1/u);
   });
 });
 
@@ -230,6 +298,17 @@ describe("release bodies", () => {
   it("renders the relay's install cell without inventing a Flatpak", () => {
     assert.match(installCell(sync), /relay tarball/u);
     assert.match(installCell(start), /flatpak install/u);
+  });
+
+  it("says the relay release is pending in the aggregate body when the guard refuses it", () => {
+    const pending = entries.map((entry) =>
+      entry.app.id === "sync" ? { ...entry, pending: true } : entry,
+    );
+    const body = aggregateReleaseBody(pending, { date: "2026-11-21" });
+    assert.match(body, /relay release is pending/u);
+    assert.match(body, /`sync-v0\.11\.3` \(pending\)/u);
+    assert.doesNotMatch(body, /releases\/tag\/sync-v0\.11\.3/u);
+    assert.doesNotMatch(body, /installed and verified by hand/u);
   });
 
   it("marks links pending before publication", () => {

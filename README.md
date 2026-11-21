@@ -26,7 +26,7 @@ in the data path. Sync carries a document between devices; it never defines its 
 ## Install
 
 Suite Start ships as the Flatpak `run.suite.start`; every other app arrives through it.
-[Installing Suite Start](apps/start/docs/how-to/install.md) owns the signed remote, the checksum and
+[Installing Suite Start](apps/start/docs/how-to/install.md) owns the signed remote, the install and
 the first launch. Open Start, install Canvas, and start with
 [Make a first workspace](docs/tutorials/02-first-workspace.md).
 
