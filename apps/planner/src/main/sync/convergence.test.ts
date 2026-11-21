@@ -72,7 +72,14 @@ afterEach(async () => {
     services.splice(0).map((created) => created.disconnect().catch(() => undefined)),
   );
   await Promise.all(servers.splice(0).map((server) => server.close()));
-  await Promise.all(cleanups.splice(0).map((directory) => rm(directory, { recursive: true })));
+  await Promise.all(
+    cleanups.splice(0).map((directory) =>
+      // A cursor write can land just after disconnect, while the directory is
+      // being removed. Retrying the removal is the honest fix: the test is about
+      // convergence, not about which teardown wins the filesystem race.
+      rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }),
+    ),
+  );
 });
 
 describe("two Planner profiles through a real relay", () => {
