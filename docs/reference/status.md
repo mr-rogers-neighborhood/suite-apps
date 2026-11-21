@@ -11,9 +11,9 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Hub: routing | Working | `suite://` links and document files open the owning app |
 | Hub: Flatpak | Working | Lists, installs from the store, updates, launches and removes Flatpak installs |
 | Canvas | Alpha | Cards, boards, editor, library and views; opt-in sync through a host; no account or share link, and still changing shape |
-| Planner | Pre-alpha | Day view, inbox, capture, estimates; no sync transport |
-| Budget | Pre-alpha | Launcher, accounts, register, month grid, rollover, reconcile, backups; no network |
-| Sync | Phase 4 demo | Protocol, membership, relay, CLI and Canvas client work; the relay stores sealed frames, not a document; loopback by default, no TLS |
+| Planner | Pre-alpha | Day view, inbox, capture and estimates; Upcoming, Projects, Tags, Focus and Rituals views; a task detail dialog; no sync transport |
+| Budget | Pre-alpha | Launcher, accounts, register, month grid, rollover, reconcile, backups, targets, rules, schedules, CSV/QIF import, reports; no network |
+| Sync | Working | Phase 4 demo: protocol, membership, invite/join, relay, CLI and Canvas client work; the relay stores sealed frames, not a document; loopback by default, no TLS |
 | Sync: invite and join | Working | An invitation link in the Sync dialog; the relay pins the joining device's key and spends the invitation |
 | Sync: blind relay | Working | One append-only file per workspace: sealed frames, roles, invites, pinned keys and removals; no code path reads a document |
 | Go | v0 container | Android debug build installs; Scratch proves capture and documents, Canvas is a placeholder, and an installed pack appears on home; [Planner's state](../../apps/go/docs/reference/planner.md); iOS unbuilt; no sync transport |

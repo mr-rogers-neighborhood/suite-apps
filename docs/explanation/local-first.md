@@ -12,7 +12,7 @@ slogan.
 | Ideal | Where Suite stands |
 | --- | --- |
 | **1. No spinners** | Met. Documents are local CRDTs; an edit does not wait for a server. |
-| **2. Not trapped on one device** | Partial. Canvas syncs through a server the user runs. Planner and Budget have no sync transport yet. |
+| **2. Not trapped on one device** | Partial. Canvas syncs through a relay the user runs, and a second device joins with a single-use invitation from the Sync dialog. Planner and Budget have no sync transport yet. |
 | **3. The network is optional** | Met. The apps open and edit offline. Budget has no network client at all. |
 | **4. Seamless collaboration** | Partial. Canvas has live presence and collaborative editing. Collaboration is a foreground session; a sleeping device is not woken. |
 | **5. The Long Now** | Met. Files are plain and exportable, the licence is MIT, and the project operates no service that can be shut down. An older file opens and is migrated; a newer one is refused by name instead of being corrupted ([the policy](../reference/file-formats.md#opening-a-file-another-version-wrote)). |
@@ -24,7 +24,8 @@ slogan.
 The limits are deliberate and recorded, not marketing gaps:
 
 - **Sync is one app deep.** The protocol and server exist, and two Canvas clients can converge through
-  them. Planner and Budget still open one file on one machine. See [Status](../reference/status.md).
+  them; a second device joins with a single-use invitation the owner mints in the Sync dialog. Planner
+  and Budget still open one file on one machine. See [Status](../reference/status.md).
 - **No background delivery.** A sleeping device is not woken. See
   `apps/go/docs/reference/decisions.md`.
 - **The sync relay is not the shipped security model.** It stores sealed frames it cannot read, but
@@ -32,7 +33,7 @@ The limits are deliberate and recorded, not marketing gaps:
   See `apps/sync/docs/reference/decisions.md`.
 - **Files rely on disk encryption.** A `.canvas`, `.planner` or `.budget` file is readable by anyone
   who has it. The apps do not add a passphrase.
-- **Longevity is a property of the format, not a promise about migrations.** Each file carries a
+- **Longevity is a property of the format, not a promise about future versions.** Each file carries a
   format and schema version. Opening a newer file in an older app is not supported.
 
 The product rule that follows: when a feature would make a document depend on a service, the
