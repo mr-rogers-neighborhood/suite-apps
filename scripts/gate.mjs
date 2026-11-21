@@ -75,19 +75,32 @@ function onPath(name) {
 }
 
 /**
- * Run a repository's browser/desktop tests.
+ * How a browser/desktop suite can reach a display, or null when it cannot.
  *
- * They need a display. A desktop session has one; a CI machine has Xvfb, which
- * `xvfb-run` starts for exactly this. Refusing loudly is better than letting
- * Playwright fail with "missing X server", which reads like a test failure.
+ * `xvfb-run` wins even when the person has a desktop session: the cross-app
+ * suite launches the real Electron app twenty-odd times, and on a real display
+ * that is a burst of windows over whatever they were doing. A virtual display
+ * runs the same test with none of the intrusion.
  */
-function runE2e(repoDir) {
+function e2eDisplay() {
+  if (onPath("xvfb-run")) return "xvfb";
   const hasDisplay =
     (process.env.DISPLAY ?? "").length > 0 || (process.env.WAYLAND_DISPLAY ?? "").length > 0;
+  return hasDisplay ? "desktop" : null;
+}
+
+/**
+ * Run a repository's browser/desktop tests.
+ *
+ * `display` comes from `e2eDisplay`. A headless host with neither Xvfb nor a
+ * display fails loudly: Playwright would otherwise fail with "missing X
+ * server", which reads like a test failure.
+ */
+function runE2e(repoDir, display) {
   const command = "pnpm";
   const args = ["exec", "playwright", "test"];
-  if (hasDisplay) return run(command, args, repoDir);
-  if (onPath("xvfb-run")) return run("xvfb-run", ["-a", command, ...args], repoDir);
+  if (display === "xvfb") return run("xvfb-run", ["-a", command, ...args], repoDir);
+  if (display === "desktop") return run(command, args, repoDir);
   return { status: 1, signal: null };
 }
 
@@ -197,20 +210,36 @@ for (const entry of build.ok ? selected : []) {
 
 // E2E after every repository's own gate: a UI spec failure should not hide whether
 // the other apps' checks passed. It only runs when the checks are green.
+let e2eRan = false;
 if (e2e && results.length > 0 && results.every((row) => row.ok)) {
+  const display = e2eDisplay();
+  // A real session is not asked to give up its screen for a test run. The suite
+  // is skipped unless the person passes `--e2e`, and the status says so.
+  const skipDesktop = display === "desktop" && !argv.includes("--e2e");
+  if (skipDesktop && !json) {
+    process.stdout.write(
+      "\ne2e skipped: no xvfb-run on this desktop session. Install Xvfb, run the gate on the VM, or pass --e2e to accept the windows.\n",
+    );
+  }
   for (const entry of selected.filter((row) => row.e2e === true)) {
+    if (skipDesktop) {
+      results.push({
+        ...entry,
+        repo: `${entry.repo} e2e`,
+        ok: true,
+        detail: "skipped: desktop display, no xvfb-run",
+      });
+      continue;
+    }
     if (!json) process.stdout.write(`\n▶ ${entry.repo} · e2e\n`);
-    const suite = runE2e(join(workdir, "apps", entry.repo));
+    const suite = runE2e(join(workdir, "apps", entry.repo), display);
     const ok = suite.status === 0;
-    const noDisplay =
-      (process.env.DISPLAY ?? "").length === 0 &&
-      (process.env.WAYLAND_DISPLAY ?? "").length === 0 &&
-      !onPath("xvfb-run");
+    e2eRan = e2eRan || ok;
     results.push({
       ...entry,
       repo: `${entry.repo} e2e`,
       ok,
-      detail: ok ? "passed" : noDisplay ? "no display and no xvfb-run" : `exit ${suite.status}`,
+      detail: ok ? "passed" : display === null ? "no display and no xvfb-run" : `exit ${suite.status}`,
     });
     if (!ok) break;
   }
@@ -223,7 +252,10 @@ const status = {
   commit: gitSha(),
   at: new Date().toISOString(),
   build,
-  e2e,
+  // Whether the suite actually ran, not whether it was requested. A skipped
+  // desktop run must not read as proof of the e2e step.
+  e2e: e2eRan,
+  e2eRequested: e2e,
   results,
 };
 const statusPath = join(ROOT, ".dev", "gate-status.json");
