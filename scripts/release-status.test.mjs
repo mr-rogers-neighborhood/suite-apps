@@ -233,9 +233,11 @@ describe("tag plans by mode", () => {
 });
 
 describe("release bodies", () => {
-  it("puts the changelog section first and names the signed remote", () => {
+  it("points at the rolling release, then the changelog section and the signed remote", () => {
     const body = appReleaseBody(start, entries[0].section);
-    assert.match(body, /^\s*### Changed/u);
+    assert.match(body, /^Current versions and the install table are on/u);
+    assert.match(body, /releases\/latest/u);
+    assert.match(body, /### Changed/u);
     assert.match(body, /flatpak install --user suite run\.suite\.start/u);
     assert.match(body, new RegExp(flatpakrepoUrl().replaceAll(".", "\\."), "u"));
     assert.match(body, /carries no app binaries/u);
