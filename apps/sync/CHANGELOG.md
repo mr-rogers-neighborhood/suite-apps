@@ -21,8 +21,8 @@ this file does not invent them; every release from here adds its section first.
   relay runs in the app's own main process, so closing the window hides it to the tray and the relay
   keeps serving; the window shows the address, the relay code, the certificate fingerprint and the
   console, and can start or stop the relay. The same Flatpak is the headless relay:
-  `flatpak run --command=suite-sync run.suite.sync serve`. It is installed from a checkout with
-  `node scripts/flatpak.mjs --app sync` until the release that publishes the app to the store lands.
+  `flatpak run --command=suite-sync run.suite.sync serve`. It installs from the suite store like
+  every other Flatpak; a checkout builds it with `node scripts/flatpak.mjs --app sync`.
 - **Starting at login** writes one XDG autostart entry and nothing else outside the sandbox. The
   manifest grants exactly `--filesystem=xdg-config/autostart:create` for it.
 - **Who can reach the relay is a choice, loopback by default.** The window's selector offers this
@@ -35,6 +35,13 @@ this file does not invent them; every release from here adds its section first.
 - **`@suite/host` can make the TLS pair it serves** (`ensureSelfSignedPair`), so an app that embeds a
   relay keeps one fingerprint across restarts. A bind that fails now rejects with the listen error
   instead of surfacing as an uncaught exception from the WebSocket server.
+
+### Removed
+
+- **The relay tarball release.** `scripts/release.mjs` no longer builds, signs or uploads a
+  `suite-sync-<version>-<arch>.tar.gz`; the relay publishes as `run.suite.sync` on the signed Flatpak
+  remote. Releases `sync-v0.11.3` and earlier stay downloadable as history and are not an install
+  path.
 
 ## [0.11.3] - 2026-11-20
 
