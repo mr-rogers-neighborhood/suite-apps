@@ -27,11 +27,8 @@ Remote: [suite.flatpakrepo](https://flatpak.suite.run/suite.flatpakrepo)
 | [Suite Canvas](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/canvas/CHANGELOG.md) | 0.1.11 | 2026-11-21 | [`canvas-v0.1.11`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/canvas-v0.1.11) | `flatpak install --user suite run.suite.canvas` |
 | [Suite Planner](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/planner/CHANGELOG.md) | 0.5.0 | 2026-11-21 | [`planner-v0.5.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/planner-v0.5.0) | `flatpak install --user suite run.suite.planner` |
 | [Suite Budget](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/budget/CHANGELOG.md) | 0.4.0 | 2026-11-21 | [`budget-v0.4.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/budget-v0.4.0) | `flatpak install --user suite run.suite.budget` |
-| [Suite Sync](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/CHANGELOG.md) | 0.11.3 | 2026-11-20 | [`sync-v0.11.3`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/sync-v0.11.3) | [relay tarball](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/docs/how-to/relay.md) |
+| [Suite Sync](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/CHANGELOG.md) | 0.11.3 | 2026-11-20 | [`sync-v0.11.3`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/sync-v0.11.3) | `flatpak install --user suite run.suite.sync` |
 | [Suite Help](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/help/CHANGELOG.md) | 0.1.1 | 2026-11-21 | [`help-v0.1.1`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/help-v0.1.1) | `flatpak install --user suite run.suite.help` |
-
-Suite Sync is a server tarball, not a Flatpak. It is installed and verified by hand from
-[its guide](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/docs/how-to/relay.md).
 
 ## Mobile
 
