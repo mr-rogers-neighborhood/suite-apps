@@ -63,6 +63,33 @@ export declare const suiteAppManifestSchema: z.ZodObject<{
         attachments: "attachments";
         publish: "publish";
     }>>>;
+    widgets: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        title: z.ZodString;
+        size: z.ZodEnum<{
+            "1x1": "1x1";
+            "2x1": "2x1";
+            full: "full";
+        }>;
+        capabilities: z.ZodArray<z.ZodEnum<{
+            capture: "capture";
+        }>>;
+        action: z.ZodDiscriminatedUnion<[z.ZodObject<{
+            kind: z.ZodLiteral<"capture">;
+            submitLabel: z.ZodDefault<z.ZodString>;
+            fields: z.ZodArray<z.ZodObject<{
+                id: z.ZodString;
+                label: z.ZodString;
+                type: z.ZodEnum<{
+                    number: "number";
+                    text: "text";
+                    day: "day";
+                }>;
+                required: z.ZodDefault<z.ZodBoolean>;
+                maxLength: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strict>>;
+        }, z.core.$strict>], "kind">;
+    }, z.core.$strict>>>;
 }, z.core.$strict>;
 export type SuiteAppManifest = z.infer<typeof suiteAppManifestSchema>;
 export type SuiteCapability = z.infer<typeof suiteCapabilitySchema>;

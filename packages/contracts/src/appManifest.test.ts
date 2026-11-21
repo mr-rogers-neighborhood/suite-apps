@@ -59,6 +59,51 @@ describe("parseAppManifest", () => {
   it("refuses a missing name", () => {
     expect(parseAppManifest({ ...canvasManifest, name: "" }).ok).toBe(false);
   });
+
+  it("keeps an app that declares no widgets exactly as it was", () => {
+    const parsed = parseAppManifest(canvasManifest);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.widgets).toEqual([]);
+  });
+
+  it("accepts a manifest that declares a capture widget", () => {
+    const parsed = parseAppManifest({
+      ...canvasManifest,
+      widgets: [
+        {
+          id: "quick-task",
+          title: "New task",
+          size: "2x1",
+          capabilities: ["capture"],
+          action: {
+            kind: "capture",
+            submitLabel: "Add task",
+            fields: [{ id: "title", label: "Task", type: "text", required: true }],
+          },
+        },
+      ],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.widgets[0]?.id).toBe("quick-task");
+  });
+
+  it("refuses a widget with an unknown size class", () => {
+    const parsed = parseAppManifest({
+      ...canvasManifest,
+      widgets: [
+        {
+          id: "quick-task",
+          title: "New task",
+          size: "wide",
+          capabilities: ["capture"],
+          action: { kind: "capture", fields: [{ id: "title", label: "Task", type: "text" }] },
+        },
+      ],
+    });
+    expect(parsed.ok).toBe(false);
+  });
 });
 
 describe("manifestFitsHub", () => {

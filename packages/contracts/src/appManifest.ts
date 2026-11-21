@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CONTRACT_VERSION, isContractCompatible } from "./contractVersion.js";
 import { type ContractParse, parseWith } from "./parse.js";
+import { suiteWidgetsSchema } from "./widgets.js";
 
 /**
  * `suite.app` — the manifest a signed app ships beside itself.
@@ -86,6 +87,12 @@ export const suiteAppManifestSchema = z
     minHubVersion: suiteSemverSchema.optional(),
     update: suiteAppUpdateSchema.optional(),
     capabilities: z.array(suiteCapabilitySchema).max(16).default([]),
+    /**
+     * The host surfaces this app offers. Absent means none, which is what every
+     * manifest written before widgets said — the default is how those apps stay
+     * unchanged rather than gaining an empty field they never declared.
+     */
+    widgets: suiteWidgetsSchema.default([]),
   })
   .strict()
   .superRefine((manifest, context) => {
