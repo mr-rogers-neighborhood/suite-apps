@@ -13,6 +13,14 @@ export default defineConfig({
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      // A sandboxed preload is a CommonJS script; the app package is ESM for the
+      // main process, so name the output explicitly rather than letting the
+      // package type choose `.mjs`.
+      rollupOptions: {
+        output: { format: "cjs", entryFileNames: "[name].cjs" },
+      },
+    },
   },
   renderer: {
     // The production window is served from `suite-help://app/`; a root-relative base keeps

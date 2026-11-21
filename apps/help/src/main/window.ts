@@ -50,7 +50,7 @@ export function createMainWindow(): BrowserWindow {
     backgroundColor: "#0b0d12",
     autoHideMenuBar: process.platform !== "darwin",
     webPreferences: {
-      preload: join(__dirname, "../preload/index.js"),
+      preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
