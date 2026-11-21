@@ -77,14 +77,16 @@ These still hold, from the old workspace skill:
 
 ## Documentation
 
-- Cross-app docs live in `docs/`: tutorials, how-to, reference and explanation. Each app keeps
+- Cross-app docs live in `docs/`: module narratives in `docs/modules/`, walks in
+  `docs/walkthroughs/`, and the older pages as a notes archive. Each app keeps
   `apps/<app>/docs/` beside its code.
 - One fact has one home. Fix the owning page and link from the rest. Never restate a version; link
   to `package.json` or the changelog.
 - Docs describe the tree as it is. The flattened layout is a proposal in
   `docs/reference/decisions.md`, not something a page may instruct today.
-- Run `node scripts/docs-check.mjs` with any docs change. Canvas also runs its own `docs:check`,
-  `docs:symbols` and `shape`.
+- Run `node scripts/docs-check.mjs` with any docs change. For the explorer's authored layer, run
+  `pnpm docs:index:check`; `pnpm docs:coverage` reports the remaining gaps without failing. Canvas
+  also runs its own `docs:check`, `docs:symbols` and `shape`.
 
 If a change needs another app edited to work, stop and coordinate; changing a
 sibling to make one app pass is not the fix.

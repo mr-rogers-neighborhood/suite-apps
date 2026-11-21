@@ -275,9 +275,14 @@ export function Explorer() {
           setView("walkthroughs");
           setSidebarOpen(false);
           break;
-        case "doc":
-          window.location.assign(`/docs/${target.path.replace(/^docs\//, "")}`);
+        case "doc": {
+          const path = target.path
+            .replace(/^docs\//, "")
+            .replace(/\.mdx?$/, "")
+            .replace(/^README$/, "");
+          window.location.assign(`/docs${path ? `/${path}` : ""}`);
           break;
+        }
       }
     },
     [expandFor],

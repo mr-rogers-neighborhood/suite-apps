@@ -46,6 +46,11 @@ One index, three views:
 `Start here` is a curated walk; `Full descent` is generated over every node. The selected node is
 the anchor when switching views.
 
+A walk advances manually with `←`/`→` (or `j`/`k`); **Play** auto-advances one step every six
+seconds, and `Esc` stops. A composed tour uses the same controls and may jump across views. From a
+symbol, `⌘↑`/`Ctrl+↑` climbs to its file and then its module; `⌘↓`/`Ctrl+↓` descends again. The
+breadcrumb does the same thing with the pointer.
+
 ## What is where
 
 | Path                                | Purpose                                                                                                            |
