@@ -10,6 +10,15 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 No changes yet.
 
+## [0.4.0] - 2026-11-21
+
+### Added
+
+- **Task notes take formatting.** Paragraphs, headings, bold, italic, inline code, links and bullet
+  or numbered lists edit in place from the task detail dialog, with a toolbar over the note instead
+  of a plain textarea. The note is the task's Loro text container, so an edit is saved as you type
+  and two edits merge; a note written before this release opens as the same words it held.
+
 ## [0.3.0] - 2026-11-20
 
 ### Added

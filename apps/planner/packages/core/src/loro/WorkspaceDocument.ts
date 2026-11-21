@@ -35,7 +35,7 @@ import {
   updateFocusSession,
 } from "./focus";
 import { ensureCurrentSchema, initializeMeta, readMeta } from "./meta";
-import { getNote, getNoteText, setNote } from "./notes";
+import { getNote, getNoteContainerId, getNoteDoc, getNoteText, setNote } from "./notes";
 import { createProject, deleteProject, listProjects, updateProject } from "./projects";
 import { ensureSettings, readSettings, updateSettings } from "./settings";
 import { readWorkspaceSnapshot, type WorkspaceSnapshot } from "./snapshot";
@@ -268,6 +268,15 @@ export class WorkspaceDocument {
 
   getNoteText(taskId: string) {
     return getNoteText(this.#doc, taskId);
+  }
+
+  /** The rich note root the task detail editor binds to. */
+  getNoteDoc(taskId: string) {
+    return getNoteDoc(this.#doc, taskId);
+  }
+
+  getNoteContainerId(taskId: string) {
+    return getNoteContainerId(this.#doc, taskId);
   }
 
   // Focus
