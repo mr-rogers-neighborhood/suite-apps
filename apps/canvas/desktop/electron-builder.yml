@@ -1,10 +1,11 @@
 # The Canvas desktop build.
 #
-# `deb` is the primary Linux target: it is what carries the `.canvas` MIME
-# association and the `x-scheme-handler/suite-canvas` declaration, because those
-# live in the desktop entry the package installs. `AppImage` is the portable
-# alternative and registers its protocols at runtime, so it works without an
-# installer and without root.
+# Linux ships the AppImage only. The `.canvas` association is declared by
+# `fileAssociations` and `linux.desktop.entry`, which electron-builder writes into
+# the image's own desktop entry, so the portable build keeps it without an
+# installer; Start declares the same MIME type when it places the image. Canvas
+# claims no URL scheme of its own: `suite://` belongs to Start, which routes a
+# link by launching this app with it.
 #
 # macOS and Windows are configured but cannot be produced here: both need a
 # signing identity this repository does not have, and an unsigned build is not
@@ -59,7 +60,6 @@ electronFuses:
 linux:
   syncDesktopName: true
   target:
-    - deb
     - AppImage
   # Without this the binary is named after the package, which for a scoped name
   # becomes `@suitedesktop`. The executable name is part of what Start records,
@@ -73,18 +73,6 @@ linux:
     entry:
       MimeType: application/x-suite-canvas;
       StartupWMClass: Suite Canvas
-
-deb:
-  depends:
-    - libgtk-3-0
-    - libnotify4
-    - libnss3
-    - libxss1
-    - libxtst6
-    - xdg-utils
-    - libatspi2.0-0
-    - libuuid1
-    - libsecret-1-0
 
 # No `appImage.license`: electron-builder reads it as a path to a file to show at
 # install, wants `.txt` or `.html`, and a bare `MIT` made it look for a file with

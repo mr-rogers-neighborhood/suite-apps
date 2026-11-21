@@ -40,7 +40,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   artifactStem,
@@ -915,17 +915,23 @@ async function buildRelayArtifact({ app, version, outputDir, arch = process.arch
 }
 
 /**
- * A PKGBUILD with the version and checksum of the artifact just built.
+ * A PKGBUILD with the version, source and checksum of the artifact just built.
  *
  * The committed PKGBUILD records the release it was written for; a release builds
- * the package from its own bytes, so both numbers are rewritten here.
+ * the package from its own bytes, so all three numbers are rewritten here. The
+ * source line is part of that: a template that names the archived repository, or a
+ * tag this run did not upload to, would 404 while the feed named a working file.
  */
-export function pkgbuildFor({ text, version, sha256 }) {
-  const patched = text
+export function pkgbuildFor({ text, version, sha256, source = null }) {
+  let patched = text
     .replace(/^pkgver=.*$/mu, `pkgver=${version}`)
     .replace(/^pkgrel=.*$/mu, "pkgrel=1")
     .replace(/^sha256sums=\(.*$/mu, `sha256sums=('${sha256}')`);
-  const unchanged = ["pkgver", "sha256sums"].filter(
+  if (source !== null) {
+    patched = patched.replace(/^source=\(.*$/mu, `source=("$pkgname-$pkgver.AppImage::${source}")`);
+  }
+  const required = source === null ? ["pkgver", "sha256sums"] : ["pkgver", "source", "sha256sums"];
+  const unchanged = required.filter(
     (fieldName) => !new RegExp(`^${fieldName}=`, "mu").test(patched),
   );
   if (unchanged.length > 0) {
@@ -994,7 +1000,14 @@ async function packageFor(app, { version, artifactPath }) {
   if (pkgname === undefined) throw new Error(`${pkgbuildPath} names no pkgname`);
 
   const work = await mkdtemp(join(tmpdir(), "suite-pkg-"));
-  const patched = pkgbuildFor({ text, version, sha256: await sha256OfFile(artifactPath) });
+  const patched = pkgbuildFor({
+    text,
+    version,
+    sha256: await sha256OfFile(artifactPath),
+    // The image this run built, on the tag this run uploads to. The manifest names
+    // the same file, so the package and the feed resolve to one release asset.
+    source: `${releaseAssetBase(app, version)}${basename(artifactPath)}`,
+  });
   await writeFile(join(work, "PKGBUILD"), patched);
   await copyFile(artifactPath, join(work, `${pkgname}-${version}.AppImage`));
 
