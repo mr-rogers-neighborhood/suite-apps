@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Publish the local Flatpak OSTree repository to the `suite-dev` static host.
+ * Publish the local Flatpak OSTree repository to the public store or the lab host.
  *
  * `scripts/flatpak.mjs` builds one signed repository at `~/suite-flatpak/repo`
  * and installs from it on this machine. This script publishes that same
@@ -9,6 +9,10 @@
  *
  *   flatpak remote-add --user --if-not-exists --from suite <url>/suite.flatpakrepo
  *   flatpak install --user suite run.suite.planner
+ *
+ * `--target s3` uploads the same bytes to the private bucket behind CloudFront,
+ * where `https://flatpak.suite.run/` serves them. `--target lan` keeps the local
+ * `suite-dev` test remote, which is the default.
  *
  * Three rules make the publication safe to repeat:
  *
@@ -29,9 +33,11 @@
  * install; a tier is installed with an explicit `//<tier>`.
  *
  * Usage:
- *   node scripts/flatpak-remote.mjs                 # dry run
- *   node scripts/flatpak-remote.mjs --publish       # sign and copy
- *   node scripts/flatpak-remote.mjs --channel beta  # dry run for a tier branch
+ *   node scripts/flatpak-remote.mjs                       # dry run, local target
+ *   node scripts/flatpak-remote.mjs --publish             # sign and copy to suite-dev
+ *   node scripts/flatpak-remote.mjs --target s3           # dry run: every aws command
+ *   node scripts/flatpak-remote.mjs --target s3 --publish # upload and invalidate
+ *   node scripts/flatpak-remote.mjs --channel beta        # dry run for a tier branch
  *   node scripts/flatpak-remote.mjs --help
  */
 import { spawnSync } from "node:child_process";
@@ -50,12 +56,24 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { branchFor, channelProblem } from "./lib/channel.mjs";
+import {
+  DEFAULT_PUBLIC_URL,
+  DEFAULT_TARGET,
+  REMOTE_NAME,
+  commandText,
+  flatpakrepoUrl,
+  invalidationCommand,
+  normalizeRemoteUrl,
+  s3ConfigProblems,
+  s3UploadCommands,
+  targetProblem,
+} from "./lib/flatpakRemote.mjs";
 import { dirtyTreeProblem, gateProblems } from "./release.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
-/** The remote name a person types after `flatpak install`. */
-export const REMOTE_NAME = "suite";
+/** The remote name `flatpak install` takes, re-exported for the release page. */
+export { REMOTE_NAME };
 
 /** The branch the stable apps carry today. A tier names its own with `--branch`. */
 export const DEFAULT_BRANCH = "master";
@@ -63,24 +81,29 @@ export const DEFAULT_BRANCH = "master";
 /** The dedicated port on the host; nothing else listens there. */
 export const PORT = 8088;
 
-/** Where the host serves from, and the URL that directory answers on. */
+/** Where the local test host serves from, and the URL that directory answers on. */
 export const DEFAULT_HOST = "suite-dev";
 export const DEFAULT_REMOTE_DIR = "/home/aurora/flatpak/repo";
 export const DEFAULT_REMOTE_URL = `http://10.28.20.200:${PORT}`;
 
 const USAGE = `usage: node scripts/flatpak-remote.mjs [options]
 
-  --publish           sign the summary and copy the repo to the host (default: dry run)
-  --dry-run           stop before signing or copying; the default
+  --publish           sign the summary and publish (default: dry run)
+  --dry-run           stop before signing, uploading or copying; the default
+  --target <place>    lan (local test host) or s3 (public store); default: ${DEFAULT_TARGET}
   --branch <name>     branch a tier publishes (default: the tier, or stable)
   --channel <tier>    slop, canary or beta; the same as --branch <tier>
-  --host <name>       ssh host (default: ${DEFAULT_HOST})
-  --url <url>         public base URL (default: ${DEFAULT_REMOTE_URL})
+  --host <name>       ssh host for the lan target (default: ${DEFAULT_HOST})
+  --url <url>         base URL (default: ${DEFAULT_REMOTE_URL} for lan,
+                      ${DEFAULT_PUBLIC_URL} for s3)
+  --bucket <name>     S3 bucket for the s3 target
+  --distribution <id> CloudFront distribution for the s3 target
   --help              print this text
 
 Environment overrides: SUITE_FLATPAK_STATE, SUITE_FLATPAK_REPO,
 SUITE_STORE_KEY_ID, SUITE_FLATPAK_HOST, SUITE_FLATPAK_REMOTE_DIR,
-SUITE_FLATPAK_URL.
+SUITE_FLATPAK_URL, SUITE_FLATPAK_TARGET, SUITE_FLATPAK_S3_BUCKET,
+SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION.
 `;
 
 function parseArgs(argv) {
@@ -91,6 +114,9 @@ function parseArgs(argv) {
     channel: null,
     host: null,
     url: null,
+    target: null,
+    bucket: null,
+    distribution: null,
     help: false,
   };
 
@@ -118,6 +144,15 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--url") {
       options.url = takeValue(index, "--url");
+      index += 1;
+    } else if (arg === "--target") {
+      options.target = takeValue(index, "--target");
+      index += 1;
+    } else if (arg === "--bucket") {
+      options.bucket = takeValue(index, "--bucket");
+      index += 1;
+    } else if (arg === "--distribution") {
+      options.distribution = takeValue(index, "--distribution");
       index += 1;
     } else {
       throw new Error(`unknown option ${arg}`);
@@ -338,6 +373,37 @@ function checkGitProof() {
   return { head, proven: status.commit };
 }
 
+/** True when the aws CLI answers; a dry run never asks. */
+function awsOnPath() {
+  const result = spawnSync("aws", ["--version"], { stdio: "ignore" });
+  return result.error === undefined && result.status === 0;
+}
+
+/** Print one command exactly as a person would paste it. */
+function printStep(step) {
+  process.stdout.write(`  $ ${commandText(step)}\n`);
+}
+
+/** Run one generated aws command, printing the same text a dry run prints. */
+function runStep(step) {
+  process.stdout.write(`\n$ ${commandText(step)}\n`);
+  const result = spawnSync(step.command, step.args, {
+    cwd: ROOT,
+    stdio: "inherit",
+    env: process.env,
+  });
+  if (result.error) throw new Error(`${step.command}: ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`${step.command} exited ${result.status}`);
+}
+
+/** The commands a publication would run, with placeholders a dry run may print. */
+function publicationCommands({ bucket, distribution }) {
+  return {
+    uploads: s3UploadCommands({ repo, flatpakrepoPath, bucket }),
+    invalidation: invalidationCommand({ distribution }),
+  };
+}
+
 async function main() {
   let options;
   try {
@@ -356,16 +422,44 @@ async function main() {
     process.exit(2);
   }
 
+  const target =
+    options.target?.trim() || process.env.SUITE_FLATPAK_TARGET?.trim() || DEFAULT_TARGET;
+  const miss = targetProblem(target);
+  if (miss !== null) throw new Error(miss);
+
   const host = options.host?.trim() || process.env.SUITE_FLATPAK_HOST?.trim() || DEFAULT_HOST;
-  const remoteDir =
-    process.env.SUITE_FLATPAK_REMOTE_DIR?.trim() || DEFAULT_REMOTE_DIR;
-  const url =
-    options.url?.trim() || process.env.SUITE_FLATPAK_URL?.trim() || DEFAULT_REMOTE_URL;
+  const remoteDir = process.env.SUITE_FLATPAK_REMOTE_DIR?.trim() || DEFAULT_REMOTE_DIR;
+  const bucket =
+    options.bucket?.trim() || process.env.SUITE_FLATPAK_S3_BUCKET?.trim() || "";
+  const distribution =
+    options.distribution?.trim() ||
+    process.env.SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION?.trim() ||
+    "";
+  const url = normalizeRemoteUrl(
+    options.url?.trim() ||
+      process.env.SUITE_FLATPAK_URL?.trim() ||
+      (target === "s3" ? DEFAULT_PUBLIC_URL : DEFAULT_REMOTE_URL),
+  );
+
+  // A dry run prints commands with placeholders, so it needs neither the bucket
+  // nor a credential; --publish refuses before it signs anything.
+  const bucketForCommands = bucket || "<SUITE_FLATPAK_S3_BUCKET>";
+  const distributionForCommands =
+    distribution || "<SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION>";
+  const awsReady = target === "s3" && options.publish ? awsOnPath() : true;
+  if (target === "s3" && options.publish) {
+    const problems = s3ConfigProblems({
+      bucket,
+      distribution,
+      awsOnPath: awsReady,
+    });
+    if (problems.length > 0) throw new Error(problems.join("\n\n"));
+  }
 
   const channel = options.channel?.trim() || null;
   if (channel !== null) {
-    const miss = channelProblem(channel);
-    if (miss !== null) throw new Error(miss);
+    const channelMiss = channelProblem(channel);
+    if (channelMiss !== null) throw new Error(channelMiss);
   }
   const requestedBranch =
     channel !== null ? branchFor(channel) : (options.branch?.trim() || null);
@@ -390,6 +484,9 @@ async function main() {
   const { head, proven } = checkGitProof();
   const { files, bytes } = treeStats(repo);
 
+  const targetLine =
+    target === "s3" ? `s3 s3://${bucketForCommands}/` : `${host}:${remoteDir}`;
+
   process.stdout.write("\nsuite Flatpak remote\n\n");
   process.stdout.write(`  repository  ${repo}\n`);
   process.stdout.write(`  store key   ${keyId}\n`);
@@ -397,8 +494,8 @@ async function main() {
   process.stdout.write(`  commit      ${head}\n`);
   process.stdout.write(`  branch      ${branch} (${onBranch.length} app refs)\n`);
   process.stdout.write(`  default     ${defaultBranch}\n`);
-  process.stdout.write(`  target      ${host}:${remoteDir}\n`);
-  process.stdout.write(`  url         ${url.replace(/\/+$/u, "")}/\n`);
+  process.stdout.write(`  target      ${targetLine}\n`);
+  process.stdout.write(`  url         ${url}\n`);
   process.stdout.write(`  upload      ${files} files, ${mib(bytes)}\n`);
   process.stdout.write("  refs\n");
   for (const ref of refs) {
@@ -411,13 +508,42 @@ async function main() {
   }
 
   if (!options.publish) {
+    process.stdout.write("\nwould sign the summary with the store key, then ");
+    if (target === "lan") {
+      process.stdout.write(`copy the repository to ${host}:${remoteDir}\n`);
+      process.stdout.write(`would write ${flatpakrepoPath} and serve it as suite.flatpakrepo\n`);
+    } else {
+      process.stdout.write("upload the same repository to S3\n");
+      process.stdout.write(`would write ${flatpakrepoPath} and upload it as suite.flatpakrepo\n`);
+      const missing = s3ConfigProblems({
+        bucket,
+        distribution,
+        awsOnPath: true,
+      });
+      if (missing.length > 0) {
+        process.stdout.write(
+          "\nthis is not publishable yet; a dry run uses placeholders for these:\n",
+        );
+        for (const problem of missing) process.stdout.write(`  - ${problem}\n`);
+      }
+      const { uploads, invalidation } = publicationCommands({
+        bucket: bucketForCommands,
+        distribution: distributionForCommands,
+      });
+      process.stdout.write("\nwould run:\n");
+      for (const step of uploads) printStep(step);
+      process.stdout.write("\nthen invalidate only the mutable paths:\n");
+      printStep(invalidation);
+    }
     process.stdout.write(
-      "\nwould sign the summary with the store key, then copy the repository " +
-        `to ${host}:${remoteDir}\n`,
+      target === "s3"
+        ? "\ndry run: nothing was signed, uploaded or invalidated.\n"
+        : "\ndry run: nothing was signed, copied or written on the host.\n",
     );
-    process.stdout.write(`would write ${flatpakrepoPath} and serve it as suite.flatpakrepo\n`);
-    process.stdout.write("\ndry run: nothing was signed, copied or written on the host.\n");
-    process.stdout.write(`To publish: node scripts/flatpak-remote.mjs --branch ${branch} --publish\n`);
+    process.stdout.write(
+      `To publish: node scripts/flatpak-remote.mjs --target ${target} ` +
+        `--branch ${branch} --publish\n`,
+    );
     return;
   }
 
@@ -428,6 +554,29 @@ async function main() {
   const flatpakrepo = flatpakrepoText({ publicKey, branch: defaultBranch, url });
   writeFileSync(flatpakrepoPath, flatpakrepo);
   process.stdout.write(`\n${flatpakrepoPath}\n`);
+
+  if (target === "s3") {
+    const { uploads, invalidation } = publicationCommands({ bucket, distribution });
+
+    // OSTree objects are content-addressed: an old one is harmless, so the sync
+    // never deletes. The mutable files are copied rather than synced so an
+    // unchanged summary is still refreshed under its no-cache header.
+    process.stdout.write("\n=== upload to s3 ===\n");
+    for (const step of uploads) runStep(step);
+
+    process.stdout.write("\n=== invalidate cloudfront ===\n");
+    runStep(invalidation);
+
+    process.stdout.write(`\npublished ${REMOTE_NAME} to s3://${bucket}/\n`);
+    process.stdout.write(`remote ${url}\n`);
+    process.stdout.write("\nadd it on another machine with:\n");
+    process.stdout.write(
+      `  flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ` +
+        `${flatpakrepoUrl(url)}\n`,
+    );
+    process.stdout.write(`  flatpak install --user ${REMOTE_NAME} run.suite.planner\n`);
+    return;
+  }
 
   process.stdout.write("\n=== copy repository ===\n");
   run("ssh", [host, `mkdir -p ${shellQuote(remoteDir)}`]);
@@ -472,11 +621,11 @@ async function main() {
   }
 
   process.stdout.write(`\npublished ${REMOTE_NAME} to ${host}:${remoteDir}\n`);
-  process.stdout.write(`remote ${url.replace(/\/+$/u, "")}/\n`);
+  process.stdout.write(`remote ${url}\n`);
   process.stdout.write("\nadd it on another machine with:\n");
   process.stdout.write(
     `  flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ` +
-      `${url.replace(/\/+$/u, "")}/${REMOTE_NAME}.flatpakrepo\n`,
+      `${flatpakrepoUrl(url)}\n`,
   );
   process.stdout.write(`  flatpak install --user ${REMOTE_NAME} run.suite.planner\n`);
 }

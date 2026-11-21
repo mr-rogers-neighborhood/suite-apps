@@ -54,7 +54,8 @@ The rules that shape this repository. Each is current; the code follows it.
   (`slop`, `canary`, `beta`) is the Flatpak branch, not part of the id, so one pre-release install
   can move tier while stable stays installed.
 - `scripts/flatpak.mjs` builds the local deployment and signs the repository summary with the store
-  key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to `suite-dev`.
+  key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to the public
+  `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`.
   `scripts/release.mjs` releases only the relay tarball.
 - A version lives in one place and a tag names one app's release. [Version ownership](../how-to/package-and-release.md#version-ownership)
   states which file owns it and which prefix the tag uses.
