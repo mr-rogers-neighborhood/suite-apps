@@ -12,6 +12,13 @@ a release is tagged `canvas-v<version>`. See
   collab server, account service or billing service now describe a local document with optional sync,
   and `SECURITY.md` describes that same surface.
 
+## [0.1.11] - 2026-11-21
+
+### Fixed
+
+- **The Flatpak carries the renderer again.** The 0.1.10 Flatpak was packaged without the web build,
+  so it could not open. The desktop build now copies the renderer the build actually produces.
+
 ## [0.1.10] - 2026-11-20
 
 ### Changed

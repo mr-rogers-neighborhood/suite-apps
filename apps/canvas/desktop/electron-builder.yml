@@ -26,7 +26,7 @@ files:
   - dist/**/*
   - package.json
 extraResources:
-  - from: ../canvas/dist
+  - from: ../dist
     to: renderer
   # The window's own icon: a desktop entry reads the theme, but `_NET_WM_ICON` — what a
   # panel draws in the taskbar — comes from `BrowserWindow({ icon })` and nothing else.
