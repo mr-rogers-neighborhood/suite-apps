@@ -126,7 +126,7 @@ breaks either blindness or conformance, and it is much cheaper to notice in a ty
 | Proposed change                                      | Does it project?                                                                                                                             |
 | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Add a field to `frame` that the host must interpret  | **No.** `H_local` would need an operation on `τ`. The change is either device-to-device (put it inside `seal`) or it makes the host a reader |
-| Let the host notify peers which document advanced    | **No.** Same reason, and it is why the doorbell is opaque (`apps/go/docs/reference/blind-doorbell-proposal.md`)                          |
+| Let the host notify peers which document advanced    | **No.** Same reason, and it is why the doorbell is opaque (`apps/go/docs/reference/blind-doorbell-proposal.md`)                              |
 | Add a `stored(index)` acknowledgement                | Yes, but do not: the numbered echo already is one, and a second confirmation is a second ordering story                                      |
 | Have the host refuse a frame at a stale epoch        | It cannot — `H_local` has no epoch test, and adding one would mean the host comparing things it was told but cannot verify                   |
 | Add a new capability-scoped request (e.g. `files.*`) | Yes: it is a new branch in `D_local`, restricted by the pack's declared capabilities                                                         |
