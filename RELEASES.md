@@ -37,10 +37,10 @@ Suite Sync is a server tarball, not a Flatpak. It is installed and verified by h
 
 | App | Version | Released | Release | Install |
 | --- | --- | --- | --- | --- |
-| [Suite Go](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/go/CHANGELOG.md) | 0.1.0 | 2026-11-18 | `go-v0.1.0` (pending) | `suite-go-0.1.0.apk` (not uploaded yet) |
+| [Suite Go](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/go/CHANGELOG.md) | 0.1.0 | 2026-11-18 | [`go-v0.1.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/go-v0.1.0) | [suite-go-0.1.0.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/suite-2026.11.21/suite-go-0.1.0.apk) |
 
-Suite Go is not a Flatpak. Its debug-signed APK, `suite-go-0.1.0.apk`, is not attached to this release yet:
-`node scripts/android-release.mjs --publish` uploads it, and the link appears once it is there.
+Suite Go is not a Flatpak. This release carries its debug-signed APK, [suite-go-0.1.0.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/suite-2026.11.21/suite-go-0.1.0.apk),
+with a SHA-256 checksum beside it; sideload it with `adb install -r -t`.
 
 ## Update
 

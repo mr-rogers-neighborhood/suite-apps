@@ -30,7 +30,7 @@ Windows and macOS have no published build.
 
 | App | What it is | State | Install |
 | --- | --- | --- | --- |
-| **Suite Go** | One mobile container that hosts the domains as packs | Shell only | [Android debug build](apps/go/README.md#run-it) |
+| **Suite Go** | One mobile container that hosts the domains as packs | Shell only | [Android APK](https://github.com/mr-rogers-neighborhood/suite-apps/releases/latest/download/suite-go.apk) |
 
 iOS has no published build.
 
