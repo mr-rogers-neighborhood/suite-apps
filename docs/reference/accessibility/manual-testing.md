@@ -1,8 +1,9 @@
 # Manual accessibility testing
 
-The automated gate runs axe against each app's start screen. axe catches roughly a third of real
-accessibility problems. This document is the other two thirds, and it is written so you can run it
-without re-deriving what to look for.
+axe catches roughly a third of real accessibility problems. Not every app runs it: Planner has no
+axe gate, and Budget's Storybook panel reports without failing the build; each app's
+`ACCESSIBILITY.md` owns the detail. This document is the other two thirds, and it is written so you
+can run it without re-deriving what to look for.
 
 Run this after any change to layout, colour, focus handling, or a dialog. It takes about twenty
 minutes for one app.
@@ -19,7 +20,7 @@ minutes for one app.
 | [The A11Y Project checklist](https://www.a11yproject.com/checklist/)          | Plain-language companion when the spec wording is dense.                                       |
 
 Target: **WCAG 2.2 level AA**, which is 55 of the 86 success criteria. The map in
-`wcag-22-map.md` records which are gated, which are manual, and which do not apply.
+`wcag-22-map.md` records which are gated, where, which are manual, and which do not apply.
 
 ## The sweep
 
@@ -99,9 +100,9 @@ that drifts from reality is worse than no map.
 
 ## What "done" means here
 
-A criterion is done when **both** halves agree: the automated gate is green and the manual step has
-been performed and recorded. A green axe run alone proves very little, and a manual pass alone
-cannot be repeated by anyone else.
+A criterion is done when **both** halves agree: where an app has an automated check for it, that
+check is green, and the manual step has been performed and recorded. A green axe run alone proves
+very little, and a manual pass alone cannot be repeated by anyone else.
 
-Each app's `ACCESSIBILITY.md` reports only what has been done this way. Do not add a claim to it that
+An app's `ACCESSIBILITY.md` reports only what has been done this way. Do not add a claim to it that
 was not earned by one of these steps.

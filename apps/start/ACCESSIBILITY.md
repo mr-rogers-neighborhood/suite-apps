@@ -9,18 +9,20 @@ breakdown is in
 
 ## What is verified by machine
 
-Two checks run on every change, and a failure stops the work.
+One accessibility check runs on every change and a failure stops the work.
 
 - **Colour contrast in every theme.** Each preset in `@suite/theme` is measured: 4.5:1 for body text
   on every surface it can sit on, 4.5:1 for faint text, and 3:1 for focus rings and component
   boundaries. A preset that fails cannot be merged. A colour that cannot be measured, such as a
   gradient or a `color-mix()`, is not allowed in a preset, because an unmeasurable colour cannot be
   checked.
-- **axe on every start screen.** All four apps are audited against the WCAG 2.2 A and AA rule sets in
-  a real window, and any violation fails the build.
 
-The second check found a real problem the moment it was written: faint text was 3.42:1 against white
-at 11px. It is fixed.
+**Start runs no axe.** There is no axe or Playwright accessibility sweep in Start's gate. The
+end-to-end suite exercises the launcher, not an accessibility rule set; painted contrast, focus order
+and screen-reader output still need the manual pass.
+
+The contrast check found a real problem the moment it was written: faint text was 3.42:1 against
+white at 11px. It is fixed.
 
 ## What is verified by hand
 
@@ -40,14 +42,15 @@ It covers six passes per screen:
 
 ## Known gaps
 
-These are real and tracked. Each has a row in the criterion map naming its success criterion.
+Start has no axe or Playwright accessibility sweep, and no manual pass has been recorded. The gaps
+below are the ones a code review can name; the manual protocol is what would confirm them. Each has a
+row in the [criterion map](../../docs/reference/accessibility/wcag-22-map.md) naming its success
+criterion.
 
-| Area             | What is missing                                                                                                                                                               | Level |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| Shortcuts        | Canvas single-key shortcuts are not remappable or disableable (SC 2.1.4).                                                                                                     | A     |
-| Board navigation | The Canvas board has no complete keyboard model for moving between cards.                                                                                                     | AA    |
-| Dragging         | Most drag actions have a menu or arrow-key equivalent. Three do not: resizing a section to an arbitrary size, re-pointing a section link, and bending a connector (SC 2.5.7). | AA    |
-| Status messages  | The markup is correct. Whether a screen reader hears a confirmation has not been listened to yet.                                                                             | AA    |
+| Area | What is missing | Level |
+| --- | --- | --- |
+| Reflow | The rail is a fixed 208px column and an app card has a 320px minimum, with no breakpoint. At 200% zoom, or a 320 CSS px viewport, the content column is narrower than a card and the page overflows instead of reflowing (SC 1.4.10). | AA |
+| Status messages | Install progress is a `role="status"` region created and filled at the same moment. Install failures, launch errors and the update-check result are plain text with no live region, and the copy-link confirmation is only a button label change, so a screen reader may miss them (SC 4.1.3). | AA |
 
 ## What does not apply
 

@@ -16,11 +16,13 @@ Two checks run on every change, and a failure stops the work.
   boundaries. A preset that fails cannot be merged. A colour that cannot be measured, such as a
   gradient or a `color-mix()`, is not allowed in a preset, because an unmeasurable colour cannot be
   checked.
-- **axe on every start screen.** All four apps are audited against the WCAG 2.2 A and AA rule sets in
-  a real window, and any violation fails the build.
+- **axe over the Storybook stories.** Every story is audited against the WCAG 2.2 A and AA rule sets
+  through the a11y addon, and a violation fails the story test in the gate. This covers the stories
+  that exist, not the running window; painted contrast, focus order and screen-reader output still
+  need the manual pass.
 
-The second check found a real problem the moment it was written: faint text was 3.42:1 against white
-at 11px. It is fixed.
+The contrast check found a real problem the moment it was written: faint text was 3.42:1 against
+white at 11px. It is fixed.
 
 ## What is verified by hand
 
@@ -40,7 +42,8 @@ It covers six passes per screen:
 
 ## Known gaps
 
-These are real and tracked. Each has a row in the criterion map naming its success criterion.
+These are real and tracked. Each has a row in the
+[criterion map](../../docs/reference/accessibility/wcag-22-map.md) naming its success criterion.
 
 | Area | What is missing | Level |
 |---|---|---|
