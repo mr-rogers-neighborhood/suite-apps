@@ -26,6 +26,12 @@ const MISSING_WORDS =
   "Suite Sync is not installed. Install the suite-sync relay and put it on PATH, or set " +
   "SUITE_SYNC_BIN to its path.";
 
+/** The Suite Sync glyph, drawn in the theme's ink like every other pane mark. */
+const SYNC_PATHS = [
+  "M4 4h4V2H4c-1.1 0-2 .9-2 2v4h2zm0 12H2v4c0 1.1.9 2 2 2h4v-2H4zm16 4h-4v2h4c1.1 0 2-.9 2-2v-4h-2zm0-18h-4v2h4v4h2V4c0-1.1-.9-2-2-2",
+  "M9.5 5h-3C5.67 5 5 5.67 5 6.5v3c0 .83.67 1.5 1.5 1.5h3c.83 0 1.5-.67 1.5-1.5v-3c0-.83-.67-1.5-1.5-1.5M9 9H7V7h2zm.5 4h-3c-.83 0-1.5.67-1.5 1.5v3c0 .83.67 1.5 1.5 1.5h3c.83 0 1.5-.67 1.5-1.5v-3c0-.83-.67-1.5-1.5-1.5M9 17H7v-2h2zm5.5-6h3c.83 0 1.5-.67 1.5-1.5v-3c0-.83-.67-1.5-1.5-1.5h-3c-.83 0-1.5.67-1.5 1.5v3c0 .83.67 1.5 1.5 1.5m.5-4h2v2h-2zm-2 6h2v2h-2zm2 2h2v2h-2zm2 2h2v2h-2zm0-4h2v2h-2z",
+];
+
 export function renderSync(state, actions) {
   const panel = document.getElementById("panel-sync");
   if (!panel) return;
@@ -33,7 +39,19 @@ export function renderSync(state, actions) {
   panel.replaceChildren();
 
   const head = el("header", "pane-head");
-  head.append(el("h2", null, "Sync"));
+  const mark = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  mark.setAttribute("viewBox", "0 0 24 24");
+  mark.setAttribute("aria-hidden", "true");
+  mark.setAttribute("class", "pane-mark");
+  for (const d of SYNC_PATHS) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("fill", "currentColor");
+    path.setAttribute("d", d);
+    mark.append(path);
+  }
+  const title = el("div", "pane-title");
+  title.append(mark, el("h2", null, "Sync"));
+  head.append(title);
   // A consequence, not a restatement of the heading above it.
   head.append(
     el(
