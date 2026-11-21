@@ -10,6 +10,21 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 No changes yet.
 
+## [0.3.0] - 2026-11-21
+
+### Added
+
+- **A debt payoff target now estimates its interest.** The target editor shows how many months the
+  current monthly need takes, the month the balance reaches zero, and the total interest, using the
+  rate stored on the linked loan or card. The estimate says it is an estimate and that new charges
+  and rate changes are not modelled; a payment that cannot cover the monthly interest is called out
+  instead of pretending the debt clears.
+
+### Changed
+
+- **Interest rounds explicitly.** Monthly interest rounds half up to the nearest minor unit, and the
+  final payment never exceeds the balance plus that month's interest.
+
 ## [0.2.5] - 2026-11-20
 
 ### Added
