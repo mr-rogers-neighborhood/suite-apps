@@ -10,7 +10,7 @@ Suite Budget is the money app in the Suite family, alongside
 
 > Suite Budget is pre-alpha. The core loop works: a launcher, accounts, transactions, the month grid,
 > rollover, reconcile, undo, and a `.budget` file with rolling backups. Targets, rules, schedules,
-> CSV/QIF import, and reports are being built.
+> CSV/QIF import, and reports are in place as well; the app still changes shape between releases.
 
 ---
 

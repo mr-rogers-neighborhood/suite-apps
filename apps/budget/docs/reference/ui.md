@@ -51,23 +51,25 @@ History lists past reconciliations with an Unlock action.
 
 ### Reports
 
-Tabs: Dashboard, Net worth, Spending, Income vs expense, Cash flow, Budget vs actual, Age of money. A
-range picker applies to the series. Every chart has a data table under it. The dashboard has widgets
+Tabs: Dashboard, Net worth, Spending, Income vs expense, Cash flow, Budget vs actual, Age of money. The
+range picker applies to the series tabs; Budget vs actual follows the Plan month, and each dashboard
+widget has its own range. The SVG charts have a data table under them. The dashboard has widgets
 (Ready to Assign, net worth, spending, income vs expense, cash flow, budget vs actual, age of money,
 text) that can be added, removed, and reordered.
 
 ### Rules, Schedules, Payees
 
-- Rules: staged, ordered list with a plain-language summary, enable/disable, edit, delete, and "Run
-  rules" with a change count. Learned rules carry a badge.
+- Rules: staged list with a plain-language summary, enable/disable, edit, delete, and "Run rules" with
+  a change count. Learned rules carry a badge.
 - Schedules: upcoming entries for the configured window with an Enter button, then the schedule list.
 - Payees: default category, last used category, transaction count, and a learning toggle. Merge moves
   every transaction from one payee to another.
 
 ### Import
 
-Choose a CSV or QIF file, map the columns, preview, then review. The review can skip likely duplicates
-and create missing categories. Errors name the row; the good rows still import.
+Choose a CSV or QIF file. CSV maps the delimiter, header row, date format, and column roles; QIF picks
+a date format. Both preview, then review. The review can skip likely duplicates and create missing
+categories. Errors name the row; the good rows still import.
 
 ## Keyboard
 
@@ -107,8 +109,9 @@ is not spending. A split parent is a container. A schedule is a template. A targ
 
 Radix primitives first. Every icon-only control has an accessible name and a title. Focus is visible and
 defined once. The register and the plan are tables with headers; amounts use tabular numerals. State is
-never colour alone: **Overspent**, **Funded**, **Left**, **Reconciled** are words. Charts have a role,
-an accessible name, and a table. `prefers-reduced-motion` is respected. Storybook runs the a11y addon.
+never colour alone: **Overspent**, **Funded**, **Left**, **Reconciled** are words. The SVG charts have
+a role, an accessible name, and a data table. `prefers-reduced-motion` is respected. Storybook runs the
+a11y addon.
 
 ## Theme
 

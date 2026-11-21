@@ -187,8 +187,8 @@ says so in the editor; `loan.interestRateBps` is stored for a later amortizing v
 
 ## Auto-assign
 
-Each action is a pure function returning `Map<categoryId, deltaMinor>`; the UI previews the total, then
-one document mutation writes the deltas and commits once.
+Each action is a pure function returning `Map<categoryId, deltaMinor>`; the view applies the deltas in
+one document mutation and reports the total and any shortfall.
 
 | Action               | Behavior                                                                                                          |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -198,18 +198,19 @@ one document mutation writes the deltas and commits once.
 | `cover_overspending` | Assign exactly the negative Available total into the negative categories from Ready to Assign; report a shortfall |
 
 Manual money moves pick a source (any category with positive Available, or Ready to Assign) and a
-destination, and show the effect before committing.
+destination, then apply the deltas in one mutation; the dialog shows the current Available beside each
+choice.
 
 ## Rules
 
-Rules run in three stages (`pre`, `default`, `post`). Within a stage they are ranked by specificity —
-`is`/`isNot` before `oneOf`, before `contains`, before `matches` — then by creation time, then by id, so
-the result is deterministic. Broad rules run first; the last matching action for a field wins. Rules run
-on import and when the user chooses "Run rules" on the document.
+Rules run in three stages (`pre`, `default`, `post`). Within a stage they are ranked broad to specific —
+`matches`, then `contains`/`doesNotContain`, then `oneOf`/`notOneOf`, then `is`/`isNot` — with more
+conditions scoring higher, then by creation time, then by id, so the result is deterministic. Broad
+rules run first; the last matching action for a field wins. Rules run on import and when the user
+chooses "Run rules" on the document.
 
 Learned rules: when the user sets a category on a transaction with a known payee, a learned
-`payee is <name> → set category` rule is created or updated. Renaming a payee creates or updates a
-learned `importedPayee contains <original> → set payee` rule. A learned rule is a normal record the user
+`payee is <name> → set category` rule is created or updated. A learned rule is a normal record the user
 can edit or disable.
 
 ## Schedules
@@ -224,19 +225,18 @@ There is no background auto-enter: the app does not create transactions while cl
 All parsers are pure and return `Result<ImportBatch, ImportError>`; the renderer presents the mapping,
 preview, and review.
 
-| Format       | v1       | Notes                                                                                                                                |
-| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| CSV          | Yes      | mapping wizard: delimiter, header, date format, payee, memo, amount or inflow/outflow, category, skip rows, negate; RFC 4180 quoting |
-| QIF          | Yes      | `!Type:Bank` records, splits (`S`/`E`/`$`), transfers (`[Account]`), cleared flag, category names                                    |
-| Native JSON  | Yes      | `suite.budget.records`, Zod-validated, opens as a new budget                                                                         |
-| `.budget`    | Yes      | opens the snapshot as a new budget in the library                                                                                    |
-| OFX/QFX/CAMT | Deferred | the adapter seam exists; no parser ships                                                                                             |
+| Format       | v1       | Notes                                                                                                                            |
+| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| CSV          | Yes      | mapping wizard: delimiter, header row, date format, payee, memo, amount or inflow/outflow, category, sign flip; RFC 4180 quoting |
+| QIF          | Yes      | `!Type:Bank` records, splits (`S`/`E`/`$`), transfers (`[Account]`), cleared flag, category names                                |
+| Native JSON  | Yes      | `suite.budget.records`, Zod-validated, opens as a new budget                                                                     |
+| `.budget`    | Yes      | opens the snapshot as a new budget in the library                                                                                |
+| OFX/QFX/CAMT | Deferred | the adapter seam exists; no parser ships                                                                                         |
 
-Dedupe: exact external id first; otherwise candidates in the same account with an equal amount, a date
-within ±3 days, and normalized payee similarity. The review list offers skip or import, per row and in
-bulk.
+Dedupe: candidates in the same account with an equal amount, a date within ±3 days, and normalized
+payee similarity. The review list offers skip or import, per row and in bulk.
 
-Import order: parse → map → rules → dedupe → review → commit as one document mutation.
+Import order: parse → map → dedupe → review → rules → commit as one document mutation.
 
 ## File formats
 
