@@ -46,6 +46,24 @@ export function formatFriendLink(details: FriendLinkDetails): string {
   return `${FRIEND_LINK_SCHEME}://${FRIEND_LINK_HOST}?${query.toString()}`;
 }
 
+/**
+ * Read what a person pasted into an add-contact field.
+ *
+ * A link and a bare code are two forms of one value, so an app needs one entry point
+ * rather than a guess about which box was used. Anything with a scheme goes through
+ * `parseFriendLink`; anything else is read as a code. A refusal carries the protocol's
+ * own sentence, so a malformed link and a malformed code fail in the same words.
+ */
+export function parseContactInput(text: string): FriendLinkParse {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return { ok: false, reason: "Paste or type a friend code first." };
+  if (/^[a-z][a-z0-9+.-]*:/iu.test(trimmed)) return parseFriendLink(trimmed);
+  const code = parseFriendCode(trimmed);
+  return code.ok
+    ? { ok: true, value: { code: code.code, publicKey: null } }
+    : { ok: false, reason: code.reason };
+}
+
 export function parseFriendLink(text: string): FriendLinkParse {
   const trimmed = text.trim();
   if (trimmed.length === 0) return { ok: false, reason: "Paste or scan a friend code first." };

@@ -1,6 +1,7 @@
-import { formatFriendCode, parseFriendCode } from "@suite/sync";
+import { formatFriendCode, formatFriendLink, parseFriendCode } from "@suite/sync";
 import { useState } from "react";
 import type { SyncContact, SyncMember } from "../store/useCanvasStore";
+import { FriendQr } from "./FriendQr";
 
 /**
  * The four things the sync dialog can be asking.
@@ -355,30 +356,37 @@ export function UnlockStep({ busy, onOpen }: UnlockStepProps) {
  */
 export interface FriendsSectionProps {
   friendCode: string;
+  /** The same code as a link, or an empty string when there is no code yet. */
+  friendLink: string;
   contacts: readonly SyncContact[];
   /** What is being typed into the add form. */
   code: string;
   name: string;
   copied: boolean;
+  linkCopied: boolean;
   busy: boolean;
   onCode: (value: string) => void;
   onName: (value: string) => void;
   onAdd: () => void;
   onCopy: () => void;
+  onCopyLink: () => void;
   onForget: (code: string) => void;
 }
 
 export function FriendsSection({
   friendCode,
+  friendLink,
   contacts,
   code,
   name,
   copied,
+  linkCopied,
   busy,
   onCode,
   onName,
   onAdd,
   onCopy,
+  onCopyLink,
   onForget,
 }: FriendsSectionProps) {
   const ownCode = friendCodeDisplay(friendCode);
@@ -413,6 +421,32 @@ export function FriendsSection({
           </button>
         </div>
       </div>
+
+      {friendLink === "" ? null : (
+        <div className="mt-2 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] leading-relaxed text-[var(--ink-muted)]">
+              Or send this link. A scan adds you in one step; the code above is the same value typed
+              by hand.
+            </p>
+            <code
+              data-testid="friend-link"
+              className="mt-1 block truncate rounded-md border border-[var(--hairline)] px-2 py-1 font-mono text-[10px]"
+            >
+              {friendLink}
+            </code>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onCopyLink}
+              className="mt-1 rounded-md px-2 py-1 text-[11px] hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
+            >
+              {linkCopied ? "Link copied" : "Copy link"}
+            </button>
+          </div>
+          <FriendQr payload={friendLink} />
+        </div>
+      )}
 
       <div className="mt-3 border-t border-[var(--hairline)] pt-3">
         <h3 className="text-xs font-semibold">People you know</h3>
@@ -450,13 +484,13 @@ export function FriendsSection({
       <div className="mt-3 border-t border-[var(--hairline)] pt-3">
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <label className="block text-[11px] text-[var(--ink-muted)]">
-            Friend code
+            Friend code or link
             <input
               value={code}
               onChange={(event) => onCode(event.target.value)}
               spellCheck={false}
               autoComplete="off"
-              placeholder="ABCD-EFGH-JKMN-PQRS"
+              placeholder="ABCD-EFGH-JKMN-PQRS or suite://friend?…"
               className="mt-1 w-full rounded-md border border-[var(--hairline)] bg-transparent px-2 py-1 font-mono text-xs"
             />
           </label>
@@ -488,4 +522,17 @@ export function FriendsSection({
 function friendCodeDisplay(code: string): string {
   const parsed = parseFriendCode(code);
   return parsed.ok ? formatFriendCode(parsed.code) : code;
+}
+
+/**
+ * The link main built, or the code alone when no key reached the renderer.
+ *
+ * `main` includes the install key so a scan completes a contact; a host that only knows
+ * the code still gets a link that names the installation, and the dialog shows exactly
+ * what its QR carries either way.
+ */
+export function friendLinkFor(link: string | null, code: string): string {
+  if (link !== null && link.trim() !== "") return link;
+  const parsed = parseFriendCode(code);
+  return parsed.ok ? formatFriendLink({ code: parsed.code, publicKey: null }) : "";
 }

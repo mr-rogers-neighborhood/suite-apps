@@ -23,6 +23,7 @@ function fakeService() {
     status: vi.fn(() => ({ state: "off" as const })),
     identity: vi.fn(async () => ({ deviceId: "d".repeat(64), publicKey: "key" })),
     friendCode: vi.fn(() => "0123456789ABCDEF"),
+    friendLink: vi.fn(() => "suite://friend?c=0123456789ABCDEF"),
     contacts: vi.fn(() => []),
     addContact: vi.fn(async () => []),
     removeContact: vi.fn(async () => []),

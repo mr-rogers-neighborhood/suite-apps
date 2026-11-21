@@ -58,6 +58,7 @@ export {
   type FriendLinkParse,
   formatFriendLink,
   friendCodeLabel,
+  parseContactInput,
   parseFriendLink,
 } from "./friendLink.js";
 export {

@@ -56,6 +56,7 @@ export function createPlannerSyncController(
       status,
       members: service?.members() ?? [],
       friendCode: service?.friendCode() ?? "",
+      friendLink: service?.friendLink() ?? "",
       contacts: (service?.contacts() ?? []).map((contact) => ({
         code: contact.code,
         name: contact.name,

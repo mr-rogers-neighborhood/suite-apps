@@ -1,5 +1,5 @@
 import type { SyncInfo } from "@suite/planner-core";
-import { deriveFriendCode, formatFriendCode } from "@suite/sync";
+import { deriveFriendCode, formatFriendCode, formatFriendLink } from "@suite/sync";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +21,7 @@ const { SyncControl } = await import("./SyncControl");
 /** 32 zero bytes in base64: a fixed key, so the expected code is stable. */
 const SOME_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 const FRIEND_CODE = deriveFriendCode(SOME_KEY);
+const FRIEND_LINK = formatFriendLink({ code: FRIEND_CODE, publicKey: SOME_KEY });
 
 const local: SyncInfo = {
   workspaceId: "a".repeat(64),
@@ -28,6 +29,7 @@ const local: SyncInfo = {
   status: { state: "off" },
   members: [],
   friendCode: FRIEND_CODE,
+  friendLink: FRIEND_LINK,
   contacts: [],
 };
 
@@ -130,6 +132,14 @@ describe("SyncControl", () => {
     expect(screen.getByText(/Nobody yet/u)).toBeInTheDocument();
   });
 
+  it("shows the friend link beside the code and draws a QR of that same link", async () => {
+    render(<SyncControl />);
+    fireEvent.click(await screen.findByTestId("sync-status"));
+
+    expect(screen.getByTestId("friend-link")).toHaveTextContent(FRIEND_LINK);
+    expect(screen.getByTestId("friend-qr")).toHaveAttribute("data-payload", FRIEND_LINK);
+  });
+
   it("adds a friend by code and name, and shows them in the list", async () => {
     const added: SyncInfo = {
       ...local,
@@ -147,17 +157,48 @@ describe("SyncControl", () => {
     render(<SyncControl />);
     fireEvent.click(await screen.findByTestId("sync-status"));
 
-    fireEvent.change(screen.getByLabelText("Friend code"), {
+    fireEvent.change(screen.getByLabelText("Friend code or link"), {
       target: { value: formatFriendCode(FRIEND_CODE) },
     });
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(bridge.syncAddContact).toHaveBeenCalledWith({
-      code: formatFriendCode(FRIEND_CODE),
+      code: FRIEND_CODE,
       name: "Ada",
     });
     expect(await screen.findByText("Ada")).toBeInTheDocument();
+  });
+
+  it("adds a friend from a pasted link, key and all", async () => {
+    render(<SyncControl />);
+    fireEvent.click(await screen.findByTestId("sync-status"));
+
+    fireEvent.change(screen.getByLabelText("Friend code or link"), {
+      target: { value: FRIEND_LINK },
+    });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(bridge.syncAddContact).toHaveBeenCalledWith({
+      code: FRIEND_CODE,
+      name: "Ada",
+      publicKey: SOME_KEY,
+    });
+  });
+
+  it("refuses a malformed link with the message a malformed code gets", async () => {
+    render(<SyncControl />);
+    fireEvent.click(await screen.findByTestId("sync-status"));
+
+    fireEvent.change(screen.getByLabelText("Friend code or link"), {
+      target: { value: "suite://friend?c=ABC" },
+    });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByText("A friend code is 16 symbols.")).toBeInTheDocument();
+    expect(bridge.syncAddContact).not.toHaveBeenCalled();
   });
 
   it("forgets a friend without touching the workspaces they are in", async () => {

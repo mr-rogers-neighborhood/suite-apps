@@ -13,6 +13,7 @@ import {
   formatInvite,
   friendInvitePayload,
   joinWorkspaceGroup,
+  parseContactInput,
   parseInvite,
   type RelayWebSocket,
   seal,
@@ -181,6 +182,10 @@ describe("friend codes and contacts", () => {
     const identity = await service.identity();
 
     expect(service.friendCode()).toBe(deriveFriendCode(identity.publicKey));
+    expect(parseContactInput(service.friendLink())).toEqual({
+      ok: true,
+      value: { code: service.friendCode(), publicKey: identity.publicKey },
+    });
     expect(service.contacts()).toEqual([]);
     await service.disconnect();
   });

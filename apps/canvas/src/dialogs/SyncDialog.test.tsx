@@ -1,11 +1,13 @@
-import { deriveFriendCode, formatFriendCode } from "@suite/sync";
+import { deriveFriendCode, formatFriendCode, formatFriendLink } from "@suite/sync";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useCanvasStore } from "../store/useCanvasStore";
 import { SyncDialog } from "./SyncDialog";
 
 const workspaceId = "a".repeat(64);
-const friendCode = deriveFriendCode("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+const installKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+const friendCode = deriveFriendCode(installKey);
+const friendLink = formatFriendLink({ code: friendCode, publicKey: installKey });
 const thisDevice = { deviceId: "b".repeat(64), name: "this laptop", role: "owner" } as const;
 const otherDevice = { deviceId: "c".repeat(64), name: "the desktop", role: "editor" } as const;
 
@@ -14,6 +16,7 @@ function open(options: {
   members?: readonly unknown[];
   contacts?: readonly unknown[];
   kit?: "made" | "declined" | null;
+  friendLink?: string;
 }) {
   useCanvasStore.setState({
     // The dialog draws from the one snapshot main pushes, so a test sets that and nothing else.
@@ -23,6 +26,7 @@ function open(options: {
       status: options.status as never,
       members: (options.members ?? []) as never,
       friendCode,
+      friendLink: options.friendLink ?? "",
       contacts: (options.contacts ?? []) as never,
       kit: options.kit ?? null,
     },
@@ -222,11 +226,57 @@ describe("the sync dialog", () => {
     open({ status: { state: "off" } });
 
     expect(screen.getByTestId("friend-code")).toHaveTextContent(formatFriendCode(friendCode));
-    fireEvent.change(screen.getByLabelText("Friend code"), { target: { value: friendCode } });
+    fireEvent.change(screen.getByLabelText("Friend code or link"), {
+      target: { value: friendCode },
+    });
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(addContact).toHaveBeenCalledWith({ code: friendCode, name: "Ada" });
+  });
+
+  it("shows the friend link beside the code and draws a QR of that same link", () => {
+    open({ status: { state: "off" }, friendLink });
+
+    expect(screen.getByTestId("friend-link")).toHaveTextContent(friendLink);
+    expect(screen.getByTestId("friend-qr")).toHaveAttribute("data-payload", friendLink);
+  });
+
+  it("adds a person from a pasted friend link, key and all", async () => {
+    const addContact = vi.fn(async () => undefined);
+    useCanvasStore.setState({ addContact });
+    open({ status: { state: "off" } });
+
+    fireEvent.change(screen.getByLabelText("Friend code or link"), {
+      target: { value: friendLink },
+    });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(addContact).toHaveBeenCalledWith({
+        code: friendCode,
+        name: "Ada",
+        publicKey: installKey,
+      }),
+    );
+  });
+
+  it("refuses a malformed friend link with the message a malformed code gets", async () => {
+    const addContact = vi.fn(async () => undefined);
+    useCanvasStore.setState({ addContact });
+    open({ status: { state: "off" } });
+
+    fireEvent.change(screen.getByLabelText("Friend code or link"), {
+      target: { value: "suite://friend?c=ABC" },
+    });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByTestId("sync-problem")).toHaveTextContent(
+      "A friend code is 16 symbols.",
+    );
+    expect(addContact).not.toHaveBeenCalled();
   });
 
   it("forgets a person without touching the workspace", async () => {

@@ -46,6 +46,21 @@ never opens a payload, and there is no document, snapshot or version vector in t
 "server reads documents" and "server is operated by a third party" are mitigated for the frames it
 holds.
 
+### Friend codes and the roster
+
+The roster the relay builds — device ids, names and roles, from the roles and pinned keys it already
+holds — says who may connect and write. It is not the app's trust list, and it is not where a person
+decides who they know.
+
+Friend codes, signed invitations and per-app contacts are built. A friend code names an installation;
+a signed invitation carries the inviter's device, key, relay and pin; and each app verifies that
+envelope, resolves the inviter's code against its own `sync/contacts.json` in its main process, and
+refuses an unknown code before it asks the relay to join. The relay sees only the invitation record it
+already understood, and it has no friend-code or contacts exchange. The code and envelope rules are in
+[the protocol](protocol.md#friend-codes-and-signed-invitations); this page records only the boundary:
+the relay's roster is an admission list, while the contacts file is the person's trust decision, and
+neither stands in for the other.
+
 ## Accepted limits
 
 - **Metadata.** Workspace and device ids, device names, public keys, epochs, kinds, payload lengths,
