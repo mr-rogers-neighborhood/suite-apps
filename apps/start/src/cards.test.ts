@@ -17,6 +17,7 @@ function discovered(overrides: Partial<SuiteAppManifest> = {}): DiscoveredApp {
       fileExtensions: ["canvas"],
       protocols: [],
       capabilities: ["document.file"],
+      widgets: [],
       ...overrides,
     },
     manifestPath: "/installs/canvas/suite.app.json",

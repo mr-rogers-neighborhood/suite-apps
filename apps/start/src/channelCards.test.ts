@@ -39,6 +39,7 @@ function discovered(
       fileExtensions: ["canvas"],
       protocols: [],
       capabilities: ["document.file"],
+      widgets: [],
     } satisfies SuiteAppManifest,
     manifestPath: "",
     executable:

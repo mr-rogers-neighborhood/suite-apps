@@ -136,9 +136,10 @@ The rules that shape this repository. Each is current; the code follows it.
 - The default layout is Start's app grid at `full`: the same cards, installs, channels and launches
   as before. The grid is a host-owned widget, so the contract is exercised before any app depends on
   it.
-- The registry is the host's: its own widgets plus the widgets of installed apps whose manifests
-  parse. An app that is not installed contributes no widget, and its layout entry is the unknown-id
-  case rather than a crash.
+- The registry is what this host build can draw: its own widgets plus the app widgets whose
+  action it implements and whose manifest parses. An app this build does not draw contributes no
+  widget, and its layout entry is the unknown-id case — dropped, named in the note, and left in the
+  file until the layout is next written.
 - Desktop first. Start proves the descriptor and the layout; Go then renders the same descriptors in
   its launcher, and an Android home-screen widget is a native adapter over the same declaration, not
   a third contract.

@@ -1,12 +1,14 @@
 import { existsSync } from "node:fs";
-import { readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   appDocumentsFolder,
   parseDeepLink,
   SUITE_APPS,
+  SUITE_WIDGET_SIZES,
   type SuiteAppEntry,
+  type SuiteWidgetSize,
   suiteDocumentsRoot,
   suitePaths,
 } from "@suite/contracts";
@@ -40,11 +42,26 @@ import {
   preReleaseRemovalCopy,
   tierForInstall,
 } from "./channels.js";
+import {
+  addWidget,
+  type DashboardLayout,
+  type DashboardRead,
+  defaultDashboard,
+  HOST_WIDGETS,
+  type HostWidget,
+  hostWidget,
+  moveWidget,
+  parseDashboard,
+  removeWidget,
+  resizeWidget,
+  serializeDashboard,
+} from "./dashboard.js";
 import { type DocumentsFolder, indexDocuments, isInsideDocuments } from "./fileIndex.js";
 import { SYNC_APPLICATION } from "./flatpak.js";
 import { defaultHost, SELF_FLATPAK_ID, sandboxId } from "./host.js";
 import {
   adoptLegacyRegistry,
+  dashboardPath,
   type HostPaths,
   hostPaths,
   hubLockPath,
@@ -64,6 +81,8 @@ import type { DiscoveredApp } from "./registry.js";
 import { describeRouteRejection, routeLaunch } from "./route.js";
 import {
   type AppLocation,
+  type DashboardState,
+  type DashboardWidget,
   type InstallProgress,
   type LauncherState,
   type RecentCard,
@@ -398,6 +417,116 @@ async function syncState(): Promise<SyncState> {
   };
 }
 
+/**
+ * The dashboard's layout file, read and written here and nowhere else.
+ *
+ * The model is pure (`dashboard.ts`); this is the one process that touches the file. It
+ * lives beside Start's other records because the layout belongs to this machine, not to
+ * an app, and it is never synced: two devices may arrange the same widgets differently.
+ */
+function dashboardFile(): string {
+  return dashboardPath(hostPathTable());
+}
+
+/** The last write that failed, so the pane says so instead of showing a stale layout. */
+let dashboardFailure: string | null = null;
+
+async function readDashboard(): Promise<DashboardRead> {
+  try {
+    const text = await readFile(dashboardFile(), "utf8");
+    return parseDashboard(JSON.parse(text));
+  } catch (error) {
+    // No file is the ordinary first launch: the default layout is not a repair.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return defaultDashboard();
+    return parseDashboard(null);
+  }
+}
+
+/**
+ * Write the layout atomically.
+ *
+ * A temporary file and a rename, like the install registry: a crash leaves either the old
+ * layout or the new one, never half of a JSON document the next launch must repair.
+ */
+async function saveDashboard(layout: DashboardLayout): Promise<void> {
+  const file = dashboardFile();
+  await mkdir(dirname(file), { recursive: true });
+  const temporary = `${file}.${process.pid}`;
+  await writeFile(temporary, serializeDashboard(layout));
+  await rename(temporary, file);
+}
+
+function widgetFor(entry: {
+  readonly id: string;
+  readonly size: SuiteWidgetSize;
+}): DashboardWidget | null {
+  const host = hostWidget(entry.id);
+  if (host === undefined) return null;
+  return {
+    id: host.id,
+    title: host.title,
+    description: host.description,
+    kind: host.kind,
+    size: entry.size,
+    sizes: host.sizes,
+  };
+}
+
+function availableWidget(host: HostWidget): DashboardWidget {
+  return {
+    id: host.id,
+    title: host.title,
+    description: host.description,
+    kind: host.kind,
+    size: host.defaultSize,
+    sizes: host.sizes,
+  };
+}
+
+/**
+ * What the dashboard pane draws.
+ *
+ * The layout says which ids and sizes; the registry says what each one is. A stored id the
+ * registry does not know has already been dropped by the parser with a note, so the page
+ * never has to decide what to do with one.
+ */
+async function dashboardState(): Promise<DashboardState> {
+  const read = await readDashboard();
+  const widgets = read.layout.widgets.flatMap((entry) => {
+    const widget = widgetFor(entry);
+    return widget === null ? [] : [widget];
+  });
+  const shown = new Set(widgets.map((widget) => widget.id));
+  return {
+    widgets,
+    available: HOST_WIDGETS.filter((host) => !shown.has(host.id)).map(availableWidget),
+    note: dashboardFailure ?? read.note,
+  };
+}
+
+/**
+ * Change the layout and redraw.
+ *
+ * Every dashboard action is one of these: read the file, apply a pure edit, write it back.
+ * A failed write is reported in the pane rather than lost; a refused edit (a move off the
+ * end, a size a widget does not offer) changes nothing and still redraws, so the controls
+ * always describe the file that is actually there.
+ */
+async function updateDashboard(
+  change: (layout: DashboardLayout) => DashboardLayout,
+): Promise<void> {
+  try {
+    const { layout } = await readDashboard();
+    await saveDashboard(change(layout));
+    dashboardFailure = null;
+  } catch (error) {
+    dashboardFailure = `Start could not save your dashboard: ${
+      error instanceof Error ? error.message : String(error)
+    }`;
+  }
+  await broadcast();
+}
+
 async function state(): Promise<LauncherState> {
   const listing = await discover();
   const apps = listing.packages.map((entry) => entry.app);
@@ -454,6 +583,7 @@ async function state(): Promise<LauncherState> {
       theme: resolvedTheme(),
     },
     version: app.getVersion(),
+    dashboard: await dashboardState(),
     sync: await syncState(),
     self:
       self === undefined
@@ -943,6 +1073,39 @@ function registerIpc(): void {
   });
 
   onIpc(START_IPC.addApp, () => addApp());
+
+  /**
+   * The dashboard's four edits.
+   *
+   * The page names an id and a choice; main validates both against its own registry and
+   * writes its own file. There is no path in either direction, so a renderer cannot point
+   * the layout at a file of its choosing.
+   */
+  onIpc(START_IPC.moveWidget, async (_event, id: unknown, direction: unknown) => {
+    if (typeof id !== "string") return;
+    if (direction !== "earlier" && direction !== "later") return;
+    await updateDashboard((layout) => moveWidget(layout, id, direction));
+  });
+
+  onIpc(START_IPC.sizeWidget, async (_event, id: unknown, size: unknown) => {
+    if (typeof id !== "string" || typeof size !== "string") return;
+    const widget = hostWidget(id);
+    if (widget === undefined) return;
+    if (!(SUITE_WIDGET_SIZES as readonly string[]).includes(size)) return;
+    await updateDashboard((layout) =>
+      resizeWidget(layout, id, size as SuiteWidgetSize, widget.sizes),
+    );
+  });
+
+  onIpc(START_IPC.addWidget, async (_event, id: unknown) => {
+    if (typeof id !== "string") return;
+    await updateDashboard((layout) => addWidget(layout, id));
+  });
+
+  onIpc(START_IPC.removeWidget, async (_event, id: unknown) => {
+    if (typeof id !== "string") return;
+    await updateDashboard((layout) => removeWidget(layout, id));
+  });
 
   /**
    * Install or update one app, with the card watching.

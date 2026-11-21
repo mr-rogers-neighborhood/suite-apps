@@ -6,6 +6,7 @@ import type { Host, HostCommand } from "./host.js";
 import {
   adoptLegacyRegistry,
   claimHubLock,
+  dashboardPath,
   hostPaths,
   hubLockPath,
   hubLockText,
@@ -116,6 +117,19 @@ describe("the registry path", () => {
     expect(registryPathFor(paths, { SUITE_START_REGISTRY: "  " })).toBe(
       "/home/me/.config/suite/start/installs.json",
     );
+  });
+});
+
+describe("the dashboard path", () => {
+  it("is this host's own layout, beside the install registry", () => {
+    const paths = hostPaths({ platform: "linux", home: HOME });
+    expect(dashboardPath(paths)).toBe("/home/me/.config/suite/start/dashboard.json");
+  });
+
+  it("is not a document folder and not shared between apps", () => {
+    const paths = hostPaths({ platform: "linux", home: HOME });
+    expect(dashboardPath(paths).startsWith(paths.suiteConfig)).toBe(true);
+    expect(dashboardPath(paths)).not.toContain("Documents");
   });
 });
 

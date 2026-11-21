@@ -20,6 +20,7 @@ function app(id: string, extensions: readonly string[]): DiscoveredApp {
       fileExtensions: [...extensions],
       protocols: [],
       capabilities: [],
+      widgets: [],
     },
     manifestPath: `/installs/${id}/suite.app.json`,
     executable: `/opt/suite/${id}`,

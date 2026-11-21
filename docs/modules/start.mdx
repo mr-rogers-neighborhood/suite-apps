@@ -122,3 +122,27 @@ event loop can exit.
 The executable comes from a record discovery already checked, and the arguments
 from a plan routing already accepted. A launch failure is therefore not a
 second place where a path or a link is trusted.
+
+## apps/start/src/dashboard.ts#parseDashboard
+
+The dashboard's layout file, read without a guess. The file is the host's own: an ordered
+list of widget ids and size classes under Start's config directory, never a document and
+never synced. A file this build does not understand falls back to the default with a
+sentence; an id nothing on the machine provides is dropped, named in that sentence and
+left on disk so reinstalling the app can bring the widget back.
+
+`known` is the registry a caller supplies — the host's widgets plus the app widgets the
+build renders — which is what lets a future app widget be a test today without the parser
+knowing about that app.
+
+## apps/start/src/dashboard.ts#moveWidget
+
+Reordering is a pure edit of the list: one place earlier or later, and a no-op at either
+end or for an id that is not there. Keeping it pure is what lets the page's move buttons,
+the file on disk and the tests share one definition of "moved" instead of three.
+
+## apps/start/src/dashboard.ts#removeWidget
+
+A widget can be taken off the dashboard, except the last one. An empty dashboard is a blank
+window with no control left to add anything back, so the refusal belongs beside the edit
+rather than in the button that calls it.

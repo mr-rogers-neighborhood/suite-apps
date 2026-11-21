@@ -90,27 +90,14 @@
               <button id="add" type="button" class="button">Add app…</button>
             </div>
           </header>
-          <ul id="apps" class="cards"></ul>
-          <p id="apps-empty" class="empty" hidden>
-            Nothing to show yet. Use <strong>Add app…</strong> to pick an application's
-            executable.
-          </p>
-          <section
-            id="apps-pre-release"
-            class="app-section"
-            aria-labelledby="apps-pre-release-title"
-            hidden
-          >
-            <h3 id="apps-pre-release-title">Pre-release</h3>
-            <p class="section-note">
-              Pre-release builds may be broken, incomplete, or change shape without notice.
-              Each app has one pre-release install shared by the slop, canary and beta tiers:
-              switching tiers keeps that install and changes its data folder. Pre-release
-              documents live in <code>Suite Slop</code>, separate from stable, and
-              uninstalling asks before deleting them.
-            </p>
-            <ul id="apps-pre-release-list" class="cards"></ul>
-          </section>
+          <p id="dashboard-note" class="empty" hidden></p>
+          <p id="dashboard-status" class="visually-hidden" role="status" aria-live="polite"></p>
+          <div id="dashboard" class="dashboard"></div>
+          <div id="dashboard-add" class="dashboard-add" hidden>
+            <label for="widget-picker">Add a widget</label>
+            <select id="widget-picker"></select>
+            <button id="widget-add" type="button" class="button">Add</button>
+          </div>
         </section>
 
         <section id="panel-files" role="tabpanel" aria-labelledby="tab-files" hidden>
