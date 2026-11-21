@@ -1,0 +1,52 @@
+appId: run.suite.help
+productName: Suite Help
+executableName: suite-help
+artifactName: suite-help-${version}-${arch}.${ext}
+copyright: Copyright © Suite contributors
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - out/**
+  - package.json
+
+asar: true
+
+# The switches an attacker cannot turn back on after packaging.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
+
+extraResources:
+  - from: resources
+    to: .
+  - from: resources/icon.png
+    to: icon.png
+# The hub discovers an app by the manifest beside its executable.
+extraFiles:
+  - from: suite.app.json
+    to: suite.app.json
+
+linux:
+  syncDesktopName: true
+  # Help ships through Flatpak. A local unpacked build is enough to package it;
+  # there is no AppImage feed and nothing to publish here.
+  target:
+    - dir
+  category: Documentation
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.reference
+
+win:
+  target:
+    - nsis

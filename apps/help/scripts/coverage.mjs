@@ -6,14 +6,14 @@
  * Report only: this never fails on a gap. Run `pnpm docs:index` first so the
  * data matches the tree.
  *
- * Usage: node tools/docs/scripts/coverage.mjs [--json]
+ * Usage: node apps/help/scripts/coverage.mjs [--json]
  */
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const dataDir = join(root, "tools/docs/public/data");
+const dataDir = join(root, "apps", "help", "public", "data");
 const asJson = process.argv.includes("--json");
 
 async function readJson(file) {

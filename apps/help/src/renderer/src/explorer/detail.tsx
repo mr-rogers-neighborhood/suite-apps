@@ -1,8 +1,6 @@
-"use client";
-
 import { ExternalLink, Link2, MousePointerClick } from "lucide-react";
-import { CodeView } from "@/components/explorer/code-view";
-import { Note } from "@/components/explorer/note";
+import { CodeView } from "@/explorer/code-view";
+import { Note } from "@/explorer/note";
 import type {
   ModuleData,
   ModuleSummary,
@@ -449,7 +447,7 @@ function ModuleDetail({
   moduleData: Record<string, ModuleData>;
   moduleById: Map<string, ModuleSummary>;
   membership: TourMembership;
-  tourStep?: TourNodeStep;
+  tourStep?: TourNodeStep | undefined;
   onSelectNode: (id: string) => void;
   onOpenBrowser: (id: string) => void;
   onOpenTour: (id: string, step: number) => void;
@@ -570,11 +568,11 @@ function NodeDetail({
   onOpenTour,
 }: {
   entry: SearchEntry;
-  focusSymbolId?: string;
+  focusSymbolId?: string | undefined;
   view: View;
   tour: Tour | null;
   tourIndex: number;
-  tourStep?: TourNodeStep;
+  tourStep?: TourNodeStep | undefined;
   moduleData: Record<string, ModuleData>;
   moduleById: Map<string, ModuleSummary>;
   membership: TourMembership;

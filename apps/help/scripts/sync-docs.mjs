@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Mirrors `docs/` into `tools/docs/.generated/docs/` for the local reader.
+ * Mirrors `docs/` into `apps/help/.generated/docs/` for Suite Help.
  *
  * The repository's Markdown is plain (`docs/README.md`, no frontmatter), while a
  * Fumadocs page needs a `title`, a `description` and a place in a sidebar. This
@@ -24,7 +24,7 @@
  * The output is a pure function of `docs/`: the target is deleted first, entries
  * are walked in sorted order, and nothing is read from the previous run.
  *
- * Usage: node tools/docs/scripts/sync-docs.mjs
+ * Usage: node apps/help/scripts/sync-docs.mjs
  */
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
@@ -32,7 +32,8 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const sourceDir = join(root, "docs");
-const contentDir = join(root, "tools/docs/.generated/docs");
+const contentDir = join(root, "apps", "help", ".generated", "docs");
+const dataDir = join(root, "apps", "help", "public", "data");
 
 const GITHUB_BLOB = "https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/";
 const GITHUB_TREE = "https://github.com/mr-rogers-neighborhood/suite-apps/tree/main/";
@@ -331,13 +332,65 @@ const dirSet = new Set(dirs);
 await rm(contentDir, { recursive: true, force: true });
 await mkdir(contentDir, { recursive: true });
 
+/** Plain text for the offline handbook search index. */
+function searchText(page) {
+  return page
+    .replace(/^---\n[\s\S]*?\n---\n?/u, "")
+    .replaceAll(/```[\s\S]*?```/g, " ")
+    .replaceAll(/<!--[\s\S]*?-->/g, " ")
+    .replaceAll(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replaceAll(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replaceAll(/<[^>]+>/g, " ")
+    .replaceAll(/[`*_>#|-]+/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim()
+    .slice(0, 6000);
+}
+
+function searchEntry(page, rel) {
+  const frontmatter = /^---\n([\s\S]*?)\n---/u.exec(page)?.[1] ?? "";
+  const title = /^title\s*:\s*(.+)$/mu
+    .exec(frontmatter)?.[1]
+    ?.trim()
+    .replaceAll(/^["']|["']$/g, "");
+  const description =
+    /^description\s*:\s*(.+)$/mu
+      .exec(frontmatter)?.[1]
+      ?.trim()
+      .replaceAll(/^["']|["']$/g, "") ?? "";
+  const slug = targetPath(rel)
+    .replace(/\.mdx$/u, "")
+    .replace(/(^|\/)index$/u, "")
+    .replace(/\/$/u, "");
+  return {
+    url: slug === "" ? "/handbook" : `/handbook/${slug}`,
+    title: title ?? humanize(rel),
+    description,
+    text: searchText(page),
+  };
+}
+
+const searchEntries = [];
+
 for (const rel of files) {
   const source = await readFile(join(sourceDir, rel), "utf8");
   const page = rewriteLinks(convertPage(source, rel), rel, fileSet, dirSet);
   const target = join(contentDir, targetPath(rel));
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, page, "utf8");
+  searchEntries.push(searchEntry(page, rel));
 }
+
+await mkdir(dataDir, { recursive: true });
+await writeFile(
+  join(dataDir, "handbook-search.json"),
+  `${JSON.stringify(
+    searchEntries.sort((left, right) => left.url.localeCompare(right.url)),
+    null,
+    2,
+  )}\n`,
+  "utf8",
+);
 
 const SECTION_ORDER = ["tutorials", "how-to", "reference", "explanation"];
 
@@ -385,5 +438,5 @@ await writeMeta();
 const assets = await copyAssets("");
 
 process.stdout.write(
-  `synced docs → tools/docs/.generated/docs: ${files.length} pages, ${assets} assets\n`,
+  `synced docs → apps/help/.generated/docs: ${files.length} pages, ${assets} assets, search index\n`,
 );

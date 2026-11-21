@@ -18,7 +18,7 @@
  * Prose notes come from `docs/modules/`; tours from `docs/tours/`.
  * The generator never overwrites either.
  *
- * Usage: node tools/docs/scripts/index-code.mjs
+ * Usage: node apps/help/scripts/index-code.mjs
  */
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, extname, join, posix, relative } from "node:path";
@@ -27,7 +27,7 @@ import { Project, ts } from "ts-morph";
 import { parse as parseYaml } from "yaml";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const outDir = join(root, "tools/docs/public/data");
+const outDir = join(root, "apps", "help", "public", "data");
 const check = process.argv.includes("--check");
 const modulesDir = join(root, "docs/modules");
 const toursDir = join(root, "docs/tours");
@@ -65,7 +65,7 @@ const SKIP_DIRS = new Set([
   "target",
   "public",
 ]);
-const ROOTS = ["apps", "packages", "scripts", "packaging", ".github", "tools/docs"];
+const ROOTS = ["apps", "packages", "scripts", "packaging", ".github"];
 const ROOT_FILES = [
   "package.json",
   "pnpm-workspace.yaml",
@@ -86,7 +86,6 @@ function packageTitle(name) {
   if (!name) return "Package";
   const short = name.replace(/^@[^/]+\//, "");
   if (short === "ui") return "UI";
-  if (short === "docs-site") return "Docs Site";
   return titleCase(short);
 }
 
@@ -169,14 +168,6 @@ async function collectPackages() {
   }
 
   for (const base of ["apps", "packages"]) await visit(base, 0);
-  const docsPkg = await readJson(join(root, "tools/docs/package.json"));
-  if (docsPkg?.name) {
-    found.set("tools/docs", {
-      dir: "tools/docs",
-      name: docsPkg.name,
-      title: packageTitle(docsPkg.name),
-    });
-  }
   return [...found.values()].sort((a, b) => b.dir.length - a.dir.length);
 }
 

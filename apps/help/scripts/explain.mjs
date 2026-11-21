@@ -5,19 +5,19 @@
  * It appends to the owning module MDX and never overwrites an existing section.
  * The generated line is a fact; the TODO is for the person writing the why.
  *
- * Usage: node tools/docs/scripts/explain.mjs <node-id>
+ * Usage: node apps/help/scripts/explain.mjs <node-id>
  */
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const dataDir = join(root, "tools/docs/public/data");
+const dataDir = join(root, "apps", "help", "public", "data");
 const modulesDir = join(root, "docs/modules");
 const target = process.argv[2];
 
 if (!target) {
-  process.stderr.write("usage: node tools/docs/scripts/explain.mjs <node-id>\n");
+  process.stderr.write("usage: node apps/help/scripts/explain.mjs <node-id>\n");
   process.exit(1);
 }
 

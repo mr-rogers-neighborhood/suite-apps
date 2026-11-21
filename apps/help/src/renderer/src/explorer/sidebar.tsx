@@ -1,8 +1,6 @@
-"use client";
-
 import { Boxes, ChevronRight, FolderTree, Route, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
-import { BrowserTree } from "@/components/explorer/tree";
+import { BrowserTree } from "@/explorer/tree";
 import type {
   FolderNode,
   ModuleSummary,

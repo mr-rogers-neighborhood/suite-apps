@@ -1,16 +1,16 @@
-"use client";
-
 import { GitBranch, Menu, X } from "lucide-react";
-import Link from "next/link";
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
 } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DetailPane } from "@/components/explorer/detail";
-import { Note } from "@/components/explorer/note";
-import { ExplorerSidebar } from "@/components/explorer/sidebar";
+import { Link, useNavigate } from "react-router";
+import { DetailPane } from "@/explorer/detail";
+import { Note } from "@/explorer/note";
+import { ExplorerSidebar } from "@/explorer/sidebar";
+import { loadBaseData } from "@/lib/explorer-data";
+import { handbookPathForDocsFile, readExplorerUrl } from "@/lib/explorer-routes";
 import type {
   BaseData,
   ModuleData,
@@ -21,38 +21,6 @@ import type {
   TourTarget,
   View,
 } from "@/lib/explorer-types";
-
-type UrlState = {
-  view?: View;
-  node?: string;
-  module?: string;
-  tour?: string;
-  step?: number;
-  level?: "file" | "symbol";
-};
-
-function readUrl(): UrlState {
-  if (typeof window === "undefined") return {};
-  const params = new URLSearchParams(window.location.search);
-  const rawView = params.get("view");
-  const view =
-    rawView === "walkthroughs"
-      ? "tours"
-      : rawView === "browser" || rawView === "modules" || rawView === "tours"
-        ? rawView
-        : undefined;
-  const rawStep = params.get("step") ?? params.get("tstep");
-  const step = rawStep === null ? undefined : Number(rawStep);
-  const level = params.get("level");
-  return {
-    view,
-    node: params.get("node") ?? undefined,
-    module: params.get("module") ?? undefined,
-    tour: params.get("tour") ?? params.get("walk") ?? undefined,
-    step: Number.isFinite(step) ? step : undefined,
-    level: level === "file" || level === "symbol" ? level : undefined,
-  };
-}
 
 function targetNodeId(target: TourTarget): string | null {
   if (
@@ -70,14 +38,6 @@ function stepLevel(step: TourStep | undefined): "file" | "symbol" | null {
   if (step?.kind !== "node") return null;
   if (step.target.kind !== "symbol") return null;
   return step.target.level === "file" ? "file" : "symbol";
-}
-
-function docPath(path: string): string {
-  const relative = path
-    .replace(/^docs\//, "")
-    .replace(/\.mdx?$/, "")
-    .replace(/^README$/, "");
-  return `/docs${relative ? `/${relative}` : ""}`;
 }
 
 const START_EXPANDED = new Set(["", "apps", "packages", "tools"]);
@@ -112,18 +72,13 @@ export function Explorer() {
   const [overlayDismissed, setOverlayDismissed] = useState(false);
   const requestedModules = useRef(new Set<string>());
   const [hydrated, setHydrated] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      fetch("/data/tree.json").then((response) => response.json()),
-      fetch("/data/modules.json").then((response) => response.json()),
-      fetch("/data/search.json").then((response) => response.json()),
-      fetch("/data/tours.json").then((response) => response.json()),
-      fetch("/data/tour-membership.json").then((response) => response.json()),
-    ])
-      .then(([tree, modules, search, tours, membership]) => {
-        if (!cancelled) setData({ tree, modules, search, tours, membership });
+    loadBaseData((url) => fetch(url))
+      .then((next) => {
+        if (!cancelled) setData(next);
       })
       .catch((reason: unknown) => {
         if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
@@ -134,7 +89,7 @@ export function Explorer() {
   }, []);
 
   useEffect(() => {
-    const state = readUrl();
+    const state = readExplorerUrl(window.location.search);
     if (state.view) setView(state.view);
     if (state.node) setSelectedNode(state.node);
     if (state.module) setSelectedModule(state.module);
@@ -298,7 +253,8 @@ export function Explorer() {
   const expandFor = useCallback(
     (id: string) => {
       const entry = searchById.get(id);
-      const path = (entry?.path ?? id).split("#")[0];
+      const [filePath] = (entry?.path ?? id).split("#");
+      const path = filePath ?? id;
       const parts = path.split("/");
       setExpanded((previous) => {
         const next = new Set(previous);
@@ -352,7 +308,7 @@ export function Explorer() {
       }
       if (step?.kind === "node" && step.target.kind === "doc") {
         setPlaying(false);
-        window.location.assign(docPath(step.target.path));
+        navigate(handbookPathForDocsFile(step.target.path));
         return;
       }
       setTourIndex(next);
@@ -363,7 +319,7 @@ export function Explorer() {
       setView("tours");
       setSidebarOpen(false);
     },
-    [tour],
+    [navigate, tour],
   );
 
   const selectTour = useCallback((id: string) => {
@@ -585,24 +541,18 @@ export function Explorer() {
         >
           {sidebarOpen ? <X className="size-4" /> : <Menu className="size-4" />}
         </button>
-        <Link href="/" className="font-semibold tracking-tight">
-          Suite docs
+        <Link to="/explore" className="font-semibold tracking-tight">
+          Suite Help
         </Link>
         <nav className="ml-auto flex items-center gap-1 text-xs text-fd-muted-foreground">
           <Link
-            href="/start"
+            to="/handbook"
             className="rounded-lg px-2 py-1.5 hover:bg-fd-accent hover:text-fd-foreground"
           >
-            Start
+            Handbook
           </Link>
           <Link
-            href="/docs"
-            className="rounded-lg px-2 py-1.5 hover:bg-fd-accent hover:text-fd-foreground"
-          >
-            Reference
-          </Link>
-          <Link
-            href="/explore?view=tours"
+            to="/explore?view=tours"
             className="rounded-lg bg-fd-accent px-2 py-1.5 font-medium text-fd-accent-foreground"
           >
             Tours
@@ -793,8 +743,8 @@ function StatusBar({
   onTogglePlay,
 }: {
   view: View;
-  entry?: SearchEntry;
-  module?: ModuleSummary;
+  entry?: SearchEntry | undefined;
+  module?: ModuleSummary | undefined;
   tour: Tour | null;
   tourIndex: number;
   playing: boolean;
