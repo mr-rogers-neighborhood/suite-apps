@@ -20,6 +20,7 @@ One Loro document holds these roots. Only `BudgetDocument` mutates them.
 | `payees`          | payee id             | `payee`                                                    |
 | `rules`           | rule id              | `rule`                                                     |
 | `schedules`       | schedule id          | `schedule`                                                 |
+| `scheduleBatches` | batch id             | `scheduleBatch`                                            |
 | `reconciliations` | reconciliation id    | `reconciliation`                                           |
 | `dashboards`      | dashboard id         | `dashboard`                                                |
 | `widgets`         | widget id            | `widget`                                                   |
@@ -103,7 +104,15 @@ Fields: `importedPayee`, `payee`, `account`, `category`, `date`, `memo`, `amount
 
 `id`, `accountId`, `payeeId` (nullable), `payeeName`, `categoryId` (nullable), `amountMinor`, `memo`,
 `flag`, `frequency` (`daily` \| `weekly` \| `monthly` \| `yearly`), `interval`, `anchorDate`,
-`nextDate`, `endDate` (nullable), `createdAt`, `updatedAt`. There is no `autoEnter` field.
+`nextDate`, `endDate` (nullable), `autoEnter`, `createdAt`, `updatedAt`. `autoEnter` defaults to
+false; a schedule with it on posts its own due occurrences.
+
+### scheduleBatch
+
+`id`, `createdAt`, `transactionIds` (string[]), `totalAmountMinor`, `runs`, `undoneAt` (nullable).
+Each run is `{ scheduleId, nextDateBefore, postedCount }`. The record is the audit trail for one
+automatic-entry pass, so the notice and its Undo survive a restart; `undoneAt` stops an undo from
+being applied twice.
 
 ### reconciliation
 
@@ -234,7 +243,20 @@ payee text to the chosen name. A learned rule is a normal record the user can ed
 A schedule stores its anchor day, so a monthly bill on the 31st clamps to the last day of short months
 and returns to the 31st afterwards. `nextDate` is the next occurrence; entering it creates a transaction
 with `scheduledId` and advances `nextDate`. Upcoming entries are derived for `settings.upcomingDays`.
-There is no background auto-enter: the app does not create transactions while closed.
+
+`autoEnter` is off by default, so a schedule stays advisory until a person ticks **Automatically add
+transaction**. With it on, the app catches up from `nextDate` through today on open and while it stays
+open. The catch-up covers at most the last 90 days per schedule (`AUTO_ENTER_HORIZON_DAYS`); an older
+occurrence advances `nextDate` without posting, rather than filling the budget with years of history.
+Each occurrence goes through the same entry path as the Enter button and becomes its own transaction,
+with the schedule's category, payee, memo and `scheduledId`.
+
+One pass that posts anything writes a `scheduleBatch` record with the transaction ids, the total and
+one run per schedule (`nextDateBefore`, `postedCount`). Undo deletes exactly those transactions and
+restores each run's `nextDate`, then marks the batch `undoneAt`; it refuses if any transaction is
+reconciled. Because the batch is a document record, the notice and its undo survive a restart. A
+schedule with a zero amount is skipped, because a zero transaction is invalid, and nothing posts
+while the app is closed: the next open is the catch-up.
 
 ## Imports
 

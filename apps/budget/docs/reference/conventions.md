@@ -103,7 +103,8 @@ A **budget** is one Loro document, one file, and one library entry. An **account
 an envelope; a **group** holds categories. A **month** is a `yyyy-MM` window with assignments and
 activity. **Ready to Assign** is money in on-budget accounts that is not sitting in an envelope. A
 **target** is a suggestion attached to a category. A **schedule** is a recurring template that becomes a
-transaction when entered. A **payee** is a name. A **rule** changes fields on a matching transaction.
+transaction when entered, by hand or by its own automatic option. A **payee** is a name. A **rule**
+changes fields on a matching transaction.
 
 Say "move to Ready to Assign" and "delete transaction", not "archive" and "remove". Accounts close; a
 budget is removed from the library but its file stays.

@@ -12,7 +12,12 @@ The rules that shape Budget.
   Assign.
 - Months are sparse. A month exists when it has data.
 - A transfer is a pair of linked records. A split is a parent with child records.
-- Targets are versioned. Rules are staged before they apply. Schedules are projections.
+- Targets are versioned. Rules are staged before they apply. Schedules are projections; one may enter
+  itself only when asked.
+- A schedule enters itself only when its **Automatically add transaction** checkbox is on. The default
+  is off, so an existing schedule stays advisory. Catch-up posts at most the last 90 days per schedule
+  on open and while the app stays open, each occurrence as its own transaction. One batch record
+  covers the run; its Undo removes exactly those transactions and restores each schedule's `nextDate`.
 - There is no bank sync, no network client, no updater and no analytics.
 - Accounting is cash basis.
 - A damaged file is never overwritten. Saves are atomic, the previous copy is kept, and seven daily

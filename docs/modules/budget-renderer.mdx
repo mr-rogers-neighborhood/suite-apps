@@ -58,3 +58,17 @@ payment that cannot cover the month's interest, or a balance that would outlast
 100 years, is reported as never paying off instead of drawn as a very long
 schedule. Saving still writes only the record the schema holds: kind, amount,
 due month and account.
+
+## apps/budget/src/renderer/src/schedules/ScheduleAutoEnterNotice.tsx#ScheduleAutoEnterNotice
+
+The checkbox is a field on the schedule dialog: it seeds from `record.autoEnter`,
+defaults off for a new schedule, and writes the same boolean through
+`createSchedule` or `updateSchedule`. The view header says the choice is per
+schedule, so the page does not read as if every schedule posts itself.
+
+The notice is the review surface for a batch. It reads the latest un-undone
+`scheduleBatch` from the snapshot, names the count and formats the total with the
+budget's currency, and offers one **Undo** that calls `undoScheduleBatch`. A
+reconciled entry makes the call throw; the notice shows that sentence beside the
+button instead of dropping the batch. Because the batch is in the document, the
+notice is still there after a restart.

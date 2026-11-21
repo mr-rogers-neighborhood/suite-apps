@@ -71,6 +71,9 @@ text) that can be added, removed, and reordered.
 - Rules: staged list with a plain-language summary, enable/disable, edit, delete, and "Run rules" with
   a change count. Learned rules carry a badge.
 - Schedules: upcoming entries for the configured window with an Enter button, then the schedule list.
+  Each schedule's **Automatically add transaction** checkbox is off by default; a ticked schedule
+  posts its due occurrences itself, and the notice under the menu bar names the batch and offers one
+  **Undo**. The choice is per schedule, so a schedule with the box off waits for **Enter**.
 - Payees: default category, last used category, transaction count, and a learning toggle. Merge moves
   every transaction from one payee to another.
 

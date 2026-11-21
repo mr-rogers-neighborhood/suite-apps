@@ -6,9 +6,9 @@ summary: "The record shapes, integer money and the ledger projections an envelop
 
 Budget's core package is the document layer and the arithmetic. It owns the Zod
 records, `BudgetDocument`, the money parser, rule evaluation and ranking, month
-math, import adapters, record exports, report series and the `.budget` envelope.
-It exists so a component never constructs a Loro value, never touches a float
-amount and never keeps a report total of its own.
+math, schedule entry, import adapters, record exports, report series and the
+`.budget` envelope. It exists so a component never constructs a Loro value, never
+touches a float amount and never keeps a report total of its own.
 
 It does not own the open document, the library index, the file path or the
 window. Main holds the authority and the file; the renderer holds a replica and
@@ -59,3 +59,23 @@ is derived from the same ledger rather than tracked as a separate account.
 Target status is computed from the available amount and, for a debt target, the
 linked account's balance. The result is plain data with no Loro handle, which is
 what lets the plan view and the report share one set of numbers.
+
+## apps/budget/packages/core/src/loro/schedules.ts#autoEnterSchedules
+
+A schedule is a template, so entering one is an ordinary transaction write.
+Auto-entry is the same path with a due test: for each schedule with `autoEnter`
+on, the function skips occurrences older than `AUTO_ENTER_HORIZON_DAYS` (90),
+then enters every occurrence from `nextDate` through today. Skipping advances
+`nextDate` without a transaction; posting advances it through `enterSchedule`, so
+a reopen cannot post a date twice.
+
+Each pass that posts anything writes one `scheduleBatch` record into its own root:
+the transaction ids, the total and one run per schedule with the `nextDate` it
+started from. `undoScheduleBatch` deletes exactly those transactions, restores
+each `nextDateBefore`, and marks the batch undone; it refuses a reconciled row
+first, because undoing a reconciled entry would break the reconciliation. The
+horizon and the batch record are what keep a years-old file from becoming a flood
+of history in one open.
+
+The tests cover a stored schedule defaulting off, a zero amount, an end date, the
+horizon, idempotence across a reopen and the undo after a restart.

@@ -123,7 +123,7 @@ imports React or Electron.
 | What a transfer and a split are | Paired records and child records                                   |
 | How targets work                | Versioned records, suggestions derived                             |
 | How rules work                  | Staged, ranked, learned from user actions                          |
-| How schedules work              | Projections; one-click entry, no unattended auto-entry             |
+| How schedules work              | Projections; one-click entry or per-schedule auto-entry            |
 | What import is                  | Adapters; no bank sync                                             |
 | What the invariant is           | Cash basis with uncategorized rows                                 |
 | Where files live                | App-managed library with backups and recovery                      |
@@ -140,7 +140,8 @@ imports React or Electron.
 - Optional passphrase encryption.
 - Shared or household budgets.
 - Investment/tracking accounts and manual valuations.
-- Auto-entering schedules while the app is closed.
+- Auto-entering schedules while the app is closed. Catch-up runs on open and while the app stays
+  open; a closed app cannot post.
 - Splitting a payment into principal and interest.
 - Privacy/scramble mode.
 - A web build at `budget.suite.run`, mobile, and the suite switcher.
