@@ -1,17 +1,19 @@
 ---
 id: release-sign-and-publish
 title: Sign and publish a release
-summary: "A version, a proven commit, a signed Flatpak remote and a relay tarball that describe one thing."
+summary: "A version, a proven commit and a signed Flatpak remote that describe one thing."
 order: 51
 ---
 
 A release is not just a build. It is a version with release notes, a commit the
-gate has proven, a signed OSTree summary for the Flatpak remote, and — for the
-relay — a tarball whose checksum list is signed. This tour follows the two
-publishing paths: what they refuse before building, what they sign, and how a
-stable deployment and a pre-release branch keep separate identities. The path is
-also the order to read a failed publish in, because each stop is a refusal that
-happens earlier than the damage would.
+gate has proven, and a signed OSTree summary for the Flatpak remote. This tour
+follows the publishing path: what it refuses before building, what it signs, and
+how a stable deployment and a pre-release branch keep separate identities. The
+path is also the order to read a failed publish in, because each stop is a
+refusal that happens earlier than the damage would.
+
+The relay is a Flatpak on the same remote, so it has no second publishing path.
+Its `sync-v<version>` tarball releases are retired history.
 
 ## scripts/release.mjs#versionFromPackage
 
@@ -31,29 +33,11 @@ The gate proof is a commit, not a working tree. The status file has to say the
 run passed, came from a clean export, and names this commit. A warm checkout that
 happens to pass is not evidence for the bytes about to publish.
 
-## scripts/release.mjs#publisherKeyProblem
-
-The relay's checksum list is signed with the update key, and the key is checked
-against the pin before the build. Finding that after upload is too late to be
-useful.
-
-## scripts/release.mjs#buildRelayArtifact
-
-The relay is a server, not an app: the tarball carries the CLI, its JavaScript
-dependencies and a launcher, but not a Node runtime. Building it from the gated
-tree is what makes the checksum describe the bytes a person installs.
-
-## scripts/release.mjs#releaseRelay
-
-The relay release uploads the tarball, `SHA256SUMS`, the detached signature and
-the public key on `sync-v<version>`. `--publish` is required; without it the same
-command is a dry run.
-
 ## scripts/flatpak.mjs#run
 
 The desktop path starts with `node scripts/flatpak.mjs`. It packages the unpacked
 tree, exports the repository, signs the summary with the store key and installs
-from the local remote.
+from the local remote. `--app sync` does the same for the relay.
 
 ## scripts/flatpak-remote.mjs#checkGitProof
 
@@ -71,12 +55,12 @@ The `.flatpakrepo` file embeds the store's public key. That is what lets a perso
 add the remote with `--from` and have Flatpak verify the summary from the first
 fetch.
 
-## interlude: Two keys, two writers
+## interlude: One key, one writer
 
-The Flatpak path signs the OSTree summary with the store key; the relay path signs
-`SHA256SUMS` with the update key. Replacing one does not replace the other. The
-store key is the trust root for the remote, and the update key is the trust root
-for the relay tarball.
+The Flatpak store key signs the OSTree summary, and it is the trust root for
+every app on the remote, the relay included. The update key that signed the
+retired relay tarball's `SHA256SUMS` has no artifact to sign; it and its pin are
+kept until they are retired deliberately.
 
 ## scripts/lib/channel.mjs#flatpakId
 

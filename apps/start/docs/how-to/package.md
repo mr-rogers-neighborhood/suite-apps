@@ -1,14 +1,14 @@
-# Packaging: Flatpak, and the relay tarball
+# Packaging: Flatpak
 
-Linux desktop apps in the suite ship as Flatpaks. The relay is a server tarball. Those are the only
-two artifact forms, and they differ in who owns the installed files.
+Linux desktop apps in the suite ship as Flatpaks, and the relay is one of them. Flatpak owns the
+installed files, inside a sandbox, and updates arrive from the signed OSTree remote.
 
-| Form          | Built for                                 | Who owns the files        | Updates arrive by            | Root needed                         |
-| ------------- | ----------------------------------------- | ------------------------- | ---------------------------- | ----------------------------------- |
-| **Flatpak**   | Canvas, Planner, Budget, Help and the hub | Flatpak, inside a sandbox | an OSTree remote             | no for `--user`, yes for `--system` |
-| Relay tarball | `suite-sync`                              | the person, under `/opt`  | the person replaces the tree | yes                                 |
+| Form        | Built for                                            | Who owns the files        | Updates arrive by | Root needed                         |
+| ----------- | ---------------------------------------------------- | ------------------------- | ----------------- | ----------------------------------- |
+| **Flatpak** | Canvas, Planner, Budget, Help, the hub and the relay | Flatpak, inside a sandbox | an OSTree remote  | no for `--user`, yes for `--system` |
 
-There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest.
+There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, and so
+is `run.suite.sync`.
 
 ## The rule
 
@@ -82,5 +82,6 @@ branch, refs and bytes it would copy, and refuses a dirty tree or a HEAD the gat
 copies the repository to `suite-dev`. It publishes the repository the local flow built; it never
 builds a second one.
 
-The relay is separate: `node scripts/release.mjs sync --publish` builds, signs and uploads its
-tarball. See [Leave a relay running](../../../sync/docs/how-to/relay.md#building-and-publishing-a-release).
+The relay publishes on the same remote: `node scripts/flatpak.mjs --app sync` builds it and
+`flatpak-remote.mjs` publishes the repository. See
+[Leave a relay running](../../../sync/docs/how-to/relay.md#building-and-publishing-a-release).

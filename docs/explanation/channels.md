@@ -85,7 +85,8 @@ remote](../reference/packaging-channels.md#the-signed-remote) describes the tran
 its accepted limit.
 
 A tier adds no third signature scheme. It is another branch under the same signed summary. The relay
-tarball is separate: its `SHA256SUMS` is signed with the update key.
+is the same kind of artifact: `run.suite.sync` is a Flatpak on the same signed remote. The retired
+tarball was the exception, and its `SHA256SUMS` was signed with the update key.
 
 ## What a tier cannot undo
 

@@ -9,7 +9,7 @@ answered is narrow: **is the key on this machine the key this tree trusts?** `pn
 | Key | Signs | Algorithm | Private half | Public half pinned in |
 | --- | --- | --- | --- | --- |
 | Pack signing | a domain pack the phone installs | Ed25519 | `pack-key` | `PACK_PUBLIC_KEY`, `apps/go/src/host/packs.ts` |
-| Update signing | a relay tarball's `SHA256SUMS` | Ed25519 | `update-key.pem` | `SUITE_UPDATE_PUBLIC_KEY`, `packages/desktop/src/updateSignature.ts` |
+| Update signing | nothing the suite ships any more; it signed the retired relay tarball's `SHA256SUMS` | Ed25519 | `update-key.pem` | `SUITE_UPDATE_PUBLIC_KEY`, `packages/desktop/src/updateSignature.ts` |
 
 The Flatpak store key is a third secret with a different job; [Packaging
 channels](../reference/packaging-channels.md#signing) owns it and this page does not restate it. The
@@ -81,10 +81,10 @@ working: the signature was checked when they were installed, and the pin only de
 installed next. A pack signed with the old key is refused after the pin moves, so the two ship
 together.
 
-**Update key.** It signs the relay's checksum list. The relay is installed by hand, so a new tarball
-can carry the new key and the release notes name the fingerprint to compare. `scripts/release.mjs`
-refuses to sign with a key that does not match the pin, before it builds anything. The Flatpak store
-key is separate and rotates on the remote; see [Packaging
+**Update key.** It signed the relay tarball's checksum list. The relay installs as a Flatpak now and
+no release signs with this key, so it has no artifact to trust; it and its pin are kept until they are
+retired deliberately, and `pnpm keys status` still proves the two agree. The Flatpak store key is
+separate and rotates on the remote; see [Packaging
 channels](../reference/packaging-channels.md#signing).
 
 ## Back up
@@ -95,9 +95,8 @@ same; a key that produces a different one is a different trust root, however sim
 
 What losing each key costs:
 
-- **Update signing key** — the relay tarball cannot be verified against the old pin. Recovery is a new
-  key, a relay release that names the new public half, and that key's fingerprint recorded with the
-  release.
+- **Update signing key** — nothing shipped depends on it any more; a future artifact that wants the
+  pin would need a new key and that key's fingerprint recorded with its release.
 - **Pack signing key** — a new key and a new pin; packs signed with the old one stop being
   installable, and anything already installed keeps working.
 

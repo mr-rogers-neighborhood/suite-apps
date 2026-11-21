@@ -35,12 +35,13 @@ See `scripts/ci/` and the README.
 - `suite-dev` is archived on GitHub; this repository is its successor and owns the
   build and release scripts. `suite-go` is archived too.
 - `suite-planner`, `suite-budget`, `suite-start` and `suite-sync` are still
-  active. Desktop apps now ship as Flatpaks from the signed OSTree remote;
-  `suite-sync` is the server's separate trust boundary and ships as a tarball.
+  active. Desktop apps now ship as Flatpaks from the signed OSTree remote,
+  including `suite-sync`: its tray app and the headless relay are one Flatpak,
+  and the relay is still the server's separate trust boundary.
 - Archiving a repository **keeps its release assets downloadable**; it only
   stops new releases. There are no per-app `latest-linux.yml` feeds to preserve:
-  the Flatpak remote is the desktop update path, and the relay tarball is the
-  other release artifact.
+  the Flatpak remote is the update path. The `sync-v<version>` relay tarballs are
+  retired history.
 
 ## Releases and pull requests
 

@@ -76,7 +76,7 @@ the profile carries only the slop tier.
 
 Only Canvas, Planner, Budget and Help can be queued: they are the apps with a Flatpak manifest and a
 `slop` identity. Start ships no `suite.app.json` and refuses a pre-release build, Go builds for
-Android, and Sync ships as a server tarball. Their gates still run at the root.
+Android, and Sync ships as the relay's Flatpak. Their gates still run at the root.
 
 The toolchain names what the factory image must provide: the pinned Node and pnpm, `git`, Docker for
 Canvas's gitleaks scan, Xvfb and the Electron GTK libraries for Start's e2e suite, the Flatpak

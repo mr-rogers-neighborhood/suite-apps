@@ -1,15 +1,15 @@
 # Package and release
 
-The suite has one repository and three artifact forms: Flatpaks for Linux desktop apps, a
-debug-signed APK for Suite Go, and a tarball for the relay. Each app keeps its own version and
-release notes; the root owns the gate and the publishing paths.
+The suite has one repository and two artifact forms: Flatpaks for Linux desktop apps — the relay is
+one of them — and a debug-signed APK for Suite Go. Each app keeps its own version and release notes;
+the root owns the gate and the publishing paths.
 
 ## What a release is
 
 A desktop release is a Flatpak deployment on the signed OSTree remote, built from a commit the gate
 has proven, with a changelog section for the version in the app's `CHANGELOG.md`. Suite Go's release
-is a debug-signed APK attached to the rolling Suite release. The relay release is a tarball on
-`sync-v<version>` with a signed `SHA256SUMS`.
+is a debug-signed APK attached to the rolling Suite release. The relay is a Flatpak on the same
+remote as the other desktop apps; it has no separate artifact.
 
 There is no app update feed, AppImage, Arch package or second copy to roll back to. For the desktop
 apps, Flatpak owns the deployment and the remote is the update channel.
@@ -92,9 +92,8 @@ mise exec -- node scripts/release-status.mjs --publish   # create or update the 
 ```
 
 A missing tag is created at the commit that added its changelog section; an existing tag is never
-moved. The relay's release is the exception: `scripts/release.mjs sync --publish` owns its tarball,
-so this script only edits that release's body and refuses when no relay release exists, or when the
-existing release carries no tarball or checksum asset.
+moved. Every per-app release is created when missing and edited in place when it exists; the artifact
+itself already exists on the signed remote or on the rolling release.
 
 [`RELEASES.md`](../../RELEASES.md) is the human mirror of the Latest release. It can be written
 before publication, so a row whose release does not exist yet says **pending** instead of linking a
@@ -132,29 +131,23 @@ it. [Suite Go's README](../../apps/go/README.md#install-the-apk) owns that insta
 
 ## The relay
 
+The relay is a Flatpak like the apps, so it has no release of its own beyond the same signed remote:
+
 ```sh
-node scripts/release.mjs sync              # dry run
-node scripts/release.mjs sync --publish    # upload tarball, checksums and signature
-node scripts/release.mjs sync --verify     # read the published assets back
+node scripts/flatpak.mjs --app sync                    # package, sign, install locally
+node scripts/flatpak-remote.mjs --target s3 --publish  # publish the shared repository
 ```
 
-The relay is a server tarball, not a desktop app. It has no Flatpak and no update feed; the person
-replaces the tree deliberately. Its assets, checksum and signature are described in
-[Leave a relay running](../../apps/sync/docs/how-to/relay.md#building-and-publishing-a-release).
+Its manifest is `packaging/flatpak/run.suite.sync.yml` and it refuses `--channel`: a tier would be a
+second mailbox on the same data. The `sync-v<version>` tarball releases it used to ship are retired
+and stay on GitHub as history only; [Leave a relay
+running](../../apps/sync/docs/how-to/relay.md#building-and-publishing-a-release) has the build and
+publish detail.
 
-Useful options:
+## What a publish refuses
 
-| Option | Effect |
-| --- | --- |
-| `--publish` | Upload the relay assets. Without it, the command is a dry run. |
-| `--tag <name>` | Release under another tag; the default is `sync-v<version>`. |
-| `--feed-dir <path>` | Copy the artifact, checksums and signature into a local folder. |
-| `--no-build` | Reuse the last build in the relay's output folder. |
-| `--verify` | Check the published assets instead of building anything. |
-
-## What the script refuses
-
-It stops before building when any of these is true, and prints every reason it found:
+The publish paths stop before copying or building when any of these is true, and print every reason
+they found:
 
 1. The tree has uncommitted changes.
 2. The version in the app's `package.json` has no `## [version]` heading in its changelog.
@@ -203,5 +196,6 @@ stamps it into the artifact.
 ## Signing
 
 The Flatpak store key signs the OSTree summary; the remote's `.flatpakrepo` carries its public half.
-The relay's update key signs `SHA256SUMS`, and `release.mjs` refuses a key that does not match the pin.
-[Manage signing keys](keys.md) owns both procedures.
+The relay's update key signed the retired tarball's `SHA256SUMS` and no longer signs anything the suite
+ships; it and its pin are kept until they are retired deliberately. [Manage signing
+keys](keys.md) owns both procedures.
