@@ -8,12 +8,30 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.3.0] - 2026-11-20
+
 ### Added
 
+- **Four more surfaces beside the day.** Projects with their open work, Tags with the tasks that
+  carry them, Upcoming grouped by day, and a Focus view whose sessions keep running when you leave
+  it. The rail lists each one; nothing is hidden behind a menu.
+- **Plan the day and shut it down.** Rituals sets the day's intention and a capacity that the meter
+  respects, then closes the day with a shutdown note; unfinished work is shown as carry-over and
+  moves only when you choose it.
+- **Edit a task without leaving the list.** Notes, checklist, recurrence, estimate, project, tags and
+  times open from the row, and the row's reminder menu still works.
 - **Share a workspace through a relay you run.** The sync pill opens a dialog that shares the open
   `.planner` file, makes a single-use invitation, joins from one, and leaves. The relay stores
   sealed frames it cannot read; the file, the keys and the document stay on the two machines. There
   is no TLS yet and the default address is loopback.
+
+### Changed
+
+- **One top bar, the same as Canvas and Budget.** The mark, workspace name, view menu, export and
+  import, and the theme control ride in the shared bar. On a phone the plan keeps the width and
+  navigation moves into the drawer.
 
 ## [0.2.4] - 2026-11-20
 

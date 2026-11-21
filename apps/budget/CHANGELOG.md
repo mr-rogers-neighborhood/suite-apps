@@ -10,6 +10,26 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 No changes yet.
 
+## [0.2.5] - 2026-11-20
+
+### Added
+
+- **Imports remember where a row came from.** A CSV or QIF row keeps its source, bank id, import
+  time and original payee, so importing the same export twice recognises what is already there by
+  id instead of guessing from the date and payee. The CSV mapping can skip leading rows.
+- **A renamed payee teaches the next import.** Renaming a payee writes a learned rule from the name
+  the bank used to the one you chose.
+
+### Fixed
+
+- **Turning learning off on a payee now means it.** The toggle was stored but never read; it now
+  stops a learned category rule from being written.
+
+### Changed
+
+- **One top bar, the same as Canvas and Planner.** The mark, budget name, view menu, actions and
+  theme control ride in the shared bar.
+
 ## [0.2.4] - 2026-11-20
 
 ### Changed
