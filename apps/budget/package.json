@@ -76,7 +76,7 @@
     "email": "maintainers@suite.run"
   },
   "license": "MIT",
-  "homepage": "https://github.com/mr-rogers-neighborhood/suite-budget",
+  "homepage": "https://github.com/mr-rogers-neighborhood/suite-apps",
   "packageManager": "pnpm@12.17.0",
   "engines": {
     "node": ">=22"
