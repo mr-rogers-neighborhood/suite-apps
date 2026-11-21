@@ -385,6 +385,23 @@ if (build) {
     );
     process.exit(1);
   }
+  // A single-app package run must not assume the workspace was prepared. The
+  // app's typecheck resolves shared packages through their `dist` and through
+  // the workspace links in `node_modules`; a fresh checkout — or one that
+  // pulled a change adding a workspace dependency — has neither until an
+  // install and the library build run. Without this it fails deep inside the
+  // app's build with "Cannot find module @suite/…", which reads like a code
+  // error rather than a missing step.
+  run("pnpm", ["install", "--frozen-lockfile"]);
+  run("pnpm", [
+    "--filter",
+    "./packages/*",
+    "--filter",
+    "./apps/*/packages/*",
+    "--workspace-concurrency=2",
+    "run",
+    "build",
+  ]);
   run("pnpm", ["--filter", app.package, "run", "package:dir"]);
 }
 
