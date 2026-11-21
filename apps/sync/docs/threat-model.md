@@ -55,6 +55,9 @@ holds.
 - **A bearer invitation.** An invitation is a signed, single-use token. Whoever spends it first gets
   the role it named; the relay pins that device's key, but there is no fingerprint confirmation yet.
   A relay code that includes an invitation carries that token, so it is a secret too.
+- **Plaintext and legacy links are local.** The apps accept `ws://` only for a loopback relay and
+  refuse a legacy `suite://join` link that points anywhere else, so deleting the envelope cannot skip
+  the signature, contact and pin checks on a remote host.
 - **The console is loopback and token-gated.** The token is generated at startup and printed with the
   console URL; a request without it gets a 401. The relay has no friend-code or contacts exchange:
   those are app data and never reach the console or the store.

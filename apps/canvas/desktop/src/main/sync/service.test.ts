@@ -550,7 +550,7 @@ describe("inviting someone in", () => {
     await expect(service.createInvite("editor")).rejects.toThrow();
   });
 
-  it("asks to join, and says it is waiting", async () => {
+  it("lets a legacy loopback invitation ask to join, and says it is waiting", async () => {
     const dataDir = await folder();
     const fake = fakeHost();
     const service = await createSyncService({
@@ -560,6 +560,8 @@ describe("inviting someone in", () => {
       webSocket: () => fake.socket,
     });
 
+    // No `e` envelope: the local demo still uses the old form, and loopback is the one place
+    // where that form cannot be redirected to somebody else's machine.
     const joining = service.join(
       `suite://join?h=ws%3A%2F%2F127.0.0.1%3A8787%2Fsync&w=${workspaceId}&i=${"b".repeat(64)}`,
     );
@@ -569,6 +571,17 @@ describe("inviting someone in", () => {
     expect(service.status()).toEqual({ state: "waiting" });
     const keyPackage = fake.sent.find((message) => message.type === "keypackage");
     expect(keyPackage).toMatchObject({ deviceId: expect.any(String), name: "the desktop" });
+  });
+
+  it("refuses a legacy invitation that would leave this machine", async () => {
+    const service = await createSyncService({ dataDir: await folder(), workspaceId });
+    await service.join(
+      `suite://join?h=${encodeURIComponent("ws://192.168.1.20:8787/sync")}&w=${workspaceId}&i=${"b".repeat(64)}`,
+    );
+
+    expect(service.status()).toMatchObject({ state: "refused" });
+    const status = service.status();
+    expect(status.state === "refused" ? status.reason : "").toMatch(/new signed invitation/u);
   });
 
   it("keeps waiting across a restart, because the invitation is already spent", async () => {
@@ -1109,6 +1122,17 @@ describe("the identity root of a new workspace", () => {
 });
 
 describe("pinning a relay certificate", () => {
+  it("refuses plaintext sync to another machine", async () => {
+    const service = await createSyncService({ dataDir: await folder(), workspaceId });
+
+    const status = await service.connect("ws://192.168.1.20:8787/sync");
+
+    expect(status).toMatchObject({ state: "refused" });
+    expect(status.state === "refused" ? status.reason : "").toMatch(
+      /only for a relay on this machine/u,
+    );
+  });
+
   it("refuses a wss relay until a fingerprint is entered", async () => {
     const service = await createSyncService({ dataDir: await folder(), workspaceId });
 

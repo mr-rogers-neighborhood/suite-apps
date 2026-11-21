@@ -161,6 +161,7 @@ export {
   relayErrorCodeSchema,
   relayHostMessageSchema,
 } from "./relay.js";
+export { isLoopbackRelayUrl } from "./relayAddress.js";
 export {
   createRelayClient,
   type RelayClient,

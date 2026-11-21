@@ -5,6 +5,7 @@ import { canonicalJson } from "./canonical.js";
 import { normaliseFingerprint } from "./fingerprint.js";
 import { isFriendCode } from "./friendCode.js";
 import { deviceIdSchema, inviteIdSchema, workspaceIdSchema } from "./ids.js";
+import { isLoopbackRelayUrl } from "./relayAddress.js";
 
 /**
  * An invitation that says who sent it, and carries the key to prove it.
@@ -37,9 +38,6 @@ const expiresAtSchema = z
     (value) => isoDateTime.test(value) && !Number.isNaN(Date.parse(value)),
     "expiresAt is an ISO-8601 timestamp",
   );
-
-/** The only hosts a plaintext `ws://` relay may name. */
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "[::1]", "localhost"]);
 
 export const friendInviteSchema = z
   .object({
@@ -149,7 +147,7 @@ export function verifyFriendInvite(
     return { ok: false, reason: "unpinned-relay" };
   }
   if (relay.protocol === "ws:") {
-    if (!LOOPBACK_HOSTS.has(relay.hostname.toLowerCase())) {
+    if (!isLoopbackRelayUrl(record.relay.url)) {
       return { ok: false, reason: "unpinned-relay" };
     }
     if (record.relay.fingerprint !== null) return { ok: false, reason: "unpinned-relay" };

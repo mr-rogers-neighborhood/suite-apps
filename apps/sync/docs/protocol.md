@@ -255,6 +255,11 @@ connects without a second certificate question; a known code with a different ke
 unknown code is refused with the code to add. Adding a contact is the explicit act. The relay sees
 only the invitation record it already understood.
 
+A link with no `e` is a legacy invitation. An app reads one only when its relay is loopback
+(`127.0.0.1`, `::1` or `localhost`); a remote legacy link is refused with a request for a new signed
+invitation, so deleting `e` cannot skip the signature, contact and pin checks. Plaintext `ws://` is
+likewise loopback-only in the apps; every other relay address must be `wss://` with a usable pin.
+
 The store is one append-only file per workspace for frames, and one each for roles, invites, pinned
 keys and removals. A frame file holds the sealed frame with the position the relay assigned, plus a
 header recording the next position so a compacted log does not move a client's cursor. There is no
