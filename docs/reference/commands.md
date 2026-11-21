@@ -57,6 +57,33 @@ The per-app gates do not run Playwright. The root gate runs Start's e2e suite af
 `xvfb-run` when there is no display; `--no-e2e` skips it. Other Playwright suites run when the owner
 asks for a run or names a milestone.
 
+## The factory profile
+
+`slopmaster.profile.json` at the root is the app set the Slopmaster factory and studio read. It
+mirrors `FactoryProfileSchema` in `slopmaster9000/packages/factory/src/profile.ts`: `v: 1`, the guest
+checkout, the apps, the toolchain enum, the gate, build and display argv objects, the release prefix
+and tier, and the environment allowlist.
+
+```sh
+mise exec -- node scripts/profile-check.mjs
+```
+
+`{app}` is the only placeholder. The gate is `node scripts/gate.mjs --only {app}` with `fresh: true`;
+the slop build is `node scripts/flatpak.mjs --app {app} --channel slop`; the display is
+`flatpak run run.suite.slop.{app}`. Each app's `slop_build_path` is `apps/<app>/slop`. A working
+change lands on `slop/<name>`; the `slop → canary → beta → stable` ladder stays with the app set and
+the profile carries only the slop tier.
+
+Only Canvas, Planner, Budget and Help can be queued: they are the apps with a Flatpak manifest and a
+`slop` identity. Start ships no `suite.app.json` and refuses a pre-release build, Go builds for
+Android, and Sync ships as a server tarball. Their gates still run at the root.
+
+The toolchain names what the factory image must provide: the pinned Node and pnpm, `git`, Docker for
+Canvas's gitleaks scan, Xvfb and the Electron GTK libraries for Start's e2e suite, the Flatpak
+builder, and Orca. `scripts/profile-check.mjs` enforces the schema and the Suite invariants and
+rejects a host path or a secret. It validates against a local JSON Schema only when one is supplied
+(`--schema` or `SLOPMASTER_PROFILE_SCHEMA`); no schema file is committed here.
+
 ## Signing keys
 
 ```sh

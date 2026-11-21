@@ -1,0 +1,70 @@
+{
+  "v": 1,
+  "id": "suite-apps",
+  "repo": {
+    "url": "https://github.com/mr-rogers-neighborhood/suite-apps",
+    "ref": "main",
+    "path": "/workspace/suite-apps"
+  },
+  "apps": [
+    {
+      "id": "canvas",
+      "path": "apps/canvas",
+      "manifest": "apps/canvas/package.json",
+      "slop_build_path": "apps/canvas/slop"
+    },
+    {
+      "id": "planner",
+      "path": "apps/planner",
+      "manifest": "apps/planner/package.json",
+      "slop_build_path": "apps/planner/slop"
+    },
+    {
+      "id": "budget",
+      "path": "apps/budget",
+      "manifest": "apps/budget/package.json",
+      "slop_build_path": "apps/budget/slop"
+    },
+    {
+      "id": "help",
+      "path": "apps/help",
+      "manifest": "apps/help/package.json",
+      "slop_build_path": "apps/help/slop"
+    }
+  ],
+  "toolchain": [
+    "git",
+    "node22",
+    "pnpm12",
+    "docker",
+    "xvfb",
+    "electron-gtk",
+    "flatpak-builder",
+    "orca"
+  ],
+  "gate": {
+    "command": ["node", "scripts/gate.mjs", "--only", "{app}"],
+    "fresh": true
+  },
+  "build": {
+    "command": ["node", "scripts/flatpak.mjs", "--app", "{app}", "--channel", "slop"]
+  },
+  "release": {
+    "branch_prefix": "slop/",
+    "tier": "slop"
+  },
+  "display": {
+    "command": ["flatpak", "run", "run.suite.slop.{app}"]
+  },
+  "env": [
+    "PATH",
+    "HOME",
+    "DISPLAY",
+    "WAYLAND_DISPLAY",
+    "XDG_RUNTIME_DIR",
+    "XDG_DATA_HOME",
+    "DBUS_SESSION_BUS_ADDRESS",
+    "SUITE_FLATPAK_REPO",
+    "SUITE_FLATPAK_XDG_DATA_HOME"
+  ]
+}
