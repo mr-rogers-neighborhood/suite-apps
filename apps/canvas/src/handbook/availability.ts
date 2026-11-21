@@ -12,7 +12,7 @@
  *     instead of gathering a selection and showing nothing. That fallback is why `false` is safe here: the
  *     command still works, it just answers in the older surface.
  *
- * The articles in `handbook/` are untouched and keep rendering into the docs site: they document the
+ * The articles in `handbook/` are untouched and keep shipping in the repository: they document the
  * interface, and documentation does not need the surface to be switched on.
  */
 export const handbookEnabled: boolean = false;
