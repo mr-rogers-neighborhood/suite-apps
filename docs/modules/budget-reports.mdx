@@ -11,7 +11,7 @@ components, the selected tab or the dashboard records; those live in the
 renderer. Every function is pure and rebuilds from the ledger, so a report total
 cannot outlive the data it came from.
 
-The shared rule is one ledger read per function and no stored totals. The tests
+The shared rule is no stored totals: each report series rebuilds from the ledger. The tests
 use a three-month budget with two income months, a refund, one uncategorized
 row, an internal transfer and a transfer out of the budget, which is enough to
 pin the distinctions the reports make: a refund reduces net spending, an

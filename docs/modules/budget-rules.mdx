@@ -18,7 +18,8 @@ throw. The draft carries names as well as ids because a person types a name, and
 the action writes the id the document stores.
 
 The failure modes are quiet by design. A disabled rule is removed before the
-walk; an unknown operator or flag falls back to a null value; a rule with no
+walk; an unknown operator is a non-match and an unknown flag falls back to a null
+value; a rule with no
 matching condition changes nothing. The outcome is not an error but an unchanged
 draft, which the caller can compare against its input.
 
@@ -50,7 +51,8 @@ this change" answerable.
 ## apps/budget/packages/core/src/rules/rank.ts#specificityScore
 
 Specificity is a number used only for ordering: the strongest operator in the
-rule (`is` and `isNot` 5, `oneOf` 4, `contains` 3, `matches` 2) times ten, plus
+rule (`is` and `isNot` 5, `oneOf` 4, `notOneOf` 4, `contains` 3,
+`doesNotContain` 3, `matches` 2) times ten, plus
 the number of conditions. A rule with one exact condition therefore outranks a
 broader rule with many loose ones, and a rule with more conditions outranks an
 otherwise equal one. The score is not a confidence and is never shown as one.

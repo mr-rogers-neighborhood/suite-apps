@@ -88,8 +88,8 @@ is not a `.budget` envelope.
 
 A CRDT map has no foreign keys, so a records file can parse and still point at a
 missing account, category, payee, parent, dashboard or transfer account. This
-function checks both directions: ids unique within each root, and every
-reference resolvable, with Ready to Assign allowed as a category. It returns
+function checks both directions: ids unique within each id-keyed root it checks,
+and every reference resolvable, with Ready to Assign allowed as a category. It returns
 messages rather than throwing, so a caller can show all the broken rows at once.
 
 ## apps/budget/packages/core/src/file/export.ts#transactionsToCsv

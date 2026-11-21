@@ -28,7 +28,7 @@ refused. The Budget core module holds the parser and formatter.
 
 ### overlay: No float ever reaches the document
 
-`parseFloat` and `toFixed` are banned outside the money file and its tests,
+`parseFloat` and `toFixed` are banned outside the money file and test files,
 which is why the rest of the app can add amounts without its own rounding rule.
 Formatting divides by the scale only at the display boundary; storage stays an
 integer.
