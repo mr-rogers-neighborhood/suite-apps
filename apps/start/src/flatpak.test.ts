@@ -185,7 +185,7 @@ describe("withFlatpakInstalls", () => {
     expect(merged.apps[0]?.manifest.version).toBe("0.1.0");
   });
 
-  it("keeps the copy Start or a person already installed", () => {
+  it("prefers the Flatpak deployment over a copy already installed", () => {
     const existing = discovered();
     const merged = withFlatpakInstalls(
       { apps: [existing], rejected: [] },
@@ -193,7 +193,22 @@ describe("withFlatpakInstalls", () => {
       [CANVAS],
       "/usr/bin/flatpak",
     );
-    expect(merged.apps).toEqual([existing]);
+    expect(merged.apps).toHaveLength(1);
+    expect(merged.apps[0]).toMatchObject({
+      executable: "/usr/bin/flatpak",
+      flatpak: { application: "run.suite.canvas" },
+    });
+    expect(merged.rejected).toEqual([
+      expect.objectContaining({ path: existing.manifestPath, id: "canvas" }),
+    ]);
+    expect(merged.rejected[0]?.reason).toContain("Flatpak");
+  });
+
+  it("does not add the same Flatpak deployment twice", () => {
+    const first = withFlatpakInstalls(empty, parseFlatpakList(LIST), [CANVAS], "/usr/bin/flatpak");
+    const second = withFlatpakInstalls(first, parseFlatpakList(LIST), [CANVAS], "/usr/bin/flatpak");
+    expect(second.apps).toHaveLength(1);
+    expect(second.rejected).toEqual([]);
   });
 
   it("skips a deployment that cannot say what version it is", () => {

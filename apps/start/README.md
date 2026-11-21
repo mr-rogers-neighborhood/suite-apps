@@ -121,8 +121,9 @@ the hub — it does not keep the apps to itself.
 and to delete: the card offers **Update** and **Uninstall**, and says **running** when the process Start
 started is still alive, asking before it closes and replaces it. A copy you placed is first-class but
 Start does not update it — the card offers Open, Reveal and Forget, never Uninstall, and its updates
-are yours to make. Two copies of one app is not a preference to offer: they share a profile and its
-single-instance lock, so only one can run.
+are yours to make. Two copies of one app share a profile and its single-instance lock, so only one can
+run. When discovery finds both an AppImage and a Flatpak deployment, the Flatpak is the one Start
+shows; the AppImage is listed as a duplicate to remove. A per-app switch is not built yet.
 
 **Install** is Start's own job. `catalogue.ts` names the three apps the suite offers and the feed each
 one declares, and asks every feed what version it has when the window opens or when you press _Check for

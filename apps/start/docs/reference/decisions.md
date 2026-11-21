@@ -35,7 +35,9 @@ The rules that shape Start.
   proxies or parses document bytes.
 - The manifest (`suite.app.json`) says what an app is. The install record (`installs.json`) is the
   only place an executable path lives. A manifest may not name a binary.
-- One copy per app. Two copies share a profile and its single-instance lock, so only one can run.
+- One copy per app. Two copies share a profile and its single-instance lock, so only one can run. When
+  discovery finds both an AppImage and a Flatpak deployment, the Flatpak is the app Start shows and
+  the AppImage is reported as a duplicate to remove. Choosing between them in the hub is not built.
 - Uninstalling an app removes versions, menu entry, icon and record. Documents are untouched.
 - `suite://<app>/workspace/<file name>` names a file, not an id. The hub routes it; the app resolves
   it against its own folder.

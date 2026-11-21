@@ -2,7 +2,12 @@ import { CONTRACT_VERSION, SUITE_PROTOCOL_PREFIX, type SuiteAppManifest } from "
 import type { CatalogueEntry } from "./catalogue.js";
 import { appIdFor, isPreReleaseId } from "./channels.js";
 import { type Host, SELF_FLATPAK_ID } from "./host.js";
-import type { DiscoveredApp, DiscoveryResult, FlatpakInstall } from "./registry.js";
+import type {
+  DiscoveredApp,
+  DiscoveryResult,
+  FlatpakInstall,
+  RejectedInstall,
+} from "./registry.js";
 
 /**
  * Flatpak as a second writer, and what Start may say about it.
@@ -167,13 +172,31 @@ export function withFlatpakInstalls(
   executable: string,
 ): DiscoveryResult {
   const apps: DiscoveredApp[] = [...result.apps];
+  const rejected: RejectedInstall[] = [...result.rejected];
 
   for (const entry of catalogue) {
-    if (apps.some((app) => app.manifest.id === entry.id)) continue;
     const install = suiteFlatpakFor(entry, installs);
     // A deployment with no version cannot answer "what is installed here", and a
     // card that guessed would be worse than a card that says nothing.
     if (install === null || install.version.length === 0) continue;
+
+    const existingIndex = apps.findIndex((app) => app.manifest.id === entry.id);
+    const existing = existingIndex === -1 ? undefined : apps[existingIndex];
+    if (existing?.flatpak !== undefined) continue;
+
+    if (existing !== undefined) {
+      // Flatpak is the default when both forms are installed. The local copy stays
+      // visible as a refusal so a person can remove it, rather than disappearing
+      // without an explanation. Two copies share one profile and its single-instance
+      // lock, so only one of them can be the app.
+      rejected.push({
+        path: existing.manifestPath.length > 0 ? existing.manifestPath : existing.executable,
+        reason:
+          "a Flatpak deployment of this app is preferred; remove this AppImage copy or the Flatpak to choose the other",
+        id: entry.id,
+      });
+      apps.splice(existingIndex, 1);
+    }
 
     apps.push({
       manifest: flatpakManifest(entry, install.version),
@@ -191,7 +214,7 @@ export function withFlatpakInstalls(
     });
   }
 
-  return { apps, rejected: result.rejected };
+  return { apps, rejected };
 }
 
 /** How Start starts a Flatpak: the CLI, then `run`, then the app's own arguments. */
