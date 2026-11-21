@@ -494,6 +494,9 @@ importers:
       '@suite/sync':
         specifier: workspace:*
         version: link:../../sync/packages/protocol
+      '@suite/sync-desktop':
+        specifier: workspace:*
+        version: link:../../../packages/sync-desktop
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -785,6 +788,9 @@ importers:
       '@suite/sync':
         specifier: workspace:*
         version: link:../sync/packages/protocol
+      '@suite/sync-desktop':
+        specifier: workspace:*
+        version: link:../../packages/sync-desktop
       '@suite/theme':
         specifier: workspace:*
         version: link:../../packages/theme

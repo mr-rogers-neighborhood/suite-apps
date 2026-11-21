@@ -27,6 +27,15 @@ export default defineConfig({
         },
       },
       {
+        // The desktop sync core Planner and Canvas share. It lives in its own package,
+        // and Planner's gate is where it runs: the package's consumers are the proof.
+        test: {
+          name: "sync-desktop",
+          environment: "node",
+          include: ["../../packages/sync-desktop/src/**/*.test.ts"],
+        },
+      },
+      {
         plugins: [react()],
         resolve: { alias: { "@suite/planner-core": core, "@renderer": renderer } },
         test: {

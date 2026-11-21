@@ -35,6 +35,7 @@
     "@suite/desktop": "workspace:*",
     "@suite/planner-core": "workspace:*",
     "@suite/sync": "workspace:*",
+    "@suite/sync-desktop": "workspace:*",
     "@suite/theme": "workspace:*",
     "@suite/ui": "workspace:*",
     "@tiptap/pm": "^3.34.0",

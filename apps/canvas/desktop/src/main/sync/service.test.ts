@@ -5,6 +5,7 @@ import {
   addDevice,
   createDeviceIdentity,
   createWorkspaceGroup,
+  type DeviceGroup,
   decodeKeyPackageBytes,
   deriveFriendCode,
   encodeBase64,
@@ -16,15 +17,22 @@ import {
   seal,
   verifyFriendInvite,
 } from "@suite/sync";
+import { createSyncStores } from "@suite/sync-desktop";
 import { describe, expect, it, vi } from "vitest";
-import { loadCursor } from "./cursorStore.js";
-import { loadGroup, saveGroup } from "./groupStore.js";
+
 import { loadOrCreateIdentity, verifyEd25519 } from "./identity.js";
-import { loadRelayConfig } from "./relayConfig.js";
 import { genesisChecksOut, readGenesis, readRootFile } from "./rootStore.js";
 import { createSyncService, type SyncStatus } from "./service.js";
 
 const workspaceId = "a".repeat(64);
+
+/** The shared store, rooted where this app keeps its files. */
+const storesFor = (dataDir: string, id: string) => createSyncStores({ dataDir, workspaceId: id });
+const loadGroup = (dataDir: string, id: string) => storesFor(dataDir, id).group.load();
+const saveGroup = (dataDir: string, id: string, group: DeviceGroup) =>
+  storesFor(dataDir, id).group.save(group);
+const loadCursor = (dataDir: string, id: string) => storesFor(dataDir, id).cursor.load();
+const loadRelayConfig = (dataDir: string, id: string) => storesFor(dataDir, id).relay.load();
 
 async function folder(): Promise<string> {
   return mkdtemp(join(tmpdir(), "suite-canvas-sync-"));
