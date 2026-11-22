@@ -5,7 +5,6 @@ import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/deskto
 import { SUITE_PACK_PUBLIC_KEY } from "@suite/pack/pinned-key";
 import { cssVariables, defaultTheme } from "@suite/theme";
 import { app, dialog, ipcMain, nativeTheme, net, protocol } from "electron";
-import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { DocumentStore } from "./documents.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
 import {
@@ -113,7 +112,8 @@ async function bootstrap(): Promise<void> {
 
   await refreshPacks();
   spaceStore = await SpaceStore.open(join(dataRoot, "spaces.loro"));
-  documents = new DocumentStore(join(dataRoot, "documents", DEFAULT_CONTAINER_ID));
+  // Documents are resolved under documents/<container>/<pack>.
+  documents = new DocumentStore(join(dataRoot, "documents"));
   // One store per (container, pack), created on first use. This is host data,
   // deliberately separate from the pack's code root.
   files = new PackFilesService(join(dataRoot, "files"));
@@ -237,24 +237,24 @@ function registerIpc(): void {
     // An empty list is a kinder fail-closed answer than `undefined` for the one
     // method whose contract is a list.
     if (!packAllows(sender.pack, "documents")) return [];
-    return documents?.list(sender.packId);
+    return documents?.list(sender.containerId, sender.packId);
   });
   onPack(PACK_IPC.createDocument, (sender, name) => {
     if (!packAllows(sender.pack, "documents") || typeof name !== "string") return undefined;
-    return documents?.create(sender.packId, name);
+    return documents?.create(sender.containerId, sender.packId, name);
   });
   onPack(PACK_IPC.openDocument, (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
-    return documents?.open(sender.packId, id);
+    return documents?.open(sender.containerId, sender.packId, id);
   });
   onPack(PACK_IPC.saveDocument, (sender, id, bytes) => {
     if (!packAllows(sender.pack, "documents")) return undefined;
     if (typeof id !== "string" || !(bytes instanceof Uint8Array)) return undefined;
-    return documents?.save(sender.packId, id, bytes);
+    return documents?.save(sender.containerId, sender.packId, id, bytes);
   });
   onPack(PACK_IPC.removeDocument, (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
-    return documents?.remove(sender.packId, id);
+    return documents?.remove(sender.containerId, sender.packId, id);
   });
 
   onPack(PACK_IPC.listFiles, (sender, path) => {

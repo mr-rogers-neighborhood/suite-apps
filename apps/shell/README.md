@@ -114,9 +114,10 @@ window.suite = {
 ```
 
 The document API requires the `documents` capability; without it, every document call returns
-nothing. `documents` is scoped by the sender's pack id. A document id is a name inside that pack's
-root; it is never a path. `save` writes bytes atomically. The host does not parse a document, so the
-pack owns its format. `welcome` stores a JSON note; `scratch` stores plain UTF-8 text.
+nothing. `documents` is scoped by the sender's container and pack id, so the same pack in two
+containers has two separate document roots. A document id is a name inside that pack's root; it is
+never a path. `save` writes bytes atomically. The host does not parse a document, so the pack owns
+its format. `welcome` stores a JSON note; `scratch` stores plain UTF-8 text.
 
 The `files` service requires the `files` capability. It is a separate root from `documents`, created
 lazily per `(container, pack)` at `files/<container>/<pack>` and never inside the pack's code

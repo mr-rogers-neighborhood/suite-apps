@@ -2,16 +2,18 @@ import { randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, sep } from "node:path";
+import { isSafeContainerId } from "./container.js";
 import { isSafePackId } from "./packs.js";
 import type { DocumentRecord, DocumentSummary } from "./shared.js";
 
 /**
  * The documents a pack owns, stored as bytes the shell never parses.
  *
- * The pack names a document; the host resolves it under that pack's own root and
- * nowhere else. There is no path in the API, so a pack cannot ask for another
- * pack's file, and a name with a slash or a `..` is refused before it reaches the
- * filesystem. This is the capability the blast-radius answer depends on.
+ * The pack names a document; the host resolves it under
+ * `<container>/<pack>` and nowhere else. There is no path in the API, so a pack
+ * cannot ask for another pack's file, and a name with a slash or a `..` is
+ * refused before it reaches the filesystem. This is the capability the
+ * blast-radius answer depends on.
  *
  * Errors are deliberately generic. A Node filesystem error carries an absolute
  * path, and the bridge would hand that path to a pack; the original error is
@@ -41,22 +43,23 @@ export class DocumentStore {
     this.#root = root;
   }
 
-  #packRoot(packId: string): string {
+  #packRoot(containerId: string, packId: string): string {
+    if (!isSafeContainerId(containerId)) throw new Error("invalid container id");
     if (!isSafePackId(packId)) throw new Error("invalid pack id");
-    return join(this.#root, packId);
+    return join(this.#root, containerId, packId);
   }
 
-  #path(packId: string, id: string): string {
+  #path(containerId: string, packId: string, id: string): string {
     if (!isSafeDocumentId(id)) throw new Error("invalid document name");
-    const directory = this.#packRoot(packId);
+    const directory = this.#packRoot(containerId, packId);
     const file = join(directory, id);
     const boundary = directory.endsWith(sep) ? directory : `${directory}${sep}`;
     if (!file.startsWith(boundary)) throw new Error("document is outside the pack");
     return file;
   }
 
-  async list(packId: string): Promise<readonly DocumentSummary[]> {
-    const directory = this.#packRoot(packId);
+  async list(containerId: string, packId: string): Promise<readonly DocumentSummary[]> {
+    const directory = this.#packRoot(containerId, packId);
     let entries: Dirent[];
     try {
       entries = await readdir(directory, { withFileTypes: true });
@@ -86,8 +89,8 @@ export class DocumentStore {
     return found.sort((left, right) => right.updatedAt - left.updatedAt);
   }
 
-  async create(packId: string, name: string): Promise<DocumentSummary> {
-    const file = this.#path(packId, name);
+  async create(containerId: string, packId: string, name: string): Promise<DocumentSummary> {
+    const file = this.#path(containerId, packId, name);
     try {
       await mkdir(dirname(file), { recursive: true });
       // `wx` refuses an existing file, so create cannot silently truncate a note
@@ -100,8 +103,8 @@ export class DocumentStore {
     }
   }
 
-  async open(packId: string, id: string): Promise<DocumentRecord | null> {
-    const file = this.#path(packId, id);
+  async open(containerId: string, packId: string, id: string): Promise<DocumentRecord | null> {
+    const file = this.#path(containerId, packId, id);
     try {
       const details = await lstat(file);
       if (!details.isFile()) throw new Error("document is not a regular file");
@@ -120,11 +123,16 @@ export class DocumentStore {
     }
   }
 
-  async save(packId: string, id: string, bytes: Uint8Array): Promise<DocumentSummary> {
+  async save(
+    containerId: string,
+    packId: string,
+    id: string,
+    bytes: Uint8Array,
+  ): Promise<DocumentSummary> {
     if (!(bytes instanceof Uint8Array)) throw new Error("a document is bytes");
     if (bytes.byteLength > MAX_DOCUMENT_BYTES) throw new Error("document is too large");
 
-    const file = this.#path(packId, id);
+    const file = this.#path(containerId, packId, id);
     const temporary = `${file}.tmp-${randomUUID()}`;
     try {
       const existing = await lstat(file).catch((error: unknown) => {
@@ -146,9 +154,9 @@ export class DocumentStore {
     }
   }
 
-  async remove(packId: string, id: string): Promise<void> {
+  async remove(containerId: string, packId: string, id: string): Promise<void> {
     try {
-      await rm(this.#path(packId, id), { force: true });
+      await rm(this.#path(containerId, packId, id), { force: true });
     } catch (error) {
       throw logged("document could not be removed", error);
     }
