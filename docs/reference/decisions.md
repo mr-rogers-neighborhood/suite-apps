@@ -162,47 +162,81 @@ suite stays separate Flatpaks plus Start.
 - Android ships as a debug-signed APK attached to the rolling release; there is no signing key or
   store channel yet.
 
-## Widgets and the dashboard
+## Widgets and Screens
 
-- A widget is host-rendered in phase 1: the app declares a descriptor, the host draws it with its own
-  components. No app bundle, script, style or document runs in the host. The white paper's widget is
-  a page a host mounts (§2.1.5, §3.1.5, §4.5); a host that never reads a document cannot mount that
-  page, so the contract is the declarative part the model implies.
-- The descriptor is `{ id, title, size, capabilities, action }`, in `suite.app.json` for desktop and
-  in a pack's `manifest.json` for Go, validated by `@suite/contracts`. `id` is app-local lower
-  kebab-case and the host registers it as `<app id>.<widget id>` — `planner.quick-task` — so an app
-  cannot claim a host id such as `start.apps`. `size` is one of `1x1`, `2x1`, `full`.
-- One action exists in phase 1: `capture`. Its fields are declared data — id, label, type (`text`,
-  `day`, `number`), whether it is required, a length ceiling — and the host renders inputs from them.
-  An unknown size, capability or action is refused when the manifest parses, not ignored.
-- A capture is typed. The host sends `{ widget, action: "capture", values }` with one string per
-  declared field; the app validates it against its own schema, writes through its own document layer
-  and answers `{ ok, message, open? }`. The host never reads or writes a document and never holds app
-  data. A malformed capture is refused with a sentence the host can show.
+- A widget is a host-rendered declaration: the app says what it is called, how big it may be, which
+  fields it takes and how one placement is configured. The host draws it with its own components.
+  No app bundle, script, style or document runs in the host. The white paper's widget is a page a
+  host mounts (§2.1.5, §3.1.5, §4.5); a host that never reads a document cannot mount that page, so
+  the contract is the declarative part the model implies.
+- There is one descriptor shape, used by Start and the desktop shell. It is
+  `{ id, title, size, capabilities, action, settings? }`, in `suite.app.json` for desktop and in a
+  pack's `manifest.json` for Go, validated by `@suite/contracts`. `id` is app-local lower kebab-case
+  and the host registers it as `<app id>.<widget id>` — `planner.quick-task` — so an app cannot
+  claim a host id. A host widget is the same shape under the host's own app id: `start.apps` and
+  `start.recents` are ordinary registry entries. `size` is one of `1x1`, `2x1`, `full`. Go reuses
+  this descriptor in its launcher and an Android home-screen widget is a native adapter over it; Go
+  does not get a second descriptor.
+- `settings` is a list of instance fields: `{ id, label, type, default?, required?, maxLength? }`,
+  using the same three types as a capture field (`text`, `day`, `number`). Every instance value is a
+  string, keyed by the field id. A widget without `settings` is unchanged and every manifest written
+  before settings existed stays valid. The contract version moved to 1.1.0 for the additive field,
+  so a manifest that uses settings declares 1.1.0 and a 1.0.0 host refuses the pair rather than
+  meeting a key it does not know.
+- One action exists in phase 1: `capture`. Its fields are declared data — id, label, type, whether
+  it is required, a length ceiling — and the host renders inputs from them. An unknown size,
+  capability or action is refused when the manifest parses, not ignored.
+- A capture is typed. The host sends `{ widget, action: "capture", values, settings }` with one
+  string per declared field and per declared setting; the app validates it against its own schema,
+  writes through its own document layer and answers `{ ok, message, open? }`. A setting the host
+  keeps but the descriptor does not declare stays on the Screen and is reported, never sent to an
+  app that cannot use it. The host never reads or writes an app document and never holds app data.
+  A malformed capture is refused with a sentence the host can show.
 - A widget opens the full app through the existing `suite://` link when the task needs more room. It
   never embeds a second instance of the app; capture is the only write path phase 1 adds.
-- The layout is the host's document: an ordered list of `{ id, size }` in a local file, per host and
-  device. Start keeps `dashboard.json` under its own config directory. It is not synced, not stored
-  in an app document and not owned by an app.
-- The layout carries a format and a version. A corrupt file, or one written by a version this build
-  does not read, falls back to the default with a visible note. An entry naming an id the host cannot
-  resolve is dropped with a note that names it; showing less than the file says, silently, is the
-  failure this rule exists to prevent.
-- The default layout is Start's app grid at `full`: the same cards, installs, channels and launches
-  as before. The grid is a host-owned widget, so the contract is exercised before any app depends on
-  it.
-- The registry is what this host build can draw: its own widgets plus the app widgets whose
-  action it implements and whose manifest parses. An app this build does not draw contributes no
-  widget, and its layout entry is the unknown-id case — dropped, named in the note, and left in the
-  file until the layout is next written.
-- Desktop first. Start proves the descriptor and the layout; Go then renders the same descriptors in
-  its launcher, and an Android home-screen widget is a native adapter over the same declaration, not
-  a third contract.
+- A **Screen** is the host's own Loro document, and `@suite/screens` owns its shape. It is
+  `{ format: "suite.screen", version: 1, id, name, widgets: [{ registryId, size, settings? }] }`.
+  The widget list is ordered; settings are the instance strings above. The schema is strict and
+  accepts no code, HTML, path, document bytes or app-data field; that refusal is the point. The
+  package carries no React, Electron, DOM or file IO: the host owns the path, the atomic write and
+  the backup, and the package only produces and reads snapshots.
+- **Home is a role**, not an app and not a fixed window. Start's dashboard becomes a Screen named
+  Home with id `start-home`; the shell's Home is the same role over the same descriptor table. A
+  Screen tab is an open surface beside app tabs: it belongs to the host chrome, not to a pack, and
+  no app can draw into it. A Screen can be opened from a tile, a launcher entry or an Android
+  home-screen widget, and Screens do not nest inline inside other Screens.
+- The Home manager is the host's, not an app's. It adds, removes, moves, resizes and configures
+  placements, with an inline edit mode for quick reorder, resize and add. The host-owned Screens
+  manager creates, renames, duplicates and deletes a Screen, sets Home, and imports or exports the
+  portable file. Start owns its manager in this slice; the shell owns its own later. Neither asks an
+  app to manage the layout, and there is no separate Suite Screens app.
+- A Screen owns order, size and placement. Every host renders the same composition responsively;
+  there is no per-device placement override in v1.
+- Unknown is visible. A registry id this build cannot resolve stays in the document and is drawn as
+  an unknown placement with a note naming it; an unknown setting stays on the instance and is
+  reported. Showing less than the Screen says, silently, is the failure this rule prevents.
+  Reinstalling or updating the app brings its widget and its settings back without the person
+  rebuilding the layout.
+- Migration keeps a backup. Start's current `dashboard.json` is `{ format: "suite.start.dashboard",
+  version: 1, widgets: [{ id, size }] }`; migration copies every entry in order, including an id this
+  build cannot resolve. A corrupt, empty or newer file is refused whole with a sentence the host
+  shows, and the old file is written aside before the Screen replaces it. A partial migration is not
+  allowed because the person cannot tell which half survived. Go's current home is its default Home
+  Screen when Go adopts the contract; this slice migrates Start only.
+- The Screen is local to this host and device in this slice. A portable `.screen` file, import and
+  export, and sync are later; the document format is designed not to block them, but none of them
+  ships here. The Screen is not stored in an app document and is not owned by an app.
+- The registry is what this host build can draw: its own widgets plus the app widgets whose action it
+  implements and whose manifest parses. One descriptor shape means Start and the shell register the
+  same app declaration, and a host that does not draw a widget leaves its entry in the unknown case.
 - Composite layout is constrained: a row or carousel groups widgets under the same size classes. It
   is not a page builder and cannot place content outside the grid.
-- Rejected: a general page builder; arbitrary app code, scripts or HTML in the host; synced or
-  app-owned layouts; host-held app data or a host-side document cache; a descriptor that needs the
-  app running to render; a widget bundle as a second packaging format.
+- The name is **Screen**, not View, Board or Space. The Home Screen is the one named Home, and
+  Screens are the set a person manages.
+- Rejected: a general page builder; arbitrary app code, scripts or HTML in the host; a Screen owned
+  by an app; synced or app-owned layouts in this slice; host-held app data or a host-side document
+  cache; a descriptor that needs the app running to render; a widget bundle as a second packaging
+  format; a second descriptor for Go.
 
 ## Product boundary
 

@@ -54,6 +54,53 @@ export declare const suiteWidgetFieldSchema: z.ZodObject<{
 }, z.core.$strict>;
 export type SuiteWidgetField = z.infer<typeof suiteWidgetFieldSchema>;
 /**
+ * One instance setting a widget declares.
+ *
+ * A setting is descriptor data, not a capture value: it says how this placement of the
+ * widget is configured, and it lives on the host's Screen beside the size. The shape is
+ * deliberately the same three field types as a capture field, with one addition: a
+ * `default` the host applies when the Screen has no value saved yet.
+ */
+export declare const suiteWidgetSettingSchema: z.ZodObject<{
+    id: z.ZodString;
+    label: z.ZodString;
+    type: z.ZodEnum<{
+        number: "number";
+        text: "text";
+        day: "day";
+    }>;
+    default: z.ZodOptional<z.ZodString>;
+    required: z.ZodDefault<z.ZodBoolean>;
+    maxLength: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strict>;
+export type SuiteWidgetSetting = z.infer<typeof suiteWidgetSettingSchema>;
+/**
+ * The settings a widget declares, with no duplicate keys.
+ *
+ * Optional on the descriptor: a widget without settings is exactly what every manifest
+ * written before settings existed contains, and it stays valid.
+ */
+export declare const suiteWidgetSettingsSchema: z.ZodArray<z.ZodObject<{
+    id: z.ZodString;
+    label: z.ZodString;
+    type: z.ZodEnum<{
+        number: "number";
+        text: "text";
+        day: "day";
+    }>;
+    default: z.ZodOptional<z.ZodString>;
+    required: z.ZodDefault<z.ZodBoolean>;
+    maxLength: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strict>>;
+/**
+ * Why one instance value does not fit its declared setting, or null when it does.
+ *
+ * Shared by the descriptor (a default must fit its own field) and by a capture parser,
+ * so a host and an app cannot disagree about what `number` or `day` means. Values stay
+ * strings: the app parses the value it receives into its own type.
+ */
+export declare function widgetSettingValueProblem(setting: Pick<SuiteWidgetSetting, "type" | "maxLength">, value: string): string | null;
+/**
  * The one action phase 1 defines.
  *
  * `fields` is the whole form. The host draws it with its own components, so the app
@@ -125,6 +172,18 @@ export declare const suiteWidgetSchema: z.ZodObject<{
             maxLength: z.ZodOptional<z.ZodNumber>;
         }, z.core.$strict>>;
     }, z.core.$strict>], "kind">;
+    settings: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        label: z.ZodString;
+        type: z.ZodEnum<{
+            number: "number";
+            text: "text";
+            day: "day";
+        }>;
+        default: z.ZodOptional<z.ZodString>;
+        required: z.ZodDefault<z.ZodBoolean>;
+        maxLength: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strict>>>;
 }, z.core.$strict>;
 export type SuiteWidget = z.infer<typeof suiteWidgetSchema>;
 export declare const suiteWidgetsSchema: z.ZodArray<z.ZodObject<{
@@ -153,6 +212,18 @@ export declare const suiteWidgetsSchema: z.ZodArray<z.ZodObject<{
             maxLength: z.ZodOptional<z.ZodNumber>;
         }, z.core.$strict>>;
     }, z.core.$strict>], "kind">;
+    settings: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        label: z.ZodString;
+        type: z.ZodEnum<{
+            number: "number";
+            text: "text";
+            day: "day";
+        }>;
+        default: z.ZodOptional<z.ZodString>;
+        required: z.ZodDefault<z.ZodBoolean>;
+        maxLength: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strict>>>;
 }, z.core.$strict>>;
 /** The id a layout names a widget by: `<app id>.<widget id>`. */
 export declare function widgetRegistryId(appId: string, widgetId: string): string;
@@ -171,13 +242,19 @@ export declare function splitWidgetRegistryId(value: string): {
  *
  * `values` is keyed by declared field id and every value is a string: the host draws a
  * text input, a date input and a number input, and an app that needs a number parses it
- * itself rather than trusting a shape it did not write. The app named in the request is
- * the one that owns the widget; the host never sends a document.
+ * itself rather than trusting a shape it did not write. `settings` is the same rule for
+ * the instance: the host applies the descriptor's defaults and sends one string per
+ * declared setting, so the app can tell two placements of one widget apart.
+ *
+ * Both records default to empty, so a capture from a host that predates settings still
+ * parses. The app named in the request is the one that owns the widget; the host never
+ * sends a document.
  */
 export declare const suiteWidgetCaptureSchema: z.ZodObject<{
     widget: z.ZodString;
     action: z.ZodLiteral<"capture">;
     values: z.ZodRecord<z.ZodString, z.ZodString>;
+    settings: z.ZodDefault<z.ZodRecord<z.ZodString, z.ZodString>>;
 }, z.core.$strict>;
 export type SuiteWidgetCapture = z.infer<typeof suiteWidgetCaptureSchema>;
 /**
@@ -201,12 +278,15 @@ export declare function parseWidgetCaptureResult(value: unknown): ContractParse<
  * Validate a capture against the widget that declared it.
  *
  * Called by the app receiving the capture, beside its own document schema. The contract
- * can check the shape the host promised — the widget id, the declared fields, what is
- * required, the length ceiling — but it cannot know what the values mean, and it does
- * not try: `day` is still a string the app parses into its own date type.
+ * can check the shape the host promised — the widget id, the declared fields and
+ * settings, what is required, the length ceiling, the setting's type — but it cannot
+ * know what the values mean, and it does not try: `day` is still a string the app parses
+ * into its own date type.
  *
  * Every issue is reported, so a person sees all three problems at once rather than one
  * per submission.
  */
-export declare function parseWidgetCapture(value: unknown, widget: Pick<SuiteWidget, "id" | "action">): ContractParse<SuiteWidgetCapture>;
+export declare function parseWidgetCapture(value: unknown, widget: Pick<SuiteWidget, "id" | "action"> & {
+    readonly settings?: readonly SuiteWidgetSetting[] | undefined;
+}): ContractParse<SuiteWidgetCapture>;
 //# sourceMappingURL=widgets.d.ts.map

@@ -82,6 +82,105 @@ export const suiteWidgetFieldSchema = z
 export type SuiteWidgetField = z.infer<typeof suiteWidgetFieldSchema>;
 
 /**
+ * One instance setting a widget declares.
+ *
+ * A setting is descriptor data, not a capture value: it says how this placement of the
+ * widget is configured, and it lives on the host's Screen beside the size. The shape is
+ * deliberately the same three field types as a capture field, with one addition: a
+ * `default` the host applies when the Screen has no value saved yet.
+ */
+export const suiteWidgetSettingSchema = z
+  .object({
+    /** The key this setting carries on the Screen and in a capture. */
+    id: suiteWidgetIdSchema,
+    label: z.string().min(1).max(64),
+    type: suiteWidgetFieldTypeSchema,
+    /** The value a Screen gets when it has not saved one. A string, like every instance value. */
+    default: z.string().min(1).max(500).optional(),
+    required: z.boolean().default(false),
+    /** A ceiling the host enforces while typing. Text settings only. */
+    maxLength: z.number().int().min(1).max(500).optional(),
+  })
+  .strict()
+  .superRefine((setting, context) => {
+    if (setting.maxLength !== undefined && setting.type !== "text") {
+      context.addIssue({
+        code: "custom",
+        path: ["maxLength"],
+        message: "only a text setting has a length ceiling",
+      });
+    }
+    if (setting.default !== undefined) {
+      const problem = widgetSettingValueProblem(setting, setting.default);
+      if (problem !== null) {
+        context.addIssue({ code: "custom", path: ["default"], message: problem });
+      }
+    }
+  });
+
+export type SuiteWidgetSetting = z.infer<typeof suiteWidgetSettingSchema>;
+
+/**
+ * The settings a widget declares, with no duplicate keys.
+ *
+ * Optional on the descriptor: a widget without settings is exactly what every manifest
+ * written before settings existed contains, and it stays valid.
+ */
+export const suiteWidgetSettingsSchema = z
+  .array(suiteWidgetSettingSchema)
+  .max(8)
+  .superRefine((settings, context) => {
+    const seen = new Set<string>();
+    settings.forEach((setting, index) => {
+      if (seen.has(setting.id)) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "id"],
+          message: `duplicate setting ${setting.id}`,
+        });
+        return;
+      }
+      seen.add(setting.id);
+    });
+  });
+
+function isCalendarDay(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
+  if (!match) return false;
+  const [, year, month, day] = match;
+  if (year === undefined || month === undefined || day === undefined) return false;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  return (
+    date.getUTCFullYear() === Number(year) &&
+    date.getUTCMonth() === Number(month) - 1 &&
+    date.getUTCDate() === Number(day)
+  );
+}
+
+/**
+ * Why one instance value does not fit its declared setting, or null when it does.
+ *
+ * Shared by the descriptor (a default must fit its own field) and by a capture parser,
+ * so a host and an app cannot disagree about what `number` or `day` means. Values stay
+ * strings: the app parses the value it receives into its own type.
+ */
+export function widgetSettingValueProblem(
+  setting: Pick<SuiteWidgetSetting, "type" | "maxLength">,
+  value: string,
+): string | null {
+  if (setting.type === "number" && !/^-?\d+$/u.test(value)) return "expected a whole number";
+  if (setting.type === "day" && !isCalendarDay(value)) return "expected a date as YYYY-MM-DD";
+  if (
+    setting.type === "text" &&
+    setting.maxLength !== undefined &&
+    value.length > setting.maxLength
+  ) {
+    return `at most ${setting.maxLength} characters`;
+  }
+  return null;
+}
+
+/**
  * The one action phase 1 defines.
  *
  * `fields` is the whole form. The host draws it with its own components, so the app
@@ -133,6 +232,8 @@ export const suiteWidgetSchema = z
     size: suiteWidgetSizeSchema,
     capabilities: z.array(suiteWidgetCapabilitySchema).max(8),
     action: suiteWidgetActionSchema,
+    /** How one placement is configured. Absent means the widget declares no settings. */
+    settings: suiteWidgetSettingsSchema.optional(),
   })
   .strict()
   .superRefine((widget, context) => {
@@ -192,14 +293,20 @@ export function splitWidgetRegistryId(
  *
  * `values` is keyed by declared field id and every value is a string: the host draws a
  * text input, a date input and a number input, and an app that needs a number parses it
- * itself rather than trusting a shape it did not write. The app named in the request is
- * the one that owns the widget; the host never sends a document.
+ * itself rather than trusting a shape it did not write. `settings` is the same rule for
+ * the instance: the host applies the descriptor's defaults and sends one string per
+ * declared setting, so the app can tell two placements of one widget apart.
+ *
+ * Both records default to empty, so a capture from a host that predates settings still
+ * parses. The app named in the request is the one that owns the widget; the host never
+ * sends a document.
  */
 export const suiteWidgetCaptureSchema = z
   .object({
     widget: suiteWidgetIdSchema,
     action: z.literal("capture"),
     values: z.record(suiteWidgetIdSchema, z.string().max(500)),
+    settings: z.record(suiteWidgetIdSchema, z.string().max(500)).default({}),
   })
   .strict();
 
@@ -238,16 +345,19 @@ export function parseWidgetCaptureResult(value: unknown): ContractParse<SuiteWid
  * Validate a capture against the widget that declared it.
  *
  * Called by the app receiving the capture, beside its own document schema. The contract
- * can check the shape the host promised — the widget id, the declared fields, what is
- * required, the length ceiling — but it cannot know what the values mean, and it does
- * not try: `day` is still a string the app parses into its own date type.
+ * can check the shape the host promised — the widget id, the declared fields and
+ * settings, what is required, the length ceiling, the setting's type — but it cannot
+ * know what the values mean, and it does not try: `day` is still a string the app parses
+ * into its own date type.
  *
  * Every issue is reported, so a person sees all three problems at once rather than one
  * per submission.
  */
 export function parseWidgetCapture(
   value: unknown,
-  widget: Pick<SuiteWidget, "id" | "action">,
+  widget: Pick<SuiteWidget, "id" | "action"> & {
+    readonly settings?: readonly SuiteWidgetSetting[] | undefined;
+  },
 ): ContractParse<SuiteWidgetCapture> {
   const base = parseWith(suiteWidgetCaptureSchema, value);
   if (!base.ok) return base;
@@ -285,6 +395,33 @@ export function parseWidgetCapture(
         path: `values.${field.id}`,
         message: `at most ${field.maxLength} characters`,
       });
+    }
+  }
+
+  const declaredSettings = new Map((widget.settings ?? []).map((setting) => [setting.id, setting]));
+  for (const key of Object.keys(capture.settings)) {
+    if (!declaredSettings.has(key)) {
+      issues.push({ path: `settings.${key}`, message: "not a declared setting" });
+    }
+  }
+
+  for (const setting of declaredSettings.values()) {
+    const value = capture.settings[setting.id];
+    if (value === undefined) {
+      if (setting.required && setting.default === undefined) {
+        issues.push({ path: `settings.${setting.id}`, message: "required" });
+      }
+      continue;
+    }
+    if (value.trim().length === 0) {
+      if (setting.required) {
+        issues.push({ path: `settings.${setting.id}`, message: "required" });
+      }
+      continue;
+    }
+    const problem = widgetSettingValueProblem(setting, value);
+    if (problem !== null) {
+      issues.push({ path: `settings.${setting.id}`, message: problem });
     }
   }
 

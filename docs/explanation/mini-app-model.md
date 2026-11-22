@@ -56,8 +56,8 @@ standard; the white paper documents the capability tiers in its security and pri
 - **A widget is a descriptor, not a page.** The white paper has the host load a widget page over a URI
   and pass data in query parameters, so the widget shares the app's data access. Suite's host never
   reads a document, so the app declares fields and a typed capture action, the host renders them, and
-  the app writes through its own document layer. [Widgets and the
-  dashboard](../reference/decisions.md#widgets-and-the-dashboard) owns that contract.
+  the app writes through its own document layer. [Widgets and
+  Screens](../reference/decisions.md#widgets-and-screens) owns that contract.
 - **No per-pack origin on mobile.** The Go container serves packs from one origin, so isolation is a
   document boundary rather than a browser origin boundary.
 - **Suspend and destroy are not separated yet.** Leaving a module disposes it. WeChat keeps a

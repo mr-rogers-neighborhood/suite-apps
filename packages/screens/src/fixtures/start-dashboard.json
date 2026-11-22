@@ -1,0 +1,9 @@
+{
+  "format": "suite.start.dashboard",
+  "version": 1,
+  "widgets": [
+    { "id": "start.apps", "size": "full" },
+    { "id": "start.recents", "size": "2x1" },
+    { "id": "planner.quick-task", "size": "1x1" }
+  ]
+}

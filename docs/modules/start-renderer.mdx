@@ -17,7 +17,7 @@ answers those questions and this directory renders the answer.
 The dashboard is painted here too: one widget shell per resolved entry, with the
 app grid's cards inside the `start.apps` one. The layout file, the registered ids
 and the fallback note all arrive in `LauncherState`; the rule for those ids lives
-in [Widgets and the dashboard](../reference/decisions.md#widgets-and-the-dashboard).
+in [Widgets and Screens](../reference/decisions.md#widgets-and-screens).
 
 The seam is the preload bridge. `globalThis.suiteStart` exposes `listApps`,
 actions and broadcasts; the page treats it as read-only input and re-reads

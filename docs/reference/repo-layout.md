@@ -14,7 +14,7 @@ apps/
   sync/         @suite/sync-server; packages/protocol, packages/host; deploy, docs
   go/           @suite/go-app mobile container; packages/go contract; docs
   shell/        @suite/shell host spike: one window, sandboxed packs, space document
-packages/       contracts, files, document-runtime, desktop, theme, ui,
+packages/       contracts, files, document-runtime, screens, desktop, theme, ui,
                 pack, pack-runtime, pack-host
 docs/           Cross-cutting documentation
 packaging/      Flatpak manifests
@@ -54,6 +54,7 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/contracts` | `packages/contracts` | Shared app and deployment contracts |
 | `@suite/files` | `packages/files` | Shared file envelopes |
 | `@suite/document-runtime` | `packages/document-runtime` | Shared document replica and atomic store |
+| `@suite/screens` | `packages/screens` | Shared Screens contract: `suite.screen` shape, Loro document, widget registry and Start's dashboard migration |
 | `@suite/desktop` | `packages/desktop` | Shared Electron policy |
 | `@suite/theme` | `packages/theme` | Shared theme variables |
 | `@suite/ui` | `packages/ui` | Shared chrome |
@@ -65,8 +66,8 @@ owns the overrides, patches and build permissions the apps need.
 
 An app's private packages stay with it: `apps/canvas/packages/graph` is Canvas's, even though it is a
 workspace package. Only `@suite/contracts`, `@suite/files`, `@suite/document-runtime`,
-`@suite/desktop`, `@suite/theme`, `@suite/ui`, `@suite/pack`, `@suite/pack-runtime` and
-`@suite/pack-host` are shared; they live at the root.
+`@suite/screens`, `@suite/desktop`, `@suite/theme`, `@suite/ui`, `@suite/pack`,
+`@suite/pack-runtime` and `@suite/pack-host` are shared; they live at the root.
 
 ## Two names that look alike
 

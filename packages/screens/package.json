@@ -1,0 +1,71 @@
+{
+  "name": "@suite/screens",
+  "version": "0.1.0",
+  "description": "The shared Screens contract: the suite.screen v1 shape, its Loro document, the host-side widget registry and Start's dashboard migration. No React, Electron, DOM or file IO.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./document": {
+      "types": "./dist/document.d.ts",
+      "development": "./src/document.ts",
+      "import": "./dist/document.js",
+      "default": "./dist/document.js"
+    },
+    "./fixture": {
+      "types": "./dist/fixture.d.ts",
+      "development": "./src/fixture.ts",
+      "import": "./dist/fixture.js",
+      "default": "./dist/fixture.js"
+    },
+    "./migrate": {
+      "types": "./dist/migrate.d.ts",
+      "development": "./src/migrate.ts",
+      "import": "./dist/migrate.js",
+      "default": "./dist/migrate.js"
+    },
+    "./registry": {
+      "types": "./dist/registry.d.ts",
+      "development": "./src/registry.ts",
+      "import": "./dist/registry.js",
+      "default": "./dist/registry.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-fixtures.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "check": "biome check . && tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@suite/contracts": "workspace:*",
+    "loro-crdt": "^1.17.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "typescript": "~5.9.3",
+    "vitest": "5.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mr-rogers-neighborhood/suite-apps.git",
+    "directory": "packages/screens"
+  },
+  "author": {
+    "name": "Suite contributors",
+    "email": "maintainers@suite.run"
+  },
+  "license": "MIT"
+}
