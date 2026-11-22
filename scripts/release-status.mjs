@@ -74,6 +74,16 @@ export const NOTES_DIR = ".dev/releases";
  */
 export const APPS = [
   {
+    id: "shell",
+    name: "Suite",
+    packageJson: "apps/shell/package.json",
+    changelog: "apps/shell/CHANGELOG.md",
+    tagPrefix: "shell-v",
+    kind: "flatpak",
+    section: "desktop",
+    flatpakId: "run.suite.shell",
+  },
+  {
     id: "start",
     name: "Suite Start",
     packageJson: "apps/start/package.json",
