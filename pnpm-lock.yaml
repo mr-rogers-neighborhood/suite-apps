@@ -669,6 +669,9 @@ importers:
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
+      '@suite/contracts':
+        specifier: workspace:*
+        version: link:../../../../packages/contracts
     devDependencies:
       '@types/react':
         specifier: ^19.3.0

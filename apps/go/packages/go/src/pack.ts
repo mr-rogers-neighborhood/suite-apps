@@ -21,6 +21,7 @@
  */
 import { hashes, verify as nobleVerify } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
+import { type SuiteWidget, suiteWidgetsSchema } from "@suite/contracts/widgets";
 import { isSuiteGoModuleId } from "./module.js";
 
 /**
@@ -111,6 +112,14 @@ export interface PackManifestCore {
   /** What it may ask the host for. Empty means it may render and nothing else. */
   readonly capabilities: readonly PackCapability[];
   readonly files: readonly PackFile[];
+  /**
+   * The host surfaces the pack offers, under the same contract a desktop app declares.
+   *
+   * Optional in the core because it is additive: a manifest written before widgets
+   * carries no key, and the canonical bytes are unchanged when it is empty, so an
+   * existing signature still verifies.
+   */
+  readonly widgets?: readonly SuiteWidget[];
 }
 
 export interface PackManifest extends PackManifestCore {
@@ -254,6 +263,21 @@ export function parsePackManifest(value: unknown): PackParse {
     }
   }
 
+  // The widgets a pack declares are the same descriptors a desktop app puts in
+  // `suite.app.json`, validated by the same contract, so a host renders both without a
+  // second shape. Empty is the ordinary case and is left out of the canonical bytes.
+  const widgets: SuiteWidget[] = [];
+  if (raw.widgets !== undefined) {
+    const parsed = suiteWidgetsSchema.safeParse(raw.widgets);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        fail(`widgets.${issue.path.map(String).join(".")}`, issue.message);
+      }
+    } else {
+      widgets.push(...parsed.data);
+    }
+  }
+
   // The entry has to match the mode: an isolated pack owns a page, a shared pack is a module
   // imported into one. Getting this wrong produces a blank frame or an import of an HTML
   // file, neither of which names the mistake.
@@ -282,6 +306,7 @@ export function parsePackManifest(value: unknown): PackParse {
       isolation,
       capabilities,
       files,
+      ...(widgets.length > 0 ? { widgets } : {}),
       signature,
     },
   };
@@ -311,6 +336,11 @@ export function canonicalManifestBytes(manifest: PackManifestCore): Uint8Array {
       sha256: file.sha256,
       bytes: file.bytes,
     })),
+    // Added last and omitted when empty, so the bytes of a manifest written before
+    // widgets are byte-identical and its signature still verifies.
+    ...(manifest.widgets !== undefined && manifest.widgets.length > 0
+      ? { widgets: manifest.widgets }
+      : {}),
   };
   return new TextEncoder().encode(JSON.stringify(canonical));
 }

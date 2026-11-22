@@ -33,6 +33,12 @@ contextBridge.exposeInMainWorld("suiteStart", {
   // it. The app's tray keeps the relay and shows its own address and fingerprint.
   installSync: () => ipcRenderer.invoke("suite:start:sync-install"),
   openSync: () => ipcRenderer.invoke("suite:start:sync-open"),
+  // The dashboard is Start's own layout: an id and a direction or size class cross
+  // the bridge, never a path. Main writes the file and broadcasts the new layout.
+  moveWidget: (id, direction) => ipcRenderer.invoke("suite:start:dashboard-move", id, direction),
+  setWidgetSize: (id, size) => ipcRenderer.invoke("suite:start:dashboard-size", id, size),
+  addWidget: (id) => ipcRenderer.invoke("suite:start:dashboard-add", id),
+  removeWidget: (id) => ipcRenderer.invoke("suite:start:dashboard-remove", id),
   // The window outlives no page load, so the listener is never removed.
   onChanged: (listener) => {
     ipcRenderer.on("suite:start:changed", (_event, state) => listener(state));

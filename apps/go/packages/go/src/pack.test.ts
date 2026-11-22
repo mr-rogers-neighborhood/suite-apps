@@ -1,3 +1,4 @@
+import type { SuiteWidget } from "@suite/contracts/widgets";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   bytesToBase64,
@@ -55,6 +56,21 @@ beforeEach(async () => {
   publicKeyBase64 = bytesToBase64(new Uint8Array(raw));
 });
 
+/** One declared capture widget, complete enough to pass the contract. */
+function widget(): SuiteWidget {
+  return {
+    id: "quick-task",
+    title: "New task",
+    size: "2x1",
+    capabilities: ["capture"],
+    action: {
+      kind: "capture",
+      submitLabel: "Add task",
+      fields: [{ id: "title", label: "Task", type: "text", required: true }],
+    },
+  };
+}
+
 describe("isSafePackPath", () => {
   it.each(["index.js", "assets/app.js", "assets/fonts/a.woff2"])("accepts %s", (path) => {
     expect(isSafePackPath(path)).toBe(true);
@@ -106,6 +122,40 @@ describe("parsePackManifest", () => {
     const { signature: _drop, ...unsigned } = await makeManifest();
     expect(unsigned).toBeDefined();
     expect(parsePackManifest(unsigned).ok).toBe(false);
+  });
+
+  it("accepts a widget descriptor and keeps a manifest without one unchanged", async () => {
+    const without = parsePackManifest(await makeManifest());
+    expect(without.ok).toBe(true);
+    if (!without.ok) return;
+    expect(without.value.widgets).toBeUndefined();
+
+    const withWidget = parsePackManifest(await makeManifest({ widgets: [widget()] }));
+    expect(withWidget.ok).toBe(true);
+    if (!withWidget.ok) return;
+    expect(withWidget.value.widgets?.[0]?.id).toBe("quick-task");
+  });
+
+  it("refuses a widget with an unknown size class", async () => {
+    const parsed = parsePackManifest(
+      await makeManifest({
+        // @ts-expect-error the parser must refuse this even though the type says no.
+        widgets: [{ ...widget(), size: "3x1" }],
+      }),
+    );
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.issues.some((issue) => issue.path.startsWith("widgets."))).toBe(true);
+  });
+
+  it("covers a declared widget with the signature", async () => {
+    const declared = widget();
+    const manifest = await makeManifest({ widgets: [declared] });
+    const escalated: PackManifest = {
+      ...manifest,
+      widgets: [{ ...declared, title: "Something else" }],
+    };
+    expect(await verifyPackSignature(escalated, publicKeyBase64)).toBe(false);
   });
 });
 

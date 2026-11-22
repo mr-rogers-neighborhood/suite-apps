@@ -1,4 +1,4 @@
-import type { SuiteReleaseChannel } from "@suite/contracts";
+import type { SuiteReleaseChannel, SuiteWidgetSize } from "@suite/contracts";
 
 /**
  * What the hub window asks the main process for.
@@ -25,6 +25,10 @@ export const START_IPC = {
   installSync: "suite:start:sync-install",
   openSync: "suite:start:sync-open",
   info: "suite:start:info",
+  moveWidget: "suite:start:dashboard-move",
+  sizeWidget: "suite:start:dashboard-size",
+  addWidget: "suite:start:dashboard-add",
+  removeWidget: "suite:start:dashboard-remove",
 } as const;
 
 /** Pushed rather than invoked: the window redraws from what arrives here. */
@@ -220,12 +224,51 @@ export interface StartSettings {
   readonly theme: ResolvedTheme;
 }
 
+/** Which way a move control takes one widget. */
+export type DashboardMoveDirection = "earlier" | "later";
+
+/** The body a widget's renderer draws. Host widgets only, in phase 1. */
+export type DashboardWidgetKind = "apps" | "recents";
+
+/**
+ * One widget, already resolved against the layout.
+ *
+ * Main does the joining: the layout names ids and sizes, the registry supplies the title,
+ * the size classes it honours and which renderer draws it. The page therefore never sees
+ * an unknown id, and never decides what a widget is — only where it sits and what the one
+ * renderer for its kind paints.
+ */
+export interface DashboardWidget {
+  /** The registry id, `<app id>.<widget id>`. */
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly kind: DashboardWidgetKind;
+  readonly size: SuiteWidgetSize;
+  /** Every class this widget offers, in the order the picker shows them. */
+  readonly sizes: readonly SuiteWidgetSize[];
+}
+
+/** The dashboard the page draws: the resolved widgets, what can be added, and the note. */
+export interface DashboardState {
+  readonly widgets: readonly DashboardWidget[];
+  /** Widgets the registry knows but this layout does not show yet. */
+  readonly available: readonly DashboardWidget[];
+  /**
+   * Why the file was not honoured, when it was not: a corrupt layout, a newer version,
+   * or an id nothing on this machine provides. `null` on an ordinary launch.
+   */
+  readonly note: string | null;
+}
+
 export interface LauncherState {
   readonly apps: readonly AppCard[];
   readonly recents: readonly RecentCard[];
   readonly files: readonly FileCard[];
   readonly settings: StartSettings;
   readonly version: string;
+  /** The home screen: one widget per layout entry, in the order the file says. */
+  readonly dashboard: DashboardState;
   /** The relay this machine runs, and what it is holding. */
   readonly sync: SyncState;
   /** Installs running right now, so a window that opens mid-install still sees the bar. */

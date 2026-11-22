@@ -14,6 +14,11 @@ rail and the keyboard model around them. It deliberately does not decide whether
 an app is installed, whether an update verifies, or what to execute. Main
 answers those questions and this directory renders the answer.
 
+The dashboard is painted here too: one widget shell per resolved entry, with the
+app grid's cards inside the `start.apps` one. The layout file, the registered ids
+and the fallback note all arrive in `LauncherState`; the rule for those ids lives
+in [Widgets and the dashboard](../reference/decisions.md#widgets-and-the-dashboard).
+
 The seam is the preload bridge. `globalThis.suiteStart` exposes `listApps`,
 actions and broadcasts; the page treats it as read-only input and re-reads
 after every action rather than predicting the result. A boundary test keeps
@@ -55,3 +60,14 @@ selected tab is in the tab order.
 
 Keeping selection and focus in one place is what lets the Cmd/Ctrl+1..4 shortcut
 and a pointer click agree on which pane is showing.
+
+## apps/start/src/renderer/dashboard.js#renderDashboard
+
+The page draws one shell per resolved widget, in the file's order, at the file's size
+class. It never decides which widget exists: main sends the title, the classes it offers
+and the note that explains a dropped entry.
+
+Reorder is a pair of move buttons and a size picker per widget, not drag-only. Both are
+reachable by pointer and keyboard, name the widget and its position, and disable at the
+ends. `renderApps` runs after this and fills the lists inside the app-grid shell, so the
+cards, installs and launches are the same code they were before the dashboard existed.

@@ -156,6 +156,7 @@ export function flatpakManifest(entry: CatalogueEntry, version: string): SuiteAp
     fileExtensions: [...entry.extensions],
     protocols: [],
     capabilities: [...entry.capabilities],
+    widgets: [],
   };
 }
 

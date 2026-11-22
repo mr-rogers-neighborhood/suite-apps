@@ -99,6 +99,19 @@ export function hubLockPath(paths: HostPaths): string {
   return join(startStateRoot(paths), "hub.lock");
 }
 
+/** The dashboard layout's file name, under Start's own state directory. */
+export const DASHBOARD_FILENAME = "dashboard.json";
+
+/**
+ * The dashboard layout: this host's, this device's.
+ *
+ * Beside the install registry rather than in a document folder, because it is the host's
+ * own arrangement and no app may read or own it.
+ */
+export function dashboardPath(paths: HostPaths): string {
+  return join(startStateRoot(paths), DASHBOARD_FILENAME);
+}
+
 /**
  * The pre-release documents root: `<home>/Documents/Suite Slop`.
  *

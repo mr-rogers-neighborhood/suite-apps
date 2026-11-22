@@ -75,6 +75,7 @@ function discovered(): DiscoveredApp {
       fileExtensions: ["canvas"],
       protocols: [],
       capabilities: ["document.file"],
+      widgets: [],
     },
     manifestPath: "/home/me/Applications/Suite/Canvas/0.1.0/suite.app.json",
     executable: "/home/me/Applications/Suite/Canvas/0.1.0/suite-canvas",

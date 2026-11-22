@@ -7,6 +7,7 @@
  * It renders what the main process reports and nothing else.
  */
 import { renderApps } from "./apps.js";
+import { renderDashboard } from "./dashboard.js";
 import { renderFiles } from "./files.js";
 import { installRail } from "./rail.js";
 import { renderSettings } from "./settings.js";
@@ -32,6 +33,28 @@ const actions = {
   },
   async remove(id) {
     await bridge.removeApp(id);
+    await refresh();
+  },
+  /**
+   * The dashboard's edits.
+   *
+   * Each one names an id and a choice; main owns the file and answers by broadcasting the
+   * layout it now has, so the page redraws from the result rather than from a guess.
+   */
+  async moveWidget(id, direction) {
+    await bridge.moveWidget(id, direction);
+    await refresh();
+  },
+  async resizeWidget(id, size) {
+    await bridge.setWidgetSize(id, size);
+    await refresh();
+  },
+  async addWidget(id) {
+    await bridge.addWidget(id);
+    await refresh();
+  },
+  async removeWidget(id) {
+    await bridge.removeWidget(id);
     await refresh();
   },
   async uninstall(id) {
@@ -123,6 +146,9 @@ function applyTheme(theme) {
 
 function render(state) {
   lastState = state;
+  // The dashboard first: the app grid is a widget, and `renderApps` fills the lists the
+  // widget shell creates.
+  renderDashboard(state, actions);
   renderApps(visibleApps(state), actions);
   renderFiles(state, actions);
   renderSettings(state, actions);
@@ -175,6 +201,13 @@ if (typeof bridge !== "object" || bridge === null) {
   document.getElementById("add").addEventListener("click", async () => {
     await bridge.addApp();
     await refresh();
+  });
+
+  // Adding a widget is a picker and one button rather than a second dashboard surface.
+  document.getElementById("widget-add")?.addEventListener("click", async () => {
+    const picker = document.getElementById("widget-picker");
+    if (!picker || picker.value.length === 0) return;
+    await actions.addWidget(picker.value);
   });
 
   // On demand: one request per app that names a feed, and nothing on a timer.
