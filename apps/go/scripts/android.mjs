@@ -13,10 +13,13 @@
  *   install                  build, install, launch once
  *   watch                    install, then reinstall on every save
  *   emulator [--start NAME]  list AVDs, or boot one and wait for it
+ *   release                  build a release-signed APK for a channel
  *
  * Flags:
  *   --device <serial>        pick a target when more than one is attached
  *   --skip-build             install the APK already on disk
+ *   --channel <name>         release: stable (default), slop, nightly or preview
+ *   --publish                release: upload it to the rolling release
  */
 import { spawn } from "node:child_process";
 import { existsSync, watch } from "node:fs";
@@ -30,7 +33,20 @@ const { appId } = appConfig;
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 const ROOT = join(APP_DIR, "..", "..");
 const ANDROID_DIR = join(APP_DIR, "android");
-const APK = join(ANDROID_DIR, "app", "build", "outputs", "apk", "debug", "app-debug.apk");
+// The dev loop installs the stable flavor. A flavor has no plain `debug` output, so the variant's
+// directory is part of the path. This is a debug signature: it updates this machine's debug install
+// and nothing else. A release-signed build is a different signer, so moving between the two means
+// uninstalling one of them.
+const APK = join(
+  ANDROID_DIR,
+  "app",
+  "build",
+  "outputs",
+  "apk",
+  "stable",
+  "debug",
+  "app-stable-debug.apk",
+);
 /** Where a change means the bundle is stale. Everything else in `apps/go` is config or native. */
 const WATCHED = [
   join(APP_DIR, "src"),
@@ -240,42 +256,18 @@ function versionArgs() {
 }
 
 /**
- * Build a *release* APK, signed with a key that is not in this repository.
+ * Build a *release* APK through the one release implementation.
  *
- * Deliberately a different command from `install`: a debug build is what you iterate with, and a
- * release build is a promise to a person that this is the app. The four values come from the
- * environment, and a missing one is refused before Gradle produces an unsigned artifact that looks
- * finished.
+ * The key, the channel rule, the artifact name and the certificate check live in
+ * `scripts/android-release.mjs`, so this command delegates rather than repeating them with a
+ * second Gradle invocation. A debug build stays the iteration path; this is the artifact a person
+ * installs.
  */
 async function release(options) {
-  const missing = [
-    "SUITE_GO_KEYSTORE",
-    "SUITE_GO_KEYSTORE_PASSWORD",
-    "SUITE_GO_KEY_ALIAS",
-    "SUITE_GO_KEY_PASSWORD",
-  ].filter((name) => !process.env[name]);
-  if (missing.length > 0) {
-    fail(
-      `A release APK needs a signing key, and ${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} not set.`,
-      "Create one with `keytool -genkeypair -v -keystore suite-go.jks -alias suite-go -keyalg RSA -keysize 4096 -validity 10000`,\n" +
-        "export the four variables above, and keep the keystore out of this repository.",
-    );
-    return false;
-  }
-
-  await command("pnpm", ["--filter", "@suite/go-app", "build"]);
-  await command("pnpm", ["exec", "cap", "sync", "android"], { cwd: APP_DIR });
-  await commandTee("./gradlew", ["assembleRelease", ...versionArgs(), "-q"], { cwd: ANDROID_DIR });
-
-  const apk = join(ANDROID_DIR, "app", "build", "outputs", "apk", "release", "app-release.apk");
-  if (!existsSync(apk)) {
-    fail(`Gradle reported success but ${apk} is missing.`, "Check the Gradle output above.");
-    return false;
-  }
-  console.log(`\n${GREEN}release APK${RESET} ${apk} (${appConfig.appName} ${appConfig.version})`);
-  if (options.publish !== true) {
-    console.log(`${DIM}Nothing was uploaded. The artifact is on disk and nothing else.${RESET}`);
-  }
+  const args = [join(ROOT, "scripts", "android-release.mjs")];
+  if (options.channel) args.push("--channel", options.channel);
+  if (options.publish) args.push("--publish");
+  await command(process.execPath, args);
   return true;
 }
 
@@ -301,7 +293,9 @@ async function buildAndInstall(device, skipBuild = false) {
   if (!skipBuild) {
     await command("pnpm", ["--filter", "@suite/go-app", "build"]);
     await command("pnpm", ["exec", "cap", "sync", "android"], { cwd: APP_DIR });
-    await commandTee("./gradlew", ["assembleDebug", ...versionArgs(), "-q"], { cwd: ANDROID_DIR });
+    await commandTee("./gradlew", ["assembleStableDebug", ...versionArgs(), "-q"], {
+      cwd: ANDROID_DIR,
+    });
   }
 
   if (!existsSync(APK)) {
@@ -531,12 +525,20 @@ async function devicesCommand() {
 }
 
 function parseArgs(argv) {
-  const options = { device: undefined, skipBuild: false, start: undefined };
+  const options = {
+    device: undefined,
+    skipBuild: false,
+    start: undefined,
+    channel: undefined,
+    publish: false,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--device") options.device = argv[index + 1];
     else if (arg === "--skip-build") options.skipBuild = true;
     else if (arg === "--start") options.start = argv[index + 1];
+    else if (arg === "--channel") options.channel = argv[index + 1];
+    else if (arg === "--publish") options.publish = true;
   }
   return options;
 }

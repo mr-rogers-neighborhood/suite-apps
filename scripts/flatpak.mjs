@@ -12,10 +12,18 @@
  *   node scripts/flatpak.mjs --app start     # Start (the hub) stable, same path
  *   node scripts/flatpak.mjs --app help      # Help stable, same path
  *   node scripts/flatpak.mjs --app sync      # Sync (the tray relay) stable, same path
- *   node scripts/flatpak.mjs --app shell     # Suite (the host) stable, same path
+ *   node scripts/flatpak.mjs --app shell     # Suite Shell (the host) stable, same path
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
- *   node scripts/flatpak.mjs --app planner --channel slop
+ *   node scripts/flatpak.mjs --app shell --channel slop
  *                                            # pre-release id on the slop branch
+ *   node scripts/flatpak.mjs --app shell --channel nightly
+ *                                            # the host pre-release id on nightly
+ *   node scripts/flatpak.mjs --app shell --channel nightly --dry-run
+ *                                            # write the generated files and print
+ *                                            # the identity; no build or install
+ *   node scripts/flatpak.mjs --app planner --channel slop --session
+ *                                            # the factory's local session build of
+ *                                            # a frozen legacy app; never published
  *
  * The repository lives outside the checkout, at ~/suite-flatpak/repo, and is
  * added as the user remote `suite-local`. When scripts/store-key.sh has made a
@@ -23,18 +31,22 @@
  * remote is added with --no-gpg-verify for local testing only.
  *
  * A pre-release is generated from the stable manifest beside it: the id is
- * `run.suite.slop.<app>`, the branch is the tier, the display name names the
- * tier, and the desktop entry registers no MIME type and no scheme handler.
+ * `run.suite.slop.<app>`, the branch is the channel, the display name names the
+ * channel, and the desktop entry registers no MIME type and no scheme handler.
+ * Other apps keep the `suite.app.json` pre-release manifest; the Shell has no
+ * such file, so it rewrites its stable manifest to the pre-release id instead
+ * and lets the pre-release Flatpak sandbox keep its data apart from stable.
  * The stable flow reads the committed manifest and is otherwise unchanged.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   branchFor,
   channelProblem,
+  channelProblemForApp,
   desktopEntry,
   displayName,
   flatpakId,
@@ -44,6 +56,7 @@ import {
   preReleaseMetainfo,
   channelRecord,
 } from "./lib/channel.mjs";
+import { shellDataRoot, shellPreReleaseManifest } from "./lib/shellChannel.mjs";
 import { STATIC_DELTA_ARGUMENTS } from "./lib/flatpakRemote.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -154,11 +167,21 @@ const appName = argumentValue(argv, "--app") ?? "canvas";
 const channel = argumentValue(argv, "--channel") ?? "stable";
 const build = !argv.includes("--no-build");
 const install = !argv.includes("--no-install");
+// The factory's slop build is a session channel, not a release: it may build a
+// frozen legacy app, but it builds into the local repository and is never
+// published. Naming the flag keeps that exception explicit.
+const session = argv.includes("--session");
 
 const channelMiss = channelProblem(channel);
 if (channelMiss !== null) {
   process.stderr.write(`${channelMiss}\n`);
   process.exit(2);
+}
+
+const frozenMiss = channelProblemForApp(appName, channel, { session });
+if (frozenMiss !== null) {
+  process.stderr.write(`${frozenMiss}\n`);
+  process.exit(1);
 }
 
 const app = APPS[appName];
@@ -167,12 +190,18 @@ if (!app) {
   process.exit(2);
 }
 
-// The hub ships no suite.app.json, so it has no pre-release app identity to
+if (session && isPreRelease(channel)) {
+  process.stdout.write(
+    `${appName}: session build on ${channel}; it is local and is never published.\n`,
+  );
+}
+
+// Start ships no suite.app.json, so it has no pre-release app identity to
 // generate. Refuse before a package build or a manifest is written. Sync is the
-// same: it is a server that happens to have a tray, and a tier would be a second
-// mailbox on the same data. The host is the same too: it ships no suite.app.json,
-// so there is no tier identity to give it.
-const noPreRelease = { start: "Suite Start", sync: "Suite Sync", shell: "Suite" };
+// same: it is a server that happens to have a tray, and a channel would be a
+// second mailbox on the same data. The Shell does have a channel: it rewrites
+// its own manifest rather than reading suite.app.json, so it is not listed here.
+const noPreRelease = { start: "Suite Start", sync: "Suite Sync" };
 if (Object.hasOwn(noPreRelease, appName) && isPreRelease(channel)) {
   process.stderr.write(
     `${noPreRelease[appName]} has no pre-release identity: it ships no suite.app.json\n`,
@@ -184,6 +213,7 @@ const id = flatpakId(appName, channel);
 const branch = branchFor(channel);
 const preRelease = isPreRelease(channel);
 const name = displayName(app.name, channel);
+const dryRun = argv.includes("--dry-run");
 const stateDir = join(homedir(), "suite-flatpak");
 const repo = process.env.SUITE_FLATPAK_REPO ?? join(stateDir, "repo");
 const buildDir = join(ROOT, "packaging", "flatpak", ".build", id);
@@ -196,6 +226,30 @@ const publicKeyPath = join(stateDir, "suite-store.gpg");
 const keyId =
   process.env.SUITE_STORE_KEY_ID?.trim() ||
   (existsSync(keyIdPath) ? readFileSync(keyIdPath, "utf8").trim() : "");
+
+// A dry run previews the identity and writes the generated pre-release files,
+// but never packages, builds, touches the signing key or installs. Exit before
+// the key check so a preview works on a machine with no key and no
+// flatpak-builder.
+if (dryRun) {
+  if (!existsSync(app.manifest)) {
+    process.stderr.write(`missing ${app.manifest}; Flatpak needs the stable manifest\n`);
+    process.exit(1);
+  }
+  const manifestPath = preRelease ? generatePreReleaseManifest() : app.manifest;
+  process.stdout.write(`${name} · ${id}${preRelease ? ` on branch ${branch}` : " (stable)"}\n`);
+  process.stdout.write(`manifest · ${manifestPath}\n`);
+  if (preRelease) {
+    process.stdout.write(`desktop · ${join(sourceDir, `${id}.desktop`)}\n`);
+    process.stdout.write(`metainfo · ${join(sourceDir, `${id}.metainfo.xml`)}\n`);
+    process.stdout.write(`launcher · ${join(sourceDir, id)}\n`);
+  }
+  // The Shell has no shared Documents folder; its data is the sandbox keyed by
+  // the id, and the pre-release id is what keeps stable and pre-release apart.
+  if (appName === "shell") process.stdout.write(`data · ${shellDataRoot(channel)}\n`);
+  process.stdout.write("dry run: no build, no repository write, no install\n");
+  process.exit(0);
+}
 
 /**
  * A fingerprint whose key is gone fails deep inside flatpak-builder with a GPG
@@ -252,14 +306,80 @@ function desktopField(text, key) {
 }
 
 /**
+ * Write the Shell pre-release files and its rewritten manifest.
+ *
+ * The desktop entry, metainfo, launcher and icon names all carry the
+ * pre-release id. The icons are the stable PNGs copied under the new name, so
+ * the rewritten manifest's install lines find them without a second icon
+ * source. The stable manifest's build steps, asar desktop-name patch and
+ * narrow grants are preserved by `shellPreReleaseManifest`.
+ */
+function generateShellPreReleaseManifest() {
+  mkdirSync(sourceDir, { recursive: true });
+
+  const stableDesktop = readFileSync(app.desktop, "utf8");
+  const desktop = desktopEntry({
+    id,
+    name,
+    comment: desktopField(stableDesktop, "Comment"),
+    categories: desktopField(stableDesktop, "Categories") || "Utility;",
+    startupClass: id,
+  });
+  writeFileSync(join(sourceDir, `${id}.desktop`), desktop);
+
+  // The stable metainfo names the stable icon next to the id and launchable the
+  // shared helper already rewrites. Point the icon at the pre-release id too.
+  const metainfo = preReleaseMetainfo(readFileSync(app.metainfo, "utf8"), {
+    stableId: app.id,
+    id,
+    name,
+  }).replace(
+    `<icon type="stock">${app.id}</icon>`,
+    `<icon type="stock">${id}</icon>`,
+  );
+  writeFileSync(join(sourceDir, `${id}.metainfo.xml`), metainfo);
+
+  writeFileSync(
+    join(sourceDir, id),
+    launcherScript({ id, folder: app.folder, binary: app.binary }),
+    { mode: 0o755 },
+  );
+
+  const icons = join(sourceDir, "icons");
+  mkdirSync(icons, { recursive: true });
+  for (const size of [48, 64, 128, 256, 512]) {
+    copyFileSync(
+      join(ROOT, "packaging", "flatpak", "icons", `${app.id}-${size}.png`),
+      join(icons, `${id}-${size}.png`),
+    );
+  }
+
+  const manifest = shellPreReleaseManifest(readFileSync(app.manifest, "utf8"), {
+    id,
+    channel,
+    stableId: app.id,
+    unpacked: app.unpacked,
+  });
+  const manifestPath = join(sourceDir, `${id}.yml`);
+  writeFileSync(manifestPath, manifest);
+  return manifestPath;
+}
+
+/**
  * Write the pre-release manifest and the files it packages.
  *
  * The stable manifest supplies the runtime, finish arguments and module shape;
  * only the identity, branch, desktop entry, channels and the tier documents
  * folder differ. Keeping the grants in one place means a permission decided for
  * stable is not silently different for a tier.
+ *
+ * Shell takes the other branch: it ships no suite.app.json, and its data is the
+ * Flatpak sandbox rather than a Documents folder, so the generated manifest is
+ * the stable Shell manifest rewritten to the pre-release id.
  */
 function generatePreReleaseManifest() {
+  if (appName === "shell") return generateShellPreReleaseManifest();
+
   const stableManifest = readFileSync(app.manifest, "utf8");
   const finishStart = stableManifest.indexOf("finish-args:");
   const modulesStart = stableManifest.indexOf("modules:");

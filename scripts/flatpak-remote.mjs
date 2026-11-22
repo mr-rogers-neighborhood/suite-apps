@@ -37,7 +37,7 @@
  *   node scripts/flatpak-remote.mjs --publish             # sign and copy to suite-dev
  *   node scripts/flatpak-remote.mjs --target s3           # dry run: every aws command
  *   node scripts/flatpak-remote.mjs --target s3 --publish # upload and invalidate
- *   node scripts/flatpak-remote.mjs --channel beta        # dry run for a tier branch
+ *   node scripts/flatpak-remote.mjs --channel preview     # dry run for a pre-release branch
  *   node scripts/flatpak-remote.mjs --help
  */
 import { spawnSync } from "node:child_process";
@@ -92,8 +92,8 @@ const USAGE = `usage: node scripts/flatpak-remote.mjs [options]
   --publish           sign the summary and publish (default: dry run)
   --dry-run           stop before signing, uploading or copying; the default
   --target <place>    lan (local test host) or s3 (public store); default: ${DEFAULT_TARGET}
-  --branch <name>     branch a tier publishes (default: the tier, or stable)
-  --channel <tier>    slop, canary or beta; the same as --branch <tier>
+  --branch <name>     branch a pre-release channel publishes (default: the channel, or stable)
+  --channel <name>    slop, nightly or preview; the same as --branch <name>
   --host <name>       ssh host for the lan target (default: ${DEFAULT_HOST})
   --url <url>         base URL (default: ${DEFAULT_REMOTE_URL} for lan,
                       ${DEFAULT_PUBLIC_URL} for s3)
@@ -494,7 +494,7 @@ async function main() {
 
   const { keyId, publicKey } = storeKey();
   const { refs, appRefs, branches } = repositoryRefs();
-  // Stable stays the default branch, so adding a tier does not change what a
+  // Stable stays the default branch, so adding a channel does not change what a
   // plain `flatpak install suite run.suite.<app>` resolves to. A future repo
   // that names stable `stable` wins over the current `master`.
   const defaultBranch = branches.includes("stable") ? "stable" : DEFAULT_BRANCH;
@@ -504,7 +504,7 @@ async function main() {
     throw new Error(
       `the repository has no app refs on branch ${branch} ` +
         `(it has: ${branches.length > 0 ? branches.join(", ") : "none"}). ` +
-        "A tier branch is published by `node scripts/flatpak.mjs --channel <tier>`.",
+        "A pre-release branch is published by `node scripts/flatpak.mjs --channel <channel>`.",
     );
   }
 

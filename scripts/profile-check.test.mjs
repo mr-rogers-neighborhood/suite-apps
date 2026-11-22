@@ -50,7 +50,15 @@ describe("the Suite app-set profile", () => {
   it("names the real gate, build and display invocations", () => {
     assert.deepEqual(profile().gate, { command: GATE_COMMAND, fresh: true });
     assert.deepEqual(profile().build, {
-      command: ["node", "scripts/flatpak.mjs", "--app", "{app}", "--channel", "slop"],
+      command: [
+        "node",
+        "scripts/flatpak.mjs",
+        "--app",
+        "{app}",
+        "--channel",
+        "slop",
+        "--session",
+      ],
     });
     assert.deepEqual(profile().display, { command: DISPLAY_COMMAND });
   });
@@ -153,7 +161,7 @@ describe("the profile check mirrors FactoryProfileSchema", () => {
 
   it("refuses a shell string in place of argv", () => {
     const value = copy();
-    value.build.command = "node scripts/flatpak.mjs --app {app} --channel slop";
+    value.build.command = "node scripts/flatpak.mjs --app {app} --channel slop --session";
     assert.match(failures(value).join("\n"), /non-empty argv array/u);
   });
 

@@ -33,14 +33,14 @@ node scripts/flatpak-remote.mjs --publish             # sign, verify and copy to
 The publish refuses a dirty tree or a HEAD the gate has not proven. It copies the repository the
 local flow built; it never builds a second one.
 
-A pre-release is a branch, not a second app:
+Canvas is frozen as a legacy mini-app: no new `slop`, `nightly` or `preview` build is published, and
+the last stable ref stays installable. The builder refuses a pre-release unless `--session` names a
+factory session build, which is local and never published:
 
 ```sh
-node scripts/flatpak.mjs --app canvas --channel slop
-node scripts/flatpak-remote.mjs --channel slop --publish
+node scripts/flatpak.mjs --app canvas --channel slop --session
 ```
 
-The stable id stays `run.suite.canvas`; the pre-release is `run.suite.slop.canvas` on branch `slop`,
-`canary` or `beta`. There is no AppImage, update feed or Arch package.
+There is no AppImage, update feed or Arch package.
 [Packaging channels](../../../../docs/reference/packaging-channels.md) owns the remote, the store key
 and the pre-release rules.

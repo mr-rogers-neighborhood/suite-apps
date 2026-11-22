@@ -4,6 +4,13 @@
 #
 #   pnpm --filter @suite/shell run package:dir
 #   node scripts/flatpak.mjs --app shell
+#   node scripts/flatpak.mjs --app shell --channel nightly
+#
+# The stable manifest is the only hand-written one. A pre-release rewrites it to
+# `run.suite.slop.shell`: the id names the desktop entry, metainfo, icon and
+# launcher, and the branch (slop, nightly or preview) carries the channel. The
+# grants and build steps below are shared, so a permission decided for stable is
+# not silently wider in a pre-release.
 #
 # The manifest packages what electron-builder produced rather than rebuilding it
 # inside flatpak-builder. The renderer and the shell are built by the same gate

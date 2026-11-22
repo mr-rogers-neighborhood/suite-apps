@@ -6,7 +6,7 @@ One task at a time: the steps for a job you already know you need to do.
 
 | Article | What it covers | Updated |
 | --- | --- | --- |
-| [Release](release.md) | A Canvas release is a Flatpak deployment on the signed OSTree remote, built from a commit the gate has proven. Canvas is one app in a suite, and each… | 2026-11-21 |
+| [Release](release.md) | A Canvas release is a Flatpak deployment on the signed OSTree remote, built from a commit the gate has proven. Canvas is one app in a suite, and each… | 2026-11-22 |
 | [Publish a copy of the source](publish.md) | The repository is public, so this page is not a step anybody has to take today. It is the runbook for the other direction: you have a fork, a private… | 2026-11-21 |
 | [Run the desktop app](run-the-desktop-app.md) | The Canvas desktop application is one renderer in a shell that owns a file. This page is the loop for working on it. It assumes a checkout and pnpm in… | 2026-11-20 |
 | [Add a feature](add-a-feature.md) | The data flow fixes the order: the document package owns the shape, the workspace document owns the write, the snapshot store owns the read, and the c… | 2026-11-20 |

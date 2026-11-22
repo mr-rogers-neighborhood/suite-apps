@@ -62,25 +62,33 @@ in a stack trace whose useful sentence is twenty lines in.
 
 ## Install the APK
 
-Suite Go ships as a **debug-signed APK** attached to the rolling Suite release. It is what you
-sideload and what the owner tests; there is no Play Store build and no release signing key yet.
+Suite Go ships as a **release-signed APK** attached to the rolling Suite release, in the same four
+channels as the desktop superapp: `stable`, `slop`, `nightly` and `preview`. It is what you sideload
+and what the owner tests; there is no Play Store build.
 
 ```sh
-mise exec -- node scripts/android-release.mjs            # build, name and checksum it
-mise exec -- node scripts/android-release.mjs --publish  # attach it to the rolling release
+mise exec -- node scripts/android-release.mjs                 # stable
+mise exec -- node scripts/android-release.mjs --channel slop  # slop, nightly or preview
+mise exec -- node scripts/android-release.mjs --publish       # attach it to the rolling release
 adb install -r -t apps/go/.dev/release/suite-go-<version>.apk
 ```
 
-"Debug-signed" means the build uses this machine's `~/.android/debug.keystore`. That signature is
-specific to the machine that built it, so an APK from another machine cannot update this one: run
-`adb uninstall run.suite.go` once, then install. The build is debuggable, which is why it is a
-sideload artifact and not a store one.
+A release build is signed by the key at `~/.config/suite/keys/suite-go-release.jks`, never by
+`~/.android/debug.keystore`. `pnpm android:key status` says whether the key in hand is the one the
+tree pins, and the build refuses any other certificate before it names or uploads the APK, so a
+debug-signed artifact cannot become the public one.
 
-`pnpm android:install` stays the dev loop; `scripts/android-release.mjs` is the release copy that
-names and checksums the artifact for download. The rolling release also carries the same bytes as
+Stable is `run.suite.go`. Every pre-release is `run.suite.slop.go`, so stable and one pre-release
+install side by side; a pre-release asset is `suite-go-<channel>-<version>.apk`, and moving from slop
+to nightly replaces the pre-release rather than adding a third install. The rolling release also
+carries stable as
 [suite-go.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/latest/download/suite-go.apk),
-so that URL always names the newest debug build; `suite-go-<version>.apk` remains canonical.
-[Android notes](docs/reference/android.md) cover the device and the toolchain.
+so that URL always names the newest stable build; `suite-go-<version>.apk` remains canonical.
+
+`pnpm android:install` stays the dev loop: it builds a debug APK signed by this machine's debug
+keystore. That is a different signature from the release key, so installing a debug build over a
+release build means uninstalling one of them first. [Android notes](docs/reference/android.md) cover
+the channels, the `versionCode` rule, the keystore and the device.
 
 ## Packages
 

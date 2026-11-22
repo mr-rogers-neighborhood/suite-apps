@@ -47,7 +47,7 @@
     "fresh": true
   },
   "build": {
-    "command": ["node", "scripts/flatpak.mjs", "--app", "{app}", "--channel", "slop"]
+    "command": ["node", "scripts/flatpak.mjs", "--app", "{app}", "--channel", "slop", "--session"]
   },
   "release": {
     "branch_prefix": "slop/",
