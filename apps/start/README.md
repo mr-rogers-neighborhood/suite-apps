@@ -14,11 +14,13 @@ replaces one itself. Everything below describes the code rather than the downloa
 
 ## What exists
 
-- **Built:** the shared packages (`@suite/contracts`, `@suite/files`), the Electron launcher shell with
-  discovery, install, routing and the Suite Help card, the Sync tab's deployment states for the
-  `run.suite.sync` Flatpak, and the invite/join flow in the apps' Sync dialogs.
+- **Built:** the shared packages (`@suite/contracts`, `@suite/files`, `@suite/screens`), the Electron
+  launcher shell with discovery, install, routing and the Suite Help card, the Sync tab's deployment
+  states for the `run.suite.sync` Flatpak, the invite/join flow in the apps' Sync dialogs, and Start's
+  Home Screen with its inline edit and host-owned Screens manager.
 - **Later:** person keys and the shared sync protocol's remaining surface. There is no hosted web app,
-  control plane or relay; sync is a server the user runs.
+  control plane or relay; sync is a server the user runs. Widget capture into an app, a portable
+  `.screen` file and Screen sync are later slices.
 
 Changes, in a person's words rather than commits: [CHANGELOG.md](CHANGELOG.md).
 Where accessibility stands, and what is checked by hand: [ACCESSIBILITY.md](ACCESSIBILITY.md).
@@ -38,6 +40,34 @@ frames. Start is not a contact book either: friend codes and contacts live in th
 A relay may run on this machine or another. Either way the tray app owns it, and a device joins with
 an invitation, a relay code, or the address and fingerprint the app shows.
 
+## Home Screen
+
+Start's Home is a **Screen**, the shared `suite.screen` v1 document from `@suite/screens`, rendered
+natively by the hub. It is the host's own document: it names which widgets are placed, at what size
+and with which instance settings, and carries no app data, HTML, script or path. The Screen lives at
+`<data>/screens/start-home.loro`; Start owns the file, the atomic write and the backups.
+
+The old `dashboard.json` is migrated once. Every entry is copied in order, including an id this build
+cannot resolve, and the old file is renamed to `dashboard.json.migrated-<date>` so it stays visible.
+A corrupt, empty or newer dashboard is refused whole with the sentence the package returns: the old
+file is untouched and the default Home is shown with a note. A Screen that cannot be read is
+quarantined under a dated name and the default Home takes its place.
+
+`start.apps` and `start.recents` are Start's own widgets, not app declarations. They resolve through
+the host's own table before the app widget registry, which is built from the `widgets` field of each
+installed `suite.app.json`. An app widget renders its declared title, capture fields and instance
+settings. An id nothing on this machine provides is a named placeholder with a note and stays in the
+document; reinstalling the app brings its widget back.
+
+**Edit layout** adds, removes, moves and resizes placements in the Screen's order. Every control names
+the widget it acts on, a focused placement answers Alt+Left and Alt+Right, and sizes stay `1x1`, `2x1`
+and `full`. The **Screens** manager is Start's, not an app's: it lists, creates, renames, duplicates
+and deletes a Screen, sets Home and opens one. The last Screen is kept, and deleting Home asks which
+Screen becomes Home first.
+
+This slice does not send a capture to an app, export or import a `.screen` file, or sync a Screen. The
+capture fields are drawn as each app declared them; the write path lands with the app that receives it.
+
 ## Two rules
 
 1. **Start is not in the data path.** It returns a path or a URL. It never proxies document bytes.
@@ -50,11 +80,12 @@ For the product story and the influences behind it, read
 
 ## Packages
 
-| Package            | Owns                                                                          | Does not own                  |
-| ------------------ | ----------------------------------------------------------------------------- | ----------------------------- |
-| `@suite/contracts` | `suite.app`, `suite.deployment`, deep-link parsing, contract versioning       | Any app schema, any I/O       |
-| `@suite/files`     | Envelope mechanics, base64, size limits, backup naming and retention planning | `fs`, an app's envelope shape |
-| `src`              | App discovery, launch plans, `suite://` routing                               | App UI, app documents         |
+| Package            | Owns                                                                           | Does not own                  |
+| ------------------ | ------------------------------------------------------------------------------ | ----------------------------- |
+| `@suite/contracts` | `suite.app`, `suite.deployment`, deep-link parsing, contract versioning        | Any app schema, any I/O       |
+| `@suite/screens`   | The `suite.screen` shape, its Loro document, the widget registry and migration | Rendering, file IO, app data  |
+| `@suite/files`     | Envelope mechanics, base64, size limits, backup naming and retention planning  | `fs`, an app's envelope shape |
+| `src`              | App discovery, the Home Screen store, launch plans, `suite://` routing         | App UI, app documents         |
 
 `@suite/files` has two entry points: `.` is pure and can run in a renderer, `./node` is where `fs`
 lives. They are one package because a package that depends on a sibling cannot be installed from a git
