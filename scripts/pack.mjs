@@ -62,7 +62,7 @@ function pkcs8Base64(privateKeyBase64) {
 }
 
 /** The public half in the form `SUITE_PACK_PUBLIC_KEY` pins. */
-function publicKeyOf(privateKeyBase64) {
+export function publicKeyOfSigningKey(privateKeyBase64) {
   return publicOf("pack", pkcs8Base64(privateKeyBase64)).publicText;
 }
 
@@ -174,7 +174,7 @@ export async function bundlePack({
     );
   }
 
-  const actualPublicKey = publicKeyOf(privateKeyBase64);
+  const actualPublicKey = publicKeyOfSigningKey(privateKeyBase64);
   if (expectedPublicKeyBase64 === undefined) {
     throw new Error("An expected public key is required, so a pack is never signed blind.");
   }
@@ -293,7 +293,7 @@ async function main(argv) {
 
   let publicKeyBase64;
   try {
-    publicKeyBase64 = publicKeyOf(privateKeyBase64);
+    publicKeyBase64 = publicKeyOfSigningKey(privateKeyBase64);
   } catch (error) {
     throw new Error(`${error.message} Run \`pnpm keys status\` to inspect the signing key.`);
   }

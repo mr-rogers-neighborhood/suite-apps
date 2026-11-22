@@ -31,3 +31,13 @@ The rules that shape Budget.
 - The library index and `recovered/` live in the application directory, not the documents folder.
 - Charts are SVG. The interface shows age of money.
 - The gate is local: `pnpm check` to edit, `pnpm verify` for the full gate. There is no Turborepo.
+- Budget also ships as a signed desktop pack. `scripts/budget-pack.mjs` builds the renderer and the
+  `window.suiteBudget` prelude into `apps/budget/pack/dist`; the prelude owns the `BudgetDocument`
+  and writes a snapshot at the visibility-hidden, `pagehide` and host-flush boundaries. The container
+  never parses or writes a budget.
+- A pack document id is its document-store file name. `LibraryEntry.path` is a display value with
+  the same id, never an absolute path, and every library call takes the id. `listBudgets` reads at
+  most the hundred most recently updated documents to recover their names and currencies.
+- External files use only the host's `pickOpen`/`pickSave` handles; a missing or failing files
+  service is a sentence and a cancellation, not an exception. The pack has no "show in folder" (the
+  host has no reveal) and no sync. Reveal is a notice until the host offers one.
