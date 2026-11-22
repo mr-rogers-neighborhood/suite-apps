@@ -759,6 +759,7 @@ function installedInfo(manifest: PackManifest, root: string): InstalledPackInfo 
     description: manifest.description ?? null,
     entry: manifest.entry,
     capabilities: manifest.capabilities,
+    widgets: manifest.widgets ?? [],
     root,
     source: "installed",
   };

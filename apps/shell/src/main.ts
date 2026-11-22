@@ -16,6 +16,7 @@ import { LAUNCHER_CONTEXT, suiteLinkFromArgv } from "./deepLink.js";
 import { DocumentStore } from "./documents.js";
 import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
+import { HOME_SCREEN_ID, openHomeScreen } from "./home.js";
 import {
   comparePackVersions,
   InstalledPackError,
@@ -39,6 +40,7 @@ import {
   packOrigin,
   packsRootFor,
 } from "./packs.js";
+import { ScreenStore } from "./screens.js";
 import { type PackSender, packSender } from "./senders.js";
 import {
   type CatalogueEntry,
@@ -87,6 +89,7 @@ protocol.registerSchemesAsPrivileged([
 
 let window: ShellWindow | null = null;
 let spaceStore: SpaceStore | null = null;
+let screenStore: ScreenStore | null = null;
 let documents: DocumentStore | null = null;
 let files: PackFilesService | null = null;
 let externalFiles: ExternalFilesService | null = null;
@@ -142,6 +145,9 @@ if (!gotLock) {
     void spaceStore?.flush().catch((error: unknown) => {
       console.warn("[shell] space document flush failed", error);
     });
+    void screenStore?.flush().catch((error: unknown) => {
+      console.warn("[shell] screen document flush failed", error);
+    });
   });
 }
 
@@ -160,6 +166,11 @@ async function bootstrap(): Promise<void> {
 
   await refreshPacks();
   spaceStore = await SpaceStore.open(join(dataRoot, "spaces.loro"));
+  // The host's own Screen. Home is created here and opened before any pack view
+  // exists, so the first window a person sees is the shell's composition rather
+  // than an empty launcher.
+  screenStore = await ScreenStore.open(join(dataRoot, "screens", `${HOME_SCREEN_ID}.loro`));
+  await openHomeScreen(screenStore, spaceStore);
   // Documents are resolved under documents/<container>/<pack>.
   documents = new DocumentStore(join(dataRoot, "documents"));
   // One store per (container, pack), created on first use. This is host data,
@@ -277,13 +288,16 @@ function themeView(): ThemeView {
 }
 
 function openWindow(): void {
-  if (spaceStore === null || documents === null) throw new Error("the shell is not ready");
+  if (spaceStore === null || screenStore === null || documents === null) {
+    throw new Error("the shell is not ready");
+  }
   let created: ShellWindow | null = null;
   created = new ShellWindow({
     packs,
     catalogue: catalogueView(),
     installedVersions: installedVersionViews(),
     spaces: spaceStore,
+    screens: screenStore,
     theme: themeView(),
     onViewClosed: (tabId) => {
       files?.releaseOwner(tabId);
@@ -346,6 +360,26 @@ function registerIpc(): void {
   onChrome(CHROME_IPC.uninstallPack, async (id, version) => {
     if (typeof id !== "string" || typeof version !== "string") return;
     await uninstallPackVersionFrom(id, version);
+  });
+  onChrome(CHROME_IPC.addWidget, async (registryId) => {
+    if (typeof registryId !== "string") return undefined;
+    await window?.addScreenWidget(registryId);
+    return window?.state();
+  });
+  onChrome(CHROME_IPC.removeWidget, async (registryId) => {
+    if (typeof registryId !== "string") return undefined;
+    await window?.removeScreenWidget(registryId);
+    return window?.state();
+  });
+  onChrome(CHROME_IPC.moveWidget, async (registryId, direction) => {
+    if (typeof registryId !== "string" || typeof direction !== "string") return undefined;
+    await window?.moveScreenWidget(registryId, direction);
+    return window?.state();
+  });
+  onChrome(CHROME_IPC.resizeWidget, async (registryId, size) => {
+    if (typeof registryId !== "string" || typeof size !== "string") return undefined;
+    await window?.resizeScreenWidget(registryId, size);
+    return window?.state();
   });
 
   onPack(PACK_IPC.launch, (sender): PackLaunchContext => {

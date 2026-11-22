@@ -92,11 +92,42 @@ The rules that shape the Suite host.
   not a data migration.
 - A stored tab is a discriminated union of a **pack** tab and a **screen** tab. The document is at
   `shell.version = 2`; a version-1 tab has no `kind` and reads as a pack tab. Old tabs are not dropped
-  or rewritten on read. This slice accepts a screen tab in the model; rendering it is the next slice.
+  or rewritten on read. A screen tab is host chrome and renders a Screen; it creates no pack view.
 - The space document stores structure, not document content: containers, spaces, groups, entries, pins,
   labels and ordering. No paths, commands, URLs to open, or executable actions.
 - Open tabs, window bounds and focus are local session state. They must not sync to another device.
 - The launcher's recents are local. A shared space later carries entries, not what you viewed.
+
+## Home and Screens
+
+- Home is a Screen named Home (`shell-home`), the shell's own Loro document at
+  `<dataRoot>/screens/shell-home.loro`. It is created and opened before any pack view exists, first in
+  the tab strip, and active on a first run. The brand and `+` open it again, so closing its tab is
+  safe. A restored session keeps its own active tab and gains Home at the front.
+- A screen tab is host chrome. It creates no `WebContentsView`; activating one hides every pack view,
+  which exposes the chrome's composition in the same content area. A pack tab hides the composition
+  and shows that pack's view. Closing the last tab shows an empty state, not a second copy of the
+  pack grid.
+- The host widget table belongs to the shell and is keyed by registry id. `shell.apps` is host chrome:
+  it has no capture action and no app behind it, and it draws the installed-pack grid, the local
+  catalogue and **Add pack…**. Host widgets resolve before the pack registry, so an installed pack
+  cannot shadow `shell.apps`.
+- App widgets are declared by installed pack manifests (`widgets`) and resolved through
+  `@suite/screens` as `<pack id>.<widget id>`. The host draws the declared title, fields and resolved
+  settings with its own components; the pack supplies data, never DOM. An unknown registry id is a
+  named placeholder with a sentence, and the placement and its saved settings stay in the document.
+- Edit mode is host chrome: named buttons and named keys add, remove, move earlier/later and change
+  the size, which stays exactly `1x1`, `2x1` or `full`. The renderer holds no document state; an
+  action names a registry id and the main process answers with the new state.
+- The screen store writes a snapshot through a temporary file and rename, keeps the previous good
+  snapshot as `<id>.loro.bak`, and quarantines an unreadable, oversized or newer file as
+  `<id>.loro.corrupt-<time>` before starting a fresh Home. It never deletes the only copy and never
+  guesses at a newer shape.
+- Capture delivery is not in this slice. An app widget says a capture is not available yet rather
+  than offering a button that cannot work. The registry's capture build stays unused until the
+  delivery path exists.
+- A Screen is local to this device. The Screens manager, a portable `.screen` file, export/import
+  and sync are later slices.
 
 ## Updates, signing and installation
 
@@ -164,12 +195,13 @@ The rules that shape the Suite host.
 ## What this spike deliberately leaves out
 
 - a remote pack index (the catalogue is a local directory);
-- rendering screen tabs (the space model accepts one);
+- app-widget capture delivery (app widgets render; captures are not sent);
+- the Screens manager and a portable `.screen` file with export/import;
 - the host's blind relay transport for pack sync;
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;
 - tab tear-off and split view;
-- host-rendered contributions;
+- host-rendered pack contributions beyond widgets;
 - containers and saved spaces in the UI;
 - space-document sync and shared spaces;
 - Windows and macOS packaging;
