@@ -66,13 +66,17 @@ Desktop Suite is separate sandboxed apps plus Start as the shell. It is not one 
 mounts domain code. Start owns the catalogue, the channels, routing and updates; Flatpak is the host
 runtime when an app is installed that way, and Start asks it to install, update or remove rather than
 writing a deployment itself. The hub ships as a Flatpak too: inside that sandbox it reaches the host's
-Flatpak service through the Flatpak session helper. Documents and keys stay with the app: the shell
-hands over a path or bytes, never parses them, and sync keys never enter Start.
+Flatpak service through the Flatpak session helper. Documents and keys stay with the app: Start hands
+over a path or bytes, never parses them, and sync keys never enter it.
 
-A signed pack form may be added inside Start later. It would be a way to deliver a domain as a
-verified bundle without making the shell the domain's runtime: the app still owns its document and
-its keys, and the pack still declares its capabilities. Domains do not move into Start; a pack that
-needs the shell to understand its document is the container this section rejects.
+That is the released form, and it remains so until the migration is proven.
+[`apps/shell`](../../apps/shell/README.md) is the intended successor: one Electron app with a
+`WebContentsView` per pack, each in its own custom-protocol origin and session partition, rendering a
+signed pack instead of launching a separate process. It is not the same-process mount this section
+rejects, because the boundary moves from the OS sandbox to a per-pack renderer, origin and session. A
+real shipping app — Budget first — has to run as a signed pack with its documents and consented
+export/import before Start stops shipping. [Decisions](../reference/decisions.md#desktop-host) owns
+the rule; the released apps remain separate Flatpaks and Start until then.
 
 ### Why not one container window
 

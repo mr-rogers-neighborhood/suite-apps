@@ -8,7 +8,7 @@ answered is narrow: **is the key on this machine the key this tree trusts?** `pn
 
 | Key | Signs | Algorithm | Private half | Public half pinned in |
 | --- | --- | --- | --- | --- |
-| Pack signing | a domain pack the phone installs | Ed25519 | `pack-key` | `PACK_PUBLIC_KEY`, `apps/go/src/host/packs.ts` |
+| Pack signing | a signed app pack the phone and the desktop install | Ed25519 | `pack-key` | `SUITE_PACK_PUBLIC_KEY`, `packages/pack/src/pinnedKey.ts` |
 | Update signing | nothing the suite ships any more; it signed the retired relay tarball's `SHA256SUMS` | Ed25519 | `update-key.pem` | `SUITE_UPDATE_PUBLIC_KEY`, `packages/desktop/src/updateSignature.ts` |
 
 The Flatpak store key is a third secret with a different job; [Packaging
@@ -76,10 +76,11 @@ test, never for one that gets pinned.
 
 A pin is a trust root, so rotation is a sequence, not an edit.
 
-**Pack key.** Generate, pin `PACK_PUBLIC_KEY`, rebuild every pack. Packs already installed keep
-working: the signature was checked when they were installed, and the pin only decides what may be
-installed next. A pack signed with the old key is refused after the pin moves, so the two ship
-together.
+**Pack key.** Generate, pin `SUITE_PACK_PUBLIC_KEY` in `packages/pack/src/pinnedKey.ts`, rebuild every
+pack. The pin is shared: Suite Go re-exports it as `PACK_PUBLIC_KEY` and the desktop host verifies with
+the same constant, so no host has a second copy. Packs already installed keep working: the signature
+was checked when they were installed, and the pin only decides what may be installed next. A pack
+signed with the old key is refused after the pin moves, so the two ship together.
 
 **Update key.** It signed the relay tarball's checksum list. The relay installs as a Flatpak now and
 no release signs with this key, so it has no artifact to trust; it and its pin are kept until they are

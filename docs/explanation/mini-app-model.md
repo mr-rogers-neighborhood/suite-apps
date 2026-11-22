@@ -34,7 +34,7 @@ standard; the white paper documents the capability tiers in its security and pri
 
 | Mechanism | In Suite |
 | --- | --- |
-| Host plus downloaded apps | Suite Start on the desktop; Suite Go on mobile |
+| Host plus downloaded apps | Suite Start on the desktop today; Suite Go on mobile. The `apps/shell` spike tests one desktop host with sandboxed packs, not shipped yet |
 | A manifest beside the executable | `suite.app.json` for desktop discovery; a pack manifest for Go |
 | Declared capabilities | Pack `capabilities`, enforced by the host; see [Go decisions](../../apps/go/docs/reference/decisions.md) |
 | One instance per app | Start installs one copy per app; a second copy cannot run because the profile lock is shared |
@@ -63,6 +63,14 @@ standard; the white paper documents the capability tiers in its security and pri
 - **Suspend and destroy are not separated yet.** Leaving a module disposes it. WeChat keeps a
   suspended module mounted and releases it later.
 - **No background delivery.** A sleeping device is not woken.
+
+## The desktop host spike
+
+`apps/shell` tests the same model on the desktop with one Electron host: a tab per pack, a custom
+protocol origin per pack, a session partition per pack, and a scoped document API. It is a spike, not
+the shipping path; the released desktop apps remain separate Flatpaks and Start.
+[Decisions](../reference/decisions.md#desktop-host) owns the direction, and
+[the host's README](../../apps/shell/README.md) states what works.
 
 ## Reading
 
