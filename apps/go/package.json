@@ -37,6 +37,7 @@
     "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/share": "^8.0.3",
     "@suite/go": "workspace:*",
+    "@suite/pack": "workspace:*",
     "@suite/theme": "workspace:*",
     "@suite/ui": "workspace:*",
     "fflate": "^0.8.3",
