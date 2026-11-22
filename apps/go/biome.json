@@ -14,7 +14,10 @@
       "!**/node_modules",
       "!apps/go/android",
       "!apps/go/.web",
-      "!**/build"
+      "!**/build",
+      "!planner-dist",
+      "!.vite-planner",
+      "!coverage"
     ]
   },
   "formatter": {
