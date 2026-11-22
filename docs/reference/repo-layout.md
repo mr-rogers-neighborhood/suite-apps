@@ -8,7 +8,7 @@ apps/
   canvas/       @suite/canvas renderer; desktop/ shell;
                 packages/graph, packages/import-obsidian; e2e, docs, handbook, internal
   planner/      @suite/planner desktop app; pack/; packages/core; docs
-  budget/       @suite/budget desktop app; packages/core; docs
+  budget/       @suite/budget desktop app; pack/; packages/core; docs
   start/        @suite/start hub; docs, e2e
   help/         @suite/help documentation app: explorer and handbook
   sync/         @suite/sync-server; packages/protocol, packages/host; deploy, docs
@@ -40,6 +40,7 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/planner-pack` | `apps/planner/pack` | Planner as a Go pack |
 | `@suite/planner-core` | `apps/planner/packages/core` | Planner schema and document layer |
 | `@suite/budget` | `apps/budget` | Budget |
+| `@suite/budget-pack` | `apps/budget/pack` | Budget as a signed desktop pack |
 | `@suite/budget-core` | `apps/budget/packages/core` | Budget schema and document layer |
 | `@suite/start` | `apps/start` | Hub |
 | `@suite/help` | `apps/help` | Documentation app: explorer and handbook |

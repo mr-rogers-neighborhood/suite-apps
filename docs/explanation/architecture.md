@@ -133,9 +133,13 @@ Only code used by more than one app belongs in a shared package:
 | `@suite/desktop` | Desktop apps | Electron security policy: sandbox, context isolation, fuses |
 | `@suite/theme` | Desktop apps | Shared theme variables |
 | `@suite/ui` | Desktop apps | Menu bar, modal, sync status and other shared chrome |
+| `@suite/pack` | Desktop host, packs, Go | Pack manifest, capabilities, contributions and Ed25519 verification |
+| `@suite/pack-runtime` | Packs | Pack-side service types; no Electron or Node |
+| `@suite/pack-host` | Desktop host | Scoped pack file store, locks, backups and the archive reader |
 
 Everything else is app-private, even when it is a separate package: `@suite/graph` is Canvas's,
-`@suite/planner-core` is Planner's, `@suite/budget-core` is Budget's, `@suite/go` is the mobile
-contract, and `@suite/sync`/`@suite/host` belong to the sync app.
+`@suite/planner-core` is Planner's, `@suite/budget-core` is Budget's, `@suite/budget-pack` is
+Budget's desktop pack, `@suite/go` is the mobile contract, and `@suite/sync`/`@suite/host` belong to
+the sync app.
 
 [Repository layout](../reference/repo-layout.md) lists the directories.
