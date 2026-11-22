@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+*.tsbuildinfo
+.DS_Store
+
+# Build output.
+dist/
+
+# electron-builder output.
+release/

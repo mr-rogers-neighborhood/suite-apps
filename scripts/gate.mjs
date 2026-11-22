@@ -37,6 +37,9 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PIPELINE = [
   { repo: "sync", package: "@suite/sync-server" },
   { repo: "start", package: "@suite/start", e2e: true },
+  // The host spike. It depends on the shared Electron policy and theme, not on
+  // any app, so it runs beside the shipped apps until the migration is proven.
+  { repo: "shell", package: "@suite/shell" },
   { repo: "help", package: "@suite/help" },
   { repo: "canvas", package: "@suite/canvas" },
   { repo: "planner", package: "@suite/planner" },
@@ -190,7 +193,33 @@ if (!build.ok) {
   results.push({ repo: "libraries", package: "apps/*/packages/*", ok: false, detail: build.detail });
 }
 
-for (const entry of build.ok ? selected : []) {
+// The pack build script is not inside a workspace package, so no app's `check:full`
+// runs its test. It imports the libraries built above, so it runs here: after the
+// build, before any app can call the tree green.
+const scripts =
+  dry || !build.ok
+    ? { ok: build.ok, detail: build.ok ? "dry run" : "not run: libraries failed" }
+    : (() => {
+        if (!json) process.stdout.write("\n▶ scripts\n");
+        const result = run("node", ["--test", "scripts/pack.test.mjs"], workdir);
+        return {
+          ok: result.status === 0,
+          detail: result.status === 0 ? "pack test" : `exit ${result.status}`,
+        };
+      })();
+
+if (!json) process.stdout.write(`${scripts.ok ? "ok  " : "FAIL"}  scripts  ${scripts.detail}\n`);
+
+if (!scripts.ok) {
+  results.push({
+    repo: "scripts",
+    package: "scripts/pack.test.mjs",
+    ok: false,
+    detail: scripts.detail,
+  });
+}
+
+for (const entry of build.ok && scripts.ok ? selected : []) {
   const repoDir = join(workdir, "apps", entry.repo);
   if (!existsSync(join(repoDir, "package.json"))) {
     results.push({ ...entry, ok: false, detail: "missing repo" });
@@ -248,6 +277,7 @@ const status = {
   commit: gitSha(),
   at: new Date().toISOString(),
   build,
+  scripts,
   // Whether the suite actually ran, not whether it was requested. A skipped
   // desktop run must not read as proof of the e2e step.
   e2e: e2eRan,

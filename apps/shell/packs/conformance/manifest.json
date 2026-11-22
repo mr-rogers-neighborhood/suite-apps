@@ -1,0 +1,10 @@
+{
+  "format": "suite.pack",
+  "id": "conformance",
+  "name": "Conformance",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "contractVersion": 1,
+  "capabilities": ["files"],
+  "description": "Exercises the scoped files service: relative paths, backups, locks and refusals."
+}
