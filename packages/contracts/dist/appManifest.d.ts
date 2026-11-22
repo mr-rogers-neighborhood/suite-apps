@@ -89,6 +89,18 @@ export declare const suiteAppManifestSchema: z.ZodObject<{
                 maxLength: z.ZodOptional<z.ZodNumber>;
             }, z.core.$strict>>;
         }, z.core.$strict>], "kind">;
+        settings: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            id: z.ZodString;
+            label: z.ZodString;
+            type: z.ZodEnum<{
+                number: "number";
+                text: "text";
+                day: "day";
+            }>;
+            default: z.ZodOptional<z.ZodString>;
+            required: z.ZodDefault<z.ZodBoolean>;
+            maxLength: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strict>>>;
     }, z.core.$strict>>>;
 }, z.core.$strict>;
 export type SuiteAppManifest = z.infer<typeof suiteAppManifestSchema>;

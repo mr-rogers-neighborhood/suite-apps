@@ -151,6 +151,7 @@ export {
   type SuiteWidgetCaptureResult,
   type SuiteWidgetField,
   type SuiteWidgetFieldType,
+  type SuiteWidgetSetting,
   type SuiteWidgetSize,
   splitWidgetRegistryId,
   suiteWidgetActionSchema,
@@ -162,7 +163,10 @@ export {
   suiteWidgetFieldTypeSchema,
   suiteWidgetIdSchema,
   suiteWidgetSchema,
+  suiteWidgetSettingSchema,
+  suiteWidgetSettingsSchema,
   suiteWidgetSizeSchema,
   suiteWidgetsSchema,
   widgetRegistryId,
+  widgetSettingValueProblem,
 } from "./widgets.js";

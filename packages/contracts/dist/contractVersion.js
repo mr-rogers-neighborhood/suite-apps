@@ -9,8 +9,15 @@
  * package because the whole surface is a hundred lines and a dependency that
  * every app installs is worse than the hundred lines.
  */
-/** The contract version this build of the packages implements. */
-export const CONTRACT_VERSION = "1.0.0";
+/**
+ * The contract version this build of the packages implements.
+ *
+ * 1.1.0 added an optional `settings` list to the widget descriptor and to the capture
+ * payload. Both are additive: a manifest written before it still parses, and a capture
+ * with no `settings` gets an empty record. A manifest that uses settings declares 1.1.0,
+ * so a 1.0.0 host refuses the pair instead of meeting a field it does not know.
+ */
+export const CONTRACT_VERSION = "1.1.0";
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/u;
 /** Parse a version, or null when it is not semver. */
 export function parseSemver(value) {

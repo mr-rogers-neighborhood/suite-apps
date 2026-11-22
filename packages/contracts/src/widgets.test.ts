@@ -4,6 +4,8 @@ import {
   parseWidgetCapture,
   parseWidgetCaptureResult,
   splitWidgetRegistryId,
+  type SuiteWidget,
+  suiteWidgetCaptureSchema,
   suiteWidgetsSchema,
   widgetRegistryId,
 } from "./widgets.js";
@@ -118,6 +120,167 @@ describe("the registry id", () => {
       expect(splitWidgetRegistryId(value)).toBeNull();
     },
   );
+});
+
+const settingsWidget: SuiteWidget = {
+  id: "quick-task",
+  title: "New task",
+  size: "2x1",
+  capabilities: ["capture"],
+  action: {
+    kind: "capture",
+    submitLabel: "Add task",
+    fields: [{ id: "title", label: "Task", type: "text", required: true, maxLength: 120 }],
+  },
+  settings: [
+    { id: "project", label: "Project", type: "text", default: "inbox", required: false, maxLength: 40 },
+    { id: "days", label: "Days ahead", type: "number", default: "7", required: false },
+    { id: "from", label: "From", type: "day", required: false },
+  ],
+};
+
+describe("the widget settings descriptor", () => {
+  it("leaves a widget without settings exactly as it was", () => {
+    const parsed = suiteWidgetsSchema.safeParse([quickTask]);
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data[0]?.settings).toBeUndefined();
+  });
+
+  it("accepts settings and applies their additive defaults", () => {
+    const parsed = suiteWidgetsSchema.safeParse([settingsWidget]);
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data[0]?.settings?.[0]?.required).toBe(false);
+  });
+
+  it("refuses a default that does not fit its own field", () => {
+    const base = {
+      ...quickTask,
+      settings: [{ id: "days", label: "Days", type: "number", default: "seven" }],
+    };
+    const parsed = suiteWidgetsSchema.safeParse([base]);
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(parsed.error.issues.map((issue) => issue.message).join(" ")).toContain("whole number");
+  });
+
+  it("refuses a day default that is not a calendar day", () => {
+    const parsed = suiteWidgetsSchema.safeParse([
+      {
+        ...quickTask,
+        settings: [{ id: "from", label: "From", type: "day", default: "2026-02-31" }],
+      },
+    ]);
+    expect(parsed.success).toBe(false);
+  });
+
+  it("refuses a text default over its own ceiling", () => {
+    const parsed = suiteWidgetsSchema.safeParse([
+      {
+        ...quickTask,
+        settings: [
+          { id: "label", label: "Label", type: "text", maxLength: 4, default: "too long" },
+        ],
+      },
+    ]);
+    expect(parsed.success).toBe(false);
+  });
+
+  it("refuses an unknown setting field and an unknown type", () => {
+    expect(
+      suiteWidgetsSchema.safeParse([
+        {
+          ...quickTask,
+          settings: [{ id: "project", label: "Project", type: "text", source: "api" }],
+        },
+      ]).success,
+    ).toBe(false);
+    expect(
+      suiteWidgetsSchema.safeParse([
+        { ...quickTask, settings: [{ id: "project", label: "Project", type: "colour" }] },
+      ]).success,
+    ).toBe(false);
+  });
+
+  it("refuses two settings with the same id", () => {
+    const parsed = suiteWidgetsSchema.safeParse([
+      {
+        ...quickTask,
+        settings: [
+          { id: "project", label: "Project", type: "text" },
+          { id: "project", label: "Again", type: "text" },
+        ],
+      },
+    ]);
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe("settings in a capture", () => {
+  it("round-trips a capture through the schema with its settings", () => {
+    const parsed = suiteWidgetCaptureSchema.safeParse({
+      widget: "quick-task",
+      action: "capture",
+      values: { title: "Ship it" },
+      settings: { project: "beta", days: "14" },
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.settings).toEqual({ project: "beta", days: "14" });
+  });
+
+  it("fills an empty settings record for a capture written before settings", () => {
+    const parsed = suiteWidgetCaptureSchema.safeParse({
+      widget: "quick-task",
+      action: "capture",
+      values: { title: "Ship it" },
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.settings).toEqual({});
+  });
+
+  it("accepts declared settings and refuses an unknown one", () => {
+    const accepted = parseWidgetCapture(
+      {
+        widget: "quick-task",
+        action: "capture",
+        values: { title: "Ship" },
+        settings: { project: "beta" },
+      },
+      settingsWidget,
+    );
+    expect(accepted.ok).toBe(true);
+
+    const refused = parseWidgetCapture(
+      {
+        widget: "quick-task",
+        action: "capture",
+        values: { title: "Ship" },
+        settings: { area: "beta" },
+      },
+      settingsWidget,
+    );
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.issues.map((issue) => issue.path)).toContain("settings.area");
+  });
+
+  it("enforces a declared setting's type", () => {
+    const parsed = parseWidgetCapture(
+      {
+        widget: "quick-task",
+        action: "capture",
+        values: { title: "Ship" },
+        settings: { days: "later" },
+      },
+      settingsWidget,
+    );
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(describeIssues(parsed.issues)).toContain("whole number");
+  });
 });
 
 const widget = {

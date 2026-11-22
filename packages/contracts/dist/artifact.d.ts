@@ -67,7 +67,7 @@ export declare const suiteArtifactSchema: z.ZodObject<{
 export type SuiteArtifact = z.infer<typeof suiteArtifactSchema>;
 export declare const parseSuiteArtifact: (input: unknown) => ContractParse<SuiteArtifact>;
 /** The contract this module was written against. */
-export declare const SUITE_ARTIFACT_CONTRACT_VERSION = "1.0.0";
+export declare const SUITE_ARTIFACT_CONTRACT_VERSION = "1.1.0";
 /** True when this build can read that artifact document. */
 export declare function isArtifactCompatible(contractVersion: string): boolean;
 //# sourceMappingURL=artifact.d.ts.map
