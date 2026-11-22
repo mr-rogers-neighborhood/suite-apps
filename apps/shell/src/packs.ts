@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { type SuiteWidget, suiteWidgetsSchema } from "@suite/contracts";
 import { resolveProtocolAsset } from "@suite/desktop";
 import {
   isSafePackId,
@@ -52,12 +53,15 @@ const manifestSchema = z
     contractVersion: z.number().int().positive(),
     minimumHostVersion: z.number().int().positive().optional(),
     capabilities: z.array(z.enum(PACK_CAPABILITIES)).default([]),
+    widgets: suiteWidgetsSchema.optional(),
   })
   .strict();
 
 /** A pack plus where its files live. `root` never crosses the IPC bridge. */
 export interface PackInfo extends PackSummary {
   readonly root: string;
+  /** Widget descriptors the manifest declares. The host draws them; it runs no code. */
+  readonly widgets?: readonly SuiteWidget[];
 }
 
 export interface PackRequest {
@@ -179,6 +183,7 @@ function readPack(directory: string): PackInfo | null {
       description: parsed.data.description ?? null,
       entry: parsed.data.entry,
       capabilities: parsed.data.capabilities as readonly PackCapability[],
+      widgets: parsed.data.widgets ?? [],
       root: directory,
       source: "development",
     };

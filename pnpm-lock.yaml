@@ -1005,6 +1005,9 @@ importers:
 
   apps/shell:
     dependencies:
+      '@suite/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@suite/desktop':
         specifier: workspace:*
         version: link:../../packages/desktop
@@ -1017,6 +1020,9 @@ importers:
       '@suite/pack-runtime':
         specifier: workspace:*
         version: link:../../packages/pack-runtime
+      '@suite/screens':
+        specifier: workspace:*
+        version: link:../../packages/screens
       '@suite/theme':
         specifier: workspace:*
         version: link:../../packages/theme

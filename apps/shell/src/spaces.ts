@@ -78,6 +78,14 @@ export interface OpenScreenTabInput {
 
 export type OpenTabInput = OpenPackTabInput | OpenScreenTabInput;
 
+/** Open a screen tab unless one for this screen already exists. */
+export interface EnsureScreenTabInput {
+  readonly screenId: string;
+  readonly title: string;
+  /** Put a new tab first, so Home precedes any restored pack tab. */
+  readonly first?: boolean;
+}
+
 const DEFAULT_SPACE = "default";
 
 /** Version 1 wrote pack tabs without `kind`; version 2 writes the discriminated shape. */
@@ -178,6 +186,41 @@ export class SpaceStore {
     this.#doc.getMap("shell").set("activeTabId", id);
     await this.#commitAndSave();
     return opened;
+  }
+
+  /**
+   * Open the one screen tab for `screenId`, or return the tab that already shows it.
+   *
+   * Home is created once per space document. `first` inserts it before any restored
+   * pack tab. It becomes active only when the document had no tabs at all: that is the
+   * first run, and a restored session keeps whatever it was showing.
+   */
+  async ensureScreenTab(
+    input: EnsureScreenTabInput,
+  ): Promise<{ readonly tab: ScreenSpaceTab; readonly opened: boolean }> {
+    const before = this.state();
+    const existing = before.tabs.find(
+      (tab): tab is ScreenSpaceTab => tab.kind === "screen" && tab.screenId === input.screenId,
+    );
+    if (existing !== undefined) return { tab: existing, opened: false };
+
+    const id = randomUUID();
+    const tab = this.#doc.getMap("tabs").ensureMergeableMap(id);
+    tab.set("kind", "screen");
+    tab.set("screenId", input.screenId);
+    tab.set("title", input.title);
+    tab.set("spaceId", DEFAULT_SPACE);
+
+    const order = this.#doc.getList("tab-order");
+    if (input.first === true) order.insert(0, id);
+    else order.push(id);
+    if (before.tabs.length === 0) this.#doc.getMap("shell").set("activeTabId", id);
+
+    await this.#commitAndSave();
+    return {
+      tab: { kind: "screen", id, screenId: input.screenId, title: input.title },
+      opened: true,
+    };
   }
 
   async activateTab(id: string | null): Promise<void> {
@@ -290,5 +333,9 @@ function initialize(doc: LoroDoc): void {
   const space = doc.getMap("spaces").ensureMergeableMap(DEFAULT_SPACE);
   space.set("name", "Default");
   space.set("color", "#7c9cff");
+  // Materialize the two tab containers so a first read is the empty state, not a
+  // schema warning about a map that has not been created yet.
+  doc.getMap("tabs");
+  doc.getList("tab-order");
   doc.commit();
 }

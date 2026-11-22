@@ -1,9 +1,17 @@
 import { join } from "node:path";
 import { originKey } from "@suite/desktop";
+import { isWidgetRegistryId } from "@suite/screens";
 import { app, BaseWindow, session, shell, WebContentsView } from "electron";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { LAUNCHER_CONTEXT, parseSuiteLink } from "./deepLink.js";
 import { navigationReleasesLocks } from "./files.js";
+import {
+  isWidgetSize,
+  preferredWidgetSize,
+  screenView,
+  shellSurface,
+  shellWidgetRegistry,
+} from "./home.js";
 import { registerPackProtocol } from "./packProtocol.js";
 import {
   externalLinkFor,
@@ -12,6 +20,7 @@ import {
   packPartition,
   tabViewTarget,
 } from "./packs.js";
+import type { ScreenStore } from "./screens.js";
 import { clearPackSender, setPackSender } from "./senders.js";
 import {
   type CatalogueEntry,
@@ -20,10 +29,11 @@ import {
   type InstalledVersionView,
   type PackLaunchContext,
   type PackShellTab,
+  type ScreenView,
   type ShellState,
   type ThemeView,
 } from "./shared.js";
-import type { SpaceStore } from "./spaces.js";
+import type { SpaceState, SpaceStore } from "./spaces.js";
 
 /** The chrome's own height. The chrome page uses the same number in its stylesheet. */
 export const TAB_BAR_HEIGHT = 56;
@@ -42,6 +52,7 @@ export class ShellWindow {
   #catalogue: readonly CatalogueEntry[];
   #installedVersions: readonly InstalledVersionView[];
   readonly #spaces: SpaceStore;
+  readonly #screens: ScreenStore;
   readonly #containerId: string;
   readonly #onViewClosed: ((tabId: string) => void) | undefined;
   readonly #views = new Map<string, WebContentsView>();
@@ -60,6 +71,7 @@ export class ShellWindow {
     readonly catalogue?: readonly CatalogueEntry[];
     readonly installedVersions?: readonly InstalledVersionView[];
     readonly spaces: SpaceStore;
+    readonly screens: ScreenStore;
     readonly theme: ThemeView;
     readonly containerId?: string;
     readonly onViewClosed?: (tabId: string) => void;
@@ -69,6 +81,7 @@ export class ShellWindow {
     this.#catalogue = options.catalogue ?? [];
     this.#installedVersions = options.installedVersions ?? [];
     this.#spaces = options.spaces;
+    this.#screens = options.screens;
     this.#containerId = options.containerId ?? DEFAULT_CONTAINER_ID;
     this.#onViewClosed = options.onViewClosed;
     this.#theme = options.theme;
@@ -142,6 +155,8 @@ export class ShellWindow {
     return {
       tabs: spaceState.tabs,
       activeTabId: spaceState.activeTabId,
+      surface: shellSurface(spaceState),
+      screens: this.#screenViews(spaceState),
       packs: this.#packs.map((pack) => ({
         id: pack.id,
         name: pack.name,
@@ -156,6 +171,38 @@ export class ShellWindow {
       theme: this.#theme,
       notice: this.#notice,
     };
+  }
+
+  /**
+   * One view per screen tab the space document names.
+   *
+   * This slice has one Screen, Home. A tab restored from a document that names a
+   * different screen stays in the strip and draws an unavailable placeholder instead
+   * of silently becoming a pack.
+   */
+  #screenViews(spaceState: SpaceState): readonly ScreenView[] {
+    const registry = shellWidgetRegistry(this.#packs);
+    const own = this.#screens.state();
+    const views: ScreenView[] = [];
+    const seen = new Set<string>();
+
+    for (const tab of spaceState.tabs) {
+      if (tab.kind !== "screen" || seen.has(tab.screenId)) continue;
+      seen.add(tab.screenId);
+      if (tab.screenId === own.id) {
+        views.push(screenView(own, this.#packs, registry));
+        continue;
+      }
+      views.push({
+        id: tab.screenId,
+        name: tab.title,
+        available: false,
+        widgets: [],
+        choices: [],
+      });
+    }
+
+    return views;
   }
 
   broadcast(): void {
@@ -197,9 +244,9 @@ export class ShellWindow {
     const parsed = parseSuiteLink(link, this.#packs);
     if (!parsed.ok) {
       this.#notice = parsed.message;
-      await this.#spaces.activateTab(null);
-      this.#hideViews();
-      this.#chrome.webContents.focus();
+      // Home is where a host sentence is visible; the launcher is no longer a second
+      // copy of the pack grid.
+      await this.openHome().catch(() => undefined);
       this.broadcast();
       return;
     }
@@ -242,12 +289,10 @@ export class ShellWindow {
       return;
     }
 
-    // A screen tab is host chrome, not a pack view. This slice accepts it in the
-    // document; rendering it is the next slice, so keep the tab and explain why
-    // the launcher is still what is showing.
+    // A screen tab is host chrome, not a pack view. The chrome page draws the
+    // composition in the same content area; hiding every pack view is what makes it
+    // visible, because a pack view is layered over that area.
     if (tab.kind === "screen") {
-      this.#notice = `${tab.title} is a screen tab; screens are not rendered yet.`;
-      await this.#spaces.activateTab(null).catch(() => undefined);
       this.#hideViews();
       this.#chrome.webContents.focus();
       this.broadcast();
@@ -259,12 +304,10 @@ export class ShellWindow {
       view = this.#viewFor(tab);
     } catch (error) {
       this.#notice = error instanceof Error ? error.message : String(error);
-      // The launcher is hidden whenever a tab is active, and the notice lives in
-      // the launcher. Return to the launcher so the reason is visible; the tab
-      // stays in the strip for the person to close.
-      await this.#spaces.activateTab(null).catch(() => undefined);
-      this.#hideViews();
-      this.#chrome.webContents.focus();
+      // The tab stays in the strip for the person to close; Home is where the
+      // sentence can be read, and it is the host's own surface rather than a second
+      // copy of the launcher.
+      await this.openHome().catch(() => undefined);
       this.broadcast();
       return;
     }
@@ -303,9 +346,61 @@ export class ShellWindow {
   }
 
   async newTab(): Promise<void> {
-    await this.#spaces.activateTab(null);
-    this.#hideViews();
-    this.#chrome.webContents.focus();
+    await this.openHome();
+  }
+
+  /** Open the Home screen tab, or activate the one already showing it. */
+  async openHome(): Promise<void> {
+    const screen = this.#screens.state();
+    const open = this.#spaces
+      .state()
+      .tabs.find((tab) => tab.kind === "screen" && tab.screenId === screen.id);
+    if (open !== undefined) {
+      await this.activateTab(open.id);
+      return;
+    }
+
+    const tab = await this.#spaces.openTab({
+      kind: "screen",
+      screenId: screen.id,
+      title: screen.name,
+    });
+    await this.activateTab(tab.id);
+  }
+
+  /**
+   * Add one placement to the Screen. The registry decides its first size, and a
+   * duplicate id is refused by the document, which says so in the notice.
+   */
+  async addScreenWidget(registryId: string): Promise<void> {
+    if (!isWidgetRegistryId(registryId)) return;
+    const registry = shellWidgetRegistry(this.#packs);
+    const added = await this.#screens.add({
+      registryId,
+      size: preferredWidgetSize(registryId, registry),
+    });
+    this.#notice = added ? null : `${registryId} is already on this Screen.`;
+    this.broadcast();
+  }
+
+  async removeScreenWidget(registryId: string): Promise<void> {
+    if (!isWidgetRegistryId(registryId)) return;
+    await this.#screens.remove(registryId);
+    this.#notice = null;
+    this.broadcast();
+  }
+
+  async moveScreenWidget(registryId: string, direction: string): Promise<void> {
+    if (!isWidgetRegistryId(registryId)) return;
+    if (direction !== "earlier" && direction !== "later") return;
+    await this.#screens.moveBy(registryId, direction);
+    this.broadcast();
+  }
+
+  async resizeScreenWidget(registryId: string, size: string): Promise<void> {
+    if (!isWidgetRegistryId(registryId)) return;
+    if (!isWidgetSize(size)) return;
+    await this.#screens.resize(registryId, size);
     this.broadcast();
   }
 
