@@ -7,7 +7,7 @@ may update them.
 
 | Form | Built for | Who owns the files | Updates arrive by | Root |
 | --- | --- | --- | --- | --- |
-| Flatpak | Canvas, Planner, Budget, Help, the hub and Sync | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
+| Flatpak | Canvas, Planner, Budget, Help, the hub, the host and Sync | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
 | Debug APK | Suite Go | the person, through `adb` or the file manager | the person installs the next APK | no |
 
 There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, Sync is an
@@ -34,7 +34,7 @@ That is why there are two writers, and neither is Start:
 
 ## Flatpak
 
-Canvas, Planner, Budget, Help, the hub and Sync each have a manifest beside the others:
+Canvas, Planner, Budget, Help, the hub, the host and Sync each have a manifest beside the others:
 
 ```
 packaging/flatpak/run.suite.canvas.yml
@@ -42,6 +42,7 @@ packaging/flatpak/run.suite.planner.yml
 packaging/flatpak/run.suite.budget.yml
 packaging/flatpak/run.suite.help.yml
 packaging/flatpak/run.suite.start.yml
+packaging/flatpak/run.suite.shell.yml
 packaging/flatpak/run.suite.sync.yml
 ```
 
@@ -60,6 +61,7 @@ node scripts/flatpak.mjs                       # Canvas: package, build, publish
 node scripts/flatpak.mjs --app planner         # Planner, same path
 node scripts/flatpak.mjs --app budget          # Budget, same path
 node scripts/flatpak.mjs --app start           # the hub, same path
+node scripts/flatpak.mjs --app shell           # the host, same path
 node scripts/flatpak.mjs --app help             # Help
 node scripts/flatpak.mjs --app sync             # the relay: tray app and headless CLI
 node scripts/flatpak.mjs --app planner --no-build   # reuse release/linux-unpacked
@@ -128,6 +130,23 @@ host's `flatpak` and manage deployments. It never writes a document.
 
 When Flatpak deploys the hub, its own row says `Flatpak` and offers **Update Start**. Flatpak replaces
 the deployment, and the new build starts next launch.
+
+### The host as a Flatpak
+
+`node scripts/flatpak.mjs --app shell` builds `run.suite.shell` as **Suite**, from the same unpacked
+tree and zypak base. Its sandbox is the narrow one: `--share=ipc`, `--share=network`, Wayland with an
+X11 fallback, and `--device=dri`. The network namespace is there because a pack with the `network`
+capability runs inside the host's sandbox; the per-pack session policy and that capability still
+decide whether a pack may reach HTTPS or WSS. It has no `--talk-name=org.freedesktop.Flatpak` and no
+host filesystem grant, because the host is not the package manager: it installs packs into its own
+data directory, `~/.var/app/run.suite.shell`, and the picker and links go through the document and
+desktop portals.
+Its desktop entry carries no scheme handler yet; Start keeps `x-scheme-handler/suite` in this phase.
+The host has no `suite.app.json`, so `--channel` is refused for `shell`.
+
+```sh
+flatpak install --user suite run.suite.shell
+```
 
 **OSTree owns updates inside Flatpak.** The sandbox sets `FLATPAK_ID`, and Canvas, Planner and Budget
 then skip their own update check and write a "not checked" report instead of offering a download.

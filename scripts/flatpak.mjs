@@ -12,6 +12,7 @@
  *   node scripts/flatpak.mjs --app start     # Start (the hub) stable, same path
  *   node scripts/flatpak.mjs --app help      # Help stable, same path
  *   node scripts/flatpak.mjs --app sync      # Sync (the tray relay) stable, same path
+ *   node scripts/flatpak.mjs --app shell     # Suite (the host) stable, same path
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
  *   node scripts/flatpak.mjs --app planner --channel slop
  *                                            # pre-release id on the slop branch
@@ -108,6 +109,18 @@ const APPS = {
     metainfo: join(ROOT, "packaging", "flatpak", "run.suite.start.metainfo.xml"),
     unpacked: join(ROOT, "apps", "start", "release", "linux-unpacked"),
   },
+  shell: {
+    id: "run.suite.shell",
+    name: "Suite",
+    package: "@suite/shell",
+    project: join(ROOT, "apps", "shell"),
+    folder: "shell",
+    binary: "suite",
+    manifest: join(ROOT, "packaging", "flatpak", "run.suite.shell.yml"),
+    desktop: join(ROOT, "packaging", "flatpak", "run.suite.shell.desktop"),
+    metainfo: join(ROOT, "packaging", "flatpak", "run.suite.shell.metainfo.xml"),
+    unpacked: join(ROOT, "apps", "shell", "release", "linux-unpacked"),
+  },
   sync: {
     id: "run.suite.sync",
     name: "Suite Sync",
@@ -157,10 +170,12 @@ if (!app) {
 // The hub ships no suite.app.json, so it has no pre-release app identity to
 // generate. Refuse before a package build or a manifest is written. Sync is the
 // same: it is a server that happens to have a tray, and a tier would be a second
-// mailbox on the same data.
-if ((appName === "start" || appName === "sync") && isPreRelease(channel)) {
+// mailbox on the same data. The host is the same too: it ships no suite.app.json,
+// so there is no tier identity to give it.
+const noPreRelease = { start: "Suite Start", sync: "Suite Sync", shell: "Suite" };
+if (Object.hasOwn(noPreRelease, appName) && isPreRelease(channel)) {
   process.stderr.write(
-    `Suite ${appName === "start" ? "Start" : "Sync"} has no pre-release identity: it ships no suite.app.json\n`,
+    `${noPreRelease[appName]} has no pre-release identity: it ships no suite.app.json\n`,
   );
   process.exit(1);
 }
