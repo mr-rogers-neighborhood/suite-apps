@@ -332,11 +332,24 @@ describe("installed pack installation", () => {
     expect(await readdir(root)).toEqual([]);
   });
 
-  it("refuses a version that is not a safe path segment and writes nothing", async () => {
+  it("ignores a version directory that is not a safe path segment", async () => {
     const root = await temporaryRoot();
-    const pack = await fixture({ version: "1.0.0/../../escape" });
-    await expect(install(root, pack)).rejects.toMatchObject({ reason: "invalid" });
-    expect(await readdir(root)).toEqual([]);
+    const pack = await fixture();
+    await install(root, pack);
+    // `parsePackManifest` refuses a slash in a version before an archive can
+    // reach the install guard, but a directory can exist under the install root
+    // with a name the scan must not join into a path.
+    await mkdir(join(root, "demo", "1.0.0\\..\\escape"), { recursive: true });
+
+    const scan = await loadInstalledPacks(root, trust(pack.publicKey));
+    expect(scan.packs).toHaveLength(1);
+    expect(scan.packs[0]?.version).toBe("1.0.0");
+    expect(scan.issues).toContainEqual(
+      expect.objectContaining({
+        reason: "invalid",
+        version: "1.0.0\\..\\escape",
+      }),
+    );
   });
 
   it("refuses a symlinked id root and writes nothing outside", async () => {

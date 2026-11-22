@@ -105,6 +105,20 @@ describe("the pack manifest", () => {
     );
     expect(parsed.ok).toBe(false);
   });
+
+  it("refuses a version that is not semver", () => {
+    // The install path never needs its own segment check for an archive: the
+    // schema refuses the slash before a path can be joined.
+    const parsed = parsePackManifest(manifest({ version: "1.0.0/../../escape" }));
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.issues.some((issue) => issue.path === "version")).toBe(true);
+  });
+
+  it("refuses a description longer than the launcher can show", () => {
+    expect(parsePackManifest(manifest({ description: "x".repeat(201) })).ok).toBe(false);
+    expect(parsePackManifest(manifest({ description: "" })).ok).toBe(false);
+  });
 });
 
 describe("canonical manifest bytes", () => {

@@ -212,7 +212,9 @@ export async function installPackArchive(
 
   const manifest = parseArchiveManifest(manifestBytes);
 
-  // Validate before joining a path, even though the manifest schema already did.
+  // The manifest schema already refuses a slash in `version`, but the guard
+  // stays as the last check before a path is joined; a schema change must not
+  // turn this into a traversal.
   if (!isSafePackId(manifest.id) || !isSafePackPath(`${manifest.id}/${manifest.version}`)) {
     throw new InstalledPackError(
       { reason: "invalid", message: "The manifest names an id or version that is not safe." },
