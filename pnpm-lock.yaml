@@ -1054,6 +1054,9 @@ importers:
       '@suite/desktop':
         specifier: workspace:*
         version: link:../../packages/desktop
+      '@suite/screens':
+        specifier: workspace:*
+        version: link:../../packages/screens
       '@suite/theme':
         specifier: workspace:*
         version: link:../../packages/theme

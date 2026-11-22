@@ -554,13 +554,13 @@ select:disabled {
 }
 
 /*
- * The dashboard.
+ * The Home Screen.
  *
  * A three-column host grid: `1x1` is one column, `2x1` is two, `full` is the row. The
  * widget is the surface and the cards inside it are content, so neither draws a second
  * frame. Nothing here decides which widget exists — only where one sits.
  */
-.dashboard {
+.home-screen {
   margin-bottom: 4px;
 }
 
@@ -677,8 +677,8 @@ select:disabled {
   padding-top: 0;
 }
 
-/* The dashboard note is a sentence about the layout, not a panel of its own. */
-#dashboard-note {
+/* The Screen note is a sentence about the document, not a panel of its own. */
+#screen-note {
   margin-bottom: 12px;
   padding: 10px 14px;
   border-style: solid;
@@ -686,7 +686,7 @@ select:disabled {
   font-size: 12px;
 }
 
-.dashboard-add {
+.screen-add {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -695,10 +695,185 @@ select:disabled {
   font-size: 12px;
 }
 
-.dashboard-add select {
+.screen-add select {
   min-width: 160px;
   font-size: 12px;
   padding: 3px 26px 3px 8px;
+}
+
+/* The Screen's own heading sits above the widgets, with the one mode switch. */
+.screen-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+
+.screen-name {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+.screen-label {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.screen-edit-note {
+  margin: 0 0 10px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.button.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* An app widget's declared capture form and instance settings. */
+.widget-capture,
+.widget-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.widget-field,
+.widget-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.widget-field input,
+.widget-setting input {
+  min-width: 160px;
+  font-size: 12px;
+}
+
+.widget-unknown {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px dashed var(--hairline);
+  border-radius: 8px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+/* The host-owned Screens manager, folded away below the Screen. */
+.screens-manager {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+.screens-manager summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.screens-manager-body {
+  margin-top: 10px;
+}
+
+.screens-intro,
+.screens-note {
+  margin: 0 0 10px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.screens-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.screen-row {
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.screen-row-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.screen-row-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.screen-badges {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.screen-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.screen-badge-warning {
+  color: var(--danger);
+}
+
+.screen-row-tools,
+.screen-rename,
+.screen-create,
+.screen-replacement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.screen-row-tools .button,
+.screen-rename .button,
+.screen-create .button,
+.screen-replacement .button {
+  font-size: 12px;
+  padding: 3px 8px;
+}
+
+.screen-rename-input {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.screen-replacement {
+  padding-top: 8px;
+  border-top: 1px dashed var(--hairline);
+}
+
+.screen-replacement .screens-note {
+  flex-basis: 100%;
+  margin: 0;
 }
 
 /* Named last so a widget's controls still line up once a narrower column arrives. */
