@@ -6,6 +6,7 @@
  * duplicated nowhere: both sides of IPC use these shapes.
  */
 import { PACK_CAPABILITIES, type PackCapability } from "@suite/pack/capabilities";
+import type { FileHandleInfo } from "@suite/pack-runtime";
 
 export const CHROME_SCHEME = "suite-shell";
 export const CHROME_HOST = "app";
@@ -44,12 +45,39 @@ export const PACK_IPC = {
   backupFile: "suite:files:backup",
   lockFile: "suite:files:lock",
   unlockFile: "suite:files:unlock",
+  pickExternalFile: "suite:files:pick-open",
+  pickExternalSave: "suite:files:pick-save",
+  readExternalFile: "suite:files:read-external",
+  writeExternalFile: "suite:files:write-external",
+  closeExternalFile: "suite:files:close-external",
+  importExternalFile: "suite:files:import-external",
   setTitle: "suite:pack:set-title",
   openExternal: "suite:pack:open-external",
 } as const;
 
-export type { FileEntry, FileLock, FileReadOptions, FileWriteOptions } from "@suite/pack-runtime";
+export type {
+  FileEntry,
+  FileFilter,
+  FileHandle,
+  FileHandleInfo,
+  FileLock,
+  FileReadOptions,
+  FileWriteOptions,
+} from "@suite/pack-runtime";
 export { PACK_CAPABILITIES, type PackCapability };
+
+/**
+ * What the main process returns for a picked handle.
+ *
+ * The token is the only name for the file across IPC; the absolute path stays in
+ * the main process. `info` is a name and a snapshot of the size and mtime, never
+ * a path. The preload wraps this into the `FileHandle` the pack sees, with the
+ * token closed over rather than exposed as a property.
+ */
+export interface IssuedFileHandle {
+  readonly token: string;
+  readonly info: FileHandleInfo;
+}
 
 /** The options `files.remove` accepts. The store owns recursion and path checks. */
 export interface FileRemoveOptions {

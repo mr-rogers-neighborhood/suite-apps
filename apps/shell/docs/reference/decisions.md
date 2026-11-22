@@ -54,8 +54,14 @@ The rules that shape the Suite host.
   Each `(container, pack)` gets one `PackFileStore`, opened lazily under
   `files/<container>/<pack>` in the host data root and never inside the pack's code directory.
   The lock owner is the tab id, so destroying a view releases the locks it held.
-- External files are still a design, not a bridge: a user-consented host handle with open-in-place
-  or import, so a pack never learns an absolute path.
+- External files are a user-consented host handle. The person picks in a host-owned platform dialog;
+  the main process keeps the absolute path and the pack gets an opaque token plus
+  `{ name, size, mtimeMs }`. Filters are data (a display name and bare lower-case extensions), never
+  a path or a glob. A token is scoped to the sender's `(container, pack, tab)` and is released when
+  the view is destroyed, crashes or is replaced. `pickOpen`/`pickSave` return `null` on cancellation.
+  `pickSave` does not truncate until the pack writes; a write is a temporary sibling renamed over the
+  destination, so a failure leaves the previous file in place. `importFile` copies into the pack's
+  own `files` root and returns a relative `FileEntry`, never an external path.
 - A document id is a file name inside the sender's pack root, never a path. Slashes, `..`, absolute
   paths and control characters are refused before the filesystem is reached. A files path is
   relative and slash-separated; the same refusals apply before `realpath` and `lstat`.
@@ -127,7 +133,6 @@ The rules that shape the Suite host.
 ## What this spike deliberately leaves out
 
 - a remote pack index, pack updates and uninstall UI;
-- external file handles: the picker, open-in-place and import;
 - the host's blind relay transport for pack sync;
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;

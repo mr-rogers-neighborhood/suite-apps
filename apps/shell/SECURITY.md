@@ -12,6 +12,20 @@ the trust boundary.
   own root; slashes (for a document), `..`, control characters and absolute paths are refused before
   the filesystem is reached. The `files` store proves every real path is inside the root, refuses
   symlinks and owns locks and backups. The host never parses a pack document.
+- **External files need the person and the `files` capability.** `pickOpen` and `pickSave` show a
+  host-owned platform dialog; the absolute path stays in the main process and the pack gets only an
+  opaque token plus `{ name, size, mtimeMs }`. Filters are validated as data (a plain name and bare
+  lower-case extensions without a dot), and a filter name may not contain a path separator or a glob
+  metacharacter. A pack without `files` gets a rejection before the dialog opens. A token is scoped
+  to the sender's `(container, pack, tab)`; another pack or tab is refused, and `importFile` can only
+  copy from a handle the sender owns. Every handle a tab holds is released when its view is
+  destroyed, crashes (`render-process-gone`) or is replaced by a navigation.
+- **External I/O is capped and errors are pathless.** Reads and writes use the pack-host default
+  (`PACK_FILE_MAX_BYTES`, 256 MiB). `pickSave` does not create or truncate the destination; a write
+  goes to a temporary sibling and is renamed over the destination only on success, so a failed write
+  leaves the previous file in place and removes the temporary file. `importFile` copies into the
+  pack's own `files` root and refuses an oversized source. A filesystem error carries a path in its
+  message, so the host logs the original and returns a sentence that names no file.
 - **Network is denied by default.** A pack without the `network` capability may load only its own
   protocol origin; its session cancels everything else and the protocol handler sets a CSP. A
   network-capable pack may reach HTTPS and WSS only. Handing a link to the OS browser is egress

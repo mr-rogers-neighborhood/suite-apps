@@ -13,4 +13,9 @@ export {
   normaliseRoot,
   resolveInside,
 } from "./path.js";
-export { PackFileStore, type PackFileStoreOptions, type RemoveOptions } from "./store.js";
+export {
+  PACK_FILE_MAX_BYTES,
+  PackFileStore,
+  type PackFileStoreOptions,
+  type RemoveOptions,
+} from "./store.js";

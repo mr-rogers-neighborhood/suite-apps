@@ -27,7 +27,8 @@ export interface PackFileStoreOptions {
   readonly now?: () => Date;
 }
 
-const DEFAULT_MAX_FILE_BYTES = 256 * 1024 * 1024;
+/** The pack-host default cap for one file, in bytes. The shell's external surface uses the same number. */
+export const PACK_FILE_MAX_BYTES = 256 * 1024 * 1024;
 
 function codeOf(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException | undefined)?.code;
@@ -66,7 +67,7 @@ export class PackFileStore {
   private constructor(root: string, realRoot: string, options: PackFileStoreOptions) {
     this.#root = root;
     this.#realRoot = realRoot;
-    this.#maxFileBytes = options.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
+    this.#maxFileBytes = options.maxFileBytes ?? PACK_FILE_MAX_BYTES;
     this.#now = options.now ?? (() => new Date());
   }
 
