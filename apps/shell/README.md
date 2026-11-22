@@ -10,6 +10,7 @@ separate Flatpaks. The point of this tree is to prove the host boundary before a
 - renderer-only packs: no Node, no raw filesystem, no network unless the manifest declares it;
 - a scoped document API that carries opaque bytes and never a path;
 - a scoped `files` service with relative paths, host-owned backups and locks;
+- a user-consented external file surface: a host-owned picker, opaque handles and import;
 - a shell-owned Loro space document that restores tabs and is container-ready;
 - three sample packs that exercise the boundary on purpose.
 
@@ -112,7 +113,10 @@ window.suite = {
   containerId,
   info(),
   documents: { list, create, open, save, remove },
-  files: { list, stat, mkdir, read, write, rename, remove, backup, lock },
+  files: {
+    list, stat, mkdir, read, write, rename, remove, backup, lock,
+    pickOpen, pickSave, importFile,
+  },
   setTitle(title),
   openExternal(url),
 };
@@ -136,8 +140,28 @@ The spike serves `documents`, `files` and the `network` policy. A manifest that 
 shared capability vocabulary is wider than this host, and loading a pack into a missing service
 would only produce buttons that fail.
 
-External files — the platform picker, open-in-place and import — are designed in `@suite/pack-runtime`
-but not implemented. A pack cannot choose an arbitrary path yet.
+External files are the consented half of `files`: the person, not the pack, chooses what to open or
+where to save. `pickOpen(filters)` and `pickSave(suggestedName)` show a host-owned platform dialog
+and resolve to a `FileHandle`, or to `null` when the person cancels. The host keeps the absolute path
+in the main process; the pack receives an opaque token and `{ name, size, mtimeMs }`, and `read`,
+`write` and `close` spend the token over IPC. A token is scoped to the sending tab's
+`(container, pack, tab)`; another pack or tab is refused, and every handle a tab owns is released
+when its view is destroyed, crashes or is replaced.
+
+Filters are data: `{ name, extensions }` with bare lower-case extensions and no dot. A filter name
+may not contain a path separator, a glob metacharacter or a drive colon, so it never names a path or
+a pattern; invalid filters are refused before the dialog opens. The pack-host cap (`256 MiB`, exported
+as `PACK_FILE_MAX_BYTES`) applies to both reads and writes.
+
+The person chooses the save destination; picking one does not create or truncate it. A new
+destination reports `{ name, size: 0, mtimeMs: 0 }`; an existing one reports its current values and
+is left untouched. A handle's write
+goes to a temporary sibling in the destination's own directory and is renamed over it only on
+success. A failed write leaves the previous file in place and removes the temporary file; a
+successful write replaces the file rather than truncating it in place. `importFile(handle, name?)`
+reads the external bytes and copies them into the pack's own `files` root through `PackFileStore`,
+returning a `FileEntry` whose `path` is relative to that root. It refuses an oversized source and
+never returns an external path.
 
 A pack's own browser storage (`localStorage`, IndexedDB) is per-pack and persistent because every
 pack has its own session partition. The `storage` capability refers to a separate host-provided
@@ -147,7 +171,8 @@ A pack cannot:
 
 - use Node or `require`;
 - read another pack's documents or files;
-- ask for an absolute path or a path outside its own root;
+- ask for an absolute path or a path outside its own root, or learn the path of a file the person
+  picked through the host dialog;
 - write a download outside its document or file root;
 - reach the network without the `network` capability, or hand a link to the OS browser through
   `openExternal` or `window.open`;
@@ -179,7 +204,6 @@ decision record owns that trade.
 ## What is not built yet
 
 - a remote pack index, uninstall and pack updates;
-- external file handles: the picker, open-in-place and import;
 - the host's blind relay transport for pack sync;
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;
@@ -210,5 +234,7 @@ mise exec -- pnpm --filter @suite/shell build
 ```
 
 The tests cover pack manifest discovery and traversal, document scoping, the `files` service's
-per-pack and per-container isolation, lock ownership, space document open/close/title and
-persistence, and the channel names the two preloads spell out by hand.
+per-pack and per-container isolation, lock ownership, the external surface's filter validation,
+token ownership and cancellation, import into the pack root, space document open/close/title and
+persistence, and the channel names the two preloads spell out by hand. The platform dialog itself is
+not exercised: tests use an injected picker, because a native dialog cannot run headlessly.
