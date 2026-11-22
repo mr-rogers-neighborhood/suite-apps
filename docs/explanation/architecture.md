@@ -75,8 +75,8 @@ That is the released form, and it remains so until the migration is proven.
 signed pack instead of launching a separate process. It is not the same-process mount this section
 rejects, because the boundary moves from the OS sandbox to a per-pack renderer, origin and session. A
 real shipping app — Budget first — has to run as a signed pack with its documents and consented
-export/import before Start stops shipping. [Decisions](../reference/decisions.md#desktop-host) owns
-the rule; the released apps remain separate Flatpaks and Start until then.
+export/import before Start stops shipping. [Shipping packs](../reference/decisions.md#shipping-packs)
+owns the rule; the released apps remain separate Flatpaks and Start until then.
 
 ### Why not one container window
 

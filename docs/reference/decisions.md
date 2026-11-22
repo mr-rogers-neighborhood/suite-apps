@@ -49,9 +49,9 @@ The rules that shape this repository. Each is current; the code follows it.
   one Electron app that opens signed, sandboxed packs as tabs, and it takes over Start's role as the
   hub. It is a spike today: the released desktop suite is still separate Flatpaks plus Start, and
   that remains the shipping form until the migration is proven.
-- **The migration is proven by an app, not by a window.** A real shipping app must run as a signed
-  pack with its documents and consented export/import; Budget is the first witness. The host also
-  carries Start's catalogue, routing and update surface before Start stops shipping.
+- **The migration is proven by an app, not by a window.** [Shipping packs](#shipping-packs) is the
+  bar, and Budget is the first witness. The host also carries Start's catalogue, routing and update
+  surface before Start stops shipping.
 - The host is not the same-process container that [Architecture](../explanation/architecture.md)
   rejects: each pack gets its own `WebContentsView`, custom-protocol origin and session partition.
   One renderer that mounts every domain is still rejected, because it loses per-app isolation,
@@ -105,6 +105,21 @@ The rules that shape this repository. Each is current; the code follows it.
   installable on the other. Pack files are the distribution path today; a signed remote index is a
   later path, and the intent is that both are first-class once the shell has one. The shell itself
   updates through its OS package.
+
+### Shipping packs
+
+The acceptance bar for a shipping desktop pack. A real shipping app must run as a signed pack with its
+documents and consented export/import; Budget is the first witness. Until one app passes, the released
+suite stays separate Flatpaks plus Start.
+
+- The pack owns its document format. The host brokers bytes and never parses it, so a pack's schema,
+  migrations and file layout stay its own.
+- A one-time import of an existing document leaves the originals untouched and keeps a copy inside the
+  pack's own scoped files. Import is not a move, and the host does not rewrite the source.
+- Start remains the shipping hub until the pack is proven. The pack proof does not move Start's
+  catalogue, routing or updates into the host.
+- Go's format split is [#202](https://github.com/mr-rogers-neighborhood/suite-apps/issues/202); that
+  issue owns the detail. The desktop pack format does not converge here.
 
 ## Packaging
 
