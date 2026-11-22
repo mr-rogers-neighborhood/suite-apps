@@ -1,0 +1,74 @@
+# Suite — the host — as a Flatpak.
+#
+# Build the unpacked app first, then let this manifest package it:
+#
+#   pnpm --filter @suite/shell run package:dir
+#   node scripts/flatpak.mjs --app shell
+#
+# The manifest packages what electron-builder produced rather than rebuilding it
+# inside flatpak-builder. The renderer and the shell are built by the same gate
+# the other artifact forms use, and the sandbox should not carry a second pnpm
+# and a network build. `org.electronjs.Electron2.BaseApp` supplies zypak, which
+# gives Electron its sandbox without a setuid chrome-sandbox.
+#
+# The host is not the package manager. It installs packs into its own sandbox
+# data directory and opens them as tabs, so its sandbox is the narrow one: no
+# host Flatpak service, no host filesystem grants. The file picker and links go
+# through the document and desktop portals.
+app-id: run.suite.shell
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: run.suite.shell
+separate-locales: false
+
+# Build-time only. The Electron BaseApp's asar patchers rewrite `desktopName`
+# while the manifest builds; the app commit carries a copy of the base's
+# `/app/bin`, and nothing at runtime reads either tool. `cleanup` only matches
+# files a module installed, and these came from the base, so the patterns have
+# to run as cleanup commands.
+cleanup-commands:
+  - rm -f /app/bin/patch-desktop-filename /app/bin/patch-electron-desktop-filename
+
+finish-args:
+  # Chromium's browser and renderer processes share memory through this.
+  - --share=ipc
+  # Native Wayland first, with X11 as the fallback for an X11 session.
+  - --socket=wayland
+  - --socket=fallback-x11
+  # GPU acceleration for the window; without it Electron renders in software.
+  - --device=dri
+
+modules:
+  - name: suite-shell
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/shell
+      - cp -a app/. /app/shell/
+      # Electron's XDG application id and WM_CLASS come from package.json's
+      # `desktopName`, so the BaseApp helper rewrites the asar copy to the
+      # Flatpak id. Without it Wayland groups the window under `suite`.
+      - patch-desktop-filename /app/shell/resources/app.asar
+      - install -Dm755 run.suite.shell /app/bin/run.suite.shell
+      - install -Dm644 run.suite.shell.desktop /app/share/applications/run.suite.shell.desktop
+      - install -Dm644 run.suite.shell.metainfo.xml /app/share/metainfo/run.suite.shell.metainfo.xml
+      - install -Dm644 icons/run.suite.shell-48.png /app/share/icons/hicolor/48x48/apps/run.suite.shell.png
+      - install -Dm644 icons/run.suite.shell-64.png /app/share/icons/hicolor/64x64/apps/run.suite.shell.png
+      - install -Dm644 icons/run.suite.shell-128.png /app/share/icons/hicolor/128x128/apps/run.suite.shell.png
+      - install -Dm644 icons/run.suite.shell-256.png /app/share/icons/hicolor/256x256/apps/run.suite.shell.png
+      - install -Dm644 icons/run.suite.shell-512.png /app/share/icons/hicolor/512x512/apps/run.suite.shell.png
+    sources:
+      - type: dir
+        path: ../../apps/shell/release/linux-unpacked
+        dest: app
+      - type: file
+        path: run.suite.shell
+      - type: file
+        path: run.suite.shell.desktop
+      - type: file
+        path: run.suite.shell.metainfo.xml
+      - type: dir
+        path: icons
+        dest: icons

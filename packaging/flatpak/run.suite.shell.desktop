@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Suite
+Comment=One window for your Suite apps
+Exec=run.suite.shell %U
+Icon=run.suite.shell
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupWMClass=run.suite.shell
