@@ -7,6 +7,24 @@ shipped host.
 
 No changes yet.
 
+## [0.2.0] - 2026-11-22
+
+### Added
+
+- **Home is a Screen.** The host opens a shell-owned Home Screen before any pack, renders the pack
+  grid as a host widget, and draws declared app widgets and named placeholders for unknown ones.
+- **Screen tabs.** A tab is either a pack or a host Screen. Opening, switching and restoring a Screen
+  tab works without creating a pack view, and the space document stores both tab kinds.
+- **The pack catalogue and lifecycle.** A local directory of `.suitepack` files is verified before
+  it is listed, trusted entries install, and uninstall and additive updates are explicit actions
+  with a refusal sentence for anything that fails verification.
+- **Routing.** `suite://<pack-id>/<path>` links resolve through one host-owned function and open the
+  current installed pack; a malformed, unknown or uninstalled target is refused with a sentence.
+- **The external file surface.** A host-owned picker hands a pack opaque handles, and import copies
+  a person's file into the pack root without exposing a host path.
+- **Packaging as `run.suite.shell`.** The host now builds as a Flatpak named Suite, with a narrower
+  sandbox than Start: no host Flatpak service, no host filesystem grants, and no scheme handler yet.
+
 ## [0.1.0] - 2026-11-22
 
 ### Added
