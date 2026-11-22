@@ -98,11 +98,36 @@ projections compute the month, targets, rules, reports, and imports.
 | ----------------------------- | ----------------------------------------------------------------------------------- |
 | `src`                         | Electron main, preload bridge, React renderer, Storybook, Playwright                |
 | `packages/core`               | Schema, `BudgetDocument`, month math, rules, importers, exports, reports, templates |
+| `pack`                        | The signed desktop pack: renderer build, `window.suiteBudget` prelude, manifest     |
 | `docs/reference`              | Architecture, conventions, data model, interface                                    |
 | `docs/reference/decisions.md` | The rules that shape Budget                                                         |
 
 Read [AGENTS.md](AGENTS.md) before contributing (human or agent), and
 [docs/reference/architecture.md](docs/reference/architecture.md) for the longer version.
+
+## As a desktop pack
+
+`pack/` builds the same renderer with a bridge prelude, for a host that carries the app as a signed
+`.suitepack` instead of shipping Budget as its own Electron window.
+
+```sh
+pnpm budget:pack                 # renderer + prelude + signature
+pnpm budget:pack --out /tmp/budget.suitepack
+```
+
+The build writes `apps/budget/pack/dist`, puts the prelude before the app script, and signs the
+directory with the pack key pinned in `packages/pack/src/pinnedKey.ts`. A key that does not match the
+pin is refused before anything is signed; `pnpm keys status` compares them. The archive lands in
+`apps/budget/.dev/` by default.
+
+Inside the pack the renderer still talks only through `BudgetBridge`. The prelude owns the
+`BudgetDocument`, applies the renderer's CRDT updates, and writes a snapshot when the page is hidden,
+on `pagehide`, and on the host's flush. Documents are identified by their pack document id; the
+`path` on a library entry is a display value, never a filesystem path. External `.budget`, JSON, CSV
+and QIF files go through the host's `pickOpen`/`pickSave` handles.
+
+What is not built yet: the host has no "show in folder", so reveal is a notice; the pack has no sync;
+and the shell integration is not claimed until the host half lands and installs this pack.
 
 ## Security
 
