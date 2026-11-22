@@ -108,9 +108,9 @@ page that is not there; `--publish` rewrites the page with real links once the r
 The signed Flatpak remote above remains the update path. Per-app releases carry no app binaries, and
 GitHub Packages is not used for the Flatpaks.
 
-## Release Suite (the host)
+## Release Suite Shell (the host)
 
-Suite is the desktop host and the first row of the rolling release's Desktop table. One command runs
+Suite Shell is the desktop host and the first row of the rolling release's Desktop table. One command runs
 its publish sequence in the order that keeps every artifact on a commit the gate proved:
 
 ```sh

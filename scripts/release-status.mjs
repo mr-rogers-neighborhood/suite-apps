@@ -75,7 +75,7 @@ export const NOTES_DIR = ".dev/releases";
 export const APPS = [
   {
     id: "shell",
-    name: "Suite",
+    name: "Suite Shell",
     packageJson: "apps/shell/package.json",
     changelog: "apps/shell/CHANGELOG.md",
     tagPrefix: "shell-v",
@@ -497,26 +497,29 @@ function goInstallNote(entries, { tag = null, apkLive = false }) {
  * reader who starts at a table would run a command that cannot work yet.
  */
 export function aggregateReleaseBody(entries, { date, tag = null, apkLive = false }) {
+  const desktop = entriesForSection(entries, "desktop");
+  const otherDesktop = desktop.filter((entry) => entry.app.id !== "shell");
   return [
-    `The current version of every Suite app on ${date}, in one place. GitHub shows one`,
-    "\"Latest\" release per repository, so this is it; the per-app releases are history.",
+    `**Suite Shell** is the desktop host; **Suite Go** is the mobile app. This is the ${date} build.`,
+    "The split apps remain on the same signed remote, below.",
     "",
-    "## Install",
-    "",
-    "The signed Flatpak remote is where the desktop apps come from. Add it once, before any",
-    "`flatpak install` line below works:",
+    "## Suite Shell (desktop)",
     "",
     "```sh",
     `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
+    "flatpak install --user suite run.suite.shell",
+    "flatpak run run.suite.shell",
     "```",
     "",
     `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
     "",
-    ...aggregateSection("Desktop", entriesForSection(entries, "desktop"), { tag, apkLive }),
-    "",
-    ...aggregateSection("Mobile", entriesForSection(entries, "mobile"), { tag, apkLive }),
+    "## Suite Go (mobile)",
     "",
     ...goInstallNote(entries, { tag, apkLive }),
+    "## Also on the remote",
+    "",
+    ...aggregateTable(otherDesktop, { tag, apkLive }),
+    "",
     "## Update",
     "",
     "Once the remote is added, the desktop apps update with:",
@@ -601,13 +604,13 @@ export function releasesPage(
   const latest = aggregatePublished
     ? [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
-        `[aggregate Suite ${date} release](${releaseUrl(tag)}), which is the repository's`,
+        `[aggregate Suite Shell + Suite Go ${date} release](${releaseUrl(tag)}), which is the repository's`,
         "\"Latest\" release on GitHub. The per-app releases stay as history and carry no app",
         "binaries.",
       ]
     : [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
-        `rolling Suite ${date} release, which is not published yet. A row marked **pending**`,
+        `rolling Suite Shell + Suite Go ${date} release, which is not published yet. A row marked **pending**`,
         "has no release to link until `--publish` creates it and refreshes this page; the",
         "per-app releases stay as history and carry no app binaries.",
       ];
@@ -987,7 +990,7 @@ function mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive }
     "gh",
     releaseArgs({
       tag,
-      title: `Suite ${date}`,
+      title: `Suite Shell + Suite Go — ${date}`,
       notesPath: join(NOTES_DIR, `${tag}.md`),
       latest: true,
       action: aggregateExisting === null ? "create" : "edit",
@@ -1120,7 +1123,7 @@ async function main(argv) {
   for (const entry of entries) process.stdout.write(`\n${summarize(entry, releases)}\n`);
 
   process.stdout.write(
-    `\nSuite ${date} · ${tag} · aggregate\n` +
+    `\nSuite Shell + Suite Go ${date} · ${tag} · aggregate\n` +
       `  release    ${
         releases === null
           ? "unknown (gh release list failed)"
@@ -1171,7 +1174,7 @@ async function main(argv) {
       "gh",
       releaseArgs({
         tag,
-        title: `Suite ${date}`,
+        title: `Suite Shell + Suite Go — ${date}`,
         notesPath: join(NOTES_DIR, `${tag}.md`),
         latest: true,
         action: aggregateExisting === null ? "create" : "edit",
