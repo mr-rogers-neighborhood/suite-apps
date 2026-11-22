@@ -51,6 +51,18 @@ export interface IssuedFileLock {
   readonly path: string;
 }
 
+/**
+ * Whether a navigation replaces the page that held a tab's locks.
+ *
+ * A main-frame, non-same-document navigation discards the old document, and with
+ * it the live page that held the tokens: a reload and a same-origin link both
+ * qualify. A hash change or `pushState` keeps the page and its locks, and a
+ * subframe never owns them.
+ */
+export function navigationReleasesLocks(isMainFrame: boolean, isSameDocument: boolean): boolean {
+  return isMainFrame && !isSameDocument;
+}
+
 interface HeldLock {
   readonly key: string;
   readonly owner: string;

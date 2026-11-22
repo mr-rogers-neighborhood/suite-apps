@@ -207,7 +207,10 @@ export class ShellWindow {
       this.window.contentView.removeChildView(view);
       if (!view.webContents.isDestroyed()) {
         clearPackSender(view.webContents.id);
-        view.webContents.close();
+        // A page's `beforeunload` may cancel `window.close`, leaving a token
+        // owned by a tab that is no longer open. Closing without waiting
+        // destroys the contents, so `destroyed` and the lock release run.
+        view.webContents.close({ waitForBeforeUnload: false });
       }
     }
     await this.activateTab(next);
@@ -321,7 +324,15 @@ export class ShellWindow {
         this.broadcast();
       }
     });
+    view.webContents.on("did-start-navigation", (details) => {
+      // A reload or a same-origin navigation replaces the document that held
+      // the tab's locks. Same-document navigation keeps that page alive.
+      if (!navigationReleasesLocks(details.isMainFrame, details.isSameDocument)) return;
+      this.#onViewClosed?.(tab.id);
+    });
     view.webContents.on("render-process-gone", (_event, details) => {
+      // The page that held the tokens is gone even though the view may reload.
+      this.#onViewClosed?.(tab.id);
       this.#notice = `${pack.name} stopped: ${details.reason}.`;
       this.broadcast();
     });
@@ -359,11 +370,13 @@ export class ShellWindow {
     for (const view of this.#views.values()) {
       if (!view.webContents.isDestroyed()) {
         clearPackSender(view.webContents.id);
-        view.webContents.close();
+        view.webContents.close({ waitForBeforeUnload: false });
       }
     }
     this.#views.clear();
-    if (!this.#chrome.webContents.isDestroyed()) this.#chrome.webContents.close();
+    if (!this.#chrome.webContents.isDestroyed()) {
+      this.#chrome.webContents.close({ waitForBeforeUnload: false });
+    }
   }
 }
 

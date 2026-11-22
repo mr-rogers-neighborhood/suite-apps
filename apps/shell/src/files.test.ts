@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStoreError } from "@suite/pack-host";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type FilesScope, filesScope, PackFilesService } from "./files.js";
+import { type FilesScope, filesScope, navigationReleasesLocks, PackFilesService } from "./files.js";
 import type { PackCapability } from "./shared.js";
 
 let root: string;
@@ -157,6 +157,13 @@ describe("the files service", () => {
 
     const again = await service.lock(welcome, "note.txt");
     await service.unlock(welcome, again.token);
+  });
+
+  it("releases locks when a navigation replaces the page", () => {
+    expect(navigationReleasesLocks(true, false)).toBe(true);
+    // Same-document navigation keeps the page, and a subframe owns no tokens.
+    expect(navigationReleasesLocks(true, true)).toBe(false);
+    expect(navigationReleasesLocks(false, false)).toBe(false);
   });
 
   it("does not let another tab spend a lock token", async () => {
