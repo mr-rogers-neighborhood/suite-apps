@@ -134,10 +134,13 @@ the deployment, and the new build starts next launch.
 ### The host as a Flatpak
 
 `node scripts/flatpak.mjs --app shell` builds `run.suite.shell` as **Suite**, from the same unpacked
-tree and zypak base. Its sandbox is the narrow one: `--share=ipc`, Wayland with an X11 fallback, and
-`--device=dri`. It has no `--talk-name=org.freedesktop.Flatpak` and no host filesystem grant, because
-the host is not the package manager: it installs packs into its own data directory,
-`~/.var/app/run.suite.shell`, and the picker and links go through the document and desktop portals.
+tree and zypak base. Its sandbox is the narrow one: `--share=ipc`, `--share=network`, Wayland with an
+X11 fallback, and `--device=dri`. The network namespace is there because a pack with the `network`
+capability runs inside the host's sandbox; the per-pack session policy and that capability still
+decide whether a pack may reach HTTPS or WSS. It has no `--talk-name=org.freedesktop.Flatpak` and no
+host filesystem grant, because the host is not the package manager: it installs packs into its own
+data directory, `~/.var/app/run.suite.shell`, and the picker and links go through the document and
+desktop portals.
 Its desktop entry carries no scheme handler yet; Start keeps `x-scheme-handler/suite` in this phase.
 The host has no `suite.app.json`, so `--channel` is refused for `shell`.
 

@@ -35,6 +35,11 @@ cleanup-commands:
 finish-args:
   # Chromium's browser and renderer processes share memory through this.
   - --share=ipc
+  # A pack with the `network` capability runs inside the host's sandbox, so the
+  # host needs the host's network namespace to carry its HTTPS and WSS requests.
+  # The per-pack session policy and the capability are still the gate: this
+  # grant only makes the namespace reachable when a pack declares network.
+  - --share=network
   # Native Wayland first, with X11 as the fallback for an X11 session.
   - --socket=wayland
   - --socket=fallback-x11
