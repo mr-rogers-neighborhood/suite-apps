@@ -3,6 +3,8 @@ import { z } from "zod";
 export const SCHEMA_VERSION = 1;
 
 export const READY_TO_ASSIGN = "rta";
+/** The name an export writes for income. An import maps it back to `READY_TO_ASSIGN`. */
+export const READY_TO_ASSIGN_NAME = "Ready to Assign";
 
 export const timestampSchema = z
   .string()

@@ -8,7 +8,28 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 ## [Unreleased]
 
-No changes yet.
+### Fixed
+
+- **An export re-imports as the same money.** Importing a CSV or QIF this app wrote kept neither
+  Ready to Assign nor a transfer's direction: income came back as a category or an uncategorized row,
+  and a transfer could arrive reversed or as an account transferring to itself. The reserved
+  `Ready to Assign` name now maps back to income, a QIF transfer takes its direction from the
+  register's amount sign, and the duplicate leg from a whole-budget QIF is skipped.
+- **A punctuation-only amount is refused, not posted as zero.** A row whose amount cell held just
+  `.` or `,` used to import as 0.00. It is now a row error, and a file with no readable row is refused
+  with the first row's reason instead of offering an empty import.
+- **A QIF export cannot be broken by a line break.** A payee, memo, category or account name
+  containing a newline used to become a new QIF field line; it is now flattened to a space, and the
+  QIF `N` reference id survives the round trip.
+- **Escape in an assigned amount cancels the edit.** Blurring after Escape used to commit the text
+  the person had just cancelled; the previous amount stays, and the field keeps the grid's focus.
+
+### Accessibility
+
+- **Budget vs actual reads as a table.** The report's header and rows now carry table, row, header
+  and cell roles, so a screen reader can associate a figure with its column. Component tests pin the
+  range label, a tab's selected state, a chart's name and data table, and the register row's own
+  Enter and Space.
 
 ## [0.4.1] - 2026-11-21
 

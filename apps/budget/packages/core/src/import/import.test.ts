@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { type CsvMapping, findDuplicateCandidates, parseCsv, parseQif } from "../index";
+import {
+  type CsvMapping,
+  findDuplicateCandidates,
+  type ImportRow,
+  parseCsv,
+  parseQif,
+  READY_TO_ASSIGN,
+  reservedCategoryId,
+  transferDirection,
+} from "../index";
 
 const mapping: CsvMapping = {
   delimiter: ",",
@@ -122,6 +131,84 @@ L[Savings]
       categoryName: null,
       transferAccountName: "Savings",
     });
+  });
+});
+
+describe("import edges", () => {
+  it("should report an empty file instead of an empty batch", () => {
+    expect(parseCsv("", mapping, "USD", 2).isErr()).toBe(true);
+    expect(parseCsv("Date,Payee,Memo,Amount,Category\n", mapping, "USD", 2).isErr()).toBe(true);
+    expect(parseQif("", "USD", 2, { dateFormat: "us" }).isErr()).toBe(true);
+  });
+
+  it("should name the first bad row when no row can be read", () => {
+    const text = `Date,Payee,Memo,Amount,Category
+not-a-date,Shop,,.,Food
+01/06/2026,Market,,nope,Food`;
+    const result = parseCsv(text, mapping, "USD", 2);
+
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe("unreadable");
+    expect(result.error.message).toContain("row 2");
+  });
+
+  it("should keep a separator-only amount out of the money", () => {
+    const text = `Date,Payee,Memo,Amount,Category
+01/05/2026,Shop,,.,Food
+01/06/2026,Market,,"-5.00",Food`;
+    const result = parseCsv(text, mapping, "USD", 2);
+    if (result.isErr()) throw result.error;
+
+    expect(result.value.errors).toHaveLength(1);
+    expect(result.value.errors[0]?.row).toBe(2);
+    expect(result.value.rows.map((row) => row.amountMinor)).toEqual([-500]);
+  });
+
+  it("should read a BOM, CRLF and a quoted line break", () => {
+    const text =
+      '\uFEFFDate,Payee,Memo,Amount,Category\r\n01/05/2026,Shop,"Line one\nLine two",-12.34,Food\r\n';
+    const result = parseCsv(text, mapping, "USD", 2);
+    if (result.isErr()) throw result.error;
+
+    expect(result.value.rows).toHaveLength(1);
+    expect(result.value.rows[0]).toMatchObject({
+      payeeName: "Shop",
+      memo: "Line one\nLine two",
+      amountMinor: -1234,
+    });
+  });
+
+  it("should map the reserved Ready to Assign name back to income", () => {
+    expect(reservedCategoryId("Ready to Assign")).toBe(READY_TO_ASSIGN);
+    expect(reservedCategoryId("  ready to assign ")).toBe(READY_TO_ASSIGN);
+    expect(reservedCategoryId("Ready to Assign (income)")).toBeNull();
+    expect(reservedCategoryId(null)).toBeNull();
+  });
+
+  it("should read a transfer's direction from the register being imported", () => {
+    const outbound: ImportRow = {
+      date: "2026-01-05",
+      amountMinor: -5_000,
+      payeeName: "Savings",
+      memo: "",
+      categoryName: null,
+      cleared: "uncleared",
+      externalId: null,
+      transferAccountName: "Savings",
+      splits: [],
+    };
+    const inbound: ImportRow = {
+      ...outbound,
+      amountMinor: 5_000,
+      payeeName: "Checking",
+      transferAccountName: "Checking",
+    };
+
+    expect(transferDirection(outbound, "Checking")).toBe("outbound");
+    expect(transferDirection(inbound, "Savings")).toBe("inbound");
+    expect(transferDirection(inbound, "Checking")).toBe("other-leg");
+    expect(transferDirection({ ...outbound, transferAccountName: null }, "Checking")).toBeNull();
   });
 });
 

@@ -30,6 +30,9 @@ export function AmountInput({
   const [text, setText] = useState(() => formatMoneyPlain(valueMinor, scale));
   const [editing, setEditing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // Escape sets the text back and blurs; the blur handler would otherwise still see the typed
+  // text from the previous render and commit the amount the person just cancelled.
+  const cancelled = useRef(false);
 
   useEffect(() => {
     if (!editing) setText(formatMoneyPlain(valueMinor, scale));
@@ -37,6 +40,10 @@ export function AmountInput({
 
   const commit = (): void => {
     setEditing(false);
+    if (cancelled.current) {
+      cancelled.current = false;
+      return;
+    }
     const parsed = parseMoney(text, currency, scale);
     if (parsed.isErr()) {
       setText(formatMoneyPlain(valueMinor, scale));
@@ -59,6 +66,7 @@ export function AmountInput({
       value={text}
       placeholder={placeholder}
       onFocus={(event) => {
+        cancelled.current = false;
         setEditing(true);
         event.currentTarget.select();
       }}
@@ -71,6 +79,7 @@ export function AmountInput({
           onNavigate?.("next");
         } else if (event.key === "Escape") {
           event.preventDefault();
+          cancelled.current = true;
           setText(formatMoneyPlain(valueMinor, scale));
           setEditing(false);
           input.current?.blur();

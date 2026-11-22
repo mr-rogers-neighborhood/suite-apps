@@ -53,6 +53,12 @@ describe("parseMoney", () => {
     expect(parseMoney("abc", "USD").isErr()).toBe(true);
   });
 
+  it("should reject separators and signs with no digits instead of reading zero", () => {
+    for (const value of [".", ",", ". ", " ,", "-.", "-", "(,)", "($)", "€"]) {
+      expect(parseMoney(value, "USD").isErr()).toBe(true);
+    }
+  });
+
   it("should reject a misplaced sign and a broken grouping", () => {
     for (const value of ["12-34", "--5", "1.2.3", "1,23,456", "1..2", "1,2345,678"]) {
       expect(parseMoney(value, "USD").isErr()).toBe(true);

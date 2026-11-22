@@ -59,9 +59,29 @@ describe("register row", () => {
     );
 
     fireEvent.keyDown(screen.getByTitle("Mark cleared"), { key: "Enter" });
+    fireEvent.keyDown(screen.getByTitle("Mark cleared"), { key: " " });
 
     expect(useUiStore.getState().newTransactionOpen).toBe(false);
     expect(useUiStore.getState().selectedTransactionId).toBeNull();
+  });
+
+  it.each(["Enter", " "])("should open the editor from the row itself with %s", (key) => {
+    const fixture = setup();
+    replica = fixture.replica;
+
+    render(
+      <WorkspaceContext.Provider value={fixture.replica}>
+        <Register account={fixture.account} />
+      </WorkspaceContext.Provider>,
+    );
+
+    const row = screen.getByText("Market").closest<HTMLElement>('[role="button"]');
+    if (!row) throw new Error("the register row is not a button");
+
+    fireEvent.keyDown(row, { key });
+
+    expect(useUiStore.getState().selectedTransactionId).toBe(fixture.transaction.id);
+    expect(useUiStore.getState().newTransactionOpen).toBe(true);
   });
 
   it("should toggle cleared and report the state as pressed", () => {

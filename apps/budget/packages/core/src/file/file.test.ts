@@ -83,6 +83,20 @@ describe("the records envelope", () => {
     expect(restored.getSnapshot()).toEqual(doc.getSnapshot());
   });
 
+  it("should keep a zero-decimal currency and its scale", () => {
+    const doc = BudgetDocument.create({
+      name: "Yen",
+      currency: "JPY",
+      now: new Date("2026-01-01T12:00:00.000Z"),
+    });
+    const decoded = decodeRecords(encodeRecords(doc.getSnapshot()));
+    if (decoded.isErr()) throw decoded.error;
+
+    expect(decoded.value.settings.currency).toBe("JPY");
+    expect(decoded.value.settings.currencyScale).toBe(0);
+    expect(BudgetDocument.fromRecords(decoded.value).getSnapshot().settings.currencyScale).toBe(0);
+  });
+
   it("should reject a records file with a broken reference", () => {
     const { doc } = sample();
     const snapshot = doc.getSnapshot();

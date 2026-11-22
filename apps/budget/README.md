@@ -84,6 +84,8 @@ The apps, the hub and the sync server share one repository and one gate. Start w
 
 What changed, in a person's words rather than commits: [CHANGELOG.md](CHANGELOG.md).
 Where accessibility stands, and what is checked by hand: [ACCESSIBILITY.md](ACCESSIBILITY.md).
+Where Budget stands against the `beta` promise, and what still needs a person:
+[docs/reference/beta-bar.md](docs/reference/beta-bar.md).
 
 ## How it is built
 

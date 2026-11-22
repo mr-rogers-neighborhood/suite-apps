@@ -50,6 +50,10 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm shape
 `pnpm check` is the edit loop: Biome, `tsc` across the workspace, `vitest run --changed`, and the shape
 check. `pnpm verify` adds `knip`, the production build, and the Storybook build.
 
+The `beta` promise is a checklist in [docs/reference/beta-bar.md](docs/reference/beta-bar.md). It names
+the review, the docs, the decision record, the no-irreversible-step rule, import/export truth,
+accessibility and the money-model tests, with the evidence for each.
+
 Playwright sits outside both. Run `pnpm build` first: the journey launches the built app. Run
 `pnpm e2e:smoke` when the owner asks for it or names a milestone; no change waits on it. In a headless
 environment, run it under `xvfb-run -a`.

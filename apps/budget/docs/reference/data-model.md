@@ -288,6 +288,22 @@ Stored metadata: an imported transaction records `imported`: `source` (`csv` or 
 `externalId` (the QIF `N` reference, otherwise null), `importedAt`, and `originalPayee` (the payee text
 as read, before rules). Split parents carry it too; the two legs of a matched transfer do not.
 
+Ready to Assign is a reserved category name. An export writes `Ready to Assign` for a transaction
+categorized to `rta`, and an import maps that name, case-insensitively, back to `rta` instead of
+creating a category. A `categoryId` of `"rta"` is income; it is not a category record.
+
+A QIF row belongs to the register being imported into, so its amount's sign gives a transfer's
+direction: negative leaves the account, positive enters it. A QIF export writes both legs of a
+transfer; the leg naming the account being imported into is the other side and is skipped, which is
+why a QIF is imported into one account rather than as a whole budget. QIF is line-based, so an export
+flattens a line break in a payee, memo, category or account name to a space. A transfer that crosses
+the budget boundary needs a category, and one QIF line cannot carry both that category and an
+`[Account]` target; the import reports that row instead of inventing the missing side.
+
+Import uses the destination budget's currency and scale. A value with more decimal places than the
+scale is rounded once, at parse time; a `.budget` or records import instead opens as a new budget and
+keeps the currency and scale it was written with.
+
 Dedupe: an import row with an `externalId` that matches an existing transaction's `imported.externalId`
 in the same account is an exact duplicate, whatever its date, amount, or payee. Otherwise candidates are
 transactions in the same account with an equal amount, a date within ±3 days, and normalized payee
@@ -316,7 +332,9 @@ is written.
 
 The records export is `suite.budget.records` and contains every root as plain arrays plus `meta`,
 `settings`, `format`, `formatVersion`, `schemaVersion`, and `exportedAt`. It is the "nothing is trapped"
-artifact. CSV and QIF exports carry transactions only.
+artifact. CSV and QIF exports carry transactions only: CSV writes a split as its child rows and a
+transfer as two rows, and a CSV import reads date, payee, memo, amount and category; QIF keeps splits,
+cleared state, transfer targets and the `N` reference.
 
 The live file is the same envelope. A `.budget` file is readable by anyone who has it; use OS disk
 encryption. The app adds no passphrase.

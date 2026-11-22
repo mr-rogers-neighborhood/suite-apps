@@ -248,30 +248,48 @@ function BudgetActual({ month, money }: { month: string; money: (value: number) 
         <Stat label="Activity" value={money(activity)} />
       </div>
       <div className="overflow-hidden rounded-xl border border-line bg-panel">
-        <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] border-b border-line bg-panel/60 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
-          <span>Category</span>
-          <span className="text-right">Assigned</span>
-          <span className="text-right">Activity</span>
-          <span className="text-right">Available</span>
-        </div>
-        {rows.map((row) => (
-          <div
-            key={row.categoryId}
-            className="grid grid-cols-[1.5fr_1fr_1fr_1fr] border-b border-line/50 px-4 py-1.5 text-[12px] last:border-0"
-          >
-            <span className="truncate text-ink">
-              {row.categoryName}
-              <span className="ml-2 text-[10px] text-faint">{row.groupName}</span>
-            </span>
-            <span className="tnum text-right text-muted">{money(row.assignedMinor)}</span>
-            <span className="tnum text-right text-muted">{money(row.activityMinor)}</span>
-            <span
-              className={`tnum text-right ${row.availableMinor < 0 ? "text-negative" : "text-ink"}`}
-            >
-              {money(row.availableMinor)}
-            </span>
-          </div>
-        ))}
+        <table className="w-full border-collapse text-[12px]">
+          <caption className="sr-only">Budget vs actual</caption>
+          <thead>
+            <tr className="border-b border-line bg-panel/60 text-[10px] font-semibold uppercase tracking-wider text-faint">
+              <th scope="col" className="px-4 py-1.5 text-left font-semibold">
+                Category
+              </th>
+              <th scope="col" className="px-4 py-1.5 text-right font-semibold">
+                Assigned
+              </th>
+              <th scope="col" className="px-4 py-1.5 text-right font-semibold">
+                Activity
+              </th>
+              <th scope="col" className="px-4 py-1.5 text-right font-semibold">
+                Available
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.categoryId} className="border-b border-line/50 last:border-0">
+                <td className="px-4 py-1.5 text-ink">
+                  <span className="block truncate">
+                    {row.categoryName}
+                    <span className="ml-2 text-[10px] text-faint">{row.groupName}</span>
+                  </span>
+                </td>
+                <td className="tnum px-4 py-1.5 text-right text-muted">
+                  {money(row.assignedMinor)}
+                </td>
+                <td className="tnum px-4 py-1.5 text-right text-muted">
+                  {money(row.activityMinor)}
+                </td>
+                <td
+                  className={`tnum px-4 py-1.5 text-right ${row.availableMinor < 0 ? "text-negative" : "text-ink"}`}
+                >
+                  {money(row.availableMinor)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
