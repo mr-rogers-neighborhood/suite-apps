@@ -9,7 +9,21 @@ are in [Version ownership](../../docs/how-to/package-and-release.md#version-owne
 
 ## Unreleased
 
-No changes yet.
+### Changed
+
+- **Packs are read through the shared archive contract.** The loader now uses
+  `@suite/pack-host/archive` instead of decompressing untrusted bytes with `unzipSync`, so the
+  compressed, per-file, total and entry-count caps, safe paths, duplicate refusal and
+  symlink/non-regular refusal apply on the phone exactly as they do on the desktop.
+- **Every installed file is verified again when packs are discovered.** A pack edited after
+  install is refused with the same `files` reason rather than trusted because its manifest was
+  signed once.
+
+### Fixed
+
+- **An archive could write files its manifest did not list.** Install now compares the archive's
+  file set with the manifest, refuses extras and missing files, and writes only the files the
+  manifest names.
 
 ## [0.1.0] - 2026-11-18
 

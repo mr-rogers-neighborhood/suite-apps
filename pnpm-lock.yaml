@@ -645,6 +645,9 @@ importers:
       '@suite/pack':
         specifier: workspace:*
         version: link:../../packages/pack
+      '@suite/pack-host':
+        specifier: workspace:*
+        version: link:../../packages/pack-host
       '@suite/theme':
         specifier: workspace:*
         version: link:../../packages/theme
