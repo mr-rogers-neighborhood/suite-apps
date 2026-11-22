@@ -134,6 +134,26 @@ describe("editing a Screen", () => {
     ]);
   });
 
+  it("moves a placement with the keyboard's earlier and later actions", async () => {
+    const store = await ScreenStore.open(path);
+    await store.add({ registryId: "welcome.notes", size: "2x1" });
+    await store.add({ registryId: "scratch.board", size: "1x1" });
+
+    await store.moveBy("welcome.notes", "later");
+    expect(store.state().widgets.map((widget) => widget.registryId)).toEqual([
+      SHELL_APPS_WIDGET,
+      "scratch.board",
+      "welcome.notes",
+    ]);
+
+    await store.moveBy("welcome.notes", "earlier");
+    expect(store.state().widgets.map((widget) => widget.registryId)).toEqual([
+      SHELL_APPS_WIDGET,
+      "welcome.notes",
+      "scratch.board",
+    ]);
+  });
+
   it("keeps an unknown widget and its unknown settings across a save", async () => {
     const store = await ScreenStore.open(path);
     await store.add({
