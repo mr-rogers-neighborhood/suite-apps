@@ -128,6 +128,16 @@ cursor, and it never enters the document or renderer storage. A wrong or missing
 connection with a sentence, and there is no plaintext fallback. TLS is transport-only: the host still
 sees sealed frames and the signed metadata, not the document.
 
+Each open writes `sync/sessions/<workspaceId>.json` (mode 0600) beside the cursor: when it opened,
+when sync last completed, and how many updates the main process handed the window. That record is
+what the dialog's **Since you last opened** card reads, and it holds no document bytes, so a count is
+the most it can honestly say. The count is every sealed update the host delivered in this run, which
+a reconnect can include this device's own replay of; importing that again changes nothing. The device
+names beside it are the host's roster, not an attribution of which device sent what. Removal is
+checked against this device's role in the roster before any commit is written. The host refuses a
+removal record that is not owner-signed; it cannot stop an MLS commit from rotating the epoch, so an
+editor never gets that far.
+
 ## The page policy
 
 `app://canvas` is a real, secure origin, so a document keeps the query-parameter routes it already has

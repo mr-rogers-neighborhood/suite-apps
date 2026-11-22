@@ -85,6 +85,21 @@ async function echoCommit(fake: ReturnType<typeof fakeHost>, index: number): Pro
   });
 }
 
+/** What the host says when a device joins: who is here, and in which role. */
+function announceRoster(
+  fake: ReturnType<typeof fakeHost>,
+  members: ReadonlyArray<{ deviceId: string; name: string; role: "owner" | "editor" | "viewer" }>,
+): void {
+  fake.host({
+    type: "joined",
+    protocolVersion: 3,
+    workspaceId,
+    newestEpoch: 1,
+    frames: 0,
+    members,
+  });
+}
+
 /** Two devices in one group, each with its own service, and a socket the test relays by hand. */
 async function twoDevices() {
   const a = await folder();
@@ -804,6 +819,10 @@ describe("inviting someone in", () => {
 describe("a revoke waits for the commit's numbered echo", () => {
   it("does not report a removal until the host has numbered the commit", async () => {
     const { serviceA, hostA, joiner } = await twoDevices();
+    announceRoster(hostA, [
+      { deviceId: (await serviceA.identity()).deviceId, name: "this laptop", role: "owner" },
+      { deviceId: joiner.deviceId, name: "the desktop", role: "editor" },
+    ]);
     let settled = false;
     const removal = serviceA.removeDevice(joiner.deviceId).then(
       () => {
@@ -829,6 +848,10 @@ describe("a revoke waits for the commit's numbered echo", () => {
 
   it("sends the commit again when the host refuses it as stale", async () => {
     const { serviceA, hostA, joiner } = await twoDevices();
+    announceRoster(hostA, [
+      { deviceId: (await serviceA.identity()).deviceId, name: "this laptop", role: "owner" },
+      { deviceId: joiner.deviceId, name: "the desktop", role: "editor" },
+    ]);
     const removal = serviceA.removeDevice(joiner.deviceId);
     await vi.waitFor(() => {
       expect(sentFrame(hostA, "commit")).toBeDefined();
@@ -851,6 +874,10 @@ describe("a revoke waits for the commit's numbered echo", () => {
 
   it("says the removal did not complete when the host goes away", async () => {
     const { serviceA, hostA, joiner } = await twoDevices();
+    announceRoster(hostA, [
+      { deviceId: (await serviceA.identity()).deviceId, name: "this laptop", role: "owner" },
+      { deviceId: joiner.deviceId, name: "the desktop", role: "editor" },
+    ]);
     const removal = serviceA.removeDevice(joiner.deviceId);
     await vi.waitFor(() => {
       expect(sentFrame(hostA, "commit")).toBeDefined();
@@ -859,11 +886,42 @@ describe("a revoke waits for the commit's numbered echo", () => {
     hostA.socket.close();
     await expect(removal).rejects.toThrow(/did not complete/u);
   });
+
+  it("refuses a removal this device is not the owner for", async () => {
+    const { serviceB, hostB, joiner, owner } = await twoDevices();
+    announceRoster(hostB, [
+      { deviceId: owner.deviceId, name: "this laptop", role: "owner" },
+      { deviceId: joiner.deviceId, name: "the desktop", role: "editor" },
+    ]);
+
+    await expect(serviceB.removeDevice(owner.deviceId)).rejects.toThrow(/owner/u);
+    // Nothing was written: a commit from an editor would rotate the epoch for everybody,
+    // which is the half of "remove" the host's signature check cannot prevent.
+    expect(hostB.sent.some((message) => message.type === "removal")).toBe(false);
+    expect(sentFrame(hostB, "commit")).toBeUndefined();
+  });
+
+  it("does not let a device remove itself, even as owner", async () => {
+    const { serviceA, hostA, joiner } = await twoDevices();
+    announceRoster(hostA, [
+      { deviceId: (await serviceA.identity()).deviceId, name: "this laptop", role: "owner" },
+      { deviceId: joiner.deviceId, name: "the desktop", role: "editor" },
+    ]);
+
+    await expect(serviceA.removeDevice((await serviceA.identity()).deviceId)).rejects.toThrow(
+      /itself/u,
+    );
+    expect(hostA.sent.some((message) => message.type === "removal")).toBe(false);
+  });
 });
 
 describe("a revoked device", () => {
   it("cannot open a post-revoke frame", async () => {
     const { serviceA, serviceB, hostA, hostB, joiner } = await twoDevices();
+    announceRoster(hostA, [
+      { deviceId: (await serviceA.identity()).deviceId, name: "this laptop", role: "owner" },
+      { deviceId: joiner.deviceId, name: "the desktop", role: "editor" },
+    ]);
     const updates: Uint8Array[] = [];
     serviceB.onUpdate((update) => updates.push(update));
 

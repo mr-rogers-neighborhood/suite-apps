@@ -3,6 +3,7 @@ import { type HubInfo, IPC, type KitImportResult, type SyncInfo } from "../../sh
 import { readHub } from "./hubAddress.js";
 import { kitFactFor } from "./kitReport.js";
 import { createSyncService, type SyncService } from "./service.js";
+import { createSinceOpened, type SinceOpenedStore } from "./sinceOpened.js";
 
 /**
  * The sync service as the renderer sees it: four doors and a push.
@@ -56,6 +57,14 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
   let kitState: "made" | "declined" | null = null;
 
   /**
+   * What arrived while this workspace was closed, and how long ago it last synced.
+   *
+   * Read from a record beside the cursor rather than from the connection, because the
+   * question outlives any one socket: the dialog asks it before this run has connected.
+   */
+  let since: SinceOpenedStore | null = null;
+
+  /**
    * The recovery-file paths this shell has handed out.
    *
    * The renderer may ask to retry one of these, because a sealed file needs its passphrase
@@ -82,6 +91,7 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
     })),
     fingerprint: service === null ? null : service.relayFingerprint(),
     kit: kitState,
+    sinceOpened: since?.summary() ?? null,
   });
 
   let deviceIdCache = "";
@@ -96,6 +106,10 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
     if (service !== null && workspaceId === current) return service;
 
     await service?.disconnect();
+    // The previous workspace's count belongs to the previous workspace: write it and start
+    // this one's record, so "since you last opened" is never two workspaces' arithmetic.
+    await since?.flush();
+    since = await createSinceOpened({ dataDir: options.dataDir, workspaceId: current });
     workspaceId = current;
     service = await createSyncService({
       dataDir: options.dataDir,
@@ -106,11 +120,16 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
     kitState = (await kitFactFor(options.dataDir, current, deviceIdCache))?.state ?? null;
 
     service.onUpdate((update) => {
+      since?.noteUpdate();
       // A plain array rather than a Buffer: the renderer is a different context and a
       // Uint8Array crosses IPC as one.
       options.webContents()?.send(IPC.syncIncoming, Array.from(update));
     });
-    service.onStatus(announce);
+    service.onStatus((status) => {
+      // The host answered, which is the one moment "last synced" is true rather than assumed.
+      if (status.state === "syncing") since?.noteSynced();
+      announce(status);
+    });
     service.onPresence((update) => {
       options.webContents()?.send(IPC.syncPresenceIncoming, Array.from(update));
     });
@@ -301,6 +320,8 @@ export function registerSyncIpc(options: SyncIpcOptions): SyncIpc {
 
   return {
     async stop() {
+      await since?.flush();
+      since = null;
       await service?.disconnect();
       service = null;
     },

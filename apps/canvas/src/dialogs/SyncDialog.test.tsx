@@ -17,6 +17,11 @@ function open(options: {
   contacts?: readonly unknown[];
   kit?: "made" | "declined" | null;
   friendLink?: string;
+  sinceOpened?: {
+    openedAt: string;
+    updates: number;
+    lastSyncedAt: string | null;
+  } | null;
 }) {
   useCanvasStore.setState({
     // The dialog draws from the one snapshot main pushes, so a test sets that and nothing else.
@@ -29,6 +34,7 @@ function open(options: {
       friendLink: options.friendLink ?? "",
       contacts: (options.contacts ?? []) as never,
       kit: options.kit ?? null,
+      sinceOpened: options.sinceOpened ?? null,
     },
   });
   return render(<SyncDialog open onClose={vi.fn()} />);
@@ -126,6 +132,64 @@ describe("the sync dialog", () => {
     expect(list).toHaveTextContent("in charge");
     expect(list).toHaveTextContent("the desktop");
     expect(list).toHaveTextContent("can edit");
+    // The id a host pins is beside the name a person weighs.
+    expect(list).toHaveTextContent(`${otherDevice.deviceId.slice(0, 12)}…`);
+    expect(screen.getByTitle(otherDevice.deviceId)).toBeInTheDocument();
+  });
+
+  it("says what arrived since the workspace was last opened", () => {
+    open({
+      status: { state: "syncing", count: 4 },
+      members: [thisDevice, otherDevice],
+      sinceOpened: {
+        openedAt: "2026-11-20T08:00:00.000Z",
+        updates: 4,
+        lastSyncedAt: new Date().toISOString(),
+      },
+    });
+
+    const card = screen.getByTestId("sync-since-opened");
+    expect(card).toHaveTextContent("4 updates arrived from the host");
+    expect(card).toHaveTextContent("Other devices here: the desktop");
+    expect(card).toHaveTextContent("Last synced just now");
+  });
+
+  it("says nothing new when the count is zero, and still says when it last synced", () => {
+    open({
+      status: { state: "syncing", count: 4 },
+      members: [thisDevice],
+      sinceOpened: {
+        openedAt: "2026-11-20T08:00:00.000Z",
+        updates: 0,
+        lastSyncedAt: "2026-11-20T08:00:00.000Z",
+      },
+    });
+
+    const card = screen.getByTestId("sync-since-opened");
+    expect(card).toHaveTextContent("Nothing new has arrived on this device yet");
+    expect(card).toHaveTextContent("No other device is listed right now");
+    expect(card).toHaveTextContent("Last synced");
+  });
+
+  it("does not offer Remove to an editor, and says who can", () => {
+    const editor = { deviceId: thisDevice.deviceId, name: "this laptop", role: "editor" } as const;
+    open({ status: { state: "syncing", count: 2 }, members: [editor, otherDevice] });
+
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(screen.getByText("Only the owner can remove a device.")).toBeInTheDocument();
+  });
+
+  it("shows when a stopped workspace last synced", () => {
+    open({
+      status: { state: "off" },
+      sinceOpened: {
+        openedAt: "2026-11-20T08:00:00.000Z",
+        updates: 0,
+        lastSyncedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+
+    expect(screen.getByTestId("sync-last-synced")).toHaveTextContent("Last synced 3 h ago");
   });
 
   it("hands back an invitation to give someone", async () => {

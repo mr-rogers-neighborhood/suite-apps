@@ -25,11 +25,19 @@ workspace is:
 shows that address — and *Join one somebody shared* takes an invitation you were sent.
 
 **Shared.** One invitation to give away, and the devices already here with what each of them may do.
-An invitation is a string, handed over however you like; whoever uses it is added, in the role the
-invitation named. Each device has a **Remove** beside it, which takes it out of the workspace for
+Each row carries the device's name, the start of the id the host pins, and its role. An invitation is
+a string, handed over however you like; whoever uses it is added, in the role the invitation named.
+The **owner** sees a **Remove** beside every other device, which takes it out of the workspace for
 good: it can no longer read anything new, its own copy stays where it is, and the only way back in is
-a fresh invitation. **Stop sharing on this device** leaves the workspace here and lets go of the copy
+a fresh invitation. An editor or viewer sees no Remove, because the host only accepts a removal an
+owner signed. **Stop sharing on this device** leaves the workspace here and lets go of the copy
 the other machines keep, which is why it is not the same as deleting anything.
+
+**Since you last opened.** Once this workspace has synced here before, the dialog opens with a small
+card: how many updates arrived during this run, the other devices the host lists, and when this
+device last completed a sync. It counts and does not describe — the machine that carries the
+workspace holds ciphertext, so the app can say that four updates arrived, not which cards they
+touched. A stopped workspace says only when it last synced, and that turning sync on catches it up.
 
 **Friends.** Every Sync dialog shows this installation's **friend code**, four groups of four
 symbols, and the **People you know** list. Give the code to somebody you trust; they add it here with
@@ -48,5 +56,5 @@ has to accept it.
 Every one of these is a read of what the machine sharing the workspace already knows. The dialog
 never sends anything on its own. When the relay is `wss://`, it asks for the **Relay certificate
 fingerprint** the relay prints at startup and, once connected, shows the pinned value; a different
-certificate stops sync. A frame count or an epoch stays out of the dialog — those are how it works,
-not what anyone is being asked to do.
+certificate stops sync. A frame index, an epoch or a key stays out of the dialog — those are how it
+works, not what anyone is being asked to do.
