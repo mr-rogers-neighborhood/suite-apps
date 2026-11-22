@@ -4,7 +4,7 @@
      in its changelog. Do not edit the table; edit those files and regenerate. -->
 
 The signed Flatpak remote is the update path. This page is the human mirror of the
-[aggregate Suite 2026-11-21 release](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/suite-2026.11.21), which is the repository's
+[aggregate Suite Shell + Suite Go 2026-11-22 release](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/suite-2026.11.22), which is the repository's
 "Latest" release on GitHub. The per-app releases stay as history and carry no app
 binaries.
 
@@ -23,6 +23,7 @@ Remote: [suite.flatpakrepo](https://flatpak.suite.run/suite.flatpakrepo)
 
 | App | Version | Released | Release | Install |
 | --- | --- | --- | --- | --- |
+| [Suite Shell](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/shell/CHANGELOG.md) | 0.2.0 | 2026-11-22 | [`shell-v0.2.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/shell-v0.2.0) | `flatpak install --user suite run.suite.shell` |
 | [Suite Start](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/start/CHANGELOG.md) | 0.6.0 | 2026-11-21 | [`start-v0.6.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/start-v0.6.0) | `flatpak install --user suite run.suite.start` |
 | [Suite Canvas](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/canvas/CHANGELOG.md) | 0.1.12 | 2026-11-21 | [`canvas-v0.1.12`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/canvas-v0.1.12) | `flatpak install --user suite run.suite.canvas` |
 | [Suite Planner](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/planner/CHANGELOG.md) | 0.5.1 | 2026-11-21 | [`planner-v0.5.1`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/planner-v0.5.1) | `flatpak install --user suite run.suite.planner` |
@@ -34,9 +35,9 @@ Remote: [suite.flatpakrepo](https://flatpak.suite.run/suite.flatpakrepo)
 
 | App | Version | Released | Release | Install |
 | --- | --- | --- | --- | --- |
-| [Suite Go](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/go/CHANGELOG.md) | 0.1.0 | 2026-11-18 | [`go-v0.1.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/go-v0.1.0) | [suite-go-0.1.0.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/suite-2026.11.21/suite-go-0.1.0.apk) |
+| [Suite Go](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/go/CHANGELOG.md) | 0.1.0 | 2026-11-18 | [`go-v0.1.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/go-v0.1.0) | [suite-go-0.1.0.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/suite-2026.11.22/suite-go-0.1.0.apk) |
 
-Suite Go is not a Flatpak. This release carries its debug-signed APK, [suite-go-0.1.0.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/suite-2026.11.21/suite-go-0.1.0.apk),
+Suite Go is not a Flatpak. This release carries its debug-signed APK, [suite-go-0.1.0.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/suite-2026.11.22/suite-go-0.1.0.apk),
 with a SHA-256 checksum beside it; sideload it with `adb install -r -t`.
 
 ## Update
