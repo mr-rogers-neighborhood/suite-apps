@@ -6,6 +6,7 @@ import { SUITE_PACK_PUBLIC_KEY } from "@suite/pack/pinned-key";
 import { cssVariables, defaultTheme } from "@suite/theme";
 import { app, dialog, ipcMain, nativeTheme, net, protocol } from "electron";
 import { DocumentStore } from "./documents.js";
+import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
 import {
   InstalledPackError,
@@ -73,6 +74,7 @@ let window: ShellWindow | null = null;
 let spaceStore: SpaceStore | null = null;
 let documents: DocumentStore | null = null;
 let files: PackFilesService | null = null;
+let externalFiles: ExternalFilesService | null = null;
 let packs: readonly PackInfo[] = [];
 
 /** The compressed archive cap this host opens from the picker. The reader enforces its own entry limits too. */
@@ -116,7 +118,11 @@ async function bootstrap(): Promise<void> {
   documents = new DocumentStore(join(dataRoot, "documents"));
   // One store per (container, pack), created on first use. This is host data,
   // deliberately separate from the pack's code root.
-  files = new PackFilesService(join(dataRoot, "files"));
+  const fileService = new PackFilesService(join(dataRoot, "files"));
+  files = fileService;
+  // The dialogs are host chrome; the absolute path a person picks stays here.
+  // `external.ts` turns it into an opaque, tab-scoped token for the pack.
+  externalFiles = new ExternalFilesService(externalDialog(), fileService);
 
   serveProtocols();
   registerIpc();
@@ -173,7 +179,10 @@ function openWindow(): void {
     packs,
     spaces: spaceStore,
     theme: themeView(),
-    onViewClosed: (tabId) => files?.releaseOwner(tabId),
+    onViewClosed: (tabId) => {
+      files?.releaseOwner(tabId);
+      externalFiles?.releaseOwner(tabId);
+    },
     onClosed: () => {
       if (window === created) window = null;
     },
@@ -303,6 +312,25 @@ function registerIpc(): void {
     await service.unlock(scope, token);
   });
 
+  onPack(PACK_IPC.pickExternalFile, (sender, filters) => {
+    return externalService().pickOpen(sender, filters);
+  });
+  onPack(PACK_IPC.pickExternalSave, (sender, suggestedName) => {
+    return externalService().pickSave(sender, suggestedName);
+  });
+  onPack(PACK_IPC.readExternalFile, (sender, token) => {
+    return externalService().read(sender, token);
+  });
+  onPack(PACK_IPC.writeExternalFile, (sender, token, bytes) => {
+    return externalService().write(sender, token, bytes);
+  });
+  onPack(PACK_IPC.closeExternalFile, (sender, token) => {
+    return externalService().close(sender, token);
+  });
+  onPack(PACK_IPC.importExternalFile, (sender, token, name) => {
+    return externalService().importFile(sender, token, name);
+  });
+
   onPack(PACK_IPC.openExternal, (sender, url) => {
     if (typeof url !== "string") return;
     // The OS browser is outside the pack's session and CSP, so it is egress
@@ -322,6 +350,43 @@ function registerIpc(): void {
       console.warn("[shell] could not persist a tab title", error);
     });
   });
+}
+
+/**
+ * The platform pickers the external file surface uses.
+ *
+ * The dialog is parented to the host window and returns an absolute path to the
+ * main process only. `external.ts` immediately turns that into a token; a pack
+ * never sees this value or the picker itself.
+ */
+function externalDialog(): ExternalDialog {
+  return {
+    async pickOpen(filters) {
+      if (window === null) return null;
+      const selection = await dialog.showOpenDialog(window.window, {
+        title: "Open a file",
+        buttonLabel: "Open",
+        properties: ["openFile"],
+        filters: filters.map((filter) => ({
+          name: filter.name,
+          extensions: [...filter.extensions],
+        })),
+      });
+      if (selection.canceled) return null;
+      return selection.filePaths[0] ?? null;
+    },
+    async pickSave(suggestedName) {
+      if (window === null) return null;
+      const selection = await dialog.showSaveDialog(window.window, {
+        title: "Save a file",
+        buttonLabel: "Save",
+        defaultPath: suggestedName,
+        properties: ["createDirectory", "showOverwriteConfirmation"],
+      });
+      if (selection.canceled) return null;
+      return selection.filePath ?? null;
+    },
+  };
 }
 
 /**
@@ -420,6 +485,11 @@ function filesFor(sender: PackSender): { scope: FilesScope; service: PackFilesSe
   if (scope === null) throw new Error("the files capability is not enabled for this pack");
   if (files === null) throw new Error("the files service is not ready");
   return { scope, service: files };
+}
+
+function externalService(): ExternalFilesService {
+  if (externalFiles === null) throw new Error("the external files service is not ready");
+  return externalFiles;
 }
 
 function requirePath(value: unknown): string {

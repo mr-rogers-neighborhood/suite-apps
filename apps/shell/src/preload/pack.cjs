@@ -23,6 +23,31 @@ const separator = host.indexOf(".");
 const containerId = separator > 0 ? host.slice(0, separator) : "";
 const packId = separator > 0 ? host.slice(separator + 1) : host;
 
+// An external handle's token is a capability, so it stays in this map and never
+// becomes a property of the object the pack sees. The pack can call, but it
+// cannot read the token out, copy it, or mint a handle of its own.
+const issuedTokens = new WeakMap();
+
+function externalHandle(issued) {
+  if (issued === null || typeof issued !== "object" || typeof issued.token !== "string") {
+    return null;
+  }
+  const handle = {
+    // A name, size and mtime snapshot. No path crosses the bridge.
+    info: issued.info,
+    read: () => ipcRenderer.invoke("suite:files:read-external", issued.token),
+    write: (bytes) => {
+      if (!bytes || typeof bytes.byteLength !== "number" || bytes.byteLength > MAX_FILE_BYTES) {
+        return Promise.reject(new Error("file is too large"));
+      }
+      return ipcRenderer.invoke("suite:files:write-external", issued.token, bytes);
+    },
+    close: () => ipcRenderer.invoke("suite:files:close-external", issued.token),
+  };
+  issuedTokens.set(handle, issued.token);
+  return handle;
+}
+
 contextBridge.exposeInMainWorld("suite", {
   packId,
   containerId,
@@ -65,6 +90,21 @@ contextBridge.exposeInMainWorld("suite", {
         path,
         release: () => ipcRenderer.invoke("suite:files:unlock", token),
       };
+    },
+    // The person picks; the host keeps the path. `null` means they cancelled,
+    // which is a value, not a failure.
+    pickOpen: async (filters) =>
+      externalHandle(await ipcRenderer.invoke("suite:files:pick-open", filters)),
+    pickSave: async (suggestedName) =>
+      externalHandle(await ipcRenderer.invoke("suite:files:pick-save", suggestedName)),
+    // Only a handle this preload issued can be imported: the WeakMap lookup
+    // fails for a copy or a hand-built object.
+    importFile: (handle, name) => {
+      const token = issuedTokens.get(handle);
+      if (typeof token !== "string") {
+        return Promise.reject(new Error("the host refused the file handle"));
+      }
+      return ipcRenderer.invoke("suite:files:import-external", token, name);
     },
   },
   setTitle: (title) => ipcRenderer.send("suite:pack:set-title", title),

@@ -54,9 +54,19 @@ describe("the pack bridge", () => {
       "remove",
       "backup",
       "lock",
+      "pickOpen",
+      "pickSave",
+      "importFile",
     ]) {
       expect(pack).toContain(`${method}:`);
     }
+  });
+
+  it("keeps an external handle's token out of the object the pack receives", () => {
+    // The token lives in a WeakMap; the handle carries functions and `info`,
+    // and only the bridge can spend it.
+    expect(pack).toContain("issuedTokens.set(handle, issued.token)");
+    expect(pack).not.toContain("token: issued.token");
   });
 
   it("does not hand a pack a filesystem or a process", () => {
