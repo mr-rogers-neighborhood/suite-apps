@@ -4,7 +4,7 @@
   "productName": "Suite",
   "desktopName": "run.suite.shell",
   "private": true,
-  "description": "The Suite host: one window that opens signed, sandboxed packs as tabs. The shell owns the chrome, its space document and the capability boundary; packs own their documents.",
+  "description": "Suite Shell, the Suite host: one window that opens signed, sandboxed packs as tabs. The shell owns the chrome, its space document and the capability boundary; packs own their documents.",
   "type": "module",
   "main": "./dist/main.js",
   "scripts": {

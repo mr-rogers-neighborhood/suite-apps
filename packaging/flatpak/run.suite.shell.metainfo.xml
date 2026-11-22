@@ -5,8 +5,8 @@
 -->
 <component type="desktop-application">
   <id>run.suite.shell</id>
-  <name>Suite</name>
-  <summary>One window for your Suite apps</summary>
+  <name>Suite Shell</name>
+  <summary>The desktop Suite host</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <url type="homepage">https://github.com/mr-rogers-neighborhood/suite-apps</url>
@@ -15,7 +15,7 @@
   </developer>
   <description>
     <p>
-      Suite is the host: one window that opens signed, sandboxed packs as tabs.
+      Suite Shell is the host: one window that opens signed, sandboxed packs as tabs.
       It owns the chrome, Home and the capability boundary; a pack owns its own
       document, and the host carries bytes without parsing them.
     </p>

@@ -127,7 +127,7 @@ function screenWidgetView(
       source: "host",
       title: host.title,
       appId: SHELL_HOST_APP_ID,
-      appName: "Suite",
+      appName: "Suite Shell",
       note: host.note,
       fields: [],
       settings: [],
@@ -202,7 +202,7 @@ export function screenChoices(
       title: host.title,
       source: "host",
       appId: SHELL_HOST_APP_ID,
-      appName: "Suite",
+      appName: "Suite Shell",
       size: host.size,
     });
   }
