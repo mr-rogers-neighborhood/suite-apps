@@ -598,7 +598,7 @@ function installedInfo(manifest: PackManifest, root: string): InstalledPackInfo 
     id: manifest.id,
     name: manifest.name,
     version: manifest.version,
-    description: null,
+    description: manifest.description ?? null,
     entry: manifest.entry,
     capabilities: manifest.capabilities,
     root,

@@ -37,6 +37,7 @@ afterEach(async () => {
 interface FixtureOptions {
   readonly id?: string;
   readonly name?: string;
+  readonly description?: string;
   readonly version?: string;
   readonly contractVersion?: number;
   readonly minimumHostVersion?: number;
@@ -74,6 +75,7 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
     contractVersion: options.contractVersion ?? 1,
     capabilities: options.capabilities ?? [],
     files: await digestPackFiles(payload),
+    ...(options.description === undefined ? {} : { description: options.description }),
     ...(options.minimumHostVersion === undefined
       ? {}
       : { minimumHostVersion: options.minimumHostVersion }),
@@ -111,13 +113,14 @@ async function install(
 describe("installed pack verification", () => {
   it("loads a valid signed pack with its files", async () => {
     const root = await temporaryRoot();
-    const pack = await fixture();
+    const pack = await fixture({ description: "A demo for the host boundary." });
     const installed = await install(root, pack);
 
     expect(installed).toMatchObject({
       id: "demo",
       name: "Demo",
       version: "1.0.0",
+      description: "A demo for the host boundary.",
       entry: "index.html",
       capabilities: [],
       source: "installed",
@@ -128,7 +131,12 @@ describe("installed pack verification", () => {
     const scan = await loadInstalledPacks(root, trust(pack.publicKey));
     expect(scan.issues).toEqual([]);
     expect(scan.packs).toHaveLength(1);
-    expect(scan.packs[0]).toMatchObject({ id: "demo", version: "1.0.0", source: "installed" });
+    expect(scan.packs[0]).toMatchObject({
+      id: "demo",
+      version: "1.0.0",
+      description: "A demo for the host boundary.",
+      source: "installed",
+    });
   });
 
   it("refuses a pack signed by a different key", async () => {

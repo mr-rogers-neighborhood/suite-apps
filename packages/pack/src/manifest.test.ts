@@ -192,6 +192,26 @@ describe("canonical manifest bytes", () => {
     if (!first.ok || !second.ok) return;
     expect(canonicalManifestBytes(first.value)).not.toEqual(canonicalManifestBytes(second.value));
   });
+
+  it("adds a description to the canonical bytes only when it is present", () => {
+    const plain = parsePackManifest(manifest());
+    const described = parsePackManifest(manifest({ description: "Notes for the launcher." }));
+    expect(plain.ok && described.ok).toBe(true);
+    if (!plain.ok || !described.ok) return;
+
+    const absent = JSON.parse(decoder.decode(canonicalManifestBytes(plain.value))) as Record<
+      string,
+      unknown
+    >;
+    const present = JSON.parse(decoder.decode(canonicalManifestBytes(described.value))) as Record<
+      string,
+      unknown
+    >;
+    // Absent means the key is absent, so a manifest signed before the field
+    // existed still produces the bytes its signature covers.
+    expect(absent).not.toHaveProperty("description");
+    expect(present.description).toBe("Notes for the launcher.");
+  });
 });
 
 describe("host fit", () => {

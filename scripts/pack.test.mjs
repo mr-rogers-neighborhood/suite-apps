@@ -35,6 +35,7 @@ function sourcePack() {
       {
         id: "demo-pack",
         name: "Demo Pack",
+        description: "Demo pack for the boundary tests.",
         version: "1.2.3",
         entry: "index.html",
         contractVersion: 1,
@@ -74,6 +75,7 @@ describe("bundlePack", () => {
     assert.equal(built.manifest.id, "demo-pack");
     assert.equal(built.manifest.version, "1.2.3");
     assert.equal(built.manifest.contractVersion, 1);
+    assert.equal(built.manifest.description, "Demo pack for the boundary tests.");
 
     // The development manifest is the declaration, not a payload file.
     assert.deepEqual(
@@ -91,6 +93,7 @@ describe("bundlePack", () => {
     const parsed = parsePackManifest(JSON.parse(decoder.decode(archive.manifestBytes)));
     assert.equal(parsed.ok, true);
     assert.deepEqual(parsed.value.files, built.manifest.files);
+    assert.equal(parsed.value.description, "Demo pack for the boundary tests.");
 
     assert.equal(await verifyPackSignature(parsed.value, keys.publicKeyBase64), true);
     const mismatches = await verifyPackFiles(

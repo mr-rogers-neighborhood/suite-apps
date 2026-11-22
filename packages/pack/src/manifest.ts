@@ -65,6 +65,11 @@ export interface PackManifestCore {
   readonly format: typeof PACK_FORMAT;
   readonly id: string;
   readonly name: string;
+  /**
+   * One line for the launcher. Optional, and absent from the canonical bytes
+   * when a manifest does not carry it, so an older signature still verifies.
+   */
+  readonly description?: string;
   readonly version: string;
   readonly entry: string;
   readonly contractVersion: number;
@@ -131,6 +136,7 @@ function manifestSchema(requireSignature: boolean) {
       format: z.literal(PACK_FORMAT),
       id: z.string().regex(PACK_ID),
       name: z.string().min(1).max(64),
+      description: z.string().min(1).max(200).optional(),
       version: z.string().regex(SEMVER),
       entry: z.string().refine(isSafePackPath, "a relative path inside the pack"),
       contractVersion: z.number().int().positive(),
@@ -250,6 +256,10 @@ export function canonicalManifestBytes(manifest: PackManifestCore): Uint8Array {
     format: manifest.format,
     id: manifest.id,
     name: manifest.name,
+    // Present only when the manifest declared one. A manifest written before
+    // this field existed therefore canonicalizes to the same bytes and keeps
+    // its signature.
+    ...(manifest.description === undefined ? {} : { description: manifest.description }),
     version: manifest.version,
     entry: manifest.entry,
     contractVersion: manifest.contractVersion,

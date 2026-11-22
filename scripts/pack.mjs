@@ -180,6 +180,7 @@ export async function bundlePack({
     format: PACK_FORMAT,
     id,
     name,
+    ...(source.description === undefined ? {} : { description: source.description }),
     version,
     entry,
     contractVersion: contract,
