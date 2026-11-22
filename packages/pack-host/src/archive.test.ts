@@ -91,6 +91,8 @@ function zipEntries(
     readonly bytes: Uint8Array;
     /** What the local header claims, when it should disagree with `bytes`. */
     readonly declaredSize?: number;
+    /** A Unix file mode, to write into the central directory only. */
+    readonly unixMode?: number;
   }[],
 ): Uint8Array {
   const locals: Uint8Array[] = [];
@@ -115,11 +117,15 @@ function zipEntries(
     const central = new Uint8Array(46 + name.byteLength);
     const centralView = new DataView(central.buffer);
     centralView.setUint32(0, 0x02_01_4b_50, true);
-    centralView.setUint16(4, 20, true);
+    // Unix made-by high byte plus the mode in the high half of the external attributes.
+    centralView.setUint16(4, entry.unixMode === undefined ? 20 : 0x03_1e, true);
     centralView.setUint16(6, 20, true);
     centralView.setUint32(20, entry.bytes.byteLength, true);
     centralView.setUint32(24, entry.bytes.byteLength, true);
     centralView.setUint16(28, name.byteLength, true);
+    if (entry.unixMode !== undefined) {
+      centralView.setUint32(38, (entry.unixMode << 16) >>> 0, true);
+    }
     centralView.setUint32(42, offset, true);
     central.set(name, 46);
     centrals.push(central);
@@ -178,6 +184,23 @@ describe("pack archives", () => {
       { name: "index.html", bytes: encoder.encode("two") },
     ]);
     expect(await readCode(archive)).toBe("duplicate-path");
+  });
+
+  it("refuses a symlink or non-regular entry in the central directory", async () => {
+    for (const unixMode of [0o12_07_77, 0o02_06_44, 0o14_06_44]) {
+      const archive = zipEntries([
+        { name: "manifest.json", bytes: encoder.encode("{}"), unixMode: 0o10_06_44 },
+        { name: "index.html", bytes: encoder.encode("no"), unixMode },
+      ]);
+      expect(await readCode(archive)).toBe("not-regular");
+    }
+
+    // A regular Unix mode is still accepted; the mode check is not "any mode at all".
+    const regular = zipEntries([
+      { name: "manifest.json", bytes: encoder.encode("{}"), unixMode: 0o10_06_44 },
+      { name: "index.html", bytes: encoder.encode("no"), unixMode: 0o10_06_44 },
+    ]);
+    expect(await readCode(regular)).toBeUndefined();
   });
 
   it("requires one manifest at the root", async () => {
