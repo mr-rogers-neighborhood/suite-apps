@@ -1,0 +1,24 @@
+{
+  "name": "@suite/budget-pack",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Suite Budget as a signed desktop pack: the renderer, its bridge prelude and the build manifest.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@suite/budget-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@suite/pack-runtime": "workspace:*",
+    "@tailwindcss/vite": "^4.3.4",
+    "@types/node": "^24.10.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "jsdom": "^30.1.3",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "5.1.0"
+  }
+}

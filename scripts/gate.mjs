@@ -193,18 +193,24 @@ if (!build.ok) {
   results.push({ repo: "libraries", package: "apps/*/packages/*", ok: false, detail: build.detail });
 }
 
-// The pack build script is not inside a workspace package, so no app's `check:full`
-// runs its test. It imports the libraries built above, so it runs here: after the
-// build, before any app can call the tree green.
+// The pack build scripts are not inside a workspace package, so no app's
+// `check:full` runs their tests. They import the libraries built above, so they
+// run here: after the build, before any app can call the tree green. The Budget
+// round-trip uses an ephemeral key and verifies against its own public half, so
+// a clean checkout with no owner signing key still proves the signed path.
 const scripts =
   dry || !build.ok
     ? { ok: build.ok, detail: build.ok ? "dry run" : "not run: libraries failed" }
     : (() => {
         if (!json) process.stdout.write("\n▶ scripts\n");
-        const result = run("node", ["--test", "scripts/pack.test.mjs"], workdir);
+        const result = run(
+          "node",
+          ["--test", "scripts/pack.test.mjs", "scripts/budget-pack.test.mjs"],
+          workdir,
+        );
         return {
           ok: result.status === 0,
-          detail: result.status === 0 ? "pack test" : `exit ${result.status}`,
+          detail: result.status === 0 ? "pack tests" : `exit ${result.status}`,
         };
       })();
 
@@ -213,13 +219,41 @@ if (!json) process.stdout.write(`${scripts.ok ? "ok  " : "FAIL"}  scripts  ${scr
 if (!scripts.ok) {
   results.push({
     repo: "scripts",
-    package: "scripts/pack.test.mjs",
+    package: "scripts/*.test.mjs",
     ok: false,
     detail: scripts.detail,
   });
 }
 
-for (const entry of build.ok && scripts.ok ? selected : []) {
+// The prelude's tests live in its own workspace package. They need no signing
+// key; the signed round-trip above is the key-bearing path, and this is the
+// bridge's list/create/commit/export/import behaviour.
+const packTests =
+  dry || !build.ok || !scripts.ok
+    ? { ok: build.ok && scripts.ok, detail: dry ? "dry run" : "not run: earlier step failed" }
+    : (() => {
+        if (!json) process.stdout.write("\n▶ budget pack\n");
+        const result = run("pnpm", ["--filter", "@suite/budget-pack", "run", "test"], workdir);
+        return {
+          ok: result.status === 0,
+          detail: result.status === 0 ? "prelude tests" : `exit ${result.status}`,
+        };
+      })();
+
+if (!json) {
+  process.stdout.write(`${packTests.ok ? "ok  " : "FAIL"}  budget pack  ${packTests.detail}\n`);
+}
+
+if (!packTests.ok) {
+  results.push({
+    repo: "budget pack",
+    package: "@suite/budget-pack",
+    ok: false,
+    detail: packTests.detail,
+  });
+}
+
+for (const entry of build.ok && scripts.ok && packTests.ok ? selected : []) {
   const repoDir = join(workdir, "apps", entry.repo);
   if (!existsSync(join(repoDir, "package.json"))) {
     results.push({ ...entry, ok: false, detail: "missing repo" });

@@ -6,6 +6,9 @@
     },
     "packages/core": {
       "project": ["src/**/*.ts"]
+    },
+    "pack": {
+      "project": ["src/**/*.ts", "*.config.ts", "*.config.mts"]
     }
   },
   "ignoreDependencies": ["tailwindcss", "loro-crdt"]
