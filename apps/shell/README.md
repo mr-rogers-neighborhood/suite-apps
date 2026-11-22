@@ -11,7 +11,11 @@ separate Flatpaks. The point of this tree is to prove the host boundary before a
 - a scoped document API that carries opaque bytes and never a path;
 - a scoped `files` service with relative paths, host-owned backups and locks;
 - a user-consented external file surface: a host-owned picker, opaque handles and import;
-- a shell-owned Loro space document that restores tabs and is container-ready;
+- a local catalogue of `.suitepack` files with verified install/refusal entries;
+- uninstall and additive pack updates, version by version;
+- `suite://<pack-id>/<path>` routing and a launch context per tab;
+- a shell-owned Loro space document that restores tabs, models pack and screen tabs, and is
+  container-ready;
 - three sample packs that exercise the boundary on purpose.
 
 ## Run it
@@ -35,7 +39,8 @@ The app loads signed installs from `<dataRoot>/packs/<id>/<version>`. It never r
 `resources/packs`, and `SUITE_SHELL_DEV_PACKS=1` is ignored in a packaged build. A development pack
 directory is `packs/<id>/` beside the checkout and only loads when that switch is set. Data lives
 under Electron's `userData` directory (`~/.config/Suite/shell` on Linux); `SUITE_SHELL_DATA` and
-`SUITE_SHELL_USER_DATA` override the data and profile directories for a test.
+`SUITE_SHELL_USER_DATA` override the data and profile directories for a test. The local catalogue
+is `<dataRoot>/catalogue`; `SUITE_SHELL_CATALOGUE` points it at another directory.
 
 The shared pack work lives outside this app: `packages/pack` owns the manifest and signature,
 `packages/pack-runtime` owns the pack-side service types, and `packages/pack-host` owns the scoped
@@ -47,18 +52,56 @@ The pinned pack key is shared with Suite Go, but the manifest is not: Go require
 refused by Go and a Go `.pack` is refused here until the formats are unified (#202).
 [Status](../../docs/reference/status.md) records the split.
 
-## Installing a pack
+## Installing, updating and removing a pack
 
-The launcher's **Install pack…** button opens the host's file picker for a `.suitepack`. The host reads
-at most 64 MiB, verifies the manifest signature against the pinned key and every file hash, refuses
-extra files and paths that leave the pack root, and only then writes
-`<dataRoot>/packs/<id>/<version>/`. Installs are additive and an existing version is never
+The launcher shows installed packs and the local catalogue together. The catalogue is a directory
+of `.suitepack` files (`<dataRoot>/catalogue`, or `SUITE_SHELL_CATALOGUE`). Each archive is read with
+the shared archive reader and verified before it is listed: the manifest signature against
+`SUITE_PACK_PUBLIC_KEY`, the host contract and capability list, and every file hash. A trusted entry
+offers **Install**; a refused entry stays visible with its refusal sentence and cannot be installed.
+Listing never extracts an archive, so a refusal leaves nothing behind.
+
+The catalogue is a local distribution path. A remote index is a later slice with the same trust
+rule; it is not built here.
+
+The **Add pack…** button is the original file picker. The host reads at most 64 MiB, verifies the
+archive with the same rules, refuses extra files and paths that leave the pack root, and only then
+writes `<dataRoot>/packs/<id>/<version>/`. Installs are additive and an existing version is never
 overwritten. A Go `.pack` is a different manifest format and is refused; it is not an import path.
+
+Updating is installing a newer archive for the same id. The loader selects the highest valid version,
+so the new version runs after a restart (or immediately when no tab is open). The old version stays
+on disk until the person removes it; the launcher lists each non-current version with an explicit
+**Remove** action. Nothing is deleted silently.
+
+**Uninstall** removes exactly `<dataRoot>/packs/<id>/<version>`. A symlinked install root, id
+directory or version directory is refused, and the version must resolve inside the real pack root;
+a path outside it, or a version that is not a safe segment, is refused before removal. If a tab for
+that pack is open, the host closes it first and says so in the notice; the view is bound to the
+version that loaded it and the host does not keep a second copy of that binding. The pack's documents
+under `documents/<container>/<pack>` and its files under `files/<container>/<pack>` are never touched.
 
 A newly installed app appears in the launcher immediately and opens now. A tab that is already open
 keeps its loaded view; running a replaced version of that pack needs a Suite restart, because the
-pack session's protocol handler is bound when its first view loads. The install IPC exists on the
-chrome bridge only; a pack has no installer channel.
+pack session's protocol handler is bound when its first view loads. The install and uninstall IPC
+exist on the chrome bridge only; a pack has no installer or lifecycle channel.
+
+## Suite links and launch
+
+The host claims `suite://` and routes `suite://<pack-id>/<path>` in one pure function. A malformed
+id, an unknown or uninstalled pack, and a pack with no entry are refused with a sentence shown in
+the launcher. The path is metadata for the pack; the host loads the pack's current installed entry.
+A deep link never installs or updates anything.
+
+Linux and Windows deliver a link as an argument to a second launch: the single-instance lock keeps
+one host, the second-instance event focuses it and routes the link. macOS delivers an `open-url`
+event; a link that arrives before the window exists is held and drained at startup.
+
+Each tab stores the context it was opened with. `window.suite.launch()` returns it from the main
+process, keyed by the sender's tab, so a pack never parses a launch out of a URL and never names
+another tab. A plain open is `{ kind: "launcher" }`; a deep link is
+`{ kind: "deep-link", url }`. The chrome's own link opening is unchanged, and a pack still cannot
+hand a link to the OS browser without `network`.
 
 ## The shape
 
@@ -84,6 +127,12 @@ a UI change, not a storage migration.
 A **Space** is the user-facing grouping — not necessarily work. A **Container** is the data
 identity. A **Session** is the local set of open windows and tabs. The spike’s space document still
 stores the live tabs; the multi-window phase splits session state into its own local store.
+
+A stored tab is a discriminated union: a **pack** tab names a pack and entry, and a **screen** tab
+names a host screen. The document is at `shell.version = 2`; a version-1 document has no `kind`, and
+its tabs read as pack tabs. Old tabs are not dropped or rewritten on read. This slice only accepts a
+screen tab in the model — rendering one is the next slice, and activating one today returns to the
+launcher with a notice.
 
 ## The pack contract
 
@@ -112,6 +161,7 @@ window.suite = {
   packId,
   containerId,
   info(),
+  launch: () => Promise<PackLaunchContext>,
   documents: { list, create, open, save, remove },
   files: {
     list, stat, mkdir, read, write, rename, remove, backup, lock,
@@ -121,6 +171,9 @@ window.suite = {
   openExternal(url),
 };
 ```
+
+`launch()` is asynchronous because it crosses the bridge. It resolves to `{ kind: "launcher" }` for
+an ordinary open or `{ kind: "deep-link", url }` when a `suite://` link opened this tab.
 
 The document API requires the `documents` capability; without it, every document call returns
 nothing. `documents` is scoped by the sender's container and pack id, so the same pack in two
@@ -203,7 +256,8 @@ decision record owns that trade.
 
 ## What is not built yet
 
-- a remote pack index, uninstall and pack updates;
+- a remote pack index (the catalogue is local only);
+- rendering screen tabs (the model accepts one; the view does not);
 - the host's blind relay transport for pack sync;
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;
@@ -235,6 +289,11 @@ mise exec -- pnpm --filter @suite/shell build
 
 The tests cover pack manifest discovery and traversal, document scoping, the `files` service's
 per-pack and per-container isolation, lock ownership, the external surface's filter validation,
-token ownership and cancellation, import into the pack root, space document open/close/title and
-persistence, and the channel names the two preloads spell out by hand. The platform dialog itself is
-not exercised: tests use an injected picker, because a native dialog cannot run headlessly.
+token ownership and cancellation, import into the pack root, catalogue trust and refusal (valid,
+wrong-key, tampered and unsigned archives), install from the catalogue, additive updates,
+version-only uninstall and symlink refusal, uninstall planning for open tabs, `suite://` parsing and
+refusals, launch contexts, space document open/close/title and persistence, version-1 space
+migration, screen-tab acceptance, and the channel names the two preloads spell out by hand. The
+platform dialog itself is not exercised: tests use an injected picker, because a native dialog cannot
+run headlessly. The Electron window, protocol registration, `open-url`/`second-instance` delivery
+and an actual pack render are not exercised headlessly; their pure routing and model pieces are.
