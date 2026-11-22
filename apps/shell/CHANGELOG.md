@@ -22,7 +22,7 @@ No changes yet.
   current installed pack; a malformed, unknown or uninstalled target is refused with a sentence.
 - **The external file surface.** A host-owned picker hands a pack opaque handles, and import copies
   a person's file into the pack root without exposing a host path.
-- **Packaging as `run.suite.shell`.** The host now builds as a Flatpak named Suite, with a narrower
+- **Packaging as `run.suite.shell`.** The host now builds as a Flatpak named Suite Shell, with a narrower
   sandbox than Start: no host Flatpak service, no host filesystem grants, and no scheme handler yet.
 
 ## [0.1.0] - 2026-11-22

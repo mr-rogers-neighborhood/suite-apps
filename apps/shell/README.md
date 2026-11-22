@@ -56,7 +56,7 @@ refused by Go and a Go `.pack` is refused here until the formats are unified (#2
 
 ## Install as a Flatpak
 
-The host installs as the Flatpak **Suite**, id `run.suite.shell`:
+The host installs as the Flatpak **Suite Shell**, id `run.suite.shell`:
 
 ```sh
 flatpak install --user suite run.suite.shell
@@ -126,7 +126,7 @@ hand a link to the OS browser without `network`.
 ## The shape
 
 ```text
-Suite (one BaseWindow)
+Suite Shell (one BaseWindow)
 ├── chrome view (full window, sandboxed renderer)
 │   ├── tab strip
 │   └── content area

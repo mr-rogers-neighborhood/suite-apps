@@ -276,7 +276,8 @@ describe("release bodies", () => {
 
   it("builds one aggregate row per app with version, date, link and install", () => {
     const body = aggregateReleaseBody(entries, { date: "2026-11-21" });
-    assert.match(body, /Latest/u);
+    assert.match(body, /Suite Shell/u);
+    assert.match(body, /Suite Go/u);
     for (const entry of entries) {
       assert.match(body, new RegExp(entry.tag, "u"));
       assert.match(body, new RegExp(`\\| \\[${entry.app.name}\\]`, "u"));
@@ -336,9 +337,9 @@ describe("sections and the Suite Go APK", () => {
     assert.equal(go.kind, "apk");
   });
 
-  it("carries the host as Suite, first in the desktop table", () => {
+  it("carries the host as Suite Shell, first in the desktop table", () => {
     const shell = APPS.find((app) => app.id === "shell");
-    assert.equal(shell.name, "Suite");
+    assert.equal(shell.name, "Suite Shell");
     assert.equal(shell.packageJson, "apps/shell/package.json");
     assert.equal(shell.changelog, "apps/shell/CHANGELOG.md");
     assert.equal(shell.tagPrefix, "shell-v");
@@ -358,7 +359,7 @@ describe("sections and the Suite Go APK", () => {
       tag: "suite-2026.11.22",
     });
     const rows = desktop.filter((line) => line.startsWith("| ["));
-    assert.match(rows[0], /\| \[Suite\]/u);
+    assert.match(rows[0], /\| \[Suite Shell\]/u);
     assert.match(rows[0], /run\.suite\.shell/u);
   });
 
@@ -407,14 +408,15 @@ describe("sections and the Suite Go APK", () => {
       tag: "suite-2026.11.21",
     });
     const remote = body.indexOf("flatpak remote-add");
-    const desktop = body.indexOf("## Desktop");
+    const also = body.indexOf("## Also on the remote");
     const update = body.indexOf("## Update");
-    assert.ok(remote >= 0 && desktop > remote);
-    assert.ok(update > desktop);
+    assert.ok(remote >= 0 && also > remote);
+    assert.ok(update > also);
 
     const page = releasesPage(entries, { date: "2026-11-21", tag: "suite-2026.11.21" });
-    assert.ok(page.indexOf("flatpak remote-add") < page.indexOf("## Desktop"));
-    assert.ok(page.indexOf("## Update") > page.indexOf("## Desktop"));
+    const pageDesktop = page.indexOf("## Desktop");
+    assert.ok(page.indexOf("flatpak remote-add") < pageDesktop);
+    assert.ok(page.indexOf("## Update") > pageDesktop);
   });
 
   it("says in the aggregate body whether the APK link is live", () => {
@@ -426,7 +428,7 @@ describe("sections and the Suite Go APK", () => {
     });
     assert.match(live, /carries its debug-signed APK/u);
     assert.match(live, /releases\/download\/suite-2026\.11\.21\/suite-go-0\.1\.0\.apk/u);
-    assert.match(live, /## Mobile/u);
+    assert.match(live, /## Suite Go \(mobile\)/u);
 
     const missing = aggregateReleaseBody(withGo, {
       date: "2026-11-21",

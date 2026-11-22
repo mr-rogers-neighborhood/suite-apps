@@ -131,9 +131,9 @@ host's `flatpak` and manage deployments. It never writes a document.
 When Flatpak deploys the hub, its own row says `Flatpak` and offers **Update Start**. Flatpak replaces
 the deployment, and the new build starts next launch.
 
-### The host as a Flatpak
+### Suite Shell as a Flatpak
 
-`node scripts/flatpak.mjs --app shell` builds `run.suite.shell` as **Suite**, from the same unpacked
+`node scripts/flatpak.mjs --app shell` builds `run.suite.shell` as **Suite Shell**, from the same unpacked
 tree and zypak base. Its sandbox is the narrow one: `--share=ipc`, `--share=network`, Wayland with an
 X11 fallback, and `--device=dri`. The network namespace is there because a pack with the `network`
 capability runs inside the host's sandbox; the per-pack session policy and that capability still

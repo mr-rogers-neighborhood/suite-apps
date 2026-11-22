@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Publish the Suite host: package it, build the Flatpak, publish the signed
+ * Publish Suite Shell and Suite Go: package the host, build the Flatpak, publish the signed
  * remote, refresh the rolling release, attach Suite Go's APK, and relink.
  *
  * The host is the top row of the rolling release and the only desktop artifact
@@ -252,15 +252,18 @@ function goVersion() {
  */
 export function installLines(version = goVersion()) {
   const lines = [
-    "flatpak install --user suite run.suite.shell",
-    "flatpak run run.suite.shell",
+    "Suite Shell (desktop):",
+    "  flatpak install --user suite run.suite.shell",
+    "  flatpak run run.suite.shell",
   ];
   if (version !== null) {
     const apk = join(APK_DIR, goApkName(version));
-    lines.push(`adb install -r -t ${apk}`);
-    lines.push(`${apk} (stable alias: ${join(APK_DIR, GO_APK_ALIAS)})`);
+    lines.push("Suite Go (mobile):");
+    lines.push(`  adb install -r -t ${apk}`);
+    lines.push(`  ${apk} (stable alias: ${join(APK_DIR, GO_APK_ALIAS)})`);
   } else {
-    lines.push(`${join(APK_DIR, GO_APK_ALIAS)} (versioned APK name unknown)`);
+    lines.push("Suite Go (mobile):");
+    lines.push(`  ${join(APK_DIR, GO_APK_ALIAS)} (versioned APK name unknown)`);
   }
   return lines;
 }
@@ -301,7 +304,7 @@ async function main(argv) {
   const status = readGateStatus();
   const refusal = publishRefusal(status, head);
 
-  process.stdout.write(options.publish ? "\nSuite release · publish\n" : "\nSuite release · dry run\n");
+  process.stdout.write(options.publish ? "\nSuite Shell + Suite Go release · publish\n" : "\nSuite Shell + Suite Go release · dry run\n");
   process.stdout.write(`\n  head        ${head}\n`);
   process.stdout.write(
     `  gate proof  ${

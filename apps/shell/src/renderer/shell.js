@@ -502,7 +502,7 @@ function widgetTile(widget, index, total) {
   const head = element("div", "widget-head");
   const title = element("h2", "widget-title", widget.title);
   head.append(title);
-  if (widget.source === "host") head.append(element("span", "pill pill-host", "Suite"));
+  if (widget.source === "host") head.append(element("span", "pill pill-host", "Suite Shell"));
   if (widget.source === "app" && widget.appName !== null) {
     head.append(element("span", "pill", widget.appName));
   }
@@ -646,7 +646,7 @@ function paint() {
 
   const active = state.tabs.find((tab) => tab.id === state.activeTabId);
   document.body.dataset.surface = state.surface;
-  document.title = active ? `${active.title} — Suite` : "Suite";
+  document.title = active ? `${active.title} — Suite Shell` : "Suite Shell";
 }
 
 function bindChrome() {

@@ -140,10 +140,10 @@ ephemeral key, so a clean checkout with no owner key still proves the build and 
 mise exec -- node scripts/release-suite.mjs [--publish] [--target s3|lan] [--skip-gate] [--skip-apk]
 ```
 
-Packages Suite, the host, publishes the signed Flatpak remote, refreshes the rolling release, attaches
+Packages Suite Shell, the host, publishes the signed Flatpak remote, refreshes the rolling release, attaches
 Suite Go's APK and relinks it. Without `--publish` it prints every step and changes nothing. The
 individual commands and the gate-proof rule are in [Package and
-release](../how-to/package-and-release.md#release-suite-the-host).
+release](../how-to/package-and-release.md#release-suite-shell-the-host).
 
 ## Docs
 

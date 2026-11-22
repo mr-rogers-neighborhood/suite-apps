@@ -111,7 +111,7 @@ const APPS = {
   },
   shell: {
     id: "run.suite.shell",
-    name: "Suite",
+    name: "Suite Shell",
     package: "@suite/shell",
     project: join(ROOT, "apps", "shell"),
     folder: "shell",
