@@ -3,8 +3,8 @@
  *
  * These are the pack-side types. They describe the host a pack is written
  * against and the target shape of `window.suite`; the v1 desktop host implements
- * a subset (documents, files and the small info surface) and refuses the rest at
- * discovery. Neither side imports Electron or Node from this package.
+ * a subset (documents, files, launch and the small info surface) and refuses the
+ * rest at discovery. Neither side imports Electron or Node from this package.
  */
 
 export type Disposable = () => void;
@@ -192,7 +192,8 @@ export type PackLaunchContext =
 export interface PackHost {
   readonly packId: string;
   readonly containerId: string;
-  readonly launch: PackLaunchContext;
+  /** The context this tab was opened with. Async because it crosses the bridge. */
+  launch(): Promise<PackLaunchContext>;
   readonly files: FilesService;
   readonly documents: DocumentsService;
   readonly storage: KeyValueStore;

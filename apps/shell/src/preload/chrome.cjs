@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld("suiteShell", {
   reloadTab: (tabId) => ipcRenderer.invoke("suite:shell:reload-tab", tabId),
   openExternal: (url) => ipcRenderer.invoke("suite:shell:open-external", url),
   installPack: () => ipcRenderer.invoke("suite:shell:install-pack"),
+  installCataloguePack: (id, version) =>
+    ipcRenderer.invoke("suite:shell:install-catalogue-pack", id, version),
+  uninstallPack: (id, version) => ipcRenderer.invoke("suite:shell:uninstall-pack", id, version),
   onState: (listener) => {
     ipcRenderer.on("suite:shell:state-changed", (_event, state) => listener(state));
   },

@@ -5,16 +5,28 @@ import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/deskto
 import { SUITE_PACK_PUBLIC_KEY } from "@suite/pack/pinned-key";
 import { cssVariables, defaultTheme } from "@suite/theme";
 import { app, dialog, ipcMain, nativeTheme, net, protocol } from "electron";
+import {
+  type CataloguePack,
+  catalogueEntry,
+  catalogueRootFor,
+  installCataloguePack,
+  loadCatalogue,
+} from "./catalogue.js";
+import { LAUNCHER_CONTEXT, suiteLinkFromArgv } from "./deepLink.js";
 import { DocumentStore } from "./documents.js";
 import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
 import {
+  comparePackVersions,
   InstalledPackError,
+  type InstalledVersion,
   installPackArchive,
   loadInstalledPacks,
   MAX_ARCHIVE_BYTES,
   type PackTrustOptions,
+  uninstallPackVersion,
 } from "./installedPacks.js";
+import { planUninstall } from "./lifecycle.js";
 import { devPacksEnabled, mergePackSources, shouldOpenAfterInstall } from "./packRegistry.js";
 import {
   discoverPacks,
@@ -29,6 +41,7 @@ import {
 } from "./packs.js";
 import { type PackSender, packSender } from "./senders.js";
 import {
+  type CatalogueEntry,
   CHROME_HOST,
   CHROME_IPC,
   CHROME_ORIGIN,
@@ -36,9 +49,11 @@ import {
   type FileReadOptions,
   type FileRemoveOptions,
   type FileWriteOptions,
+  type InstalledVersionView,
   PACK_IPC,
   PACK_SCHEME,
   type PackInfoView,
+  type PackLaunchContext,
   type ThemeView,
 } from "./shared.js";
 import { SpaceStore } from "./spaces.js";
@@ -76,6 +91,9 @@ let documents: DocumentStore | null = null;
 let files: PackFilesService | null = null;
 let externalFiles: ExternalFilesService | null = null;
 let packs: readonly PackInfo[] = [];
+let catalogue: readonly CataloguePack[] = [];
+let installedVersions: readonly InstalledVersion[] = [];
+let pendingDeepLink: string | null = null;
 
 /** The compressed archive cap this host opens from the picker. The reader enforces its own entry limits too. */
 const MAX_INSTALL_BYTES = MAX_ARCHIVE_BYTES;
@@ -84,7 +102,22 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on("second-instance", () => window?.focus());
+  registerSuiteProtocol();
+
+  // A second launch is how Linux and Windows deliver a `suite://` link. The lock
+  // keeps one host; this event focuses it and routes the argument it arrived with.
+  app.on("second-instance", (_event, argv) => {
+    window?.focus();
+    const link = suiteLinkFromArgv(argv);
+    if (link !== null) handleDeepLink(link);
+  });
+
+  // macOS delivers a link as an event rather than an argument. It can arrive
+  // before the window exists, so the handler stores it and bootstrap drains it.
+  app.on("open-url", (event, url) => {
+    event.preventDefault();
+    handleDeepLink(url);
+  });
 
   app
     .whenReady()
@@ -96,8 +129,14 @@ if (!gotLock) {
 
   app.on("window-all-closed", () => app.quit());
   app.on("activate", () => {
-    if (window === null) openWindow();
-    else window.focus();
+    if (window === null) {
+      openWindow();
+      const link = pendingDeepLink;
+      pendingDeepLink = null;
+      if (link !== null) handleDeepLink(link);
+    } else {
+      window.focus();
+    }
   });
   app.on("before-quit", () => {
     void spaceStore?.flush().catch((error: unknown) => {
@@ -111,6 +150,13 @@ async function bootstrap(): Promise<void> {
 
   const dataRoot = dataRootFor();
   await mkdir(dataRoot, { recursive: true });
+  // The catalogue is a drop directory. Creating it is a convenience; an absent
+  // or overridden path still scans as an empty catalogue.
+  await mkdir(catalogueRootFor(dataRoot, process.env), { recursive: true }).catch(
+    (error: unknown) => {
+      console.warn("[shell] could not create the catalogue directory", error);
+    },
+  );
 
   await refreshPacks();
   spaceStore = await SpaceStore.open(join(dataRoot, "spaces.loro"));
@@ -128,12 +174,46 @@ async function bootstrap(): Promise<void> {
   registerIpc();
   nativeTheme.on("updated", () => window?.setTheme(themeView()));
   openWindow();
+
+  const startupLink = pendingDeepLink ?? suiteLinkFromArgv(process.argv);
+  pendingDeepLink = null;
+  if (startupLink !== null) handleDeepLink(startupLink);
 }
 
 function dataRootFor(): string {
   const override = process.env.SUITE_SHELL_DATA?.trim();
   if (override !== undefined && override.length > 0) return override;
   return join(app.getPath("userData"), "shell");
+}
+
+/**
+ * Claim `suite://` for this host.
+ *
+ * A packaged app registers itself. A checkout runs through the Electron binary,
+ * so the executable and the app path are passed explicitly; without them the
+ * handler would start Electron with no app to run.
+ */
+function registerSuiteProtocol(): void {
+  if (process.defaultApp) {
+    const appPath = process.argv[1];
+    if (appPath !== undefined) {
+      app.setAsDefaultProtocolClient("suite", process.execPath, [appPath]);
+    }
+    return;
+  }
+  app.setAsDefaultProtocolClient("suite");
+}
+
+/** Route one link, or hold it until the window exists. */
+function handleDeepLink(url: string): void {
+  if (window === null) {
+    pendingDeepLink = url;
+    return;
+  }
+  void window.openDeepLink(url).catch((error: unknown) => {
+    console.warn("[shell] could not open a Suite link", error);
+    window?.setNotice("That Suite link could not be opened.");
+  });
 }
 
 function packTrustOptions(): PackTrustOptions {
@@ -164,7 +244,31 @@ async function refreshPacks(): Promise<void> {
     : [];
 
   packs = mergePackSources({ installed: scan.packs, development });
-  console.info(`[shell] ${packs.length} pack(s) available`);
+  installedVersions = scan.versions;
+  catalogue = await loadCatalogue(catalogueRootFor(dataRootFor(), process.env), packTrustOptions());
+  console.info(
+    `[shell] ${packs.length} pack(s) available; ${catalogue.length} catalogue archive(s)`,
+  );
+}
+
+/** What the chrome sees: no archive paths and no refusal codes. */
+function catalogueView(): readonly CatalogueEntry[] {
+  return catalogue.map(catalogueEntry);
+}
+
+/** Every valid version with the loader's current choice marked. */
+function installedVersionViews(): readonly InstalledVersionView[] {
+  const current = new Map(packs.map((pack) => [pack.id, pack.version]));
+  return installedVersions.map((entry) => ({
+    id: entry.id,
+    version: entry.version,
+    current: current.get(entry.id) === entry.version,
+  }));
+}
+
+/** Replace the window's pack data from the module's last scan. */
+function publishPackData(): void {
+  window?.setPackData(packs, catalogueView(), installedVersionViews());
 }
 
 function themeView(): ThemeView {
@@ -177,6 +281,8 @@ function openWindow(): void {
   let created: ShellWindow | null = null;
   created = new ShellWindow({
     packs,
+    catalogue: catalogueView(),
+    installedVersions: installedVersionViews(),
     spaces: spaceStore,
     theme: themeView(),
     onViewClosed: (tabId) => {
@@ -233,7 +339,18 @@ function registerIpc(): void {
   onChrome(CHROME_IPC.installPack, async () => {
     await installPackFromFile();
   });
+  onChrome(CHROME_IPC.installCataloguePack, async (id, version) => {
+    if (typeof id !== "string" || typeof version !== "string") return;
+    await installPackFromCatalogue(id, version);
+  });
+  onChrome(CHROME_IPC.uninstallPack, async (id, version) => {
+    if (typeof id !== "string" || typeof version !== "string") return;
+    await uninstallPackVersionFrom(id, version);
+  });
 
+  onPack(PACK_IPC.launch, (sender): PackLaunchContext => {
+    return window?.launchFor(sender.tabId) ?? LAUNCHER_CONTEXT;
+  });
   onPack(PACK_IPC.info, (sender): PackInfoView => {
     return {
       id: sender.pack.id,
@@ -426,27 +543,34 @@ async function installPackFromFile(): Promise<void> {
     return;
   }
 
+  const current = window;
+  const before = packs;
   try {
     const installed = await installPackArchive(
       bytes,
       join(dataRootFor(), "packs"),
       packTrustOptions(),
     );
+    const previous = before.find((pack) => pack.id === installed.id) ?? null;
     await refreshPacks();
-    window?.setPacks(packs);
-    const opened = shouldOpenAfterInstall(window?.state().tabs ?? [], installed.id);
+    publishPackData();
+    const opened = shouldOpenAfterInstall(current.state().tabs, installed.id);
     if (opened) {
-      await window?.openPack(installed.id).catch((error: unknown) => {
+      await current.openPack(installed.id).catch((error: unknown) => {
         console.warn(`[shell] could not open ${installed.id} after install`, error);
       });
     }
-    window?.setNotice(
+    const keptOlder =
+      previous !== null && comparePackVersions(installed.version, previous.version) > 0
+        ? ` Version ${previous.version} is still on disk; remove it from the launcher when you are ready.`
+        : "";
+    current.setNotice(
       opened
-        ? `${installed.name} ${installed.version} installed. The app is open now.`
-        : `${installed.name} ${installed.version} installed. Restart Suite to run the new version of the already-open app.`,
+        ? `${installed.name} ${installed.version} installed. The app is open now.${keptOlder}`
+        : `${installed.name} ${installed.version} installed. Restart Suite to run the new version of the already-open app.${keptOlder}`,
     );
   } catch (error) {
-    window?.setNotice(installRefusal(error));
+    current.setNotice(installRefusal(error));
   }
 }
 
@@ -454,6 +578,98 @@ function installRefusal(error: unknown): string {
   if (error instanceof InstalledPackError) return `The pack was refused: ${error.message}`;
   console.warn("[shell] pack install failed", error);
   return "The pack could not be installed.";
+}
+
+/**
+ * Install one trusted archive the catalogue listed.
+ *
+ * The entry is looked up again by id and version, and `installCataloguePack`
+ * re-reads and re-verifies the bytes. A stale or swapped file is refused by the
+ * same rules as the file picker. An update is just a newer version directory;
+ * the older one stays until the person removes it from the launcher.
+ */
+async function installPackFromCatalogue(id: string, version: string): Promise<void> {
+  if (window === null) return;
+
+  const entry = catalogue.find(
+    (candidate) => candidate.id === id && candidate.version === version && candidate.trusted,
+  );
+  if (entry === undefined) {
+    window.setNotice(`No trusted ${id} ${version} is in the catalogue.`);
+    return;
+  }
+
+  const previous = packs.find((pack) => pack.id === id) ?? null;
+  try {
+    const installed = await installCataloguePack(
+      entry,
+      join(dataRootFor(), "packs"),
+      packTrustOptions(),
+    );
+    await refreshPacks();
+    publishPackData();
+
+    const opened = shouldOpenAfterInstall(window.state().tabs, installed.id);
+    if (opened) {
+      await window.openPack(installed.id).catch((error: unknown) => {
+        console.warn(`[shell] could not open ${installed.id} after install`, error);
+      });
+    }
+
+    const keptOlder =
+      previous !== null && comparePackVersions(installed.version, previous.version) > 0
+        ? ` Version ${previous.version} is still on disk; remove it from the launcher when you are ready.`
+        : "";
+    window.setNotice(
+      opened
+        ? `${installed.name} ${installed.version} installed. The app is open now.${keptOlder}`
+        : `${installed.name} ${installed.version} installed. Restart Suite to run the new version of the already-open app.${keptOlder}`,
+    );
+  } catch (error) {
+    window.setNotice(installRefusal(error));
+  }
+}
+
+/**
+ * Remove one installed version.
+ *
+ * If the removed version is the one open tabs are running, those tabs close
+ * first; the notice says how many. An older version left behind by an update is
+ * removed without touching the tabs running the new one. Documents and files
+ * live outside the pack root and are never part of this operation.
+ */
+async function uninstallPackVersionFrom(id: string, version: string): Promise<void> {
+  if (window === null) return;
+
+  const plan = planUninstall(window.state().tabs, id);
+  if (plan.closeTabs.length > 0) {
+    await window.closeTabs(plan.closeTabs);
+  }
+
+  try {
+    await uninstallPackVersion(join(dataRootFor(), "packs"), id, version);
+  } catch (error) {
+    window.setNotice(
+      error instanceof InstalledPackError
+        ? `The pack version was not removed: ${error.message}`
+        : "The pack version could not be removed.",
+    );
+    // A failed removal may still have changed the disk; re-read rather than keep
+    // a stale list. The tabs are already closed, which is safe either way.
+    await refreshPacks();
+    publishPackData();
+    return;
+  }
+
+  await refreshPacks();
+  publishPackData();
+  const closed =
+    plan.closeTabs.length > 0
+      ? ` ${plan.closeTabs.length} open tab${plan.closeTabs.length === 1 ? "" : "s"} closed first.`
+      : "";
+  window.setNotice(
+    `${id} ${version} was removed. Its documents and files were left in place.${closed}`,
+  );
 }
 
 function onChrome<T>(channel: string, handler: (...args: unknown[]) => T): void {

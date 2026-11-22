@@ -12,6 +12,8 @@ const elements = {
   tabs: document.querySelector("#tabs"),
   packs: document.querySelector("#packs"),
   packCount: document.querySelector("#pack-count"),
+  catalogue: document.querySelector("#catalogue"),
+  catalogueCount: document.querySelector("#catalogue-count"),
   search: document.querySelector("#search"),
   notice: document.querySelector("#notice"),
   newTab: document.querySelector("#new-tab"),
@@ -23,6 +25,8 @@ let state = {
   tabs: [],
   activeTabId: null,
   packs: [],
+  catalogue: [],
+  installedVersions: [],
   theme: { mode: "dark", values: {} },
   notice: null,
 };
@@ -74,7 +78,7 @@ function renderTabs() {
     node.title = tab.title;
 
     const dot = element("span", "tab-dot");
-    dot.style.background = colorFor(tab.packId);
+    dot.style.background = colorFor(tab.kind === "pack" ? tab.packId : tab.id);
     dot.setAttribute("aria-hidden", "true");
 
     const title = element("span", "tab-title", tab.title);
@@ -102,24 +106,161 @@ function renderTabs() {
   elements.tabs.replaceChildren(fragment);
 }
 
-function renderPacks() {
+function matchesQuery(name, id, description) {
   const needle = query.trim().toLowerCase();
-  const matches = state.packs.filter((pack) => {
-    if (needle.length === 0) return true;
-    return `${pack.name} ${pack.id} ${pack.description ?? ""}`.toLowerCase().includes(needle);
-  });
+  if (needle.length === 0) return true;
+  return `${name} ${id} ${description ?? ""}`.toLowerCase().includes(needle);
+}
 
-  elements.packCount.textContent =
-    state.packs.length === 0
-      ? ""
-      : `${state.packs.length} pack${state.packs.length === 1 ? "" : "s"}`;
+function actionButton(label, onClick, className) {
+  const button = element("button", className ? `action ${className}` : "action", label);
+  button.type = "button";
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick(button);
+  });
+  return button;
+}
+
+function countLabel(total, noun) {
+  return total === 0 ? "" : `${total} ${noun}${total === 1 ? "" : "s"}`;
+}
+
+function installedCard(pack) {
+  const tile = element("div", "tile");
+  const card = element("button", "card");
+  card.type = "button";
+  card.title = `Open ${pack.name}`;
+
+  const top = element("div", "card-top");
+  const dot = element("span", "card-dot");
+  dot.style.background = colorFor(pack.id);
+  dot.setAttribute("aria-hidden", "true");
+  top.append(dot, element("span", "card-name", pack.name));
+  if (pack.source === "development") {
+    const dev = element("span", "pill pill-dev", "dev");
+    dev.title = "Loaded from an unsigned development directory";
+    top.append(dev);
+  }
+  top.append(element("span", "card-version", `v${pack.version}`));
+
+  const description = element(
+    "p",
+    "card-description",
+    pack.description ?? "A sandboxed Suite pack.",
+  );
+
+  const meta = element("div", "card-meta");
+  for (const capability of pack.capabilities) {
+    meta.append(element("span", "pill", capability));
+  }
+  if (pack.capabilities.length === 0) meta.append(element("span", "pill", "no capabilities"));
+
+  card.append(top, description, meta);
+  card.addEventListener("click", () => run(api.openPack(pack.id)));
+  tile.append(card);
+
+  const actions = element("div", "tile-actions");
+  const older = state.installedVersions.filter(
+    (version) => version.id === pack.id && !version.current,
+  );
+  for (const version of older) {
+    actions.append(
+      actionButton(`Remove v${version.version}`, () =>
+        run(api.uninstallPack(pack.id, version.version)),
+      ),
+    );
+  }
+  if (pack.source === "installed") {
+    actions.append(
+      actionButton(
+        "Uninstall",
+        () => run(api.uninstallPack(pack.id, pack.version)),
+        "action-danger",
+      ),
+    );
+  }
+  if (actions.childElementCount > 0) tile.append(actions);
+  return tile;
+}
+
+function catalogueCard(entry) {
+  const tile = element("div", "tile");
+  const card = element("div", "card card-static");
+  const name = entry.name.length > 0 ? entry.name : entry.id;
+
+  const top = element("div", "card-top");
+  const dot = element("span", "card-dot");
+  dot.style.background = colorFor(entry.id);
+  dot.setAttribute("aria-hidden", "true");
+  top.append(dot, element("span", "card-name", name));
+  top.append(
+    element(
+      "span",
+      entry.trusted ? "pill pill-available" : "pill pill-refused",
+      entry.trusted ? "available" : "refused",
+    ),
+  );
+  if (entry.version.length > 0) {
+    top.append(element("span", "card-version", `v${entry.version}`));
+  }
+
+  const description = element(
+    "p",
+    "card-description",
+    entry.description ??
+      (entry.trusted ? "A signed pack in the catalogue." : "This archive cannot be installed."),
+  );
+  card.append(top, description);
+
+  if (!entry.trusted) {
+    card.append(
+      element("p", "card-warning", entry.refusal ?? "This archive could not be verified."),
+    );
+  }
+
+  tile.append(card);
+  const actions = element("div", "tile-actions");
+  if (!entry.trusted) {
+    const refused = actionButton("Cannot install", () => {});
+    refused.disabled = true;
+    actions.append(refused);
+  } else {
+    const installed = state.installedVersions.some(
+      (version) => version.id === entry.id && version.version === entry.version,
+    );
+    const button = actionButton(
+      installed ? "Installed" : `Install v${entry.version}`,
+      () => {
+        button.disabled = true;
+        Promise.resolve(api.installCataloguePack(entry.id, entry.version))
+          .catch((error) => {
+            showNotice(error instanceof Error ? error.message : "The host refused that action.");
+          })
+          .finally(() => {
+            button.disabled = installed;
+          });
+      },
+      "action-primary",
+    );
+    button.disabled = installed;
+    actions.append(button);
+  }
+  tile.append(actions);
+  return tile;
+}
+
+function renderPacks() {
+  const matches = state.packs.filter((pack) => matchesQuery(pack.name, pack.id, pack.description));
+
+  elements.packCount.textContent = countLabel(state.packs.length, "pack");
 
   if (matches.length === 0) {
     const message = element(
       "p",
       "empty",
       state.packs.length === 0
-        ? "No packs are installed. Use Install pack… to add a signed pack."
+        ? "No packs are installed. Add a signed pack or install one from the catalogue below."
         : `No pack matches “${query.trim()}”.`,
     );
     elements.packs.replaceChildren(message);
@@ -127,46 +268,43 @@ function renderPacks() {
   }
 
   const fragment = document.createDocumentFragment();
-  for (const pack of matches) {
-    const card = element("button", "card");
-    card.type = "button";
-    card.title = `Open ${pack.name}`;
-
-    const top = element("div", "card-top");
-    const dot = element("span", "card-dot");
-    dot.style.background = colorFor(pack.id);
-    dot.setAttribute("aria-hidden", "true");
-    top.append(dot, element("span", "card-name", pack.name));
-    if (pack.source === "development") {
-      const dev = element("span", "pill pill-dev", "dev");
-      dev.title = "Loaded from an unsigned development directory";
-      top.append(dev);
-    }
-    top.append(element("span", "card-version", `v${pack.version}`));
-
-    const description = element(
-      "p",
-      "card-description",
-      pack.description ?? "A sandboxed Suite pack.",
-    );
-
-    const meta = element("div", "card-meta");
-    for (const capability of pack.capabilities) {
-      meta.append(element("span", "pill", capability));
-    }
-    if (pack.capabilities.length === 0) meta.append(element("span", "pill", "no capabilities"));
-
-    card.append(top, description, meta);
-    card.addEventListener("click", () => run(api.openPack(pack.id)));
-    fragment.append(card);
-  }
+  for (const pack of matches) fragment.append(installedCard(pack));
   elements.packs.replaceChildren(fragment);
+}
+
+function renderCatalogue() {
+  const matches = state.catalogue.filter((entry) =>
+    matchesQuery(entry.name, entry.id, entry.description),
+  );
+  elements.catalogueCount.textContent = countLabel(state.catalogue.length, "archive");
+
+  if (state.catalogue.length === 0) {
+    elements.catalogue.replaceChildren(
+      element(
+        "p",
+        "empty",
+        "No archives are in the catalogue. Put signed .suitepack files in the catalogue folder, or use Add pack….",
+      ),
+    );
+    return;
+  }
+  if (matches.length === 0) {
+    elements.catalogue.replaceChildren(
+      element("p", "empty", `No catalogue archive matches “${query.trim()}”.`),
+    );
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const entry of matches) fragment.append(catalogueCard(entry));
+  elements.catalogue.replaceChildren(fragment);
 }
 
 function paint() {
   applyTheme();
   renderTabs();
   renderPacks();
+  renderCatalogue();
 
   const active = state.tabs.find((tab) => tab.id === state.activeTabId);
   document.body.dataset.active = String(state.activeTabId !== null);
@@ -194,6 +332,7 @@ function bindChrome() {
   elements.search.addEventListener("input", () => {
     query = elements.search.value;
     renderPacks();
+    renderCatalogue();
   });
 
   elements.installPack.addEventListener("click", () => {
@@ -214,6 +353,7 @@ function bindChrome() {
         elements.search.value = "";
         query = "";
         renderPacks();
+        renderCatalogue();
       }
       return;
     }

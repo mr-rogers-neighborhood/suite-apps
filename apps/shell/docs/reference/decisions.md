@@ -90,6 +90,9 @@ The rules that shape the Suite host.
 - Its shape is container-ready: a tab carries a `spaceId`, and the document carries a default space.
   V1 exposes one default container and flat tabs; adding containers and saved spaces is a UI change,
   not a data migration.
+- A stored tab is a discriminated union of a **pack** tab and a **screen** tab. The document is at
+  `shell.version = 2`; a version-1 tab has no `kind` and reads as a pack tab. Old tabs are not dropped
+  or rewritten on read. This slice accepts a screen tab in the model; rendering it is the next slice.
 - The space document stores structure, not document content: containers, spaces, groups, entries, pins,
   labels and ordering. No paths, commands, URLs to open, or executable actions.
 - Open tabs, window bounds and focus are local session state. They must not sync to another device.
@@ -97,18 +100,46 @@ The rules that shape the Suite host.
 
 ## Updates, signing and installation
 
-- The shell owns its update path. A pack has no IPC to the updater or installer.
+- The shell owns its update path. A pack has no IPC to the updater, installer or uninstaller.
 - Signed packs are the load path. A `.suitepack` archive carries a signed `manifest.json` and the files
   it lists. The host verifies the manifest signature and every file hash against the pinned key, and
   refuses duplicate entries, extra files and paths that leave the pack root, before it extracts
   anything. Only verified installs load in a packaged build.
+- The local catalogue is a directory of `.suitepack` files, `<dataRoot>/catalogue` by default and
+  `SUITE_SHELL_CATALOGUE` when set. Every archive is read and verified before it is listed; a refused
+  archive still lists with its refusal sentence and can never be installed. Listing extracts nothing.
+  A remote index is a later slice with the same trust decision.
 - An install is `<dataRoot>/packs/<id>/<version>/`, written to a temporary sibling and renamed into
   place. An existing version is refused, not overwritten; installs are additive, so an older version
   stays available when a newer archive fails verification.
-- Installation is user-initiated and host-only: the chrome bridge opens the file picker and the pack
-  bridge has no installer channel. A new app opens immediately after install. A tab already open keeps
-  its loaded view; running a replaced version of that pack needs a restart, because the session's
-  protocol handler is bound when its first view loads.
+- An update is installing a newer version for the same id. The loader selects the highest valid
+  version. The newer directory is additive; the old one is not deleted silently. The launcher offers
+  an explicit remove action for each non-current version.
+- Uninstall removes exactly `<dataRoot>/packs/<id>/<version>/`. A symlinked install root, id
+  directory or version directory is refused, the version must resolve inside the real pack root, and
+  the path is checked before removal. A pack's documents and files live outside that root and are
+  never removed. If a tab for that pack is open, the host closes it first and says so; a view is
+  bound to the version that loaded it, so the host does not assume an open tab matches the selected
+  version.
+- Installation is user-initiated and host-only: the chrome bridge opens the file picker or installs a
+  catalogue entry, and the pack bridge has no installer or lifecycle channel. A new app opens
+  immediately after install. A tab already open keeps its loaded view; running a replaced version of
+  that pack needs a restart, because the session's protocol handler is bound when its first view
+  loads.
+
+## Routing and launch
+
+- The host claims `suite://` and parses `suite://<pack-id>/<path>` in one pure function. A malformed
+  id, an unknown or uninstalled pack, and a pack with no entry are refused. A link never installs or
+  updates.
+- The single-instance lock keeps one host. Linux and Windows route the link from the second
+  instance's argv; macOS routes `open-url`, holding a link that arrives before the window exists.
+- A link opens or focuses the pack's tab and loads the pack's current installed entry. The chrome's
+  own link opening is unchanged, and a pack still needs `network` to hand a link to the OS browser.
+- The host stores a launch context per tab and derives the tab from the sender. A pack calls
+  `window.suite.launch()` and receives `{ kind: "launcher" }` for an ordinary open or
+  `{ kind: "deep-link", url }` for a link; it never parses a launch out of a URL and never names
+  another tab.
 - Unsigned directory packs are an explicit development path: `SUITE_SHELL_DEV_PACKS=1` in an
   unpackaged checkout. The switch is ignored in a packaged build. In that mode a development pack wins
   a collision with an installed pack of the same id, because the person is iterating on the directory;
@@ -132,7 +163,8 @@ The rules that shape the Suite host.
 
 ## What this spike deliberately leaves out
 
-- a remote pack index, pack updates and uninstall UI;
+- a remote pack index (the catalogue is a local directory);
+- rendering screen tabs (the space model accepts one);
 - the host's blind relay transport for pack sync;
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;

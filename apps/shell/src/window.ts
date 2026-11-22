@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { originKey } from "@suite/desktop";
 import { app, BaseWindow, session, shell, WebContentsView } from "electron";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
+import { LAUNCHER_CONTEXT, parseSuiteLink } from "./deepLink.js";
 import { navigationReleasesLocks } from "./files.js";
 import { registerPackProtocol } from "./packProtocol.js";
 import {
@@ -13,10 +14,13 @@ import {
 } from "./packs.js";
 import { clearPackSender, setPackSender } from "./senders.js";
 import {
+  type CatalogueEntry,
   CHROME_ORIGIN,
   CHROME_STATE,
+  type InstalledVersionView,
+  type PackLaunchContext,
+  type PackShellTab,
   type ShellState,
-  type ShellTab,
   type ThemeView,
 } from "./shared.js";
 import type { SpaceStore } from "./spaces.js";
@@ -35,16 +39,26 @@ export class ShellWindow {
   readonly window: BaseWindow;
   readonly #chrome: WebContentsView;
   #packs: readonly PackInfo[];
+  #catalogue: readonly CatalogueEntry[];
+  #installedVersions: readonly InstalledVersionView[];
   readonly #spaces: SpaceStore;
   readonly #containerId: string;
   readonly #onViewClosed: ((tabId: string) => void) | undefined;
   readonly #views = new Map<string, WebContentsView>();
+  /**
+   * What each tab was opened with. It is stored here, keyed by the tab the main
+   * process derived from the sender, so a pack never parses a launch out of a URL
+   * or names another tab. A deep link updates the entry before the tab activates.
+   */
+  readonly #launchContexts = new Map<string, PackLaunchContext>();
   #theme: ThemeView;
   #notice: string | null = null;
   #closed = false;
 
   constructor(options: {
     readonly packs: readonly PackInfo[];
+    readonly catalogue?: readonly CatalogueEntry[];
+    readonly installedVersions?: readonly InstalledVersionView[];
     readonly spaces: SpaceStore;
     readonly theme: ThemeView;
     readonly containerId?: string;
@@ -52,6 +66,8 @@ export class ShellWindow {
     readonly onClosed?: () => void;
   }) {
     this.#packs = options.packs;
+    this.#catalogue = options.catalogue ?? [];
+    this.#installedVersions = options.installedVersions ?? [];
     this.#spaces = options.spaces;
     this.#containerId = options.containerId ?? DEFAULT_CONTAINER_ID;
     this.#onViewClosed = options.onViewClosed;
@@ -135,6 +151,8 @@ export class ShellWindow {
         capabilities: pack.capabilities,
         source: pack.source,
       })),
+      catalogue: this.#catalogue,
+      installedVersions: this.#installedVersions,
       theme: this.#theme,
       notice: this.#notice,
     };
@@ -148,7 +166,7 @@ export class ShellWindow {
     this.window.setTitle(active === undefined ? "Suite" : `${active.title} — Suite`);
   }
 
-  async openPack(packId: string): Promise<void> {
+  async openPack(packId: string, launch: PackLaunchContext = LAUNCHER_CONTEXT): Promise<void> {
     const pack = this.#packs.find((candidate) => candidate.id === packId);
     if (pack === undefined) {
       this.#notice = `No pack named ${packId} is installed.`;
@@ -157,12 +175,60 @@ export class ShellWindow {
     }
 
     const tab = await this.#spaces.openTab({
+      kind: "pack",
       packId: pack.id,
       title: pack.name,
       entry: pack.entry,
     });
+    this.#launchContexts.set(tab.id, launch);
     this.#notice = null;
     await this.activateTab(tab.id);
+  }
+
+  /**
+   * Route a `suite://` link to its installed pack.
+   *
+   * The link never installs or updates. An unknown or malformed link returns to
+   * the launcher so the refusal sentence is visible. An already-open tab for the
+   * pack is focused and receives the new context; otherwise a tab opens with the
+   * context stored before its view is created.
+   */
+  async openDeepLink(link: string): Promise<void> {
+    const parsed = parseSuiteLink(link, this.#packs);
+    if (!parsed.ok) {
+      this.#notice = parsed.message;
+      await this.#spaces.activateTab(null);
+      this.#hideViews();
+      this.#chrome.webContents.focus();
+      this.broadcast();
+      return;
+    }
+
+    const { pack, launch } = parsed.value;
+    const open = this.#spaces
+      .state()
+      .tabs.find((tab) => tab.kind === "pack" && tab.packId === pack.id);
+    if (open !== undefined) {
+      this.#launchContexts.set(open.id, launch);
+      this.#notice = null;
+      await this.activateTab(open.id);
+      return;
+    }
+
+    const tab = await this.#spaces.openTab({
+      kind: "pack",
+      packId: pack.id,
+      title: pack.name,
+      entry: pack.entry,
+    });
+    this.#launchContexts.set(tab.id, launch);
+    this.#notice = null;
+    await this.activateTab(tab.id);
+  }
+
+  /** The launch context for a tab the main process derived from the sender. */
+  launchFor(tabId: string): PackLaunchContext {
+    return this.#launchContexts.get(tabId) ?? LAUNCHER_CONTEXT;
   }
 
   async activateTab(tabId: string | null): Promise<void> {
@@ -170,6 +236,18 @@ export class ShellWindow {
     const state = this.#spaces.state();
     const tab = tabId === null ? undefined : state.tabs.find((entry) => entry.id === tabId);
     if (tab === undefined) {
+      this.#hideViews();
+      this.#chrome.webContents.focus();
+      this.broadcast();
+      return;
+    }
+
+    // A screen tab is host chrome, not a pack view. This slice accepts it in the
+    // document; rendering it is the next slice, so keep the tab and explain why
+    // the launcher is still what is showing.
+    if (tab.kind === "screen") {
+      this.#notice = `${tab.title} is a screen tab; screens are not rendered yet.`;
+      await this.#spaces.activateTab(null).catch(() => undefined);
       this.#hideViews();
       this.#chrome.webContents.focus();
       this.broadcast();
@@ -201,6 +279,7 @@ export class ShellWindow {
 
   async closeTab(tabId: string): Promise<void> {
     const next = await this.#spaces.closeTab(tabId);
+    this.#launchContexts.delete(tabId);
     const view = this.#views.get(tabId);
     if (view !== undefined) {
       this.#views.delete(tabId);
@@ -214,6 +293,13 @@ export class ShellWindow {
       }
     }
     await this.activateTab(next);
+  }
+
+  /** Close several tabs, in the order the caller chose, before an uninstall. */
+  async closeTabs(tabIds: readonly string[]): Promise<void> {
+    for (const tabId of tabIds) {
+      await this.closeTab(tabId);
+    }
   }
 
   async newTab(): Promise<void> {
@@ -237,9 +323,15 @@ export class ShellWindow {
     this.broadcast();
   }
 
-  /** Replace the launcher's pack list without rebuilding the window. */
-  setPacks(packs: readonly PackInfo[]): void {
+  /** Replace the launcher's data without rebuilding the window. */
+  setPackData(
+    packs: readonly PackInfo[],
+    catalogue: readonly CatalogueEntry[] = this.#catalogue,
+    installedVersions: readonly InstalledVersionView[] = this.#installedVersions,
+  ): void {
     this.#packs = packs;
+    this.#catalogue = catalogue;
+    this.#installedVersions = installedVersions;
     this.broadcast();
   }
 
@@ -266,7 +358,7 @@ export class ShellWindow {
     this.window.focus();
   }
 
-  #viewFor(tab: ShellTab): WebContentsView {
+  #viewFor(tab: PackShellTab): WebContentsView {
     const existing = this.#views.get(tab.id);
     if (existing !== undefined) return existing;
 

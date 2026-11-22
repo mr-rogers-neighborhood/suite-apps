@@ -36,7 +36,7 @@
           <input
             id="search"
             type="search"
-            placeholder="Search installed packs…"
+            placeholder="Search packs…"
             autocomplete="off"
             spellcheck="false"
           />
@@ -55,13 +55,15 @@
         <section class="available" aria-labelledby="available-heading">
           <div class="section-head">
             <h2 id="available-heading">Available</h2>
+            <span id="catalogue-count" class="count"></span>
           </div>
           <p class="muted">
-            Packs arrive as signed <code>.suitepack</code> files. Installing adds one to this device.
-            A new app opens right away; restart Suite to run a new version of an app that is
-            already open.
+            Packs arrive as signed <code>.suitepack</code> files in the catalogue folder. Installing
+            adds one to this device. A new app opens right away; restart Suite to run a new version
+            of an app that is already open. An update keeps the old version until you remove it.
           </p>
-          <button id="install-pack" class="install" type="button">Install pack…</button>
+          <div id="catalogue" class="grid"></div>
+          <button id="install-pack" class="install" type="button">Add pack…</button>
         </section>
       </div>
     </main>

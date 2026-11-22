@@ -18,6 +18,7 @@ import {
   installPackArchive,
   loadInstalledPacks,
   type PackTrustOptions,
+  uninstallPackVersion,
 } from "./installedPacks.js";
 import type { PackCapability } from "./shared.js";
 
@@ -382,6 +383,82 @@ describe("installed pack installation", () => {
 
     expect(await readdir(outside)).toEqual([]);
     expect(await readdir(join(root, "demo"))).toEqual(["1.0.0"]);
+  });
+});
+
+describe("installed pack uninstall", () => {
+  it("removes only the named version and leaves the other one", async () => {
+    const root = await temporaryRoot();
+    const keys = await generatePackKeyPair();
+    await install(root, await fixture({ version: "1.0.0", keys }));
+    await install(root, await fixture({ version: "1.1.0", keys }));
+
+    await uninstallPackVersion(root, "demo", "1.0.0");
+    expect(await readdir(join(root, "demo"))).toEqual(["1.1.0"]);
+
+    const scan = await loadInstalledPacks(root, trust(keys.publicKeyBase64));
+    expect(scan.versions.map((version) => version.version)).toEqual(["1.1.0"]);
+  });
+
+  it("never touches the pack's documents or files", async () => {
+    const dataRoot = await temporaryRoot();
+    const root = join(dataRoot, "packs");
+    const pack = await fixture();
+    await install(root, pack);
+
+    const document = join(dataRoot, "documents", "default", "demo", "note.json");
+    const packFile = join(dataRoot, "files", "default", "demo", "notes.txt");
+    await mkdir(join(dataRoot, "documents", "default", "demo"), { recursive: true });
+    await mkdir(join(dataRoot, "files", "default", "demo"), { recursive: true });
+    await writeFile(document, "{}");
+    await writeFile(packFile, "kept");
+
+    await uninstallPackVersion(root, "demo", "1.0.0");
+    expect(await readFile(document, "utf8")).toBe("{}");
+    expect(await readFile(packFile, "utf8")).toBe("kept");
+  });
+
+  it("refuses a symlinked install root without following it", async () => {
+    const actual = await temporaryRoot();
+    const outside = await temporaryRoot();
+    const pack = await fixture();
+    await install(actual, pack);
+    const link = join(outside, "packs-link");
+    await symlink(actual, link);
+
+    await expect(uninstallPackVersion(link, "demo", "1.0.0")).rejects.toMatchObject({
+      reason: "io",
+      message: expect.stringContaining("symbolic link"),
+    });
+    expect(await readdir(join(actual, "demo"))).toEqual(["1.0.0"]);
+  });
+
+  it("refuses a symlinked version directory without following it", async () => {
+    const root = await temporaryRoot();
+    const outside = await temporaryRoot();
+    await mkdir(join(root, "demo"), { recursive: true });
+    await mkdir(join(outside, "kept"), { recursive: true });
+    await symlink(join(outside, "kept"), join(root, "demo", "1.0.0"));
+
+    await expect(uninstallPackVersion(root, "demo", "1.0.0")).rejects.toMatchObject({
+      reason: "io",
+      message: expect.stringContaining("symbolic link"),
+    });
+    expect(await readdir(join(outside, "kept"))).toEqual([]);
+  });
+
+  it("refuses a version that is not a safe path segment", async () => {
+    const root = await temporaryRoot();
+    await expect(uninstallPackVersion(root, "demo", "../escape")).rejects.toMatchObject({
+      reason: "invalid",
+    });
+  });
+
+  it("refuses a version that is not installed", async () => {
+    const root = await temporaryRoot();
+    await expect(uninstallPackVersion(root, "demo", "1.0.0")).rejects.toMatchObject({
+      reason: "io",
+    });
   });
 });
 

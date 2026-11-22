@@ -16,9 +16,13 @@ describe("the chrome bridge", () => {
     },
   );
 
-  it("exposes install as host chrome, never to a pack", () => {
+  it("exposes install and lifecycle as host chrome, never to a pack", () => {
     expect(chrome).toContain("installPack: () =>");
+    expect(chrome).toContain("installCataloguePack: (id, version) =>");
+    expect(chrome).toContain("uninstallPack: (id, version) =>");
     expect(pack).not.toContain("suite:shell:install-pack");
+    expect(pack).not.toContain("suite:shell:install-catalogue-pack");
+    expect(pack).not.toContain("suite:shell:uninstall-pack");
   });
 
   it("listens on the channel the main process broadcasts to", () => {
@@ -40,6 +44,10 @@ describe("the pack bridge", () => {
 
   it("exposes the one global a pack looks for", () => {
     expect(pack).toContain('exposeInMainWorld("suite"');
+  });
+
+  it("exposes the launch context as an async call", () => {
+    expect(pack).toContain("launch: () => ipcRenderer.invoke");
   });
 
   it("exposes the files service under the pack-side method names", () => {

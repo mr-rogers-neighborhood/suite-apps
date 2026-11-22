@@ -15,11 +15,20 @@ import { z } from "zod";
  * is a UI change rather than a data migration. Collaboration and sync are not
  * here yet; the decision record owns that order.
  */
+/**
+ * The tab schema is forward-compatible with the screen model.
+ *
+ * Version 1 wrote a pack tab with no `kind`. `kind` is optional here so those
+ * tabs keep reading; a missing kind is a pack tab. A screen tab has a
+ * `screenId` and no pack fields. The document is never rewritten on read.
+ */
 const tabSchema = z.object({
-  packId: z.string(),
+  kind: z.enum(["pack", "screen"]).optional(),
+  packId: z.string().optional(),
+  screenId: z.string().optional(),
   title: z.string(),
-  entry: z.string(),
-  spaceId: z.string(),
+  entry: z.string().optional(),
+  spaceId: z.string().optional(),
 });
 
 const spacesSchema = z.object({
@@ -32,25 +41,47 @@ const spacesSchema = z.object({
   "tab-order": z.array(z.string()),
 });
 
-export interface SpaceTab {
+export interface PackSpaceTab {
+  readonly kind: "pack";
   readonly id: string;
   readonly packId: string;
   readonly title: string;
   readonly entry: string;
 }
 
+export interface ScreenSpaceTab {
+  readonly kind: "screen";
+  readonly id: string;
+  readonly screenId: string;
+  readonly title: string;
+}
+
+export type SpaceTab = PackSpaceTab | ScreenSpaceTab;
+
 export interface SpaceState {
   readonly tabs: readonly SpaceTab[];
   readonly activeTabId: string | null;
 }
 
-export interface OpenTabInput {
+export interface OpenPackTabInput {
+  readonly kind?: "pack";
   readonly packId: string;
   readonly title: string;
   readonly entry: string;
 }
 
+export interface OpenScreenTabInput {
+  readonly kind: "screen";
+  readonly screenId: string;
+  readonly title: string;
+}
+
+export type OpenTabInput = OpenPackTabInput | OpenScreenTabInput;
+
 const DEFAULT_SPACE = "default";
+
+/** Version 1 wrote pack tabs without `kind`; version 2 writes the discriminated shape. */
+export const SPACE_VERSION = 2;
 
 /**
  * The space document holds tab metadata, not document content. Eight megabytes is
@@ -108,7 +139,8 @@ export class SpaceStore {
     for (const id of parsed.data["tab-order"]) {
       const tab = parsed.data.tabs[id];
       if (tab === undefined) continue;
-      tabs.push({ id, packId: tab.packId, title: tab.title, entry: tab.entry });
+      const read = readTab(id, tab);
+      if (read !== null) tabs.push(read);
     }
 
     const requested = parsed.data.shell.activeTabId ?? null;
@@ -121,15 +153,31 @@ export class SpaceStore {
     const id = randomUUID();
     const tabs = this.#doc.getMap("tabs");
     const tab = tabs.ensureMergeableMap(id);
-    tab.set("packId", input.packId);
     tab.set("title", input.title);
-    tab.set("entry", input.entry);
     tab.set("spaceId", DEFAULT_SPACE);
+
+    let opened: SpaceTab;
+    if (input.kind === "screen") {
+      tab.set("kind", "screen");
+      tab.set("screenId", input.screenId);
+      opened = { kind: "screen", id, screenId: input.screenId, title: input.title };
+    } else {
+      tab.set("kind", "pack");
+      tab.set("packId", input.packId);
+      tab.set("entry", input.entry);
+      opened = {
+        kind: "pack",
+        id,
+        packId: input.packId,
+        title: input.title,
+        entry: input.entry,
+      };
+    }
 
     this.#doc.getList("tab-order").push(id);
     this.#doc.getMap("shell").set("activeTabId", id);
     await this.#commitAndSave();
-    return { id, packId: input.packId, title: input.title, entry: input.entry };
+    return opened;
   }
 
   async activateTab(id: string | null): Promise<void> {
@@ -175,6 +223,9 @@ export class SpaceStore {
   }
 
   async #commitAndSave(): Promise<void> {
+    // Any write moves the document to the current shape. Existing tabs are left
+    // exactly as they are; only the version marker is updated.
+    this.#doc.getMap("shell").set("version", SPACE_VERSION);
     this.#doc.commit();
     await this.#save();
   }
@@ -199,6 +250,19 @@ export class SpaceStore {
   }
 }
 
+type StoredTab = z.infer<typeof tabSchema>;
+
+/** Read one stored tab, treating a missing `kind` as the version-1 pack tab. */
+function readTab(id: string, tab: StoredTab): SpaceTab | null {
+  const kind = tab.kind ?? "pack";
+  if (kind === "screen") {
+    if (tab.screenId === undefined) return null;
+    return { kind: "screen", id, screenId: tab.screenId, title: tab.title };
+  }
+  if (tab.packId === undefined || tab.entry === undefined) return null;
+  return { kind: "pack", id, packId: tab.packId, title: tab.title, entry: tab.entry };
+}
+
 async function quarantine(path: string, reason: string, error?: unknown): Promise<void> {
   const backup = `${path}.corrupt-${Date.now()}`;
   try {
@@ -220,7 +284,7 @@ function freshDocument(): LoroDoc {
 
 function initialize(doc: LoroDoc): void {
   const shell = doc.getMap("shell");
-  shell.set("version", 1);
+  shell.set("version", SPACE_VERSION);
   shell.set("activeTabId", null);
 
   const space = doc.getMap("spaces").ensureMergeableMap(DEFAULT_SPACE);
