@@ -77,10 +77,11 @@ test, never for one that gets pinned.
 A pin is a trust root, so rotation is a sequence, not an edit.
 
 **Pack key.** Generate, pin `SUITE_PACK_PUBLIC_KEY` in `packages/pack/src/pinnedKey.ts`, rebuild every
-pack. The pin is shared: Suite Go re-exports it as `PACK_PUBLIC_KEY` and the desktop host verifies with
-the same constant, so no host has a second copy. Packs already installed keep working: the signature
-was checked when they were installed, and the pin only decides what may be installed next. A pack
-signed with the old key is refused after the pin moves, so the two ship together.
+pack and reinstall them. The pin is shared: Suite Go re-exports it as `PACK_PUBLIC_KEY` and the desktop
+host verifies with the same constant, so no host has a second copy. But the pin is a trust root, not
+an install-time receipt: the shell re-verifies every installed manifest at boot, so moving the pin
+makes packs signed with the old key fail as `untrusted` and they stop loading. A rotation therefore
+refuses the old packs; rebuild and reinstall them, and ship the new pin with those packs.
 
 **Update key.** It signed the relay tarball's checksum list. The relay installs as a Flatpak now and
 no release signs with this key, so it has no artifact to trust; it and its pin are kept until they are
@@ -98,8 +99,8 @@ What losing each key costs:
 
 - **Update signing key** — nothing shipped depends on it any more; a future artifact that wants the
   pin would need a new key and that key's fingerprint recorded with its release.
-- **Pack signing key** — a new key and a new pin; packs signed with the old one stop being
-  installable, and anything already installed keeps working.
+- **Pack signing key** — a new key and a new pin; packs signed with the old one are refused and every
+  installed pack signed with it must be rebuilt and reinstalled.
 
 A secret is not a backup because it was committed to a remote: nobody can read it back. GitHub's
 secret store, when a service uses one, never shows a value again.

@@ -41,13 +41,18 @@ The shared pack work lives outside this app: `packages/pack` owns the manifest a
 file store and the archive reader. The spike uses the shared pack id, path and capability
 vocabulary. Contributions and multi-window work are the next slices.
 
+The pinned pack key is shared with Suite Go, but the manifest is not: Go requires `independent` and
+`isolation`, has its own capability list and different canonical bytes. A desktop `.suitepack` is
+refused by Go and a Go `.pack` is refused here until the formats are unified (#202).
+[Status](../../docs/reference/status.md) records the split.
+
 ## Installing a pack
 
-The launcher's **Install pack…** button opens the host's file picker for a `.suitepack` (the `.pack`
-extension is accepted for import compatibility). The host reads at most 64 MiB, verifies the
-manifest signature against the pinned key and every file hash, refuses extra files and paths that
-leave the pack root, and only then writes `<dataRoot>/packs/<id>/<version>/`. Installs are additive
-and an existing version is never overwritten.
+The launcher's **Install pack…** button opens the host's file picker for a `.suitepack`. The host reads
+at most 64 MiB, verifies the manifest signature against the pinned key and every file hash, refuses
+extra files and paths that leave the pack root, and only then writes
+`<dataRoot>/packs/<id>/<version>/`. Installs are additive and an existing version is never
+overwritten. A Go `.pack` is a different manifest format and is refused; it is not an import path.
 
 A newly installed app appears in the launcher immediately and opens now. A tab that is already open
 keeps its loaded view; running a replaced version of that pack needs a Suite restart, because the

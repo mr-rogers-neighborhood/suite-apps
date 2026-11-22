@@ -1,10 +1,10 @@
 /**
  * The services a pack sees.
  *
- * These are the pack-side types. The host implements them, the pack consumes
- * them, and neither side imports Electron or Node from this package. A pack gets
- * a scoped filesystem, user-consented external files, an opaque relay transport,
- * command contributions, notifications and a lifecycle.
+ * These are the pack-side types. They describe the host a pack is written
+ * against and the target shape of `window.suite`; the v1 desktop host implements
+ * a subset (documents, files and the small info surface) and refuses the rest at
+ * discovery. Neither side imports Electron or Node from this package.
  */
 
 export type Disposable = () => void;

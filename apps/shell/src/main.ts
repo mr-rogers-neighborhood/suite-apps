@@ -338,7 +338,7 @@ async function installPackFromFile(): Promise<void> {
     title: "Install a pack",
     buttonLabel: "Install",
     properties: ["openFile"],
-    filters: [{ name: "Suite pack", extensions: ["suitepack", "pack"] }],
+    filters: [{ name: "Suite pack", extensions: ["suitepack"] }],
   });
   if (selection.canceled) return;
   const file = selection.filePaths[0];

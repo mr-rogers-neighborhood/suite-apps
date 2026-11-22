@@ -1,6 +1,12 @@
 # `@suite/pack`
 
-The Suite pack contract: the shared manifest, signature and capability contract for desktop and mobile. Suite Go's manifest builds on it with the `independent` and `isolation` fields; the desktop host reads the contract as written here.
+The Suite pack contract for the desktop host: the manifest, signature and capability contract that
+`apps/shell` installs and verifies.
+
+The pinned key and the capability vocabulary are shared with Suite Go, but the manifest format is
+not. Go's manifest requires `independent` and `isolation`, has its own capability list and different
+canonical bytes, so a Go `.pack` is refused by this parser and a desktop `.suitepack` by Go.
+Unifying the two is #202; [Status](../../docs/reference/status.md) records the current split.
 
 A pack is a signed bundle. The manifest declares what the pack is, which entry the host loads, what it may ask for, what it contributes to the host chrome, and the SHA-256 of every file. The Ed25519 signature covers the manifest; the hashes cover the files. A host verifies both before it runs anything.
 

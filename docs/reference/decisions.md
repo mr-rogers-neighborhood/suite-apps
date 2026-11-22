@@ -87,8 +87,11 @@ The rules that shape this repository. Each is current; the code follows it.
 
 ## Packs
 
-- `@suite/pack` is the shared contract: manifest, capabilities, contributions, file hashes and
-  Ed25519 verification. One vocabulary for desktop and mobile.
+- `@suite/pack` is the desktop pack contract: manifest, capabilities, contributions, file hashes and
+  Ed25519 verification. It shares the pinned key and the capability words with Suite Go, not the
+  manifest: Go requires `independent` and `isolation` and has different canonical bytes, so each
+  host refuses the other's pack until the formats are unified (#202). [Status](status.md) is the
+  source of truth for that split.
 - `@suite/pack-runtime` is the pack-side service interface. `@suite/pack-host` is the host-side
   scoped file store, locks and backups. Neither imports Electron.
 - A pack's `files` capability is a **scoped filesystem**, not an arbitrary path API: relative paths
@@ -97,9 +100,11 @@ The rules that shape this repository. Each is current; the code follows it.
   open-in-place or import.
 - The host may open the pinned relay socket, but it forwards opaque frames. The pack runs the sync
   protocol and holds the keys. The host sees ciphertext, not a document.
-- One shared Suite pack key signs desktop and mobile packs. Pack files are the distribution path
-  today; a signed remote index is a later path, and the intent is that both are first-class once the
-  shell has one. The shell itself updates through its OS package.
+- One shared Suite pack key signs desktop and mobile packs; the pin is the one thing both hosts
+  read from the same source. The manifests differ until #202, so a pack built for one host is not
+  installable on the other. Pack files are the distribution path today; a signed remote index is a
+  later path, and the intent is that both are first-class once the shell has one. The shell itself
+  updates through its OS package.
 
 ## Packaging
 
