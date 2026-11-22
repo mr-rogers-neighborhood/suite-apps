@@ -18,6 +18,7 @@ import {
 import { devPacksEnabled, mergePackSources, shouldOpenAfterInstall } from "./packRegistry.js";
 import {
   discoverPacks,
+  externalLinkFor,
   HOST_CAPABILITIES,
   HOST_CONTRACT_VERSION,
   HOST_VERSION,
@@ -302,8 +303,12 @@ function registerIpc(): void {
     await service.unlock(scope, token);
   });
 
-  onPack(PACK_IPC.openExternal, (_sender, url) => {
-    if (typeof url === "string") window?.openExternal(url);
+  onPack(PACK_IPC.openExternal, (sender, url) => {
+    if (typeof url !== "string") return;
+    // The OS browser is outside the pack's session and CSP, so it is egress
+    // under the same capability. A pack without `network` gets no browser open.
+    const link = externalLinkFor(sender.pack, url);
+    if (link !== null) window?.openExternal(link);
   });
 
   ipcMain.on(PACK_IPC.setTitle, (event, title) => {

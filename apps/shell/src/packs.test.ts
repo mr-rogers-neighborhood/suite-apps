@@ -5,12 +5,14 @@ import { isSafePackPath } from "@suite/pack/manifest";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   discoverPacks,
+  externalLinkFor,
   packAllows,
   packOrigin,
   packPartition,
   packsRootFor,
   packUrl,
   resolvePackRequest,
+  tabViewTarget,
 } from "./packs.js";
 
 const roots: string[] = [];
@@ -120,6 +122,42 @@ describe("pack capabilities", () => {
     expect(packAllows({ capabilities: ["documents"] }, "documents")).toBe(true);
     expect(packAllows({ capabilities: ["documents"] }, "network")).toBe(false);
     expect(packAllows({ capabilities: [] }, "documents")).toBe(false);
+  });
+
+  it("hands a link to the OS browser only for a network pack", () => {
+    expect(externalLinkFor({ capabilities: ["documents"] }, "https://example.com/x")).toBeNull();
+    expect(externalLinkFor({ capabilities: ["network"] }, "https://example.com/x")).toBe(
+      "https://example.com/x",
+    );
+    expect(externalLinkFor({ capabilities: ["network"] }, "http://example.com/")).toBe(
+      "http://example.com/",
+    );
+  });
+
+  it("refuses a scheme the OS browser should not be asked to open", () => {
+    expect(externalLinkFor({ capabilities: ["network"] }, "javascript:alert(1)")).toBeNull();
+    expect(externalLinkFor({ capabilities: ["network"] }, "file:///etc/passwd")).toBeNull();
+    expect(externalLinkFor({ capabilities: ["network"] }, "not a url")).toBeNull();
+  });
+});
+
+describe("tab view target", () => {
+  it("loads the installed pack's current entry, not the tab's recorded one", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "welcome");
+    const packs = discoverPacks(root);
+
+    const target = tabViewTarget(packs, { packId: "welcome", entry: "old/index.html" });
+    expect(target?.url).toBe("suite-pack://default.welcome/index.html");
+    expect(target?.pack.entry).toBe("index.html");
+  });
+
+  it("has no target when the pack is no longer installed", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "welcome");
+    const packs = discoverPacks(root);
+
+    expect(tabViewTarget(packs, { packId: "scratch", entry: "index.html" })).toBeNull();
   });
 });
 

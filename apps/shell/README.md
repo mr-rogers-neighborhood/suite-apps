@@ -143,7 +143,8 @@ A pack cannot:
 - read another pack's documents or files;
 - ask for an absolute path or a path outside its own root;
 - write a download outside its document or file root;
-- reach the network without the `network` capability;
+- reach the network without the `network` capability, or hand a link to the OS browser through
+  `openExternal` or `window.open`;
 - open a window, navigate away from its own origin, or grant itself a permission;
 - install or update another pack.
 
@@ -157,7 +158,9 @@ A pack cannot:
   is refused, and `list` skips one. Backups and temp files use the same file root.
 - **The pack session denies permissions wholesale.** A pack without `network` may load only its own
   `suite-pack://` origin; the protocol handler also sets a CSP. A pack with `network` may reach HTTPS
-  and WSS only.
+  and WSS only, and only it may hand an `http`/`https` link to the OS browser. `openExternal` and a
+  pack's `window.open` are both refused without the capability; the chrome's own link opener is not
+  gated, because it is the host.
 - **The shell owns its space document.** It may parse `spaces.loro`; it never parses `.canvas`,
   `.planner`, `.budget` or a pack's own bytes.
 - **The shell owns updates.** A pack has no IPC to the updater or installer. Pack installation is

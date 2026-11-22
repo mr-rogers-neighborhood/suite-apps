@@ -14,7 +14,9 @@ the trust boundary.
   symlinks and owns locks and backups. The host never parses a pack document.
 - **Network is denied by default.** A pack without the `network` capability may load only its own
   protocol origin; its session cancels everything else and the protocol handler sets a CSP. A
-  network-capable pack may reach HTTPS and WSS only.
+  network-capable pack may reach HTTPS and WSS only. Handing a link to the OS browser is egress
+  outside that session, so `openExternal` and a pack's `window.open` are refused without `network`;
+  only the chrome's own host link opener is ungated.
 - **Permissions are denied wholesale.** A pack cannot open a window, navigate to another origin,
   grant itself a permission or reach the updater.
 - **The space document is shell-owned and validated.** It is the one document the host parses. If it ever

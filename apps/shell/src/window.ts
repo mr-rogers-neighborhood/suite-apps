@@ -2,8 +2,15 @@ import { join } from "node:path";
 import { originKey } from "@suite/desktop";
 import { app, BaseWindow, session, shell, WebContentsView } from "electron";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
+import { navigationReleasesLocks } from "./files.js";
 import { registerPackProtocol } from "./packProtocol.js";
-import { type PackInfo, packOrigin, packPartition, packUrl } from "./packs.js";
+import {
+  externalLinkFor,
+  type PackInfo,
+  packOrigin,
+  packPartition,
+  tabViewTarget,
+} from "./packs.js";
 import { clearPackSender, setPackSender } from "./senders.js";
 import {
   CHROME_ORIGIN,
@@ -260,8 +267,9 @@ export class ShellWindow {
     const existing = this.#views.get(tab.id);
     if (existing !== undefined) return existing;
 
-    const pack = this.#packs.find((candidate) => candidate.id === tab.packId);
-    if (pack === undefined) throw new Error(`pack ${tab.packId} is no longer installed`);
+    const target = tabViewTarget(this.#packs, tab, this.#containerId);
+    if (target === null) throw new Error(`pack ${tab.packId} is no longer installed`);
+    const { pack } = target;
 
     configurePackSession(pack, this.#containerId);
     const view = new WebContentsView({
@@ -287,7 +295,8 @@ export class ShellWindow {
     });
 
     view.webContents.setWindowOpenHandler(({ url }) => {
-      this.openExternal(url);
+      const link = externalLinkFor(pack, url);
+      if (link !== null) this.openExternal(link);
       return { action: "deny" };
     });
     view.webContents.on("will-navigate", (event, url) => {
@@ -323,12 +332,10 @@ export class ShellWindow {
       this.#onViewClosed?.(tab.id);
     });
 
-    void view.webContents
-      .loadURL(packUrl(pack.id, tab.entry, this.#containerId))
-      .catch((error: unknown) => {
-        this.#notice = `${pack.name} failed to load: ${error instanceof Error ? error.message : String(error)}`;
-        this.broadcast();
-      });
+    void view.webContents.loadURL(target.url).catch((error: unknown) => {
+      this.#notice = `${pack.name} failed to load: ${error instanceof Error ? error.message : String(error)}`;
+      this.broadcast();
+    });
     return view;
   }
 

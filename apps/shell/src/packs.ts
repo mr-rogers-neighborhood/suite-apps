@@ -6,10 +6,17 @@ import {
   isSafePackPath,
   PACK_CONTRACT_VERSION,
   PACK_FORMAT,
+  packAllows,
 } from "@suite/pack/manifest";
 import { z } from "zod";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
-import { PACK_CAPABILITIES, PACK_SCHEME, type PackCapability, type PackSummary } from "./shared.js";
+import {
+  PACK_CAPABILITIES,
+  PACK_SCHEME,
+  type PackCapability,
+  type PackSummary,
+  type ShellTab,
+} from "./shared.js";
 
 export { isSafePackId, PACK_FORMAT, packAllows } from "@suite/pack/manifest";
 
@@ -82,6 +89,45 @@ export function packOrigin(id: string, containerId = DEFAULT_CONTAINER_ID): stri
 /** The URL a pack file is loaded from. Segments are encoded; the resolver re-checks them. */
 export function packUrl(id: string, entry: string, containerId = DEFAULT_CONTAINER_ID): string {
   return `${packOrigin(id, containerId)}/${entry.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+/**
+ * What a tab loads now: the installed pack, and its current entry.
+ *
+ * A tab records the entry that existed when it was opened, and the space
+ * document keeps that value for display. An updated pack may rename its entry,
+ * so loading the recorded path after a restart reaches a file that is no longer
+ * there. The installed pack's `entry` is the only path that exists now.
+ */
+export function tabViewTarget(
+  packs: readonly PackInfo[],
+  tab: Pick<ShellTab, "packId" | "entry">,
+  containerId = DEFAULT_CONTAINER_ID,
+): { readonly pack: PackInfo; readonly url: string } | null {
+  const pack = packs.find((candidate) => candidate.id === tab.packId);
+  if (pack === undefined) return null;
+  return { pack, url: packUrl(pack.id, pack.entry, containerId) };
+}
+
+/**
+ * The URL a pack may hand to the OS browser, or `null`.
+ *
+ * The browser is network egress outside the pack's session and its CSP, so the
+ * same `network` capability that governs those governs this. A pack without it
+ * gets no browser open, even for a link it cannot otherwise reach.
+ */
+export function externalLinkFor(
+  pack: Pick<PackSummary, "capabilities">,
+  url: string,
+): string | null {
+  if (!packAllows(pack, "network")) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 export function packPartition(id: string, containerId = DEFAULT_CONTAINER_ID): string {
