@@ -67,6 +67,25 @@ Updates arrive through Flatpak: `flatpak update --user` replaces the deployment,
 not check for or install its own update. From a checkout, `node scripts/flatpak.mjs --app shell`
 builds the same unpacked tree into the local store.
 
+A pre-release channel is the same build under `run.suite.slop.shell`, on the `slop`, `nightly` or
+`preview` branch:
+
+```sh
+node scripts/flatpak.mjs --app shell --channel nightly
+flatpak install --user suite-local run.suite.slop.shell//nightly
+```
+
+All three pre-release channels share the one pre-release id; the branch, the desktop name (`Suite
+Shell (nightly)`) and the desktop entry, metainfo, icon and launcher names carry the channel. Moving
+from `slop` to `nightly` replaces the one pre-release install, so a machine holds stable plus at most
+one pre-release.
+
+The pre-release keeps the stable sandbox and gets its own profile from its id. Its data root is the
+pre-release sandbox, `~/.var/app/run.suite.slop.shell/config/Suite/shell`, with its own `packs/` and
+`spaces.loro`; stable's `~/.var/app/run.suite.shell/config/Suite/shell` is never opened by it. The
+shell has no `Documents/Suite` grant to split, and the pre-release does not gain a `Documents/Suite
+Slop` folder: files still cross only through the portals.
+
 Packs live in the sandbox data directory, `~/.var/app/run.suite.shell`, not in the checkout. A
 development pack under `packs/` therefore does not load in the Flatpak, and `SUITE_SHELL_DEV_PACKS=1`
 stays a convenience of an unpackaged build. The Flatpak does not register `suite://` yet: Start keeps

@@ -205,12 +205,21 @@ const scripts =
         if (!json) process.stdout.write("\n▶ scripts\n");
         const result = run(
           "node",
-          ["--test", "scripts/pack.test.mjs", "scripts/budget-pack.test.mjs"],
+          [
+            "--test",
+            "scripts/pack.test.mjs",
+            "scripts/budget-pack.test.mjs",
+            "scripts/channel.test.mjs",
+            "scripts/shell-channel.test.mjs",
+            "scripts/android-release.test.mjs",
+            "scripts/release-status.test.mjs",
+          ],
           workdir,
         );
         return {
           ok: result.status === 0,
-          detail: result.status === 0 ? "pack tests" : `exit ${result.status}`,
+          detail:
+            result.status === 0 ? "pack, channel and release tests" : `exit ${result.status}`,
         };
       })();
 

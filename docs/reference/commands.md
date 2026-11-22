@@ -18,10 +18,11 @@ mise exec -- node scripts/gate.mjs --no-e2e        # skip Start's e2e suite
 ```
 
 The gate builds the workspace libraries (`packages/*` and `apps/*/packages/*`) once, runs
-`node --test scripts/pack.test.mjs` for the pack build script that no app's gate covers, then runs
-each app's own `check:full` in dependency order. It writes `.dev/gate-status.json`. `--fresh` exports
-`HEAD` with `git archive`, installs from the lockfile, and runs the same order in that clean tree. The
-cross-app Playwright suite runs after the checks, under `xvfb-run` when there is no display.
+`node --test scripts/pack.test.mjs scripts/budget-pack.test.mjs scripts/channel.test.mjs` for the
+scripts that no app's gate covers, then runs each app's own `check:full` in dependency order. It
+writes `.dev/gate-status.json`. `--fresh` exports `HEAD` with `git archive`, installs from the
+lockfile, and runs the same order in that clean tree. The cross-app Playwright suite runs after the
+checks, under `xvfb-run` when there is no display.
 
 Run heavy checks under a cap so a fan-out cannot take the desktop with it:
 
@@ -70,14 +71,17 @@ mise exec -- node scripts/profile-check.mjs
 ```
 
 `{app}` is the only placeholder. The gate is `node scripts/gate.mjs --only {app}` with `fresh: true`;
-the slop build is `node scripts/flatpak.mjs --app {app} --channel slop`; the display is
-`flatpak run run.suite.slop.{app}`. Each app's `slop_build_path` is `apps/<app>/slop`. A working
-change lands on `slop/<name>`; the `slop → canary → beta → stable` ladder stays with the app set and
-the profile carries only the slop tier.
+the slop build is `node scripts/flatpak.mjs --app {app} --channel slop --session`; the display is
+`flatpak run run.suite.slop.{app}`. `--session` is what lets the factory build a frozen legacy app;
+that build is local and is never published. Each app's `slop_build_path` is `apps/<app>/slop`. A working
+change lands on `slop/<name>`; the `slop → nightly → preview → stable` ladder stays with the app set,
+and the profile carries only the `slop` channel.
 
-Only Canvas, Planner, Budget and Help can be queued: they are the apps with a Flatpak manifest and a
-`slop` identity. Start ships no `suite.app.json` and refuses a pre-release build, Go builds for
-Android, and Sync ships as the relay's Flatpak. Their gates still run at the root.
+Only Canvas, Planner, Budget and Help can be queued: they are the legacy apps with a Flatpak manifest
+and an existing `slop` identity. They are frozen for release and get no new pre-release channel until
+they become packs; the factory `slop` build is the session channel, not a shipped channel. Start ships
+no `suite.app.json` and refuses a pre-release build, Go builds for Android, and Sync ships as the
+relay's Flatpak. Their gates still run at the root.
 
 The toolchain names what the factory image must provide: the pinned Node and pnpm, `git`, Docker for
 Canvas's gitleaks scan, Xvfb and the Electron GTK libraries for Start's e2e suite, the Flatpak
@@ -92,6 +96,8 @@ pnpm keys status            # presence, fingerprint, and whether each pin accept
 pnpm keys status --strict   # also fail when a key is absent
 pnpm keys generate pack     # a new pack signing keypair
 pnpm keys generate update   # a new update signing keypair
+pnpm android:key status     # the Android release certificate against its pin
+pnpm android:key generate   # make the Android release keystore
 ```
 
 The private halves live outside the repository, and each public half is pinned in the source that

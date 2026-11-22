@@ -67,7 +67,7 @@ node scripts/flatpak.mjs --app start              # the hub
 node scripts/flatpak.mjs --app planner            # Planner
 node scripts/flatpak.mjs --app help               # Help
 node scripts/flatpak.mjs --app planner --no-build # reuse release/linux-unpacked
-node scripts/flatpak.mjs --app planner --channel slop  # pre-release branch
+node scripts/flatpak.mjs --app shell --channel slop    # pre-release branch
 ```
 
 Run the owning app's gate first. The script builds the unpacked tree when needed, exports the

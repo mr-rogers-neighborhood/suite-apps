@@ -1,15 +1,16 @@
 # Package and release
 
 The suite has one repository and two artifact forms: Flatpaks for Linux desktop apps — the relay is
-one of them — and a debug-signed APK for Suite Go. Each app keeps its own version and release notes;
+one of them — and a release-signed APK for Suite Go. Each app keeps its own version and release notes;
 the root owns the gate and the publishing paths.
 
 ## What a release is
 
 A desktop release is a Flatpak deployment on the signed OSTree remote, built from a commit the gate
 has proven, with a changelog section for the version in the app's `CHANGELOG.md`. Suite Go's release
-is a debug-signed APK attached to the rolling Suite release. The relay is a Flatpak on the same
-remote as the other desktop apps; it has no separate artifact.
+is a release-signed APK attached to the rolling Suite release, on the stable or a pre-release
+channel. The relay is a Flatpak on the same remote as the other desktop apps; it has no separate
+artifact.
 
 There is no app update feed, AppImage, Arch package or second copy to roll back to. For the desktop
 apps, Flatpak owns the deployment and the remote is the update channel.
@@ -59,20 +60,24 @@ The publish refuses a dirty tree or a HEAD that `.dev/gate-status.json` does not
 the repository the local flow built; it never builds a second one. Publication copies bytes and
 commits nothing, so the gate proof stays on HEAD.
 
-## Pre-release tiers
+## Pre-release channels
 
-A pre-release is a build of the same app on the `slop`, `canary` or `beta` branch. It is not a second
-app: it shares `run.suite.slop.<app>` across the three tiers and takes the tier as its Flatpak branch.
-Stable keeps `run.suite.<app>`, so both can be installed at once. One pre-release install at a time is
-the supported shape; moving tier replaces it.
+A pre-release is a build of the same app on the `slop`, `nightly` or `preview` branch. It is not a
+second app: it shares `run.suite.slop.<app>` across the three channels and takes the channel as its
+Flatpak branch. Stable keeps `run.suite.<app>`, so both can be installed at once. One pre-release
+install at a time is the supported shape; moving channel replaces it.
 
 ```sh
-node scripts/flatpak.mjs --app planner --channel slop
+node scripts/flatpak.mjs --app shell --channel slop
 node scripts/flatpak-remote.mjs --target s3 --channel slop --publish
 ```
 
-The tier branch is published on the same signed remote; the stable refs are not rewritten. See
-[Packaging channels](../reference/packaging-channels.md#pre-release-tiers) for the identity and the
+A frozen legacy mini-app (Canvas, Planner, Budget, Help) is refused here: it keeps its last stable ref
+and gets no new pre-release. `--session` builds one locally for the factory profile, and that build is
+never published.
+
+The pre-release branch is published on the same signed remote; the stable refs are not rewritten. See
+[Packaging channels](../reference/packaging-channels.md#pre-release-channels) for the identity and the
 desktop-entry rule.
 
 ## GitHub releases
@@ -142,23 +147,30 @@ release that will carry it:
 
 ```sh
 mise exec -- node scripts/release-status.mjs --publish   # creates the rolling release
-mise exec -- node scripts/android-release.mjs --publish  # builds and uploads the APK and .sha256
+mise exec -- node scripts/android-release.mjs --publish  # builds and uploads the stable APK
+mise exec -- node scripts/android-release.mjs --channel slop --publish
 mise exec -- node scripts/release-status.mjs --publish   # relinks the body and RELEASES.md
 ```
 
-The first command creates the rolling release with empty assets. Until the APK is uploaded, the Go
-row names the file instead of linking it and the body says the asset is not attached; the release
-script prints a non-fatal warning naming the upload command. Run `release-status.mjs --publish`
-again after the upload so the GitHub body and `RELEASES.md` link the download instead of describing
-it as missing.
+The first command creates the rolling release with empty assets. Until the stable APK is uploaded,
+the Go row names the file instead of linking it and the body says the asset is not attached; the
+release script prints a non-fatal warning naming the upload command. Run
+`release-status.mjs --publish` again after the upload so the GitHub body and `RELEASES.md` link the
+download instead of describing it as missing.
 
-The upload also carries the same bytes as `suite-go.apk`, so
+`--channel` accepts `stable` (the default), `slop`, `nightly` and `preview`. The stable asset keeps
+`suite-go-<version>.apk` and the `suite-go.apk` alias, so
 `https://github.com/mr-rogers-neighborhood/suite-apps/releases/latest/download/suite-go.apk` always
-names the newest debug build; the versioned asset stays canonical.
+names the newest stable build. A pre-release is `suite-go-<channel>-<version>.apk` and has no stable
+alias.
 
-Only the debug keystore signs this build — there is no release signing key and no Play channel. The
-APK is for sideloading and for the owner's phone, and the signature belongs to the machine that built
-it. [Suite Go's README](../../apps/go/README.md#install-the-apk) owns that install path.
+A release build is signed by the key at `~/.config/suite/keys/suite-go-release.jks`, and the script
+verifies the APK's certificate against the pinned fingerprint before it uploads anything. `pnpm
+android:key status` answers the same question by hand. The debug keystore is the dev loop only: it
+is a different signer, so it cannot update a release install.
+[Suite Go's README](../../apps/go/README.md#install-the-apk) owns the install path, and [Android
+notes](../../apps/go/docs/reference/android.md#release-signing-and-channels) own the channels, the
+`versionCode` rule and the keystore.
 
 ## The relay
 
@@ -169,7 +181,7 @@ node scripts/flatpak.mjs --app sync                    # package, sign, install 
 node scripts/flatpak-remote.mjs --target s3 --publish  # publish the shared repository
 ```
 
-Its manifest is `packaging/flatpak/run.suite.sync.yml` and it refuses `--channel`: a tier would be a
+Its manifest is `packaging/flatpak/run.suite.sync.yml` and it refuses `--channel`: a channel would be a
 second mailbox on the same data. The `sync-v<version>` tarball releases it used to ship are retired
 and stay on GitHub as history only; [Leave a relay
 running](../../apps/sync/docs/how-to/relay.md#building-and-publishing-a-release) has the build and

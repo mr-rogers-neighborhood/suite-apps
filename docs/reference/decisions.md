@@ -133,9 +133,26 @@ suite stays separate Flatpaks plus Start.
 - An installed deployment is compared with its own `origin` remote's commit, so a copy from
   `suite-local` is not measured against the public `suite` store. A fresh install probes `suite`
   first, then `suite-local`.
-- Stable and pre-release are two identities: `run.suite.<app>` and `run.suite.slop.<app>`. The tier
-  (`slop`, `canary`, `beta`) is the Flatpak branch, not part of the id, so one pre-release install
-  can move tier while stable stays installed.
+- The channels are `slop`, `nightly`, `preview` and `stable`, and they belong to the superapp: Suite
+  Shell on the desktop and Suite Go on mobile. `slop` stays the session channel; `nightly` and
+  `preview` replace `canary` and `beta`, which are refused rather than aliased. A mini-app does not
+  carry a channel; when it ships as a pack it carries a signed version.
+- Product maturity is separate from the channel: `pre-alpha`, `alpha`, `beta` and `1.0`. A
+  stable-channel build can still be labeled `alpha`.
+- Stable and pre-release are two identities: `run.suite.<app>` and `run.suite.slop.<app>`. The
+  channel (`slop`, `nightly`, `preview`) is the Flatpak branch, not part of the id, so one pre-release
+  install can move channel while stable stays installed.
+- Suite Go carries the same channel model in its package id: `run.suite.go` for stable and one shared
+  `run.suite.slop.go` for every pre-release. The APK is signed by a release keystore outside the
+  repository; its certificate digest is pinned, and a build refuses any other certificate. The debug
+  key is a dev-loop signature and never a public artifact.
+- `versionCode` is the base in `app.config.json` times ten plus a fixed channel digit (stable 0,
+  slop 1, nightly 2, preview 3). It increases within a channel as the base does, and promotion raises
+  the digit so a channel move is an update on the shared pre-release id; a demotion requires an
+  uninstall.
+- Canvas, Planner, Budget and Help are frozen legacy apps until they become packs: their code and last
+  artifact stay, and no new pre-release channel is published for them. Start and Sync are neither
+  superapps nor frozen, so their rows name no channel.
 - `scripts/flatpak.mjs` builds the local deployment and signs the repository summary with the store
   key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to the public
   `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`. The relay publishes on
@@ -159,8 +176,10 @@ suite stays separate Flatpaks plus Start.
   `.dev/`: a cleanup deletes it, and the pin is left with no key able to satisfy it.
   [Manage signing keys](../how-to/keys.md) owns the procedure.
 - Linux is the published desktop platform. macOS and Windows have no signing identity.
-- Android ships as a debug-signed APK attached to the rolling release; there is no signing key or
-  store channel yet.
+- Android ships as a release-signed APK attached to the rolling release, on the stable or a
+  pre-release channel; there is no store channel yet. The keystore lives outside the repository and
+  the certificate digest is pinned, so a build refuses any other signer. The debug key is the dev
+  loop only.
 
 ## Widgets and Screens
 

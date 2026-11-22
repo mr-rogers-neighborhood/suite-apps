@@ -89,6 +89,76 @@ machine. `mise exec` supplies the Node and pnpm pinned in `package.json`; the pn
 `SUITE_GO_JAVA_HOME`. `android:install` ends with `installed` and starts
 `run.suite.go/.MainActivity`; `android:eval` prints the value, here `Suite Go`.
 
+## Release signing and channels
+
+A public APK is a release build signed by one key, never by the build machine's debug keystore. The
+keystore and its password live outside the repository:
+
+```
+~/.config/suite/keys/suite-go-release.jks    PKCS#12, mode 0600
+~/.config/suite/keys/suite-go-release.pass   the store password, mode 0600
+```
+
+`SUITE_KEYS_DIR` moves the directory. `SUITE_GO_KEYSTORE` and `SUITE_GO_KEYSTORE_PASSWORD` name a
+keystore elsewhere, which is what another machine or a test uses; `SUITE_GO_KEY_ALIAS` overrides the
+`suite-go` alias. The password is never committed and never printed.
+
+The certificate's SHA-256 digest is pinned in `scripts/lib/androidKey.mjs` as
+`ANDROID_RELEASE_CERT_SHA256`. Android refuses an update signed by a different certificate, so a
+machine holding another key cannot update an installed build. The check is:
+
+```sh
+mise exec -- pnpm android:key status
+```
+
+It prints the fingerprint in groups of eight and whether the pin accepts it. A build refuses an
+absent or mismatched key before Gradle runs, and `scripts/android-release.mjs` verifies the finished
+APK's certificate with `apksigner` before naming or uploading it, so a debug-signed artifact cannot
+become the public one.
+
+Make the key once:
+
+```sh
+mise exec -- node scripts/android-release.mjs --key-generate
+```
+
+It writes both files owner-readable only, prints only the certificate digest, and refuses to replace
+an existing key without `--force`. Pin the digest it prints in the same change. [Manage signing
+keys](../../../../docs/how-to/keys.md) owns backup and rotation.
+
+### The four channels
+
+| Channel   | Package id          | Version name    | Launcher label     | versionCode |
+| --------- | ------------------- | --------------- | ------------------ | ----------- |
+| `stable`  | `run.suite.go`      | `0.1.0`         | Suite Go           | base × 10   |
+| `slop`    | `run.suite.slop.go` | `0.1.0-slop`    | Suite Go (slop)    | base × 10+1 |
+| `nightly` | `run.suite.slop.go` | `0.1.0-nightly` | Suite Go (nightly) | base × 10+2 |
+| `preview` | `run.suite.slop.go` | `0.1.0-preview` | Suite Go (preview) | base × 10+3 |
+
+Stable and one pre-release install side by side, because they are two package ids with two data
+trees. Every pre-release shares `run.suite.slop.go`, so moving from slop to nightly replaces the
+pre-release instead of adding a third install. **One pre-release install at a time is the supported
+shape**, the same rule the desktop Flatpaks follow ([Channels](../../../../docs/explanation/channels.md)).
+
+`base` is `versionCode` in `apps/go/app.config.json`. The digit is fixed per channel, so a release
+that bumps the base always increases the code within that channel. Promotion raises the digit, so
+slop → nightly → preview installs as an update on the shared pre-release id. A demotion lowers it,
+which Android refuses: run `adb uninstall run.suite.slop.go` first. Stable and pre-release ids never
+collide, so their sequences are independent.
+
+Build and name:
+
+```sh
+mise exec -- node scripts/android-release.mjs --channel slop
+```
+
+The stable asset keeps `suite-go-<version>.apk` and the `suite-go.apk` alias; a pre-release is
+`suite-go-<channel>-<version>.apk` and has no stable alias. Nothing is uploaded without `--publish`,
+and no device is needed: the APK is built, verified and checksummed on the machine. Install it with
+`adb install -r -t <path>`. A debug build is a dev-loop artifact signed by
+`~/.android/debug.keystore`, which is a different signature, so installing one over a release build
+means uninstalling the other first.
+
 ## The share intent
 
 `android/app/src/main/AndroidManifest.xml` holds the only hand-edited part of the generated project:

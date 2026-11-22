@@ -7,6 +7,20 @@ apply plugin: 'com.android.application'
 def suiteVersionCode = (project.findProperty("suiteVersionCode") ?: "2") as Integer
 def suiteVersionName = (project.findProperty("suiteVersionName") ?: "0.1.0").toString()
 
+// The channel identity table. `scripts/android-release.mjs` owns the same numbers and the artifact
+// names; it reads the built APK back with `aapt` and refuses a package id or versionCode that does
+// not match, so this table and the script cannot drift silently. Stable keeps the id a shipped
+// install already has. Every pre-release shares one id, `run.suite.slop.go`, so moving from slop to
+// nightly replaces the pre-release instead of adding a third install; the channel is in the display
+// and version name, not the id.
+//
+// versionCode = base x 10 + channel digit. The digit is fixed per channel, so bumping the base in
+// app.config.json always increases the code within a channel. Promotion raises the digit, so
+// slop -> nightly -> preview installs as an update on the shared pre-release id; a demotion lowers
+// it, which Android refuses. The rule is in apps/go/docs/reference/android.md.
+def channelDigits = [stable: 0, slop: 1, nightly: 2, preview: 3]
+def preReleaseId = "run.suite.slop.go"
+
 android {
     namespace = "run.suite.go"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -14,7 +28,7 @@ android {
         applicationId "run.suite.go"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode suiteVersionCode
+        versionCode suiteVersionCode * 10
         versionName suiteVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -25,8 +39,8 @@ android {
     }
     // A release build is signed with a key that never enters this repository: the four values come
     // from the environment, and a missing one fails the build with a sentence rather than producing
-    // an unsigned APK that looks finished. `scripts/android.mjs release` is the only caller that
-    // sets them; the debug build does not need any of this.
+    // an unsigned APK that looks finished. `scripts/android-release.mjs` is the only caller that
+    // sets them; the debug build does not need any of this and keeps the machine's debug keystore.
     signingConfigs {
         if (System.getenv("SUITE_GO_KEYSTORE") != null) {
             release {
@@ -35,6 +49,32 @@ android {
                 keyAlias System.getenv("SUITE_GO_KEY_ALIAS")
                 keyPassword System.getenv("SUITE_GO_KEY_PASSWORD")
             }
+        }
+    }
+    flavorDimensions += "channel"
+    productFlavors {
+        stable {
+            dimension "channel"
+            applicationId "run.suite.go"
+            versionCode suiteVersionCode * 10 + channelDigits.stable
+        }
+        slop {
+            dimension "channel"
+            applicationId preReleaseId
+            versionCode suiteVersionCode * 10 + channelDigits.slop
+            versionNameSuffix "-slop"
+        }
+        nightly {
+            dimension "channel"
+            applicationId preReleaseId
+            versionCode suiteVersionCode * 10 + channelDigits.nightly
+            versionNameSuffix "-nightly"
+        }
+        preview {
+            dimension "channel"
+            applicationId preReleaseId
+            versionCode suiteVersionCode * 10 + channelDigits.preview
+            versionNameSuffix "-preview"
         }
     }
     buildTypes {

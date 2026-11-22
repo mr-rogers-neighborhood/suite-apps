@@ -78,13 +78,21 @@ const RELEASE_KEYS = ["branch_prefix", "tier"];
 
 /** The real Suite invocations, spelled once. */
 const GATE_COMMAND = ["node", "scripts/gate.mjs", "--only", "{app}"];
-const BUILD_COMMAND = ["node", "scripts/flatpak.mjs", "--app", "{app}", "--channel", "slop"];
+const BUILD_COMMAND = [
+  "node",
+  "scripts/flatpak.mjs",
+  "--app",
+  "{app}",
+  "--channel",
+  "slop",
+  "--session",
+];
 const DISPLAY_COMMAND = ["flatpak", "run", "run.suite.slop.{app}"];
 const REPO_REF = "main";
 const REPO_GUEST_PATH = "/workspace/suite-apps";
 
-/** The app-set release convention: `slop` → `canary` → `beta` → `stable`. */
-const LADDER = ["slop", "canary", "beta", "stable"];
+/** The app-set release convention: `slop` → `nightly` → `preview` → `stable`. */
+const LADDER = ["slop", "nightly", "preview", "stable"];
 const BRANCH_PREFIX = "slop/";
 const TIER = "slop";
 

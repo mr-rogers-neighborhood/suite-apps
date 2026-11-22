@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   branchFor,
   channelProblem,
+  channelProblemForApp,
   channelRecord,
   desktopEntry,
   displayName,
@@ -14,23 +15,39 @@ import {
 } from "./lib/channel.mjs";
 
 describe("pre-release identity", () => {
-  it("gives a pre-release one id across tiers and leaves stable alone", () => {
+  it("gives a pre-release one id across channels and leaves stable alone", () => {
     assert.equal(flatpakId("planner", "stable"), "run.suite.planner");
     assert.equal(flatpakId("planner", "slop"), "run.suite.slop.planner");
-    assert.equal(flatpakId("planner", "canary"), "run.suite.slop.planner");
-    assert.equal(flatpakId("planner", "beta"), "run.suite.slop.planner");
+    assert.equal(flatpakId("planner", "nightly"), "run.suite.slop.planner");
+    assert.equal(flatpakId("planner", "preview"), "run.suite.slop.planner");
     assert.equal(suiteAppId("planner", "stable"), "planner");
     assert.equal(suiteAppId("planner", "slop"), "slop-planner");
     assert.equal(branchFor("stable"), "master");
-    assert.equal(branchFor("beta"), "beta");
+    assert.equal(branchFor("nightly"), "nightly");
+    assert.equal(branchFor("preview"), "preview");
     assert.equal(displayName("Suite Planner", "slop"), "Suite Planner (slop)");
     assert.equal(displayName("Suite Planner", "stable"), "Suite Planner");
   });
 
-  it("refuses a channel it does not know", () => {
+  it("refuses a channel it does not know, including the retired names", () => {
     assert.equal(channelProblem("slop"), null);
-    assert.match(channelProblem("nightly"), /unknown channel/u);
-    assert.throws(() => flatpakId("planner", "nightly"), /unknown channel/u);
+    assert.equal(channelProblem("nightly"), null);
+    assert.equal(channelProblem("preview"), null);
+    assert.equal(channelProblem("stable"), null);
+    assert.match(channelProblem("canary"), /unknown channel/u);
+    assert.match(channelProblem("beta"), /unknown channel/u);
+    assert.throws(() => flatpakId("planner", "canary"), /unknown channel/u);
+    assert.throws(() => flatpakId("planner", "beta"), /unknown channel/u);
+  });
+
+  it("refuses a frozen legacy app's pre-release unless it is a session build", () => {
+    for (const app of ["canvas", "planner", "budget", "help"]) {
+      assert.match(channelProblemForApp(app, "slop"), /frozen/u);
+      assert.equal(channelProblemForApp(app, "stable"), null);
+      assert.equal(channelProblemForApp(app, "slop", { session: true }), null);
+    }
+    assert.equal(channelProblemForApp("shell", "nightly"), null);
+    assert.equal(channelProblemForApp("go", "preview"), null);
   });
 
   it("writes a distinct manifest with no file association or stable update", () => {
@@ -54,15 +71,15 @@ describe("pre-release identity", () => {
     assert.deepEqual(manifest.capabilities, ["document.file"]);
   });
 
-  it("records the tier as a build-time field beside the manifest", () => {
+  it("records the channel as a build-time field beside the manifest", () => {
     assert.throws(() => channelRecord({ app: "planner", channel: "bet" }), /pre-release/u);
-    assert.deepEqual(channelRecord({ app: "planner", channel: "beta" }), {
+    assert.deepEqual(channelRecord({ app: "planner", channel: "preview" }), {
       format: "suite.channel",
       app: "planner",
-      channel: "beta",
+      channel: "preview",
       id: "run.suite.slop.planner",
       stableId: "run.suite.planner",
-      branch: "beta",
+      branch: "preview",
     });
   });
 

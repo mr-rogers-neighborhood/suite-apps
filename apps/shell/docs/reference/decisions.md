@@ -129,6 +129,23 @@ The rules that shape the Suite host.
 - A Screen is local to this device. The Screens manager, a portable `.screen` file, export/import
   and sync are later slices.
 
+## Channels
+
+- Shell is a superapp, so it carries one channel for the whole product. Stable is `run.suite.shell` on
+  `master`. One pre-release id, `run.suite.slop.shell`, carries `slop`, `nightly` and `preview` on
+  branches of the same names; the display name, desktop entry, metainfo, icon and launcher follow the
+  pre-release id.
+- One pre-release install at a time. Moving from `slop` to `nightly` replaces the pre-release rather
+  than adding a third install. Stable and one pre-release are two ids and can be installed side by
+  side.
+- The pre-release keeps the stable sandbox grants and is isolated by its id, not by a Documents
+  folder. Its data root is `~/.var/app/run.suite.slop.shell/config/Suite/shell`, so its `packs/`
+  installs and `spaces.loro` cannot collide with stable's
+  `~/.var/app/run.suite.shell/config/Suite/shell`. The shell has no `Documents/Suite` grant to split,
+  and the pre-release must not gain a `Documents/Suite Slop` folder.
+- A channel is a distribution fact, not a pack fact. A pack carries a signed version and no channel,
+  and the shell's signed pack loader is unchanged.
+
 ## Updates, signing and installation
 
 - The shell owns its update path. A pack has no IPC to the updater, installer or uninstaller.

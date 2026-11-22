@@ -9,7 +9,9 @@
  * - **One rolling Suite release**, tagged `suite-YYYY.MM.DD`, marked Latest. Its
  *   body is a table of every app's current version, its release date, a link to
  *   that app's own release and how it is installed: a Flatpak command, or the
- *   debug-signed Suite Go APK attached to this same release.
+ *   release-signed Suite Go APK attached to this same release. Each row also names
+ *   the release channel and product maturity; channels belong to the superapp
+ *   (Suite Shell and Suite Go), and the legacy mini-apps are marked frozen.
  * - **One release per app**, tagged `<app>-v<version>`, kept as history and
  *   never marked Latest. It carries the changelog section and an install block;
  *   it carries no app binaries, because the signed Flatpak remote is the update
@@ -56,6 +58,18 @@ export const RELEASES_FILE = "RELEASES.md";
 /** Where a publish writes each release body before handing it to `gh`. */
 export const NOTES_DIR = ".dev/releases";
 
+/** The product-maturity labels, separate from the release channels. */
+export const PRODUCT_MATURITY = ["pre-alpha", "alpha", "beta", "1.0"];
+
+/**
+ * The apps frozen as legacy until they become packs.
+ *
+ * The list lives in the channel library so the Flatpak builder refuses a new
+ * pre-release build for the same apps this table marks frozen. Start and Sync
+ * are not frozen: they are not superapps either, so their rows name no channel.
+ */
+export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
+
 /**
  * Every app a table names. Each section keeps this order.
  *
@@ -63,12 +77,18 @@ export const NOTES_DIR = ".dev/releases";
  * place that turns it into a cell:
  *
  * - `flatpak` — a signed deployment on the OSTree remote, including the relay.
- * - `apk` — a debug-signed APK attached to the rolling suite release.
+ * - `apk` — a release-signed APK attached to the rolling suite release.
  *
  * `section` is the table a row belongs to: `desktop` or `mobile`. The table is
  * rendered by `aggregateSection`, which takes a title and the entries to render,
  * so a section is only a title plus its rows and the shape can be reused by a
  * page that splits the same data differently.
+ *
+ * `channel` names the release channel of a superapp row: Suite Shell and Suite
+ * Go. It is absent on apps that are not superapps. `maturity` is the product
+ * label and is independent of the channel, so a `stable` build may be `alpha`.
+ * `frozen` marks a legacy app that keeps its code and last artifact but gets no
+ * new release or channel.
  *
  * `flatpakId` is null outside the Flatpak rows.
  */
@@ -82,6 +102,8 @@ export const APPS = [
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.shell",
+    channel: "stable",
+    maturity: "alpha",
   },
   {
     id: "start",
@@ -102,6 +124,8 @@ export const APPS = [
     kind: "apk",
     section: "mobile",
     flatpakId: null,
+    channel: "stable",
+    maturity: "pre-alpha",
   },
   {
     id: "canvas",
@@ -112,6 +136,8 @@ export const APPS = [
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.canvas",
+    maturity: "alpha",
+    frozen: true,
   },
   {
     id: "planner",
@@ -122,6 +148,8 @@ export const APPS = [
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.planner",
+    maturity: "pre-alpha",
+    frozen: true,
   },
   {
     id: "budget",
@@ -132,6 +160,8 @@ export const APPS = [
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.budget",
+    maturity: "pre-alpha",
+    frozen: true,
   },
   {
     id: "sync",
@@ -152,6 +182,7 @@ export const APPS = [
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.help",
+    frozen: true,
   },
 ];
 
@@ -258,6 +289,41 @@ export function installCell(app, { version = null, tag = null, apkLive = false }
     return `\`${name}\` (not uploaded yet)`;
   }
   throw new Error(`no install cell for kind ${String(app.kind)}`);
+}
+
+/**
+ * The channel a row names: a superapp's channel, `frozen` for legacy, or none.
+ *
+ * A legacy app is not on a channel any more, so saying `frozen` in the channel
+ * cell is honest: its code and last artifact stay, but no new build is offered.
+ */
+export function channelLabel(app) {
+  if (app.frozen === true) return "frozen";
+  return app.channel ?? "—";
+}
+
+/** The product-maturity label, or an em dash when none is recorded. */
+export function maturityLabel(app) {
+  return app.maturity ?? "—";
+}
+
+/** True when this app's releases are frozen until it becomes a pack. */
+export function isLegacyFrozen(app) {
+  return app.frozen === true;
+}
+
+/**
+ * The two labels every generated release note carries.
+ *
+ * Channel and maturity answer different questions: the channel is what a build
+ * has survived, the maturity is what the product is ready for. A `stable`
+ * channel build can still be `alpha`.
+ */
+export function releaseLabels(app) {
+  return [
+    `- **Channel:** ${channelLabel(app)}`,
+    `- **Maturity:** ${maturityLabel(app)}`,
+  ];
 }
 
 function escapeRegExp(value) {
@@ -424,16 +490,16 @@ export function aggregateRows(
       : `[\`${appTag}\`](${releaseUrl(appTag)})`;
     const install = installCell(app, { version, tag, apkLive });
     return (
-      `| [${app.name}](${blobUrl(app.changelog)}) | ${version} | ${released} | ` +
-      `${release} | ${install} |`
+      `| [${app.name}](${blobUrl(app.changelog)}) | ${channelLabel(app)} | ` +
+      `${maturityLabel(app)} | ${version} | ${released} | ${release} | ${install} |`
     );
   });
 }
 
 /** The header every generated table carries. */
 export const AGGREGATE_TABLE_HEADER = [
-  "| App | Version | Released | Release | Install |",
-  "| --- | --- | --- | --- | --- |",
+  "| App | Channel | Maturity | Version | Released | Release | Install |",
+  "| --- | --- | --- | --- | --- | --- | --- |",
 ];
 
 /**
@@ -476,13 +542,13 @@ function goInstallNote(entries, { tag = null, apkLive = false }) {
   const name = goApkName(go.version);
   if (apkLive && tag !== null) {
     return [
-      `Suite Go is not a Flatpak. This release carries its debug-signed APK, [${name}](${goApkUrl(tag, go.version)}),`,
+      `Suite Go is not a Flatpak. This release carries its release-signed APK, [${name}](${goApkUrl(tag, go.version)}),`,
       "with a SHA-256 checksum beside it; sideload it with `adb install -r -t`.",
       "",
     ];
   }
   return [
-    `Suite Go is not a Flatpak. Its debug-signed APK, \`${name}\`, is not attached to this release yet:`,
+    `Suite Go is not a Flatpak. Its release-signed APK, \`${name}\`, is not attached to this release yet:`,
     "`node scripts/android-release.mjs --publish` uploads it, and the link appears once it is there.",
     "",
   ];
@@ -499,12 +565,15 @@ function goInstallNote(entries, { tag = null, apkLive = false }) {
 export function aggregateReleaseBody(entries, { date, tag = null, apkLive = false }) {
   const desktop = entriesForSection(entries, "desktop");
   const otherDesktop = desktop.filter((entry) => entry.app.id !== "shell");
+  const shell = entries.find((entry) => entry.app.id === "shell") ?? null;
+  const go = entries.find((entry) => entry.app.id === "go") ?? null;
   return [
-    `**Suite Shell** is the desktop host; **Suite Go** is the mobile app. This is the ${date} build.`,
-    "The split apps remain on the same signed remote, below.",
+    `**Suite Shell** is the desktop superapp; **Suite Go** is the mobile superapp. This is the ${date} build.`,
+    "The split apps remain on the same signed remote, below; the legacy ones are frozen.",
     "",
     "## Suite Shell (desktop)",
     "",
+    ...(shell === null ? [] : [...releaseLabels(shell.app), ""]),
     "```sh",
     `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
     "flatpak install --user suite run.suite.shell",
@@ -515,10 +584,14 @@ export function aggregateReleaseBody(entries, { date, tag = null, apkLive = fals
     "",
     "## Suite Go (mobile)",
     "",
+    ...(go === null ? [] : [...releaseLabels(go.app), ""]),
     ...goInstallNote(entries, { tag, apkLive }),
     "## Also on the remote",
     "",
     ...aggregateTable(otherDesktop, { tag, apkLive }),
+    "",
+    "`frozen` marks a legacy app: its code and last artifact stay, and it gets no new",
+    "pre-release channel until it becomes a pack.",
     "",
     "## Update",
     "",
@@ -547,19 +620,22 @@ export function appReleaseBody(app, section, { tag = null, apkLive = false } = {
     `Current versions and the install table are on [the latest Suite release](${latestReleaseUrl()}).`,
     "This page is the release note for this app.",
     "",
-    section.trim(),
-    "",
-    "## Install",
-    "",
+    ...releaseLabels(app),
   ];
+  if (isLegacyFrozen(app)) {
+    lines.push(
+      "- **State:** frozen until it becomes a pack; its code and last artifact stay, and it gets no new pre-release channel.",
+    );
+  }
+  lines.push("", section.trim(), "", "## Install", "");
 
   if (app.kind === "apk") {
     const releaseLink = tag === null ? latestReleaseUrl() : releaseUrl(tag);
     lines.push(
       "Suite Go is a mobile app, not a Flatpak.",
       apkLive
-        ? `This build's debug-signed APK is attached to [the rolling Suite release](${releaseLink}).`
-        : `Its debug-signed APK is published on [the rolling Suite release](${releaseLink}); that ` +
+        ? `This build's release-signed APK is attached to [the rolling Suite release](${releaseLink}).`
+        : `Its release-signed APK is published on [the rolling Suite release](${releaseLink}); that ` +
             "release's Mobile table says whether this build is attached yet.",
       "This per-app entry is history and carries no binary.",
       "",
@@ -633,6 +709,17 @@ export function releasesPage(
     "```",
     "",
     `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
+    "",
+    "## Channels and maturity",
+    "",
+    "A channel is a promise about a build: `slop`, `nightly`, `preview` or `stable`. Channels are on",
+    "the superapp, Suite Shell and Suite Go, not on individual mini-apps. Packs carry signed versions,",
+    "not channels. Maturity is separate: `pre-alpha`, `alpha`, `beta` or `1.0`, so a `stable`-channel",
+    "build can still be `alpha`.",
+    "",
+    "`frozen` marks a legacy app: Canvas, Planner, Budget and Help keep their code and last artifact,",
+    "and they get no new pre-release channel until they become packs. Start and Sync are not",
+    "superapps and are not frozen; their rows name no channel.",
     "",
     ...aggregateSection("Desktop", entriesForSection(entries, "desktop"), {
       markPending: true,

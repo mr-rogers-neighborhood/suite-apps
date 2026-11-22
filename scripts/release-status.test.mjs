@@ -10,6 +10,7 @@ import {
   appReleaseBody,
   changelogDate,
   changelogDateProblem,
+  channelLabel,
   currentAggregateTag,
   entriesForSection,
   flatpakrepoUrl,
@@ -18,9 +19,12 @@ import {
   installCell,
   installCommand,
   isDate,
+  isLegacyFrozen,
+  maturityLabel,
   parseArgs,
   planTag,
   releaseAction,
+  releaseLabels,
   releasesPage,
   remoteLookupProblem,
   tagFor,
@@ -232,6 +236,81 @@ describe("tag plans by mode", () => {
   });
 });
 
+describe("channels and maturity", () => {
+  it("labels the superapp rows with their channel and maturity", () => {
+    const shell = APPS.find((app) => app.id === "shell");
+    const goApp = APPS.find((app) => app.id === "go");
+    assert.equal(channelLabel(shell), "stable");
+    assert.equal(maturityLabel(shell), "alpha");
+    assert.equal(channelLabel(goApp), "stable");
+    assert.equal(maturityLabel(goApp), "pre-alpha");
+    assert.deepEqual(releaseLabels(shell), [
+      "- **Channel:** stable",
+      "- **Maturity:** alpha",
+    ]);
+  });
+
+  it("freezes the legacy apps and names no channel for the hub or relay", () => {
+    for (const id of ["canvas", "planner", "budget", "help"]) {
+      const app = APPS.find((row) => row.id === id);
+      assert.equal(isLegacyFrozen(app), true);
+      assert.equal(channelLabel(app), "frozen");
+    }
+    for (const id of ["start", "sync"]) {
+      const app = APPS.find((row) => row.id === id);
+      assert.equal(isLegacyFrozen(app), false);
+      assert.equal(channelLabel(app), "—");
+      assert.equal(maturityLabel(app), "—");
+    }
+  });
+
+  it("shows channel, maturity and frozen in the generated table and notes", () => {
+    const shell = APPS.find((app) => app.id === "shell");
+    const goApp = APPS.find((app) => app.id === "go");
+    const withSuperapps = [
+      {
+        app: shell,
+        version: "0.2.0",
+        date: "2026-11-22",
+        tag: "shell-v0.2.0",
+        section: "### Added\n\n- **The host.** It exists.",
+      },
+      ...entries,
+      {
+        app: goApp,
+        version: "0.1.0",
+        date: "2026-11-18",
+        tag: "go-v0.1.0",
+        section: "### Added\n\n- **The first version.** It exists.",
+      },
+    ];
+    const body = aggregateReleaseBody(withSuperapps, { date: "2026-11-22" });
+    assert.match(body, /desktop superapp; \*\*Suite Go\*\* is the mobile superapp/u);
+    assert.match(body, /\*\*Channel:\*\* stable/u);
+    assert.match(body, /\*\*Maturity:\*\* alpha/u);
+    assert.match(body, /\| \[Suite Canvas\]\([^)]*\) \| frozen \| alpha \|/u);
+
+    const frozen = appReleaseBody(
+      APPS.find((app) => app.id === "canvas"),
+      "### Fixed\n\n- **A package.** It packaged.",
+    );
+    assert.match(frozen, /\*\*Channel:\*\* frozen/u);
+    assert.match(frozen, /frozen until it becomes a pack/u);
+  });
+
+  it("renders the new columns in RELEASES.md", () => {
+    const published = entries.map((entry) => ({ ...entry, published: true }));
+    const page = releasesPage(published, {
+      date: "2026-11-21",
+      tag: "suite-2026.11.21",
+      aggregatePublished: true,
+    });
+    assert.match(page, /## Channels and maturity/u);
+    assert.match(page, /\| App \| Channel \| Maturity \| Version \| Released \| Release \| Install \|/u);
+    assert.match(page, /a `stable`-channel\s+build can still be `alpha`/u);
+  });
+});
+
 describe("release bodies", () => {
   it("points at the rolling release, then the changelog section and the signed remote", () => {
     const body = appReleaseBody(start, entries[0].section);
@@ -426,7 +505,8 @@ describe("sections and the Suite Go APK", () => {
       tag: "suite-2026.11.21",
       apkLive: true,
     });
-    assert.match(live, /carries its debug-signed APK/u);
+    assert.match(live, /carries its release-signed APK/u);
+    assert.doesNotMatch(live, /debug-signed/u);
     assert.match(live, /releases\/download\/suite-2026\.11\.21\/suite-go-0\.1\.0\.apk/u);
     assert.match(live, /## Suite Go \(mobile\)/u);
 

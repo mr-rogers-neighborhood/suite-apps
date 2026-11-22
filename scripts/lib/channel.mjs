@@ -2,26 +2,56 @@
  * The channel identities shared by the release and Flatpak paths.
  *
  * Stable keeps the id a shipped install already has. A pre-release shares one
- * id across the slop, canary and beta tiers, so a machine can hold stable and
- * one pre-release side by side, and moving tier replaces the pre-release rather
- * than adding a third install. The tier is the branch; the id stays put.
+ * id across the slop, nightly and preview channels, so a machine can hold stable
+ * and one pre-release side by side, and moving channel replaces the pre-release
+ * rather than adding a third install. The channel is the branch; the id stays
+ * put. `canary` and `beta` were the old names and are refused rather than
+ * silently aliased, so a stale command fails where it is typed.
  *
  * Pure string work lives here so both scripts describe the same identity and a
  * test can prove the desktop entry registers no MIME type or scheme handler.
  */
 
-/** The released channel, and the one whose id predates the tiers. */
+/** The released channel, and the one whose id predates the channels. */
 export const STABLE_CHANNEL = "stable";
 
-/** Pre-release tiers, in promotion order. */
-export const PRE_RELEASE_CHANNELS = ["slop", "canary", "beta"];
+/** Pre-release channels, in promotion order. */
+export const PRE_RELEASE_CHANNELS = ["slop", "nightly", "preview"];
 
 /** Every channel the scripts accept. */
 export const CHANNELS = [STABLE_CHANNEL, ...PRE_RELEASE_CHANNELS];
 
-/** True when this channel is one of the pre-release tiers. */
+/**
+ * The legacy mini-apps, frozen until they become packs.
+ *
+ * Their code and last artifacts stay, and a person can still install the last
+ * stable ref. They get no new release and no new pre-release build; the
+ * superapp carries the channel. One list is read by the release table and by
+ * the Flatpak builder, so a fold here closes every path at once.
+ */
+export const LEGACY_FROZEN_IDS = ["canvas", "planner", "budget", "help"];
+
+/** True when this channel is one of the pre-release channels. */
 export function isPreRelease(channel) {
   return PRE_RELEASE_CHANNELS.includes(channel);
+}
+
+/**
+ * Why this app cannot build on this channel, or null.
+ *
+ * A frozen legacy app has no pre-release identity to publish. The factory's
+ * `slop` build is a session channel rather than a shipped one, so an explicit
+ * `session` request may still build one; every other path is refused before a
+ * manifest is written.
+ */
+export function channelProblemForApp(app, channel, { session = false } = {}) {
+  if (!isPreRelease(channel) || session) return null;
+  if (!LEGACY_FROZEN_IDS.includes(app)) return null;
+  return (
+    `${app} is frozen as a legacy mini-app: it gets no new pre-release build. ` +
+    "The last stable ref is its release, and the superapp carries the channel. " +
+    "A factory session build may pass --session; it is local and never published."
+  );
 }
 
 /**
@@ -49,14 +79,14 @@ export function flatpakId(app, channel) {
  * A pre-release id is `slop-<app>` with a hyphen: that is the canonical manifest
  * id, and the one every app classifies as a pre-release. The Flatpak id is a
  * different field and keeps its dots (`run.suite.slop.<app>`); the branch names
- * the tier. Do not change this to the dot form an early build wrote — that form
+ * the channel. Do not change this to the dot form an early build wrote — that form
  * is read for compatibility, never written.
  */
 export function suiteAppId(app, channel) {
   return isPreRelease(channel) ? `slop-${app}` : app;
 }
 
-/** The name a person reads, which names the pre-release tier. */
+/** The name a person reads, which names the pre-release channel. */
 export function displayName(name, channel) {
   return isPreRelease(channel) ? `${name} (${channel})` : name;
 }
@@ -65,7 +95,8 @@ export function displayName(name, channel) {
  * The OSTree branch the channel publishes on.
  *
  * Stable still uses `master`, which is what the existing `suite-local` remote
- * carries. A tier uses its own name, so the branch and the tier cannot drift.
+ * carries. A pre-release channel uses its own name, so the branch and the
+ * channel cannot drift.
  */
 export function branchFor(channel) {
   return isPreRelease(channel) ? channel : "master";
@@ -110,10 +141,10 @@ export function preReleaseAppManifest(base, channel) {
 }
 
 /**
- * The build-time field that names the tier.
+ * The build-time field that names the channel.
  *
  * `suite.app.json` deliberately stays inside the contract every installed
- * build already parses; the tier is a build fact, so it rides beside it.
+ * build already parses; the channel is a build fact, so it rides beside it.
  */
 export function channelRecord({ app, channel }) {
   if (!isPreRelease(channel)) {
@@ -132,8 +163,8 @@ export function channelRecord({ app, channel }) {
 /**
  * The pre-release desktop entry.
  *
- * No `MimeType` and no `x-scheme-handler/*` line: a tier must not claim the
- * stable documents or the suite link. `NoDisplay=false` keeps the card visible
+ * No `MimeType` and no `x-scheme-handler/*` line: a pre-release channel must not
+ * claim the stable documents or the suite link. `NoDisplay=false` keeps the card visible
  * beside stable, and the icon name is the app id so a taskbar can find it.
  */
 export function desktopEntry({
