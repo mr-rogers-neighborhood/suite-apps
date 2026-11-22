@@ -1,0 +1,40 @@
+{
+  "name": "@suite/pack-runtime",
+  "version": "0.1.0",
+  "description": "The pack-side view of the Suite host: pack files, external file handles, opaque relay transport, commands, notifications and lifecycle. Types only; no Electron, no Node, no host policy.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "check": "biome check . && tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "@biomejs/biome": "2.6.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mr-rogers-neighborhood/suite-apps.git",
+    "directory": "packages/pack-runtime"
+  },
+  "author": {
+    "name": "Suite contributors",
+    "email": "maintainers@suite.run"
+  },
+  "license": "MIT"
+}

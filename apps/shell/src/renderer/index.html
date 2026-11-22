@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Suite</title>
+    <link rel="stylesheet" href="shell.css" />
+  </head>
+  <body data-active="false">
+    <header class="tabbar">
+      <button id="home" class="brand" type="button" title="Home" aria-label="Home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>Suite</span>
+      </button>
+      <div id="tabs" class="tabs" role="tablist" aria-label="Open apps"></div>
+      <button id="new-tab" class="new-tab" type="button" title="New tab" aria-label="New tab">
+        +
+      </button>
+    </header>
+
+    <main id="launcher" class="launcher">
+      <div class="launcher-inner">
+        <p class="eyebrow">One window, many apps</p>
+        <h1>Open an app</h1>
+        <p class="lede">
+          Each pack runs in its own sandbox and keeps its own documents. The shell never reads them.
+          Commands and contributions arrive with the next slice.
+        </p>
+
+        <label class="search">
+          <span class="visually-hidden">Search packs</span>
+          <input
+            id="search"
+            type="search"
+            placeholder="Search installed packs…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+
+        <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+
+        <section aria-labelledby="installed-heading">
+          <div class="section-head">
+            <h2 id="installed-heading">Installed</h2>
+            <span id="pack-count" class="count"></span>
+          </div>
+          <div id="packs" class="grid"></div>
+        </section>
+
+        <section class="available" aria-labelledby="available-heading">
+          <div class="section-head">
+            <h2 id="available-heading">Available</h2>
+          </div>
+          <p class="muted">
+            Packs arrive as signed <code>.suitepack</code> files. Installing adds one to this device.
+            A new app opens right away; restart Suite to run a new version of an app that is
+            already open.
+          </p>
+          <button id="install-pack" class="install" type="button">Install pack…</button>
+        </section>
+      </div>
+    </main>
+
+    <script type="module" src="shell.js"></script>
+  </body>
+</html>

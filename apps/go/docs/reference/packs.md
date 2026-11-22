@@ -127,11 +127,13 @@ answers and they are the same fork as the isolation question:
 The second is the shape Canvas needs, and it is why the isolation spike is not optional. **Not decided
 here**, because it changes how every pack is built.
 
-**3. The key is the trust boundary.** `PACK_PUBLIC_KEY` is pinned in the app and never fetched: a feed
-that could hand over a new key has handed over the app. The value in the repository today is a
-**development key** that exists so the pipeline could be exercised before there is a release process. The
-release key replaces it in the same change that signs packs in CI, and its private half never enters this
-repository.
+**3. The key is the trust boundary.** `SUITE_PACK_PUBLIC_KEY` in `packages/pack/src/pinnedKey.ts` is
+pinned and never fetched: a feed that could hand over a new key has handed over the app.
+`PACK_PUBLIC_KEY` in `apps/go/src/host/packs.ts` only re-exports it, because a second copy is a second
+trust root, and a rotation edits the shared pin and rebuilds every pack. The value in the repository
+today is a **development key** that exists so the pipeline could be exercised before there is a release
+process. The release key replaces it in the same change that signs packs in CI, and its private half
+never enters this repository.
 
 ## What a pack may not do
 

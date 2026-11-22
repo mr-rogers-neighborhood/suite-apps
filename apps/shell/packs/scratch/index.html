@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scratch</title>
+    <!-- Inline styles are fine; inline scripts are blocked by the host CSP. -->
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 32px 24px 48px;
+        background: var(--canvas, #0d0f13);
+        color: var(--ink, #e6e8ee);
+        font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+
+      code {
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 0.9em;
+        color: var(--accent, #7ea6ff);
+      }
+
+      .page {
+        max-width: 720px;
+        margin: 0 auto;
+        display: grid;
+        gap: 16px;
+      }
+
+      .eyebrow {
+        margin: 0 0 6px;
+        color: var(--ink-muted, #8b93a3);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 26px;
+        letter-spacing: -0.01em;
+      }
+
+      .lede {
+        margin: 0;
+        color: var(--ink-muted, #9aa3b2);
+      }
+
+      .card {
+        background: var(--surface, #171a21);
+        border: 1px solid var(--hairline, #262b35);
+        border-radius: 12px;
+        padding: 16px;
+      }
+
+      .meta {
+        margin: 0 0 10px;
+        color: var(--ink-muted, #9aa3b2);
+        font-size: 13px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 260px;
+        padding: 10px 12px;
+        resize: vertical;
+        border: 1px solid var(--hairline, #2a303c);
+        border-radius: 8px;
+        background: var(--canvas, #0d0f13);
+        color: inherit;
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      button {
+        border: 1px solid var(--hairline, #2a303c);
+        border-radius: 8px;
+        padding: 8px 14px;
+        background: var(--surface, #1b202a);
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:hover:not(:disabled) {
+        border-color: var(--accent, #6ea8fe);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      button.primary {
+        border-color: transparent;
+        background: var(--accent, #4f8cff);
+        color: var(--on-accent, #08101f);
+        font-weight: 600;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--accent, #6ea8fe);
+        outline-offset: 2px;
+      }
+
+      .status {
+        margin: 0;
+        min-height: 20px;
+        color: var(--ink-muted, #9aa3b2);
+        font-size: 13px;
+      }
+
+      .status[data-tone="ok"] {
+        color: var(--ok, #7fd6a4);
+      }
+
+      .status[data-tone="warn"] {
+        color: var(--warn, #ffcf7a);
+      }
+
+      .status[data-tone="bad"] {
+        color: var(--danger, #ff8f8f);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="eyebrow">Pack <code id="pack-id">…</code></p>
+        <h1>Scratch</h1>
+        <p class="lede">
+          One document, <code>scratch.txt</code>. Documents and pack files are scoped to this pack
+          id.
+        </p>
+      </header>
+
+      <section class="card" aria-labelledby="doc-title">
+        <h2 class="eyebrow" id="doc-title">Document</h2>
+        <p id="doc-meta" class="meta">Loading…</p>
+        <textarea id="editor" spellcheck="false" disabled></textarea>
+        <div class="row">
+          <button id="save" class="primary" type="button" disabled>Save</button>
+          <button id="clear" type="button" disabled>Clear</button>
+          <button id="probe-files" type="button">Probe Conformance files</button>
+        </div>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite" data-tone="info">Loading…</p>
+    </main>
+
+    <script src="scratch.js" defer></script>
+  </body>
+</html>

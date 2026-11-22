@@ -1,0 +1,10 @@
+{
+  "format": "suite.pack",
+  "id": "welcome",
+  "name": "Welcome",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "contractVersion": 1,
+  "capabilities": ["documents"],
+  "description": "Demo pack for the host boundary: notes, no Node, no network."
+}

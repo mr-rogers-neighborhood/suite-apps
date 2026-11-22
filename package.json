@@ -23,6 +23,7 @@
     "docs:build": "pnpm --dir apps/help build",
     "docs:clean": "pnpm --dir apps/help clean",
     "keys": "node scripts/keys.mjs",
+    "pack": "node scripts/pack.mjs",
     "format": "pnpm --filter \"./apps/*\" --filter \"./apps/*/*\" --filter \"./packages/*\" --workspace-concurrency=1 run format",
     "build": "pnpm --filter \"./apps/*\" --filter \"./apps/*/*\" --filter \"./packages/*\" --workspace-concurrency=1 run build",
     "prepare": "husky"
@@ -30,6 +31,8 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
+    "@suite/pack": "workspace:*",
+    "@suite/pack-host": "workspace:*",
     "husky": "^9.1.7"
   }
 }

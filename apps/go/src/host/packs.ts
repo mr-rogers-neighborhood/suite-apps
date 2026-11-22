@@ -11,6 +11,7 @@ import {
   verifyPackFiles,
   verifyPackSignature,
 } from "@suite/go";
+import { SUITE_PACK_PUBLIC_KEY } from "@suite/pack/pinned-key";
 import { unzipSync, zipSync } from "fflate";
 
 /**
@@ -28,11 +29,13 @@ import { unzipSync, zipSync } from "fflate";
 const ROOT = "packs";
 
 /**
- * The key that signs packs.
+ * The key that signs packs, re-exported from the shared trust root.
  *
- * Pinned at build time and never fetched, because a feed that could hand over a new key has
- * handed over the app. An empty value refuses every pack, which is the correct default for a
- * build with no key: an unverified pack is never better than no pack.
+ * `@suite/pack` pins `SUITE_PACK_PUBLIC_KEY` at `packages/pack/src/pinnedKey.ts`, and the desktop
+ * host reads the same constant. Keeping one copy is the point: two pins would let the phone and the
+ * desktop accept different packs while both calling themselves Suite. An empty value refuses every
+ * pack, which is the correct default for a build with no key: an unverified pack is never better
+ * than no pack.
  *
  * The private half is a release secret and lives outside this repository, at
  * `~/.config/suite/keys/pack-key` (or wherever `SUITE_KEYS_DIR` points). `pnpm planner:pack`
@@ -40,10 +43,11 @@ const ROOT = "packs";
  * says whether the key on this machine is the key this constant trusts — the check that matters,
  * because a pack signed by anything else is refused on the device as `untrusted`.
  *
- * Rotation is one change: `pnpm keys generate pack`, put the public half here, rebuild every pack.
- * [Keys](../../../../docs/how-to/keys.md) states the procedure and what a fingerprint proves.
+ * Rotation is one change: `pnpm keys generate pack`, put the public half in the shared pin, rebuild
+ * every pack. [Keys](../../../../docs/how-to/keys.md) states the procedure and what a fingerprint
+ * proves.
  */
-export const PACK_PUBLIC_KEY = "x5QN5OKEGya9gsrbNGaKZMfznsAv6+Cux/qrBYHuSfc=";
+export const PACK_PUBLIC_KEY = SUITE_PACK_PUBLIC_KEY;
 
 /**
  * What this build implements. Bumped when the host services a pack may call change.

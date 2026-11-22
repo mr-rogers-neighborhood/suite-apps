@@ -1,0 +1,10 @@
+{
+  "format": "suite.pack",
+  "id": "scratch",
+  "name": "Scratch",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "contractVersion": 1,
+  "capabilities": ["documents", "files"],
+  "description": "One scratch.txt document plus a cross-pack files probe, scoped to this pack."
+}

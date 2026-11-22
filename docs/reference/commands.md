@@ -17,10 +17,11 @@ mise exec -- node scripts/gate.mjs --fresh         # this commit, clean install
 mise exec -- node scripts/gate.mjs --no-e2e        # skip Start's e2e suite
 ```
 
-The gate builds the workspace libraries (`packages/*` and `apps/*/packages/*`) once, then runs each
-app's own `check:full` in dependency order. It writes `.dev/gate-status.json`. `--fresh` exports `HEAD` with `git archive`,
-installs from the lockfile, and runs the same order in that clean tree. The cross-app Playwright suite
-runs after the checks, under `xvfb-run` when there is no display.
+The gate builds the workspace libraries (`packages/*` and `apps/*/packages/*`) once, runs
+`node --test scripts/pack.test.mjs` for the pack build script that no app's gate covers, then runs
+each app's own `check:full` in dependency order. It writes `.dev/gate-status.json`. `--fresh` exports
+`HEAD` with `git archive`, installs from the lockfile, and runs the same order in that clean tree. The
+cross-app Playwright suite runs after the checks, under `xvfb-run` when there is no display.
 
 Run heavy checks under a cap so a fan-out cannot take the desktop with it:
 
@@ -96,6 +97,31 @@ pnpm keys generate update   # a new update signing keypair
 The private halves live outside the repository, and each public half is pinned in the source that
 verifies it. [Manage signing keys](../how-to/keys.md) has the directory, the rotation order and what
 a backup has to preserve.
+
+## Build a pack
+
+```sh
+mise exec -- node scripts/pack.mjs --dir <pack-dir> [--out <file.suitepack>] \
+  [--key <base64>] [--contract <n>] [--min-host <n>]
+```
+
+`--dir` holds the development `manifest.json`, the HTML entry and its assets. The script hashes every
+other file into the manifest, signs the canonical core with the pack key, and writes
+`<id>-<version>.suitepack` (or `--out`) with a sibling `.sha256` holding the digest and file name.
+The key comes from `--key`, `$SUITE_PACK_KEY`, or `pack-key` in the Suite keys directory. A clean
+checkout has none, and an absent, unreadable or non-matching key is refused before anything is
+signed; `pnpm keys status` compares the key with the pin. Rotation is in [Manage signing
+keys](../how-to/keys.md).
+
+The script imports `@suite/pack` and `@suite/pack-host` through their `dist/`, so a clean checkout
+must build those two libraries first:
+
+```sh
+mise exec -- pnpm --filter @suite/pack build
+mise exec -- pnpm --filter @suite/pack-host build
+```
+
+The gate's libraries step does the same build before anything else runs.
 
 ## Docs
 

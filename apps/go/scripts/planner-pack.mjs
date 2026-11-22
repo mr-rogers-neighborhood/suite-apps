@@ -6,8 +6,10 @@
  *
  * The private key follows the existing rule: it is never in this repository. `SUITE_PACK_KEY` or
  * `--key` supplies it; `~/.config/suite/keys/pack-key` is where `pnpm keys generate pack` puts it
- * (or wherever `SUITE_KEYS_DIR` points). The public half is `PACK_PUBLIC_KEY` in
- * `src/host/packs.ts`, and `pnpm keys status` says whether the two on this machine agree.
+ * (or wherever `SUITE_KEYS_DIR` points). The public half is `SUITE_PACK_PUBLIC_KEY` in
+ * `packages/pack/src/pinnedKey.ts`; `PACK_PUBLIC_KEY` in `src/host/packs.ts` re-exports it, so a
+ * rotation edits the shared pin and rebuilds every pack. `pnpm keys status` says whether the two on
+ * this machine agree.
  *
  * The entry page is written here rather than committed: its script name carries Vite's content
  * hash, and its CSP is the pack's own network seal, which the installer verifies.
@@ -38,7 +40,7 @@ const out = arg("out") ?? join(DEV_DIR, `${id}.pack`);
  *
  * It used to be `apps/go/.dev/suite-pack-key`, which is the scratch directory the build replaces:
  * a cleanup took the only copy with it. Nothing durable lives there now. `pnpm keys status`
- * reports whether this key is the one `PACK_PUBLIC_KEY` trusts.
+ * reports whether this key is the one `SUITE_PACK_PUBLIC_KEY` trusts.
  */
 function localKey() {
   return readKey("pack") ?? undefined;

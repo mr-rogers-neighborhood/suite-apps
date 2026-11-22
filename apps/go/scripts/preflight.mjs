@@ -184,12 +184,12 @@ async function main() {
     warn(
       "pack signing key",
       "absent — `pnpm planner:pack` cannot sign",
-      "pnpm keys generate pack, then pin its public half as PACK_PUBLIC_KEY",
+      "pnpm keys generate pack, then put its public half in SUITE_PACK_PUBLIC_KEY at packages/pack/src/pinnedKey.ts",
     );
   else if (packKey.ok)
     pass(
       "pack signing key",
-      `${groupedFingerprint(packKey.fingerprint)} — matches PACK_PUBLIC_KEY`,
+      `${groupedFingerprint(packKey.fingerprint)} — matches SUITE_PACK_PUBLIC_KEY`,
     );
   else
     fail(

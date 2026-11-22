@@ -43,6 +43,69 @@ The rules that shape this repository. Each is current; the code follows it.
 - The top bar is a host–app contract: the host keeps `mark` and `controls`, and the active app takes
   over the middle. [Menu bar](menu-bar.md) names the seven zones.
 
+## Desktop host
+
+- **Direction: one desktop host.** `apps/shell` (`@suite/shell`) is the intended desktop host. It is
+  one Electron app that opens signed, sandboxed packs as tabs, and it takes over Start's role as the
+  hub. It is a spike today: the released desktop suite is still separate Flatpaks plus Start, and
+  that remains the shipping form until the migration is proven.
+- **The migration is proven by an app, not by a window.** A real shipping app must run as a signed
+  pack with its documents and consented export/import; Budget is the first witness. The host also
+  carries Start's catalogue, routing and update surface before Start stops shipping.
+- The host is not the same-process container that [Architecture](../explanation/architecture.md)
+  rejects: each pack gets its own `WebContentsView`, custom-protocol origin and session partition.
+  One renderer that mounts every domain is still rejected, because it loses per-app isolation,
+  crash boundaries and accessibility boundaries.
+- Packs are renderer-only: no Node, no raw filesystem, no network unless the manifest declares it.
+  The host brokers files and documents as opaque bytes scoped by the sender's pack id, and never
+  parses an app document.
+- The shell owns its space document. A **Space** is the user-facing grouping — not necessarily work;
+  a **Container** is the local data identity; a **Session** is the local set of open windows and tabs.
+  The space document is a Loro document with the shell's own schema; it is container-ready, but v1
+  exposes one default container and flat tabs. App documents and sync keys stay with their packs.
+  A domain app may still call its own document a “workspace” in its own docs; the host does not use
+  that word for shell state.
+- The shell owns the chrome and renders pack-declared contributions (commands, menus, toolbar,
+  status, widgets). A pack draws only its content; it never renders into host DOM.
+- Signed packs are the release rule. The spike loads directory packs for development and must not
+  ship as a release path.
+- A host agent is not built now. The Flatpak session helper (`org.freedesktop.Flatpak` through
+  `flatpak-spawn --host`) is what the sandboxed hub uses behind the same
+  [`PackageBackend`](../../apps/start/docs/reference/decisions.md); that grant is effectively host
+  command execution. A D-Bus agent remains the alternative if the permission set grows, and it would
+  be a second package manager until it earns its keep.
+- No service owns sync membership or keys. One service owning them would collapse the sandbox
+  isolation; [sync is a capability](../../apps/sync/docs/reference/sync-capability.md) that moves
+  sealed frames and readable membership.
+- `@suite/sync-desktop` is shared mechanics, not shared trust. The group, relay pin, cursor, pending
+  join, frame queue and reconnect live once for Canvas and Planner; each app injects its own data
+  directory and identity, keeps its own `sync/contacts.json` decision, and keeps its capability and
+  IPC surface. A shared contacts file would move a per-app trust decision across the boundary and is
+  rejected here.
+- The W3C MiniApp model contributed the host, the manifest, declared capabilities and the lifecycle.
+  Its packaging specification is retired, so there is no compliance target.
+
+## Packs
+
+- `@suite/pack` is the desktop pack contract: manifest, capabilities, contributions, file hashes and
+  Ed25519 verification. It shares the pinned key and the capability words with Suite Go, not the
+  manifest: Go requires `independent` and `isolation` and has different canonical bytes, so each
+  host refuses the other's pack until the formats are unified (#202). [Status](status.md) is the
+  source of truth for that split.
+- `@suite/pack-runtime` is the pack-side service interface. `@suite/pack-host` is the host-side
+  scoped file store, locks and backups. Neither imports Electron.
+- A pack's `files` capability is a **scoped filesystem**, not an arbitrary path API: relative paths
+  inside the pack's root, host-owned atomic writes, backups and locks; absolute paths, `..`,
+  symlinks and non-regular files are refused. External files use a user-consented host handle, with
+  open-in-place or import.
+- The host may open the pinned relay socket, but it forwards opaque frames. The pack runs the sync
+  protocol and holds the keys. The host sees ciphertext, not a document.
+- One shared Suite pack key signs desktop and mobile packs; the pin is the one thing both hosts
+  read from the same source. The manifests differ until #202, so a pack built for one host is not
+  installable on the other. Pack files are the distribution path today; a signed remote index is a
+  later path, and the intent is that both are first-class once the shell has one. The shell itself
+  updates through its OS package.
+
 ## Packaging
 
 - Flatpak is the only Linux desktop form: Canvas, Planner, Budget, Help, Start and Sync. Sync's app is
@@ -83,29 +146,6 @@ The rules that shape this repository. Each is current; the code follows it.
 - Linux is the published desktop platform. macOS and Windows have no signing identity.
 - Android ships as a debug-signed APK attached to the rolling release; there is no signing key or
   store channel yet.
-
-## Desktop host
-
-- Desktop Suite is separate sandboxed apps plus Start as the shell. The shell owns the catalogue, the
-  channels, routing and updates; Flatpak is the host runtime; documents and keys stay app-owned.
-- One container window is rejected: it loses per-app isolation, crash boundaries and accessibility
-  boundaries.
-- A host agent is not built now. The Flatpak session helper (`org.freedesktop.Flatpak` through
-  `flatpak-spawn --host`) is what the sandboxed hub uses behind the same
-  [`PackageBackend`](../../apps/start/docs/reference/decisions.md); that grant is effectively host
-  command execution. A D-Bus agent remains the alternative if the permission set grows, and it would
-  be a second package manager until it earns its keep.
-- No service owns sync membership or keys. One service owning them would collapse the sandbox
-  isolation; [sync is a capability](../../apps/sync/docs/reference/sync-capability.md) that moves
-  sealed frames and readable membership.
-- `@suite/sync-desktop` is shared mechanics, not shared trust. The group, relay pin, cursor, pending
-  join, frame queue and reconnect live once for Canvas and Planner; each app injects its own data
-  directory and identity, keeps its own `sync/contacts.json` decision, and keeps its capability and
-  IPC surface. A shared contacts file would move a per-app trust decision across the boundary and is
-  rejected here.
-- A signed pack form may be added inside Start later; domains do not move into it.
-- The W3C MiniApp model contributed the host, the manifest, declared capabilities and the lifecycle.
-  Its packaging specification is retired, so there is no compliance target.
 
 ## Widgets and the dashboard
 

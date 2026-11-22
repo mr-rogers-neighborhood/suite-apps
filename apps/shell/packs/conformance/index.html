@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conformance</title>
+    <link rel="stylesheet" href="conformance.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="eyebrow">Pack <code id="pack-id">…</code></p>
+        <h1>Files conformance</h1>
+        <p class="lede">
+          Everything here is scoped to this pack. Paths stay relative; the host owns the root,
+          backups and locks.
+        </p>
+      </header>
+
+      <section class="card" aria-labelledby="checks-title">
+        <div class="card-head">
+          <h2 class="eyebrow" id="checks-title">Checks</h2>
+          <button id="run-all" class="primary" type="button">Run all</button>
+        </div>
+        <div class="row">
+          <button data-check="writeListRead" type="button">Write, list, read</button>
+          <button data-check="makeDirectory" type="button">mkdir</button>
+          <button data-check="rename" type="button">Rename</button>
+          <button data-check="backup" type="button">Backup</button>
+          <button data-check="remove" type="button">Remove</button>
+          <button data-check="lock" type="button">Lock</button>
+          <button data-check="traversal" type="button">Refuse traversal</button>
+          <button data-check="secret" type="button">Write cross-pack marker</button>
+          <button id="clear" type="button">Clear log</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="log-title">
+        <h2 class="eyebrow" id="log-title">Log</h2>
+        <ol id="log" class="log" aria-live="polite"></ol>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite" data-tone="info">Ready.</p>
+    </main>
+
+    <script src="conformance.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,431 @@
+import { join } from "node:path";
+import { originKey } from "@suite/desktop";
+import { app, BaseWindow, session, shell, WebContentsView } from "electron";
+import { DEFAULT_CONTAINER_ID } from "./container.js";
+import { navigationReleasesLocks } from "./files.js";
+import { registerPackProtocol } from "./packProtocol.js";
+import {
+  externalLinkFor,
+  type PackInfo,
+  packOrigin,
+  packPartition,
+  tabViewTarget,
+} from "./packs.js";
+import { clearPackSender, setPackSender } from "./senders.js";
+import {
+  CHROME_ORIGIN,
+  CHROME_STATE,
+  type ShellState,
+  type ShellTab,
+  type ThemeView,
+} from "./shared.js";
+import type { SpaceStore } from "./spaces.js";
+
+/** The chrome's own height. The chrome page uses the same number in its stylesheet. */
+export const TAB_BAR_HEIGHT = 56;
+
+const configuredPartitions = new Set<string>();
+
+/**
+ * One OS window: a full-window chrome view with pack views laid over its content
+ * area. Closing a tab destroys its view; switching a tab only hides it, so a
+ * half-typed note survives a trip through the launcher.
+ */
+export class ShellWindow {
+  readonly window: BaseWindow;
+  readonly #chrome: WebContentsView;
+  #packs: readonly PackInfo[];
+  readonly #spaces: SpaceStore;
+  readonly #containerId: string;
+  readonly #onViewClosed: ((tabId: string) => void) | undefined;
+  readonly #views = new Map<string, WebContentsView>();
+  #theme: ThemeView;
+  #notice: string | null = null;
+  #closed = false;
+
+  constructor(options: {
+    readonly packs: readonly PackInfo[];
+    readonly spaces: SpaceStore;
+    readonly theme: ThemeView;
+    readonly containerId?: string;
+    readonly onViewClosed?: (tabId: string) => void;
+    readonly onClosed?: () => void;
+  }) {
+    this.#packs = options.packs;
+    this.#spaces = options.spaces;
+    this.#containerId = options.containerId ?? DEFAULT_CONTAINER_ID;
+    this.#onViewClosed = options.onViewClosed;
+    this.#theme = options.theme;
+
+    this.window = new BaseWindow({
+      width: 1280,
+      height: 820,
+      minWidth: 760,
+      minHeight: 520,
+      show: false,
+      title: "Suite",
+      backgroundColor: "#0b0d12",
+    });
+
+    this.#chrome = new WebContentsView({
+      webPreferences: {
+        preload: join(app.getAppPath(), "dist", "preload", "chrome.cjs"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        webSecurity: true,
+        spellcheck: false,
+      },
+    });
+    this.#chrome.setBackgroundColor("#0b0d12");
+    this.window.contentView.addChildView(this.#chrome);
+    this.window.on("resize", () => this.#layout());
+    this.window.on("closed", () => {
+      this.#close();
+      options.onClosed?.();
+    });
+
+    this.#chrome.webContents.setWindowOpenHandler(({ url }) => {
+      this.openExternal(url);
+      return { action: "deny" };
+    });
+    this.#chrome.webContents.on("will-navigate", (event, url) => {
+      if (originKey(url) !== originKey(CHROME_ORIGIN)) event.preventDefault();
+    });
+    this.#chrome.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
+      if (!isMainFrame) return;
+      console.error(`[shell] the chrome page failed to load ${url}: ${description} (${code})`);
+      // A hidden window with a live process is worse than an empty one: the
+      // person can at least close it and see the log.
+      this.window.show();
+    });
+
+    this.#layout();
+    void this.#chrome.webContents.loadURL(`${CHROME_ORIGIN}/index.html`).catch((error: unknown) => {
+      console.error("[shell] the chrome page failed to load", error);
+    });
+    this.#chrome.webContents.once("did-finish-load", () => {
+      this.#layout();
+      this.window.show();
+      // A restored space document can name an active tab. The tab strip draws it, but
+      // the pack view only exists after it is activated; do that once the chrome
+      // can receive the state it produces.
+      const active = this.#spaces.state().activeTabId;
+      if (active === null) this.broadcast();
+      else {
+        void this.activateTab(active).catch((error: unknown) => {
+          console.warn("[shell] could not restore the active tab", error);
+          this.broadcast();
+        });
+      }
+    });
+  }
+
+  state(): ShellState {
+    const spaceState = this.#spaces.state();
+    return {
+      tabs: spaceState.tabs,
+      activeTabId: spaceState.activeTabId,
+      packs: this.#packs.map((pack) => ({
+        id: pack.id,
+        name: pack.name,
+        version: pack.version,
+        description: pack.description,
+        entry: pack.entry,
+        capabilities: pack.capabilities,
+        source: pack.source,
+      })),
+      theme: this.#theme,
+      notice: this.#notice,
+    };
+  }
+
+  broadcast(): void {
+    if (this.#closed) return;
+    const state = this.state();
+    this.#chrome.webContents.send(CHROME_STATE, state);
+    const active = state.tabs.find((tab) => tab.id === state.activeTabId);
+    this.window.setTitle(active === undefined ? "Suite" : `${active.title} — Suite`);
+  }
+
+  async openPack(packId: string): Promise<void> {
+    const pack = this.#packs.find((candidate) => candidate.id === packId);
+    if (pack === undefined) {
+      this.#notice = `No pack named ${packId} is installed.`;
+      this.broadcast();
+      return;
+    }
+
+    const tab = await this.#spaces.openTab({
+      packId: pack.id,
+      title: pack.name,
+      entry: pack.entry,
+    });
+    this.#notice = null;
+    await this.activateTab(tab.id);
+  }
+
+  async activateTab(tabId: string | null): Promise<void> {
+    await this.#spaces.activateTab(tabId);
+    const state = this.#spaces.state();
+    const tab = tabId === null ? undefined : state.tabs.find((entry) => entry.id === tabId);
+    if (tab === undefined) {
+      this.#hideViews();
+      this.#chrome.webContents.focus();
+      this.broadcast();
+      return;
+    }
+
+    let view: WebContentsView;
+    try {
+      view = this.#viewFor(tab);
+    } catch (error) {
+      this.#notice = error instanceof Error ? error.message : String(error);
+      // The launcher is hidden whenever a tab is active, and the notice lives in
+      // the launcher. Return to the launcher so the reason is visible; the tab
+      // stays in the strip for the person to close.
+      await this.#spaces.activateTab(null).catch(() => undefined);
+      this.#hideViews();
+      this.#chrome.webContents.focus();
+      this.broadcast();
+      return;
+    }
+
+    for (const [id, candidate] of this.#views) {
+      candidate.setVisible(id === tab.id);
+    }
+    this.#layout();
+    view.webContents.focus();
+    this.broadcast();
+  }
+
+  async closeTab(tabId: string): Promise<void> {
+    const next = await this.#spaces.closeTab(tabId);
+    const view = this.#views.get(tabId);
+    if (view !== undefined) {
+      this.#views.delete(tabId);
+      this.window.contentView.removeChildView(view);
+      if (!view.webContents.isDestroyed()) {
+        clearPackSender(view.webContents.id);
+        // A page's `beforeunload` may cancel `window.close`, leaving a token
+        // owned by a tab that is no longer open. Closing without waiting
+        // destroys the contents, so `destroyed` and the lock release run.
+        view.webContents.close({ waitForBeforeUnload: false });
+      }
+    }
+    await this.activateTab(next);
+  }
+
+  async newTab(): Promise<void> {
+    await this.#spaces.activateTab(null);
+    this.#hideViews();
+    this.#chrome.webContents.focus();
+    this.broadcast();
+  }
+
+  reloadTab(tabId: string): void {
+    this.#views.get(tabId)?.webContents.reload();
+  }
+
+  async setTabTitle(tabId: string, title: string): Promise<void> {
+    await this.#spaces.setTitle(tabId, title);
+    this.broadcast();
+  }
+
+  setTheme(theme: ThemeView): void {
+    this.#theme = theme;
+    this.broadcast();
+  }
+
+  /** Replace the launcher's pack list without rebuilding the window. */
+  setPacks(packs: readonly PackInfo[]): void {
+    this.#packs = packs;
+    this.broadcast();
+  }
+
+  /** Show a host-owned message, such as the result of an install. */
+  setNotice(message: string | null): void {
+    this.#notice = message;
+    this.broadcast();
+  }
+
+  openExternal(url: string): void {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
+      void shell.openExternal(parsed.toString()).catch(() => undefined);
+    } catch {
+      // A malformed URL is not something to hand to the OS.
+    }
+  }
+
+  focus(): void {
+    if (this.#closed) return;
+    if (this.window.isMinimized()) this.window.restore();
+    this.window.show();
+    this.window.focus();
+  }
+
+  #viewFor(tab: ShellTab): WebContentsView {
+    const existing = this.#views.get(tab.id);
+    if (existing !== undefined) return existing;
+
+    const target = tabViewTarget(this.#packs, tab, this.#containerId);
+    if (target === null) throw new Error(`pack ${tab.packId} is no longer installed`);
+    const { pack } = target;
+
+    configurePackSession(pack, this.#containerId);
+    const view = new WebContentsView({
+      webPreferences: {
+        preload: join(app.getAppPath(), "dist", "preload", "pack.cjs"),
+        session: session.fromPartition(packPartition(pack.id, this.#containerId)),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        webSecurity: true,
+        spellcheck: true,
+      },
+    });
+    const webContentsId = view.webContents.id;
+    view.setBackgroundColor("#0b0d12");
+    this.window.contentView.addChildView(view);
+    this.#views.set(tab.id, view);
+    setPackSender(webContentsId, {
+      containerId: this.#containerId,
+      packId: pack.id,
+      tabId: tab.id,
+      pack,
+    });
+
+    view.webContents.setWindowOpenHandler(({ url }) => {
+      const link = externalLinkFor(pack, url);
+      if (link !== null) this.openExternal(link);
+      return { action: "deny" };
+    });
+    view.webContents.on("will-navigate", (event, url) => {
+      if (originKey(url) !== originKey(packOrigin(pack.id, this.#containerId))) {
+        event.preventDefault();
+      }
+    });
+    view.webContents.on("will-attach-webview", (event) => {
+      event.preventDefault();
+    });
+    view.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
+      if (!isMainFrame) return;
+      this.#notice = `${pack.name} failed to load ${url}: ${description} (${code}).`;
+      this.broadcast();
+    });
+    view.webContents.on("did-finish-load", () => {
+      // Theme tokens are host-provided. A pack may override them, but it starts
+      // inside the same palette as the chrome without shipping a copy.
+      void view.webContents.insertCSS(themeCss(this.#theme)).catch(() => undefined);
+      if (this.#notice?.startsWith(pack.name) === true) {
+        this.#notice = null;
+        this.broadcast();
+      }
+    });
+    view.webContents.on("did-start-navigation", (details) => {
+      // A reload or a same-origin navigation replaces the document that held
+      // the tab's locks. Same-document navigation keeps that page alive.
+      if (!navigationReleasesLocks(details.isMainFrame, details.isSameDocument)) return;
+      this.#onViewClosed?.(tab.id);
+    });
+    view.webContents.on("render-process-gone", (_event, details) => {
+      // The page that held the tokens is gone even though the view may reload.
+      this.#onViewClosed?.(tab.id);
+      this.#notice = `${pack.name} stopped: ${details.reason}.`;
+      this.broadcast();
+    });
+    view.webContents.once("destroyed", () => {
+      clearPackSender(webContentsId);
+      // Locks are owned by the tab id. A destroyed view cannot release its own
+      // writer, so the host does it here.
+      this.#onViewClosed?.(tab.id);
+    });
+
+    void view.webContents.loadURL(target.url).catch((error: unknown) => {
+      this.#notice = `${pack.name} failed to load: ${error instanceof Error ? error.message : String(error)}`;
+      this.broadcast();
+    });
+    return view;
+  }
+
+  #layout(): void {
+    if (this.#closed) return;
+    const { width, height } = this.window.getContentBounds();
+    this.#chrome.setBounds({ x: 0, y: 0, width, height });
+    const contentHeight = Math.max(0, height - TAB_BAR_HEIGHT);
+    for (const view of this.#views.values()) {
+      view.setBounds({ x: 0, y: TAB_BAR_HEIGHT, width, height: contentHeight });
+    }
+  }
+
+  #hideViews(): void {
+    for (const view of this.#views.values()) view.setVisible(false);
+  }
+
+  #close(): void {
+    if (this.#closed) return;
+    this.#closed = true;
+    for (const view of this.#views.values()) {
+      if (!view.webContents.isDestroyed()) {
+        clearPackSender(view.webContents.id);
+        view.webContents.close({ waitForBeforeUnload: false });
+      }
+    }
+    this.#views.clear();
+    if (!this.#chrome.webContents.isDestroyed()) {
+      this.#chrome.webContents.close({ waitForBeforeUnload: false });
+    }
+  }
+}
+
+/**
+ * A pack's session is its storage boundary and its network policy.
+ *
+ * Permissions are denied wholesale. A pack without `network` may reach only its
+ * own `suite-pack://` origin; a pack with the capability may also reach HTTPS and
+ * WSS. The CSP set by the protocol handler is the second line.
+ */
+function themeCss(theme: ThemeView): string {
+  const variables = Object.entries(theme.values)
+    .map(([name, value]) => `${name}: ${value};`)
+    .join(" ");
+  return `:root { color-scheme: ${theme.mode}; ${variables} }`;
+}
+
+function configurePackSession(pack: PackInfo, containerId: string): void {
+  const partition = packPartition(pack.id, containerId);
+  if (configuredPartitions.has(partition)) return;
+  configuredPartitions.add(partition);
+
+  const packSession = session.fromPartition(partition);
+  registerPackProtocol(packSession, pack, containerId);
+  packSession.setPermissionRequestHandler((_contents, _permission, callback) => {
+    callback(false);
+  });
+  packSession.setPermissionCheckHandler(() => false);
+  // A download writes outside the pack's document root and has no size cap. A
+  // pack that needs to export a file must use the host's file service (later).
+  packSession.on("will-download", (event) => event.preventDefault());
+
+  const network = pack.capabilities.includes("network");
+  const ownOrigin = packOrigin(pack.id, containerId);
+  packSession.webRequest.onBeforeRequest((details, callback) => {
+    const url = details.url;
+    const local =
+      url.startsWith(`${ownOrigin}/`) ||
+      url.startsWith("devtools:") ||
+      url.startsWith("blob:") ||
+      url.startsWith("data:");
+    if (local) {
+      callback({});
+      return;
+    }
+    if (network && (url.startsWith("https:") || url.startsWith("wss:"))) {
+      callback({});
+      return;
+    }
+    callback({ cancel: true });
+  });
+}

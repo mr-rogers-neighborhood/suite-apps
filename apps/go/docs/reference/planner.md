@@ -101,11 +101,14 @@ pnpm android:install             # the shell; the pack is installed separately u
 ```
 
 `pnpm planner:pack` signs with `SUITE_PACK_KEY`, `--key`, or the key at
-`~/.config/suite/keys/pack-key`. The public half is `PACK_PUBLIC_KEY` in `src/host/packs.ts`, and
-`pnpm keys status` says whether the two agree — a pack signed by any other key is refused on the
-device as `untrusted`. The key was rotated when this pack was wired, because the earlier one had no
-private half anywhere; [Manage signing keys](../../../../docs/how-to/keys.md) records where the
-replacement lives and how the next rotation works.
+`~/.config/suite/keys/pack-key`. The public half is `SUITE_PACK_PUBLIC_KEY` in
+`packages/pack/src/pinnedKey.ts`, the one pin every host imports; `PACK_PUBLIC_KEY` in
+`apps/go/src/host/packs.ts` only re-exports it. A rotation edits that shared pin and rebuilds every
+pack — editing the re-export would reintroduce a second trust source. `pnpm keys status` says whether
+the key on this machine agrees with the pin — a pack signed by any other key is refused on the device
+as `untrusted`. The key was rotated when this pack was wired, because the earlier one had no private
+half anywhere; [Manage signing keys](../../../../docs/how-to/keys.md) records where the replacement
+lives and how the next rotation works.
 
 ## Reminders
 

@@ -12,6 +12,7 @@ each app:
 | `apps/sync` | `apps/sync/README.md` and `docs/` | `node scripts/gate.mjs --only sync` |
 | `apps/start` | `apps/start/README.md` and `docs/` | `node scripts/gate.mjs --only start` |
 | `apps/help` | `apps/help/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only help` |
+| `apps/shell` | `apps/shell/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only shell` |
 
 The full gate is `node scripts/gate.mjs`; `--fresh` proves the commit rather
 than the working tree. Use `mise exec --` so the Node and pnpm versions pinned

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Welcome</title>
+    <link rel="stylesheet" href="welcome.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="head">
+        <p class="eyebrow">Pack <code id="pack-id">…</code></p>
+        <h1>Welcome</h1>
+        <p class="lede">
+          A small demo of the host boundary: opaque documents, no Node, no network.
+        </p>
+      </header>
+
+      <section class="card" aria-labelledby="notes-title">
+        <h2 class="section-title" id="notes-title">Notes</h2>
+        <div class="row">
+          <input
+            id="note-name"
+            type="text"
+            placeholder="Note name"
+            aria-label="Note name"
+            autocomplete="off"
+          />
+          <button id="new-note" class="primary" type="button">New note</button>
+        </div>
+        <ul id="notes" class="notes"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="editor-title">
+        <h2 class="section-title" id="editor-title">Editor</h2>
+        <p id="note-meta" class="meta">No note open.</p>
+        <textarea
+          id="editor"
+          placeholder="Open or create a note to start writing."
+          spellcheck="true"
+          disabled
+        ></textarea>
+        <div class="row actions">
+          <button id="save" class="primary" type="button" disabled>Save</button>
+          <button id="delete" type="button" disabled>Delete</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="tests-title">
+        <h2 class="section-title" id="tests-title">Boundary tests</h2>
+        <p class="meta">
+          All three fail on purpose: no network, no path out of the pack, and no files capability.
+        </p>
+        <div class="row">
+          <button id="test-network" type="button">Test network block</button>
+          <button id="test-sibling" type="button">Test sibling access</button>
+          <button id="test-files" type="button">Test missing files capability</button>
+        </div>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite" data-tone="info">Loading…</p>
+    </main>
+
+    <script src="welcome.js" defer></script>
+  </body>
+</html>

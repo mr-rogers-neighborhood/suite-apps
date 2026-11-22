@@ -6,8 +6,9 @@
  *     --version 0.1.0 --entry index.js --key <private-key-base64> --out Canvas.pack
  *
  * The private key is never in this repository. `pnpm pack:keygen` prints a pair once;
- * the public half goes into `PACK_PUBLIC_KEY` in `apps/go/src/host/packs.ts` and the
- * private half is kept wherever release secrets live.
+ * the public half goes into `SUITE_PACK_PUBLIC_KEY` in `packages/pack/src/pinnedKey.ts`
+ * (`PACK_PUBLIC_KEY` in `apps/go/src/host/packs.ts` re-exports it, so a rotation edits the
+ * shared pin and rebuilds every pack) and the private half is kept wherever release secrets live.
  *
  * The manifest is built from the files actually present, so a pack cannot claim a hash for
  * content that is not in it. The signature goes over the canonical manifest bytes the
