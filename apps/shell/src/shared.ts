@@ -23,6 +23,8 @@ export const CHROME_IPC = {
   reloadTab: "suite:shell:reload-tab",
   openExternal: "suite:shell:open-external",
   installPack: "suite:shell:install-pack",
+  installCataloguePack: "suite:shell:install-catalogue-pack",
+  uninstallPack: "suite:shell:uninstall-pack",
 } as const;
 
 /** Pushed, not invoked: the chrome redraws from the last state it received. */
@@ -30,6 +32,7 @@ export const CHROME_STATE = "suite:shell:state-changed";
 
 export const PACK_IPC = {
   info: "suite:pack:info",
+  launch: "suite:pack:launch",
   listDocuments: "suite:documents:list",
   createDocument: "suite:documents:create",
   openDocument: "suite:documents:open",
@@ -63,6 +66,7 @@ export type {
   FileLock,
   FileReadOptions,
   FileWriteOptions,
+  PackLaunchContext,
 } from "@suite/pack-runtime";
 export { PACK_CAPABILITIES, type PackCapability };
 
@@ -98,13 +102,54 @@ export interface PackSummary {
   readonly source: PackSource;
 }
 
-/** One app session. The shell owns the tab; the pack owns everything inside it. */
-export interface ShellTab {
+/**
+ * A pack on disk that the catalogue found.
+ *
+ * `trusted` is the host's verification result, not the archive's claim. A refused
+ * archive still lists, with a sentence a person can read; it can never install.
+ * The absolute path stays in the main process.
+ */
+export interface CatalogueEntry {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  readonly description: string | null;
+  readonly entry: string;
+  readonly trusted: boolean;
+  readonly refusal: string | null;
+}
+
+/** One version directory present under the install root. */
+export interface InstalledVersionView {
+  readonly id: string;
+  readonly version: string;
+  /** True for the version the loader selects, which is what a tab runs. */
+  readonly current: boolean;
+}
+
+/**
+ * One app session. The shell owns the tab; a pack owns everything inside it.
+ *
+ * A tab is either a pack tab (a renderer on its own origin) or a screen tab
+ * (host-owned chrome, reserved for the next slice). Version-1 space documents
+ * carry no `kind` and read as pack tabs.
+ */
+export interface PackShellTab {
+  readonly kind: "pack";
   readonly id: string;
   readonly packId: string;
   readonly title: string;
   readonly entry: string;
 }
+
+export interface ScreenShellTab {
+  readonly kind: "screen";
+  readonly id: string;
+  readonly screenId: string;
+  readonly title: string;
+}
+
+export type ShellTab = PackShellTab | ScreenShellTab;
 
 export interface ThemeView {
   readonly mode: "light" | "dark";
@@ -115,6 +160,8 @@ export interface ShellState {
   readonly tabs: readonly ShellTab[];
   readonly activeTabId: string | null;
   readonly packs: readonly PackSummary[];
+  readonly catalogue: readonly CatalogueEntry[];
+  readonly installedVersions: readonly InstalledVersionView[];
   readonly theme: ThemeView;
   readonly notice: string | null;
 }

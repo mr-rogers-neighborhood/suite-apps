@@ -48,9 +48,6 @@ export function mergePackSources({ installed, development }: PackSources): reado
  * bound to the version that loaded — so opening it again would only add a
  * duplicate tab. Only a pack with no tab opens.
  */
-export function shouldOpenAfterInstall(
-  tabs: readonly Pick<ShellTab, "packId">[],
-  packId: string,
-): boolean {
-  return !tabs.some((tab) => tab.packId === packId);
+export function shouldOpenAfterInstall(tabs: readonly ShellTab[], packId: string): boolean {
+  return !tabs.some((tab) => tab.kind === "pack" && tab.packId === packId);
 }

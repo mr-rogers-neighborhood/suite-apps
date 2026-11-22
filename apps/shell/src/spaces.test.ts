@@ -1,6 +1,7 @@
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { LoroDoc } from "loro-crdt";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpaceStore } from "./spaces.js";
 
@@ -31,7 +32,9 @@ describe("the space document", () => {
     });
 
     expect(store.state()).toEqual({
-      tabs: [{ id: tab.id, packId: "welcome", title: "Welcome", entry: "index.html" }],
+      tabs: [
+        { kind: "pack", id: tab.id, packId: "welcome", title: "Welcome", entry: "index.html" },
+      ],
       activeTabId: tab.id,
     });
   });
@@ -104,7 +107,54 @@ describe("the space document", () => {
 
     const second = await SpaceStore.open(path);
     expect(second.state()).toEqual({
-      tabs: [{ id: tab.id, packId: "welcome", title: "Restored", entry: "index.html" }],
+      tabs: [
+        { kind: "pack", id: tab.id, packId: "welcome", title: "Restored", entry: "index.html" },
+      ],
+      activeTabId: tab.id,
+    });
+  });
+
+  it("reads a version-1 document as pack tabs and still activates it", async () => {
+    const doc = new LoroDoc();
+    doc.getMap("shell").set("version", 1);
+    doc.getMap("shell").set("activeTabId", "old-tab");
+    const space = doc.getMap("spaces").ensureMergeableMap("default");
+    space.set("name", "Default");
+    space.set("color", "#7c9cff");
+    const tab = doc.getMap("tabs").ensureMergeableMap("old-tab");
+    tab.set("packId", "welcome");
+    tab.set("title", "Welcome");
+    tab.set("entry", "index.html");
+    tab.set("spaceId", "default");
+    doc.getList("tab-order").push("old-tab");
+    doc.commit();
+    await writeFile(path, doc.export({ mode: "snapshot" }));
+
+    const store = await SpaceStore.open(path);
+    expect(store.state()).toEqual({
+      tabs: [
+        {
+          kind: "pack",
+          id: "old-tab",
+          packId: "welcome",
+          title: "Welcome",
+          entry: "index.html",
+        },
+      ],
+      activeTabId: "old-tab",
+    });
+
+    // Restoring the active tab is the activation path the window uses at start.
+    await store.activateTab("old-tab");
+    expect(store.state().activeTabId).toBe("old-tab");
+  });
+
+  it("accepts a screen tab in the model without rendering it", async () => {
+    const store = await SpaceStore.open(path);
+    const tab = await store.openTab({ kind: "screen", screenId: "home", title: "Home" });
+
+    expect(store.state()).toEqual({
+      tabs: [{ kind: "screen", id: tab.id, screenId: "home", title: "Home" }],
       activeTabId: tab.id,
     });
   });

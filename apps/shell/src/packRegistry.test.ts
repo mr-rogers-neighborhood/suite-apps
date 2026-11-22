@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { devPacksEnabled, mergePackSources, shouldOpenAfterInstall } from "./packRegistry.js";
 import type { PackInfo } from "./packs.js";
+import type { ShellTab } from "./shared.js";
+
+function tab(packId: string): ShellTab {
+  return { kind: "pack", id: packId, packId, title: packId, entry: "index.html" };
+}
 
 function pack(id: string, name: string, source: PackInfo["source"]): PackInfo {
   return {
@@ -71,15 +76,24 @@ describe("merging pack sources", () => {
 describe("opening a pack after install", () => {
   it("opens a pack that has no tab", () => {
     expect(shouldOpenAfterInstall([], "demo")).toBe(true);
-    expect(shouldOpenAfterInstall([{ packId: "welcome" }], "demo")).toBe(true);
+    expect(shouldOpenAfterInstall([tab("welcome")], "demo")).toBe(true);
   });
 
   it("does not open a duplicate tab for a pack that is already open", () => {
-    expect(shouldOpenAfterInstall([{ packId: "demo" }], "demo")).toBe(false);
-    expect(shouldOpenAfterInstall([{ packId: "welcome" }, { packId: "demo" }], "demo")).toBe(false);
+    expect(shouldOpenAfterInstall([tab("demo")], "demo")).toBe(false);
+    expect(shouldOpenAfterInstall([tab("welcome"), tab("demo")], "demo")).toBe(false);
   });
 
   it("matches the pack id exactly", () => {
-    expect(shouldOpenAfterInstall([{ packId: "demolition" }], "demo")).toBe(true);
+    expect(shouldOpenAfterInstall([tab("demolition")], "demo")).toBe(true);
+  });
+
+  it("ignores a screen tab", () => {
+    expect(
+      shouldOpenAfterInstall(
+        [{ kind: "screen", id: "home", screenId: "home", title: "Home" }],
+        "demo",
+      ),
+    ).toBe(true);
   });
 });

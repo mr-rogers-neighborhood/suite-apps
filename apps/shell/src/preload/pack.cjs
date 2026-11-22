@@ -52,6 +52,9 @@ contextBridge.exposeInMainWorld("suite", {
   packId,
   containerId,
   info: () => ipcRenderer.invoke("suite:pack:info"),
+  // The host stores the context per tab and derives the tab from the sender, so
+  // a pack cannot parse a launch out of a URL or name another tab.
+  launch: () => ipcRenderer.invoke("suite:pack:launch"),
   documents: {
     list: () => ipcRenderer.invoke("suite:documents:list"),
     create: (name) => ipcRenderer.invoke("suite:documents:create", name),

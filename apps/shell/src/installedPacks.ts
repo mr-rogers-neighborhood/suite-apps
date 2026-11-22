@@ -71,10 +71,41 @@ export interface InstalledPackIssue {
   readonly message: string;
 }
 
+/** One verified version directory, whether or not it is the selected version. */
+export interface InstalledVersion {
+  readonly id: string;
+  readonly version: string;
+  readonly root: string;
+}
+
 export interface InstalledPackScan {
   readonly packs: readonly InstalledPackInfo[];
   readonly issues: readonly InstalledPackIssue[];
+  /** Every valid version on disk, including older versions kept after an update. */
+  readonly versions: readonly InstalledVersion[];
 }
+
+/** A verified archive: the signed manifest and the payload the reader extracted. */
+export interface VerifiedPackArchive {
+  readonly manifest: PackManifest;
+  readonly manifestBytes: Uint8Array;
+  readonly files: ReadonlyMap<string, Uint8Array>;
+}
+
+/**
+ * The result of checking an archive without writing anything.
+ *
+ * `manifest` is present whenever the archive yielded a parseable manifest, even
+ * when the signature or file hashes refused it, so the catalogue can show what
+ * the archive claims to be next to the refusal.
+ */
+export type PackArchiveCheck =
+  | { readonly ok: true; readonly value: VerifiedPackArchive }
+  | {
+      readonly ok: false;
+      readonly error: InstalledPackError;
+      readonly manifest: PackManifest | null;
+    };
 
 /** A refusal before it is given an id and version. */
 interface Refusal {
@@ -109,7 +140,7 @@ export async function loadInstalledPacks(
   root: string,
   options: PackTrustOptions,
 ): Promise<InstalledPackScan> {
-  if (!(await pathExists(root))) return { packs: [], issues: [] };
+  if (!(await pathExists(root))) return { packs: [], issues: [], versions: [] };
 
   const idEntries = await readdir(root, { withFileTypes: true }).catch(() => null);
   if (idEntries === null) {
@@ -123,11 +154,13 @@ export async function loadInstalledPacks(
           message: "The pack install root could not be read.",
         },
       ],
+      versions: [],
     };
   }
 
   const issues: InstalledPackIssue[] = [];
   const packs: InstalledPackInfo[] = [];
+  const versions: InstalledVersion[] = [];
 
   for (const idEntry of idEntries.sort((left, right) => left.name.localeCompare(right.name))) {
     // A crash can leave a temporary directory behind. It is not a pack id.
@@ -171,8 +204,12 @@ export async function loadInstalledPacks(
       }
 
       const verified = await verifyInstalledDirectory(join(idRoot, version), id, version, options);
-      if (verified.ok) valid.push(verified.info);
-      else issues.push(verified.issue);
+      if (verified.ok) {
+        valid.push(verified.info);
+        versions.push({ id, version, root: verified.info.root });
+      } else {
+        issues.push(verified.issue);
+      }
     }
 
     const best = highestVersion(valid);
@@ -182,7 +219,80 @@ export async function loadInstalledPacks(
   packs.sort(
     (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
   );
-  return { packs, issues };
+  versions.sort(
+    (left, right) =>
+      left.id.localeCompare(right.id) || comparePackVersions(left.version, right.version),
+  );
+  return { packs, issues, versions };
+}
+
+/**
+ * Read and verify an archive without writing anything.
+ *
+ * This is the catalogue's whole trust decision: the archive reader owns the zip
+ * format, the manifest parser owns the shape, and `verifyManifest` owns the
+ * signature, the host fit and every file hash. Nothing is extracted here, so a
+ * refused archive leaves no directory behind.
+ */
+export async function checkPackArchive(
+  bytes: Uint8Array,
+  options: PackTrustOptions,
+): Promise<PackArchiveCheck> {
+  let archive: Awaited<ReturnType<typeof readPackArchive>>;
+  try {
+    archive = await readPackArchive(bytes, { maxArchiveBytes: MAX_ARCHIVE_BYTES });
+  } catch (error) {
+    return {
+      ok: false,
+      manifest: null,
+      error: new InstalledPackError({
+        reason: "unreadable",
+        message: error instanceof Error ? error.message : "The pack archive could not be read.",
+      }),
+    };
+  }
+
+  let manifest: PackManifest;
+  try {
+    manifest = parseArchiveManifest(archive.manifestBytes);
+  } catch (error) {
+    if (error instanceof InstalledPackError) return { ok: false, manifest: null, error };
+    throw error;
+  }
+
+  // The manifest schema already refuses a slash in `version`, but the guard
+  // stays as the last check before a path is joined; a schema change must not
+  // turn this into a traversal.
+  if (!isSafePackId(manifest.id) || !isSafePackPath(`${manifest.id}/${manifest.version}`)) {
+    return {
+      ok: false,
+      manifest,
+      error: new InstalledPackError(
+        { reason: "invalid", message: "The manifest names an id or version that is not safe." },
+        manifest.id,
+        manifest.version,
+      ),
+    };
+  }
+
+  const refusal = await verifyManifest(
+    manifest,
+    () => [...archive.files.keys()],
+    async (path) => archive.files.get(path) ?? null,
+    options,
+  );
+  if (refusal !== null) {
+    return {
+      ok: false,
+      manifest,
+      error: new InstalledPackError(refusal, manifest.id, manifest.version),
+    };
+  }
+
+  return {
+    ok: true,
+    value: { manifest, manifestBytes: archive.manifestBytes, files: archive.files },
+  };
 }
 
 /**
@@ -197,41 +307,9 @@ export async function installPackArchive(
   root: string,
   options: PackTrustOptions,
 ): Promise<InstalledPackInfo> {
-  let manifestBytes: Uint8Array;
-  let archiveFiles: ReadonlyMap<string, Uint8Array>;
-  try {
-    const archive = await readPackArchive(bytes, { maxArchiveBytes: MAX_ARCHIVE_BYTES });
-    manifestBytes = archive.manifestBytes;
-    archiveFiles = archive.files;
-  } catch (error) {
-    throw new InstalledPackError({
-      reason: "unreadable",
-      message: error instanceof Error ? error.message : "The pack archive could not be read.",
-    });
-  }
-
-  const manifest = parseArchiveManifest(manifestBytes);
-
-  // The manifest schema already refuses a slash in `version`, but the guard
-  // stays as the last check before a path is joined; a schema change must not
-  // turn this into a traversal.
-  if (!isSafePackId(manifest.id) || !isSafePackPath(`${manifest.id}/${manifest.version}`)) {
-    throw new InstalledPackError(
-      { reason: "invalid", message: "The manifest names an id or version that is not safe." },
-      manifest.id,
-      manifest.version,
-    );
-  }
-
-  const refusal = await verifyManifest(
-    manifest,
-    () => [...archiveFiles.keys()],
-    async (path) => archiveFiles.get(path) ?? null,
-    options,
-  );
-  if (refusal !== null) {
-    throw new InstalledPackError(refusal, manifest.id, manifest.version);
-  }
+  const check = await checkPackArchive(bytes, options);
+  if (!check.ok) throw check.error;
+  const { manifest, manifestBytes, files: archiveFiles } = check.value;
 
   const idRoot = join(root, manifest.id);
   const target = join(idRoot, manifest.version);
@@ -327,6 +405,84 @@ export async function installPackArchive(
   }
 
   return installedInfo(manifest, target);
+}
+
+/**
+ * Remove exactly one installed version: `<root>/<id>/<version>/`.
+ *
+ * Nothing else is touched. The id directory, the older or newer versions beside
+ * it, and the pack's documents and files under the host data root outlive this
+ * call. A symlinked install root, id directory or version directory is refused
+ * rather than followed, and the real version path must still resolve inside the
+ * real install root.
+ */
+export async function uninstallPackVersion(
+  root: string,
+  id: string,
+  version: string,
+): Promise<void> {
+  const refuse = (message: string): InstalledPackError =>
+    new InstalledPackError({ reason: "io", message }, id, version);
+
+  if (!isSafePackId(id) || !isSafePackPath(`${id}/${version}`)) {
+    throw new InstalledPackError(
+      { reason: "invalid", message: "That id or version is not a safe pack path." },
+      id,
+      version,
+    );
+  }
+
+  const inspect = async (path: string): Promise<Awaited<ReturnType<typeof lstat>>> => {
+    try {
+      return await lstat(path);
+    } catch (error) {
+      if (isNotFound(error)) throw refuse(`${id} ${version} is not installed.`);
+      throw refuse("The pack install root could not be read.");
+    }
+  };
+
+  const rootEntry = await inspect(root);
+  if (rootEntry.isSymbolicLink()) {
+    throw refuse("The pack install root is a symbolic link; it was not followed.");
+  }
+  if (!rootEntry.isDirectory()) {
+    throw refuse("The pack install root is not a directory.");
+  }
+
+  const idEntry = await inspect(join(root, id));
+  if (idEntry.isSymbolicLink()) {
+    throw refuse(`${id}'s install directory is a symbolic link; it was not followed.`);
+  }
+  if (!idEntry.isDirectory()) {
+    throw refuse(`${id} has no installed versions.`);
+  }
+
+  const target = join(root, id, version);
+  const targetEntry = await inspect(target);
+  if (targetEntry.isSymbolicLink()) {
+    throw refuse(`${id} ${version} is a symbolic link; it was not followed.`);
+  }
+  if (!targetEntry.isDirectory()) {
+    throw refuse(`${id} ${version} is not an installed version.`);
+  }
+
+  let realRoot: string;
+  let realTarget: string;
+  try {
+    realRoot = await realpath(root);
+    realTarget = await realpath(target);
+  } catch {
+    throw refuse("The pack version could not be resolved.");
+  }
+  if (!isInside(realTarget, realRoot)) {
+    throw refuse(`${id} ${version} resolves outside the pack root.`);
+  }
+
+  try {
+    await rm(target, { recursive: true, force: false });
+  } catch {
+    throw refuse(`${id} ${version} could not be removed.`);
+  }
 }
 
 /**

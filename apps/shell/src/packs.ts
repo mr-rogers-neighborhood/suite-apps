@@ -10,13 +10,7 @@ import {
 } from "@suite/pack/manifest";
 import { z } from "zod";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
-import {
-  PACK_CAPABILITIES,
-  PACK_SCHEME,
-  type PackCapability,
-  type PackSummary,
-  type ShellTab,
-} from "./shared.js";
+import { PACK_CAPABILITIES, PACK_SCHEME, type PackCapability, type PackSummary } from "./shared.js";
 
 export { isSafePackId, PACK_FORMAT, packAllows } from "@suite/pack/manifest";
 
@@ -101,7 +95,7 @@ export function packUrl(id: string, entry: string, containerId = DEFAULT_CONTAIN
  */
 export function tabViewTarget(
   packs: readonly PackInfo[],
-  tab: Pick<ShellTab, "packId" | "entry">,
+  tab: { readonly packId: string; readonly entry: string },
   containerId = DEFAULT_CONTAINER_ID,
 ): { readonly pack: PackInfo; readonly url: string } | null {
   const pack = packs.find((candidate) => candidate.id === tab.packId);
