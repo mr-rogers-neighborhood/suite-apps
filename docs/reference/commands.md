@@ -134,6 +134,17 @@ puts the prelude in front of the app script, and signs the directory with the pi
 output is `apps/budget/.dev/budget-<version>.suitepack`. The gate runs the signed round-trip with an
 ephemeral key, so a clean checkout with no owner key still proves the build and verification path.
 
+## Releases
+
+```sh
+mise exec -- node scripts/release-suite.mjs [--publish] [--target s3|lan] [--skip-gate] [--skip-apk]
+```
+
+Packages Suite, the host, publishes the signed Flatpak remote, refreshes the rolling release, attaches
+Suite Go's APK and relinks it. Without `--publish` it prints every step and changes nothing. The
+individual commands and the gate-proof rule are in [Package and
+release](../how-to/package-and-release.md#release-suite-the-host).
+
 ## Docs
 
 ```sh

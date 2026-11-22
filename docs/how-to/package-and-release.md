@@ -108,6 +108,33 @@ page that is not there; `--publish` rewrites the page with real links once the r
 The signed Flatpak remote above remains the update path. Per-app releases carry no app binaries, and
 GitHub Packages is not used for the Flatpaks.
 
+## Release Suite (the host)
+
+Suite is the desktop host and the first row of the rolling release's Desktop table. One command runs
+its publish sequence in the order that keeps every artifact on a commit the gate proved:
+
+```sh
+mise exec -- node scripts/release-suite.mjs --publish                 # the public store
+mise exec -- node scripts/release-suite.mjs --target lan --publish    # the suite-dev fallback
+```
+
+It runs, in order: `node scripts/gate.mjs --fresh`; `pnpm --filter @suite/shell package:dir`;
+`node scripts/flatpak.mjs --app shell`; `node scripts/flatpak-remote.mjs --target s3|lan --publish`;
+`node scripts/release-status.mjs --publish`; `node scripts/android-release.mjs --publish`; then
+`node scripts/release-status.mjs --publish` again so the rolling body and `RELEASES.md` link the APK.
+
+`--target s3` is the public store and the update path people install from; it reads its own bucket,
+distribution and credentials inside `flatpak-remote.mjs`, and `release-suite.mjs` passes only the
+target. `--target lan` publishes the same repository to the `suite-dev` test host, which is the
+fallback when the store is not reachable. `--skip-gate` reuses the existing proof, and `--skip-apk`
+leaves the APK steps out for a desktop-only release.
+
+Without `--publish` the command is a dry run: it prints every step and passes `--publish` to no
+child, so nothing is built, signed, uploaded or written. A publish refuses unless
+`.dev/gate-status.json` names HEAD, says `ok`, came from a clean `--fresh` export and is not an
+`--only` run. `--skip-gate` does not waive that rule; it only avoids running the gate again. The
+sequence prints the install lines for `run.suite.shell` and the APK path and alias at the end.
+
 ## Suite Go (Android)
 
 Suite Go's artifact is an APK on the rolling release, not on `go-v<version>`. It sits after the

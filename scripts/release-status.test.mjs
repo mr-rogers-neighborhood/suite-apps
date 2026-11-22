@@ -323,8 +323,9 @@ describe("sections and the Suite Go APK", () => {
   it("keeps the desktop rows in reading order and Go alone on mobile", () => {
     assert.deepEqual(
       APPS.filter((app) => app.section === "desktop").map((app) => app.id),
-      ["start", "canvas", "planner", "budget", "sync", "help"],
+      ["shell", "start", "canvas", "planner", "budget", "sync", "help"],
     );
+    assert.equal(APPS[0].id, "shell");
     assert.deepEqual(
       APPS.filter((app) => app.section === "mobile").map((app) => app.id),
       ["go"],
@@ -333,6 +334,32 @@ describe("sections and the Suite Go APK", () => {
     assert.equal(go.changelog, "apps/go/CHANGELOG.md");
     assert.equal(go.tagPrefix, "go-v");
     assert.equal(go.kind, "apk");
+  });
+
+  it("carries the host as Suite, first in the desktop table", () => {
+    const shell = APPS.find((app) => app.id === "shell");
+    assert.equal(shell.name, "Suite");
+    assert.equal(shell.packageJson, "apps/shell/package.json");
+    assert.equal(shell.changelog, "apps/shell/CHANGELOG.md");
+    assert.equal(shell.tagPrefix, "shell-v");
+    assert.equal(shell.kind, "flatpak");
+    assert.equal(shell.section, "desktop");
+    assert.equal(shell.flatpakId, "run.suite.shell");
+    assert.equal(installCommand(shell), "flatpak install --user suite run.suite.shell");
+
+    const shellEntry = {
+      app: shell,
+      version: "0.1.0",
+      date: "2026-11-22",
+      tag: "shell-v0.1.0",
+      section: "### Added\n\n- **The host.** It exists.",
+    };
+    const desktop = aggregateSection("Desktop", [shellEntry, ...entries], {
+      tag: "suite-2026.11.22",
+    });
+    const rows = desktop.filter((line) => line.startsWith("| ["));
+    assert.match(rows[0], /\| \[Suite\]/u);
+    assert.match(rows[0], /run\.suite\.shell/u);
   });
 
   it("renders a section as a title and its own rows", () => {
