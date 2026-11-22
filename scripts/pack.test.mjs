@@ -146,6 +146,35 @@ describe("bundlePack", () => {
     assert.deepEqual(archivePaths.filter((path) => path === "__proto__"), ["__proto__"]);
     assert.equal(decoder.decode(archive.files.get("__proto__")), "proto payload");
   });
+
+  it("does not hash a previous build written inside the source directory", async () => {
+    const directory = sourcePack();
+    const keys = await generatePackKeyPair();
+    const outPath = join(directory, "demo-pack.suitepack");
+
+    const first = await bundlePack({
+      directory,
+      privateKeyBase64: keys.secretKeyBase64,
+      expectedPublicKeyBase64: keys.publicKeyBase64,
+      outPath,
+    });
+    const second = await bundlePack({
+      directory,
+      privateKeyBase64: keys.secretKeyBase64,
+      expectedPublicKeyBase64: keys.publicKeyBase64,
+      outPath,
+    });
+
+    // The archive and its .sha256 are build output, not payload. A second run
+    // must produce the same manifest, not one that hashes the first run.
+    assert.deepEqual(
+      second.manifest.files.map((file) => file.path),
+      ["assets/app.js", "index.html"],
+    );
+    assert.deepEqual(second.manifest.files, first.manifest.files);
+    const archive = await readArchive(outPath);
+    assert.deepEqual([...archive.files.keys()].sort(), ["assets/app.js", "index.html"]);
+  });
 });
 
 describe("the pack pin", () => {

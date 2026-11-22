@@ -76,15 +76,19 @@ function seedBase64(privateKeyBase64) {
 /**
  * Every regular file under `base`, keyed by slash-separated pack path.
  *
+ * `skip` holds the resolved output archive and its checksum. A second build with
+ * `--out` inside `--dir` must not hash the previous build into the new pack.
+ *
  * The record has no prototype: a payload may legitimately be named `__proto__`, and a plain object
  * would silently change its prototype instead of keeping the file.
  */
-function collectFiles(base, current = base, found = Object.create(null)) {
+function collectFiles(base, skip, current = base, found = Object.create(null)) {
   for (const entry of readdirSync(current, { withFileTypes: true })) {
     const full = join(current, entry.name);
+    if (skip.has(resolve(full))) continue;
     const path = relative(base, full).split(sep).join("/");
     if (entry.isDirectory()) {
-      collectFiles(base, full, found);
+      collectFiles(base, skip, full, found);
     } else if (entry.isFile()) {
       if (path !== SOURCE_MANIFEST) found[path] = new Uint8Array(readFileSync(full));
     } else {
@@ -158,7 +162,9 @@ export async function bundlePack({
         : positiveInteger(source.minimumHostVersion, `${SOURCE_MANIFEST} minimumHostVersion`)
       : positiveInteger(minimumHostVersion, "--min-host");
 
-  const files = collectFiles(directory);
+  const output = outPath ?? `${id}-${version}.suitepack`;
+  const skip = new Set([resolve(output), resolve(`${output}.sha256`)]);
+  const files = collectFiles(directory, skip);
   if (Object.keys(files).length === 0) {
     throw new Error(`${directory} has no payload files besides ${SOURCE_MANIFEST}.`);
   }
@@ -202,7 +208,6 @@ export async function bundlePack({
   }
 
   const bytes = buildPackArchive(parsed.value, files);
-  const output = outPath ?? `${id}-${version}.suitepack`;
   const sha256 = await sha256Hex(bytes);
 
   mkdirSync(dirname(output), { recursive: true });
