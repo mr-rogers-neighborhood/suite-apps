@@ -11,17 +11,38 @@ and functional packages that are installed and removed on demand.
 
 ## The pipeline, proven on a device
 
-| Step                                | Where                                           | Verified                                                    |
-| ----------------------------------- | ----------------------------------------------- | ----------------------------------------------------------- |
-| Build a directory of files          | `scripts/pack.mjs --dir`                        | 3 files, 0.3 KiB                                            |
-| Hash every file, canonicalise, sign | `pack.mjs` + `canonicalManifestBytes`           | Ed25519 over the manifest, SHA-256 per file                 |
-| Install from bytes                  | `src/host/packs.ts`                             | Signature checked, files written to `packs/<id>/<version>/` |
-| Import the installed entry          | `import(entryUrl)`                              | `probe-pack-loaded` exported and read back                  |
-| Its relative assets resolve         | `fetch(new URL('./assets/note.txt', entryUrl))` | `hello from a pack asset`                                   |
-| Its WASM instantiates               | `WebAssembly.instantiate` on a relative `.wasm` | 8 bytes, instantiated                                       |
-| Uninstall returns the space         | `Filesystem.rmdir` on `packs/<id>`              | 38 KiB → 4 KiB                                              |
-| An untrusted signer is refused      | `verifyPackSignature`                           | `reason: "unsigned"`                                        |
-| A tampered file is refused          | `verifyPackFiles`                               | `reason: "hash"`                                            |
+| Step                                | Where                                           | Verified                                                                   |
+| ----------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------- |
+| Build a directory of files          | `scripts/pack.mjs --dir`                        | 3 files, 0.3 KiB                                                           |
+| Hash every file, canonicalise, sign | `pack.mjs` + `canonicalManifestBytes`           | Ed25519 over the manifest, SHA-256 per file                                |
+| Install from bytes                  | `readPackArchive` + `src/host/packs.ts`         | Signature and every hash checked, files written to `packs/<id>/<version>/` |
+| Import the installed entry          | `import(entryUrl)`                              | `probe-pack-loaded` exported and read back                                 |
+| Re-verify before offering a pack    | `discover()`                                    | Every installed file re-hashed; a tampered pack is not listed              |
+| Its relative assets resolve         | `fetch(new URL('./assets/note.txt', entryUrl))` | `hello from a pack asset`                                                  |
+| Its WASM instantiates               | `WebAssembly.instantiate` on a relative `.wasm` | 8 bytes, instantiated                                                      |
+| Uninstall returns the space         | `Filesystem.rmdir` on `packs/<id>`              | 38 KiB → 4 KiB                                                             |
+| An untrusted signer is refused      | `verifyPackSignature`                           | `reason: "unsigned"`                                                       |
+| A tampered file is refused          | `verifyPackFiles`                               | `reason: "hash"`                                                           |
+
+## The archive is untrusted
+
+`install` no longer hands the bytes to `unzipSync`. It calls the shared
+`readPackArchive` from `@suite/pack-host/archive`, the same reader the desktop host uses. The
+reader streams the zip, checks each entry's declared size before decompressing it and the bytes
+actually produced after, and refuses unsafe paths, duplicate names, symlinks and other non-regular
+entries, too many files, and totals past its caps. The loader then refuses an archive with no
+`manifest.json`, a manifest this build cannot parse, an unlisted file, a missing listed file, a
+signature it does not trust, or a file whose hash does not match.
+
+The caps are the reader's defaults — 64 MiB compressed, 64 MiB per file, 128 MiB total and 2048
+entries — plus `MAX_ARCHIVE_BYTES`, which the store passes explicitly. Only files the manifest
+lists are written, so an extra entry in the archive never reaches the disk.
+
+**Loading re-checks the disk, not just the manifest.** `discover` parses the installed manifest,
+verifies its signature, compares the directory's file set with the manifest, and re-hashes every
+listed file. A pack whose bytes changed after install is refused and reported through
+`issues()` with the same `files` reason install uses, rather than being offered as a module that
+will run something other than what was signed.
 
 ## Why `/_capacitor_file_/` is the whole trick
 
@@ -138,7 +159,10 @@ never enters this repository.
 ## What a pack may not do
 
 - Name a file outside itself. `.`/`..`, absolute paths, backslashes and control characters are refused
-  by `isSafePackPath`, and an `entry` the manifest does not list is refused too.
+  by `isSafePackPath`, a path that appears twice is refused, a symlink or other non-regular entry is
+  refused, and an `entry` the manifest does not list is refused too.
+- Carry a file the manifest does not list, or omit one it does. Both are refused before anything is
+  written, and the installed directory is checked against the manifest again on every load.
 - Claim a contract the host does not implement. `contractVersion` and `minimumHostVersion` produce a
   sentence a person can act on, not a crash at the first missing method.
 - Arrive without a signature. An unsigned or damaged pack is refused whole; the installed version stays.

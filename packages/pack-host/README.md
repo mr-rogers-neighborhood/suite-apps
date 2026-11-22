@@ -23,11 +23,11 @@ const backup = await files.backup("boards/today.canvas");
 
 ## Pack archives
 
-`readPackArchive` and `buildPackArchive` are the `.suitepack` zip reader and writer. They import no Electron and add no host policy of their own beyond the archive rules.
+`readPackArchive` and `buildPackArchive` are the `.suitepack` zip reader and writer. They import no Electron and add no host policy of their own beyond the archive rules. Import them from `@suite/pack-host/archive` when the root export's Node file store is not wanted; that subpath is the one Suite Go bundles.
 
-- `readPackArchive` streams the zip, checks each entry's declared size before decompressing and the bytes produced after, and refuses unsafe paths, duplicate names, more than `maxFiles` entries, and an archive with no `manifest.json` at its root. It returns the raw manifest bytes and a `Map` of payload files; the caller parses and verifies the manifest with `@suite/pack`.
+- `readPackArchive` streams the zip, checks each entry's declared size before decompressing and the bytes produced after, and refuses unsafe paths, duplicate names, symlinks and other non-regular entries, more than `maxFiles` entries, and an archive with no `manifest.json` at its root. It returns the raw manifest bytes and a `Map` of payload files; the caller parses and verifies the manifest with `@suite/pack`.
 - `buildPackArchive` writes the manifest first and the payload in code-unit path order, with a fixed timestamp on every entry, so the same manifest and files produce the same bytes on any machine and the `.sha256` sidecar is reproducible. A payload named `manifest.json` is refused.
-- A failure is a `PackArchiveError` with one of `invalid-zip`, `too-large`, `too-many-files`, `invalid-path`, `duplicate-path` or `missing-manifest`, and a message that names no absolute path.
+- A failure is a `PackArchiveError` with one of `invalid-zip`, `too-large`, `too-many-files`, `invalid-path`, `duplicate-path`, `missing-manifest` or `not-regular`, and a message that names no absolute path.
 
 ```ts
 const archive = await readPackArchive(bytes);

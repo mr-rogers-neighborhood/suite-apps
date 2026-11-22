@@ -38,6 +38,7 @@
     "@capacitor/share": "^8.0.3",
     "@suite/go": "workspace:*",
     "@suite/pack": "workspace:*",
+    "@suite/pack-host": "workspace:*",
     "@suite/theme": "workspace:*",
     "@suite/ui": "workspace:*",
     "fflate": "^0.8.3",

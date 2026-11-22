@@ -12,6 +12,12 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./archive": {
+      "types": "./dist/archive.d.ts",
+      "development": "./src/archive.ts",
+      "import": "./dist/archive.js",
+      "default": "./dist/archive.js"
+    },
     "./files": {
       "types": "./dist/files/index.d.ts",
       "development": "./src/files/index.ts",
