@@ -1,0 +1,54 @@
+{
+  "name": "@suite/pack-host",
+  "version": "0.1.0",
+  "description": "Host-side mechanics a Suite pack may use: a scoped filesystem, host-owned locks and backups, and the pure pieces the Electron host wraps. No Electron import.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./files": {
+      "types": "./dist/files/index.d.ts",
+      "development": "./src/files/index.ts",
+      "import": "./dist/files/index.js",
+      "default": "./dist/files/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "check": "biome check . && tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "~5.9.3",
+    "vitest": "5.1.0",
+    "@biomejs/biome": "2.6.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mr-rogers-neighborhood/suite-apps.git",
+    "directory": "packages/pack-host"
+  },
+  "author": {
+    "name": "Suite contributors",
+    "email": "maintainers@suite.run"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@suite/pack": "workspace:*",
+    "@suite/pack-runtime": "workspace:*",
+    "fflate": "^0.8.3"
+  }
+}

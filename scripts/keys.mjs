@@ -25,7 +25,7 @@ function help() {
   process.stdout.write(`Suite signing keys
 
   pnpm keys status [--strict]      presence, fingerprint, and the pin each key must match
-  pnpm keys generate pack          make apps/go's pack signing key
+  pnpm keys generate pack          make the shared desktop and mobile pack signing key
   pnpm keys generate update        make the update feed signing key
 
 The private keys live outside the repository, at

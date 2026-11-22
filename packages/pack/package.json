@@ -1,0 +1,73 @@
+{
+  "name": "@suite/pack",
+  "version": "0.1.0",
+  "description": "The Suite pack contract: manifest, capabilities, contributions, file hashes and Ed25519 verification. Pure TypeScript and WebCrypto; no Node, no Electron, no host policy.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./capabilities": {
+      "types": "./dist/capabilities.d.ts",
+      "development": "./src/capabilities.ts",
+      "import": "./dist/capabilities.js",
+      "default": "./dist/capabilities.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest.d.ts",
+      "development": "./src/manifest.ts",
+      "import": "./dist/manifest.js",
+      "default": "./dist/manifest.js"
+    },
+    "./pinned-key": {
+      "types": "./dist/pinnedKey.d.ts",
+      "development": "./src/pinnedKey.ts",
+      "import": "./dist/pinnedKey.js",
+      "default": "./dist/pinnedKey.js"
+    },
+    "./signature": {
+      "types": "./dist/signature.d.ts",
+      "development": "./src/signature.ts",
+      "import": "./dist/signature.js",
+      "default": "./dist/signature.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "check": "biome check . && tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^3.2.0",
+    "@noble/hashes": "^2.4.0",
+    "@suite/contracts": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "~5.9.3",
+    "vitest": "5.1.0",
+    "@biomejs/biome": "2.6.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mr-rogers-neighborhood/suite-apps.git",
+    "directory": "packages/pack"
+  },
+  "author": {
+    "name": "Suite contributors",
+    "email": "maintainers@suite.run"
+  },
+  "license": "MIT"
+}
