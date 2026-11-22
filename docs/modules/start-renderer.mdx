@@ -14,10 +14,16 @@ rail and the keyboard model around them. It deliberately does not decide whether
 an app is installed, whether an update verifies, or what to execute. Main
 answers those questions and this directory renders the answer.
 
-The dashboard is painted here too: one widget shell per resolved entry, with the
-app grid's cards inside the `start.apps` one. The layout file, the registered ids
-and the fallback note all arrive in `LauncherState`; the rule for those ids lives
-in [Widgets and Screens](../reference/decisions.md#widgets-and-screens).
+The Home Screen is painted here too: one widget shell per resolved placement, with the
+app grid's cards inside the `start.apps` one, an app widget's declared capture fields and
+settings, and a named placeholder for an id this build cannot resolve. The Screen, the
+resolved placements and the fallback note all arrive in `LauncherState`; the rule for those
+ids lives in [Widgets and Screens](../reference/decisions.md#widgets-and-screens).
+
+The Screens manager is the host's own surface in the same pane. It lists every Screen and
+offers create, rename, duplicate, delete, Set Home and Open; deleting Home asks which Screen
+replaces it. The page never edits a document: every action crosses the bridge and returns
+the new Screens state, which the page repaints from.
 
 The seam is the preload bridge. `globalThis.suiteStart` exposes `listApps`,
 actions and broadcasts; the page treats it as read-only input and re-reads
@@ -61,13 +67,22 @@ selected tab is in the tab order.
 Keeping selection and focus in one place is what lets the Cmd/Ctrl+1..4 shortcut
 and a pointer click agree on which pane is showing.
 
-## apps/start/src/renderer/dashboard.js#renderDashboard
+## apps/start/src/renderer/home.js#renderHome
 
-The page draws one shell per resolved widget, in the file's order, at the file's size
-class. It never decides which widget exists: main sends the title, the classes it offers
-and the note that explains a dropped entry.
+The page draws one shell per resolved placement, in the Screen's order, at its size class,
+with the title, capture fields, settings and notes main resolved. It never decides which
+widget exists or whether an unknown id may be dropped: an unknown placement arrives named
+after its registry id with a note, and is drawn like any other.
 
-Reorder is a pair of move buttons and a size picker per widget, not drag-only. Both are
-reachable by pointer and keyboard, name the widget and its position, and disable at the
-ends. `renderApps` runs after this and fills the lists inside the app-grid shell, so the
-cards, installs and launches are the same code they were before the dashboard existed.
+Edit layout is a mode, not a drag gesture. Every control is a named button or picker, and a
+focused placement answers Alt+Left and Alt+Right, so moving is reachable without a pointer.
+`renderApps` runs after this and fills the lists inside the app-grid shell, so the cards,
+installs and launches are the same code they were before the Screen existed.
+
+## apps/start/src/renderer/screens.js#renderScreens
+
+The manager is Start's, not an app's. It draws the list, each row's roles and the controls
+that create, rename, duplicate, delete, set Home and open a Screen. Deleting Home is a
+two-step answer: main refuses the first press and returns the other Screens as choices, so
+the row asks which one becomes Home before the deletion happens. The last Screen's Delete is
+disabled because an empty set has no surface left to create another on.

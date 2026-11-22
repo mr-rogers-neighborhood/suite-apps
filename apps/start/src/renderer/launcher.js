@@ -7,9 +7,10 @@
  * It renders what the main process reports and nothing else.
  */
 import { renderApps } from "./apps.js";
-import { renderDashboard } from "./dashboard.js";
 import { renderFiles } from "./files.js";
+import { renderHome } from "./home.js";
 import { installRail } from "./rail.js";
+import { renderScreens } from "./screens.js";
 import { renderSettings } from "./settings.js";
 import { SUITE_MARK_PATH, SUITE_MARK_VIEW_BOX } from "./suiteMark.js";
 import { renderSync } from "./sync.js";
@@ -36,26 +37,48 @@ const actions = {
     await refresh();
   },
   /**
-   * The dashboard's edits.
+   * The Home Screen's edits.
    *
-   * Each one names an id and a choice; main owns the file and answers by broadcasting the
-   * layout it now has, so the page redraws from the result rather than from a guess.
+   * Each one names an id and a choice; main owns the document and answers with the new
+   * Screens state, so the page redraws from the result rather than from a guess.
    */
   async moveWidget(id, direction) {
-    await bridge.moveWidget(id, direction);
-    await refresh();
+    applyScreens(await bridge.moveWidget(id, direction));
   },
   async resizeWidget(id, size) {
-    await bridge.setWidgetSize(id, size);
-    await refresh();
+    applyScreens(await bridge.setWidgetSize(id, size));
   },
   async addWidget(id) {
-    await bridge.addWidget(id);
-    await refresh();
+    applyScreens(await bridge.addWidget(id));
   },
   async removeWidget(id) {
-    await bridge.removeWidget(id);
-    await refresh();
+    applyScreens(await bridge.removeWidget(id));
+  },
+  async setWidgetSetting(id, field, value) {
+    applyScreens(await bridge.setWidgetSetting(id, field, value));
+  },
+  /** The manager's edits: Start owns the set, and each answers with the new state. */
+  async createScreen(name) {
+    applyScreens(await bridge.createScreen(name));
+  },
+  async renameScreen(id, name) {
+    applyScreens(await bridge.renameScreen(id, name));
+  },
+  async duplicateScreen(id) {
+    applyScreens(await bridge.duplicateScreen(id));
+  },
+  async deleteScreen(id, replacementId) {
+    applyScreens(await bridge.deleteScreen(id, replacementId));
+  },
+  async setHomeScreen(id) {
+    applyScreens(await bridge.setHomeScreen(id));
+  },
+  async openScreen(id) {
+    applyScreens(await bridge.openScreen(id));
+  },
+  /** Repaint from the last state, for a local mode switch such as Edit layout. */
+  rerender() {
+    if (lastState !== null) render(lastState);
   },
   async uninstall(id) {
     await bridge.uninstallApp(id);
@@ -116,6 +139,20 @@ const actions = {
 /** The last thing main said, so a progress event can redraw the cards alone. */
 let lastState = null;
 
+/**
+ * Take the Screens state an action returned and redraw.
+ *
+ * The action's answer is the authority for the surface it changed. Everything else in
+ * `lastState` is still true, so it is kept rather than re-listing every app on each edit.
+ */
+function applyScreens(screens) {
+  if (screens === null || screens === undefined || lastState === null) {
+    void refresh();
+    return;
+  }
+  render({ ...lastState, screens });
+}
+
 /** The Apps filter, so a list of nine still behaves like a list of three. */
 let appFilter = "";
 
@@ -146,10 +183,11 @@ function applyTheme(theme) {
 
 function render(state) {
   lastState = state;
-  // The dashboard first: the app grid is a widget, and `renderApps` fills the lists the
+  // The Home Screen first: the app grid is a widget, and `renderApps` fills the lists the
   // widget shell creates.
-  renderDashboard(state, actions);
+  renderHome(state, actions);
   renderApps(visibleApps(state), actions);
+  renderScreens(state, actions);
   renderFiles(state, actions);
   renderSettings(state, actions);
   renderSync(state, actions);
@@ -203,7 +241,7 @@ if (typeof bridge !== "object" || bridge === null) {
     await refresh();
   });
 
-  // Adding a widget is a picker and one button rather than a second dashboard surface.
+  // Adding a widget is a picker and one button rather than a second Home surface.
   document.getElementById("widget-add")?.addEventListener("click", async () => {
     const picker = document.getElementById("widget-picker");
     if (!picker || picker.value.length === 0) return;

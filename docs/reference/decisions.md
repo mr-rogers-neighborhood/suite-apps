@@ -173,8 +173,9 @@ suite stays separate Flatpaks plus Start.
   `{ id, title, size, capabilities, action, settings? }`, in `suite.app.json` for desktop and in a
   pack's `manifest.json` for Go, validated by `@suite/contracts`. `id` is app-local lower kebab-case
   and the host registers it as `<app id>.<widget id>` — `planner.quick-task` — so an app cannot
-  claim a host id. A host widget is the same shape under the host's own app id: `start.apps` and
-  `start.recents` are ordinary registry entries. `size` is one of `1x1`, `2x1`, `full`. Go reuses
+  claim a host id. A host widget uses the same registry-id shape under the host's own app id, but it
+  resolves through the host's own table: `start.apps` and `start.recents` are not app declarations,
+  and the registry is for app declarations. `size` is one of `1x1`, `2x1`, `full`. Go reuses
   this descriptor in its launcher and an Android home-screen widget is a native adapter over it; Go
   does not get a second descriptor.
 - `settings` is a list of instance fields: `{ id, label, type, default?, required?, maxLength? }`,

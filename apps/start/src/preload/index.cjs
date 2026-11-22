@@ -33,12 +33,22 @@ contextBridge.exposeInMainWorld("suiteStart", {
   // it. The app's tray keeps the relay and shows its own address and fingerprint.
   installSync: () => ipcRenderer.invoke("suite:start:sync-install"),
   openSync: () => ipcRenderer.invoke("suite:start:sync-open"),
-  // The dashboard is Start's own layout: an id and a direction or size class cross
-  // the bridge, never a path. Main writes the file and broadcasts the new layout.
-  moveWidget: (id, direction) => ipcRenderer.invoke("suite:start:dashboard-move", id, direction),
-  setWidgetSize: (id, size) => ipcRenderer.invoke("suite:start:dashboard-size", id, size),
-  addWidget: (id) => ipcRenderer.invoke("suite:start:dashboard-add", id),
-  removeWidget: (id) => ipcRenderer.invoke("suite:start:dashboard-remove", id),
+  // The Home Screen is Start's own document: an id and a size class cross the
+  // bridge, never a path. Main writes the file and answers with the new state.
+  moveWidget: (id, direction) => ipcRenderer.invoke("suite:start:screen-move", id, direction),
+  setWidgetSize: (id, size) => ipcRenderer.invoke("suite:start:screen-size", id, size),
+  addWidget: (id) => ipcRenderer.invoke("suite:start:screen-add", id),
+  removeWidget: (id) => ipcRenderer.invoke("suite:start:screen-remove", id),
+  setWidgetSetting: (id, field, value) =>
+    ipcRenderer.invoke("suite:start:screen-setting", id, field, value),
+  // The host-owned Screens manager. Each answers with the new Screens state.
+  createScreen: (name) => ipcRenderer.invoke("suite:start:screen-create", name),
+  renameScreen: (id, name) => ipcRenderer.invoke("suite:start:screen-rename", id, name),
+  duplicateScreen: (id) => ipcRenderer.invoke("suite:start:screen-duplicate", id),
+  deleteScreen: (id, replacementId) =>
+    ipcRenderer.invoke("suite:start:screen-delete", id, replacementId),
+  setHomeScreen: (id) => ipcRenderer.invoke("suite:start:screen-home", id),
+  openScreen: (id) => ipcRenderer.invoke("suite:start:screen-open", id),
   // The window outlives no page load, so the listener is never removed.
   onChanged: (listener) => {
     ipcRenderer.on("suite:start:changed", (_event, state) => listener(state));

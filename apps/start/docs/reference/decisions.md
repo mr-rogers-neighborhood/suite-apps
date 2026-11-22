@@ -56,4 +56,33 @@ The rules that shape Start.
 - Flatpak installs are listed, installed from the store, launched and removable through Start. Start
   asks Flatpak to install or update; it never replaces a deployment itself.
 - The renderer is sandboxed: context isolation, sandbox, no `nodeIntegration`, no remote content.
+- Start's Home is a Screen: the shared `suite.screen` v1 document from `@suite/screens`, opened from
+  `<data>/screens/start-home.loro`. A Screen names registry ids, sizes and instance settings and
+  carries no app data, HTML, script or path. The Screen is Start's own document; no app owns or reads
+  it, and it is never stored inside an app document.
+- Home is a role in a set of Screens, not one fixed window. `screens.json` records which Screen is
+  Home; the window also holds an open Screen, so the manager can show another composition without
+  changing what the next launch opens.
+- The old `dashboard.json` is migrated once. Every entry is copied in order, including an id this
+  build cannot resolve, and the old file is renamed to `dashboard.json.migrated-<date>` beside itself.
+  A corrupt, empty or newer dashboard is refused whole with the sentence `@suite/screens` returns; the
+  old file is left untouched and the default Home is shown with that sentence.
+- A Screen that cannot be opened is quarantined as `<id>.loro.corrupt-<timestamp>` and the default
+  Home is written in its place with a note, the way the shell handles `spaces.loro`. Screen writes are
+  atomic (temporary file, then rename) and keep the previous bytes as `<id>.loro.bak`.
+- Host widgets are Start's own table: `start.apps` and `start.recents` use the registry-id shape but
+  not the app registry, because no app declares them and they have no capture action. An installed
+  app's `suite.app.json` `widgets` field is resolved through `@suite/screens`. A registry id neither
+  source knows stays in the Screen and is drawn as a named placeholder with a note; it is never
+  dropped.
+- Inline edit is a mode with named controls: add, remove, move and resize in the Screen's order, with
+  a size picker that stays within `1x1`, `2x1` and `full`. A focused placement also answers Alt+Left
+  and Alt+Right, so moving is not drag-only.
+- The Screens manager is the host's, not an app's: Start lists, creates, renames, duplicates and
+  deletes a Screen, sets Home and opens one. Deleting the last Screen is refused; deleting Home asks
+  which other Screen becomes Home first.
+- This slice does not send a widget capture to an app, export or import a portable `.screen` file, or
+  sync a Screen. App widgets render the title, capture fields and settings their manifest declares,
+  and the capture handoff lands with the app that receives it.
+- The renderer is sandboxed: context isolation, sandbox, no `nodeIntegration`, no remote content.
 - The gate is local: `pnpm check`.

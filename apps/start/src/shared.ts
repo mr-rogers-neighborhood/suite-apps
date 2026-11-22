@@ -25,10 +25,19 @@ export const START_IPC = {
   installSync: "suite:start:sync-install",
   openSync: "suite:start:sync-open",
   info: "suite:start:info",
-  moveWidget: "suite:start:dashboard-move",
-  sizeWidget: "suite:start:dashboard-size",
-  addWidget: "suite:start:dashboard-add",
-  removeWidget: "suite:start:dashboard-remove",
+  // The Home Screen: an id and a choice cross the bridge, never a path.
+  moveWidget: "suite:start:screen-move",
+  sizeWidget: "suite:start:screen-size",
+  addWidget: "suite:start:screen-add",
+  removeWidget: "suite:start:screen-remove",
+  setWidgetSetting: "suite:start:screen-setting",
+  // The host-owned manager. Each answers with the new Screens state.
+  createScreen: "suite:start:screen-create",
+  renameScreen: "suite:start:screen-rename",
+  duplicateScreen: "suite:start:screen-duplicate",
+  deleteScreen: "suite:start:screen-delete",
+  setHomeScreen: "suite:start:screen-home",
+  openScreen: "suite:start:screen-open",
 } as const;
 
 /** Pushed rather than invoked: the window redraws from what arrives here. */
@@ -224,41 +233,115 @@ export interface StartSettings {
   readonly theme: ResolvedTheme;
 }
 
-/** Which way a move control takes one widget. */
-export type DashboardMoveDirection = "earlier" | "later";
-
-/** The body a widget's renderer draws. Host widgets only, in phase 1. */
-export type DashboardWidgetKind = "apps" | "recents";
+/** Which way a move control takes one placement. */
+export type ScreenMoveDirection = "earlier" | "later";
 
 /**
- * One widget, already resolved against the layout.
+ * What a placement draws.
  *
- * Main does the joining: the layout names ids and sizes, the registry supplies the title,
- * the size classes it honours and which renderer draws it. The page therefore never sees
- * an unknown id, and never decides what a widget is — only where it sits and what the one
- * renderer for its kind paints.
+ * `apps` and `recents` come from Start's own table. `app` is a descriptor an installed app
+ * declared in `suite.app.json`. `unknown` is a registry id this build cannot resolve: it
+ * stays in the document and is drawn as a named placeholder, never dropped.
  */
-export interface DashboardWidget {
-  /** The registry id, `<app id>.<widget id>`. */
+export type ScreenWidgetKind = "apps" | "recents" | "app" | "unknown";
+
+/** One field a resolved app widget asks the host to draw for a capture. */
+export interface ScreenWidgetFieldView {
   readonly id: string;
-  readonly title: string;
-  readonly description: string;
-  readonly kind: DashboardWidgetKind;
-  readonly size: SuiteWidgetSize;
-  /** Every class this widget offers, in the order the picker shows them. */
-  readonly sizes: readonly SuiteWidgetSize[];
+  readonly label: string;
+  readonly type: "text" | "day" | "number";
+  readonly required: boolean;
+  readonly maxLength: number | null;
 }
 
-/** The dashboard the page draws: the resolved widgets, what can be added, and the note. */
-export interface DashboardState {
-  readonly widgets: readonly DashboardWidget[];
-  /** Widgets the registry knows but this layout does not show yet. */
-  readonly available: readonly DashboardWidget[];
+/** One instance setting, with the value the Screen currently resolves to. */
+export interface ScreenWidgetSettingView {
+  readonly id: string;
+  readonly label: string;
+  readonly type: "text" | "day" | "number";
+  readonly value: string;
+  readonly required: boolean;
+  readonly maxLength: number | null;
+}
+
+/**
+ * One placement, already resolved against the widget registry.
+ *
+ * Main does the joining: the Screen names registry ids, sizes and settings; the registry
+ * supplies the title, the size classes and the capture fields. The page never sees an
+ * unresolved entry without a name: an unknown id arrives as an `unknown` placement whose
+ * title is the id itself.
+ */
+export interface ScreenWidgetView {
+  /** The registry id, `<app id>.<widget id>`. */
+  readonly registryId: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly kind: ScreenWidgetKind;
+  readonly size: SuiteWidgetSize;
+  /** Every class this placement can take, in the order the picker shows them. */
+  readonly sizes: readonly SuiteWidgetSize[];
+  /** The app descriptor's submit label, or null when it declares no capture. */
+  readonly submitLabel: string | null;
+  readonly fields: readonly ScreenWidgetFieldView[];
+  /** Declared settings with defaults applied, plus unknown ones kept on the Screen. */
+  readonly settings: readonly ScreenWidgetSettingView[];
+  /** Saved settings the descriptor does not declare. They stay on the Screen. */
+  readonly unknownSettings: readonly string[];
+  /** A sentence about an unknown widget, an issue, or settings this build cannot use. */
+  readonly note: string | null;
+}
+
+/** A widget the person can still add to the open Screen. */
+export interface AvailableScreenWidget {
+  readonly registryId: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly defaultSize: SuiteWidgetSize;
+}
+
+/** One Screen, as the manager lists it. */
+export interface ScreenSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly home: boolean;
+  readonly open: boolean;
+  /** False when the file exists but this build cannot read it. */
+  readonly readable: boolean;
+}
+
+/** The open Screen: its name and its resolved, ordered placements. */
+export interface ScreenView {
+  readonly id: string;
+  readonly name: string;
+  readonly home: boolean;
+  readonly widgets: readonly ScreenWidgetView[];
+}
+
+/** The replacement question asked before Home is deleted. */
+export interface ScreenReplacement {
+  /** The Screen whose deletion is waiting for an answer. */
+  readonly forId: string;
+  readonly choices: readonly { readonly id: string; readonly name: string }[];
+}
+
+/** Everything the Home Screen pane and the host-owned manager draw. */
+export interface ScreensState {
+  readonly homeId: string;
+  readonly openId: string;
+  readonly screens: readonly ScreenSummary[];
+  readonly screen: ScreenView;
+  /** Widgets the registry knows but the open Screen does not show yet. */
+  readonly available: readonly AvailableScreenWidget[];
   /**
-   * Why the file was not honoured, when it was not: a corrupt layout, a newer version,
-   * or an id nothing on this machine provides. `null` on an ordinary launch.
+   * Why the Screen document was not honoured, when it was not: a corrupt or newer file,
+   * or a refused migration. `null` on an ordinary launch.
    */
   readonly note: string | null;
+  /** The answer to the last manager action, when it has one. */
+  readonly managerNote: string | null;
+  /** Set when Home cannot be deleted until another Screen is chosen as Home. */
+  readonly replacement: ScreenReplacement | null;
 }
 
 export interface LauncherState {
@@ -267,8 +350,8 @@ export interface LauncherState {
   readonly files: readonly FileCard[];
   readonly settings: StartSettings;
   readonly version: string;
-  /** The home screen: one widget per layout entry, in the order the file says. */
-  readonly dashboard: DashboardState;
+  /** The Home Screen: the open composition and the Screens a person manages. */
+  readonly screens: ScreensState;
   /** The relay this machine runs, and what it is holding. */
   readonly sync: SyncState;
   /** Installs running right now, so a window that opens mid-install still sees the bar. */

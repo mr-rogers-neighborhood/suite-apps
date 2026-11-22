@@ -90,14 +90,18 @@
               <button id="add" type="button" class="button">Add app…</button>
             </div>
           </header>
-          <p id="dashboard-note" class="empty" hidden></p>
-          <p id="dashboard-status" class="visually-hidden" role="status" aria-live="polite"></p>
-          <div id="dashboard" class="dashboard"></div>
-          <div id="dashboard-add" class="dashboard-add" hidden>
+          <p id="screen-note" class="empty" hidden></p>
+          <p id="screen-status" class="visually-hidden" role="status" aria-live="polite"></p>
+          <div id="screen" class="home-screen"></div>
+          <div id="screen-add" class="screen-add" hidden>
             <label for="widget-picker">Add a widget</label>
             <select id="widget-picker"></select>
             <button id="widget-add" type="button" class="button">Add</button>
           </div>
+          <details id="screens-manager" class="screens-manager">
+            <summary>Screens</summary>
+            <div id="screens-manager-body" class="screens-manager-body"></div>
+          </details>
         </section>
 
         <section id="panel-files" role="tabpanel" aria-labelledby="tab-files" hidden>

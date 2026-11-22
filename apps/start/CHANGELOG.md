@@ -9,7 +9,19 @@ Canvas's releases from before the monorepo, not the launcher's. The rules are in
 
 ## [Unreleased]
 
-No changes yet.
+### Added
+
+- **Home is a Screen.** Start's dashboard is now the shared `suite.screen` document, rendered natively
+  from `<data>/screens/start-home.loro`. The old `dashboard.json` migrates once and is kept as a dated
+  backup; a corrupt, empty or newer layout or Screen is quarantined and explained rather than partly
+  shown. An unknown widget keeps its place as a named placeholder.
+- **Inline edit and a Screens manager.** Add, remove, move and resize placements in the Screen's order,
+  with named controls and Alt+Left/Alt+Right for a focused widget. Start, not an app, lists, creates,
+  renames, duplicates and deletes Screens, sets Home and opens one; the last Screen is kept and
+  deleting Home asks for a replacement first.
+- **App widgets render their declaration.** A widget in an installed app's `suite.app.json` shows its
+  title, capture fields and instance settings. Sending a capture, exporting a `.screen` file and
+  Screen sync are later slices.
 
 ## [0.6.0] - 2026-11-21
 

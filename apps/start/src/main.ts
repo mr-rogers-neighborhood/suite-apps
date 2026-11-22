@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -13,6 +13,12 @@ import {
   suitePaths,
 } from "@suite/contracts";
 import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/desktop";
+import {
+  createWidgetRegistry,
+  defaultStartDashboard,
+  START_HOME_SCREEN_ID,
+  type WidgetRegistry,
+} from "@suite/screens";
 import { cssVariables, defaultTheme, presetById } from "@suite/theme";
 import {
   app,
@@ -42,20 +48,6 @@ import {
   preReleaseRemovalCopy,
   tierForInstall,
 } from "./channels.js";
-import {
-  addWidget,
-  type DashboardLayout,
-  type DashboardRead,
-  defaultDashboard,
-  HOST_WIDGETS,
-  type HostWidget,
-  hostWidget,
-  moveWidget,
-  parseDashboard,
-  removeWidget,
-  resizeWidget,
-  serializeDashboard,
-} from "./dashboard.js";
 import { type DocumentsFolder, indexDocuments, isInsideDocuments } from "./fileIndex.js";
 import { SYNC_APPLICATION } from "./flatpak.js";
 import { defaultHost, SELF_FLATPAK_ID, sandboxId } from "./host.js";
@@ -79,14 +71,23 @@ import type { PackageLaunchObserver, PackageListing } from "./packageBackend.js"
 import { RECENT_LIMIT, type RecentsFile, recentsFile } from "./recents.js";
 import type { DiscoveredApp } from "./registry.js";
 import { describeRouteRejection, routeLaunch } from "./route.js";
+import { SCREENS_DIRECTORY, SCREENS_INDEX_FILENAME, ScreenStore } from "./screenStore.js";
+import {
+  availableScreenWidgets,
+  resolveScreenWidgets,
+  screenWidgetSizes,
+  widgetDefaultSize,
+  widgetSettingField,
+} from "./screenView.js";
 import {
   type AppLocation,
-  type DashboardState,
-  type DashboardWidget,
   type InstallProgress,
   type LauncherState,
   type RecentCard,
   type ResolvedTheme,
+  type ScreenReplacement,
+  type ScreensState,
+  type ScreenView,
   START_CHANGED,
   START_INSTALL_PROGRESS,
   START_IPC,
@@ -418,113 +419,90 @@ async function syncState(): Promise<SyncState> {
 }
 
 /**
- * The dashboard's layout file, read and written here and nowhere else.
+ * Start's Home Screen.
  *
- * The model is pure (`dashboard.ts`); this is the one process that touches the file. It
- * lives beside Start's other records because the layout belongs to this machine, not to
- * an app, and it is never synced: two devices may arrange the same widgets differently.
+ * The store (`screenStore.ts`) owns the document, its atomic writes and its backups; this
+ * is the process that holds one instance and the Screen the window currently shows. Home
+ * is a role in a set of Screens, so `openScreenId` is window state and `homeId` is what a
+ * launch restores.
+ *
+ * Nothing here reads app data: the registry knows which descriptors this build can draw,
+ * and an id it cannot resolve stays on the Screen as a named placeholder.
  */
-function dashboardFile(): string {
-  return dashboardPath(hostPathTable());
+let screenStore: ScreenStore;
+let openScreenId = START_HOME_SCREEN_ID;
+let screensFailure: string | null = null;
+
+interface ScreenAnswer {
+  readonly note?: string;
+  readonly replacement?: ScreenReplacement | null;
 }
 
-/** The last write that failed, so the pane says so instead of showing a stale layout. */
-let dashboardFailure: string | null = null;
+/** The app widget registry for this build: every installed manifest's declarations. */
+function widgetRegistry(apps: readonly DiscoveredApp[]): WidgetRegistry {
+  return createWidgetRegistry(
+    apps.map((app) => ({ appId: app.manifest.id, widgets: app.manifest.widgets })),
+  );
+}
 
-async function readDashboard(): Promise<DashboardRead> {
+/** What the Home Screen pane and its manager draw. */
+async function screensState(
+  apps: readonly DiscoveredApp[],
+  answer: ScreenAnswer = {},
+): Promise<ScreensState> {
+  const registry = widgetRegistry(apps);
+  const summaries = await screenStore.summaries();
+  const homeId = screenStore.homeId;
+  if (!summaries.some((screen) => screen.id === openScreenId)) openScreenId = homeId;
+
+  const opened = await screenStore.open(openScreenId);
+  // A Screen can disappear between the listing and the read (a person at a file manager).
+  // The default Home keeps the pane legible; the file note already says what happened.
+  const screen = opened ?? defaultStartDashboard().screen;
+  const screenView: ScreenView = {
+    id: screen.id,
+    name: screen.name,
+    home: screen.id === homeId,
+    widgets: resolveScreenWidgets(screen, registry),
+  };
+
+  return {
+    homeId,
+    openId: screen.id,
+    screens: summaries.map((summary) => ({
+      ...summary,
+      home: summary.id === homeId,
+      open: summary.id === screen.id,
+    })),
+    screen: screenView,
+    available: availableScreenWidgets(screen, registry),
+    note: screensFailure ?? screenStore.note,
+    managerNote: answer.note ?? null,
+    replacement: answer.replacement ?? null,
+  };
+}
+
+/**
+ * Run one Screen action and answer the new state.
+ *
+ * A refused edit (a move off the end, a size the widget does not offer) changes nothing
+ * and still answers, so the controls describe the document that is actually there. A
+ * failed write is a sentence in the pane, not a lost edit.
+ */
+async function withScreen(
+  work: (apps: readonly DiscoveredApp[]) => Promise<ScreenAnswer>,
+): Promise<ScreensState> {
+  const apps = (await discover()).packages.map((entry) => entry.app);
+  let answer: ScreenAnswer = {};
   try {
-    const text = await readFile(dashboardFile(), "utf8");
-    return parseDashboard(JSON.parse(text));
+    answer = await work(apps);
+    screensFailure = null;
   } catch (error) {
-    // No file is the ordinary first launch: the default layout is not a repair.
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return defaultDashboard();
-    return parseDashboard(null);
-  }
-}
-
-/**
- * Write the layout atomically.
- *
- * A temporary file and a rename, like the install registry: a crash leaves either the old
- * layout or the new one, never half of a JSON document the next launch must repair.
- */
-async function saveDashboard(layout: DashboardLayout): Promise<void> {
-  const file = dashboardFile();
-  await mkdir(dirname(file), { recursive: true });
-  const temporary = `${file}.${process.pid}`;
-  await writeFile(temporary, serializeDashboard(layout));
-  await rename(temporary, file);
-}
-
-function widgetFor(entry: {
-  readonly id: string;
-  readonly size: SuiteWidgetSize;
-}): DashboardWidget | null {
-  const host = hostWidget(entry.id);
-  if (host === undefined) return null;
-  return {
-    id: host.id,
-    title: host.title,
-    description: host.description,
-    kind: host.kind,
-    size: entry.size,
-    sizes: host.sizes,
-  };
-}
-
-function availableWidget(host: HostWidget): DashboardWidget {
-  return {
-    id: host.id,
-    title: host.title,
-    description: host.description,
-    kind: host.kind,
-    size: host.defaultSize,
-    sizes: host.sizes,
-  };
-}
-
-/**
- * What the dashboard pane draws.
- *
- * The layout says which ids and sizes; the registry says what each one is. A stored id the
- * registry does not know has already been dropped by the parser with a note, so the page
- * never has to decide what to do with one.
- */
-async function dashboardState(): Promise<DashboardState> {
-  const read = await readDashboard();
-  const widgets = read.layout.widgets.flatMap((entry) => {
-    const widget = widgetFor(entry);
-    return widget === null ? [] : [widget];
-  });
-  const shown = new Set(widgets.map((widget) => widget.id));
-  return {
-    widgets,
-    available: HOST_WIDGETS.filter((host) => !shown.has(host.id)).map(availableWidget),
-    note: dashboardFailure ?? read.note,
-  };
-}
-
-/**
- * Change the layout and redraw.
- *
- * Every dashboard action is one of these: read the file, apply a pure edit, write it back.
- * A failed write is reported in the pane rather than lost; a refused edit (a move off the
- * end, a size a widget does not offer) changes nothing and still redraws, so the controls
- * always describe the file that is actually there.
- */
-async function updateDashboard(
-  change: (layout: DashboardLayout) => DashboardLayout,
-): Promise<void> {
-  try {
-    const { layout } = await readDashboard();
-    await saveDashboard(change(layout));
-    dashboardFailure = null;
-  } catch (error) {
-    dashboardFailure = `Start could not save your dashboard: ${
+    screensFailure = `Start could not save your Screens: ${
       error instanceof Error ? error.message : String(error)
     }`;
   }
-  await broadcast();
+  return screensState(apps, answer);
 }
 
 async function state(): Promise<LauncherState> {
@@ -583,7 +561,7 @@ async function state(): Promise<LauncherState> {
       theme: resolvedTheme(),
     },
     version: app.getVersion(),
-    dashboard: await dashboardState(),
+    screens: await screensState(apps),
     sync: await syncState(),
     self:
       self === undefined
@@ -1075,37 +1053,139 @@ function registerIpc(): void {
   onIpc(START_IPC.addApp, () => addApp());
 
   /**
-   * The dashboard's four edits.
+   * The Home Screen's inline edits.
    *
-   * The page names an id and a choice; main validates both against its own registry and
-   * writes its own file. There is no path in either direction, so a renderer cannot point
-   * the layout at a file of its choosing.
+   * The page names a registry id, a direction or a size class; main validates it against
+   * its own registry and writes its own document. There is no path in either direction, so
+   * a renderer cannot point the Screen at a file of its choosing. Every call answers with
+   * the new state, which is what the page redraws from.
    */
-  onIpc(START_IPC.moveWidget, async (_event, id: unknown, direction: unknown) => {
-    if (typeof id !== "string") return;
-    if (direction !== "earlier" && direction !== "later") return;
-    await updateDashboard((layout) => moveWidget(layout, id, direction));
-  });
+  onIpc(START_IPC.moveWidget, (_event, id: unknown, direction: unknown) =>
+    withScreen(async () => {
+      if (typeof id !== "string") return {};
+      if (direction !== "earlier" && direction !== "later") return {};
+      await screenStore.moveWidget(openScreenId, id, direction);
+      return {};
+    }),
+  );
 
-  onIpc(START_IPC.sizeWidget, async (_event, id: unknown, size: unknown) => {
-    if (typeof id !== "string" || typeof size !== "string") return;
-    const widget = hostWidget(id);
-    if (widget === undefined) return;
-    if (!(SUITE_WIDGET_SIZES as readonly string[]).includes(size)) return;
-    await updateDashboard((layout) =>
-      resizeWidget(layout, id, size as SuiteWidgetSize, widget.sizes),
-    );
-  });
+  onIpc(START_IPC.sizeWidget, (_event, id: unknown, size: unknown) =>
+    withScreen(async (apps) => {
+      if (typeof id !== "string" || typeof size !== "string") return {};
+      if (!(SUITE_WIDGET_SIZES as readonly string[]).includes(size)) return {};
+      if (!screenWidgetSizes(id, widgetRegistry(apps)).includes(size as SuiteWidgetSize)) return {};
+      await screenStore.resizeWidget(openScreenId, id, size as SuiteWidgetSize);
+      return {};
+    }),
+  );
 
-  onIpc(START_IPC.addWidget, async (_event, id: unknown) => {
-    if (typeof id !== "string") return;
-    await updateDashboard((layout) => addWidget(layout, id));
-  });
+  onIpc(START_IPC.addWidget, (_event, id: unknown) =>
+    withScreen(async (apps) => {
+      if (typeof id !== "string") return {};
+      const registry = widgetRegistry(apps);
+      const size = widgetDefaultSize(id, registry);
+      if (size === null) return { note: `Nothing installed provides ${id}.` };
+      const added = await screenStore.addWidget(openScreenId, { registryId: id, size });
+      return added ? {} : { note: `${id} is already on this Screen.` };
+    }),
+  );
 
-  onIpc(START_IPC.removeWidget, async (_event, id: unknown) => {
-    if (typeof id !== "string") return;
-    await updateDashboard((layout) => removeWidget(layout, id));
-  });
+  onIpc(START_IPC.removeWidget, (_event, id: unknown) =>
+    withScreen(async () => {
+      if (typeof id !== "string") return {};
+      const screen = await screenStore.open(openScreenId);
+      // An empty Screen is a blank window with no widget left to remove. The last
+      // placement stays, as it did on the dashboard.
+      if (screen === null || screen.widgets.length <= 1) return {};
+      await screenStore.removeWidget(openScreenId, id);
+      return {};
+    }),
+  );
+
+  onIpc(START_IPC.setWidgetSetting, (_event, id: unknown, field: unknown, value: unknown) =>
+    withScreen(async (apps) => {
+      if (typeof id !== "string" || typeof field !== "string" || typeof value !== "string") {
+        return {};
+      }
+      if (widgetSettingField(id, field, widgetRegistry(apps)) === null) return {};
+      if (value.length > 500) return {};
+      await screenStore.setWidgetSetting(openScreenId, id, field, value);
+      return {};
+    }),
+  );
+
+  /**
+   * The host-owned Screens manager.
+   *
+   * Start, not an app, creates, renames, duplicates and deletes a Screen, sets Home and
+   * opens one. Deleting Home answers with the question first; the replacement id is the
+   * answer to it.
+   */
+  onIpc(START_IPC.createScreen, (_event, name: unknown) =>
+    withScreen(async () => {
+      if (typeof name !== "string") return {};
+      await screenStore.create(name);
+      return {};
+    }),
+  );
+
+  onIpc(START_IPC.renameScreen, (_event, id: unknown, name: unknown) =>
+    withScreen(async () => {
+      if (typeof id !== "string" || typeof name !== "string") return {};
+      const renamed = await screenStore.rename(id, name);
+      return renamed ? {} : { note: "That Screen is no longer here." };
+    }),
+  );
+
+  onIpc(START_IPC.duplicateScreen, (_event, id: unknown) =>
+    withScreen(async () => {
+      if (typeof id !== "string") return {};
+      const copy = await screenStore.duplicate(id);
+      return copy === null ? { note: "That Screen is no longer here." } : {};
+    }),
+  );
+
+  onIpc(START_IPC.deleteScreen, (_event, id: unknown, replacementId: unknown) =>
+    withScreen(async () => {
+      if (typeof id !== "string") return {};
+      const removal = await screenStore.remove(
+        id,
+        typeof replacementId === "string" ? replacementId : null,
+      );
+      if (removal.ok) {
+        if (openScreenId === id) openScreenId = removal.homeId;
+        return {};
+      }
+      return {
+        note: removal.message,
+        replacement:
+          removal.reason === "replacement"
+            ? {
+                forId: id,
+                choices: removal.choices.map((screen) => ({ id: screen.id, name: screen.name })),
+              }
+            : null,
+      };
+    }),
+  );
+
+  onIpc(START_IPC.setHomeScreen, (_event, id: unknown) =>
+    withScreen(async () => {
+      if (typeof id !== "string") return {};
+      const changed = await screenStore.setHome(id);
+      return changed ? {} : { note: "That Screen is no longer here." };
+    }),
+  );
+
+  onIpc(START_IPC.openScreen, (_event, id: unknown) =>
+    withScreen(async () => {
+      if (typeof id !== "string") return {};
+      const screen = await screenStore.open(id);
+      if (screen === null) return { note: "That Screen could not be opened." };
+      openScreenId = screen.id;
+      return {};
+    }),
+  );
 
   /**
    * Install or update one app, with the card watching.
@@ -1424,6 +1504,18 @@ if (!gotLock) {
     }
     registry = registryAt(registryPath);
     recents = recentsFile(dataDirectory);
+
+    // The Home Screen is Start's own document, under its own data directory. The old
+    // dashboard layout is read once and kept beside itself as a dated backup.
+    screenStore = ScreenStore.at({
+      directory: join(dataDirectory, SCREENS_DIRECTORY),
+      indexFile: join(dataDirectory, SCREENS_INDEX_FILENAME),
+      dashboardFile: dashboardPath(paths),
+    });
+    const loadedScreens = await screenStore.load();
+    openScreenId = loadedScreens.homeId;
+    if (loadedScreens.note !== null) console.warn(`[screens] ${loadedScreens.note}`);
+
     backend = nativePackageBackend({
       roots: roots(),
       registry,

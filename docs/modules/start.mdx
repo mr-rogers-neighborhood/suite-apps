@@ -8,9 +8,9 @@ Start is a package manager with a small UI. It owns the catalogue, the install
 records, the channel a card points at, and the launch command. It never reads a
 document, never embeds an app, and never proxies document bytes.
 
-Its home screen is a dashboard of host-rendered widgets, and the app grid is the
-first one. The descriptor, the capture action and the rule that the layout is the
-host's own file are decided once in
+Its Home is a Screen of host-rendered widgets, and the app grid is the first one.
+The Screen is the host's own Loro document; the descriptor, the capture action and
+the rule that the composition is the host's own file are decided once in
 [Widgets and Screens](../reference/decisions.md#widgets-and-screens).
 
 It owns what is installed, who placed it, which version and channel it is, and
@@ -123,26 +123,47 @@ The executable comes from a record discovery already checked, and the arguments
 from a plan routing already accepted. A launch failure is therefore not a
 second place where a path or a link is trusted.
 
-## apps/start/src/dashboard.ts#parseDashboard
+## apps/start/src/screenStore.ts#ScreenStore.load
 
-The dashboard's layout file, read without a guess. The file is the host's own: an ordered
-list of widget ids and size classes under Start's config directory, never a document and
-never synced. A file this build does not understand falls back to the default with a
-sentence; an id nothing on the machine provides is dropped, named in that sentence and
-left on disk so reinstalling the app can bring the widget back.
+The one module that owns the Screen's path, its atomic write and its backups. On first launch
+it reads `dashboard.json`, migrates every entry in order through `@suite/screens`, writes
+`<data>/screens/start-home.loro` and renames the old file to `dashboard.json.migrated-<date>`.
+A corrupt, empty or newer dashboard is refused whole with the package's sentence: the old file
+is untouched and the default Home is shown with that sentence.
 
-`known` is the registry a caller supplies — the host's widgets plus the app widgets the
-build renders — which is what lets a future app widget be a test today without the parser
-knowing about that app.
+Later launches open the Screen document. A file this build cannot read is quarantined under a
+dated `.corrupt-` name and the default Home is written in its place, the way the shell handles
+`spaces.loro`. A bad file is evidence, not something to delete.
 
-## apps/start/src/dashboard.ts#moveWidget
+## apps/start/src/screenStore.ts#ScreenStore.setWidgetSetting
 
-Reordering is a pure edit of the list: one place earlier or later, and a no-op at either
-end or for an id that is not there. Keeping it pure is what lets the page's move buttons,
-the file on disk and the tests share one definition of "moved" instead of three.
+An instance setting belongs to the placement, so it is written on the Screen beside the size.
+An empty value clears the key, and an unknown setting or registry id is left alone: this layer
+does not ask a registry what is declared, which is what lets an app bring its settings back
+when it is reinstalled.
 
-## apps/start/src/dashboard.ts#removeWidget
+## apps/start/src/screenStore.ts#ScreenStore.remove
 
-A widget can be taken off the dashboard, except the last one. An empty dashboard is a blank
-window with no control left to add anything back, so the refusal belongs beside the edit
-rather than in the button that calls it.
+Deleting a Screen keeps the set usable. The last Screen cannot be deleted, and Home is a role,
+so deleting it first asks which other Screen becomes Home; a refusal changes nothing and names
+what to do. The window's open Screen is separate from Home, so showing another composition does
+not move what the next launch opens.
+
+## apps/start/src/screenView.ts#resolveScreenWidgets
+
+The join between a Screen and what this build can draw. The host table is consulted first,
+because `start.apps` and `start.recents` are Start's own widgets rather than app declarations;
+the app registry comes second, built from each installed manifest's `widgets` field. An id
+neither knows is kept and described as unknown, with its saved settings still named.
+
+## apps/start/src/hostWidgets.ts#HOST_WIDGETS
+
+Start's own widgets: the app grid and the recently opened list. They use the registry-id shape
+a Screen names so one ordered list can hold host and app widgets together, but they are not
+`SuiteWidget` descriptors and have no capture action. Keeping the table separate is what stops
+the app registry from having to pretend the host is an app.
+
+## apps/start/src/screenView.ts#availableScreenWidgets
+
+The add picker's list: host widgets first, then app widgets the open Screen does not show yet.
+A registry id appears once per Screen, so an id already drawn is not offered again.

@@ -14,15 +14,15 @@
     "package:dir": "pnpm build && electron-builder --dir",
     "start": "electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build:all": "pnpm --filter @suite/contracts --filter @suite/files --filter @suite/theme --filter @suite/ui --filter @suite/desktop --filter @suite/start --workspace-concurrency=1 run build",
-    "typecheck:all": "pnpm --filter @suite/start --filter @suite/contracts --filter @suite/desktop --filter @suite/files --filter @suite/theme --filter @suite/ui run typecheck",
+    "build:all": "pnpm --filter @suite/contracts --filter @suite/screens --filter @suite/files --filter @suite/theme --filter @suite/ui --filter @suite/desktop --filter @suite/start --workspace-concurrency=1 run build",
+    "typecheck:all": "pnpm --filter @suite/start --filter @suite/screens --filter @suite/contracts --filter @suite/desktop --filter @suite/files --filter @suite/theme --filter @suite/ui run typecheck",
     "check": "biome check . && pnpm build:all && pnpm typecheck:all && vitest run",
     "check:full": "pnpm check",
     "format": "biome format --write .",
     "lint": "biome check .",
     "test": "vitest run",
     "verify": "pnpm check",
-    "build:verify": "pnpm --filter @suite/contracts --filter @suite/files --filter @suite/theme --filter @suite/ui --filter @suite/desktop --filter @suite/start --workspace-concurrency=1 run build && git diff --exit-code -- ../../packages",
+    "build:verify": "pnpm --filter @suite/contracts --filter @suite/screens --filter @suite/files --filter @suite/theme --filter @suite/ui --filter @suite/desktop --filter @suite/start --workspace-concurrency=1 run build && git diff --exit-code -- ../../packages",
     "e2e": "playwright test",
     "e2e:packaged": "playwright test --config playwright.packaged.config.ts",
     "dev": "pnpm build:all && pnpm --filter @suite/start start"
@@ -30,6 +30,7 @@
   "dependencies": {
     "@suite/contracts": "workspace:*",
     "@suite/desktop": "workspace:*",
+    "@suite/screens": "workspace:*",
     "@suite/theme": "workspace:*"
   },
   "devDependencies": {
