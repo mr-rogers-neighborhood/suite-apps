@@ -86,7 +86,12 @@ function buildCode(
  * not trust it either.
  */
 function zipEntries(
-  entries: readonly { readonly name: string; readonly bytes: Uint8Array }[],
+  entries: readonly {
+    readonly name: string;
+    readonly bytes: Uint8Array;
+    /** What the local header claims, when it should disagree with `bytes`. */
+    readonly declaredSize?: number;
+  }[],
 ): Uint8Array {
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
@@ -101,7 +106,7 @@ function zipEntries(
     localView.setUint16(6, 0, true);
     localView.setUint16(8, 0, true);
     localView.setUint32(18, entry.bytes.byteLength, true);
-    localView.setUint32(22, entry.bytes.byteLength, true);
+    localView.setUint32(22, entry.declaredSize ?? entry.bytes.byteLength, true);
     localView.setUint16(26, name.byteLength, true);
     local.set(name, 30);
     local.set(entry.bytes, 30 + name.byteLength);
@@ -198,6 +203,20 @@ describe("pack archives", () => {
     expect(await readCode(archive, { maxFileBytes: 1 })).toBe("too-large");
     expect(await readCode(archive, { maxTotalBytes: 1 })).toBe("too-large");
     expect(await readCode(archive, { maxFiles: 2 })).toBe("too-many-files");
+  });
+
+  it("refuses an entry that grows past or ends before its declared size", async () => {
+    // The reader checks the bytes it actually received against the local header,
+    // not only the header's own limit.
+    const grown = zipEntries([
+      { name: "manifest.json", bytes: encoder.encode("{}"), declaredSize: 1 },
+    ]);
+    expect(await readCode(grown)).toBe("invalid-zip");
+
+    const short = zipEntries([
+      { name: "manifest.json", bytes: encoder.encode("{}"), declaredSize: 3 },
+    ]);
+    expect(await readCode(short)).toBe("invalid-zip");
   });
 
   it("refuses a manifest.json payload when building", async () => {
