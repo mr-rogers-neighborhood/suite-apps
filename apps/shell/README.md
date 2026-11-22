@@ -54,6 +54,24 @@ The pinned pack key is shared with Suite Go, but the manifest is not: Go require
 refused by Go and a Go `.pack` is refused here until the formats are unified (#202).
 [Status](../../docs/reference/status.md) records the split.
 
+## Install as a Flatpak
+
+The host installs as the Flatpak **Suite**, id `run.suite.shell`:
+
+```sh
+flatpak install --user suite run.suite.shell
+flatpak run run.suite.shell
+```
+
+Updates arrive through Flatpak: `flatpak update --user` replaces the deployment, and the app does
+not check for or install its own update. From a checkout, `node scripts/flatpak.mjs --app shell`
+builds the same unpacked tree into the local store.
+
+Packs live in the sandbox data directory, `~/.var/app/run.suite.shell`, not in the checkout. A
+development pack under `packs/` therefore does not load in the Flatpak, and `SUITE_SHELL_DEV_PACKS=1`
+stays a convenience of an unpackaged build. The Flatpak does not register `suite://` yet: Start keeps
+the scheme in this phase, and the host routes a link that reaches it.
+
 ## Installing, updating and removing a pack
 
 Home's `shell.apps` widget shows installed packs and the local catalogue together. The catalogue is a directory
