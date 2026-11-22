@@ -149,7 +149,7 @@ describe("the space document", () => {
     expect(store.state().activeTabId).toBe("old-tab");
   });
 
-  it("accepts a screen tab in the model without rendering it", async () => {
+  it("opens and restores a screen tab", async () => {
     const store = await SpaceStore.open(path);
     const tab = await store.openTab({ kind: "screen", screenId: "home", title: "Home" });
 
@@ -157,6 +157,88 @@ describe("the space document", () => {
       tabs: [{ kind: "screen", id: tab.id, screenId: "home", title: "Home" }],
       activeTabId: tab.id,
     });
+  });
+
+  it("restores both tab kinds from a version-2 document", async () => {
+    const doc = new LoroDoc();
+    doc.getMap("shell").set("version", 2);
+    doc.getMap("shell").set("activeTabId", "screen-tab");
+    const space = doc.getMap("spaces").ensureMergeableMap("default");
+    space.set("name", "Default");
+    space.set("color", "#7c9cff");
+
+    const pack = doc.getMap("tabs").ensureMergeableMap("pack-tab");
+    pack.set("kind", "pack");
+    pack.set("packId", "welcome");
+    pack.set("title", "Welcome");
+    pack.set("entry", "index.html");
+    pack.set("spaceId", "default");
+
+    const screen = doc.getMap("tabs").ensureMergeableMap("screen-tab");
+    screen.set("kind", "screen");
+    screen.set("screenId", "shell-home");
+    screen.set("title", "Home");
+    screen.set("spaceId", "default");
+
+    doc.getList("tab-order").push("screen-tab");
+    doc.getList("tab-order").push("pack-tab");
+    doc.commit();
+    await writeFile(path, doc.export({ mode: "snapshot" }));
+
+    const store = await SpaceStore.open(path);
+    expect(store.state()).toEqual({
+      tabs: [
+        { kind: "screen", id: "screen-tab", screenId: "shell-home", title: "Home" },
+        {
+          kind: "pack",
+          id: "pack-tab",
+          packId: "welcome",
+          title: "Welcome",
+          entry: "index.html",
+        },
+      ],
+      activeTabId: "screen-tab",
+    });
+
+    await store.activateTab("pack-tab");
+    expect(store.state().activeTabId).toBe("pack-tab");
+  });
+
+  it("ensures one screen tab and does not duplicate it", async () => {
+    const store = await SpaceStore.open(path);
+    const first = await store.ensureScreenTab({
+      screenId: "shell-home",
+      title: "Home",
+      first: true,
+    });
+    const second = await store.ensureScreenTab({
+      screenId: "shell-home",
+      title: "Home",
+      first: true,
+    });
+
+    expect(first.opened).toBe(true);
+    expect(second.opened).toBe(false);
+    expect(second.tab.id).toBe(first.tab.id);
+    expect(store.state().tabs).toHaveLength(1);
+  });
+
+  it("puts a first screen tab before a restored pack tab without stealing focus", async () => {
+    const store = await SpaceStore.open(path);
+    const pack = await store.openTab({
+      packId: "welcome",
+      title: "Welcome",
+      entry: "index.html",
+    });
+
+    const ensured = await store.ensureScreenTab({
+      screenId: "shell-home",
+      title: "Home",
+      first: true,
+    });
+    expect(store.state().tabs.map((tab) => tab.id)).toEqual([ensured.tab.id, pack.id]);
+    expect(store.state().activeTabId).toBe(pack.id);
+    expect(store.state().tabs[0]?.title).toBe("Home");
   });
 
   it("treats an unknown active tab as the launcher", async () => {

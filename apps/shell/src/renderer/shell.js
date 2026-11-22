@@ -1,29 +1,41 @@
 /*
  * The chrome page.
  *
- * It draws the tab strip and the launcher. It never draws pack content: a pack
- * lives in its own WebContentsView over the area below the tab bar. The page
- * names packs and tabs; the main process owns windows, views and documents.
+ * It draws the tab strip, and the Screen the active tab names. A pack tab is covered by
+ * its own WebContentsView, so this page draws only the tab strip and the empty state
+ * while a pack is active. A Screen tab is host chrome: the composition fills the same
+ * area the launcher used to.
+ *
+ * The page is a read-only view of the state the main process pushes. It never reads a
+ * file, keeps no document state, and calls host actions that answer with the new state.
  */
 
 const api = globalThis.suiteShell;
 
 const elements = {
   tabs: document.querySelector("#tabs"),
-  packs: document.querySelector("#packs"),
-  packCount: document.querySelector("#pack-count"),
-  catalogue: document.querySelector("#catalogue"),
-  catalogueCount: document.querySelector("#catalogue-count"),
-  search: document.querySelector("#search"),
+  screen: document.querySelector("#screen"),
+  screenName: document.querySelector("#screen-name"),
+  screenEyebrow: document.querySelector(".screen-title .eyebrow"),
+  widgets: document.querySelector("#widgets"),
   notice: document.querySelector("#notice"),
+  editToggle: document.querySelector("#edit-toggle"),
+  editBar: document.querySelector("#edit-bar"),
+  widgetChoice: document.querySelector("#widget-choice"),
+  addWidget: document.querySelector("#add-widget"),
+  empty: document.querySelector("#empty"),
   newTab: document.querySelector("#new-tab"),
   home: document.querySelector("#home"),
-  installPack: document.querySelector("#install-pack"),
+  openHome: document.querySelector("#open-home"),
 };
+
+const SIZES = ["1x1", "2x1", "full"];
 
 let state = {
   tabs: [],
   activeTabId: null,
+  surface: "launcher",
+  screens: [],
   packs: [],
   catalogue: [],
   installedVersions: [],
@@ -31,7 +43,15 @@ let state = {
   notice: null,
 };
 let query = "";
+let editing = false;
 let shouldFocusSearch = true;
+let appsView = {
+  packs: null,
+  packCount: null,
+  catalogue: null,
+  catalogueCount: null,
+  search: null,
+};
 
 function showNotice(message) {
   elements.notice.hidden = false;
@@ -39,9 +59,23 @@ function showNotice(message) {
 }
 
 function run(promise) {
-  promise.catch((error) => {
+  Promise.resolve(promise).catch((error) => {
     showNotice(error instanceof Error ? error.message : "The host refused that action.");
   });
+}
+
+/** A widget action answers with the new state; draw it without waiting for the push. */
+function runAction(promise) {
+  Promise.resolve(promise)
+    .then((next) => {
+      if (next && Array.isArray(next.tabs)) {
+        state = next;
+        paint();
+      }
+    })
+    .catch((error) => {
+      showNotice(error instanceof Error ? error.message : "The host refused that action.");
+    });
 }
 
 function colorFor(id) {
@@ -65,6 +99,17 @@ function applyTheme() {
   }
 }
 
+function sizeLabel(size) {
+  if (size === "full") return "Full row";
+  if (size === "2x1") return "2 × 1";
+  return "1 × 1";
+}
+
+function nextSize(size) {
+  const index = SIZES.indexOf(size);
+  return SIZES[(index + 1) % SIZES.length];
+}
+
 function renderTabs() {
   const fragment = document.createDocumentFragment();
 
@@ -75,11 +120,13 @@ function renderTabs() {
     node.setAttribute("aria-selected", String(selected));
     node.tabIndex = selected ? 0 : -1;
     node.dataset.tabId = tab.id;
+    node.dataset.kind = tab.kind;
     node.title = tab.title;
 
     const dot = element("span", "tab-dot");
-    dot.style.background = colorFor(tab.kind === "pack" ? tab.packId : tab.id);
+    dot.style.background = colorFor(tab.kind === "pack" ? tab.packId : tab.screenId);
     dot.setAttribute("aria-hidden", "true");
+    if (tab.kind === "screen") dot.classList.add("tab-dot-screen");
 
     const title = element("span", "tab-title", tab.title);
     const close = element("button", "tab-close", "×");
@@ -251,35 +298,37 @@ function catalogueCard(entry) {
 }
 
 function renderPacks() {
+  if (appsView.packs === null) return;
   const matches = state.packs.filter((pack) => matchesQuery(pack.name, pack.id, pack.description));
-
-  elements.packCount.textContent = countLabel(state.packs.length, "pack");
+  appsView.packCount.textContent = countLabel(state.packs.length, "pack");
 
   if (matches.length === 0) {
-    const message = element(
-      "p",
-      "empty",
-      state.packs.length === 0
-        ? "No packs are installed. Add a signed pack or install one from the catalogue below."
-        : `No pack matches “${query.trim()}”.`,
+    appsView.packs.replaceChildren(
+      element(
+        "p",
+        "empty",
+        state.packs.length === 0
+          ? "No packs are installed. Add a signed pack or install one from the catalogue below."
+          : `No pack matches “${query.trim()}”.`,
+      ),
     );
-    elements.packs.replaceChildren(message);
     return;
   }
 
   const fragment = document.createDocumentFragment();
   for (const pack of matches) fragment.append(installedCard(pack));
-  elements.packs.replaceChildren(fragment);
+  appsView.packs.replaceChildren(fragment);
 }
 
 function renderCatalogue() {
+  if (appsView.catalogue === null) return;
   const matches = state.catalogue.filter((entry) =>
     matchesQuery(entry.name, entry.id, entry.description),
   );
-  elements.catalogueCount.textContent = countLabel(state.catalogue.length, "archive");
+  appsView.catalogueCount.textContent = countLabel(state.catalogue.length, "archive");
 
   if (state.catalogue.length === 0) {
-    elements.catalogue.replaceChildren(
+    appsView.catalogue.replaceChildren(
       element(
         "p",
         "empty",
@@ -289,7 +338,7 @@ function renderCatalogue() {
     return;
   }
   if (matches.length === 0) {
-    elements.catalogue.replaceChildren(
+    appsView.catalogue.replaceChildren(
       element("p", "empty", `No catalogue archive matches “${query.trim()}”.`),
     );
     return;
@@ -297,79 +346,344 @@ function renderCatalogue() {
 
   const fragment = document.createDocumentFragment();
   for (const entry of matches) fragment.append(catalogueCard(entry));
-  elements.catalogue.replaceChildren(fragment);
+  appsView.catalogue.replaceChildren(fragment);
 }
 
-function paint() {
-  applyTheme();
-  renderTabs();
+function refreshApps() {
   renderPacks();
   renderCatalogue();
-
-  const active = state.tabs.find((tab) => tab.id === state.activeTabId);
-  document.body.dataset.active = String(state.activeTabId !== null);
-  document.title = active ? `${active.title} — Suite` : "Suite";
-
-  elements.notice.hidden = state.notice === null;
-  elements.notice.textContent = state.notice ?? "";
-
-  if (state.activeTabId === null && shouldFocusSearch) {
-    shouldFocusSearch = false;
-    elements.search.focus();
-  }
 }
 
-function bindChrome() {
-  elements.newTab.addEventListener("click", () => {
-    shouldFocusSearch = true;
-    run(api.newTab());
-  });
-  elements.home.addEventListener("click", () => {
-    shouldFocusSearch = true;
-    run(api.newTab());
-  });
+/**
+ * The `shell.apps` host widget: the installed pack grid and the local catalogue.
+ *
+ * It is the launcher's content, drawn inside the Screen rather than beside it, so Home
+ * replaces the bare launcher instead of duplicating it.
+ */
+function renderAppsWidget(body) {
+  body.classList.add("apps-widget");
 
-  elements.search.addEventListener("input", () => {
-    query = elements.search.value;
-    renderPacks();
-    renderCatalogue();
+  const search = element("label", "search");
+  const hidden = element("span", "visually-hidden", "Search packs");
+  const input = element("input", "");
+  input.type = "search";
+  input.placeholder = "Search packs…";
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  input.value = query;
+  input.addEventListener("input", () => {
+    query = input.value;
+    refreshApps();
   });
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    input.value = "";
+    query = "";
+    refreshApps();
+  });
+  search.append(hidden, input);
+  body.append(search);
 
-  elements.installPack.addEventListener("click", () => {
-    elements.installPack.disabled = true;
+  const installed = element("section");
+  const installedHead = element("div", "section-head");
+  const packCount = element("span", "count");
+  installedHead.append(element("h2", "", "Installed"), packCount);
+  const packs = element("div", "grid");
+  installed.append(installedHead, packs);
+
+  const available = element("section", "available");
+  const availableHead = element("div", "section-head");
+  const catalogueCount = element("span", "count");
+  availableHead.append(element("h2", "", "Available"), catalogueCount);
+  const muted = element(
+    "p",
+    "muted",
+    "Packs arrive as signed .suitepack files in the catalogue folder. Installing adds one to this device. A new app opens right away; restart Suite to run a new version of an app that is already open. An update keeps the old version until you remove it.",
+  );
+  const catalogue = element("div", "grid");
+  const install = element("button", "install", "Add pack…");
+  install.type = "button";
+  install.addEventListener("click", () => {
+    install.disabled = true;
     Promise.resolve(api.installPack())
       .catch((error) => {
         showNotice(error instanceof Error ? error.message : "The host refused that action.");
       })
       .finally(() => {
-        elements.installPack.disabled = false;
+        install.disabled = false;
       });
+  });
+  available.append(availableHead, muted, catalogue, install);
+
+  body.append(installed, available);
+  appsView = { packs, packCount, catalogue, catalogueCount, search: input };
+  refreshApps();
+}
+
+function appWidgetBody(widget) {
+  const fragment = document.createDocumentFragment();
+  fragment.append(element("p", "widget-meta", `From ${widget.appName}`));
+
+  if (widget.fields.length === 0) {
+    fragment.append(element("p", "widget-muted", "This widget declares no fields."));
+  } else {
+    const fields = element("div", "fields");
+    for (const field of widget.fields) {
+      const row = element("div", "field");
+      const label = element("span", "field-label", field.label);
+      row.append(label, element("span", "pill", field.type));
+      if (field.required) row.append(element("span", "pill pill-required", "required"));
+      fields.append(row);
+    }
+    fragment.append(fields);
+  }
+
+  if (widget.settings.length > 0) {
+    const settings = element("div", "widget-settings");
+    for (const setting of widget.settings) {
+      settings.append(
+        element("p", "widget-muted", `${setting.label}: ${setting.value || "not set"}`),
+      );
+    }
+    fragment.append(settings);
+  }
+  if (widget.unknownSettings.length > 0) {
+    fragment.append(
+      element(
+        "p",
+        "widget-muted",
+        `Saved settings this widget does not declare: ${widget.unknownSettings.join(", ")}.`,
+      ),
+    );
+  }
+  if (widget.issues.length > 0) {
+    fragment.append(
+      element("p", "card-warning", `Check this widget's settings: ${widget.issues.join("; ")}.`),
+    );
+  }
+  if (widget.note !== null) fragment.append(element("p", "widget-note", widget.note));
+  return fragment;
+}
+
+function editControls(widget, index, total) {
+  const controls = element("div", "widget-edit");
+
+  const earlier = actionButton("Move earlier", () =>
+    runAction(api.moveWidget(widget.registryId, "earlier")),
+  );
+  earlier.disabled = index === 0;
+
+  const later = actionButton("Move later", () =>
+    runAction(api.moveWidget(widget.registryId, "later")),
+  );
+  later.disabled = index === total - 1;
+
+  const size = actionButton(`Size: ${sizeLabel(widget.size)}`, () =>
+    runAction(api.resizeWidget(widget.registryId, nextSize(widget.size))),
+  );
+
+  const remove = actionButton(
+    "Remove",
+    () => runAction(api.removeWidget(widget.registryId)),
+    "action-danger",
+  );
+
+  controls.append(earlier, later, size, remove);
+  return controls;
+}
+
+function widgetTile(widget, index, total) {
+  const tile = element("section", `widget widget-${widget.size} widget-${widget.source}`);
+  tile.dataset.registryId = widget.registryId;
+  tile.setAttribute("role", "group");
+  tile.setAttribute("aria-label", `${widget.title}, ${sizeLabel(widget.size)}`);
+  if (editing) tile.tabIndex = 0;
+
+  const head = element("div", "widget-head");
+  const title = element("h2", "widget-title", widget.title);
+  head.append(title);
+  if (widget.source === "host") head.append(element("span", "pill pill-host", "Suite"));
+  if (widget.source === "app" && widget.appName !== null) {
+    head.append(element("span", "pill", widget.appName));
+  }
+  if (widget.source === "unknown") head.append(element("span", "pill pill-refused", "unknown"));
+  head.append(element("span", "widget-size", sizeLabel(widget.size)));
+  tile.append(head);
+
+  const body = element("div", "widget-body");
+  if (widget.source === "host" && widget.registryId === "shell.apps") {
+    renderAppsWidget(body);
+  } else if (widget.source === "host") {
+    if (widget.note !== null) body.append(element("p", "widget-note", widget.note));
+  } else if (widget.source === "app") {
+    body.append(appWidgetBody(widget));
+  } else {
+    if (widget.note !== null) body.append(element("p", "widget-note", widget.note));
+    if (widget.unknownSettings.length > 0) {
+      body.append(
+        element(
+          "p",
+          "widget-muted",
+          `Saved settings kept with it: ${widget.unknownSettings.join(", ")}.`,
+        ),
+      );
+    }
+  }
+  tile.append(body);
+
+  if (editing) {
+    tile.append(editControls(widget, index, total));
+    tile.addEventListener("keydown", (event) => {
+      if (event.target !== tile) return;
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        runAction(api.moveWidget(widget.registryId, "earlier"));
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        runAction(api.moveWidget(widget.registryId, "later"));
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        const current = SIZES.indexOf(widget.size);
+        const previous = SIZES[(current - 1 + SIZES.length) % SIZES.length];
+        runAction(api.resizeWidget(widget.registryId, previous));
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        runAction(api.resizeWidget(widget.registryId, nextSize(widget.size)));
+      } else if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        runAction(api.removeWidget(widget.registryId));
+      }
+    });
+  }
+
+  return tile;
+}
+
+function renderWidgets(view) {
+  const fragment = document.createDocumentFragment();
+  view.widgets.forEach((widget, index) => {
+    fragment.append(widgetTile(widget, index, view.widgets.length));
+  });
+  if (view.widgets.length === 0) {
+    fragment.append(element("p", "empty", "This Screen has no widgets. Choose Edit to add one."));
+  }
+  elements.widgets.replaceChildren(fragment);
+}
+
+function renderChoices(view) {
+  const placed = new Set(view.widgets.map((widget) => widget.registryId));
+  const choices = view.choices.filter((choice) => !placed.has(choice.registryId));
+  elements.widgetChoice.replaceChildren();
+  for (const choice of choices) {
+    const option = element("option", "", `${choice.title} — ${choice.appName}`);
+    option.value = choice.registryId;
+    elements.widgetChoice.append(option);
+  }
+  elements.addWidget.disabled = choices.length === 0;
+}
+
+function updateFocus() {
+  if (!shouldFocusSearch) return;
+  if (state.surface !== "screen" || appsView.search === null) return;
+  shouldFocusSearch = false;
+  appsView.search.focus();
+}
+
+function renderScreen() {
+  const active = state.tabs.find((tab) => tab.id === state.activeTabId);
+  const screenTab = active !== undefined && active.kind === "screen" ? active : null;
+  const view =
+    screenTab === null ? undefined : state.screens.find((s) => s.id === screenTab.screenId);
+  const visible = state.surface === "screen" && screenTab !== null;
+
+  elements.screen.hidden = !visible;
+  elements.empty.hidden = state.surface !== "launcher";
+
+  if (!visible) {
+    editing = false;
+    appsView = {
+      packs: null,
+      packCount: null,
+      catalogue: null,
+      catalogueCount: null,
+      search: null,
+    };
+    return;
+  }
+
+  elements.notice.hidden = state.notice === null;
+  elements.notice.textContent = state.notice ?? "";
+  elements.screenName.textContent = view ? view.name : screenTab.title;
+  elements.screenEyebrow.textContent = view ? "Screen" : "Unavailable screen";
+
+  if (view === undefined || !view.available) {
+    editing = false;
+    elements.editToggle.hidden = true;
+    elements.editBar.hidden = true;
+    elements.widgets.replaceChildren(
+      element(
+        "p",
+        "empty",
+        `${screenTab.title} is not a screen this build has. The tab is kept so you can close it.`,
+      ),
+    );
+    return;
+  }
+
+  elements.editToggle.hidden = false;
+  elements.editToggle.textContent = editing ? "Done" : "Edit";
+  elements.editToggle.setAttribute("aria-pressed", String(editing));
+  elements.editBar.hidden = !editing;
+  renderChoices(view);
+  renderWidgets(view);
+  updateFocus();
+}
+
+function paint() {
+  applyTheme();
+  renderTabs();
+  renderScreen();
+
+  const active = state.tabs.find((tab) => tab.id === state.activeTabId);
+  document.body.dataset.surface = state.surface;
+  document.title = active ? `${active.title} — Suite` : "Suite";
+}
+
+function bindChrome() {
+  const openHome = () => {
+    shouldFocusSearch = true;
+    run(api.newTab());
+  };
+
+  elements.newTab.addEventListener("click", openHome);
+  elements.home.addEventListener("click", openHome);
+  elements.openHome.addEventListener("click", openHome);
+
+  elements.editToggle.addEventListener("click", () => {
+    editing = !editing;
+    paint();
+  });
+
+  elements.addWidget.addEventListener("click", () => {
+    const registryId = elements.widgetChoice.value;
+    if (registryId.length === 0) return;
+    runAction(api.addWidget(registryId));
   });
 
   document.addEventListener("keydown", (event) => {
     const command = event.ctrlKey || event.metaKey;
-    if (!command) {
-      if (event.key === "Escape" && document.activeElement === elements.search) {
-        elements.search.value = "";
-        query = "";
-        renderPacks();
-        renderCatalogue();
-      }
-      return;
-    }
+    if (!command) return;
 
     if (event.key.toLowerCase() === "t") {
       event.preventDefault();
-      shouldFocusSearch = true;
-      run(api.newTab());
+      openHome();
     } else if (event.key.toLowerCase() === "w" && state.activeTabId !== null) {
       event.preventDefault();
       run(api.closeTab(state.activeTabId));
     } else if (event.key.toLowerCase() === "k") {
       event.preventDefault();
       shouldFocusSearch = true;
-      elements.search.focus();
-      elements.search.select();
+      updateFocus();
     }
   });
 }
@@ -387,7 +701,6 @@ async function start() {
   api.onState((next) => {
     if (!next) return;
     received = true;
-    if (next.activeTabId === null && state.activeTabId !== null) shouldFocusSearch = true;
     state = next;
     paint();
   });

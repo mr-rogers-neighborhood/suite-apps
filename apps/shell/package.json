@@ -14,8 +14,8 @@
     "start": "electron .",
     "dev": "SUITE_SHELL_DEV_PACKS=1 pnpm build:all && SUITE_SHELL_DEV_PACKS=1 pnpm start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build:all": "pnpm --filter @suite/contracts --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme --filter @suite/shell --workspace-concurrency=1 run build",
-    "typecheck:all": "pnpm --filter @suite/shell --filter @suite/contracts --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme run typecheck",
+    "build:all": "pnpm --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme --filter @suite/shell --workspace-concurrency=1 run build",
+    "typecheck:all": "pnpm --filter @suite/shell --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme run typecheck",
     "check:packages": "pnpm --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host run check && pnpm --filter @suite/pack --filter @suite/pack-host test",
     "check": "pnpm build:all && pnpm check:packages && biome check . && pnpm typecheck:all && vitest run",
     "check:full": "pnpm check",
@@ -25,9 +25,11 @@
     "verify": "pnpm check"
   },
   "dependencies": {
+    "@suite/contracts": "workspace:*",
     "@suite/pack": "workspace:*",
     "@suite/pack-host": "workspace:*",
     "@suite/pack-runtime": "workspace:*",
+    "@suite/screens": "workspace:*",
     "@suite/desktop": "workspace:*",
     "@suite/theme": "workspace:*",
     "loro-crdt": "^1.18.0",

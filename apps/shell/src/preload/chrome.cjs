@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld("suiteShell", {
   installCataloguePack: (id, version) =>
     ipcRenderer.invoke("suite:shell:install-catalogue-pack", id, version),
   uninstallPack: (id, version) => ipcRenderer.invoke("suite:shell:uninstall-pack", id, version),
+  addWidget: (registryId) => ipcRenderer.invoke("suite:shell:add-widget", registryId),
+  removeWidget: (registryId) => ipcRenderer.invoke("suite:shell:remove-widget", registryId),
+  moveWidget: (registryId, direction) =>
+    ipcRenderer.invoke("suite:shell:move-widget", registryId, direction),
+  resizeWidget: (registryId, size) =>
+    ipcRenderer.invoke("suite:shell:resize-widget", registryId, size),
   onState: (listener) => {
     ipcRenderer.on("suite:shell:state-changed", (_event, state) => listener(state));
   },

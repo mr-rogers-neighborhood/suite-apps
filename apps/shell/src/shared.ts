@@ -5,6 +5,7 @@
  * `channels.test.ts` reads them and fails if a channel name drifts. Types are
  * duplicated nowhere: both sides of IPC use these shapes.
  */
+import type { SuiteWidgetFieldType, SuiteWidgetSize } from "@suite/contracts";
 import { PACK_CAPABILITIES, type PackCapability } from "@suite/pack/capabilities";
 import type { FileHandleInfo } from "@suite/pack-runtime";
 
@@ -25,6 +26,10 @@ export const CHROME_IPC = {
   installPack: "suite:shell:install-pack",
   installCataloguePack: "suite:shell:install-catalogue-pack",
   uninstallPack: "suite:shell:uninstall-pack",
+  addWidget: "suite:shell:add-widget",
+  removeWidget: "suite:shell:remove-widget",
+  moveWidget: "suite:shell:move-widget",
+  resizeWidget: "suite:shell:resize-widget",
 } as const;
 
 /** Pushed, not invoked: the chrome redraws from the last state it received. */
@@ -151,6 +156,69 @@ export interface ScreenShellTab {
 
 export type ShellTab = PackShellTab | ScreenShellTab;
 
+/**
+ * What the chrome paints below the tab strip.
+ *
+ * A pack tab is covered by its own view, so the chrome content is hidden. A screen
+ * tab is host chrome, so its composition fills that same area. With no active tab
+ * the chrome shows its empty state rather than a second copy of Home.
+ */
+export type ShellSurface = "launcher" | "pack" | "screen";
+
+/** Where a placement's descriptor came from. `unknown` is kept, never dropped. */
+export type ScreenWidgetSource = "host" | "app" | "unknown";
+
+/** One field a widget declares. The host draws it; the app never supplies DOM. */
+export interface ScreenWidgetFieldView {
+  readonly id: string;
+  readonly label: string;
+  readonly type: SuiteWidgetFieldType;
+  readonly required: boolean;
+}
+
+/** One instance setting with its saved (or default) value resolved by the registry. */
+export interface ScreenWidgetSettingView {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+}
+
+export interface ScreenWidgetView {
+  readonly registryId: string;
+  readonly size: SuiteWidgetSize;
+  readonly source: ScreenWidgetSource;
+  readonly title: string;
+  readonly appId: string | null;
+  readonly appName: string | null;
+  /** A sentence for an unknown widget or a write path this host cannot serve yet. */
+  readonly note: string | null;
+  readonly fields: readonly ScreenWidgetFieldView[];
+  readonly settings: readonly ScreenWidgetSettingView[];
+  /** Instance settings the declared descriptor does not know. Kept on the Screen. */
+  readonly unknownSettings: readonly string[];
+  /** Settings that do not fit their declared field. */
+  readonly issues: readonly string[];
+}
+
+/** One widget the edit surface offers to add. */
+export interface ScreenChoiceView {
+  readonly registryId: string;
+  readonly title: string;
+  readonly source: "host" | "app";
+  readonly appId: string;
+  readonly appName: string;
+  readonly size: SuiteWidgetSize;
+}
+
+/** A Screen as the chrome draws it. `available` is false for a restored unknown screen. */
+export interface ScreenView {
+  readonly id: string;
+  readonly name: string;
+  readonly available: boolean;
+  readonly widgets: readonly ScreenWidgetView[];
+  readonly choices: readonly ScreenChoiceView[];
+}
+
 export interface ThemeView {
   readonly mode: "light" | "dark";
   readonly values: Readonly<Record<string, string>>;
@@ -159,6 +227,8 @@ export interface ThemeView {
 export interface ShellState {
   readonly tabs: readonly ShellTab[];
   readonly activeTabId: string | null;
+  readonly surface: ShellSurface;
+  readonly screens: readonly ScreenView[];
   readonly packs: readonly PackSummary[];
   readonly catalogue: readonly CatalogueEntry[];
   readonly installedVersions: readonly InstalledVersionView[];

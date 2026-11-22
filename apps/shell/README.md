@@ -5,7 +5,7 @@ The desktop host. One installed Electron app; each app is a sandboxed, signed pa
 This is a spike, not the shipping desktop app. Canvas, Planner, Budget, Help, Start and Sync remain
 separate Flatpaks. The point of this tree is to prove the host boundary before anything migrates:
 
-- one window, a host-owned tab strip, and a pack view per tab;
+- one window, a host-owned tab strip, pack views and host-rendered Screen tabs;
 - each pack on its own `suite-pack://<container>.<id>` origin and its own session partition;
 - renderer-only packs: no Node, no raw filesystem, no network unless the manifest declares it;
 - a scoped document API that carries opaque bytes and never a path;
@@ -16,6 +16,8 @@ separate Flatpaks. The point of this tree is to prove the host boundary before a
 - `suite://<pack-id>/<path>` routing and a launch context per tab;
 - a shell-owned Loro space document that restores tabs, models pack and screen tabs, and is
   container-ready;
+- a shell-owned Home Screen that opens before any pack, renders the pack grid as a host widget,
+  and draws declared app widgets and named placeholders for unknown ones;
 - three sample packs that exercise the boundary on purpose.
 
 ## Run it
@@ -54,7 +56,7 @@ refused by Go and a Go `.pack` is refused here until the formats are unified (#2
 
 ## Installing, updating and removing a pack
 
-The launcher shows installed packs and the local catalogue together. The catalogue is a directory
+Home's `shell.apps` widget shows installed packs and the local catalogue together. The catalogue is a directory
 of `.suitepack` files (`<dataRoot>/catalogue`, or `SUITE_SHELL_CATALOGUE`). Each archive is read with
 the shared archive reader and verified before it is listed: the manifest signature against
 `SUITE_PACK_PUBLIC_KEY`, the host contract and capability list, and every file hash. A trusted entry
@@ -71,7 +73,7 @@ overwritten. A Go `.pack` is a different manifest format and is refused; it is n
 
 Updating is installing a newer archive for the same id. The loader selects the highest valid version,
 so the new version runs after a restart (or immediately when no tab is open). The old version stays
-on disk until the person removes it; the launcher lists each non-current version with an explicit
+on disk until the person removes it; Home lists each non-current version with an explicit
 **Remove** action. Nothing is deleted silently.
 
 **Uninstall** removes exactly `<dataRoot>/packs/<id>/<version>`. A symlinked install root, id
@@ -81,7 +83,7 @@ that pack is open, the host closes it first and says so in the notice; the view 
 version that loaded it and the host does not keep a second copy of that binding. The pack's documents
 under `documents/<container>/<pack>` and its files under `files/<container>/<pack>` are never touched.
 
-A newly installed app appears in the launcher immediately and opens now. A tab that is already open
+A newly installed app appears on Home immediately and opens now. A tab that is already open
 keeps its loaded view; running a replaced version of that pack needs a Suite restart, because the
 pack session's protocol handler is bound when its first view loads. The install and uninstall IPC
 exist on the chrome bridge only; a pack has no installer or lifecycle channel.
@@ -89,8 +91,8 @@ exist on the chrome bridge only; a pack has no installer or lifecycle channel.
 ## Suite links and launch
 
 The host claims `suite://` and routes `suite://<pack-id>/<path>` in one pure function. A malformed
-id, an unknown or uninstalled pack, and a pack with no entry are refused with a sentence shown in
-the launcher. The path is metadata for the pack; the host loads the pack's current installed entry.
+id, an unknown or uninstalled pack, and a pack with no entry are refused with a sentence shown on
+Home. The path is metadata for the pack; the host loads the pack's current installed entry.
 A deep link never installs or updates anything.
 
 Linux and Windows deliver a link as an argument to a second launch: the single-instance lock keeps
@@ -109,15 +111,18 @@ hand a link to the OS browser without `network`.
 Suite (one BaseWindow)
 ├── chrome view (full window, sandboxed renderer)
 │   ├── tab strip
-│   └── launcher
-└── pack views (one WebContentsView per tab, below the tab bar)
+│   └── content area
+│       ├── Home / Screen composition (a screen tab is active)
+│       └── empty state (no tab is active)
+└── pack views (one WebContentsView per pack tab, below the tab bar)
     ├── suite-pack://default.welcome  → persist:default:welcome
     └── suite-pack://default.scratch  → persist:default:scratch
 ```
 
 The chrome view is the only renderer the host itself draws. A pack view covers the content area when
 its tab is active; switching tabs only hides the other views, so a half-typed document survives a
-trip through the launcher. Closing a tab destroys its view.
+switch. Closing a pack tab destroys its view. A Screen tab is host chrome: no view is created for it,
+so hiding every pack view is what makes the composition visible.
 
 The default container id is already in the data model: documents live under
 `documents/default/<pack>`, pack files under `files/<container>/<pack>`, a pack origin is
@@ -130,9 +135,63 @@ stores the live tabs; the multi-window phase splits session state into its own l
 
 A stored tab is a discriminated union: a **pack** tab names a pack and entry, and a **screen** tab
 names a host screen. The document is at `shell.version = 2`; a version-1 document has no `kind`, and
-its tabs read as pack tabs. Old tabs are not dropped or rewritten on read. This slice only accepts a
-screen tab in the model — rendering one is the next slice, and activating one today returns to the
-launcher with a notice.
+its tabs read as pack tabs. Old tabs are not dropped or rewritten on read.
+
+## Home and Screens
+
+Home is the shell's own Screen, `shell-home`, stored at `<dataRoot>/screens/shell-home.loro`. It is
+created and opened before any pack view exists, its tab is first in the strip, and it is the active
+tab on a first run. The brand and the `+` button open Home again, so closing it is safe. A restored
+space document keeps its active tab; Home is still added at the front.
+
+The composition is the same content area the launcher used to fill:
+
+```json
+{
+  "format": "suite.screen",
+  "version": 1,
+  "id": "shell-home",
+  "name": "Home",
+  "widgets": [{ "registryId": "shell.apps", "size": "full" }]
+}
+```
+
+A Screen tab is host-rendered. Opening, activating, switching away from and closing one are ordinary
+tab actions, and no pack view is created for it. While a screen tab is active every pack view is
+hidden, which exposes the chrome's composition; switching to a pack tab shows that pack's view and
+hides the composition. Closing the last tab shows an empty state with one way back to Home, not a
+second copy of the pack grid.
+
+`shell.apps` is a **host widget**, not a `SuiteWidget` descriptor: it lives in a shell table keyed by
+registry id and has no capture action or app behind it. It draws the installed-pack grid, the search
+field, the local catalogue and **Add pack…** — the launcher's content, now inside Home. Host widgets
+are resolved first, so an installed pack cannot shadow `shell.apps`.
+
+App widgets come from `widgets` in each installed pack manifest, resolved through
+`@suite/screens`'s registry as `<pack id>.<widget id>`. The host draws the declared title, fields and
+resolved settings with its own components; the pack supplies data, never DOM. A registry id that
+does not resolve is a named placeholder with a sentence, and the placement and its settings stay in
+the document. This slice does **not** deliver captures: an app widget says so, rather than offering a
+button that cannot work.
+
+**Edit** on Home adds an inline edit surface. Every action has a named button and a key on the
+focused widget:
+
+| Action               | Key                     | Button                              |
+| -------------------- | ----------------------- | ----------------------------------- |
+| Move earlier / later | `↑` / `↓`               | Move earlier, Move later            |
+| Smaller / larger     | `←` / `→`               | Size: … cycles `1x1`, `2x1`, `full` |
+| Remove               | `Delete` or `Backspace` | Remove                              |
+
+The size classes stay exactly `1x1`, `2x1` and `full`. Adding is a named **Add widget** control fed by
+the host table and the installed packs. The chrome never keeps document state; every action names a
+registry id and the main process answers with the new state. Unknown ids and unknown settings survive
+editing, saving and reopening.
+
+The screen store writes a snapshot through a temporary file and rename, keeps the previous good
+snapshot as `<id>.loro.bak`, and renames an unreadable or oversized file to `<id>.loro.corrupt-<time>`
+before starting a fresh Home. It never deletes the only copy and never repairs a newer version by
+guessing.
 
 ## The pack contract
 
@@ -257,19 +316,23 @@ decision record owns that trade.
 ## What is not built yet
 
 - a remote pack index (the catalogue is local only);
-- rendering screen tabs (the model accepts one; the view does not);
+- app-widget capture delivery (app widgets render their declared fields, but the host does not send
+  a capture to the pack yet);
 - the host's blind relay transport for pack sync;
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;
 - tab tear-off and split view (the view tree is ready; the UI is not);
-- host-rendered pack contributions (commands, menus, toolbar, status, widgets);
+- host-rendered pack contributions (commands, menus, toolbar, status; widgets are host-rendered here,
+  but a pack's non-widget contributions still are not);
+- the Screens manager (create, rename, duplicate, delete, set Home) and a portable `.screen` file with
+  export/import;
 - containers and saved spaces in the UI (the space document already carries a space id);
 - space-document sync, shared spaces, presence and follow;
 - Windows and macOS packaging.
 
 ## Sample packs
 
-These directories load only with `SUITE_SHELL_DEV_PACKS=1`; their launcher cards carry a `dev` pill.
+These directories load only with `SUITE_SHELL_DEV_PACKS=1`; their cards on Home carry a `dev` pill.
 
 - `packs/welcome` — notes, title updates, and three deliberate boundary tests: a blocked `fetch`, a
   refused sibling-path open, and a refused `files` call without the capability.
@@ -290,10 +353,13 @@ mise exec -- pnpm --filter @suite/shell build
 The tests cover pack manifest discovery and traversal, document scoping, the `files` service's
 per-pack and per-container isolation, lock ownership, the external surface's filter validation,
 token ownership and cancellation, import into the pack root, catalogue trust and refusal (valid,
-wrong-key, tampered and unsigned archives), install from the catalogue, additive updates,
+wrong-key, tampered and unsigned), install from the catalogue, additive updates,
 version-only uninstall and symlink refusal, uninstall planning for open tabs, `suite://` parsing and
-refusals, launch contexts, space document open/close/title and persistence, version-1 space
-migration, screen-tab acceptance, and the channel names the two preloads spell out by hand. The
-platform dialog itself is not exercised: tests use an injected picker, because a native dialog cannot
-run headlessly. The Electron window, protocol registration, `open-url`/`second-instance` delivery
-and an actual pack render are not exercised headlessly; their pure routing and model pieces are.
+refusals, launch contexts, space document open/close/title and persistence, version-1 and version-2
+space documents with both tab kinds, Home creation and ordering, the screen store's save, backup and
+quarantine, add/remove/move/resize including the keyboard's earlier/later path, unknown widget
+placeholders, and the channel names the two preloads spell out by hand. The platform dialog itself
+is not exercised: tests use an injected picker, because a native dialog cannot run headlessly. The
+Electron window, protocol registration, `open-url`/`second-instance` delivery, the rendered
+composition and an actual pack render are not exercised headlessly; their pure model and view pieces
+are.
