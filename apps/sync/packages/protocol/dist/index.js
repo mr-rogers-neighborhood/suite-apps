@@ -5,7 +5,7 @@ export { formatFingerprint, normaliseFingerprint } from "./fingerprint.js";
 export { frameHeaderSchema, frameKindSchema, framePayload, frameRejection, frameRejectionSchema, frameSchema, hostAcceptsEpoch, sealedFrameSchema, } from "./frame.js";
 export { deriveFriendCode, deriveFriendCodeFromBytes, formatFriendCode, friendCodeMatches, isFriendCode, parseFriendCode, } from "./friendCode.js";
 export { deviceIdFromPublicKey, friendInvitePayload, friendInviteRejectionSchema, friendInviteSchema, verifyFriendInvite, } from "./friendInvite.js";
-export { FRIEND_LINK_HOST, FRIEND_LINK_SCHEME, formatFriendLink, friendCodeLabel, parseFriendLink, } from "./friendLink.js";
+export { FRIEND_LINK_HOST, FRIEND_LINK_SCHEME, formatFriendLink, friendCodeLabel, parseContactInput, parseFriendLink, } from "./friendLink.js";
 export { genesisNamesItsRoot, genesisPayload, genesisRecordSchema, verifyGenesis, workspaceIdFromRootKey, } from "./genesis.js";
 export { addDevice, applyCommit, createDeviceIdentity, createWorkspaceGroup, decodeGroup, decodeKeyPackageBytes, encodeGroup, encodeKeyPackageBytes, exportKey, joinWorkspaceGroup, leafIndexOf, open, removeDevice, SUITE_CIPHERSUITE, seal, } from "./group.js";
 export { deviceIdSchema, inviteIdSchema, isDeviceId, isInviteId, isMemberId, isWorkspaceId, memberIdSchema, workspaceIdSchema, } from "./ids.js";
