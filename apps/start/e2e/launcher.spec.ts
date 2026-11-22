@@ -260,6 +260,10 @@ test("detects the Suite Sync deployment and opens it through Flatpak", async () 
   });
   const run = await launch(box, [], { SUITE_START_FLATPAK: flatpak.executable });
   try {
+    // The pane lives behind the rail's Sync tab, so the control is only visible
+    // once that section is the one on screen.
+    await run.page.getByRole("tab", { name: "Sync" }).click();
+    await expect(run.page.locator("#panel-sync")).toBeVisible();
     // Installed is a deployment fact, not a relay Start found on PATH.
     await expect(run.page.locator("#panel-sync .pane-note").first()).toHaveText(
       "Installed. Open Suite Sync to run the relay.",
@@ -282,6 +286,9 @@ test("installs Suite Sync from the store when Flatpak does not have it", async (
   const flatpak = await fakeFlatpak(box, { installed: false, sync: { installed: false } });
   const run = await launch(box, [], { SUITE_START_FLATPAK: flatpak.executable });
   try {
+    // Same as above: select the section before reaching for its controls.
+    await run.page.getByRole("tab", { name: "Sync" }).click();
+    await expect(run.page.locator("#panel-sync")).toBeVisible();
     await expect(run.page.locator("#panel-sync .pane-note").first()).toHaveText(
       "Not installed. Start can install Suite Sync from the store.",
     );
