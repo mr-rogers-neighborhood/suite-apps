@@ -5,13 +5,13 @@ belong to it; Canvas's is [here](../../apps/canvas/docs/reference/glossary.md).
 
 | Term | Means |
 | --- | --- |
-| **Suite** | The product family: Canvas, Planner, Budget, Start, Sync and Go, plus the shared packages. |
+| **Suite** | The product family: Canvas, Planner, Budget, Start, Sync, Help and Go, plus the Suite Shell host and shared packages. |
 | **App** | A user-facing product. UI copy says "app", because the hub installs apps. |
 | **Domain** | The architecture word for an app's subject matter. Go hosts domains; a pack carries one. It is the same three things as Canvas, Planner and Budget. |
 | **Pack** | A built bundle a domain module is delivered as: a manifest, declared capabilities and the module's code. |
-| **Host** | The process that launches an app and routes to it: Suite Start on the desktop, Suite Go on mobile. A host never reads a document. |
+| **Host** | The process that launches a pack and routes to it: Suite Shell on the desktop, Suite Go on mobile. Start is the shipping hub, not the host. A host never reads a document payload. |
 | **Hub** | Suite Start specifically: install, update, remove, launch, route. |
-| **Manifest** | `suite.app.json`, shipped beside an app's executable. It says what the app is and may not name a binary. |
+| **Manifest** | Three shapes with one word: `suite.app.json` beside a desktop app, `manifest.json` inside a `.suitepack`, and the update-feed manifest. The [superapp spec](../spec/superapp.md) owns the pack manifest. |
 | **Install record** | `installs.json` under `~/.config/suite/start`. It is the only place an executable path lives. |
 | **Capability** | A permission a pack declares in its manifest, which the host enforces. A declaration is not a user authorisation. |
 | **Document** | One Loro CRDT per app workspace, stored in a file the app owns: `.canvas`, `.planner` or `.budget`. |
@@ -24,7 +24,7 @@ belong to it; Canvas's is [here](../../apps/canvas/docs/reference/glossary.md).
 | **Device** | A 64-hex identity for one installation that holds a document and joins a sync workspace. |
 | **Epoch** | The group-key generation. A revoke bumps it; a client ignores a frame from another epoch. |
 | **Blind relay** | A sync server that stores sealed frames it cannot read and cannot merge. It is what the tree runs. |
-| **Session** | A period when two or more devices are connected and collaborating. There is no background wake, so collaboration is a session, not a subscription. |
+| **Session** | A period when two or more devices are connected and collaborating. A device may be signalled, but it is never woken to accept document data or a write; collaboration is a session, not a subscription. |
 | **Local-first** | The copy on the device is primary; a server, if any, holds a secondary copy. See [Local-first](../explanation/local-first.md). |
 | **Gate** | The local commands that verify a change. The root gate runs each app's gate; see [Commands](commands.md). |
 

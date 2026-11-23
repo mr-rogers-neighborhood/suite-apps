@@ -14,9 +14,9 @@ slogan.
 | **1. No spinners** | Met. Documents are local CRDTs; an edit does not wait for a server. |
 | **2. Not trapped on one device** | Partial. Canvas and Planner sync through a relay the user runs, and a second device joins with a single-use invitation from the Sync dialog. Budget has no network client. |
 | **3. The network is optional** | Met. The apps open and edit offline. Budget has no network client at all. |
-| **4. Seamless collaboration** | Partial. Canvas has live presence and collaborative editing. Collaboration is a foreground session; a sleeping device is not woken. |
-| **5. The Long Now** | Met. Files are plain and exportable, the licence is MIT, and the project operates no service that can be shut down. An older file opens and is migrated; a newer one is refused by name instead of being corrupted ([the policy](../reference/file-formats.md#opening-a-file-another-version-wrote)). |
-| **6. Security and privacy by default** | Partial. There is no account, no telemetry and no project-operated server. Document files are not encrypted, and the sync relay's TLS is a pinned self-signed certificate, so the relay itself still sees its metadata. |
+| **4. Seamless collaboration** | Partial. Canvas has live presence and collaborative editing. Collaboration is a foreground session; a device may be signalled, but it is never woken to accept document data or a write. |
+| **5. The Long Now** | Met. Files are user-owned and exportable, the licence is MIT, and the project operates no document, sync, identity, telemetry or account service. The signed Flatpak store is distribution only. An older file opens and is migrated; a newer one is refused by name instead of being corrupted ([the policy](../reference/file-formats.md#opening-a-file-another-version-wrote)). |
+| **6. Security and privacy by default** | Partial. There is no account, no telemetry and no project-operated document, sync or identity service. Document files are not encrypted, and the sync relay's TLS is a pinned self-signed certificate, so the relay itself still sees its metadata. |
 | **7. Ownership and control** | Met. A document is a file the user owns and can copy, back up or export. Apps install and uninstall without an account. |
 
 ## What "partial" means in practice
@@ -27,7 +27,9 @@ The limits are deliberate and recorded, not marketing gaps:
   through them; a second device joins with a single-use invitation the owner mints in the Sync dialog.
   Budget still opens one file on one machine. [Planner's Sync](../../apps/planner/docs/reference/sync.md)
   owns the Planner detail; [Status](../reference/status.md) has the per-subsystem picture.
-- **No background delivery.** A sleeping device is not woken. See
+- **No silent data wake.** A push may signal a notification or a wake hint, and an opt-in background
+  refresh may pull frames; correctness never depends on it. See
+  [the superapp spec](../spec/superapp.md#7-sync-sharing-and-cloud-peers) and
   `apps/go/docs/reference/decisions.md`.
 - **The sync relay is not the shipped security model.** It stores sealed frames it cannot read and,
   off loopback, serves TLS with a self-signed certificate the app pins; it still binds to loopback by

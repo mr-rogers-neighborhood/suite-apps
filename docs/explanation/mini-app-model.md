@@ -34,19 +34,19 @@ standard; the white paper documents the capability tiers in its security and pri
 
 | Mechanism | In Suite |
 | --- | --- |
-| Host plus downloaded apps | Suite Start on the desktop today; Suite Go on mobile. The `apps/shell` spike tests one desktop host with sandboxed packs, not shipped yet |
-| A manifest beside the executable | `suite.app.json` for desktop discovery; a pack manifest for Go |
+| Host plus downloaded apps | Suite Shell on the desktop and Suite Go on mobile. Start is the shipping hub; the shell is the packaged host target |
+| A manifest beside the executable | `suite.app.json` for desktop discovery; `manifest.json` inside a `.suitepack` for both hosts |
 | Declared capabilities | Pack `capabilities`, enforced by the host; see [Go decisions](../../apps/go/docs/reference/decisions.md) |
-| One instance per app | Start installs one copy per app; a second copy cannot run because the profile lock is shared |
-| Addressable app entry | `suite://<app>/workspace/<file name>` routing through Start |
+| One instance per app | Start installs one copy per app; the shell keeps one running instance per container and opens tabs into it |
+| Addressable app entry | `suite://<app>/<path>`; Start's `/workspace/` form remains a compatibility route |
 | A widget in a host surface | A descriptor a host renders on its dashboard; no app code runs in the host |
 | A document boundary | The container never reads a document; `.canvas`, `.planner` and `.budget` belong to their apps |
 
 ## Where Suite differs
 
-- **No platform review tier.** A hosted catalogue and human review cannot exist without operating a
-  platform, which the product does not do. Declared capabilities are enforced by the host; the
-  user-authorisation tier is still missing.
+- **No mandatory review tier.** An optional signed catalogue is a profile: it recommends and shows
+  provenance, but it never gates. Declared capabilities are enforced by the host; consent tiers and a
+  network allowlist are the target in [the superapp spec](../spec/superapp.md).
 - **No hosted identity.** There is no account and no directory to look a person up in. A contact list
   is local to each app, and the relay stores neither it nor a friend code; [Status](../reference/status.md)
   owns what that exchange does today.
@@ -62,7 +62,8 @@ standard; the white paper documents the capability tiers in its security and pri
   document boundary rather than a browser origin boundary.
 - **Suspend and destroy are not separated yet.** Leaving a module disposes it. WeChat keeps a
   suspended module mounted and releases it later.
-- **No background delivery.** A sleeping device is not woken.
+- **No silent data wake.** A push may signal, and opt-in background refresh may pull frames; a
+  sleeping device is never woken to accept document data or a write.
 
 ## The desktop host spike
 

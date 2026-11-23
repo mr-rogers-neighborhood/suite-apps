@@ -15,7 +15,7 @@ The rules that shape Start.
   predates the field.
 - Stable and a pre-release are two cards because they are two ids: `run.suite.<app>` and
   `run.suite.slop.<app>`. The manifest id is `slop-<app>`, and the older `slop.<app>` id is still
-  read. The card says its tier in text — `slop`, `canary` or `beta` — and names the risk and removal
+  read. The card says its tier in text — `slop`, `nightly` or `preview` — and names the risk and removal
   path; a colour is never the only signal.
 - One pre-release id means one pre-release install. Every tier shares it, and the Flatpak ref branch
   names the tier. Start refuses to install a second branch; the card offers a switch, which keeps the

@@ -8,7 +8,7 @@ Reference facts are derived; module MDX and tours are the prose layer. Prose is 
 after a person reviews or rewrites it and adds `reviewed: human` to the module or tour frontmatter.
 Until then it is generated, whether a person or an agent wrote it.
 
-**Handbook.** The Diátaxis pages under `docs/` rendered with the Fumadocs look. The source paths stay
+**Handbook.** The notes archive under `docs/` rendered with the Fumadocs look. The source paths stay
 where they are; the app labels the section _Handbook_. A link between two pages is rewritten to its
 `/handbook/...` route, so it keeps the reader in the app; a link that leaves `docs/` opens GitHub.
 

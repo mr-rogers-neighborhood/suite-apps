@@ -1,8 +1,8 @@
 # Architecture
 
-Suite is six applications in one repository. They share packages, a gate and a release process, but
-they do not share a process, a document or a trust boundary. This page describes those boundaries;
-each app's own `docs/reference/` architecture page describes its internals.
+Suite is one repository of apps. They share packages, a gate and a release process, but they do not
+share a process, a document or a trust boundary. This page describes those boundaries; each app's own
+`docs/reference/` architecture page describes its internals.
 
 ## Three roles
 
@@ -111,11 +111,11 @@ accepts. Go reserves the same capability for a future host.
 
 The W3C MiniApp work supplied four mechanisms the suite's host model uses: a host that launches
 packaged apps, a manifest that declares what the app is, declared capabilities the host enforces,
-and a lifecycle that distinguishes a running app from a disposed one. It supplied no compliance
+and a lifecycle that distinguishes a running app from a disposed one. It supplied no W3C compliance
 target: the MiniApp Packaging specification is
 [retired](https://www.w3.org/standards/history/miniapp-packaging/), so no build is certified against
-it. The model is an influence, not a standard Suite conforms to;
-[The mini-app model](mini-app-model.md) owns the comparison.
+it. The [Suite superapp specification](../spec/superapp.md) is the target for the host and pack
+contract; [The mini-app model](mini-app-model.md) owns the comparison.
 
 The two host seams are named rather than implied: [Start's decisions](../../apps/start/docs/reference/decisions.md)
 state the `PackageBackend` rule, and [the sync capability](../../apps/sync/docs/reference/sync-capability.md)

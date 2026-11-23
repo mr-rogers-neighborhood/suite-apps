@@ -42,7 +42,7 @@ The rules that shape Canvas. The architecture and data model pages describe how 
   resolves a `?share=` address.
 - What ships is a local document plus opt-in sync. One device runs the workspace and a `suite-sync` host
   carries the frames; another device joins with an invite. Sharing is that invite, or the exported
-  file. Roles are viewer and editor.
+  file. Roles are owner, editor and viewer; the Canvas UI may expose only editor and viewer.
 - Sync sends sealed frames. Group keys live in each member's main process, so the host stores frames
   it cannot read and signed records that name a device and a role, never the document.
 - A removed device is revoked: the group moves to a new epoch, so the removed copy cannot read
