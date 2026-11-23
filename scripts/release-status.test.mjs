@@ -726,3 +726,11 @@ describe("channel-aware notes", () => {
     assert.match(body, /suite-go-preview-0\.1\.0\.apk/u);
   });
 });
+
+describe("arguments", () => {
+  it("parses --channel and rejects an unknown one", () => {
+    assert.equal(parseArgs(["--channel", "preview"]).channel, "preview");
+    assert.equal(parseArgs([]).channel, "stable");
+    assert.throws(() => parseArgs(["--channel", "canary"]), /unknown channel/u);
+  });
+});
