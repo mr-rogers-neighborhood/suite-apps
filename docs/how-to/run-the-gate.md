@@ -63,6 +63,21 @@ file records `e2e: false`; install Xvfb, run the gate on the VM, or pass `--e2e`
 windows. A headless host with neither a display nor `xvfb-run` fails the run rather than pretending
 it passed.
 
+## Flaky tests
+
+A test tagged `@quarantine` is a known flake, not a silent skip. It still runs in the nightly and
+weekly gates and reports its result there. The merge queue sets `SUITE_QUARANTINE_SKIP=1` on Start's
+e2e step, and `apps/start/playwright.config.ts` then excludes `@quarantine` from that run:
+
+```sh
+SUITE_QUARANTINE_SKIP=1 mise exec -- pnpm --filter @suite/start e2e
+```
+
+The same config asks for one retry, so a single transient timeout does not read as a red pull
+request. A second failure is a bug to fix or a test to quarantine, not a reason to raise the retry
+count. Do not set `SUITE_QUARANTINE_SKIP` on the nightly or weekly run, or the flake stops being
+reported at all.
+
 ## Export retention
 
 A passing `--fresh` run keeps its own export and the previous proof under `.dev/gate/`; older export
@@ -100,5 +115,6 @@ phrases.
 ## CI is the proof
 
 `main` runs the full fresh gate on every push (`main-gate`), and the merge queue runs the affected
-rows plus Start's e2e. The `vm` remote and the `scripts/ci/` hook are retired; nothing else needs to be
-scheduled, and `suite-dev` remains only the LAN Flatpak test host.
+rows plus Start's e2e. The weekly workflow reruns the fresh gate with the action pin audit and cache
+cleanup, and the platform matrix keeps its own daily schedule. The `vm` remote and the `scripts/ci/`
+hook are retired, and `suite-dev` remains only the LAN Flatpak test host.

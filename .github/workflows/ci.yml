@@ -85,10 +85,53 @@ jobs:
           scripts/android-release.test.mjs
           scripts/release-status.test.mjs
 
+  workflows:
+    name: workflows
+    # Cheap enough to run on every change, like the docs checks: a broken
+    # workflow is a red pull request, not a surprise after merge (C4.3).
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: "1.27.x"
+          cache: false
+      - name: actionlint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          # SC2016 fires on the intentional single-quoted `node -e` scripts
+          # (release.yml's OIDC claims, weekly.yml's cache filter); the `$` is
+          # for node, not the shell.
+          "$(go env GOPATH)/bin/actionlint" -ignore 'SC2016' .github/workflows/*.yml
+
+  dependency-review:
+    name: dependency-review
+    # Evidence, not a required check: the aggregator does not wait for it.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
+
   apps:
     name: apps (${{ matrix.repo }})
     needs: detect
-    if: needs.detect.result == 'success' && needs.detect.outputs.matrix != ''
+    # A fork pull request runs fast checks only until a maintainer labels it
+    # `ci:full`; same-repo PRs, the merge queue and dispatch run as before
+    # (C2.4).
+    if: >-
+      needs.detect.result == 'success' && needs.detect.outputs.matrix != '' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository ||
+       contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -127,7 +170,14 @@ jobs:
   e2e:
     name: e2e
     needs: detect
-    if: needs.detect.result == 'success' && (github.event_name == 'merge_group' || needs.detect.outputs.e2e == 'true')
+    # The fork rule of C2.4 also covers the heavy suite: a fork PR waits for
+    # the `ci:full` label. The merge queue and dispatch keep their behavior.
+    if: >-
+      needs.detect.result == 'success' &&
+      (github.event_name == 'merge_group' || needs.detect.outputs.e2e == 'true') &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository ||
+       contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -147,6 +197,10 @@ jobs:
       - name: Xvfb
         run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Start e2e
+        env:
+          # Quarantine applies to the merge queue only: the suite still runs a
+          # quarantined test nightly, where a flake is reported (C5.4).
+          SUITE_QUARANTINE_SKIP: ${{ github.event_name == 'merge_group' && '1' || '' }}
         run: node scripts/gate.mjs --only start --e2e
 
   full-gate:
@@ -177,14 +231,18 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [detect, fast, apps, e2e, full-gate]
+    needs: [detect, fast, workflows, apps, e2e, full-gate]
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate
         run: |
           test "${{ needs.detect.result }}" = "success"
           test "${{ needs.fast.result }}" = "success"
-          test "${{ needs.apps.result }}" = "success"
+          test "${{ needs.workflows.result }}" = "success"
+          if [ "${{ needs.apps.result }}" != "success" ] && [ "${{ needs.apps.result }}" != "skipped" ]; then
+            echo "apps: ${{ needs.apps.result }}"
+            exit 1
+          fi
           if [ "${{ needs.e2e.result }}" != "success" ] && [ "${{ needs.e2e.result }}" != "skipped" ]; then
             echo "e2e: ${{ needs.e2e.result }}"
             exit 1
