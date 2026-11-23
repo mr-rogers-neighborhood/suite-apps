@@ -58,9 +58,21 @@ describe("the dry-run and publish distinction", () => {
   it("passes --publish only to the steps that act", () => {
     const steps = releaseSteps({ publish: true });
     const publishing = steps.filter((step) => step.args.includes("--publish")).map((step) => step.id);
-    assert.deepEqual(publishing, ["remote", "release-status", "apk", "relink"]);
+    assert.deepEqual(publishing, ["remote", "apk", "relink"]);
     const gate = steps.find((step) => step.id === "gate");
     assert.ok(!gate.args.includes("--publish"));
+  });
+
+  it("drafts the release, attaches the APK to the draft, then publishes it", () => {
+    const steps = releaseSteps({ publish: true });
+    const first = steps.find((step) => step.id === "release-status");
+    const apk = steps.find((step) => step.id === "apk");
+    const relink = steps.find((step) => step.id === "relink");
+    assert.deepEqual(first.args, ["scripts/release-status.mjs", "--draft"]);
+    assert.deepEqual(apk.args, ["scripts/android-release.mjs", "--publish"]);
+    assert.deepEqual(relink.args, ["scripts/release-status.mjs", "--publish"]);
+    assert.ok(steps.indexOf(first) < steps.indexOf(apk));
+    assert.ok(steps.indexOf(apk) < steps.indexOf(relink));
   });
 
   it("keeps the same step list in both modes", () => {

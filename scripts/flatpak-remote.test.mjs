@@ -10,6 +10,7 @@ import {
   cacheControlFor,
   cacheControlProblem,
   commandText,
+  commitFileText,
   flatpakrepoUrl,
   invalidationCommand,
   normalizeRemoteUrl,
@@ -17,6 +18,7 @@ import {
   s3UploadCommands,
   targetProblem,
 } from "./lib/flatpakRemote.mjs";
+import { parseArgs } from "./flatpak-remote.mjs";
 
 const repo = "/home/publisher/suite-flatpak/repo";
 const flatpakrepoPath = "/home/publisher/suite-flatpak/suite.flatpakrepo";
@@ -217,5 +219,63 @@ describe("printing a command", () => {
       commandText({ command: "aws", args: ["s3", "cp", "/tmp/a b", "s3://b/c"] }),
       "aws s3 cp '/tmp/a b' s3://b/c",
     );
+  });
+});
+
+describe("publishing an existing repository", () => {
+  it("takes the repository and the commit file as values", () => {
+    const options = parseArgs([
+      "--from-repo",
+      "/runner/suite-flatpak/repo",
+      "--commit-file",
+      ".dev/release/flatpak-commits",
+      "--publish",
+    ]);
+    assert.equal(options.fromRepo, "/runner/suite-flatpak/repo");
+    assert.equal(options.commitFile, ".dev/release/flatpak-commits");
+    assert.equal(options.publish, true);
+  });
+
+  it("keeps the repository optional", () => {
+    const options = parseArgs(["--target", "s3"]);
+    assert.equal(options.fromRepo, null);
+    assert.equal(options.commitFile, null);
+  });
+
+  it("refuses a flag without its value", () => {
+    assert.throws(() => parseArgs(["--from-repo"]), /--from-repo needs a value/u);
+    assert.throws(() => parseArgs(["--commit-file"]), /--commit-file needs a value/u);
+  });
+
+  it("refuses an option it does not know", () => {
+    assert.throws(() => parseArgs(["--from-repo=/tmp/repo"]), /unknown option/u);
+  });
+});
+
+describe("the commit file", () => {
+  const shell = "a".repeat(64);
+  const go = "b".repeat(64);
+
+  it("names every shipped ref and its commit, sorted by ref", () => {
+    assert.equal(
+      commitFileText([
+        { ref: "app/run.suite.shell/x86_64/master", commit: shell },
+        { ref: "app/run.suite.go/x86_64/master", commit: go },
+      ]),
+      `${go}  app/run.suite.go/x86_64/master\n` +
+        `${shell}  app/run.suite.shell/x86_64/master\n`,
+    );
+  });
+
+  it("refuses an empty publication", () => {
+    assert.throws(() => commitFileText([]), /at least one published ref/u);
+  });
+
+  it("refuses a line without a commit", () => {
+    assert.throws(
+      () => commitFileText([{ ref: "app/run.suite.shell/x86_64/master", commit: "nope" }]),
+      /no OSTree commit/u,
+    );
+    assert.throws(() => commitFileText([{ ref: "", commit: shell }]), /needs a ref/u);
   });
 });

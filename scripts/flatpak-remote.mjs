@@ -32,12 +32,20 @@
  * when the repository carries one), so adding a tier does not break a stable
  * install; a tier is installed with an explicit `//<tier>`.
  *
+ * `--from-repo` publishes a repository an earlier step already built, instead of
+ * the default `SUITE_FLATPAK_REPO` (or `<state>/repo`). `--commit-file` writes
+ * the commits the published branch refs point at, one `<commit>  <ref>` line per
+ * ref, after signing the summary and before the upload. The summary is re-signed
+ * by this run; the commits are not rewritten, so the file is what an attestation
+ * should name.
+ *
  * Usage:
  *   node scripts/flatpak-remote.mjs                       # dry run, local target
  *   node scripts/flatpak-remote.mjs --publish             # sign and copy to suite-dev
  *   node scripts/flatpak-remote.mjs --target s3           # dry run: every aws command
  *   node scripts/flatpak-remote.mjs --target s3 --publish # upload and invalidate
  *   node scripts/flatpak-remote.mjs --channel preview     # dry run for a pre-release branch
+ *   node scripts/flatpak-remote.mjs --from-repo <path> --commit-file <path> --publish
  *   node scripts/flatpak-remote.mjs --help
  */
 import { spawnSync } from "node:child_process";
@@ -53,7 +61,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { branchFor, channelProblem } from "./lib/channel.mjs";
 import {
@@ -62,6 +70,7 @@ import {
   REMOTE_NAME,
   STATIC_DELTA_ARGUMENTS,
   commandText,
+  commitFileText,
   flatpakrepoUrl,
   invalidationCommand,
   normalizeRemoteUrl,
@@ -99,6 +108,10 @@ const USAGE = `usage: node scripts/flatpak-remote.mjs [options]
                       ${DEFAULT_PUBLIC_URL} for s3)
   --bucket <name>     S3 bucket for the s3 target
   --distribution <id> CloudFront distribution for the s3 target
+  --from-repo <path>  publish this already-built repository instead of
+                      $SUITE_FLATPAK_REPO or <state>/repo
+  --commit-file <path> write "<commit>  <ref>" for each published ref before
+                      the upload, so the attestation names the shipped commits
   --help              print this text
 
 Environment overrides: SUITE_FLATPAK_STATE, SUITE_FLATPAK_REPO,
@@ -107,7 +120,7 @@ SUITE_FLATPAK_URL, SUITE_FLATPAK_TARGET, SUITE_FLATPAK_S3_BUCKET,
 SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION.
 `;
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {
     publish: false,
     dryRun: false,
@@ -118,6 +131,8 @@ function parseArgs(argv) {
     target: null,
     bucket: null,
     distribution: null,
+    fromRepo: null,
+    commitFile: null,
     help: false,
   };
 
@@ -154,6 +169,12 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--distribution") {
       options.distribution = takeValue(index, "--distribution");
+      index += 1;
+    } else if (arg === "--from-repo") {
+      options.fromRepo = takeValue(index, "--from-repo");
+      index += 1;
+    } else if (arg === "--commit-file") {
+      options.commitFile = takeValue(index, "--commit-file");
       index += 1;
     } else {
       throw new Error(`unknown option ${arg}`);
@@ -219,7 +240,7 @@ function mib(bytes) {
  * no parent commit to diff against, so this reports zero rather than failing:
  * the summary still installs and updates, they just download in full.
  */
-function staticDeltas() {
+function staticDeltas(repo) {
   const dirs = ["deltas", "delta-indexes"].map((name) => join(repo, name));
   if (!dirs.some((dir) => existsSync(dir))) return { files: 0, bytes: 0, deltas: 0 };
   let files = 0;
@@ -238,7 +259,6 @@ function staticDeltas() {
 }
 
 const stateDir = process.env.SUITE_FLATPAK_STATE?.trim() || join(homedir(), "suite-flatpak");
-const repo = process.env.SUITE_FLATPAK_REPO?.trim() || join(stateDir, "repo");
 const keyIdPath = join(stateDir, "store-key.id");
 const publicKeyPath = join(stateDir, "suite-store.gpg");
 const flatpakrepoPath = join(stateDir, `${REMOTE_NAME}.flatpakrepo`);
@@ -282,8 +302,8 @@ function storeKey() {
   return { keyId, publicKey: exported.stdout };
 }
 
-/** Every ref in the local repository, and the branches the app refs name. */
-function repositoryRefs() {
+/** Every ref in one repository, and the branches the app refs name. */
+function repositoryRefs(repo) {
   if (!existsSync(repo)) {
     throw new Error(`no repository at ${repo}; run scripts/flatpak.mjs first`);
   }
@@ -302,6 +322,16 @@ function repositoryRefs() {
   return { refs, appRefs, branches };
 }
 
+/** The OSTree commit one published ref points at. */
+function commitOf(repo, ref) {
+  const output = capture("ostree", [`--repo=${repo}`, "rev-parse", ref]);
+  const commit = output.split(/\s+/u)[0] ?? "";
+  if (!/^[0-9a-f]{40,64}$/iu.test(commit)) {
+    throw new Error(`ostree printed no commit for ${ref}: ${JSON.stringify(output)}`);
+  }
+  return commit;
+}
+
 function branchRefs(appRefs, branch) {
   return appRefs.filter((ref) => ref.split("/")[3] === branch);
 }
@@ -315,7 +345,7 @@ function branchRefs(appRefs, branch) {
  * enumerate with verification on? A missing or wrong signature fails here,
  * before the bytes are copied.
  */
-function verifySignedSummary() {
+function verifySignedSummary(repo) {
   const summaryPath = join(repo, "summary");
   const signaturePath = join(repo, "summary.sig");
   if (!existsSync(summaryPath) || !existsSync(signaturePath) || statSync(signaturePath).size === 0) {
@@ -425,7 +455,7 @@ function runStep(step) {
 }
 
 /** The commands a publication would run, with placeholders a dry run may print. */
-function publicationCommands({ bucket, distribution }) {
+function publicationCommands({ repo, bucket, distribution }) {
   return {
     uploads: s3UploadCommands({ repo, flatpakrepoPath, bucket }),
     invalidation: invalidationCommand({ distribution }),
@@ -468,6 +498,11 @@ async function main() {
       process.env.SUITE_FLATPAK_URL?.trim() ||
       (target === "s3" ? DEFAULT_PUBLIC_URL : DEFAULT_REMOTE_URL),
   );
+  const repo = resolve(
+    options.fromRepo?.trim() ||
+      process.env.SUITE_FLATPAK_REPO?.trim() ||
+      join(stateDir, "repo"),
+  );
 
   // A dry run prints commands with placeholders, so it needs neither the bucket
   // nor a credential; --publish refuses before it signs anything.
@@ -493,7 +528,7 @@ async function main() {
     channel !== null ? branchFor(channel) : (options.branch?.trim() || null);
 
   const { keyId, publicKey } = storeKey();
-  const { refs, appRefs, branches } = repositoryRefs();
+  const { refs, appRefs, branches } = repositoryRefs(repo);
   // Stable stays the default branch, so adding a channel does not change what a
   // plain `flatpak install suite run.suite.<app>` resolves to. A future repo
   // that names stable `stable` wins over the current `master`.
@@ -509,9 +544,12 @@ async function main() {
   }
 
   const onBranch = branchRefs(appRefs, branch);
+  const publishedCommits = onBranch
+    .map((ref) => ({ ref, commit: commitOf(repo, ref) }))
+    .sort((left, right) => left.ref.localeCompare(right.ref));
   const { head, proven } = checkGitProof();
   const { files, bytes } = treeStats(repo);
-  const deltas = staticDeltas();
+  const deltas = staticDeltas(repo);
 
   const targetLine =
     target === "s3" ? `s3 s3://${bucketForCommands}/` : `${host}:${remoteDir}`;
@@ -540,6 +578,10 @@ async function main() {
   if (runtimeRefs > 0) {
     process.stdout.write(`    (${runtimeRefs} runtime and metadata refs beside them)\n`);
   }
+  process.stdout.write("  shipping\n");
+  for (const { ref, commit } of publishedCommits) {
+    process.stdout.write(`    ${commit}  ${ref}\n`);
+  }
 
   if (!options.publish) {
     process.stdout.write("\nwould sign the summary with the store key, then ");
@@ -561,6 +603,7 @@ async function main() {
         for (const problem of missing) process.stdout.write(`  - ${problem}\n`);
       }
       const { uploads, invalidation } = publicationCommands({
+        repo,
         bucket: bucketForCommands,
         distribution: distributionForCommands,
       });
@@ -568,6 +611,11 @@ async function main() {
       for (const step of uploads) printStep(step);
       process.stdout.write("\nthen invalidate only the mutable paths:\n");
       printStep(invalidation);
+    }
+    if (options.commitFile !== null) {
+      process.stdout.write(
+        `\nwould write ${resolve(options.commitFile)} with the commits above before the upload\n`,
+      );
     }
     process.stdout.write(
       target === "s3"
@@ -585,7 +633,7 @@ async function main() {
   // A repository built by an older `scripts/flatpak.mjs` has no deltas yet;
   // regenerating here costs CPU once and gives the publication its `deltas/`.
   run("flatpak", ["build-update-repo", ...STATIC_DELTA_ARGUMENTS, `--gpg-sign=${keyId}`, repo]);
-  verifySignedSummary();
+  verifySignedSummary(repo);
   // The upload syncs `deltas/` and `delta-indexes/`; empty trees upload nothing
   // and keep a first publication (no parent commit to diff) working.
   mkdirSync(join(repo, "deltas"), { recursive: true });
@@ -595,8 +643,22 @@ async function main() {
   writeFileSync(flatpakrepoPath, flatpakrepo);
   process.stdout.write(`\n${flatpakrepoPath}\n`);
 
+  // Attestation names the commits, not the summary this run signed. Resolve
+  // them again after `build-update-repo`, then write the file before any byte
+  // leaves the machine.
+  if (options.commitFile !== null) {
+    const shippedCommits = onBranch
+      .map((ref) => ({ ref, commit: commitOf(repo, ref) }))
+      .sort((left, right) => left.ref.localeCompare(right.ref));
+    const commitPath = resolve(options.commitFile);
+    mkdirSync(dirname(commitPath), { recursive: true });
+    const text = commitFileText(shippedCommits);
+    writeFileSync(commitPath, text);
+    process.stdout.write(`\n${commitPath}\n${text}`);
+  }
+
   if (target === "s3") {
-    const { uploads, invalidation } = publicationCommands({ bucket, distribution });
+    const { uploads, invalidation } = publicationCommands({ repo, bucket, distribution });
 
     // OSTree objects are content-addressed: an old one is harmless, so the sync
     // never deletes. The mutable files are copied rather than synced so an

@@ -12,6 +12,8 @@ import {
   changelogDateProblem,
   channelLabel,
   currentAggregateTag,
+  draftAction,
+  draftReleaseArgs,
   entriesForSection,
   flatpakrepoUrl,
   goApkName,
@@ -23,12 +25,14 @@ import {
   maturityLabel,
   parseArgs,
   planTag,
-  releaseAction,
+  publishAction,
+  publishReleaseArgs,
   releaseLabels,
   releasesPage,
   remoteLookupProblem,
   tagFor,
   tagPlanDisposition,
+  writesReleasesPage,
 } from "./release-status.mjs";
 
 const start = APPS.find((app) => app.id === "start");
@@ -190,13 +194,112 @@ describe("tag choice", () => {
   });
 });
 
-describe("release actions", () => {
-  it("creates a release that is missing", () => {
-    assert.deepEqual(releaseAction({ exists: false }), { action: "create", problem: null });
+describe("the draft phase", () => {
+  const tag = "suite-2026.11.21";
+
+  it("creates a missing release as a draft", () => {
+    assert.deepEqual(draftAction({ exists: false, isDraft: false, tag }), {
+      action: "create",
+      problem: null,
+    });
+    const args = draftReleaseArgs({
+      tag,
+      title: "Suite Shell + Suite Go — 2026-11-21",
+      notesPath: ".dev/releases/suite-2026.11.21.md",
+      action: "create",
+      target: "0fb48469e5de7f812a6322092396d69f669712d3",
+    });
+    assert.deepEqual(args.slice(0, 3), ["release", "create", tag]);
+    assert.ok(args.includes("--draft"));
+    assert.ok(!args.includes("--latest"), "a draft is not Latest before publication");
   });
 
-  it("edits a release that exists, so its assets stay", () => {
-    assert.deepEqual(releaseAction({ exists: true }), { action: "edit", problem: null });
+  it("is idempotent: a rerun edits the same draft instead of creating another", () => {
+    assert.deepEqual(draftAction({ exists: true, isDraft: true, tag }), {
+      action: "edit",
+      problem: null,
+    });
+    const args = draftReleaseArgs({
+      tag,
+      title: "Suite Shell + Suite Go — 2026-11-21",
+      notesPath: ".dev/releases/suite-2026.11.21.md",
+      action: "edit",
+      target: "0fb48469e5de7f812a6322092396d69f669712d3",
+    });
+    assert.deepEqual(args.slice(0, 3), ["release", "edit", tag]);
+    assert.ok(!args.includes("--draft"));
+    assert.ok(!args.includes("--draft=false"), "editing a draft must not publish it");
+    assert.ok(!args.includes("--target"));
+  });
+
+  it("leaves an already published release alone on a rerun", () => {
+    const phase = draftAction({ exists: true, isDraft: false, tag });
+    assert.equal(phase.action, "skip");
+    assert.match(phase.problem, /suite-2026\.11\.21 is already published/u);
+    assert.match(phase.problem, /immutable/u);
+    assert.match(phase.problem, /refuses to edit/u);
+    assert.match(phase.problem, /leaves it unchanged/u);
+  });
+});
+
+describe("the publish phase", () => {
+  const tag = "suite-2026.11.21";
+
+  it("flips a draft with gh release edit --draft=false", () => {
+    assert.deepEqual(publishAction({ exists: true, isDraft: true, tag }), {
+      action: "publish",
+      problem: null,
+    });
+    const aggregate = publishReleaseArgs({
+      tag,
+      notesPath: ".dev/releases/suite-2026.11.21.md",
+      latest: true,
+    });
+    assert.deepEqual(aggregate.slice(0, 3), ["release", "edit", tag]);
+    assert.ok(aggregate.includes("--draft=false"));
+    assert.ok(aggregate.includes("--latest"));
+
+    const perApp = publishReleaseArgs({
+      tag: "start-v0.5.1",
+      notesPath: ".dev/releases/start-v0.5.1.md",
+      latest: false,
+    });
+    assert.ok(perApp.includes("--draft=false"));
+    assert.ok(perApp.includes("--latest=false"));
+  });
+
+  it("refuses to edit an already-published release, and does not republish it", () => {
+    const phase = publishAction({ exists: true, isDraft: false, tag });
+    assert.equal(phase.action, "skip");
+    assert.notEqual(phase.action, "publish");
+    assert.match(phase.problem, /already published/u);
+    assert.match(phase.problem, /immutable/u);
+    assert.match(phase.problem, /refuses to edit/u);
+  });
+
+  it("refuses a missing release and names the draft step", () => {
+    const phase = publishAction({ exists: false, isDraft: false, tag });
+    assert.equal(phase.action, "refuse");
+    assert.match(phase.problem, /has no draft release/u);
+    assert.match(phase.problem, /--draft/u);
+  });
+
+  it("does not fail a release over an app that is already out", () => {
+    // A normal release bumps one app; every other app's current version is
+    // already published and must be skipped, not turned into a fatal refusal.
+    const published = publishAction({ exists: true, isDraft: false, tag: "start-v0.5.0" });
+    assert.equal(published.action, "skip");
+    const draft = publishAction({ exists: true, isDraft: true, tag: "shell-v0.2.1" });
+    assert.equal(draft.action, "publish");
+  });
+});
+
+describe("RELEASES.md writers", () => {
+  it("is written only by --write and --publish", () => {
+    assert.equal(writesReleasesPage("write"), true);
+    assert.equal(writesReleasesPage("publish"), true);
+    assert.equal(writesReleasesPage("draft"), false);
+    assert.equal(writesReleasesPage("dry-run"), false);
   });
 });
 
@@ -208,13 +311,14 @@ describe("tag plans by mode", () => {
     assert.deepEqual(tagPlanDisposition(problem, "write"), { problem: null, pending: true });
   });
 
-  it("still refuses a tag-plan problem for --publish and the dry run", () => {
+  it("still refuses a tag-plan problem for --draft, --publish and the dry run", () => {
+    assert.deepEqual(tagPlanDisposition(problem, "draft"), { problem, pending: false });
     assert.deepEqual(tagPlanDisposition(problem, "publish"), { problem, pending: false });
     assert.deepEqual(tagPlanDisposition(problem, "dry-run"), { problem, pending: false });
   });
 
   it("keeps a resolved plan unpending in every mode", () => {
-    for (const mode of ["write", "publish", "dry-run"]) {
+    for (const mode of ["write", "draft", "publish", "dry-run"]) {
       assert.deepEqual(tagPlanDisposition(null, mode), { problem: null, pending: false });
     }
   });
@@ -479,6 +583,35 @@ describe("sections and the Suite Go APK", () => {
     assert.match(missing, /suite-go-0\.1\.0\.apk/u);
     assert.match(missing, /not uploaded yet/u);
     assert.doesNotMatch(missing, /releases\/download/u);
+
+    const draft = installCell(go, {
+      version: "0.1.0",
+      tag: "suite-2026.11.21",
+      draft: true,
+    });
+    assert.match(draft, /attached to this draft before publication/u);
+    assert.doesNotMatch(draft, /releases\/download/u);
+  });
+
+  it("promises no APK link in a draft body, and says it is attached before publication", () => {
+    const withGo = [...entries, goEntry];
+    const draft = aggregateReleaseBody(withGo, {
+      date: "2026-11-21",
+      tag: "suite-2026.11.21",
+      draft: true,
+    });
+    assert.match(draft, /uploaded to this draft/u);
+    assert.match(draft, /once `--publish` flips the draft/u);
+    assert.doesNotMatch(draft, /releases\/download/u);
+    assert.doesNotMatch(draft, /carries its release-signed APK/u);
+    assert.doesNotMatch(draft, /not attached to this release/u);
+
+    const goDraft = appReleaseBody(go, goEntry.section, {
+      tag: "suite-2026.11.21",
+      draft: true,
+    });
+    assert.match(goDraft, /while that release is a draft/u);
+    assert.doesNotMatch(goDraft, /Mobile table says whether/u);
   });
 
   it("puts the store instruction above the tables and Update below them", () => {
@@ -514,8 +647,9 @@ describe("sections and the Suite Go APK", () => {
       date: "2026-11-21",
       tag: "suite-2026.11.21",
     });
-    assert.match(missing, /not attached to this release yet/u);
-    assert.match(missing, /android-release\.mjs --publish/u);
+    assert.match(missing, /not attached to this release/u);
+    assert.match(missing, /before publishing/u);
+    assert.match(missing, /assets are locked/u);
   });
 
   it("names the aggregate tag from the newest changelog date", () => {
@@ -536,19 +670,25 @@ describe("arguments", () => {
   it("defaults to a dry run that writes nothing", () => {
     const options = parseArgs([]);
     assert.equal(options.publish, false);
+    assert.equal(options.draft, false);
     assert.equal(options.write, false);
     assert.equal(options.date, null);
   });
 
-  it("reads publish, write and date", () => {
+  it("reads draft, publish, write and date", () => {
     const options = parseArgs(["--publish", "--date", "2026-11-21"]);
     assert.equal(options.publish, true);
     assert.equal(options.date, "2026-11-21");
+    assert.equal(parseArgs(["--draft"]).draft, true);
     assert.equal(parseArgs(["--write"]).write, true);
     assert.equal(parseArgs(["--dry-run"]).dryRun, true);
   });
 
   it("refuses any two modes together", () => {
+    assert.throws(
+      () => parseArgs(["--draft", "--publish"]),
+      /--draft and --publish pick different modes/u,
+    );
     assert.throws(
       () => parseArgs(["--publish", "--write"]),
       /--publish and --write pick different modes/u,

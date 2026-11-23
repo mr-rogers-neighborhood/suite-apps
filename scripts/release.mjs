@@ -22,7 +22,8 @@ This script publishes nothing; it holds the release helpers.
 
   Desktop apps and the relay   node scripts/flatpak-remote.mjs --target s3 --publish
   Suite Go's APK               node scripts/android-release.mjs --publish
-  Release bodies, RELEASES.md  node scripts/release-status.mjs --publish
+  Release drafts               node scripts/release-status.mjs --draft
+  Publish, RELEASES.md         node scripts/release-status.mjs --publish
 
 The relay tarball release is retired. Older sync-v<version> assets remain
 downloadable history; the relay installs as the Flatpak run.suite.sync.

@@ -64,6 +64,7 @@ GitHub Packages is not used for the Flatpaks.
 ## Regenerate
 
 ```sh
-mise exec -- node scripts/release-status.mjs --write
+mise exec -- node scripts/release-status.mjs --draft
 mise exec -- node scripts/release-status.mjs --publish
+mise exec -- node scripts/release-status.mjs --write
 ```

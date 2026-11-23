@@ -173,6 +173,32 @@ function aws(args) {
   return { command: "aws", args };
 }
 
+/**
+ * The refs a publication shipped and the OSTree commit each one names.
+ *
+ * The summary is re-signed at publish time, so it is not the artifact to attest; the commits the
+ * published refs point at are. One `<commit>  <ref>` line per ref, sorted by ref, keeps the file
+ * deterministic for an attestation and readable with the usual checksum tools.
+ */
+export function commitFileText(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error("a commit file needs at least one published ref");
+  }
+  const lines = entries.map(({ ref, commit } = {}) => {
+    if (typeof ref !== "string" || ref.length === 0) {
+      throw new Error("a commit file entry needs a ref");
+    }
+    if (typeof commit !== "string" || !/^[0-9a-f]{40,64}$/iu.test(commit)) {
+      throw new Error(`a commit file entry for ${ref} has no OSTree commit`);
+    }
+    return { ref, commit };
+  });
+  return `${lines
+    .sort((left, right) => left.ref.localeCompare(right.ref))
+    .map(({ ref, commit }) => `${commit}  ${ref}`)
+    .join("\n")}\n`;
+}
+
 /** The path of one repository file as an S3 key URL. */
 function s3Url(bucket, key) {
   return `s3://${bucket}/${key}`;

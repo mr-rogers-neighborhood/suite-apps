@@ -375,8 +375,9 @@ mise exec -- node scripts/android-release.mjs --publish   # attach it to the rol
 `scripts/android-release.mjs` builds, verifies the APK's certificate against the pinned fingerprint,
 checks the package id and `versionCode` with `aapt`, then names and checksums the artifact. It
 refuses a debug-signed or mislabelled APK, so a debug build is a dev-loop path and never a public
-artifact. `--publish` attaches the asset to the rolling release after
-`release-status.mjs --publish` has created it. No device or emulator is involved.
+artifact. `--publish` attaches the asset to the rolling release while that release is a draft, after
+`release-status.mjs --draft` has created it; `release-status.mjs --publish` then publishes the drafts.
+No device or emulator is involved.
 
 The keystore, its password file, the fingerprint pin and the rotation order are in [Android
 notes](../../apps/go/docs/reference/android.md#release-signing-and-channels) and [Manage signing
