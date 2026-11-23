@@ -551,6 +551,10 @@ if (app.verify) run(process.execPath, [app.verify, app.unpacked]);
 
 const manifestPath = preRelease ? generatePreReleaseManifest() : app.manifest;
 mkdirSync(buildDir, { recursive: true });
+// `--repo` fills an OSTree inside an existing directory. The default repo sits
+// under `stateDir`; a `SUITE_FLATPAK_REPO` elsewhere is made here, on the build
+// path only, so `--dry-run` still touches nothing.
+mkdirSync(repo, { recursive: true });
 run("flatpak-builder", [
   "--user",
   ...(keyId.length > 0 ? [`--gpg-sign=${keyId}`] : []),
