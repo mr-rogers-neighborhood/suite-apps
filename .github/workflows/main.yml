@@ -1,6 +1,5 @@
-# The trunk proof: every push to `main` runs the whole gate from a fresh export
-# of the commit, the same command a person runs. The VM remains the independent
-# copy until the matrix matches it for a month (ci.md, Migration 6).
+# The trunk proof: every push to `main` runs the whole gate with `--fresh`, the
+# same command a person runs.
 #
 # e2e stays on the merge queue and nightly; a trunk push must not spend its
 # budget on a desktop suite that already ran on the queue entry.

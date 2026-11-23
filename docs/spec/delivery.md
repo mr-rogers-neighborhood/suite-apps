@@ -29,10 +29,11 @@ pre-release and never Latest, so they stay immutable and out of the stable page.
 newest 14 releases (`--prune --channel nightly --keep 14`); the stable body links the newest preview
 and nightly releases. Each
 publication also writes `release-manifest.json` with the commit, the lockfile hash, the artifact
-digests and the signer identities, and attaches it to the draft before publication (D2.1). The workflow header records the known limits: the Flatpak
-summary is re-signed while the OSTree commit stays fixed (the commit is what is attested), `preview`
-still refreshes the rolling release, and `RELEASES.md` is regenerated in the runner rather than
-committed.
+digests and the signer identities, and attaches it to the draft before publication (D2.1). The
+workflow header records the known limits: the Flatpak summary is re-signed while the OSTree commit
+stays fixed (the commit is what is attested); a pre-release channel publishes its own page and never
+the stable Latest one, whose body links the newest preview and nightly; a published release is
+immutable; and `RELEASES.md` is regenerated in the runner rather than committed.
 
 ## 1. Principles
 
@@ -79,8 +80,8 @@ the previous version for rollback.
 | --- | --- | --- | --- | --- |
 | `slop` | A branch or session build | Fast checks only; no e2e | The person and agents working on it | Local/session artifact; never a public channel |
 | `nightly` | Schedule from `main` (02:00 UTC) | Full `--fresh` gate + e2e + package build | Dogfooders | Public pre-release branch; unreviewed |
-| `preview` | Manual dispatch or `preview-v*` tag | Nightly gate + human review + smoke + install | Release candidates | Public pre-release branch; reviewed |
-| `stable` | Manual dispatch or release tag | Preview gate + version/docs/support promise | Everyone | Default branch; versioned |
+| `preview` | Manual dispatch | Nightly gate + human review + smoke + install | Release candidates | Public pre-release branch; reviewed |
+| `stable` | Manual dispatch | Preview gate + version/docs/support promise | Everyone | Default branch; versioned |
 
 **D3.1** `slop` is not a CI publish. It is the build being worked on; it may be broken. The fast gate
 must finish without e2e, so a session does not wait at the full suite.

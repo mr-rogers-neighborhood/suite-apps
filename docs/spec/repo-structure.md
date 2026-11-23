@@ -85,7 +85,7 @@ unless the task needs it. The merge queue and nightly own the full proof.
 generated page is refreshed by its script, not hand-edited.
 
 **R5.5** A review-only agent comments or requests changes; it never merges. The coordinator runs the
-merge queue and the VM gate until the VM is retired.
+merge queue; it is the last check.
 
 ## 6. Migration
 

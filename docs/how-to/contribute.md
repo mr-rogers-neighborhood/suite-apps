@@ -50,10 +50,12 @@ straight to `main`.
    and the exact evidence: the command and what it printed.
 3. Ask for a review-only Orca worker. It reads the diff and runs the owning app's headless checks.
    It may comment or request changes, and it does not merge, push to `main`, or publish.
-4. The coordinator runs the owning gate and the VM gate on the pull request's head, then merges.
+4. The coordinator runs the owning gate on the pull request's head and enqueues it; the merge queue
+   is the last check.
 5. A direct push to `main` is only an explicit owner checkpoint.
 
-No GitHub Actions workflow is assumed. The gate is the command in [Verify](#verify); a pull request
+GitHub Actions runs the gate: a pull request runs the rows its diff can break, `main` runs the fresh
+gate, and the merge queue adds the e2e. The gate is the command in [Verify](#verify); a pull request
 that names no command is not evidence.
 
 ## Documentation
