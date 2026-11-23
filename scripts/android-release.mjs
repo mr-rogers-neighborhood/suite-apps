@@ -474,9 +474,12 @@ function verifyApkCertificate(apkPath, { env, buildTools }) {
       `apksigner refused ${apkPath}:\n${(verified.stderr || verified.stdout).trim()}`,
     );
   }
-  const fingerprint = parseApksignerFingerprint(verified.stdout);
+  // `apksigner` writes the certificate block to stdout on some versions and to
+  // stderr on others; read both, and show the output when neither has it.
+  const output = `${verified.stdout}\n${verified.stderr}`;
+  const fingerprint = parseApksignerFingerprint(output);
   if (fingerprint === null) {
-    throw new Error(`apksigner printed no certificate for ${apkPath}`);
+    throw new Error(`apksigner printed no certificate for ${apkPath}:\n${output.trim()}`);
   }
   const pin = normaliseFingerprint(ANDROID_RELEASE_CERT_SHA256);
   if (fingerprint !== pin) {
