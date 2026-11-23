@@ -235,8 +235,11 @@ jobs:
             ref=run.suite.slop.shell
             branch="${CHANNEL}"
           fi
-          ostree --repo="${SUITE_FLATPAK_REPO}" rev-parse "${ref}" \
-            > ".dev/release/suite-shell-${CHANNEL}.commit"
+          # Flatpak refs live at app/<id>/<arch>/<branch>, not at refs/heads/<id>.
+          arch="$(flatpak --default-arch)"
+          commit="$(ostree --repo="${SUITE_FLATPAK_REPO}" \
+            rev-parse "app/${ref}/${arch}/${branch}")"
+          printf '%s\n' "${commit}" > ".dev/release/suite-shell-${CHANNEL}.commit"
           cat ".dev/release/suite-shell-${CHANNEL}.commit"
           flatpak build-bundle "${SUITE_FLATPAK_REPO}" \
             ".dev/release/suite-shell-${CHANNEL}.flatpak" "${ref}" "${branch}"
