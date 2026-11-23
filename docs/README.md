@@ -61,6 +61,7 @@ one copy is already wrong.
 | App and process boundaries | [Architecture](explanation/architecture.md) |
 | The rules that shape the repository | [Decisions](reference/decisions.md) |
 | The superapp and pack contract | [Specification](spec/README.md) |
+| Packaging, CI and platform support | [Delivery spec](spec/delivery.md) |
 | Directories and packages | [Repository layout](reference/repo-layout.md) |
 | The shared top bar and its takeover rule | [Menu bar](reference/menu-bar.md) |
 | App renderer bridge contracts | [Bridges](reference/bridges.md) |

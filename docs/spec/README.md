@@ -67,6 +67,10 @@ without a test or a named gap.
 | Fact | Owner |
 | --- | --- |
 | Normative host/pack/relay behavior | [superapp.md](superapp.md) |
+| Packaging, channels, signing, release | [delivery.md](delivery.md) |
+| Pipeline, gates, merge queue, runners | [ci.md](ci.md) |
+| Platform tiers and lifecycles | [platforms.md](platforms.md) |
+| App, package and pack layout | [repo-structure.md](repo-structure.md) |
 | Manifest fields and enums | [manifest.schema.json](manifest.schema.json) |
 | Positive/negative examples | [fixtures.json](fixtures.json) |
 | What exists | [ledger.md](ledger.md) and [status](../reference/status.md) |
@@ -79,11 +83,15 @@ without a test or a named gap.
 
 ## How to read
 
-1. [superapp.md](superapp.md) is normative. Every rule has a stable ID (`S4.2`).
-2. [manifest.schema.json](manifest.schema.json) is the machine-readable half; [fixtures.json](fixtures.json)
+1. [superapp.md](superapp.md) is normative for the product contract. Every rule has a stable ID
+   (`S4.2`).
+2. [delivery.md](delivery.md), [ci.md](ci.md), [platforms.md](platforms.md) and
+   [repo-structure.md](repo-structure.md) own packaging, the pipeline, the platform matrix and the
+   tree.
+3. [manifest.schema.json](manifest.schema.json) is the machine-readable half; [fixtures.json](fixtures.json)
    is the minimum positive/negative corpus.
-3. [ledger.md](ledger.md) maps every clause to `implemented`, `partial`, `absent` or `future`.
-4. `mise exec -- pnpm spec:check` checks the clause IDs, schema, fixtures and ledger coverage.
+4. [ledger.md](ledger.md) maps every product clause to `implemented`, `partial`, `absent` or `future`.
+5. `mise exec -- pnpm spec:check` checks the clause IDs, schema, fixtures and ledger coverage.
 
 The papers are W3C, *MiniApp Standardization White Paper* v2 (2026), and Kleppmann et al.,
 *Local-First Software: You Own Your Data, in spite of the Cloud* (Onward! 2019). Loro supplies the

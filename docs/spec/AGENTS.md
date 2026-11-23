@@ -10,9 +10,11 @@ match the code, and do not mark a clause implemented without a test or a named g
 2. [superapp.md](superapp.md) — the clause you are touching, not the whole file. Clause IDs are
    `S<major>.<minor>` (`S4.2`).
 3. [ledger.md](ledger.md) — the status and evidence for that clause.
-4. [manifest.schema.json](manifest.schema.json) and [fixtures.json](fixtures.json) for a manifest
+4. Delivery work: [delivery.md](delivery.md), [ci.md](ci.md), [platforms.md](platforms.md),
+   [repo-structure.md](repo-structure.md). Read only the section you are changing.
+5. [manifest.schema.json](manifest.schema.json) and [fixtures.json](fixtures.json) for a manifest
    change.
-5. The owning app's `AGENTS.md` and gate for implementation.
+6. The owning app's `AGENTS.md` and gate for implementation.
 
 ## Rules
 
