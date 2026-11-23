@@ -872,6 +872,11 @@ export function parseArgs(argv) {
     else if (arg === "--date") {
       options.date = takeValue(index, "--date");
       index += 1;
+    } else if (arg === "--channel") {
+      options.channel = takeValue(index, "--channel");
+      const miss = channelProblem(options.channel);
+      if (miss !== null) throw new Error(miss);
+      index += 1;
     } else if (arg.startsWith("--")) {
       throw new Error(`unknown option ${arg}`);
     } else {
