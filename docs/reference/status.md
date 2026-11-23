@@ -48,6 +48,8 @@ is a command that can be run; see [Commands](commands.md).
 
 ## Where to go next
 
+- [The superapp specification](../spec/README.md) is the target contract, and its
+  [ledger](../spec/ledger.md) says which clauses the tree implements.
 - [Local-first](../explanation/local-first.md) records which local-first ideals are met and which are
   partial.
 - Each app's `README.md` says what that app does and what it does not.

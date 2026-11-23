@@ -213,13 +213,14 @@ const scripts =
             "scripts/shell-channel.test.mjs",
             "scripts/android-release.test.mjs",
             "scripts/release-status.test.mjs",
+            "scripts/spec.test.mjs",
           ],
           workdir,
         );
         return {
           ok: result.status === 0,
           detail:
-            result.status === 0 ? "pack, channel and release tests" : `exit ${result.status}`,
+            result.status === 0 ? "pack, channel, release and spec tests" : `exit ${result.status}`,
         };
       })();
 
