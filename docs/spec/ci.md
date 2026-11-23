@@ -40,7 +40,9 @@ self-hosted runner. `pull_request_target` is not used to check out a fork.
 | `push` to `main` | `main` | Yes: `main-gate` |
 | `schedule` 02:00 UTC | `nightly` | No; publishes nightly |
 | `workflow_dispatch` | `preview`, `stable`, `matrix` | Environment approval |
-| `push` tag `v*` / `<app>-v*` | `release` | Environment approval |
+
+`release` has no tag trigger: a publication creates the tag and a dispatch follows, rather than a
+tag starting a build ([delivery.md](delivery.md) §0).
 
 **C2.1** A merge queue is enabled on `main`; the `ci` workflow includes `merge_group`. A required check
 that does not run on `merge_group` blocks every merge.
@@ -158,7 +160,8 @@ cancellation. Two publications of the same channel never overlap.
 Standard runners are free for public repositories.
 
 **C8.2** Self-hosted runners are not used for pull requests on this public repository. A dedicated
-publisher or a protected environment holds signing keys; it runs only on a tag/manual event.
+publisher or a protected environment holds signing keys; it runs only on a `workflow_dispatch` or
+from the nightly.
 
 **C8.3** Revyl Proof of Changes runs as a GitHub App from `.revyl/config.yaml`, not as a workflow job.
 It builds the app on a pull request, runs it on a cloud device, and posts its own checks; those checks
@@ -194,7 +197,7 @@ exposed, rotate it and delete the log.
 | Every push to `main` | `main-gate --fresh --no-e2e`, affected build, packaging build |
 | Nightly 02:00 UTC | Full fresh gate + e2e + Linux/Android/macOS/Windows/iOS builds + Revyl smoke + publish nightly |
 | Weekly | Full matrix, dependency review, action pin audit, cache cleanup |
-| Manual | Preview/stable publication, platform matrix run, VM comparison |
+| Manual | Preview/stable publication, platform matrix run |
 
 **C10.1** A nightly failure opens or updates one issue; it does not spam a new issue per night.
 
@@ -212,21 +215,22 @@ unless the task needs it; the merge queue and nightly own the full proof.
 workflows, `docs/spec/README.md`. A change that touches one is small and calls it out in the PR.
 
 **C11.4** A review-only agent comments or requests changes; it never merges. The coordinator runs the
-merge queue and the VM gate until the VM is retired.
+owning gate and enqueues the pull request; the merge queue is the last check.
 
 **C11.5** The merge queue replaces “update your branch and rerun” races. A lockfile-only conflict is
 resolved by the queue’s merge commit, not by every agent rebasing.
 
 ## 12. Migration
 
+The move to Actions happened in this order; the VM gate it replaced is retired.
+
 1. **Enable**: turn on Actions, add branch protection/ruleset and the merge queue, land `ci` with the
-   fast affected checks. Keep the VM gate as required.
+   fast affected checks. The VM gate stayed required while Actions proved the same rows.
 2. **Select**: add `detect` and the affected map; cache pnpm and Playwright. Measure PR time.
 3. **Trunk**: add `main-gate` and `nightly`; compare the VM result with Actions on the same commits.
 4. **Package**: add Linux/Android packaging and attestations; preview/stable environments.
 5. **Matrix**: add Windows, macOS, iOS simulator and Revyl smoke.
-6. **Retire**: remove the VM dependency only after a month of matching results and a documented
-   fallback.
+6. **Retire**: the VM gate was removed after a month of matching results and a documented fallback.
 
 ## 13. Cost and limits
 
