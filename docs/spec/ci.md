@@ -49,8 +49,10 @@ that does not run on `merge_group` blocks every merge.
 when every needed job succeeded or was skipped with a reason. A matrix job's failure fails the
 aggregator.
 
-**C2.3** `main` is protected: no direct pushes, one approving review, the `ci` check, and no force
-push. A direct push is an explicit owner checkpoint, not the normal path.
+**C2.3** `main` is protected: no direct pushes, the `ci` check, and no force push. One approving
+review is required where a second reviewer exists; a single-owner repository records the substitute
+in [decisions.md](../reference/decisions.md#reviews-and-release-keys) rather than pretending someone
+else reviewed the change. A direct push is an explicit owner checkpoint, not the normal path.
 
 **C2.4** A pull request from a fork runs fast checks only. E2E, packaging and device jobs need a
 maintainer label or an environment approval; a public fork does not get free heavy compute.
@@ -176,8 +178,12 @@ Android emulator sessions on nightly, preview and release candidates, not every 
 **C9.2** AWS access uses GitHub OIDC with a role trust policy scoped to this repository, branch or
 environment. No long-lived AWS key is stored.
 
-**C9.3** Signing keys live in the `release` environment with required reviewers, or on the local
-publisher. The environment is restricted to `main` and release tags. A pull request cannot reach it.
+**C9.3** Signing keys live in the `release` environment, or on the local publisher. The environment
+is restricted to `main` and release tags and holds no reviewer, because the nightly publication must
+run unattended; the reviewer sits on `approval`, which gates `preview` and `stable`. A single-owner
+repository records that split in
+[decisions.md](../reference/decisions.md#reviews-and-release-keys). A pull request cannot reach
+either environment.
 
 **C9.4** Actions and reusable workflows are pinned by full commit SHA or a workflow dependency lockfile.
 Dependabot updates them. A third-party action is reviewed before it is added.

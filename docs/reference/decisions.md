@@ -184,6 +184,23 @@ suite stays separate Flatpaks plus Start.
   the certificate digest is pinned, so a build refuses any other signer. The debug key is the dev
   loop only.
 
+## Reviews and release keys
+
+- The repository has one owner account. GitHub refuses a self-approval, so a required approving
+  review would deadlock every pull request and the merge queue; the `main` ruleset requires no
+  approval. The review is the review-only agent, required thread resolution and the `ci` check, and
+  the merge queue is the last gate. This is the recorded exception to C2.3, not a claim that a second
+  person reviewed the change.
+- The `approval` environment holds the reviewer for `preview` and `stable`. The `release` environment
+  holds the signing keys, is restricted to `main` and release tags, and has no reviewer: a required
+  reviewer there would also hold the nightly `workflow_call`, which must publish unattended. The
+  boundary is the branch policy plus the approval job that must succeed before the publish job
+  starts. This is the recorded exception to C9.3.
+- A second account or team restores the two-person shape. Until then, neither environment pretends
+  to have one.
+- Actions are pinned by full commit SHA and `sha_pinning_required` is on for the repository;
+  Dependabot is the only writer of those pins.
+
 ## Widgets and Screens
 
 - A widget is a host-rendered declaration: the app says what it is called, how big it may be, which
