@@ -23,9 +23,10 @@ operation. An owner configures that environment with the secrets `SUITE_STORE_KE
 `SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION`. A release tag is followed by a dispatch. Publication is
 three steps in one run: `release-status.mjs --draft` creates the releases as drafts,
 `android-release.mjs --upload` attaches the exact attested APK, and `release-status.mjs --publish`
-flips the drafts and writes `RELEASES.md`. Each publication also writes `release-manifest.json` with the
-commit, the lockfile hash, the artifact digests and the signer identities, and attaches it to the
-draft before publication (D2.1). The workflow header records the known limits: the Flatpak
+flips the drafts and writes `RELEASES.md`. `--channel` names the APK asset and the channel in the body,
+so a preview publication links `suite-go-preview-<version>.apk` rather than the stable name. Each
+publication also writes `release-manifest.json` with the commit, the lockfile hash, the artifact
+digests and the signer identities, and attaches it to the draft before publication (D2.1). The workflow header records the known limits: the Flatpak
 summary is re-signed while the OSTree commit stays fixed (the commit is what is attested), `preview`
 still refreshes the rolling release, and `RELEASES.md` is regenerated in the runner rather than
 committed.

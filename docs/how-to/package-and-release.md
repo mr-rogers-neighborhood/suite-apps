@@ -114,6 +114,8 @@ mise exec -- node scripts/release-status.mjs             # dry run: every comman
 mise exec -- node scripts/release-status.mjs --draft     # create or update the drafts
 mise exec -- node scripts/release-status.mjs --publish   # publish the drafts, then write RELEASES.md
 mise exec -- node scripts/release-status.mjs --write     # refresh RELEASES.md only
+mise exec -- node scripts/release-status.mjs --draft --channel preview
+                                                        # name the preview APK in the body
 ```
 
 Publication is two phases because a published GitHub release is immutable: its tag, assets and body
