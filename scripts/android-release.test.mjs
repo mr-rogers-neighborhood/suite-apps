@@ -264,3 +264,21 @@ describe("APK identity", () => {
     assert.equal(groupedFingerprint(normaliseFingerprint(colonised)), colonised);
   });
 });
+
+describe("apksigner output", () => {
+  it("reads the newer V2 label as well as Signer #1", () => {
+    const digest = "221c6e4bdcbd1323f571eef58bdbd9d09f35ec1a33f404ea2f63e1216366d14f";
+    const grouped = digest
+      .match(/.{2}/gu)
+      .join(":")
+      .toUpperCase();
+    assert.equal(
+      parseApksignerFingerprint(`V2 Signer: certificate SHA-256 digest: ${grouped}\n`),
+      digest,
+    );
+    assert.equal(
+      parseApksignerFingerprint(`Signer #1 certificate SHA-256 digest: ${grouped}\n`),
+      digest,
+    );
+  });
+});

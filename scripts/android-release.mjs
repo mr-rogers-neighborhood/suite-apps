@@ -440,7 +440,9 @@ function androidEnvironment(sdkRoot, jdk, signing = null) {
 
 /** The certificate digest `apksigner` prints for the APK, or null. */
 export function parseApksignerFingerprint(text) {
-  const match = /Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F:]+)/u.exec(text);
+  // Build-tools print `Signer #1 certificate SHA-256 digest:` in older
+  // releases and `V2 Signer: certificate SHA-256 digest:` in newer ones.
+  const match = /certificate SHA-256 digest:\s*([0-9a-fA-F:]+)/u.exec(text);
   return match?.[1] ? normaliseFingerprint(match[1]) : null;
 }
 
