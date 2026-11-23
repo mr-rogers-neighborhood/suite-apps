@@ -18,7 +18,9 @@
 # `publish` is off for a manual dispatch. With it off the job runs the gate,
 # builds and signs both artifacts, attests them, and stops: a rehearsal. It still
 # needs the keys, because the Android release APK cannot be built or verified
-# without the keystore.
+# without the keystore. Its clean-install check then installs whatever the public
+# remote serves on the stable branch today, and skips when nothing is there, so
+# the mechanism proves itself without publishing a build.
 #
 # The flow is draft → attach → publish, the only order an immutable release
 # allows (D6.3):
@@ -27,7 +29,12 @@
 #   2. `android-release.mjs --upload <apk> --publish` uploads the exact APK this
 #      job built and attested into that draft. The Flatpak remote is published
 #      from the repository this job built.
-#   3. `release-status.mjs --publish` flips the drafts and writes RELEASES.md.
+#   3. The published remote is installed in a throwaway user installation and
+#      launched, on a host that knows nothing but the public URL. This is the
+#      install test D4.1 step 5 and P5.1 ask for; the summary check inside
+#      `flatpak-remote.mjs` proves the signature, not that a client can resolve,
+#      install and run the ref.
+#   4. `release-status.mjs --publish` flips the drafts and writes RELEASES.md.
 #
 # Signing keys are environment secrets, never repository secrets:
 #
@@ -294,6 +301,9 @@ jobs:
         id: apk
         env:
           CHANNEL: ${{ inputs.channel }}
+          # The versionCode preflight reads the newest published manifest with
+          # `gh` and fails closed without a token.
+          GH_TOKEN: ${{ github.token }}
           SUITE_GO_KEYSTORE_PASSWORD: ${{ secrets.SUITE_GO_KEYSTORE_PASSWORD }}
           SUITE_GO_KEY_ALIAS: ${{ secrets.SUITE_GO_KEY_ALIAS }}
           SUITE_GO_KEY_PASSWORD: ${{ secrets.SUITE_GO_KEY_PASSWORD }}
@@ -390,7 +400,9 @@ jobs:
           CHANNEL: ${{ inputs.channel }}
         run: node scripts/release-status.mjs --draft --channel "${CHANNEL}"
 
-      - name: Attach the manifest to the draft
+      # The manifest (D2.1) and the SBOM (D10 item 5) are assets of the draft, so
+      # they become immutable with the release.
+      - name: Attach the manifest and SBOM to the draft
         if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -401,6 +413,7 @@ jobs:
             -e "import('./scripts/release-status.mjs').then((m) => console.log(m.currentAggregateTag({ channel: process.env.CHANNEL })))")"
           test -n "${tag}"
           gh release upload "${tag}" .dev/release/release-manifest.json --clobber
+          gh release upload "${tag}" .dev/release/suite-apps.spdx.json --clobber
 
       - name: Upload the exact APK into the draft
         if: inputs.publish
@@ -427,6 +440,90 @@ jobs:
           args=(--target s3 --from-repo "${SUITE_FLATPAK_REPO}")
           if [ "${CHANNEL}" != "stable" ]; then args+=(--channel "${CHANNEL}"); fi
           node scripts/flatpak-remote.mjs "${args[@]}" --publish
+
+      # D4.1 step 5, D10 item 7, P5.1: install the ref a client would get, from
+      # the public URL, in an installation that has never seen this runner's
+      # repository. A failure stops here, so the drafts stay unpublished and
+      # nobody is told the build exists; the Flatpak branch can be repointed by
+      # the next publication (D1.5).
+      - name: Verify the published Flatpak from a clean install
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          # A throwaway user installation. The gate's remotes, the repository
+          # this job built and the S3 copy are all invisible from here.
+          export FLATPAK_USER_DIR="${work}/user"
+          export XDG_DATA_HOME="${work}/data"
+          export FLATPAK_CONFIG_DIR="${work}/config"
+          mkdir -p "${FLATPAK_USER_DIR}" "${XDG_DATA_HOME}" "${FLATPAK_CONFIG_DIR}"
+          trap 'rm -rf "${work}"' EXIT
+
+          # The Suite remote carries apps, not their runtime; a clean host adds
+          # Flathub for that, exactly as the install instructions tell a person.
+          flatpak remote-add --user --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+          flatpak remote-add --user --if-not-exists --from suite \
+            https://flatpak.suite.run/suite.flatpakrepo
+
+          expected=""
+          if [ "${PUBLISH}" = "true" ]; then
+            if [ "${CHANNEL}" = "stable" ]; then
+              app=run.suite.shell
+              branch=master
+            else
+              app=run.suite.slop.shell
+              branch="${CHANNEL}"
+            fi
+            commit_file=".dev/release/suite-shell-${CHANNEL}.commit"
+            test -s "${commit_file}"
+            expected="$(cat "${commit_file}")"
+          else
+            # A rehearsal published nothing, so the only ref it can prove is
+            # what the public remote serves on the stable branch today. No
+            # build published means nothing to install, and that is a skip.
+            app=run.suite.shell
+            branch=master
+            if ! flatpak remote-ls --user suite --app \
+              --columns=application,branch \
+              | awk -v app="${app}" -v branch="${branch}" \
+                '$1 == app && $2 == branch { found = 1 } END { exit !found }'; then
+              echo "rehearsal: the public remote has no ${app}//${branch}; skipping the clean install"
+              exit 0
+            fi
+          fi
+          ref="${app}//${branch}"
+
+          flatpak install --user --noninteractive -y suite "${ref}"
+
+          installed_ref="$(flatpak info --user --show-ref "${app}" "${branch}")"
+          installed_commit="$(flatpak info --user --show-commit "${app}" "${branch}")"
+          wanted_ref="app/${app}/$(flatpak --default-arch)/${branch}"
+          echo "installed ${installed_ref} at ${installed_commit}"
+          if [ "${installed_ref}" != "${wanted_ref}" ]; then
+            echo "expected the ${wanted_ref} branch, installed ${installed_ref}" >&2
+            exit 1
+          fi
+          if [ -n "${expected}" ] && [ "${installed_commit}" != "${expected}" ]; then
+            echo "the installed commit is ${installed_commit}, but ${commit_file} says ${expected}" >&2
+            exit 1
+          fi
+
+          # The commit has to run, not just exist. A window that is still up
+          # after 25s is a pass: `timeout` kills it and exits 124.
+          log="${work}/launch.log"
+          status=0
+          xvfb-run -a timeout 25 flatpak run --branch="${branch}" "${app}" \
+            >"${log}" 2>&1 || status=$?
+          if [ "${status}" -ne 0 ] && [ "${status}" -ne 124 ]; then
+            echo "flatpak run ${ref} exited ${status} before the timeout" >&2
+            cat "${log}" >&2
+            exit 1
+          fi
+          echo "clean install verified: ${installed_ref} at ${installed_commit} launched (exit ${status})"
 
       - name: Publish the drafts and write RELEASES.md
         if: inputs.publish
