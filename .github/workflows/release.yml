@@ -146,6 +146,51 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # The claims are public and short-lived; printing them turns an opaque
+      # AssumeRoleWithWebIdentity refusal into the exact sub and aud AWS saw.
+      - name: OIDC claims
+        run: |
+          set -euo pipefail
+          response="$(curl -sS \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")"
+          token="$(printf '%s' "${response}" | jq -r .value)"
+          node -e '
+            const claims = JSON.parse(Buffer.from(process.argv[1].split(".")[1], "base64url"));
+            for (const key of ["sub", "aud", "environment", "ref", "repository", "repository_owner"]) {
+              if (claims[key] !== undefined) console.log(`${key}: ${claims[key]}`);
+            }
+          ' "${token}"
+
+      - name: Check the S3 publishing configuration
+        if: inputs.publish
+        env:
+          ROLE_ARN: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          BUCKET: ${{ vars.SUITE_FLATPAK_S3_BUCKET }}
+          DISTRIBUTION: ${{ vars.SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "${ROLE_ARN}" ] || missing+=("repository variable AWS_RELEASE_ROLE_ARN")
+          [ -n "${BUCKET}" ] || missing+=("SUITE_FLATPAK_S3_BUCKET")
+          [ -n "${DISTRIBUTION}" ] || missing+=("SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION")
+          if [ "${#missing[@]}" -ne 0 ]; then
+            printf 'The s3 target also needs:\n'
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+      # Also on a rehearsal: assuming the role proves the trust policy without
+      # publishing anything.
+      - name: AWS credentials (OIDC)
+        if: vars.AWS_RELEASE_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          role-session-name: suite-release-${{ inputs.channel }}
+          aws-region: ${{ vars.AWS_RELEASE_REGION || 'us-east-1' }}
+
+
       - name: Playwright browser (Canvas stories)
         run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
 
@@ -335,32 +380,6 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: .dev/release/release-manifest.json
-
-      - name: Check the S3 publishing configuration
-        if: inputs.publish
-        env:
-          ROLE_ARN: ${{ vars.AWS_RELEASE_ROLE_ARN }}
-          BUCKET: ${{ vars.SUITE_FLATPAK_S3_BUCKET }}
-          DISTRIBUTION: ${{ vars.SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION }}
-        run: |
-          set -euo pipefail
-          missing=()
-          [ -n "${ROLE_ARN}" ] || missing+=("repository variable AWS_RELEASE_ROLE_ARN")
-          [ -n "${BUCKET}" ] || missing+=("SUITE_FLATPAK_S3_BUCKET")
-          [ -n "${DISTRIBUTION}" ] || missing+=("SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION")
-          if [ "${#missing[@]}" -ne 0 ]; then
-            printf 'The s3 target also needs:\n'
-            printf '  - %s\n' "${missing[@]}"
-            exit 1
-          fi
-
-      - name: AWS credentials (OIDC)
-        if: inputs.publish && vars.AWS_RELEASE_ROLE_ARN != ''
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
-          role-session-name: suite-release-${{ inputs.channel }}
-          aws-region: ${{ vars.AWS_RELEASE_REGION || 'us-east-1' }}
 
       # Draft first: an immutable release cannot take an asset after it is
       # published, so the APK and the body must be final while it is a draft.
