@@ -33,6 +33,7 @@
  *   node scripts/android-release.mjs --channel slop     # slop, nightly or preview
  *   node scripts/android-release.mjs --publish          # also upload it to the rolling release
  *   node scripts/android-release.mjs --dry-run          # print the upload; the default
+ *   node scripts/android-release.mjs --upload <apk>     # upload an APK built by an earlier step
  *   node scripts/android-release.mjs --key-status       # is the key the one the tree pins?
  *   node scripts/android-release.mjs --key-generate     # make the release keystore, once
  *   node scripts/android-release.mjs --help
@@ -41,6 +42,13 @@
  * that release does not exist, because the rolling release is created by
  * `node scripts/release-status.mjs --publish`, not here. Stable also refreshes `suite-go.apk`; a
  * pre-release uploads only its channel-named asset and checksum.
+ *
+ * `--upload <apk>` replaces the build with a verification step: the APK's certificate is checked
+ * against the pin, its package id and version name decide the channel and version, and the staged
+ * copy is hashed before upload. It uploads nothing without `--publish`. Pass `--channel` for a
+ * pre-release APK, because `run.suite.slop.go` is shared by slop, nightly and preview. Because a
+ * published GitHub release is immutable, a published rolling release is refused; `--allow-published`
+ * is the explicit override for a repository that has not enabled immutable releases.
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -53,7 +61,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resolveJdk, resolveSdkRoot } from "../apps/go/scripts/preflight.mjs";
 import {
@@ -67,7 +75,7 @@ import {
   normaliseFingerprint,
   signingEnvironment,
 } from "./lib/androidKey.mjs";
-import { CHANNELS, channelProblem, isPreRelease } from "./lib/channel.mjs";
+import { CHANNELS, PRE_RELEASE_CHANNELS, channelProblem, isPreRelease } from "./lib/channel.mjs";
 import { currentAggregateTag, goApkName } from "./release-status.mjs";
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -112,9 +120,11 @@ const RESET = "\u001b[0m";
 
 const USAGE = `usage: node scripts/android-release.mjs [options]
 
-  --channel <name>     stable (default), slop, nightly or preview
+  --channel <name>     stable, slop, nightly or preview
   --publish            upload the APK and its checksum to the rolling release
   --dry-run            print the upload command instead; the default
+  --upload <apk>       upload an APK built earlier; never builds
+  --allow-published    allow a published, non-immutable rolling release
   --key-status         report the release key and whether it matches the pin
   --key-generate       make the release keystore in the Suite key directory
   --force              replace the keystore; only with --key-generate
@@ -123,6 +133,10 @@ const USAGE = `usage: node scripts/android-release.mjs [options]
 The build is a release build, signed with the key at
 ${androidKeystorePath()}
 or wherever ${ANDROID_KEYSTORE_ENV} points. A debug-signed APK is never a release artifact.
+
+--upload checks the APK's certificate and identity instead of signing one. Without --channel it
+accepts a stable APK; a pre-release APK shares one package id across slop, nightly and preview, so
+name its channel. --upload still uploads only with --publish.
 `;
 
 function quote(value) {
@@ -206,6 +220,106 @@ export function uploadNames(version, channel = "stable") {
   const names = [asset, `${asset}.sha256`];
   if (!isPreRelease(channel)) names.push(GO_APK_ALIAS);
   return names;
+}
+
+/**
+ * The channel and version an already-built APK carries.
+ *
+ * A stable APK names itself, so `--channel` is optional. The pre-release package id is shared by
+ * slop, nightly and preview, so the channel is a decision the artifact cannot make; the caller has
+ * to pass it. An explicit channel is checked against both the package id and the version name
+ * suffix, so a mislabelled upload is refused before it reaches a release.
+ */
+export function resolveUploadIdentity({ applicationId = null, versionName = null, channel = null } = {}) {
+  if (typeof applicationId !== "string" || applicationId.length === 0) {
+    throw new Error("the APK names no package id, so its channel cannot be derived");
+  }
+  if (typeof versionName !== "string" || versionName.length === 0) {
+    throw new Error("the APK names no version, so its asset name cannot be derived");
+  }
+
+  if (channel === null || channel === undefined) {
+    if (applicationId === CHANNEL_PACKAGE_ID.stable) {
+      return { channel: "stable", version: versionName };
+    }
+    if (applicationId === CHANNEL_PACKAGE_ID.slop) {
+      throw new Error(
+        `${applicationId} is shared by slop, nightly and preview, so the asset name is ambiguous. ` +
+          "Pass --channel slop, --channel nightly or --channel preview.",
+      );
+    }
+    throw new Error(
+      `${applicationId} is not a Suite Go release package ` +
+        `(${CHANNEL_PACKAGE_ID.stable} or ${CHANNEL_PACKAGE_ID.slop}).`,
+    );
+  }
+
+  const problem = channelProblem(channel);
+  if (problem !== null) throw new Error(problem);
+
+  const expectedId = CHANNEL_PACKAGE_ID[channel];
+  if (applicationId !== expectedId) {
+    throw new Error(
+      `the APK is ${applicationId}, not ${expectedId} for ${channel}: ` +
+        "the artifact and --channel disagree.",
+    );
+  }
+
+  const suffix = isPreRelease(channel) ? `-${channel}` : "";
+  if (suffix.length > 0 && !versionName.endsWith(suffix)) {
+    throw new Error(
+      `the ${channel} APK has version name ${JSON.stringify(versionName)}, which does not end ` +
+        `in ${JSON.stringify(suffix)}: the artifact and --channel disagree.`,
+    );
+  }
+  if (suffix.length === 0) {
+    const named = PRE_RELEASE_CHANNELS.find((candidate) => versionName.endsWith(`-${candidate}`));
+    if (named !== undefined) {
+      throw new Error(
+        `the APK has version name ${JSON.stringify(versionName)}, which names ${named}: ` +
+          "the artifact and --channel stable disagree.",
+      );
+    }
+  }
+  const version = suffix.length > 0 ? versionName.slice(0, -suffix.length) : versionName;
+  if (version.length === 0) {
+    throw new Error(`the APK has no version before ${JSON.stringify(suffix)}`);
+  }
+  return { channel, version };
+}
+
+/**
+ * Why a present rolling release cannot take this upload, or null.
+ *
+ * Drafts are the normal publication state (D6.3): every asset is attached before the release is
+ * published. A published release may be immutable, in which case no flag can reopen it; a
+ * repository without immutable releases can still take a late asset, but only when the caller says
+ * `--allow-published`. An unknown state is treated as immutable rather than guessed.
+ */
+export function publishedReleaseProblem({ isDraft = null, isImmutable = null, allowPublished = false } = {}) {
+  if (isDraft === true) return null;
+  if (isDraft !== false) {
+    return "could not tell whether the rolling release is a draft, so the upload is refused.";
+  }
+  if (isImmutable === true) {
+    return (
+      "the rolling release is published and immutable, so its assets are locked. " +
+      "Publish a new draft instead; --allow-published cannot reopen an immutable release."
+    );
+  }
+  if (isImmutable !== false) {
+    return (
+      "the rolling release is published and its immutability could not be read, so the upload " +
+        "is refused rather than risking a locked asset."
+    );
+  }
+  if (!allowPublished) {
+    return (
+      "the rolling release is already published. Pass --allow-published only when the repository " +
+      "does not use immutable releases; otherwise publish a new draft."
+    );
+  }
+  return null;
 }
 
 /** The Gradle task for one channel's release variant. */
@@ -315,9 +429,11 @@ function androidEnvironment(sdkRoot, jdk, signing = null) {
   const env = { ...process.env };
   env.ANDROID_HOME = sdkRoot;
   env.ANDROID_SDK_ROOT = sdkRoot;
-  env.JAVA_HOME = jdk;
+  if (jdk !== null) env.JAVA_HOME = jdk;
   // Gradle reads JAVA_HOME; `apksigner` is a shell script that runs `java` from PATH.
-  env.PATH = `${join(sdkRoot, "platform-tools")}:${join(jdk, "bin")}:${env.PATH ?? ""}`;
+  const path = [join(sdkRoot, "platform-tools")];
+  if (jdk !== null) path.push(join(jdk, "bin"));
+  env.PATH = [...path, env.PATH ?? ""].join(":");
   for (const [name, value] of Object.entries(signing ?? {})) env[name] = value;
   return env;
 }
@@ -350,6 +466,109 @@ function sha256OfFile(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+/** The certificate digest on `apkPath`, proven against the pin this tree carries. */
+function verifyApkCertificate(apkPath, { env, buildTools }) {
+  const verified = capture(buildTools.apksigner, ["verify", "--print-certs", apkPath], { env });
+  if (verified.status !== 0) {
+    throw new Error(
+      `apksigner refused ${apkPath}:\n${(verified.stderr || verified.stdout).trim()}`,
+    );
+  }
+  const fingerprint = parseApksignerFingerprint(verified.stdout);
+  if (fingerprint === null) {
+    throw new Error(`apksigner printed no certificate for ${apkPath}`);
+  }
+  const pin = normaliseFingerprint(ANDROID_RELEASE_CERT_SHA256);
+  if (fingerprint !== pin) {
+    throw new Error(
+      `refusing to publish: the APK is signed by ${groupedFingerprint(fingerprint)}, ` +
+        `but this tree pins ${groupedFingerprint(pin)}. A debug-signed artifact is not a release.`,
+    );
+  }
+  return fingerprint;
+}
+
+/** The package id, versionCode and version name the bytes actually carry. */
+function readApkIdentity(apkPath, { env, buildTools }) {
+  const badging = capture(buildTools.aapt, ["dump", "badging", apkPath], { env });
+  if (badging.status !== 0) {
+    throw new Error(`aapt could not read ${apkPath}:\n${badging.stderr.trim()}`);
+  }
+  const identity = parseBadging(badging.stdout);
+  if (identity === null) throw new Error(`aapt printed no package line for ${apkPath}`);
+  return identity;
+}
+
+/**
+ * Put the exact artifact under its release name and write its checksum.
+ *
+ * A copy is made only when the input is not already the staged path. The hash of the staged copy
+ * must equal the input's, so a rename or a copy can never change which bytes are published.
+ */
+function stageArtifact({ sourcePath, asset, checksum, alias }) {
+  const sourceSha = sha256OfFile(sourcePath);
+  mkdirSync(RELEASE_DIR, { recursive: true });
+
+  const apkPath = join(RELEASE_DIR, asset);
+  if (resolve(sourcePath) !== resolve(apkPath)) copyFileSync(sourcePath, apkPath);
+
+  const sha256 = sha256OfFile(apkPath);
+  if (sha256 !== sourceSha) {
+    throw new Error(
+      `refusing to upload ${sourcePath}: the staged copy hashes to ${sha256}, not ${sourceSha}.`,
+    );
+  }
+
+  const checksumPath = join(RELEASE_DIR, checksum);
+  writeFileSync(checksumPath, `${sha256}  ${asset}\n`);
+
+  // A copy, not a second build: the alias has to be the exact bytes the
+  // versioned asset carries, or the stable URL would download another app.
+  let aliasPath = null;
+  if (alias !== undefined) {
+    aliasPath = join(RELEASE_DIR, alias);
+    copyFileSync(apkPath, aliasPath);
+  }
+
+  return { apkPath, checksumPath, aliasPath, sha256 };
+}
+
+/** Fail if the staged file stopped being the bytes that were verified and checksummed. */
+function assertStagedArtifact(artifact) {
+  const actual = sha256OfFile(artifact.apkPath);
+  if (actual !== artifact.sha256) {
+    throw new Error(
+      `refusing to upload ${artifact.apkPath}: it hashes to ${actual}, but the attested ` +
+        `artifact is ${artifact.sha256}.`,
+    );
+  }
+  if (artifact.aliasPath !== null) {
+    const alias = sha256OfFile(artifact.aliasPath);
+    if (alias !== artifact.sha256) {
+      throw new Error(
+        `refusing to upload ${artifact.aliasPath}: the alias hashes to ${alias}, not the ` +
+          `versioned asset's ${artifact.sha256}.`,
+      );
+    }
+  }
+}
+
+/** The one upload command, for both the build path and `--upload`. */
+function uploadCommand({ tag, artifact }) {
+  return [
+    "gh",
+    [
+      "release",
+      "upload",
+      tag,
+      artifact.apkPath,
+      artifact.checksumPath,
+      ...(artifact.aliasPath === null ? [] : [artifact.aliasPath]),
+      "--clobber",
+    ],
+  ];
+}
+
 /**
  * Build one channel's release APK, verify its identity, and name it.
  *
@@ -364,7 +583,6 @@ function build({ config, channel, env, buildTools }) {
   const expectedCode = versionCodeFor(base, channel);
   const expectedId = CHANNEL_PACKAGE_ID[channel];
   const gradleApk = gradleApkPath(channel);
-  mkdirSync(RELEASE_DIR, { recursive: true });
 
   command("pnpm", ["--filter", "@suite/go-app", "build"]);
   command("pnpm", ["--filter", "@suite/go-app", "exec", "cap", "sync", "android"], {
@@ -385,30 +603,8 @@ function build({ config, channel, env, buildTools }) {
     );
   }
 
-  const verified = capture(buildTools.apksigner, ["verify", "--print-certs", gradleApk], { env });
-  if (verified.status !== 0) {
-    throw new Error(
-      `apksigner refused ${gradleApk}:\n${(verified.stderr || verified.stdout).trim()}`,
-    );
-  }
-  const fingerprint = parseApksignerFingerprint(verified.stdout);
-  if (fingerprint === null) {
-    throw new Error(`apksigner printed no certificate for ${gradleApk}`);
-  }
-  const pin = normaliseFingerprint(ANDROID_RELEASE_CERT_SHA256);
-  if (fingerprint !== pin) {
-    throw new Error(
-      `refusing to publish ${channel}: the APK is signed by ${groupedFingerprint(fingerprint)}, ` +
-        `but this tree pins ${groupedFingerprint(pin)}. A debug-signed artifact is not a release.`,
-    );
-  }
-
-  const badging = capture(buildTools.aapt, ["dump", "badging", gradleApk], { env });
-  if (badging.status !== 0) {
-    throw new Error(`aapt could not read ${gradleApk}:\n${badging.stderr.trim()}`);
-  }
-  const identity = parseBadging(badging.stdout);
-  if (identity === null) throw new Error(`aapt printed no package line for ${gradleApk}`);
+  const fingerprint = verifyApkCertificate(gradleApk, { env, buildTools });
+  const identity = readApkIdentity(gradleApk, { env, buildTools });
   if (identity.applicationId !== expectedId) {
     throw new Error(
       `the ${channel} APK is ${identity.applicationId}, not ${expectedId}: the Gradle flavor ` +
@@ -429,20 +625,12 @@ function build({ config, channel, env, buildTools }) {
     );
   }
 
-  const apkPath = join(RELEASE_DIR, asset);
-  copyFileSync(gradleApk, apkPath);
-
-  const sha256 = sha256OfFile(apkPath);
-  const checksumPath = join(RELEASE_DIR, checksum);
-  writeFileSync(checksumPath, `${sha256}  ${asset}\n`);
-
-  // A copy, not a second build: the alias has to be the exact bytes the
-  // versioned asset carries, or the stable URL would download another app.
-  let aliasPath = null;
-  if (alias !== undefined) {
-    aliasPath = join(RELEASE_DIR, alias);
-    copyFileSync(apkPath, aliasPath);
-  }
+  const staged = stageArtifact({
+    sourcePath: gradleApk,
+    asset,
+    checksum,
+    alias,
+  });
 
   return {
     version,
@@ -451,11 +639,8 @@ function build({ config, channel, env, buildTools }) {
     versionCode: expectedCode,
     applicationId: identity.applicationId,
     asset,
-    apkPath,
-    checksumPath,
     alias,
-    aliasPath,
-    sha256,
+    ...staged,
     fingerprint,
   };
 }
@@ -480,16 +665,33 @@ export function classifyReleaseView({ error = null, status = null, stderr = "" }
 
 /** Whether gh can see the rolling release, and why not when it cannot. */
 function readRelease(tag) {
-  const result = spawnSync("gh", ["release", "view", tag, "--json", "tagName"], {
-    cwd: ROOT,
-    encoding: "utf8",
-    env: process.env,
-  });
-  return classifyReleaseView({
+  const result = spawnSync(
+    "gh",
+    ["release", "view", tag, "--json", "tagName,isDraft,isImmutable"],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: process.env,
+    },
+  );
+  const view = classifyReleaseView({
     error: result.error ?? null,
     status: result.status,
     stderr: result.stderr ?? "",
   });
+  if (view.state !== "present") return view;
+
+  let data = null;
+  try {
+    data = JSON.parse(result.stdout);
+  } catch {
+    data = null;
+  }
+  return {
+    ...view,
+    isDraft: typeof data?.isDraft === "boolean" ? data.isDraft : null,
+    isImmutable: typeof data?.isImmutable === "boolean" ? data.isImmutable : null,
+  };
 }
 
 /** Print the key's location, fingerprint and pin; a mismatch is a failure. */
@@ -561,31 +763,186 @@ function keyGenerate({ env, jdk, force }) {
   );
 }
 
-async function main(argv) {
+/**
+ * The options `main` understands, separated so a test never builds anything.
+ *
+ * `channel` is null when it was not passed: the build path defaults to stable, while `--upload`
+ * lets the APK decide (and refuses an ambiguous pre-release).
+ */
+export function parseArgs(argv) {
   const options = {
     publish: false,
     dryRun: false,
     help: false,
-    channel: "stable",
+    channel: null,
+    upload: null,
+    allowPublished: false,
     keyStatus: false,
     keyGenerate: false,
     force: false,
   };
+
+  function takeValue(index, flag) {
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith("--")) {
+      throw new Error(`${flag} needs a value`);
+    }
+    return value;
+  }
+
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") options.help = true;
     else if (arg === "--publish") options.publish = true;
     else if (arg === "--dry-run") options.dryRun = true;
+    else if (arg === "--allow-published") options.allowPublished = true;
     else if (arg === "--key-status" || arg === "status") options.keyStatus = true;
     else if (arg === "--key-generate" || arg === "generate") options.keyGenerate = true;
     else if (arg === "--force") options.force = true;
     else if (arg === "--channel") {
-      options.channel = argv[index + 1] ?? "";
+      options.channel = takeValue(index, "--channel");
+      index += 1;
+    } else if (arg === "--upload") {
+      options.upload = takeValue(index, "--upload");
       index += 1;
     } else {
-      process.stderr.write(`unknown option ${arg}\n\n${USAGE}`);
-      process.exit(2);
+      throw new Error(`unknown option ${arg}`);
     }
+  }
+
+  return options;
+}
+
+/** Why this rolling release cannot take an upload, or null. */
+function releaseRefusal({ tag, release, allowPublished, checkPublished = true }) {
+  if (release.state === "missing") {
+    return (
+      `no GitHub release ${tag}, so there is nowhere to attach the APK.\n` +
+      "Run `node scripts/release-status.mjs --publish` first; it creates the rolling " +
+      "release. Then run this again."
+    );
+  }
+  if (release.state === "unavailable") {
+    return (
+      `could not read GitHub release ${tag}, so the upload is refused` +
+      (release.detail === "" ? "." : `:\n  ${release.detail}`) +
+      "\nCheck `gh auth status` and that the repository is reachable, then run this again."
+    );
+  }
+  if (!checkPublished) return null;
+  return publishedReleaseProblem({
+    isDraft: release.isDraft ?? null,
+    isImmutable: release.isImmutable ?? null,
+    allowPublished,
+  });
+}
+
+/** The lines every verified artifact prints, built or uploaded. */
+function reportArtifact({ artifact, size }) {
+  process.stdout.write(
+    `\n${GREEN}${artifact.channel} release APK${RESET} ${artifact.apkPath}\n`,
+  );
+  process.stdout.write(`  package    ${artifact.applicationId}\n`);
+  process.stdout.write(`  version    ${artifact.version} (versionCode ${artifact.versionCode})\n`);
+  process.stdout.write(`  signer     ${groupedFingerprint(artifact.fingerprint)}\n`);
+  process.stdout.write(`  size       ${size} bytes\n`);
+  process.stdout.write(`  sha256     ${artifact.sha256}\n`);
+  process.stdout.write(`  checksum   ${artifact.checksumPath}\n`);
+  if (artifact.aliasPath !== null) {
+    process.stdout.write(`  alias      ${artifact.aliasPath}\n`);
+  }
+}
+
+/**
+ * Upload an APK that an earlier step already built and attested.
+ *
+ * Nothing is built or signed here: the certificate must already be the pinned release key, and
+ * the package id and version name must agree with `--channel` (or name stable on their own). The
+ * staged copy is hashed again before upload, so the bytes sent are the bytes checked here.
+ */
+function uploadExisting({ options, tag, release, releaseProblem }) {
+  const input = options.upload;
+  if (!existsSync(input) || !statSync(input).isFile()) {
+    throw new Error(`--upload ${input} is not a file`);
+  }
+
+  const sdkRoot = resolveSdkRoot();
+  if (sdkRoot === null) {
+    throw new Error(
+      "no Android SDK found: set ANDROID_HOME, or install one at ~/Android/Sdk. " +
+        "The APK's certificate and identity cannot be checked without apksigner and aapt.",
+    );
+  }
+  const buildTools = resolveBuildTools(sdkRoot);
+  if (buildTools === null) {
+    throw new Error(
+      `${join(sdkRoot, "build-tools")} has no apksigner and aapt: install build-tools with ` +
+        `sdkmanager --sdk_root=${sdkRoot} "build-tools;36.0.0"`,
+    );
+  }
+
+  const env = androidEnvironment(sdkRoot, resolveJdk());
+  const fingerprint = verifyApkCertificate(input, { env, buildTools });
+  const identity = readApkIdentity(input, { env, buildTools });
+  const { channel, version } = resolveUploadIdentity({
+    applicationId: identity.applicationId,
+    versionName: identity.versionName,
+    channel: options.channel,
+  });
+  const [asset, checksum, alias] = uploadNames(version, channel);
+
+  const artifact = {
+    channel,
+    version,
+    applicationId: identity.applicationId,
+    versionCode: identity.versionCode,
+    asset,
+    alias,
+    fingerprint,
+    ...stageArtifact({ sourcePath: input, asset, checksum, alias }),
+  };
+
+  reportArtifact({ artifact, size: statSync(artifact.apkPath).size });
+
+  finishUpload({ options, tag, release, releaseProblem, artifact });
+}
+
+/** Prove the staged bytes still match, then print or run the one upload command. */
+function finishUpload({ options, tag, release, releaseProblem, artifact }) {
+  assertStagedArtifact(artifact);
+  const upload = uploadCommand({ tag, artifact });
+
+  if (options.publish) {
+    command(upload[0], upload[1]);
+    process.stdout.write(`\n${GREEN}uploaded${RESET} ${artifact.asset} to ${tag}\n`);
+    return;
+  }
+
+  process.stdout.write(`\nDry run: nothing was uploaded. The upload would be:\n`);
+  process.stdout.write(`  $ ${commandText(upload[0], upload[1])}\n`);
+  if (releaseProblem !== null) {
+    process.stdout.write(`${DIM}${releaseProblem}${RESET}\n`);
+  } else if (release.state === "missing") {
+    process.stdout.write(
+      `${DIM}${tag} does not exist yet; \`--publish\` refuses until ` +
+        "`node scripts/release-status.mjs --publish` has created it.${RESET}\n",
+    );
+  } else if (release.state === "unavailable") {
+    process.stdout.write(
+      `${DIM}gh could not read ${tag}, so \`--publish\` would refuse. Check \`gh auth status\`.${RESET}\n`,
+    );
+  } else {
+    process.stdout.write(`${DIM}${tag} exists; the rolling release is ready for it.${RESET}\n`);
+  }
+}
+
+async function main(argv) {
+  let options;
+  try {
+    options = parseArgs(argv);
+  } catch (error) {
+    process.stderr.write(`${error.message}\n\n${USAGE}`);
+    process.exit(2);
   }
   if (options.publish && options.dryRun) {
     process.stderr.write("--publish and --dry-run contradict each other\n\n" + USAGE);
@@ -599,6 +956,10 @@ async function main(argv) {
     process.stderr.write("--force only means something with --key-generate\n\n" + USAGE);
     process.exit(2);
   }
+  if ((options.keyStatus || options.keyGenerate) && options.upload !== null) {
+    process.stderr.write("--upload cannot be combined with --key-status or --key-generate\n\n" + USAGE);
+    process.exit(2);
+  }
 
   if (options.keyStatus) {
     keyStatus({ env: process.env });
@@ -609,12 +970,28 @@ async function main(argv) {
     return;
   }
 
-  const channel = options.channel;
-  const problem = channelProblem(channel);
-  if (problem !== null) {
-    process.stderr.write(`${problem}\n\n${USAGE}`);
-    process.exit(2);
+  if (options.channel !== null) {
+    const problem = channelProblem(options.channel);
+    if (problem !== null) {
+      process.stderr.write(`${problem}\n\n${USAGE}`);
+      process.exit(2);
+    }
   }
+
+  if (options.upload !== null) {
+    const tag = currentAggregateTag();
+    const release = readRelease(tag);
+    const releaseProblem = releaseRefusal({
+      tag,
+      release,
+      allowPublished: options.allowPublished,
+    });
+    if (options.publish && releaseProblem !== null) throw new Error(releaseProblem);
+    uploadExisting({ options, tag, release, releaseProblem });
+    return;
+  }
+
+  const channel = options.channel ?? "stable";
 
   const config = appConfig();
   const packageVersion = JSON.parse(readFileSync(join(APP_DIR, "package.json"), "utf8")).version;
@@ -673,40 +1050,24 @@ async function main(argv) {
 
   const tag = currentAggregateTag();
   const release = readRelease(tag);
+  const releaseProblem = releaseRefusal({
+    tag,
+    release,
+    allowPublished: options.allowPublished,
+    checkPublished: false,
+  });
 
   // Fail before a long build when there is nowhere to upload: the rolling release
   // belongs to `release-status.mjs`, and a missing `gh` is a different problem.
-  if (options.publish && release.state === "missing") {
-    throw new Error(
-      `no GitHub release ${tag}, so there is nowhere to attach the APK.\n` +
-        "Run `node scripts/release-status.mjs --publish` first; it creates the rolling " +
-        "release. Then run this again.",
-    );
-  }
-  if (options.publish && release.state === "unavailable") {
-    throw new Error(
-      `could not read GitHub release ${tag}, so the upload is refused` +
-        (release.detail === "" ? "." : `:\n  ${release.detail}`) +
-        "\nCheck `gh auth status` and that the repository is reachable, then run this again.",
-    );
-  }
+  // The publish-time immutable check belongs to `--upload`; the workstation build
+  // path keeps its long-standing behaviour.
+  if (options.publish && releaseProblem !== null) throw new Error(releaseProblem);
 
   const env = androidEnvironment(toolchain.sdkRoot, toolchain.jdk, signing);
   const built = build({ config, channel, env, buildTools });
   const size = statSync(built.apkPath).size;
 
-  process.stdout.write(
-    `\n${GREEN}${channel} release APK${RESET} ${built.apkPath}\n`,
-  );
-  process.stdout.write(`  package    ${built.applicationId}\n`);
-  process.stdout.write(`  version    ${config.version} (versionCode ${built.versionCode})\n`);
-  process.stdout.write(`  signer     ${groupedFingerprint(built.fingerprint)}\n`);
-  process.stdout.write(`  size       ${size} bytes\n`);
-  process.stdout.write(`  sha256     ${built.sha256}\n`);
-  process.stdout.write(`  checksum   ${built.checksumPath}\n`);
-  if (built.aliasPath !== null) {
-    process.stdout.write(`  alias      ${built.aliasPath}\n`);
-  }
+  reportArtifact({ artifact: built, size });
   process.stdout.write(
     `\nInstall on an attached phone:\n  adb install -r -t ${quote(built.apkPath)}\n`,
   );
@@ -718,39 +1079,7 @@ async function main(argv) {
       : `${DIM}Stable is ${CHANNEL_PACKAGE_ID[channel]}; a pre-release install sits beside it.${RESET}\n`,
   );
 
-  const upload = [
-    "gh",
-    [
-      "release",
-      "upload",
-      tag,
-      built.apkPath,
-      built.checksumPath,
-      ...(built.aliasPath === null ? [] : [built.aliasPath]),
-      "--clobber",
-    ],
-  ];
-
-  if (options.publish) {
-    command(upload[0], upload[1]);
-    process.stdout.write(`\n${GREEN}uploaded${RESET} ${built.asset} to ${tag}\n`);
-    return;
-  }
-
-  process.stdout.write(`\nDry run: nothing was uploaded. The upload would be:\n`);
-  process.stdout.write(`  $ ${commandText(upload[0], upload[1])}\n`);
-  if (release.state === "missing") {
-    process.stdout.write(
-      `${DIM}${tag} does not exist yet; \`--publish\` refuses until ` +
-        "`node scripts/release-status.mjs --publish` has created it.${RESET}\n",
-    );
-  } else if (release.state === "unavailable") {
-    process.stdout.write(
-      `${DIM}gh could not read ${tag}, so \`--publish\` would refuse. Check \`gh auth status\`.${RESET}\n`,
-    );
-  } else {
-    process.stdout.write(`${DIM}${tag} exists; the rolling release is ready for it.${RESET}\n`);
-  }
+  finishUpload({ options, tag, release, releaseProblem, artifact: built });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

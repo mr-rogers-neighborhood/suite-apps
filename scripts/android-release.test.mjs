@@ -6,7 +6,10 @@ import {
   goApkAssetName,
   GO_APK_ALIAS,
   parseApksignerFingerprint,
+  parseArgs,
   parseBadging,
+  publishedReleaseProblem,
+  resolveUploadIdentity,
   uploadNames,
   versionCodeFor,
 } from "./android-release.mjs";
@@ -68,6 +71,126 @@ describe("upload set", () => {
   it("refuses a channel it has no identity for", () => {
     assert.throws(() => goApkAssetName("0.1.0", "canary"), /unknown channel/u);
     assert.throws(() => uploadNames("0.1.0", "beta"), /unknown channel/u);
+  });
+});
+
+describe("upload arguments", () => {
+  it("takes an APK path without requiring --channel", () => {
+    const options = parseArgs(["--upload", "incoming/suite-go-0.1.0.apk"]);
+    assert.equal(options.upload, "incoming/suite-go-0.1.0.apk");
+    assert.equal(options.channel, null);
+    assert.equal(options.publish, false);
+    assert.equal(options.allowPublished, false);
+  });
+
+  it("keeps --publish explicit beside --upload", () => {
+    const options = parseArgs(["--upload", "a.apk", "--channel", "slop", "--publish"]);
+    assert.equal(options.upload, "a.apk");
+    assert.equal(options.channel, "slop");
+    assert.equal(options.publish, true);
+  });
+
+  it("accepts --allow-published as its own switch", () => {
+    assert.equal(parseArgs(["--upload", "a.apk", "--allow-published"]).allowPublished, true);
+  });
+
+  it("refuses a flag without its value", () => {
+    assert.throws(() => parseArgs(["--upload"]), /--upload needs a value/u);
+    assert.throws(() => parseArgs(["--channel"]), /--channel needs a value/u);
+  });
+
+  it("refuses an option it does not know", () => {
+    assert.throws(() => parseArgs(["--upload=artifact.apk"]), /unknown option/u);
+  });
+});
+
+describe("upload identity", () => {
+  it("accepts a stable APK without --channel", () => {
+    assert.deepEqual(
+      resolveUploadIdentity({ applicationId: "run.suite.go", versionName: "0.1.0" }),
+      { channel: "stable", version: "0.1.0" },
+    );
+  });
+
+  it("refuses a pre-release APK while its channel is ambiguous", () => {
+    assert.throws(
+      () => resolveUploadIdentity({ applicationId: "run.suite.slop.go", versionName: "0.1.0-slop" }),
+      /--channel/u,
+    );
+  });
+
+  it("derives the version from a pre-release version name", () => {
+    for (const channel of ["slop", "nightly", "preview"]) {
+      assert.deepEqual(
+        resolveUploadIdentity({
+          applicationId: "run.suite.slop.go",
+          versionName: `0.1.0-${channel}`,
+          channel,
+        }),
+        { channel, version: "0.1.0" },
+      );
+    }
+  });
+
+  it("refuses an artifact whose id and channel disagree", () => {
+    assert.throws(
+      () => resolveUploadIdentity({ applicationId: "run.suite.go", versionName: "0.1.0", channel: "slop" }),
+      /not run\.suite\.slop\.go/u,
+    );
+    assert.throws(
+      () =>
+        resolveUploadIdentity({
+          applicationId: "run.suite.slop.go",
+          versionName: "0.1.0-slop",
+          channel: "nightly",
+        }),
+      /does not end/u,
+    );
+    assert.throws(
+      () =>
+        resolveUploadIdentity({
+          applicationId: "run.suite.go",
+          versionName: "0.1.0-slop",
+          channel: "stable",
+        }),
+      /names slop/u,
+    );
+  });
+
+  it("refuses a package that is not Suite Go", () => {
+    assert.throws(
+      () => resolveUploadIdentity({ applicationId: "com.example.app", versionName: "1.0.0" }),
+      /not a Suite Go release package/u,
+    );
+  });
+});
+
+describe("published releases", () => {
+  it("accepts a draft", () => {
+    assert.equal(publishedReleaseProblem({ isDraft: true }), null);
+  });
+
+  it("refuses an immutable published release even with the override", () => {
+    assert.match(
+      publishedReleaseProblem({ isDraft: false, isImmutable: true, allowPublished: true }),
+      /immutable/u,
+    );
+  });
+
+  it("refuses a published release unless --allow-published names a non-immutable one", () => {
+    assert.match(
+      publishedReleaseProblem({ isDraft: false, isImmutable: false }),
+      /--allow-published/u,
+    );
+    assert.equal(
+      publishedReleaseProblem({ isDraft: false, isImmutable: false, allowPublished: true }),
+      null,
+    );
+  });
+
+  it("refuses when it cannot tell whether the release is locked", () => {
+    assert.match(publishedReleaseProblem({ isDraft: null, isImmutable: false }), /draft/u);
+    assert.match(publishedReleaseProblem({ isDraft: false, isImmutable: null }), /immutability/u);
   });
 });
 
