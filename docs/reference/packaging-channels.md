@@ -177,11 +177,12 @@ the S3 cache classes and the invalidation paths.
 
 `node scripts/flatpak-remote.mjs` is a dry run. It prints the branch, the refs and the bytes it would
 publish, and refuses a dirty tree or a HEAD that `.dev/gate-status.json` does not prove, with the same
-rule the gate uses. With `--publish` it runs
+rule the gate uses. With `--publish` it first merges the refs already on the bucket, then runs
 `flatpak build-update-repo --generate-static-deltas --gpg-sign=<store key>` on
 `~/suite-flatpak/repo`, verifies the fresh summary in a throwaway Flatpak installation, writes
 `~/suite-flatpak/suite.flatpakrepo`, and publishes the same bytes. It never builds a second
-repository. Publication copies bytes and commits nothing, so the gate proof stays on HEAD.
+repository. Publication copies bytes and commits nothing, so the gate proof stays on HEAD. The merge
+is [one summary names every channel](#one-summary-names-every-channel).
 
 Both `flatpak.mjs` and the publisher pass `--generate-static-deltas`, so `~/suite-flatpak/repo`
 carries a `deltas/` tree and its `delta-indexes/`: an update from one build to the next downloads the
@@ -208,6 +209,29 @@ an old one is harmless and a client may still be fetching it. `summaries/` is th
 an OSTree client fetches after reading `summary.idx`; publishing the index without it fails the client
 with a 403. After the upload it invalidates those five summary paths, because they are the only names
 that change between publications; a new delta is a new path, so nothing invalidates it.
+
+### One summary names every channel
+
+The public remote is one OSTree repository and one `summary`, and every channel writes it. A
+publication therefore does not sign from the local repository alone: with `--target s3 --publish` it
+first copies `refs/` and the metadata subset of `objects/` (`*.commit`, `*.commitmeta`,
+`*.commitmeta2`, `*.dirtree`, `*.dirmeta`) from the bucket into the repository `flatpak.mjs` built,
+then signs a summary naming every ref the refs tree holds. The refs this run did not build are its
+**foreign refs**; a nightly publication keeps stable and preview this way instead of replacing them.
+
+After signing, the publisher reads the refs the new summary advertises and refuses to upload when a
+merged ref is missing. A summary that omits a ref hides an install whose ref and objects are still in
+the bucket even though nothing else is wrong. A first publication has no refs to merge, and
+`--no-merge-published` is the deliberate override for a bucket whose refs should go away; a normal
+channel publication never needs it.
+
+When a foreign ref exists, `flatpak build-update-repo` runs with `--no-update-appstream`: the foreign
+tree is not local, so appstream cannot be regenerated, and the `appstream` ref merged from the bucket
+is preserved rather than replaced. A newly published channel is therefore not in the appstream
+metadata a software centre shows until a later publication regenerates it; `flatpak install` and
+`flatpak update` read the signed summary, so the channel still installs and updates. Static deltas are
+skipped for each foreign app id (`--static-delta-ignore-ref=<app-id>`), because a delta needs the tree
+this run did not build.
 
 `suite-dev` stays the local test remote, at:
 
