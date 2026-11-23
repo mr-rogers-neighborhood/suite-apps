@@ -1,0 +1,26 @@
+project:
+  id: "1b424f2f-a6b0-49e0-9827-9c1643f26d96"
+build:
+  framework: android
+  profiles:
+    preview:
+      android:
+        app_id: "0c868763-b14d-4bdb-8216-51e519d04cd4"
+        setup_commands:
+          - "sudo apt-get update -qq && sudo apt-get install -y -qq openjdk-21-jdk"
+          - "pnpm install"
+        build_commands:
+          - "pnpm --filter \"./packages/*\" run build"
+          - "pnpm --filter @suite/go-app build"
+          - "pnpm --filter @suite/go-app exec cap sync android"
+          - "export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64 && cd apps/go/android && ./gradlew assembleStableDebug"
+        output_path: "apps/go/android/app/build/outputs/apk/stable/debug/app-stable-debug.apk"
+pr_review:
+  enabled: true
+  build:
+    kind: revyl
+    profile: preview
+  proof_of_changes:
+    enabled: true
+    harness:
+      kind: revyl
