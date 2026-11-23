@@ -45,5 +45,5 @@ deliberately small; a real governance process can grow here without touching a n
 
 The project owner decides spec changes, catalogue policy and revocations that are not publisher
 signed. A review-only agent may request changes but never merges. The coordinator runs the gate and
-the VM gate. A decision that changes the contract is recorded here and in
+enqueues the pull request. A decision that changes the contract is recorded here and in
 `docs/reference/decisions.md`.

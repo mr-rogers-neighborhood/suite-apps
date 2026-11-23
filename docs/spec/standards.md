@@ -17,7 +17,7 @@ code in this repository is written and checked; app `AGENTS.md` files own their 
 - Conventional commits. A change that alters behavior, ownership or a document shape updates the
   owning page and the ledger in the same change.
 - A review-only agent may comment or request changes; it never merges. The coordinator runs the
-  owning gate and the VM gate.
+  owning gate.
 
 ## What does not belong in the spec
 
