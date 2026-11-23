@@ -138,14 +138,18 @@ mise exec -- node scripts/release-status.mjs --prune --channel nightly --keep 14
 
 Stable publishes `suite-<date>` and is the repository's Latest release. A pre-release channel
 publishes its own `suite-<channel>-<date>` release, marked *pre-release*; it never moves Latest, and
-the stable release body links the newest preview and nightly pages.
+the stable release body links the newest preview and nightly pages. Stable's tag is the newest
+changelog date — the snapshot the body names — while a pre-release tag is the day it is published in
+UTC (`suite-nightly-2026.11.23`), even when no app version changed. The body still says "This is the
+2026-11-22 build", because the snapshot is what the release contains.
 
 Publication is two phases because a published GitHub release is immutable: its tag, assets and body
 lock at publication. The order is draft → attach assets → publish.
 
 1. `--draft` creates the rolling release as a draft, with its body and tag plan. Rerunning it
-   updates the same draft, so it is idempotent; a release that is already published is skipped, not
-   edited, and it never writes `RELEASES.md`.
+   updates the same draft, so it is idempotent; a target that is already published is refused, not
+   edited, so the run stops before its assets would upload into an immutable release. It never
+   writes `RELEASES.md`.
 2. Attach the artifacts the release carries while it is still a draft. For Suite Go that is
    `node scripts/android-release.mjs --upload <apk>`; `--publish` builds the APK and attaches it in
    one step.
@@ -158,11 +162,14 @@ refused instead, because publishing it would attach nothing: run `--draft` first
 `RELEASES.md` from the state GitHub has after the run, so repeating it once the release is out
 refreshes the page and changes nothing on GitHub.
 
-There is one rolling release per date. A second publication on the same day needs `--date` with a new
-day, because the earlier `suite-YYYY.MM.DD` tag is already published and cannot be reused.
+There is one release per tag. A second publication on the same day needs `--date` with another day,
+because the earlier `suite-YYYY.MM.DD` or `suite-<channel>-YYYY.MM.DD` tag is already published and
+cannot be reused; on stable `--date` also sets the snapshot date the body names, while a pre-release
+keeps its newest-changelog snapshot. `--draft` refuses by name when the tag it would draft already
+exists and is published: a skip would send the caller's asset upload into an immutable release, so a
+same-day rerun must pass `--date`.
 
-A missing rolling tag is created at HEAD, the snapshot the page describes; an existing tag is never
-moved.
+A missing tag is created at HEAD, the tree the body describes; an existing tag is never moved.
 
 [`RELEASES.md`](../../RELEASES.md) is the human mirror of the Latest release. `--write` and
 `--publish` write it; `--draft` does not. It lists the two superapps and carries no per-app release
