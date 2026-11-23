@@ -18,6 +18,7 @@ import {
   collectReleases,
   currentAggregateTag,
   draftAction,
+  draftRefusalMessage,
   draftReleaseArgs,
   flatpakrepoUrl,
   goApkName,
@@ -35,7 +36,10 @@ import {
   publishReleaseArgs,
   readManifest,
   releaseAssetUrl,
+  releaseDates,
+  releaseFor,
   releaseLabels,
+  releasePhase,
   releasesPage,
   remoteLookupProblem,
   superappEntries,
@@ -127,6 +131,96 @@ describe("tags and dates", () => {
   it("falls back to today when no section carries a date", () => {
     const undated = entries.map((entry) => ({ ...entry, date: null }));
     assert.match(aggregateDate(undated), /^\d{4}-\d{2}-\d{2}$/u);
+  });
+});
+
+describe("publication dates", () => {
+  const onNov23 = new Date("2026-11-23T12:00:00Z");
+  const onDec01 = new Date("2026-12-01T00:30:00Z");
+
+  /** A tree whose newest changelog date is 2026-11-22 for every app. */
+  function treeFiles() {
+    const files = {};
+    for (const app of APPS) {
+      files[app.packageJson] = JSON.stringify({ version: "1.0.0" });
+      files[app.changelog] = "## [1.0.0] - 2026-11-22\n\n### Added\n\n- **It exists.**\n";
+    }
+    return files;
+  }
+
+  it("plans a nightly tag for the publication day while the body names the snapshot", () => {
+    const { snapshotDate, tagDate } = releaseDates(entries, {
+      channel: "nightly",
+      now: onNov23,
+    });
+    assert.equal(snapshotDate, "2026-11-22");
+    assert.equal(tagDate, "2026-11-23");
+    assert.equal(aggregateTag(tagDate, "nightly"), "suite-nightly-2026.11.23");
+
+    const body = aggregateReleaseBody(entries, {
+      date: snapshotDate,
+      tag: aggregateTag(tagDate, "nightly"),
+      channel: "nightly",
+    });
+    assert.match(
+      body,
+      /This is the 2026-11-22 build, published on the \*\*nightly\*\* channel/u,
+    );
+  });
+
+  it("gives a preview a new tag every day even when no app version changed", () => {
+    const first = releaseDates(entries, { channel: "preview", now: onNov23 });
+    const second = releaseDates(entries, { channel: "preview", now: onDec01 });
+    assert.equal(first.tagDate, "2026-11-23");
+    assert.equal(second.tagDate, "2026-12-01");
+    assert.equal(aggregateTag(first.tagDate, "preview"), "suite-preview-2026.11.23");
+    assert.equal(second.snapshotDate, "2026-11-22", "the snapshot does not move with the clock");
+  });
+
+  it("keeps the changelog date as stable's tag", () => {
+    const { snapshotDate, tagDate } = releaseDates(entries, { channel: "stable", now: onDec01 });
+    assert.equal(snapshotDate, "2026-11-22");
+    assert.equal(tagDate, "2026-11-22");
+    assert.equal(aggregateTag(tagDate), "suite-2026.11.22");
+  });
+
+  it("--date moves the tag, and on stable the snapshot too", () => {
+    const nightly = releaseDates(entries, {
+      channel: "nightly",
+      date: "2026-11-24",
+      now: onNov23,
+    });
+    assert.equal(nightly.tagDate, "2026-11-24");
+    assert.equal(nightly.snapshotDate, "2026-11-22");
+    assert.equal(aggregateTag(nightly.tagDate, "nightly"), "suite-nightly-2026.11.24");
+
+    const stable = releaseDates(entries, { channel: "stable", date: "2026-11-24" });
+    assert.equal(stable.tagDate, "2026-11-24");
+    assert.equal(stable.snapshotDate, "2026-11-24");
+
+    assert.throws(
+      () => releaseDates(entries, { channel: "nightly", date: "2026-02-31" }),
+      /real YYYY-MM-DD/u,
+    );
+  });
+
+  it("the aggregate tag helper agrees with the draft plan", () => {
+    const files = treeFiles();
+    const load = (path) => files[path] ?? "";
+    const collected = collectReleases({ load });
+    assert.deepEqual(collected.problems, []);
+    assert.equal(collected.entries.length, APPS.length);
+
+    const expected = {
+      stable: "suite-2026.11.22",
+      nightly: "suite-nightly-2026.11.23",
+      preview: "suite-preview-2026.11.23",
+    };
+    for (const [channel, tag] of Object.entries(expected)) {
+      const { tagDate } = releaseDates(collected.entries, { channel, now: onNov23 });
+      assert.equal(aggregateTag(tagDate, channel), tag, channel);
+      assert.equal(currentAggregateTag({ load, channel, now: onNov23 }), tag, channel);
+    }
   });
 });
 
@@ -244,13 +338,26 @@ describe("the draft phase", () => {
     assert.ok(!args.includes("--target"));
   });
 
-  it("leaves an already published release alone on a rerun", () => {
+  it("refuses a draft over an already published release and names --date", () => {
     const phase = draftAction({ exists: true, isDraft: false, tag });
-    assert.equal(phase.action, "skip");
+    assert.equal(phase.action, "refuse");
     assert.match(phase.problem, /suite-2026\.11\.21 is already published/u);
     assert.match(phase.problem, /immutable/u);
-    assert.match(phase.problem, /refuses to edit/u);
-    assert.match(phase.problem, /leaves it unchanged/u);
+    assert.match(phase.problem, /--date/u);
+  });
+
+  it("refuses from a release list too, so the guard is what main runs", () => {
+    const releases = [
+      { tagName: "suite-nightly-2026.11.22", isDraft: false },
+      { tagName: "suite-nightly-2026.11.23", isDraft: true },
+    ];
+    assert.deepEqual(releasePhase("draft", releases, "suite-nightly-2026.11.22"), {
+      action: "refuse",
+      problem: draftRefusalMessage("suite-nightly-2026.11.22"),
+    });
+    assert.equal(releasePhase("draft", releases, "suite-nightly-2026.11.23").action, "edit");
+    assert.equal(releasePhase("draft", releases, "suite-nightly-2026.11.24").action, "create");
+    assert.equal(releaseFor(releases, "suite-nightly-2026.11.24"), null);
   });
 });
 

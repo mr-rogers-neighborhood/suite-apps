@@ -12,10 +12,12 @@
  * `.dev/release/release-manifest.json` exists, the body also carries the
  * artifact digests and the commands that verify a download (D6.2).
  *
- * The version has one home: the app's `package.json`. The date has one home:
- * the `## [version] - YYYY-MM-DD` heading in its changelog. This script reads
- * both, refuses a version without a matching section, and writes nothing to
- * GitHub by default.
+ * The version has one home: the app's `package.json`. The snapshot date has one
+ * home: the `## [version] - YYYY-MM-DD` heading in its changelog. This script
+ * reads both, refuses a version without a matching section, and writes nothing
+ * to GitHub by default. A pre-release tag carries the day it is published, not
+ * the snapshot date, so a nightly gets a new tag every day even when no app
+ * version changed (D6.1).
  *
  * Publication is two phases, because published releases are immutable (D6.3):
  * the tag, every asset and the body lock when the release is published.
@@ -206,7 +208,8 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --draft              create or update the rolling release as a draft
   --publish            publish the existing draft, then write ${RELEASES_FILE}
   --write              write ${RELEASES_FILE} and stop short of GitHub
-  --date <YYYY-MM-DD>  date for the aggregate tag (default: the newest app release)
+  --date <YYYY-MM-DD>  tag date; a pre-release defaults to today in UTC, stable to
+                       the newest app release (which is also stable's snapshot date)
   --channel <name>     stable (default), slop, nightly or preview; names the APK asset
   --manifest <path>    release manifest for the Artifacts section
                        (default: .dev/release/release-manifest.json when it exists)
@@ -221,7 +224,9 @@ A release is created as a draft, its assets are attached while it is a draft, an
 
 The versions come from each app's package.json; the dates from its changelog.
 Only the rolling release and the pre-release channel pages exist; per-app tags
-are retired.
+are retired. --date sets the tag date: stable uses the newest changelog date by
+default, a pre-release uses today in UTC, and a same-day rerun of one needs
+--date for another day.
 `;
 
 /** The aggregate tag, dotted as the owner chose: `suite-2026.11.21`. */
@@ -233,11 +238,17 @@ export function aggregateTag(date, channel = "stable") {
 /**
  * The aggregate tag the current tree is released under.
  *
- * The APK is attached to the rolling release, so `android-release.mjs` has to
- * name the same tag `--publish` picks: the newest changelog date, not the wall
- * clock. `load` is injectable so a test needs no tree.
+ * The workflow attaches assets to the draft after `--draft`, so it has to name
+ * the same tag `--draft` created: stable uses the newest changelog date, and a
+ * pre-release channel uses today in UTC. `--date` names a tag date explicitly.
+ * `load` and `now` are injectable so a test needs no tree and no clock.
  */
-export function currentAggregateTag({ load = read, channel = "stable" } = {}) {
+export function currentAggregateTag({
+  load = read,
+  channel = "stable",
+  date = null,
+  now = new Date(),
+} = {}) {
   const entries = [];
   for (const app of APPS) {
     try {
@@ -248,7 +259,8 @@ export function currentAggregateTag({ load = read, channel = "stable" } = {}) {
       // An app whose files cannot be read cannot change the newest date.
     }
   }
-  return aggregateTag(aggregateDate(entries), channel);
+  const { tagDate } = releaseDates(entries, { channel, date, now });
+  return aggregateTag(tagDate, channel);
 }
 
 /** A release's page on GitHub. */
@@ -460,11 +472,12 @@ export function changelogDateProblem(changelog, version) {
 }
 
 /**
- * The date the aggregate release carries.
+ * The newest changelog date: the snapshot a release describes.
  *
- * The newest app date, not the wall clock: a rolling release is a snapshot of
- * the apps, so a day when nothing shipped does not need a new tag and a re-run
- * produces the same page. `--date` overrides it for a deliberate backfill.
+ * A rolling release is a snapshot of the apps, so a day when nothing shipped
+ * does not change it. `--date` overrides it for a deliberate backfill; on a
+ * pre-release the override moves the tag date instead, because the body keeps
+ * naming the snapshot (see `releaseDates`).
  */
 export function aggregateDate(entries, override = null) {
   if (override !== null) {
@@ -478,6 +491,26 @@ export function aggregateDate(entries, override = null) {
   const dates = entries.map((entry) => entry.date).filter((date) => date !== null);
   if (dates.length === 0) return today();
   return dates.reduce((newest, date) => (date > newest ? date : newest));
+}
+
+/**
+ * The two dates one release run carries (D6.1).
+ *
+ * The snapshot date is the newest changelog date, and the body keeps naming it:
+ * "This is the <snapshot> build". The tag date is the day the release is
+ * published: stable keeps the snapshot date, while nightly and preview use
+ * today in UTC, so a daily publication gets a new `suite-<channel>-YYYY.MM.DD`
+ * even when no app version changed.
+ *
+ * `--date` sets the tag date. On stable the tag date is also the snapshot date,
+ * because the rolling tag *is* the snapshot; on a pre-release it only moves the
+ * tag, and the body still names the newest changelog date.
+ */
+export function releaseDates(entries, { channel = "stable", date = null, now = new Date() } = {}) {
+  const override = date === null ? null : aggregateDate(entries, date);
+  const snapshotDate = aggregateDate(entries, channel === "stable" ? override : null);
+  const tagDate = override ?? (channel === "stable" ? snapshotDate : today(now));
+  return { snapshotDate, tagDate };
 }
 
 /**
@@ -497,16 +530,33 @@ export function publishedReleaseMessage(tag) {
 }
 
 /**
+ * The message for a release a draft run refuses to overwrite.
+ *
+ * A published release cannot be turned back into a draft, and it is immutable
+ * (D6.3), so the assets this run would attach have nowhere to go. Skipping and
+ * letting the caller upload would fail inside an immutable release, so the
+ * draft phase refuses before anything is written.
+ */
+export function draftRefusalMessage(tag) {
+  return (
+    `${tag} is already published, and published releases are immutable: --draft will not ` +
+    "create or edit a draft over it, because the assets that follow would upload into a " +
+    "locked release. A same-day rerun needs --date <YYYY-MM-DD> naming another day."
+  );
+}
+
+/**
  * What the draft phase may do with one release, or why it must not.
  *
  * A draft is mutable, so rerunning `--draft` edits the same release and stays
  * idempotent. A published release cannot be turned back into a draft, so it is
- * skipped: a version that is already out has nothing left to draft.
+ * refused by name: the version is already out, and the caller's attachment
+ * step would otherwise hit an immutable release.
  */
 export function draftAction({ exists, isDraft, tag }) {
   if (!exists) return { action: "create", problem: null };
   if (isDraft === true) return { action: "edit", problem: null };
-  return { action: "skip", problem: publishedReleaseMessage(tag) };
+  return { action: "refuse", problem: draftRefusalMessage(tag) };
 }
 
 /**
@@ -1229,7 +1279,7 @@ function tagStatus(item, backfill) {
   return backfill(item.plan.commit);
 }
 
-/** Where the aggregate tag may be created: the snapshot HEAD describes. */
+/** Where the aggregate tag may be created: the tree HEAD describes. */
 function planAggregate(tag, head) {
   const localCommit = localTagCommit(tag);
   const remote = remoteTagCommit(tag);
@@ -1488,6 +1538,27 @@ function decidePhase(mode, { exists, isDraft, tag }) {
   return draftAction({ exists, isDraft, tag });
 }
 
+/** One release row from a release list, or null when the tag is not there. */
+export function releaseFor(releases, tag) {
+  return (releases ?? []).find((row) => row.tagName === tag) ?? null;
+}
+
+/**
+ * Which phase one mode runs for one tag, read from a release list.
+ *
+ * The list is the injectable seam: the real run reads `gh release list`, and a
+ * test passes rows directly, so the decision the draft phase makes over a
+ * published release is the one exercised here.
+ */
+export function releasePhase(mode, releases, tag) {
+  const row = releaseFor(releases, tag);
+  return decidePhase(mode, {
+    exists: row !== null,
+    isDraft: row?.isDraft === true,
+    tag,
+  });
+}
+
 async function main(argv) {
   let options;
   try {
@@ -1562,15 +1633,15 @@ async function main(argv) {
   if (problems.length > 0) throw new Error(problems.join("\n\n"));
 
   const head = currentHead();
-  const date = aggregateDate(entries, options.date);
-  const tag = aggregateTag(date, channel);
+  const { snapshotDate, tagDate } = releaseDates(entries, { channel, date: options.date });
+  const tag = aggregateTag(tagDate, channel);
   const preReleases = channel === "stable" ? preReleaseLinks(releases) : [];
   const aggregate = planAggregate(tag, head);
   if (aggregate.plan.problem !== null && mode !== "write") {
     throw new Error(aggregate.plan.problem);
   }
 
-  const aggregateRow = knownReleases.find((row) => row.tagName === tag) ?? null;
+  const aggregateRow = releaseFor(knownReleases, tag);
   const aggregateExists = aggregateRow !== null;
   const aggregateIsDraft = aggregateRow?.isDraft === true;
   const aggregatePublished = aggregateExists && aggregateRow.isDraft === false;
@@ -1580,11 +1651,7 @@ async function main(argv) {
     aggregate.actionProblem =
       "gh release list failed; refusing to publish releases it cannot read";
   } else {
-    const phase = decidePhase(mode, {
-      exists: aggregateExists,
-      isDraft: aggregateIsDraft,
-      tag,
-    });
+    const phase = releasePhase(mode, knownReleases, tag);
     aggregate.action = phase.action;
     aggregate.actionProblem = phase.problem;
   }
@@ -1612,7 +1679,7 @@ async function main(argv) {
   // body states what the release actually carries.
   const draftBodies = mode === "draft" || mode === "dry-run";
   const body = aggregateReleaseBody(entries, {
-    date,
+    date: snapshotDate,
     tag,
     apkLive,
     draft: draftBodies,
@@ -1620,7 +1687,13 @@ async function main(argv) {
     preReleases,
     manifest,
   });
-  const page = releasesPage(entries, { date, tag, aggregatePublished, apkLive, channel });
+  const page = releasesPage(entries, {
+    date: snapshotDate,
+    tag,
+    aggregatePublished,
+    apkLive,
+    channel,
+  });
   const notes = [{ path: join(NOTES_DIR, `${tag}.md`), body }];
 
   process.stdout.write(`\nSuite releases · ${mode === "dry-run" ? "dry run" : mode}\n`);
@@ -1638,7 +1711,8 @@ async function main(argv) {
   }
 
   process.stdout.write(
-    `\nSuite Shell + Suite Go ${date} · ${tag} · aggregate\n` +
+    `\nSuite Shell + Suite Go ${snapshotDate} build · ${tag} · aggregate\n` +
+      (tagDate === snapshotDate ? "" : `  tag date   ${tagDate} (snapshot ${snapshotDate})\n`) +
       `  release    ${
         releases === null
           ? "unknown (gh release list failed)"
@@ -1656,6 +1730,12 @@ async function main(argv) {
     for (const notice of skipped) process.stdout.write(`  - ${notice}\n`);
   }
 
+  // A dry run plans the draft commands, so a refusal the real draft would hit
+  // must fail here too rather than print a plan that cannot run.
+  if (fatalProblems.length > 0 && mode === "dry-run") {
+    throw new Error(fatalProblems.join("\n\n"));
+  }
+
   if (mode === "publish") {
     if (fatalProblems.length > 0) {
       // A version that was never drafted is a refusal, not a skip: publishing
@@ -1665,7 +1745,7 @@ async function main(argv) {
     mainPublish({
       entries,
       aggregate,
-      date,
+      date: snapshotDate,
       tag,
       releases,
       notes,
@@ -1678,7 +1758,8 @@ async function main(argv) {
 
   if (mode === "draft") {
     if (fatalProblems.length > 0) throw new Error(fatalProblems.join("\n\n"));
-    mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel });
+    // The title names the publication day; the body names the snapshot.
+    mainDraft({ aggregate, date: tagDate, tag, releases, notes, prerelease, channel });
     return;
   }
 
@@ -1692,7 +1773,7 @@ async function main(argv) {
     mode: "draft",
     aggregate,
     tag,
-    date,
+    date: tagDate,
     channel,
     prerelease,
   })) {

@@ -137,8 +137,12 @@ key.
 ## 6. Releases, tags and notes
 
 **D6.1** The rolling `suite-YYYY.MM.DD` release is the only GitHub release; the two channel pages,
-`suite-preview-<date>` and `suite-nightly-<date>`, are the other two. Per-app tags are retired. The
-signed Flatpak remote is the update path; GitHub Releases are the mirror and the APK download.
+`suite-preview-<date>` and `suite-nightly-<date>`, are the other two. Per-app tags are retired. A
+pre-release tag carries the UTC day it was published, so a nightly gets a new tag every day even
+when no app version changed; its body still names the newest changelog date as the snapshot. Stable's
+tag is that snapshot date, and `--date` sets the tag date (on stable, the snapshot too) for a
+same-day rerun. The signed Flatpak remote is the update path; GitHub Releases are the mirror and the
+APK download.
 
 **D6.2** Release notes carry the channel and product maturity separately, plus the artifact digest
 and the verification command. A note without a digest is incomplete.
