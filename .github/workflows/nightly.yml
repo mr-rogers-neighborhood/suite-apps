@@ -150,26 +150,32 @@ jobs:
   report:
     name: report
     needs: [gate, package-linux, package-android]
-    if: failure()
+    # Green nights close the rolling issue; red ones open or update it. One
+    # issue, not one per night (C10.1).
+    if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
       actions: read
     steps:
-      - name: One rolling nightly issue
+      - name: Open, update or close the rolling nightly issue
         uses: actions/github-script@v7
+        env:
+          GATE: ${{ needs.gate.result }}
+          LINUX: ${{ needs.package-linux.result }}
+          ANDROID: ${{ needs.package-android.result }}
         with:
           script: |
             const label = "ci-nightly";
             const title = "Nightly gate is red";
-            const body = [
-              `The nightly run failed on \`${context.sha}\`.`,
-              "",
-              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              "",
-              `Jobs: ${["gate", "package-linux", "package-android"].join(", ")}`,
-            ].join("\n");
+            const results = {
+              gate: process.env.GATE,
+              "package-linux": process.env.LINUX,
+              "package-android": process.env.ANDROID,
+            };
+            const failed = Object.entries(results).filter(([, result]) => result !== "success");
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
             try {
               await github.rest.issues.createLabel({
@@ -188,6 +194,29 @@ jobs:
               state: "open",
               per_page: 1,
             });
+
+            if (failed.length === 0) {
+              if (open.data.length === 0) return;
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: open.data[0].number,
+                body: `Nightly is green again on \`${context.sha}\`. ${runUrl}`,
+              });
+              await github.rest.issues.update({
+                ...context.repo,
+                issue_number: open.data[0].number,
+                state: "closed",
+              });
+              return;
+            }
+
+            const body = [
+              `The nightly run failed on \`${context.sha}\`.`,
+              "",
+              `Failed: ${failed.map(([name, result]) => `\`${name}\` (${result})`).join(", ")}`,
+              "",
+              `Run: ${runUrl}`,
+            ].join("\n");
 
             if (open.data.length > 0) {
               await github.rest.issues.createComment({
