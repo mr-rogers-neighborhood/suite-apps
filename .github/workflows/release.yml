@@ -301,6 +301,9 @@ jobs:
         id: apk
         env:
           CHANNEL: ${{ inputs.channel }}
+          # The versionCode preflight reads the newest published manifest with
+          # `gh` and fails closed without a token.
+          GH_TOKEN: ${{ github.token }}
           SUITE_GO_KEYSTORE_PASSWORD: ${{ secrets.SUITE_GO_KEYSTORE_PASSWORD }}
           SUITE_GO_KEY_ALIAS: ${{ secrets.SUITE_GO_KEY_ALIAS }}
           SUITE_GO_KEY_PASSWORD: ${{ secrets.SUITE_GO_KEY_PASSWORD }}
