@@ -5,7 +5,7 @@
  * the answer to most of the questions an alpha raises, and a reader should not have to guess the
  * address. A fork points this at itself with `VITE_SUITE_REPO_URL`.
  */
-const DEFAULT_REPOSITORY_URL = "https://github.com/mr-rogers-neighborhood/suite-apps";
+const DEFAULT_REPOSITORY_URL = "https://github.com/mrrnbhd/suite-apps";
 
 export function repositoryUrl(): string {
   const configured = import.meta.env.VITE_SUITE_REPO_URL;

@@ -4,7 +4,7 @@
      in its changelog. Do not edit the table; edit those files and regenerate. -->
 
 The signed Flatpak remote is the update path. This page is the human mirror of the
-[aggregate Suite Shell + Suite Go 2026-11-22 release](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/suite-2026.11.22), which is the repository's
+[aggregate Suite Shell + Suite Go 2026-11-22 release](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-2026.11.22), which is the repository's
 "Latest" release on GitHub. The per-app releases stay as history and carry no app
 binaries.
 
@@ -34,21 +34,21 @@ superapps and are not frozen; their rows name no channel.
 
 | App | Channel | Maturity | Version | Released | Release | Install |
 | --- | --- | --- | --- | --- | --- | --- |
-| [Suite Shell](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/shell/CHANGELOG.md) | stable | alpha | 0.2.0 | 2026-11-22 | [`shell-v0.2.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/shell-v0.2.0) | `flatpak install --user suite run.suite.shell` |
-| [Suite Start](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/start/CHANGELOG.md) | — | — | 0.6.0 | 2026-11-21 | [`start-v0.6.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/start-v0.6.0) | `flatpak install --user suite run.suite.start` |
-| [Suite Canvas](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/canvas/CHANGELOG.md) | frozen | alpha | 0.1.12 | 2026-11-21 | [`canvas-v0.1.12`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/canvas-v0.1.12) | `flatpak install --user suite run.suite.canvas` |
-| [Suite Planner](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/planner/CHANGELOG.md) | frozen | pre-alpha | 0.5.1 | 2026-11-21 | [`planner-v0.5.1`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/planner-v0.5.1) | `flatpak install --user suite run.suite.planner` |
-| [Suite Budget](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/budget/CHANGELOG.md) | frozen | pre-alpha | 0.4.1 | 2026-11-21 | [`budget-v0.4.1`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/budget-v0.4.1) | `flatpak install --user suite run.suite.budget` |
-| [Suite Sync](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/CHANGELOG.md) | — | — | 0.12.0 | 2026-11-21 | [`sync-v0.12.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/sync-v0.12.0) | `flatpak install --user suite run.suite.sync` |
-| [Suite Help](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/help/CHANGELOG.md) | frozen | — | 0.1.2 | 2026-11-21 | [`help-v0.1.2`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/help-v0.1.2) | `flatpak install --user suite run.suite.help` |
+| [Suite Shell](https://github.com/mrrnbhd/suite-apps/blob/main/apps/shell/CHANGELOG.md) | stable | alpha | 0.2.0 | 2026-11-22 | [`shell-v0.2.0`](https://github.com/mrrnbhd/suite-apps/releases/tag/shell-v0.2.0) | `flatpak install --user suite run.suite.shell` |
+| [Suite Start](https://github.com/mrrnbhd/suite-apps/blob/main/apps/start/CHANGELOG.md) | — | — | 0.6.0 | 2026-11-21 | [`start-v0.6.0`](https://github.com/mrrnbhd/suite-apps/releases/tag/start-v0.6.0) | `flatpak install --user suite run.suite.start` |
+| [Suite Canvas](https://github.com/mrrnbhd/suite-apps/blob/main/apps/canvas/CHANGELOG.md) | frozen | alpha | 0.1.12 | 2026-11-21 | [`canvas-v0.1.12`](https://github.com/mrrnbhd/suite-apps/releases/tag/canvas-v0.1.12) | `flatpak install --user suite run.suite.canvas` |
+| [Suite Planner](https://github.com/mrrnbhd/suite-apps/blob/main/apps/planner/CHANGELOG.md) | frozen | pre-alpha | 0.5.1 | 2026-11-21 | [`planner-v0.5.1`](https://github.com/mrrnbhd/suite-apps/releases/tag/planner-v0.5.1) | `flatpak install --user suite run.suite.planner` |
+| [Suite Budget](https://github.com/mrrnbhd/suite-apps/blob/main/apps/budget/CHANGELOG.md) | frozen | pre-alpha | 0.4.1 | 2026-11-21 | [`budget-v0.4.1`](https://github.com/mrrnbhd/suite-apps/releases/tag/budget-v0.4.1) | `flatpak install --user suite run.suite.budget` |
+| [Suite Sync](https://github.com/mrrnbhd/suite-apps/blob/main/apps/sync/CHANGELOG.md) | — | — | 0.12.0 | 2026-11-21 | [`sync-v0.12.0`](https://github.com/mrrnbhd/suite-apps/releases/tag/sync-v0.12.0) | `flatpak install --user suite run.suite.sync` |
+| [Suite Help](https://github.com/mrrnbhd/suite-apps/blob/main/apps/help/CHANGELOG.md) | frozen | — | 0.1.2 | 2026-11-21 | [`help-v0.1.2`](https://github.com/mrrnbhd/suite-apps/releases/tag/help-v0.1.2) | `flatpak install --user suite run.suite.help` |
 
 ## Mobile
 
 | App | Channel | Maturity | Version | Released | Release | Install |
 | --- | --- | --- | --- | --- | --- | --- |
-| [Suite Go](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/go/CHANGELOG.md) | stable | pre-alpha | 0.1.0 | 2026-11-18 | [`go-v0.1.0`](https://github.com/mr-rogers-neighborhood/suite-apps/releases/tag/go-v0.1.0) | [suite-go-0.1.0.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/suite-2026.11.22/suite-go-0.1.0.apk) |
+| [Suite Go](https://github.com/mrrnbhd/suite-apps/blob/main/apps/go/CHANGELOG.md) | stable | pre-alpha | 0.1.0 | 2026-11-18 | [`go-v0.1.0`](https://github.com/mrrnbhd/suite-apps/releases/tag/go-v0.1.0) | [suite-go-0.1.0.apk](https://github.com/mrrnbhd/suite-apps/releases/download/suite-2026.11.22/suite-go-0.1.0.apk) |
 
-Suite Go is not a Flatpak. This release carries its release-signed APK, [suite-go-0.1.0.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/download/suite-2026.11.22/suite-go-0.1.0.apk),
+Suite Go is not a Flatpak. This release carries its release-signed APK, [suite-go-0.1.0.apk](https://github.com/mrrnbhd/suite-apps/releases/download/suite-2026.11.22/suite-go-0.1.0.apk),
 with a SHA-256 checksum beside it; sideload it with `adb install -r -t`.
 
 ## Update

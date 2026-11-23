@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Contributing guide
-    url: https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/docs/how-to/contribute.md
+    url: https://github.com/mrrnbhd/suite-apps/blob/main/docs/how-to/contribute.md
     about: Read this before filing; it says which gate a change must pass.
   - name: Security
-    url: https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/canvas/SECURITY.md
+    url: https://github.com/mrrnbhd/suite-apps/blob/main/apps/canvas/SECURITY.md
     about: Report a vulnerability privately, not in an issue.

@@ -27,7 +27,7 @@ See `scripts/ci/` and the README.
 
 ## Publishing and archives
 
-- `origin` is <https://github.com/mr-rogers-neighborhood/suite-apps>. It is the
+- `origin` is <https://github.com/mrrnbhd/suite-apps>. It is the
   renamed `suite-canvas` repository: the stars and Canvas's 0.1.0–0.1.9 releases
   moved with it. `legacy/canvas` holds Canvas's pre-import history.
 - `suite-apps-1` is the bootstrap snapshot from before the rename. Not canonical.

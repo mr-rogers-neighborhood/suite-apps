@@ -1,7 +1,7 @@
 import { el } from "./format.js";
 
 /** Where "Support Suite" goes. One line, so it can point at whatever page should take money. */
-const SUPPORT_URL = "https://github.com/mr-rogers-neighborhood/suite-apps";
+const SUPPORT_URL = "https://github.com/mrrnbhd/suite-apps";
 
 /** Settings reports what Start knows about itself, and nothing it does not. */
 export function renderSettings(state, actions) {

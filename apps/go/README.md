@@ -82,7 +82,7 @@ Stable is `run.suite.go`. Every pre-release is `run.suite.slop.go`, so stable an
 install side by side; a pre-release asset is `suite-go-<channel>-<version>.apk`, and moving from slop
 to nightly replaces the pre-release rather than adding a third install. The rolling release also
 carries stable as
-[suite-go.apk](https://github.com/mr-rogers-neighborhood/suite-apps/releases/latest/download/suite-go.apk),
+[suite-go.apk](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk),
 so that URL always names the newest stable build; `suite-go-<version>.apk` remains canonical.
 
 `pnpm android:install` stays the dev loop: it builds a debug APK signed by this machine's debug

@@ -46,7 +46,7 @@ import {
 
 /** The repository this page and these releases belong to. */
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-export const RELEASE_REPO = "mr-rogers-neighborhood/suite-apps";
+export const RELEASE_REPO = "mrrnbhd/suite-apps";
 
 /** The Flatpak remote a person adds before installing; the signed update path. */
 export { REMOTE_NAME };

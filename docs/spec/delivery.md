@@ -1,11 +1,11 @@
 # Delivery specification
 
 Status: draft 0.1. Target for packaging, channels and release. Today's state is in
-[Status](../reference/status.md); the open work is [#215](https://github.com/mr-rogers-neighborhood/suite-apps/issues/215),
-[#219](https://github.com/mr-rogers-neighborhood/suite-apps/issues/219),
-[#220](https://github.com/mr-rogers-neighborhood/suite-apps/issues/220),
-[#221](https://github.com/mr-rogers-neighborhood/suite-apps/issues/221) and
-[#222](https://github.com/mr-rogers-neighborhood/suite-apps/issues/222). The product contract is
+[Status](../reference/status.md); the open work is [#215](https://github.com/mrrnbhd/suite-apps/issues/215),
+[#219](https://github.com/mrrnbhd/suite-apps/issues/219),
+[#220](https://github.com/mrrnbhd/suite-apps/issues/220),
+[#221](https://github.com/mrrnbhd/suite-apps/issues/221) and
+[#222](https://github.com/mrrnbhd/suite-apps/issues/222). The product contract is
 [superapp.md](superapp.md); the pipeline is [ci.md](ci.md); the platform matrix is [platforms.md](platforms.md).
 
 ## 1. Principles

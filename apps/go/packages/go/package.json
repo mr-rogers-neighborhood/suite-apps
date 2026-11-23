@@ -31,7 +31,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mr-rogers-neighborhood/suite-apps.git",
+    "url": "git+https://github.com/mrrnbhd/suite-apps.git",
     "directory": "packages/go"
   },
   "license": "MIT",

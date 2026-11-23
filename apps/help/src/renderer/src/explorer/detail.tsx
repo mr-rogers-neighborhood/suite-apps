@@ -31,7 +31,7 @@ type Props = {
   onOpenTour: (id: string, step: number) => void;
 };
 
-const GITHUB = "https://github.com/mr-rogers-neighborhood/suite-apps/blob/main";
+const GITHUB = "https://github.com/mrrnbhd/suite-apps/blob/main";
 
 function sourceUrl(fileId: string, line?: number) {
   return `${GITHUB}/${fileId}${line ? `#L${line}` : ""}`;
