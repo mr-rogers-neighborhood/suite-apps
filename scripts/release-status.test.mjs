@@ -25,6 +25,8 @@ import {
   maturityLabel,
   parseArgs,
   planTag,
+  preReleaseLinks,
+  pruneCandidates,
   publishAction,
   publishReleaseArgs,
   releaseLabels,
@@ -732,5 +734,62 @@ describe("arguments", () => {
     assert.equal(parseArgs(["--channel", "preview"]).channel, "preview");
     assert.equal(parseArgs([]).channel, "stable");
     assert.throws(() => parseArgs(["--channel", "canary"]), /unknown channel/u);
+  });
+});
+
+describe("channel releases", () => {
+  it("prefixes the tag for a pre-release channel", () => {
+    assert.equal(aggregateTag("2026-11-23"), "suite-2026.11.23");
+    assert.equal(aggregateTag("2026-11-23", "nightly"), "suite-nightly-2026.11.23");
+    assert.equal(aggregateTag("2026-11-23", "preview"), "suite-preview-2026.11.23");
+  });
+
+  it("marks pre-release drafts and publications", () => {
+    const draft = draftReleaseArgs({
+      tag: "suite-nightly-2026.11.23",
+      title: "Suite Shell + Suite Go — 2026-11-23",
+      notesPath: "notes.md",
+      action: "create",
+      target: "abc123",
+      prerelease: true,
+    });
+    assert.ok(draft.includes("--prerelease"));
+    const publish = publishReleaseArgs({
+      tag: "suite-nightly-2026.11.23",
+      notesPath: "notes.md",
+      latest: false,
+      prerelease: true,
+    });
+    assert.ok(publish.includes("--latest=false"));
+    assert.ok(publish.includes("--prerelease"));
+    assert.ok(!publish.includes("--latest"));
+  });
+
+  it("links the newest pre-release releases from the stable body", () => {
+    const links = preReleaseLinks([
+      { tagName: "suite-preview-2026.11.22", isDraft: false },
+      { tagName: "suite-preview-2026.11.23", isDraft: false },
+      { tagName: "suite-nightly-2026.11.23", isDraft: false },
+      { tagName: "suite-nightly-2026.11.24", isDraft: true },
+      { tagName: "suite-2026.11.23", isDraft: false },
+    ]);
+    assert.deepEqual(links, [
+      { channel: "preview", tag: "suite-preview-2026.11.23" },
+      { channel: "nightly", tag: "suite-nightly-2026.11.23" },
+    ]);
+  });
+
+  it("prunes only the older published releases of one channel", () => {
+    const releases = [
+      { tagName: "suite-nightly-2026.11.23", isDraft: false },
+      { tagName: "suite-nightly-2026.11.22", isDraft: false },
+      { tagName: "suite-nightly-2026.11.21", isDraft: false },
+      { tagName: "suite-nightly-2026.11.20", isDraft: true },
+      { tagName: "suite-preview-2026.11.01", isDraft: false },
+      { tagName: "suite-2026.11.01", isDraft: false },
+    ];
+    assert.deepEqual(pruneCandidates(releases, { channel: "nightly", keep: 2 }), [
+      "suite-nightly-2026.11.21",
+    ]);
   });
 });

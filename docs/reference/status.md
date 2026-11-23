@@ -46,8 +46,9 @@ the release channels the superapp uses.
 The gate is one command, and CI runs that command rather than a second path. A pull request runs the
 rows its diff can break, `main` runs the full fresh gate, and the merge queue adds Start's e2e. The
 nightly run adds the full gate with e2e, builds the host Flatpak and the Go debug APK, and attests
-both; with the release keys and `NIGHTLY_PUBLISH` configured it publishes the nightly channel. The
-GitHub mirror is a draft → attach → publish flow, safe for immutable releases. The VM gate is
+both; with the release keys and `NIGHTLY_PUBLISH` configured it publishes the nightly channel as its
+own pre-release page (`suite-nightly-<date>`), keeping the newest 14. The GitHub mirror is a draft →
+attach → publish flow, safe for immutable releases. The VM gate is
 retired; the evidence is a command that can be run, and CI runs it. See [Commands](commands.md).
 
 ## Where to go next

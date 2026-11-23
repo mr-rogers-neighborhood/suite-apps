@@ -48,9 +48,9 @@
 # - The Flatpak summary is re-signed by `flatpak-remote.mjs` at publish time; the
 #   OSTree commit does not change, so the workflow attests the commit (bundled)
 #   rather than the summary. The APK is uploaded from the bytes this job built.
-# - A `preview` dispatch still refreshes the rolling `suite-YYYY.MM.DD` release;
-#   it names the preview APK and channel in the body rather than pretending it is
-#   the stable build.
+# - Pre-release channels publish their own release, never the stable Latest one.
+#   Nightly keeps the newest 14 and prunes older ones (D6.1, and a readable
+#   Releases page); preview is retained as release-candidate history.
 # - `RELEASES.md` is rewritten in the runner and not committed; the mirror on
 #   `main` updates when someone commits the generated file.
 # - The `lan` target stays a workstation operation: a runner has neither the SSH
@@ -394,10 +394,11 @@ jobs:
         if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ inputs.channel }}
         run: |
           set -euo pipefail
           tag="$(node --input-type=module \
-            -e "import('./scripts/release-status.mjs').then((m) => console.log(m.currentAggregateTag()))")"
+            -e "import('./scripts/release-status.mjs').then((m) => console.log(m.currentAggregateTag({ channel: process.env.CHANNEL })))")"
           test -n "${tag}"
           gh release upload "${tag}" .dev/release/release-manifest.json --clobber
 
@@ -410,13 +411,9 @@ jobs:
           SUITE_GO_KEYSTORE_PASSWORD: ${{ secrets.SUITE_GO_KEYSTORE_PASSWORD }}
           SUITE_GO_KEY_ALIAS: ${{ secrets.SUITE_GO_KEY_ALIAS }}
           SUITE_GO_KEY_PASSWORD: ${{ secrets.SUITE_GO_KEY_PASSWORD }}
-        # `--allow-published` is the bridge while this repository's releases are
-        # not immutable: a preview may attach to the existing rolling release. The
-        # script still refuses an immutable release, so enabling immutability
-        # closes this path without another workflow edit.
         run: >-
           node scripts/android-release.mjs --upload "${APK}" --channel "${CHANNEL}"
-          --allow-published --publish
+          --publish
 
       - name: Publish the signed Flatpak remote
         if: inputs.publish
@@ -437,6 +434,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CHANNEL: ${{ inputs.channel }}
         run: node scripts/release-status.mjs --publish --channel "${CHANNEL}"
+
+      # Nightly is frequent; keep the Releases page readable. Stable and preview
+      # are never pruned.
+      - name: Prune old nightly releases
+        if: inputs.publish && inputs.channel == 'nightly'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-status.mjs --prune --channel nightly --keep 14
 
       - name: Upload the artifacts
         if: inputs.publish

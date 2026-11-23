@@ -115,8 +115,14 @@ mise exec -- node scripts/release-status.mjs --draft     # create or update the 
 mise exec -- node scripts/release-status.mjs --publish   # publish the drafts, then write RELEASES.md
 mise exec -- node scripts/release-status.mjs --write     # refresh RELEASES.md only
 mise exec -- node scripts/release-status.mjs --draft --channel preview
-                                                        # name the preview APK in the body
+                                                        # suite-preview-<date>, prerelease
+mise exec -- node scripts/release-status.mjs --prune --channel nightly --keep 14
+                                                        # delete older nightly releases
 ```
+
+Stable publishes `suite-<date>` and is the repository's Latest release. A pre-release channel
+publishes its own `suite-<channel>-<date>` release, marked *pre-release*; it never moves Latest, and
+the stable release body links the newest preview and nightly pages.
 
 Publication is two phases because a published GitHub release is immutable: its tag, assets and body
 lock at publication. The order is draft → attach assets → publish.
