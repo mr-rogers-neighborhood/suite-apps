@@ -1,0 +1,96 @@
+# Phase 1 of the CI spec: fast static checks on every change, a manual full gate,
+# and one aggregator the merge queue can require. The VM gate remains the full
+# independent proof until the matrix lands.
+#
+# The spec check is conditional because this workflow lands before the spec PR;
+# it turns on automatically when scripts/spec.test.mjs exists. The affected-app
+# matrix, e2e, packaging and release jobs are Phase 2+; see docs/spec/ci.md.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  fast:
+    name: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Spec check (when the spec is present)
+        if: hashFiles('scripts/spec.test.mjs') != ''
+        run: node --test scripts/spec.test.mjs
+      - name: Docs links
+        run: pnpm docs:check
+      - name: Docs index
+        run: pnpm docs:index
+      - name: Docs index check
+        run: pnpm docs:index:check
+      - name: Scripts without a build
+        run: >-
+          node --test
+          scripts/channel.test.mjs
+          scripts/shell-channel.test.mjs
+          scripts/android-release.test.mjs
+          scripts/release-status.test.mjs
+
+  full-gate:
+    name: full-gate
+    # Phase 1 runs the full fresh gate on demand. Phase 2 wires it to main.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Fresh gate
+        run: node scripts/gate.mjs --fresh --no-e2e
+
+  ci:
+    name: ci
+    if: always()
+    needs: [fast, full-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate
+        run: |
+          test "${{ needs.fast.result }}" = "success"
+          if [ "${{ needs.full-gate.result }}" != "success" ] && [ "${{ needs.full-gate.result }}" != "skipped" ]; then
+            echo "full-gate: ${{ needs.full-gate.result }}"
+            exit 1
+          fi
