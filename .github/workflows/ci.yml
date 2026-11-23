@@ -166,6 +166,10 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Playwright browser (Canvas stories)
+        run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
       - name: Fresh gate
         run: node scripts/gate.mjs --fresh --no-e2e
 
