@@ -54,7 +54,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { changelogSection, versionFromPackage } from "./release.mjs";
-import { CHANNELS, channelProblem } from "./lib/channel.mjs";
+import { CHANNELS, branchFor, channelProblem, flatpakId as flatpakIdFor } from "./lib/channel.mjs";
 import {
   DEFAULT_PUBLIC_URL,
   REMOTE_NAME,
@@ -323,11 +323,40 @@ export function flatpakrepoUrl() {
   return remoteFlatpakrepoUrl(REMOTE_URL);
 }
 
+/**
+ * The Flatpak id a release installs: a superapp's pre-release id on a
+ * pre-release channel, its stable id otherwise.
+ *
+ * Only a superapp carries a channel. A pre-release build shares
+ * `run.suite.slop.<app>` and takes the channel as its branch, so its install
+ * must name both; the frozen legacy rows and the hub and relay keep their stable
+ * ids on every page, because no pre-release build replaces them.
+ */
+export function releaseFlatpakId(app, channel = "stable") {
+  if (app.kind !== "flatpak") return null;
+  if (channel === "stable" || app.channel === undefined) return app.flatpakId;
+  return flatpakIdFor(app.id, channel);
+}
+
+/** The branch suffix a pre-release ref needs (`//nightly`), or empty on stable. */
+function refBranch(app, channel) {
+  return channel !== "stable" && app.channel !== undefined ? `//${branchFor(channel)}` : "";
+}
+
+/**
+ * The full Flatpak ref a release installs or runs.
+ *
+ * A pre-release is `run.suite.slop.shell//nightly`, because the pre-release id
+ * is shared across channels and the branch is what names the channel.
+ */
+export function releaseFlatpakRef(app, channel = "stable") {
+  return `${releaseFlatpakId(app, channel)}${refBranch(app, channel)}`;
+}
+
 /** The install command for a Flatpak app, or null for anything else. */
-export function installCommand(app) {
-  return app.kind !== "flatpak"
-    ? null
-    : `flatpak install --user ${REMOTE_NAME} ${app.flatpakId}`;
+export function installCommand(app, channel = "stable") {
+  if (app.kind !== "flatpak") return null;
+  return `flatpak install --user ${REMOTE_NAME} ${releaseFlatpakRef(app, channel)}`;
 }
 
 /** The APK a Suite Go version attaches to the rolling release. */
@@ -347,13 +376,15 @@ export function goApkUrl(tag, version, channel = "stable") {
  * already carries the APK; until it does the cell names the file instead of
  * linking a download that would 404. `draft` says that cell is written into a
  * release that is still a draft, where the APK is attached before publication,
- * so the wording does not read as a promise the run cannot keep.
+ * so the wording does not read as a promise the run cannot keep. `channel` is
+ * the release's channel, so a pre-release row names the superapp's
+ * `run.suite.slop.<app>` ref on that branch rather than the stable one.
  */
 export function installCell(
   app,
   { version = null, tag = null, apkLive = false, draft = false, channel = "stable" } = {},
 ) {
-  if (app.kind === "flatpak") return `\`${installCommand(app)}\``;
+  if (app.kind === "flatpak") return `\`${installCommand(app, channel)}\``;
   if (app.kind === "apk") {
     const name = version === null ? "suite-go.apk" : goApkName(version, channel);
     if (apkLive && tag !== null && version !== null) {
@@ -732,10 +763,10 @@ function artifactFileName(artifact) {
  * numbers come from `release-manifest.json` as it was written beside the built
  * artifacts, so a draft can state them: the bytes exist before publication and
  * `--publish` only locks them. The install and info commands name the manifest's
- * own Flatpak id, which is `run.suite.slop.shell` on a pre-release channel, and
- * the APK's `.sha256` file is the one uploaded beside the APK.
+ * own Flatpak id and channel branch — `run.suite.slop.shell//nightly` on a
+ * pre-release — and the APK's `.sha256` file is the one uploaded beside the APK.
  */
-export function artifactsSection(manifest, { tag = null, draft = false } = {}) {
+export function artifactsSection(manifest, { tag = null, draft = false, channel = "stable" } = {}) {
   const flatpak = manifestArtifact(manifest, "flatpak");
   const apk = manifestArtifact(manifest, "apk");
   if (flatpak === null && apk === null) return [];
@@ -783,9 +814,17 @@ export function artifactsSection(manifest, { tag = null, draft = false } = {}) {
   const commands = [];
   if (apkFile !== null) commands.push(`sha256sum -c ${apkFile}.sha256`);
   if (flatpak !== null && typeof flatpak.id === "string" && flatpak.id.length > 0) {
+    // A pre-release is the same id on another branch, so the ref needs both:
+    // `run.suite.slop.shell//nightly`. Stable is the default branch and keeps
+    // the plain id a shipped install already has.
+    const artifactBranch =
+      typeof flatpak.branch === "string" && flatpak.branch.length > 0
+        ? flatpak.branch
+        : branchFor(channel);
+    const branch = channel === "stable" ? "" : `//${artifactBranch}`;
     commands.push(
-      `flatpak install --user ${REMOTE_NAME} ${flatpak.id}`,
-      `flatpak info ${flatpak.id}`,
+      `flatpak install --user ${REMOTE_NAME} ${flatpak.id}${branch}`,
+      `flatpak info ${flatpak.id}${branch}`,
     );
   }
   if (commands.length > 0) {
@@ -832,6 +871,9 @@ export function aggregateReleaseBody(
   const otherDesktop = desktop.filter((entry) => entry.app.id !== "shell");
   const shell = entries.find((entry) => entry.app.id === "shell") ?? null;
   const go = entries.find((entry) => entry.app.id === "go") ?? null;
+  // The Shell install block is always present, even on a tree whose Shell row
+  // could not be collected, so it reads its id from the app table.
+  const shellApp = APPS.find((app) => app.id === "shell");
   return [
     `**Suite Shell** is the desktop superapp; **Suite Go** is the mobile superapp. This is the ${date} build` +
       (channel === "stable" ? "." : `, published on the **${channel}** channel.`),
@@ -851,8 +893,8 @@ export function aggregateReleaseBody(
     ...(shell === null ? [] : [...releaseLabels(shell.app, channel), ""]),
     "```sh",
     `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
-    "flatpak install --user suite run.suite.shell",
-    "flatpak run run.suite.shell",
+    installCommand(shellApp, channel),
+    `flatpak run ${releaseFlatpakRef(shellApp, channel)}`,
     "```",
     "",
     `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
@@ -868,7 +910,7 @@ export function aggregateReleaseBody(
     "`frozen` marks a legacy app: its code and last artifact stay, and it gets no new",
     "pre-release channel until it becomes a pack.",
     "",
-    ...artifactsSection(manifest, { tag, draft }),
+    ...artifactsSection(manifest, { tag, draft, channel }),
     "## Update",
     "",
     "Once the remote is added, the desktop apps update with:",
@@ -933,7 +975,7 @@ export function appReleaseBody(
       "",
       "```sh",
       `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
-      installCommand(app),
+      installCommand(app, channel),
       "flatpak update --user",
       "```",
       "",

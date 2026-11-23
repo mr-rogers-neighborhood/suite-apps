@@ -852,6 +852,23 @@ describe("release notes name their channel", () => {
     });
     assert.match(body, /\*\*Channel:\*\* preview/u);
     assert.doesNotMatch(body, /\*\*Channel:\*\* stable/u);
+    assert.ok(body.includes("flatpak install --user suite run.suite.slop.shell//preview"));
+  });
+
+  it("installs the pre-release id on its branch, not the stable id", () => {
+    const body = aggregateReleaseBody(withSuperapps, {
+      date: "2026-11-23",
+      tag: "suite-nightly-2026.11.23",
+      channel: "nightly",
+    });
+    assert.ok(body.includes("flatpak install --user suite run.suite.slop.shell//nightly"));
+    assert.ok(body.includes("flatpak run run.suite.slop.shell//nightly"));
+    assert.ok(!body.includes("flatpak install --user suite run.suite.shell"));
+    assert.ok(!body.includes("flatpak run run.suite.shell"));
+
+    const stable = aggregateReleaseBody(withSuperapps, { date: "2026-11-23" });
+    assert.ok(stable.includes("flatpak install --user suite run.suite.shell\n"));
+    assert.ok(!stable.includes("run.suite.slop.shell"));
   });
 
   it("still says stable on a stable body", () => {
@@ -952,8 +969,8 @@ describe("the Artifacts section", () => {
       assert.ok(body.includes("branch `nightly`"), "the Flatpak branch is named");
       assert.ok(body.includes(`[${MANIFEST_FILE}](${releaseAssetUrl(tag, MANIFEST_FILE)})`));
       assert.match(body, /sha256sum -c suite-go-nightly-0\.1\.0\.apk\.sha256/u);
-      assert.match(body, /flatpak install --user suite run\.suite\.slop\.shell/u);
-      assert.match(body, /flatpak info run\.suite\.slop\.shell/u);
+      assert.ok(body.includes("flatpak install --user suite run.suite.slop.shell//nightly"));
+      assert.ok(body.includes("flatpak info run.suite.slop.shell//nightly"));
 
       const draft = aggregateReleaseBody([shellEntry, ...entries, goEntry], {
         date: "2026-11-23",
