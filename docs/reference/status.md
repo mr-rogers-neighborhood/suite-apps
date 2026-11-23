@@ -44,9 +44,10 @@ in parentheses (`Frozen (alpha)`) is the product label the app carried when it f
 the release channels the superapp uses.
 
 The gate is one command, and CI runs that command rather than a second path. A pull request runs the
-rows its diff can break, `main` runs the full fresh gate, and the merge queue adds Start's e2e.
-Nothing runs overnight yet, and `suite-dev` remains the independent full gate. The evidence is a
-command that can be run; see [Commands](commands.md).
+rows its diff can break, `main` runs the full fresh gate, and the merge queue adds Start's e2e. The
+nightly run adds the full gate with e2e, builds the host Flatpak and the Go debug APK, and attests
+both; it does not publish. `suite-dev` remains the independent full gate. The evidence is a command
+that can be run; see [Commands](commands.md).
 
 ## Where to go next
 

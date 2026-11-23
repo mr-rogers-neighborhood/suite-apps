@@ -1,0 +1,205 @@
+# Nightly proof: the full gate with e2e, then the two artifacts that carry this
+# repository's installs. It builds and attests; it does not publish. A nightly
+# artifact is not a release, and publication still needs the signed Flatpak
+# remote and the release keystore in a protected environment (ci.md, C9).
+#
+# A failure opens or updates one issue instead of a new one per night (C10.1).
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: nightly-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Playwright browser (Canvas stories)
+        run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
+      - name: Xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Fresh gate with e2e
+        run: node scripts/gate.mjs --fresh
+
+  package-linux:
+    name: package-linux
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Flatpak tooling
+        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+      - name: Flatpak runtimes
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk//25.08 \
+            org.electronjs.Electron2.BaseApp//25.08
+      - name: Build the host Flatpak (nightly branch)
+        env:
+          SUITE_FLATPAK_REPO: ${{ github.workspace }}/.nightly/flatpak-repo
+        run: node scripts/flatpak.mjs --app shell --channel nightly --no-install
+      - name: Bundle
+        run: |
+          flatpak build-bundle "$GITHUB_WORKSPACE/.nightly/flatpak-repo" suite-shell-nightly.flatpak \
+            run.suite.slop.shell nightly
+      - name: Attest the bundle
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: suite-shell-nightly.flatpak
+      - name: Upload the bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-shell-nightly-flatpak
+          path: suite-shell-nightly.flatpak
+          retention-days: 14
+          if-no-files-found: error
+
+  package-android:
+    name: package-android
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      # No release key here, so this is the flavor's debug build: proof that the
+      # app assembles, not the signed artifact a release carries.
+      - name: Build the debug APK
+        run: |
+          pnpm --filter "./packages/*" run build
+          pnpm --filter @suite/go-app build
+          pnpm --filter @suite/go-app exec cap sync android
+          cd apps/go/android
+          ./gradlew assembleStableDebug
+          cp app/build/outputs/apk/stable/debug/app-stable-debug.apk \
+            "$GITHUB_WORKSPACE/suite-go-debug.apk"
+      - name: Attest the APK
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: suite-go-debug.apk
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-go-nightly-debug-apk
+          path: suite-go-debug.apk
+          retention-days: 14
+          if-no-files-found: error
+
+  report:
+    name: report
+    needs: [gate, package-linux, package-android]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: One rolling nightly issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = "ci-nightly";
+            const title = "Nightly gate is red";
+            const body = [
+              `The nightly run failed on \`${context.sha}\`.`,
+              "",
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              "",
+              `Jobs: ${["gate", "package-linux", "package-android"].join(", ")}`,
+            ].join("\n");
+
+            try {
+              await github.rest.issues.createLabel({
+                ...context.repo,
+                name: label,
+                color: "d73a4a",
+                description: "The scheduled nightly gate or packaging failed",
+              });
+            } catch (error) {
+              if (error.status !== 422) throw error;
+            }
+
+            const open = await github.rest.issues.listForRepo({
+              ...context.repo,
+              labels: label,
+              state: "open",
+              per_page: 1,
+            });
+
+            if (open.data.length > 0) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: open.data[0].number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                ...context.repo,
+                title,
+                body,
+                labels: [label],
+              });
+            }
