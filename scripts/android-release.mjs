@@ -984,7 +984,8 @@ async function main(argv) {
   }
 
   if (options.upload !== null) {
-    const tag = currentAggregateTag();
+    const channel = options.channel ?? "stable";
+    const tag = currentAggregateTag({ channel });
     const release = readRelease(tag);
     const releaseProblem = releaseRefusal({
       tag,
@@ -1053,7 +1054,7 @@ async function main(argv) {
     throw new Error("the keystore is present but its password is not; run --key-status");
   }
 
-  const tag = currentAggregateTag();
+  const tag = currentAggregateTag({ channel });
   const release = readRelease(tag);
   const releaseProblem = releaseRefusal({
     tag,

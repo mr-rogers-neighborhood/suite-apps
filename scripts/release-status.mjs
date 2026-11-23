@@ -209,6 +209,8 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --write              write ${RELEASES_FILE} and stop short of GitHub
   --date <YYYY-MM-DD>  date for the aggregate tag (default: the newest app release)
   --channel <name>     stable (default), slop, nightly or preview; names the APK asset
+  --prune              delete old published pre-release releases (never stable)
+  --keep <n>           releases a pruned channel keeps (default 14)
   --help               print this text
 
 Pass one of --draft, --publish, --write and --dry-run.
@@ -225,8 +227,9 @@ export function tagFor(app, version) {
 }
 
 /** The aggregate tag, dotted as the owner chose: `suite-2026.11.21`. */
-export function aggregateTag(date) {
-  return `suite-${date.replace(/-/gu, ".")}`;
+export function aggregateTag(date, channel = "stable") {
+  const dotted = date.replace(/-/gu, ".");
+  return channel === "stable" ? `suite-${dotted}` : `suite-${channel}-${dotted}`;
 }
 
 /**
@@ -236,7 +239,7 @@ export function aggregateTag(date) {
  * name the same tag `--publish` picks: the newest changelog date, not the wall
  * clock. `load` is injectable so a test needs no tree.
  */
-export function currentAggregateTag({ load = read } = {}) {
+export function currentAggregateTag({ load = read, channel = "stable" } = {}) {
   const entries = [];
   for (const app of APPS) {
     try {
@@ -247,7 +250,7 @@ export function currentAggregateTag({ load = read } = {}) {
       // An app whose files cannot be read cannot change the newest date.
     }
   }
-  return aggregateTag(aggregateDate(entries));
+  return aggregateTag(aggregateDate(entries), channel);
 }
 
 /** A release's page on GitHub. */
@@ -258,6 +261,37 @@ export function releaseUrl(tag) {
 /** The repository's Latest release, which is the rolling Suite snapshot. */
 export function latestReleaseUrl() {
   return `https://github.com/${RELEASE_REPO}/releases/latest`;
+}
+
+/** The newest published preview and nightly releases, for the stable body. */
+export function preReleaseLinks(releases) {
+  const rows = (releases ?? []).filter(
+    (row) =>
+      row.isDraft === false &&
+      /^suite-(?:nightly|preview)-\d{4}\.\d{2}\.\d{2}$/u.test(row.tagName ?? ""),
+  );
+  const newest = (channel) =>
+    rows
+      .filter((row) => row.tagName.startsWith(`suite-${channel}-`))
+      .sort((a, b) => b.tagName.localeCompare(a.tagName))[0]?.tagName ?? null;
+  return ["preview", "nightly"]
+    .map((channel) => ({ channel, tag: newest(channel) }))
+    .filter((row) => row.tag !== null);
+}
+
+/**
+ * Published pre-release releases older than the newest `keep` for a channel.
+ *
+ * The tag carries its date, so lexical order is chronological for one fixed
+ * tag shape. Only published releases are pruned; a draft is still being written.
+ */
+export function pruneCandidates(releases, { channel, keep }) {
+  return (releases ?? [])
+    .filter((row) => row.isDraft === false)
+    .filter((row) => row.tagName.startsWith(`suite-${channel}-`))
+    .sort((a, b) => b.tagName.localeCompare(a.tagName))
+    .slice(keep)
+    .map((row) => row.tagName);
 }
 
 /** One asset's download URL on a release. */
@@ -637,7 +671,7 @@ function goInstallNote(entries, { tag = null, apkLive = false, draft = false, ch
  */
 export function aggregateReleaseBody(
   entries,
-  { date, tag = null, apkLive = false, draft = false, channel = "stable" },
+  { date, tag = null, apkLive = false, draft = false, channel = "stable", preReleases = [] },
 ) {
   const desktop = entriesForSection(entries, "desktop");
   const otherDesktop = desktop.filter((entry) => entry.app.id !== "shell");
@@ -648,6 +682,15 @@ export function aggregateReleaseBody(
       (channel === "stable" ? "." : `, published on the **${channel}** channel.`),
     "The split apps remain on the same signed remote, below; the legacy ones are frozen.",
     "",
+    ...(preReleases.length === 0
+      ? []
+      : [
+          "Pre-release channels are separate releases:",
+          ...preReleases.map(
+            (row) => `- Latest ${row.channel}: [${row.tag}](${releaseUrl(row.tag)})`,
+          ),
+          "",
+        ]),
     "## Suite Shell (desktop)",
     "",
     ...(shell === null ? [] : [...releaseLabels(shell.app), ""]),
@@ -851,6 +894,8 @@ export function parseArgs(argv) {
     write: false,
     date: null,
     channel: "stable",
+    prune: false,
+    keep: 14,
     help: false,
   };
 
@@ -877,6 +922,14 @@ export function parseArgs(argv) {
       const miss = channelProblem(options.channel);
       if (miss !== null) throw new Error(miss);
       index += 1;
+    } else if (arg === "--prune") {
+      options.prune = true;
+    } else if (arg === "--keep") {
+      options.keep = Number(takeValue(index, "--keep"));
+      if (!Number.isInteger(options.keep) || options.keep < 1) {
+        throw new Error("--keep needs a positive whole number");
+      }
+      index += 1;
     } else if (arg.startsWith("--")) {
       throw new Error(`unknown option ${arg}`);
     } else {
@@ -889,6 +942,7 @@ export function parseArgs(argv) {
     options.publish ? "--publish" : null,
     options.write ? "--write" : null,
     options.dryRun ? "--dry-run" : null,
+    options.prune ? "--prune" : null,
   ].filter((mode) => mode !== null);
   if (modes.length > 1) {
     throw new Error(`${modes.join(" and ")} pick different modes; pass at most one`);
@@ -1157,9 +1211,17 @@ function planAggregate(tag, head) {
  * about publication, not about a private draft. Editing an existing draft
  * updates only its title and body, which is what makes a rerun idempotent.
  */
-export function draftReleaseArgs({ tag, title, notesPath, action, target }) {
+export function draftReleaseArgs({
+  tag,
+  title,
+  notesPath,
+  action,
+  target,
+  prerelease = false,
+}) {
+  const pre = prerelease ? ["--prerelease"] : [];
   if (action === "edit") {
-    return ["release", "edit", tag, "--title", title, "--notes-file", notesPath];
+    return ["release", "edit", tag, "--title", title, "--notes-file", notesPath, ...pre];
   }
   return [
     "release",
@@ -1172,6 +1234,7 @@ export function draftReleaseArgs({ tag, title, notesPath, action, target }) {
     "--draft",
     "--target",
     target,
+    ...pre,
   ];
 }
 
@@ -1182,7 +1245,7 @@ export function draftReleaseArgs({ tag, title, notesPath, action, target }) {
  * body that links the attached APK becomes public without a second, separate
  * edit after the release is locked. Only a draft is ever passed here.
  */
-export function publishReleaseArgs({ tag, notesPath, latest }) {
+export function publishReleaseArgs({ tag, notesPath, latest, prerelease = false }) {
   return [
     "release",
     "edit",
@@ -1191,11 +1254,12 @@ export function publishReleaseArgs({ tag, notesPath, latest }) {
     notesPath,
     "--draft=false",
     latest ? "--latest" : "--latest=false",
+    ...(prerelease ? ["--prerelease"] : []),
   ];
 }
 
 /** Create or update every release as a draft; never write the page. */
-function mainDraft({ entries, aggregate, date, tag, releases, notes }) {
+function mainDraft({ entries, aggregate, date, tag, releases, notes, prerelease }) {
   if (releases === null) {
     throw new Error(
       "gh release list failed; refusing to draft into a repository it cannot read",
@@ -1216,6 +1280,7 @@ function mainDraft({ entries, aggregate, date, tag, releases, notes }) {
         notesPath: join(NOTES_DIR, `${entry.tag}.md`),
         action: entry.action,
         target: entry.plan.commit,
+        prerelease,
       }),
     );
   }
@@ -1230,6 +1295,7 @@ function mainDraft({ entries, aggregate, date, tag, releases, notes }) {
         notesPath: join(NOTES_DIR, `${tag}.md`),
         action: aggregate.action,
         target: aggregate.plan.commit,
+        prerelease,
       }),
     );
   }
@@ -1242,7 +1308,18 @@ function mainDraft({ entries, aggregate, date, tag, releases, notes }) {
 }
 
 /** Publish the drafts, then write the page with real links. */
-function mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive }) {
+function mainPublish({
+  entries,
+  aggregate,
+  date,
+  tag,
+  releases,
+  notes,
+  apkLive,
+  channel,
+  prerelease,
+  preReleases,
+}) {
   if (releases === null) {
     throw new Error("gh release list failed; refusing to publish into a repository it cannot read");
   }
@@ -1270,21 +1347,29 @@ function mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive }
       publishReleaseArgs({
         tag,
         notesPath: join(NOTES_DIR, `${tag}.md`),
-        latest: true,
+        latest: channel === "stable",
+        prerelease,
       }),
     );
   }
 
   // Every release named on the page is public now, so the refresh links instead
   // of saying "pending". The APK link is live only when the draft already
-  // carried the asset; it could not be attached after publication.
-  for (const entry of entries) entry.published = true;
-  writeReleasesPage(
-    "publish",
-    releasesPage(entries, { date, tag, aggregatePublished: true, apkLive }),
+  // carried the asset; it could not be attached after publication. A pre-release
+  // publication does not own the stable page, so it leaves the file alone.
+  if (channel === "stable") {
+    for (const entry of entries) entry.published = true;
+    writeReleasesPage(
+      "publish",
+      releasesPage(entries, { date, tag, aggregatePublished: true, apkLive }),
+    );
+    process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
+  } else {
+    process.stdout.write(`\n${RELEASES_FILE} is written by the stable channel only.\n`);
+  }
+  process.stdout.write(
+    `${channel === "stable" ? "Latest" : "Published"} release: ${releaseUrl(tag)}\n`,
   );
-  process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
-  process.stdout.write(`Latest release: ${releaseUrl(tag)}\n`);
 }
 
 /**
@@ -1355,6 +1440,8 @@ async function main(argv) {
 
   const channelMiss = channelProblem(options.channel);
   if (channelMiss !== null) throw new Error(channelMiss);
+  const channel = options.channel;
+  const prerelease = channel !== "stable";
 
   const mode = options.draft
     ? "draft"
@@ -1364,6 +1451,31 @@ async function main(argv) {
         ? "write"
         : "dry-run";
   const releases = existingReleases();
+
+  if (options.prune) {
+    if (channel === "stable") {
+      throw new Error("--prune is for a pre-release channel; the stable release is never pruned");
+    }
+    if (releases === null) {
+      throw new Error("gh release list failed; refusing to prune releases it cannot read");
+    }
+    const doomed = pruneCandidates(releases, { channel, keep: options.keep });
+    for (const tag of doomed) {
+      if (options.dryRun) {
+        process.stdout.write(`would delete ${tag}\n`);
+      } else {
+        run("gh", ["release", "delete", tag, "--yes", "--cleanup-tag"]);
+        process.stdout.write(`deleted ${tag}\n`);
+      }
+    }
+    process.stdout.write(
+      doomed.length === 0
+        ? `Nothing to prune: ${channel} keeps the newest ${options.keep}.\n`
+        : `Pruned ${doomed.length} ${channel} release(s); kept the newest ${options.keep}.\n`,
+    );
+    return;
+  }
+
   const { problems, entries } = collect({ mode });
   const knownReleases = releases ?? [];
 
@@ -1376,7 +1488,11 @@ async function main(argv) {
     entry.isLatest = row?.isLatest === true;
     entry.published = row !== null && row.isDraft === false;
 
-    if (releases === null && mode === "publish") {
+    if (prerelease) {
+      // A pre-release channel publishes one aggregate release, not per-app ones.
+      entry.action = "skip";
+      entry.actionProblem = null;
+    } else if (releases === null && mode === "publish") {
       entry.action = "refuse";
       entry.actionProblem =
         "gh release list failed; refusing to publish releases it cannot read";
@@ -1403,7 +1519,8 @@ async function main(argv) {
 
   const head = currentHead();
   const date = aggregateDate(entries, options.date);
-  const tag = aggregateTag(date);
+  const tag = aggregateTag(date, channel);
+  const preReleases = channel === "stable" ? preReleaseLinks(releases) : [];
   const aggregate = planAggregate(tag, head);
   if (aggregate.plan.problem !== null && mode !== "write") {
     throw new Error(aggregate.plan.problem);
@@ -1437,7 +1554,6 @@ async function main(argv) {
   // draft can already carry the APK: the upload happens between `--draft` and
   // `--publish`, and the publish phase re-renders the body from this read.
   const goEntry = entries.find((entry) => entry.app.kind === "apk") ?? null;
-  const channel = options.channel;
   const goAsset = goEntry === null ? null : goApkName(goEntry.version, channel);
   const aggregateAssets = aggregateExists ? releaseAssets(tag) : null;
   const apkLive =
@@ -1457,6 +1573,7 @@ async function main(argv) {
     apkLive,
     draft: draftBodies,
     channel,
+    preReleases,
   });
   const page = releasesPage(entries, { date, tag, aggregatePublished, apkLive, channel });
   const notes = [
@@ -1513,13 +1630,24 @@ async function main(argv) {
       // it now would have to create a release and attach nothing.
       throw new Error(fatalProblems.join("\n\n"));
     }
-    mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive });
+    mainPublish({
+      entries,
+      aggregate,
+      date,
+      tag,
+      releases,
+      notes,
+      apkLive,
+      channel,
+      prerelease,
+      preReleases,
+    });
     return;
   }
 
   if (mode === "draft") {
     if (fatalProblems.length > 0) throw new Error(fatalProblems.join("\n\n"));
-    mainDraft({ entries, aggregate, date, tag, releases, notes });
+    mainDraft({ entries, aggregate, date, tag, releases, notes, prerelease });
     return;
   }
 
