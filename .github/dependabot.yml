@@ -1,0 +1,13 @@
+# Keep the SHA-pinned actions current. A pin is only readable because of its
+# trailing version comment; Dependabot rewrites both together (ci.md, C9.4).
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
