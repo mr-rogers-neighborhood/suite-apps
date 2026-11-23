@@ -1,7 +1,11 @@
 # Platform support specification
 
 Status: draft 0.1. Target matrix. Today Linux Flatpak and Android APK are the only public forms; the
-other platforms are build/test targets until signing exists. The delivery contract is
+other platforms are build/test targets until signing exists. `.github/workflows/platforms.yml`
+builds unsigned Windows x64 and macOS arm64 zips of the Suite Shell at 03:30 UTC and on dispatch,
+attests an SBOM and provenance for each, and keeps them as 14-day test artifacts — never a release,
+never a download a person is asked to install. There is no iOS build: the tree has no Xcode or
+Capacitor iOS project, so the simulator row has no job yet. The delivery contract is
 [delivery.md](delivery.md); the pipeline is [ci.md](ci.md).
 
 ## 1. What a tier means
