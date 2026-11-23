@@ -83,7 +83,10 @@ TestFlight, no App Store. A device target is a future Apple-signing decision.
 preview and release candidates, not every pull request. A session leaves screenshots and a verdict;
 link it from the release check.
 
-**P4.1** A Windows, macOS or iOS test artifact attaches to a draft or pre-release with its checksum.
+**P4.1** Revyl Proof of Changes is a GitHub App check on the pull request, not a workflow job. It
+builds and runs the app on a cloud device; its check is evidence, not a required check in v1.
+
+**P4.2** A Windows, macOS or iOS test artifact attaches to a draft or pre-release with its checksum.
 It is never presented as a stable download. Unsigned means Gatekeeper or SmartScreen will warn; the
 artifact README says so.
 

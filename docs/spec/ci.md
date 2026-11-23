@@ -1,9 +1,10 @@
 # CI specification
 
-Status: draft 0.1. Target for the pipeline. Today the gate is local and the independent gate is the
-home VM; GitHub Actions is disabled and `main` is unprotected. The delivery contract is
-[delivery.md](delivery.md); the platform matrix is [platforms.md](platforms.md); the product contract
-is [superapp.md](superapp.md).
+Status: draft 0.1. Phase 1 is live: Actions is enabled, `.github/workflows/ci.yml` runs the fast check
+on pull requests, merge groups and `main`, and the `main` ruleset requires the `ci` check. The VM remains
+the full independent gate. The affected matrix, e2e, packaging, attestations, merge queue and VM
+retirement are Phase 2+. The delivery contract is [delivery.md](delivery.md); the platform matrix is
+[platforms.md](platforms.md); the product contract is [superapp.md](superapp.md).
 
 ## 1. Principles
 
@@ -49,6 +50,10 @@ maintainer label or an environment approval; a public fork does not get free hea
 **C2.5** The owner may keep a ruleset bypass for an explicit emergency checkpoint. A bypass is a
 recorded decision, not the normal path.
 
+**C2.6** Enable the merge queue in the repository UI when the plan offers it; the `merge_group`
+trigger is required. If the plan or API cannot enable it, the pull-request rule plus the required
+`ci` check is the fallback, and the limitation is recorded rather than pretended.
+
 ## 3. Jobs
 
 | Job | Runs on | What it does | Cache |
@@ -64,7 +69,7 @@ recorded decision, not the normal path.
 | `build-windows` | windows-latest | Electron build, unsigned zip | pnpm store |
 | `build-macos` | macos-latest | Electron build, unsigned zip/dmg | pnpm store |
 | `build-ios` | macos-latest | Simulator app for Revyl | pnpm store, Xcode cache |
-| `device` | Revyl | iOS simulator/Android emulator smoke | none |
+| `device` | Revyl GitHub App | iOS simulator/Android emulator smoke | none |
 | `publish` | ubuntu-latest | Sign, attest, publish, verify | none |
 
 **C3.1** `fast` and `build` are matrices over the affected projects. An empty matrix is success with
@@ -147,9 +152,10 @@ Standard runners are free for public repositories.
 **C8.2** Self-hosted runners are not used for pull requests on this public repository. A dedicated
 publisher or a protected environment holds signing keys; it runs only on a tag/manual event.
 
-**C8.3** Revyl runs iOS simulator and Android emulator sessions on its free plan. It is used on
-nightly, preview and release candidates, not every pull request. A device result is evidence, not a
-required check in v1.
+**C8.3** Revyl Proof of Changes runs as a GitHub App from `.revyl/config.yaml`, not as a workflow job.
+It builds the app on a pull request, runs it on a cloud device, and posts its own checks; those checks
+are evidence, not a required check in Phase 1. It uses the Revyl free plan for iOS simulator and
+Android emulator sessions on nightly, preview and release candidates, not every pull request.
 
 **C8.4** macOS runners are scarce and 3-core/7 GB on arm64. A build that needs more uses
 `macos-15-intel` (4 CPU/14 GB) and records why.
