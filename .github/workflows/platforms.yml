@@ -456,8 +456,27 @@ jobs:
             "${runtime}//${version}" \
             "${sdk}//${version}" \
             "${base}//${base_version}"
+      # The manifest packages `release/linux-unpacked`, but electron-builder
+      # appends the architecture off x64 (`linux-arm64-unpacked`) even for a
+      # `--dir` build. Build first, name the directory the manifest expects,
+      # then hand the result to flatpak.mjs with `--no-build` so it does not
+      # rebuild and look at the old name.
+      - name: Build the unpacked shell
+        run: pnpm --filter @suite/shell run package:dir
+      - name: Name the unpacked directory the manifest expects
+        run: |
+          set -euo pipefail
+          release="apps/shell/release"
+          unpacked="${release}/linux-unpacked"
+          if [ ! -d "${unpacked}" ]; then
+            arch_dir="$(find "${release}" -maxdepth 1 -type d -name 'linux-*-unpacked' -print -quit)"
+            test -n "${arch_dir}"
+            mv "${arch_dir}" "${unpacked}"
+          fi
+          test -x "${unpacked}/suite"
+          ls -d "${unpacked}"
       - name: Build the host Flatpak
-        run: node scripts/flatpak.mjs --app shell --no-install
+        run: node scripts/flatpak.mjs --app shell --no-build --no-install
       - name: Bundle the Flatpak
         run: |
           set -euo pipefail
