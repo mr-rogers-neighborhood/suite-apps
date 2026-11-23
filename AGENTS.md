@@ -20,10 +20,10 @@ in `package.json` resolve.
 The gate runs suite-start's e2e suite after the repository checks pass, under
 `xvfb-run` when there is no display; `--no-e2e` skips it for a quick loop.
 
-The independent gate runs on `suite-dev`: pushing `main` to the `vm` remote
-queues the same gate there, in a memory-capped unit. Results are in
-`~/ci/status.json` on the VM and `ssh suite-dev cat ~/ci/status.json` from here.
-See `scripts/ci/` and the README.
+CI is the independent proof: `.github/workflows/main.yml` runs the full fresh gate on every push to
+`main`, and the merge queue runs the affected rows plus Start's e2e. The old `vm` remote, its
+`scripts/ci/` hook and the `suite-dev` gate are retired; `suite-dev` remains only the LAN Flatpak test
+host.
 
 ## Publishing and archives
 
@@ -31,8 +31,6 @@ See `scripts/ci/` and the README.
   renamed `suite-canvas` repository: the stars and Canvas's 0.1.0–0.1.9 releases
   moved with it. `legacy/canvas` holds Canvas's pre-import history.
 - `suite-apps-1` is the bootstrap snapshot from before the rename. Not canonical.
-- `vm` is the independent gate. Push the commit you want gated:
-  `git push origin main && git push vm main`.
 - `suite-dev` is archived on GitHub; this repository is its successor and owns the
   build and release scripts. `suite-go` is archived too.
 - `suite-planner`, `suite-budget`, `suite-start` and `suite-sync` are still
@@ -54,8 +52,8 @@ container, if it ever exists, is a separate decision.
 
 Every change lands through a branch or worktree and a pull request. A review-only agent reviews the
 diff and runs headless checks; it may comment or request changes but never merges. The coordinator
-runs the owning gate and the VM gate, then merges. A direct push to `main` is only an explicit owner
-checkpoint.
+runs the owning gate and enqueues the pull request; the merge queue is the last check. A direct push
+to `main` is only an explicit owner checkpoint.
 
 ## Monorepo rules
 
