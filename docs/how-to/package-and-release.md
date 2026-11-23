@@ -104,6 +104,19 @@ installs — a `flatpak install` command for desktop, the APK asset for Suite Go
 (`start-v<version>`, `canvas-v<version>`, `go-v<version>`, `sync-v<version>`) stay as history and are
 not marked Latest.
 
+Every note names the channel the release was published from — `stable`, `nightly` or `preview` —
+separately from the product maturity, so a `stable`-channel build can still be `alpha`. A frozen
+legacy row still says `frozen`, and a row that is not a superapp names no channel.
+
+The rolling body also carries an **Artifacts** section when `.dev/release/release-manifest.json`
+exists. It names the Flatpak's OSTree commit, its id and branch, the bundle's SHA-256, the APK's
+SHA-256, a link to the manifest asset on the release page, and a paste-able block to check a
+download: `sha256sum -c <apk>.sha256`, then `flatpak install --user suite <id>` and `flatpak info
+<id>`. The numbers are read from the manifest, never re-hashed here. They are final in a draft: the
+bytes are built and attached before publication, and `--publish` only locks them. A local `--write`
+run has no manifest, so it omits the section instead of inventing digests; `--manifest <path>` names
+a manifest somewhere else.
+
 Both come from the versions already in the tree. The script reads `package.json` and the
 `## [version] - YYYY-MM-DD` section of the changelog, refuses a version with no section or a date
 that is not a real calendar day, and does nothing to GitHub by default. Pass one of `--draft`,
@@ -203,12 +216,8 @@ attached during the same promotion. `--publish` re-renders the body from the dra
 flips the draft, so the published page links the download. Running `--draft` again after publication
 skips the released page with a message rather than editing it.
 
-`release-status.mjs` has no `--channel` input: the row always names the stable
-`suite-go-<version>.apk`. A pre-release APK is an extra asset on the same rolling release and is not
-the row's install link.
-
-`--channel` accepts `stable` (the default), `slop`, `nightly` and `preview`. The stable asset keeps
-`suite-go-<version>.apk` and the `suite-go.apk` alias, so
+`--channel` accepts `stable` (the default), `slop`, `nightly` and `preview`, and names the channel
+the note reports. The stable asset keeps `suite-go-<version>.apk` and the `suite-go.apk` alias, so
 `https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk` always
 names the newest stable build. A pre-release is `suite-go-<channel>-<version>.apk` and has no stable
 alias.

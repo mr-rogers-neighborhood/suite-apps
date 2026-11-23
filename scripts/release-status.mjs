@@ -11,7 +11,9 @@
  *   that app's own release and how it is installed: a Flatpak command, or the
  *   release-signed Suite Go APK attached to this same release. Each row also names
  *   the release channel and product maturity; channels belong to the superapp
- *   (Suite Shell and Suite Go), and the legacy mini-apps are marked frozen.
+ *   (Suite Shell and Suite Go), and the legacy mini-apps are marked frozen. When
+ *   `.dev/release/release-manifest.json` exists, the body also carries the
+ *   artifact digests and the commands that verify a download (D6.2).
  * - **One release per app**, tagged `<app>-v<version>`, kept as history and
  *   never marked Latest. It carries the changelog section and an install block;
  *   it carries no app binaries, because the signed Flatpak remote is the update
@@ -49,7 +51,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { changelogSection, versionFromPackage } from "./release.mjs";
 import { CHANNELS, channelProblem } from "./lib/channel.mjs";
@@ -72,6 +74,16 @@ export const RELEASES_FILE = "RELEASES.md";
 
 /** Where a publish writes each release body before handing it to `gh`. */
 export const NOTES_DIR = ".dev/releases";
+
+/**
+ * The digest manifest `release-manifest.mjs` writes for one publication (D2.1).
+ *
+ * The release workflow writes it before `--draft`, attests it, and attaches it
+ * to the rolling draft; `--publish` re-renders the body from it. A local
+ * `--write` run usually has no manifest, which is why the section is optional.
+ */
+export const MANIFEST_FILE = "release-manifest.json";
+export const MANIFEST_PATH = join(".dev", "release", MANIFEST_FILE);
 
 /** The product-maturity labels, separate from the release channels. */
 export const PRODUCT_MATURITY = ["pre-alpha", "alpha", "beta", "1.0"];
@@ -209,6 +221,8 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --write              write ${RELEASES_FILE} and stop short of GitHub
   --date <YYYY-MM-DD>  date for the aggregate tag (default: the newest app release)
   --channel <name>     stable (default), slop, nightly or preview; names the APK asset
+  --manifest <path>    release manifest for the Artifacts section
+                       (default: .dev/release/release-manifest.json when it exists)
   --prune              delete old published pre-release releases (never stable)
   --keep <n>           releases a pruned channel keeps (default 14)
   --help               print this text
@@ -352,14 +366,18 @@ export function installCell(
 }
 
 /**
- * The channel a row names: a superapp's channel, `frozen` for legacy, or none.
+ * The channel a row names: the release's channel, `frozen` for legacy, or none.
  *
  * A legacy app is not on a channel any more, so saying `frozen` in the channel
  * cell is honest: its code and last artifact stay, but no new build is offered.
+ * A superapp names the channel the release is published from, so a nightly page
+ * says `nightly` rather than the stable channel the table was first written for.
+ * A row that is not a superapp (the hub, the relay) names no channel.
  */
-export function channelLabel(app) {
+export function channelLabel(app, channel = "stable") {
   if (app.frozen === true) return "frozen";
-  return app.channel ?? "—";
+  if (app.channel === undefined) return "—";
+  return channel;
 }
 
 /** The product-maturity label, or an em dash when none is recorded. */
@@ -377,11 +395,13 @@ export function isLegacyFrozen(app) {
  *
  * Channel and maturity answer different questions: the channel is what a build
  * has survived, the maturity is what the product is ready for. A `stable`
- * channel build can still be `alpha`.
+ * channel build can still be `alpha`. `channel` is the release's channel, so a
+ * note rendered for `suite-nightly-<date>` names `nightly`, not the channel the
+ * app was first catalogued under.
  */
-export function releaseLabels(app) {
+export function releaseLabels(app, channel = "stable") {
   return [
-    `- **Channel:** ${channelLabel(app)}`,
+    `- **Channel:** ${channelLabel(app, channel)}`,
     `- **Maturity:** ${maturityLabel(app)}`,
   ];
 }
@@ -587,7 +607,7 @@ export function aggregateRows(
       : `[\`${appTag}\`](${releaseUrl(appTag)})`;
     const install = installCell(app, { version, tag, apkLive, draft, channel });
     return (
-      `| [${app.name}](${blobUrl(app.changelog)}) | ${channelLabel(app)} | ` +
+      `| [${app.name}](${blobUrl(app.changelog)}) | ${channelLabel(app, channel)} | ` +
       `${maturityLabel(app)} | ${version} | ${released} | ${release} | ${install} |`
     );
   });
@@ -662,6 +682,133 @@ function goInstallNote(entries, { tag = null, apkLive = false, draft = false, ch
 }
 
 /**
+ * The release manifest at `path`, or null when the file does not exist.
+ *
+ * The manifest is read, never recomputed: its digests describe the bytes the
+ * workflow built, and hashing a file on this machine could describe a different
+ * one. A missing manifest is normal on a local `--write` run, so it omits the
+ * section rather than failing. A malformed one refuses: a note that names the
+ * wrong digest is worse than one that names none.
+ */
+export function readManifest(path = MANIFEST_PATH, { load = read } = {}) {
+  let text;
+  try {
+    text = load(path);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      `${path} is not valid JSON; refusing to build a note from digests it cannot read`,
+    );
+  }
+}
+
+/** One artifact from the manifest by kind, or null when the manifest omits it. */
+function manifestArtifact(manifest, kind) {
+  const artifacts = Array.isArray(manifest?.artifacts) ? manifest.artifacts : [];
+  return artifacts.find((artifact) => artifact?.kind === kind) ?? null;
+}
+
+/** A manifest value as a code span, or an em dash when it is missing. */
+function codeOrDash(value) {
+  return typeof value === "string" && value.length > 0 ? `\`${value}\`` : "—";
+}
+
+/** The file name inside a manifest's repository-relative artifact path. */
+function artifactFileName(artifact) {
+  return typeof artifact?.file === "string" && artifact.file.length > 0
+    ? basename(artifact.file)
+    : null;
+}
+
+/**
+ * The Artifacts section: the digests from the manifest and how to check them.
+ *
+ * D6.2 asks a note to carry both the digest and the verification command. The
+ * numbers come from `release-manifest.json` as it was written beside the built
+ * artifacts, so a draft can state them: the bytes exist before publication and
+ * `--publish` only locks them. The install and info commands name the manifest's
+ * own Flatpak id, which is `run.suite.slop.shell` on a pre-release channel, and
+ * the APK's `.sha256` file is the one uploaded beside the APK.
+ */
+export function artifactsSection(manifest, { tag = null, draft = false } = {}) {
+  const flatpak = manifestArtifact(manifest, "flatpak");
+  const apk = manifestArtifact(manifest, "apk");
+  if (flatpak === null && apk === null) return [];
+
+  const lines = [
+    "## Artifacts",
+    "",
+    "These digests are read from `release-manifest.json`, which is attached to this release;",
+    "they describe the bytes that were built, not a later rebuild.",
+    "",
+  ];
+
+  if (flatpak !== null) {
+    const bundle = artifactFileName(flatpak);
+    lines.push(
+      `- Flatpak ${codeOrDash(flatpak.id)} on branch ${codeOrDash(flatpak.branch)}: ` +
+        `OSTree commit ${codeOrDash(flatpak.commit)}, ` +
+        `bundle${bundle === null ? "" : ` \`${bundle}\``} SHA-256 ${codeOrDash(flatpak.sha256)}.`,
+    );
+  }
+
+  const apkFile = artifactFileName(apk);
+  if (apk !== null) {
+    lines.push(
+      `- APK${apkFile === null ? "" : ` \`${apkFile}\``}: SHA-256 ${codeOrDash(apk.sha256)}.`,
+    );
+  }
+
+  lines.push(
+    "",
+    tag === null
+      ? `Manifest: \`${MANIFEST_FILE}\` on the rolling release.`
+      : `Manifest: [${MANIFEST_FILE}](${releaseAssetUrl(tag, MANIFEST_FILE)})`,
+    "",
+  );
+
+  if (draft) {
+    lines.push(
+      "The manifest and the artifacts are attached to this draft before publication, so these are",
+      "the final bytes; `--publish` locks them and makes the manifest download above live.",
+      "",
+    );
+  }
+
+  const commands = [];
+  if (apkFile !== null) commands.push(`sha256sum -c ${apkFile}.sha256`);
+  if (flatpak !== null && typeof flatpak.id === "string" && flatpak.id.length > 0) {
+    commands.push(
+      `flatpak install --user ${REMOTE_NAME} ${flatpak.id}`,
+      `flatpak info ${flatpak.id}`,
+    );
+  }
+  if (commands.length > 0) {
+    lines.push(
+      "Download the files beside their `.sha256`, then check them:",
+      "",
+      "```sh",
+      ...commands,
+      "```",
+      "",
+    );
+    if (flatpak !== null) {
+      lines.push(
+        "`flatpak info` prints the deployed OSTree commit; compare it with the one above.",
+        "",
+      );
+    }
+  }
+
+  return lines;
+}
+
+/**
  * The aggregate release body: every current version, in two tables.
  *
  * The versions are the table's purpose and appear once each. The prose does not
@@ -671,7 +818,15 @@ function goInstallNote(entries, { tag = null, apkLive = false, draft = false, ch
  */
 export function aggregateReleaseBody(
   entries,
-  { date, tag = null, apkLive = false, draft = false, channel = "stable", preReleases = [] },
+  {
+    date,
+    tag = null,
+    apkLive = false,
+    draft = false,
+    channel = "stable",
+    preReleases = [],
+    manifest = null,
+  },
 ) {
   const desktop = entriesForSection(entries, "desktop");
   const otherDesktop = desktop.filter((entry) => entry.app.id !== "shell");
@@ -693,7 +848,7 @@ export function aggregateReleaseBody(
         ]),
     "## Suite Shell (desktop)",
     "",
-    ...(shell === null ? [] : [...releaseLabels(shell.app), ""]),
+    ...(shell === null ? [] : [...releaseLabels(shell.app, channel), ""]),
     "```sh",
     `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
     "flatpak install --user suite run.suite.shell",
@@ -704,7 +859,7 @@ export function aggregateReleaseBody(
     "",
     "## Suite Go (mobile)",
     "",
-    ...(go === null ? [] : [...releaseLabels(go.app), ""]),
+    ...(go === null ? [] : [...releaseLabels(go.app, channel), ""]),
     ...goInstallNote(entries, { tag, apkLive, draft, channel }),
     "## Also on the remote",
     "",
@@ -713,6 +868,7 @@ export function aggregateReleaseBody(
     "`frozen` marks a legacy app: its code and last artifact stay, and it gets no new",
     "pre-release channel until it becomes a pack.",
     "",
+    ...artifactsSection(manifest, { tag, draft }),
     "## Update",
     "",
     "Once the remote is added, the desktop apps update with:",
@@ -746,7 +902,7 @@ export function appReleaseBody(
     `Current versions and the install table are on [the latest Suite release](${latestReleaseUrl()}).`,
     "This page is the release note for this app.",
     "",
-    ...releaseLabels(app),
+    ...releaseLabels(app, channel),
   ];
   if (isLegacyFrozen(app)) {
     lines.push(
@@ -855,12 +1011,14 @@ export function releasesPage(
       markPending: true,
       tag,
       apkLive,
+      channel,
     }),
     "",
     ...aggregateSection("Mobile", entriesForSection(entries, "mobile"), {
       markPending: true,
       tag,
       apkLive,
+      channel,
     }),
     "",
     ...goInstallNote(entries, { tag, apkLive, channel }),
@@ -894,6 +1052,7 @@ export function parseArgs(argv) {
     write: false,
     date: null,
     channel: "stable",
+    manifest: null,
     prune: false,
     keep: 14,
     help: false,
@@ -921,6 +1080,9 @@ export function parseArgs(argv) {
       options.channel = takeValue(index, "--channel");
       const miss = channelProblem(options.channel);
       if (miss !== null) throw new Error(miss);
+      index += 1;
+    } else if (arg === "--manifest") {
+      options.manifest = takeValue(index, "--manifest");
       index += 1;
     } else if (arg === "--prune") {
       options.prune = true;
@@ -995,7 +1157,7 @@ function git(args) {
 }
 
 function read(path) {
-  return readFileSync(join(ROOT, path), "utf8");
+  return readFileSync(resolve(ROOT, path), "utf8");
 }
 
 function localTagCommit(tag) {
@@ -1476,6 +1638,19 @@ async function main(argv) {
     return;
   }
 
+  // D6.2: the digests come from the manifest the workflow wrote beside the
+  // artifacts, never from re-hashing them here. A local `--write` run has none,
+  // so the section is absent rather than invented; an explicit path that is
+  // missing is a mistake and refuses.
+  const manifestPath = options.manifest ?? MANIFEST_PATH;
+  const manifest = readManifest(manifestPath);
+  if (manifest === null && options.manifest !== null) {
+    throw new Error(
+      `--manifest ${options.manifest} names no readable file; refusing to omit the Artifacts ` +
+        "section it asked for",
+    );
+  }
+
   const { problems, entries } = collect({ mode });
   const knownReleases = releases ?? [];
 
@@ -1574,6 +1749,7 @@ async function main(argv) {
     draft: draftBodies,
     channel,
     preReleases,
+    manifest,
   });
   const page = releasesPage(entries, { date, tag, aggregatePublished, apkLive, channel });
   const notes = [
