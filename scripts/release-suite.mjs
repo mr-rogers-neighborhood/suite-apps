@@ -13,12 +13,12 @@
  * 3. `scripts/flatpak.mjs --app shell` — build, sign and install locally.
  * 4. `scripts/flatpak-remote.mjs --target <s3|lan> --publish` — the signed
  *    remote. `s3` is the public store; `lan` is the fallback test host.
- * 5. `scripts/release-status.mjs --publish` — create or update the rolling
- *    `suite-YYYY.MM.DD` release.
+ * 5. `scripts/release-status.mjs --draft` — create or update the rolling
+ *    `suite-YYYY.MM.DD` release as a draft.
  * 6. `scripts/android-release.mjs --publish` — attach `suite-go.apk` and its
- *    checksum to that release.
- * 7. `scripts/release-status.mjs --publish` again — relink the body and
- *    `RELEASES.md` now that the APK exists.
+ *    checksum to that draft.
+ * 7. `scripts/release-status.mjs --publish` — publish the drafts, relink the
+ *    body and write `RELEASES.md` now that the APK exists.
  *
  * Nothing is published unless `--publish` is passed, and then only for a HEAD
  * `.dev/gate-status.json` proves. `--skip-gate` reuses an existing proof; it
@@ -176,22 +176,24 @@ export function releaseSteps({
   steps.push({
     id: "release-status",
     command: "node",
-    args: ["scripts/release-status.mjs", ...(publish ? ["--publish"] : [])],
-    note: "create or update the rolling release and RELEASES.md",
+    // A dry run prints the plain command so a copy is the script's own dry run;
+    // a publish drafts first, because a published release is immutable.
+    args: ["scripts/release-status.mjs", ...(publish ? ["--draft"] : [])],
+    note: "create or update the rolling release as a draft",
   });
   if (!skipApk) {
     steps.push({
       id: "apk",
       command: "node",
       args: ["scripts/android-release.mjs", ...(publish ? ["--publish"] : [])],
-      note: "build Suite Go's APK and attach it, with its checksum",
+      note: "build Suite Go's APK and attach it to the draft, with its checksum",
     });
   }
   steps.push({
     id: "relink",
     command: "node",
     args: ["scripts/release-status.mjs", ...(publish ? ["--publish"] : [])],
-    note: "relink the body and RELEASES.md now that the APK exists",
+    note: "publish the drafts and write RELEASES.md now that the APK exists",
   });
   return steps;
 }

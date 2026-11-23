@@ -17,10 +17,23 @@
  *   it carries no app binaries, because the signed Flatpak remote is the update
  *   path.
  *
- * The version has one home: the app's `package.json`. The date has one home: the
- * `## [version] - YYYY-MM-DD` heading in its changelog. This script reads both,
- * refuses a version without a matching section, and writes nothing to GitHub
- * unless `--publish` is passed.
+ * The version has one home: the app's `package.json`. The date has one home:
+ * the `## [version] - YYYY-MM-DD` heading in its changelog. This script reads
+ * both, refuses a version without a matching section, and writes nothing to
+ * GitHub by default.
+ *
+ * Publication is two phases, because published releases are immutable (D6.3):
+ * the tag, every asset and the body lock when the release is published.
+ *
+ * 1. `--draft` creates or updates every per-app release and the rolling release
+ *    as a draft, with its body and tag plan. Assets are attached while the
+ *    release is still a draft. Rerunning it updates the same drafts and writes
+ *    no page.
+ * 2. `--publish` refreshes each draft body from the assets it now carries,
+ *    publishes the drafts with `gh release edit --draft=false`, then writes
+ *    `RELEASES.md` with real links. A release that is already published is
+ *    never edited: it is skipped with a message and the page is rewritten from
+ *    the current state. A version with no draft is refused.
  *
  * Backfilling a tag is deliberate: a missing tag is created at the commit that
  * added the changelog section (`git log -S`), never at HEAD, and an existing tag
@@ -28,9 +41,10 @@
  *
  * Usage:
  *   node scripts/release-status.mjs            # dry run: commands and bodies
+ *   node scripts/release-status.mjs --draft    # create or update the draft releases
+ *   node scripts/release-status.mjs --publish  # publish the drafts, then write RELEASES.md
  *   node scripts/release-status.mjs --write    # refresh RELEASES.md only
- *   node scripts/release-status.mjs --publish  # create or update the releases
- *   node scripts/release-status.mjs --date 2026-11-21 --publish
+ *   node scripts/release-status.mjs --date 2026-11-21 --draft
  *   node scripts/release-status.mjs --help
  */
 import { spawnSync } from "node:child_process";
@@ -189,12 +203,16 @@ export const APPS = [
 const USAGE = `usage: node scripts/release-status.mjs [options]
 
   --dry-run            print every command and body; the default
+  --draft              create or update the releases as drafts
+  --publish            publish the existing drafts, then write ${RELEASES_FILE}
   --write              write ${RELEASES_FILE} and stop short of GitHub
-  --publish            create or update the releases, then write ${RELEASES_FILE}
   --date <YYYY-MM-DD>  date for the aggregate tag (default: the newest app release)
   --help               print this text
 
-Pass one of --publish, --write and --dry-run.
+Pass one of --draft, --publish, --write and --dry-run.
+
+A release is created as a draft, its assets are attached while it is a draft, and
+--publish flips it. A published release is immutable and is never edited.
 
 The versions come from each app's package.json; the dates from its changelog.
 `;
@@ -275,17 +293,23 @@ export function goApkUrl(tag, version) {
 /**
  * The table cell that says how one row is installed.
  *
- * One cell per row, whatever the artifact. `apkLive` is whether the aggregate
- * release already carries the APK; until it does the cell names the file
- * instead of linking a download that would 404.
+ * One cell per row, whatever the artifact. `apkLive` is whether the release
+ * already carries the APK; until it does the cell names the file instead of
+ * linking a download that would 404. `draft` says that cell is written into a
+ * release that is still a draft, where the APK is attached before publication,
+ * so the wording does not read as a promise the run cannot keep.
  */
-export function installCell(app, { version = null, tag = null, apkLive = false } = {}) {
+export function installCell(
+  app,
+  { version = null, tag = null, apkLive = false, draft = false } = {},
+) {
   if (app.kind === "flatpak") return `\`${installCommand(app)}\``;
   if (app.kind === "apk") {
     const name = version === null ? "suite-go.apk" : goApkName(version);
     if (apkLive && tag !== null && version !== null) {
       return `[${name}](${goApkUrl(tag, version)})`;
     }
+    if (draft) return `\`${name}\` (attached to this draft before publication)`;
     return `\`${name}\` (not uploaded yet)`;
   }
   throw new Error(`no install cell for kind ${String(app.kind)}`);
@@ -391,16 +415,52 @@ export function aggregateDate(entries, override = null) {
 }
 
 /**
- * What a publish may do with one release, or why it must not.
+ * The message for a release GitHub has already published.
  *
- * Every artifact already exists elsewhere — the signed Flatpak remote, the
- * rolling release's APK — so a release page is created when missing and edited
- * in place when it exists. An existing page keeps whatever assets it carries.
+ * Immutable releases lock the tag, every asset and the body at publication
+ * (D6.3), so no later run may edit one. The action is a skip: a repository
+ * ships several apps from one tag namespace, so the unchanged apps are already
+ * published on every normal release day, and one of them must not block the
+ * others. The release is left exactly as GitHub has it.
  */
-export function releaseAction({ exists }) {
-  return exists
-    ? { action: "edit", problem: null }
-    : { action: "create", problem: null };
+export function publishedReleaseMessage(tag) {
+  return (
+    `${tag} is already published, and published releases are immutable: this run refuses ` +
+    "to edit its tag, assets or body, and leaves it unchanged."
+  );
+}
+
+/**
+ * What the draft phase may do with one release, or why it must not.
+ *
+ * A draft is mutable, so rerunning `--draft` edits the same release and stays
+ * idempotent. A published release cannot be turned back into a draft, so it is
+ * skipped: a version that is already out has nothing left to draft.
+ */
+export function draftAction({ exists, isDraft, tag }) {
+  if (!exists) return { action: "create", problem: null };
+  if (isDraft === true) return { action: "edit", problem: null };
+  return { action: "skip", problem: publishedReleaseMessage(tag) };
+}
+
+/**
+ * What the publish phase may do with one release, or why it must not.
+ *
+ * `--publish` only flips drafts. A missing release is a refusal, because the
+ * draft phase was skipped; a published one is skipped, because it is already
+ * public and immutable.
+ */
+export function publishAction({ exists, isDraft, tag }) {
+  if (!exists) {
+    return {
+      action: "refuse",
+      problem:
+        `${tag} has no draft release. Run \`node scripts/release-status.mjs --draft\` first, ` +
+        "attach its assets while it is a draft, then publish.",
+    };
+  }
+  if (isDraft === true) return { action: "publish", problem: null };
+  return { action: "skip", problem: publishedReleaseMessage(tag) };
 }
 
 /** Why an unknown origin tag state blocks a decision, or null when it is known. */
@@ -475,11 +535,12 @@ export function tagPlanDisposition(problem, mode) {
  *
  * `tag` and `apkLive` describe the aggregate release the APK lives on. The
  * subset passed in is the section being rendered, so callers can split desktop
- * and mobile rows without changing this shape.
+ * and mobile rows without changing this shape. `draft` marks a body written
+ * into a release that is still a draft.
  */
 export function aggregateRows(
   entries,
-  { markPending = false, tag = null, apkLive = false } = {},
+  { markPending = false, tag = null, apkLive = false, draft = false } = {},
 ) {
   return entries.map((entry) => {
     const { app, version, date, tag: appTag } = entry;
@@ -488,7 +549,7 @@ export function aggregateRows(
     const release = pending
       ? `\`${appTag}\` (pending)`
       : `[\`${appTag}\`](${releaseUrl(appTag)})`;
-    const install = installCell(app, { version, tag, apkLive });
+    const install = installCell(app, { version, tag, apkLive, draft });
     return (
       `| [${app.name}](${blobUrl(app.changelog)}) | ${channelLabel(app)} | ` +
       `${maturityLabel(app)} | ${version} | ${released} | ${release} | ${install} |`
@@ -534,9 +595,11 @@ export function aggregateSection(title, entries, options = {}) {
  *
  * The APK lives on the rolling release, so whether it is there yet is a fact
  * about this release. Saying so in the body is what keeps the Install cell from
- * being a dead link that looks live.
+ * being a dead link that looks live. A draft says the APK is attached during the
+ * same promotion: it is uploaded to the draft and the link is live once
+ * `--publish` flips it, so the draft must not claim the asset already exists.
  */
-function goInstallNote(entries, { tag = null, apkLive = false }) {
+function goInstallNote(entries, { tag = null, apkLive = false, draft = false }) {
   const go = entries.find((entry) => entry.app.kind === "apk") ?? null;
   if (go === null) return [];
   const name = goApkName(go.version);
@@ -547,9 +610,17 @@ function goInstallNote(entries, { tag = null, apkLive = false }) {
       "",
     ];
   }
+  if (draft) {
+    return [
+      `Suite Go is not a Flatpak. Its release-signed APK, \`${name}\`, is uploaded to this draft`,
+      "before publication, so this release carries it once `--publish` flips the draft; sideload it",
+      "with `adb install -r -t` after downloading.",
+      "",
+    ];
+  }
   return [
-    `Suite Go is not a Flatpak. Its release-signed APK, \`${name}\`, is not attached to this release yet:`,
-    "`node scripts/android-release.mjs --publish` uploads it, and the link appears once it is there.",
+    `Suite Go is not a Flatpak. Its release-signed APK, \`${name}\`, is not attached to this release.`,
+    "Attach it to the draft before publishing; after publication the assets are locked.",
     "",
   ];
 }
@@ -562,7 +633,10 @@ function goInstallNote(entries, { tag = null, apkLive = false }) {
  * added before the tables, because every `flatpak install` cell needs it and a
  * reader who starts at a table would run a command that cannot work yet.
  */
-export function aggregateReleaseBody(entries, { date, tag = null, apkLive = false }) {
+export function aggregateReleaseBody(
+  entries,
+  { date, tag = null, apkLive = false, draft = false },
+) {
   const desktop = entriesForSection(entries, "desktop");
   const otherDesktop = desktop.filter((entry) => entry.app.id !== "shell");
   const shell = entries.find((entry) => entry.app.id === "shell") ?? null;
@@ -585,10 +659,10 @@ export function aggregateReleaseBody(entries, { date, tag = null, apkLive = fals
     "## Suite Go (mobile)",
     "",
     ...(go === null ? [] : [...releaseLabels(go.app), ""]),
-    ...goInstallNote(entries, { tag, apkLive }),
+    ...goInstallNote(entries, { tag, apkLive, draft }),
     "## Also on the remote",
     "",
-    ...aggregateTable(otherDesktop, { tag, apkLive }),
+    ...aggregateTable(otherDesktop, { tag, apkLive, draft }),
     "",
     "`frozen` marks a legacy app: its code and last artifact stay, and it gets no new",
     "pre-release channel until it becomes a pack.",
@@ -610,9 +684,15 @@ export function aggregateReleaseBody(entries, { date, tag = null, apkLive = fals
  * No version is restated outside the title `gh` sets; the section is the note.
  * The APK entry is the one that cannot assume its artifact: `apkLive` is read
  * from the rolling release's assets, and without it the body says where the
- * truth is rather than claiming an attachment that may not exist yet.
+ * truth is rather than claiming an attachment that may not exist yet. `draft`
+ * is the same fact one phase earlier: the release being written is a draft, and
+ * `--publish` re-renders it from the assets it carries before flipping it.
  */
-export function appReleaseBody(app, section, { tag = null, apkLive = false } = {}) {
+export function appReleaseBody(
+  app,
+  section,
+  { tag = null, apkLive = false, draft = false } = {},
+) {
   // The rolling release is the page a person should read; this one is the note
   // for a version. Say so first, so a direct link from the table does not look
   // like a second, competing install page.
@@ -635,7 +715,10 @@ export function appReleaseBody(app, section, { tag = null, apkLive = false } = {
       "Suite Go is a mobile app, not a Flatpak.",
       apkLive
         ? `This build's release-signed APK is attached to [the rolling Suite release](${releaseLink}).`
-        : `Its release-signed APK is published on [the rolling Suite release](${releaseLink}); that ` +
+        : draft
+          ? `This build's release-signed APK is uploaded to [the rolling Suite release](${releaseLink}) ` +
+            "while that release is a draft, so the download is live once it is published."
+          : `Its release-signed APK is published on [the rolling Suite release](${releaseLink}); that ` +
             "release's Mobile table says whether this build is attached yet.",
       "This per-app entry is history and carries no binary.",
       "",
@@ -669,9 +752,10 @@ export function appReleaseBody(app, section, { tag = null, apkLive = false } = {
  * file restates it because it is a mirror, and a mirror that is typed by hand
  * drifts.
  *
- * The page can be written before publication, so a row that has no release yet
- * says **pending** instead of linking a page that does not exist. `--publish`
- * rewrites the page with real links once the releases are created.
+ * The page can be written before publication, so a row that has no published
+ * release says **pending** instead of linking a page that does not exist.
+ * `--write` writes it from the tree; `--publish` rewrites it with real links
+ * after the drafts are published. `--draft` never writes it.
  */
 export function releasesPage(
   entries,
@@ -687,8 +771,8 @@ export function releasesPage(
     : [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
         `rolling Suite Shell + Suite Go ${date} release, which is not published yet. A row marked **pending**`,
-        "has no release to link until `--publish` creates it and refreshes this page; the",
-        "per-app releases stay as history and carry no app binaries.",
+        "has no published release to link yet: `--draft` creates the drafts, and `--publish` publishes",
+        "them and refreshes this page. The per-app releases stay as history and carry no app binaries.",
       ];
 
   return [
@@ -747,8 +831,9 @@ export function releasesPage(
     "## Regenerate",
     "",
     "```sh",
-    "mise exec -- node scripts/release-status.mjs --write",
+    "mise exec -- node scripts/release-status.mjs --draft",
     "mise exec -- node scripts/release-status.mjs --publish",
+    "mise exec -- node scripts/release-status.mjs --write",
     "```",
     "",
   ].join("\n");
@@ -756,7 +841,14 @@ export function releasesPage(
 
 /** Parse the command line; a dry run is the default and one mode at a time. */
 export function parseArgs(argv) {
-  const options = { publish: false, dryRun: false, write: false, date: null, help: false };
+  const options = {
+    draft: false,
+    publish: false,
+    dryRun: false,
+    write: false,
+    date: null,
+    help: false,
+  };
 
   function takeValue(index, flag) {
     const value = argv[index + 1];
@@ -769,6 +861,7 @@ export function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") options.help = true;
+    else if (arg === "--draft") options.draft = true;
     else if (arg === "--publish") options.publish = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--write") options.write = true;
@@ -783,6 +876,7 @@ export function parseArgs(argv) {
   }
 
   const modes = [
+    options.draft ? "--draft" : null,
     options.publish ? "--publish" : null,
     options.write ? "--write" : null,
     options.dryRun ? "--dry-run" : null,
@@ -792,6 +886,30 @@ export function parseArgs(argv) {
   }
 
   return options;
+}
+
+/**
+ * The one place that says which modes write `RELEASES.md`.
+ *
+ * A draft is not public, so drafting must not refresh the mirror; a dry run
+ * writes nothing at all. `--write` refreshes the page from the tree and
+ * `--publish` writes it once the releases are public.
+ */
+export function writesReleasesPage(mode) {
+  return mode === "write" || mode === "publish";
+}
+
+/**
+ * Write `RELEASES.md`, refusing from a mode that must not touch the mirror.
+ *
+ * The guard is the invariant, not a comment: `--draft` and `--dry-run` can
+ * never reach the file, whatever a future branch does.
+ */
+function writeReleasesPage(mode, content) {
+  if (!writesReleasesPage(mode)) {
+    throw new Error(`${mode} must not write ${RELEASES_FILE}`);
+  }
+  writeFileSync(join(ROOT, RELEASES_FILE), content);
 }
 
 function quote(value) {
@@ -839,11 +957,16 @@ function changelogCommit(app, version) {
   return commit.length === 0 ? null : commit;
 }
 
-/** Every release that already exists, by tag, or null when the read failed. */
+/**
+ * Every release that already exists, by tag, or null when the read failed.
+ *
+ * `isDraft` is the whole draft/publish decision: a draft is mutable, and a
+ * published release is immutable (D6.3) and must never be edited again.
+ */
 function existingReleases() {
   const result = spawnSync(
     "gh",
-    ["release", "list", "--limit", "200", "--json", "tagName,isLatest"],
+    ["release", "list", "--limit", "200", "--json", "tagName,isLatest,isDraft,isImmutable"],
     { cwd: ROOT, encoding: "utf8", env: process.env },
   );
   if (result.error || result.status !== 0) return null;
@@ -979,8 +1102,8 @@ function summarize(entry, releases) {
   if (releases !== null) {
     releaseLine =
       entry.actionProblem === null || entry.actionProblem === undefined
-        ? `${entry.action}${release?.isLatest === true ? " (currently Latest)" : ""}`
-        : `REFUSED: ${entry.actionProblem}`;
+        ? actionLabel(entry)
+        : `${actionLabel(entry)}: ${entry.actionProblem}`;
   }
   const lines = [`${entry.app.name} ${entry.version} · ${entry.tag} · ${entry.date ?? "undated"}`];
   lines.push(`  release    ${releaseLine}`);
@@ -1018,18 +1141,16 @@ function planAggregate(tag, head) {
   };
 }
 
-function releaseArgs({ tag, title, notesPath, latest, action, target }) {
+/**
+ * The `gh release` arguments for the draft phase.
+ *
+ * A draft is created with `--draft` and has no `--latest`: Latest is a fact
+ * about publication, not about a private draft. Editing an existing draft
+ * updates only its title and body, which is what makes a rerun idempotent.
+ */
+export function draftReleaseArgs({ tag, title, notesPath, action, target }) {
   if (action === "edit") {
-    return [
-      "release",
-      "edit",
-      tag,
-      "--title",
-      title,
-      "--notes-file",
-      notesPath,
-      latest ? "--latest" : "--latest=false",
-    ];
+    return ["release", "edit", tag, "--title", title, "--notes-file", notesPath];
   }
   return [
     "release",
@@ -1039,12 +1160,79 @@ function releaseArgs({ tag, title, notesPath, latest, action, target }) {
     title,
     "--notes-file",
     notesPath,
-    latest ? "--latest" : "--latest=false",
+    "--draft",
     "--target",
     target,
   ];
 }
 
+/**
+ * The `gh release` arguments that publish one draft.
+ *
+ * The notes are refreshed in the same edit that flips `--draft=false`, so a
+ * body that links the attached APK becomes public without a second, separate
+ * edit after the release is locked. Only a draft is ever passed here.
+ */
+export function publishReleaseArgs({ tag, notesPath, latest }) {
+  return [
+    "release",
+    "edit",
+    tag,
+    "--notes-file",
+    notesPath,
+    "--draft=false",
+    latest ? "--latest" : "--latest=false",
+  ];
+}
+
+/** Create or update every release as a draft; never write the page. */
+function mainDraft({ entries, aggregate, date, tag, releases, notes }) {
+  if (releases === null) {
+    throw new Error(
+      "gh release list failed; refusing to draft into a repository it cannot read",
+    );
+  }
+
+  mkdirSync(join(ROOT, NOTES_DIR), { recursive: true });
+  for (const item of notes) writeFileSync(join(ROOT, item.path), item.body);
+
+  for (const entry of entries) {
+    if (entry.action !== "create" && entry.action !== "edit") continue;
+    if (entry.plan.createLocal) run("git", ["tag", entry.tag, entry.plan.commit]);
+    run(
+      "gh",
+      draftReleaseArgs({
+        tag: entry.tag,
+        title: `${entry.app.name} ${entry.version}`,
+        notesPath: join(NOTES_DIR, `${entry.tag}.md`),
+        action: entry.action,
+        target: entry.plan.commit,
+      }),
+    );
+  }
+
+  if (aggregate.action === "create" || aggregate.action === "edit") {
+    if (aggregate.plan.createLocal) run("git", ["tag", tag, aggregate.plan.commit]);
+    run(
+      "gh",
+      draftReleaseArgs({
+        tag,
+        title: `Suite Shell + Suite Go — ${date}`,
+        notesPath: join(NOTES_DIR, `${tag}.md`),
+        action: aggregate.action,
+        target: aggregate.plan.commit,
+      }),
+    );
+  }
+
+  process.stdout.write(
+    `\nDraft step complete. ${RELEASES_FILE} is written when the drafts are published.\n` +
+      "Attach every asset while the releases are drafts, then run:\n" +
+      "  mise exec -- node scripts/release-status.mjs --publish\n",
+  );
+}
+
+/** Publish the drafts, then write the page with real links. */
 function mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive }) {
   if (releases === null) {
     throw new Error("gh release list failed; refusing to publish into a repository it cannot read");
@@ -1054,43 +1242,36 @@ function mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive }
   for (const item of notes) writeFileSync(join(ROOT, item.path), item.body);
 
   for (const entry of entries) {
-    if (entry.action === null) {
-      throw new Error(entry.actionProblem ?? `${entry.tag} has no release action`);
-    }
+    if (entry.action !== "publish") continue;
     if (entry.plan.createLocal) run("git", ["tag", entry.tag, entry.plan.commit]);
     run(
       "gh",
-      releaseArgs({
+      publishReleaseArgs({
         tag: entry.tag,
-        title: `${entry.app.name} ${entry.version}`,
         notesPath: join(NOTES_DIR, `${entry.tag}.md`),
         latest: false,
-        action: entry.action,
-        target: entry.plan.commit,
       }),
     );
   }
 
-  if (aggregate.plan.createLocal) run("git", ["tag", tag, aggregate.plan.commit]);
-  const aggregateExisting = releases.find((row) => row.tagName === tag) ?? null;
-  run(
-    "gh",
-    releaseArgs({
-      tag,
-      title: `Suite Shell + Suite Go — ${date}`,
-      notesPath: join(NOTES_DIR, `${tag}.md`),
-      latest: true,
-      action: aggregateExisting === null ? "create" : "edit",
-      target: aggregate.plan.commit,
-    }),
-  );
+  if (aggregate.action === "publish") {
+    if (aggregate.plan.createLocal) run("git", ["tag", tag, aggregate.plan.commit]);
+    run(
+      "gh",
+      publishReleaseArgs({
+        tag,
+        notesPath: join(NOTES_DIR, `${tag}.md`),
+        latest: true,
+      }),
+    );
+  }
 
-  // Everything named on the page now exists, so the refresh links instead of
-  // saying "pending". The APK is uploaded by `android-release.mjs`, so its link
-  // is live only when this run already found the asset on the aggregate release.
+  // Every release named on the page is public now, so the refresh links instead
+  // of saying "pending". The APK link is live only when the draft already
+  // carried the asset; it could not be attached after publication.
   for (const entry of entries) entry.published = true;
-  writeFileSync(
-    join(ROOT, RELEASES_FILE),
+  writeReleasesPage(
+    "publish",
     releasesPage(entries, { date, tag, aggregatePublished: true, apkLive }),
   );
   process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
@@ -1098,24 +1279,55 @@ function mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive }
 }
 
 /**
- * Say that the Suite Go link is not live, without failing the release.
+ * Say that a draft is about to be published without Suite Go's APK.
  *
- * The APK is built and uploaded by `scripts/android-release.mjs` after the
- * aggregate release exists, so a release run can legitimately see no asset
- * yet. A dead download link that looks live is the thing this avoids: the
- * body and the page say the file is not attached, and this names the upload.
+ * The APK is built and uploaded by `scripts/android-release.mjs` while the
+ * rolling release is a draft. Publishing without it is irreversible: the
+ * published release locks its assets, so the file can never be attached
+ * afterwards. A dead download link that looks live is the thing this avoids;
+ * the warning names the upload rather than failing a deliberate desktop-only
+ * release.
  */
-function warnMissingApk({ tag, goAsset, apkLive, aggregateExists, releasesKnown }) {
-  if (goAsset === null || apkLive || !releasesKnown) return;
-  const situation = aggregateExists
-    ? `${tag} carries no ${goAsset}`
-    : `${tag} does not exist yet, so ${goAsset} cannot be attached`;
+function warnMissingApk({ tag, goAsset }) {
   process.stderr.write(
-    `\nwarning: ${situation}.\n` +
-      "         The Suite Go Install cell names the file instead of linking a download.\n" +
-      "         Upload it with: node scripts/android-release.mjs --publish\n" +
-      `         Then run this script again so the body and ${RELEASES_FILE} link it.\n`,
+    `\nwarning: ${tag} is a draft with no ${goAsset}.\n` +
+      "         Publishing locks the release's tag, assets and body: the APK could never be\n" +
+      "         attached afterwards, and the Suite Go cell will name the file, not link it.\n" +
+      "         Attach it to the draft first: node scripts/android-release.mjs --publish\n" +
+      `         Then run --publish again so the body and ${RELEASES_FILE} link it.\n`,
   );
+}
+
+/** The short label one release's decided phase gets in the summary. */
+function actionLabel(entry) {
+  const label =
+    {
+      create: "create as draft",
+      edit: "update draft",
+      publish: "publish draft",
+      refuse: "REFUSED",
+      skip: "skip",
+      link: "link (published)",
+      pending: "pending (not published)",
+    }[entry.action] ?? String(entry.action);
+  return entry.isLatest === true ? `${label} (currently Latest)` : label;
+}
+
+/**
+ * Which phase one mode runs for one release.
+ *
+ * `--write` decides nothing on GitHub: it only needs to know whether a row
+ * links or is pending, which `published` already answers.
+ */
+function decidePhase(mode, { exists, isDraft, tag }) {
+  if (mode === "publish") return publishAction({ exists, isDraft, tag });
+  if (mode === "write") {
+    return {
+      action: exists && isDraft !== true ? "link" : "pending",
+      problem: null,
+    };
+  }
+  return draftAction({ exists, isDraft, tag });
 }
 
 async function main(argv) {
@@ -1132,25 +1344,46 @@ async function main(argv) {
     return;
   }
 
-  const mode = options.publish ? "publish" : options.write ? "write" : "dry-run";
+  const mode = options.draft
+    ? "draft"
+    : options.publish
+      ? "publish"
+      : options.write
+        ? "write"
+        : "dry-run";
   const releases = existingReleases();
   const { problems, entries } = collect({ mode });
-
   const knownReleases = releases ?? [];
+
+  const fatalProblems = [];
+  const skipped = [];
   for (const entry of entries) {
-    const exists = knownReleases.some((row) => row.tagName === entry.tag);
-    entry.published = releases !== null && exists;
-    if (releases === null) {
-      entry.action = "create";
-      entry.actionProblem = null;
-      continue;
+    const row = knownReleases.find((candidate) => candidate.tagName === entry.tag) ?? null;
+    entry.exists = row !== null;
+    entry.isDraft = row?.isDraft === true;
+    entry.isLatest = row?.isLatest === true;
+    entry.published = row !== null && row.isDraft === false;
+
+    if (releases === null && mode === "publish") {
+      entry.action = "refuse";
+      entry.actionProblem =
+        "gh release list failed; refusing to publish releases it cannot read";
+    } else {
+      const phase = decidePhase(mode, {
+        exists: entry.exists,
+        isDraft: entry.isDraft,
+        tag: entry.tag,
+      });
+      entry.action = phase.action;
+      entry.actionProblem = phase.problem;
     }
-    const action = releaseAction({ exists });
-    entry.action = action.action;
-    entry.actionProblem = action.problem;
-    if (action.problem !== null) {
-      entry.pending = true;
-      if (mode !== "write") problems.push(action.problem);
+
+    if (entry.actionProblem !== null && mode !== "write") {
+      // A refused or skipped release that is already public still links; only
+      // one with no public release is pending in the page a refusal rewrites.
+      if (entry.action === "refuse" && entry.published !== true) entry.pending = true;
+      if (entry.action === "refuse") fatalProblems.push(entry.actionProblem);
+      else skipped.push(entry.actionProblem);
     }
   }
 
@@ -1160,50 +1393,76 @@ async function main(argv) {
   const date = aggregateDate(entries, options.date);
   const tag = aggregateTag(date);
   const aggregate = planAggregate(tag, head);
-  if (aggregate.plan.problem !== null && !options.write) throw new Error(aggregate.plan.problem);
+  if (aggregate.plan.problem !== null && mode !== "write") {
+    throw new Error(aggregate.plan.problem);
+  }
 
-  const aggregatePublished = releases !== null && knownReleases.some((row) => row.tagName === tag);
-  const aggregateExisting = knownReleases.find((row) => row.tagName === tag) ?? null;
+  const aggregateRow = knownReleases.find((row) => row.tagName === tag) ?? null;
+  const aggregateExists = aggregateRow !== null;
+  const aggregateIsDraft = aggregateRow?.isDraft === true;
+  const aggregatePublished = aggregateExists && aggregateRow.isDraft === false;
+
+  if (releases === null && mode === "publish") {
+    aggregate.action = "refuse";
+    aggregate.actionProblem =
+      "gh release list failed; refusing to publish releases it cannot read";
+  } else {
+    const phase = decidePhase(mode, {
+      exists: aggregateExists,
+      isDraft: aggregateIsDraft,
+      tag,
+    });
+    aggregate.action = phase.action;
+    aggregate.actionProblem = phase.problem;
+  }
+  if (aggregate.actionProblem !== null && mode !== "write") {
+    if (aggregate.action === "refuse") fatalProblems.push(aggregate.actionProblem);
+    else skipped.push(aggregate.actionProblem);
+  }
+
   // The APK belongs to the aggregate release, so whether its cell links is read
-  // from that release's assets, not assumed from the version in the tree.
+  // from that release's assets, not assumed from the version in the tree. A
+  // draft can already carry the APK: the upload happens between `--draft` and
+  // `--publish`, and the publish phase re-renders the body from this read.
   const goEntry = entries.find((entry) => entry.app.kind === "apk") ?? null;
   const goAsset = goEntry === null ? null : goApkName(goEntry.version);
-  const aggregateAssets = aggregateExisting === null ? null : releaseAssets(tag);
+  const aggregateAssets = aggregateExists ? releaseAssets(tag) : null;
   const apkLive =
     goAsset !== null &&
     aggregateAssets !== null &&
     aggregateAssets.some((asset) => asset?.name === goAsset);
-  warnMissingApk({
-    tag,
-    goAsset,
-    apkLive,
-    aggregateExists: aggregateExisting !== null,
-    releasesKnown: releases !== null,
-  });
+  if (mode === "publish" && aggregateIsDraft && goAsset !== null && !apkLive) {
+    warnMissingApk({ tag, goAsset });
+  }
 
-  const body = aggregateReleaseBody(entries, { date, tag, apkLive });
+  // A draft body says the APK is attached during the same promotion; a published
+  // body states what the release actually carries.
+  const draftBodies = mode === "draft" || mode === "dry-run";
+  const body = aggregateReleaseBody(entries, { date, tag, apkLive, draft: draftBodies });
   const page = releasesPage(entries, { date, tag, aggregatePublished, apkLive });
   const notes = [
     ...entries.map((entry) => ({
       path: join(NOTES_DIR, `${entry.tag}.md`),
-      body: appReleaseBody(entry.app, entry.section, { tag, apkLive }),
+      body: appReleaseBody(entry.app, entry.section, {
+        tag,
+        apkLive,
+        draft: draftBodies,
+      }),
     })),
     { path: join(NOTES_DIR, `${tag}.md`), body },
   ];
 
-  process.stdout.write(
-    `\nSuite releases · ${mode === "dry-run" ? "dry run" : mode}\n`,
-  );
+  process.stdout.write(`\nSuite releases · ${mode === "dry-run" ? "dry run" : mode}\n`);
   if (releases === null) {
     process.stdout.write(
       "\ncould not read the existing releases (gh release list failed); " +
-        "this run assumes there are none and cannot publish.\n",
+        "this run cannot draft or publish.\n",
     );
   } else {
     const latest = releases.find((row) => row.isLatest);
     process.stdout.write(
-      `\nLatest on GitHub now: ${latest === undefined ? "none" : latest.tagName} → ` +
-        `${tag} after this run\n`,
+      `\nLatest on GitHub now: ${latest === undefined ? "none" : latest.tagName}` +
+        (mode === "publish" ? ` → ${tag} after this run\n` : "\n"),
     );
   }
 
@@ -1214,25 +1473,44 @@ async function main(argv) {
       `  release    ${
         releases === null
           ? "unknown (gh release list failed)"
-          : aggregateExisting === null
-            ? "create (Latest)"
-            : "edit (Latest)"
+          : aggregate.action === "refuse"
+            ? "REFUSED (see below)"
+            : actionLabel(aggregate)
       }\n` +
       `  tag        ${tagStatus(aggregate, (commit) => `backfill ${commit.slice(0, 12)} — HEAD, the snapshot this page describes`)}\n`,
   );
 
-  if (options.publish) {
+  if (skipped.length > 0) {
+    process.stdout.write(
+      `\n${skipped.length} release(s) already published and immutable; left unchanged:\n`,
+    );
+    for (const notice of skipped) process.stdout.write(`  - ${notice}\n`);
+  }
+
+  if (mode === "publish") {
+    if (fatalProblems.length > 0) {
+      // A version that was never drafted is a refusal, not a skip: publishing
+      // it now would have to create a release and attach nothing.
+      throw new Error(fatalProblems.join("\n\n"));
+    }
     mainPublish({ entries, aggregate, date, tag, releases, notes, apkLive });
     return;
   }
 
-  if (options.write) {
-    writeFileSync(join(ROOT, RELEASES_FILE), page);
+  if (mode === "draft") {
+    if (fatalProblems.length > 0) throw new Error(fatalProblems.join("\n\n"));
+    mainDraft({ entries, aggregate, date, tag, releases, notes });
+    return;
+  }
+
+  if (mode === "write") {
+    writeReleasesPage("write", page);
     process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
     return;
   }
 
   for (const entry of entries) {
+    if (entry.action !== "create" && entry.action !== "edit") continue;
     if (entry.plan.createLocal) {
       process.stdout.write(
         `\n  $ ${commandText("git", ["tag", entry.tag, entry.plan.commit])}`,
@@ -1241,49 +1519,53 @@ async function main(argv) {
     process.stdout.write(
       `\n  $ ${commandText(
         "gh",
-        releaseArgs({
+        draftReleaseArgs({
           tag: entry.tag,
           title: `${entry.app.name} ${entry.version}`,
           notesPath: join(NOTES_DIR, `${entry.tag}.md`),
-          latest: false,
-          action: entry.action ?? "edit",
+          action: entry.action,
           target: entry.plan.commit,
         }),
       )}\n`,
     );
   }
 
-  if (aggregate.plan.createLocal) {
-    process.stdout.write(`\n  $ ${commandText("git", ["tag", tag, aggregate.plan.commit])}`);
+  if (aggregate.action === "create" || aggregate.action === "edit") {
+    if (aggregate.plan.createLocal) {
+      process.stdout.write(`\n  $ ${commandText("git", ["tag", tag, aggregate.plan.commit])}`);
+    }
+    process.stdout.write(
+      `\n  $ ${commandText(
+        "gh",
+        draftReleaseArgs({
+          tag,
+          title: `Suite Shell + Suite Go — ${date}`,
+          notesPath: join(NOTES_DIR, `${tag}.md`),
+          action: aggregate.action,
+          target: aggregate.plan.commit,
+        }),
+      )}\n`,
+    );
   }
-  process.stdout.write(
-    `\n  $ ${commandText(
-      "gh",
-      releaseArgs({
-        tag,
-        title: `Suite Shell + Suite Go — ${date}`,
-        notesPath: join(NOTES_DIR, `${tag}.md`),
-        latest: true,
-        action: aggregateExisting === null ? "create" : "edit",
-        target: aggregate.plan.commit,
-      }),
-    )}\n`,
-  );
 
   for (const entry of entries) {
-    process.stdout.write(`\n--- ${entry.app.name} ${entry.version} · body ---\n\n`);
-    process.stdout.write(appReleaseBody(entry.app, entry.section, { tag, apkLive }));
+    process.stdout.write(`\n--- ${entry.app.name} ${entry.version} · draft body ---\n\n`);
+    process.stdout.write(
+      appReleaseBody(entry.app, entry.section, { tag, apkLive, draft: true }),
+    );
   }
 
-  process.stdout.write(`\n--- ${tag} · body ---\n\n`);
+  process.stdout.write(`\n--- ${tag} · draft body ---\n\n`);
   process.stdout.write(body);
   process.stdout.write(
     `\n--- ${RELEASES_FILE} ---\n\n` +
-      "would be written from the same table, with the generated header and a regenerate block.\n",
+      "would be written from the same table by --write and by --publish; --draft never writes it.\n",
   );
   process.stdout.write(
-    "\ndry run: nothing was tagged, published or written; the bodies above are what would be used.\n" +
-      "To publish: mise exec -- node scripts/release-status.mjs --publish\n" +
+    "\ndry run: nothing was tagged, drafted, published or written; the bodies above are what a draft would use.\n" +
+      "To draft: mise exec -- node scripts/release-status.mjs --draft\n" +
+      "Attach the assets while the releases are drafts, then publish:\n" +
+      "  mise exec -- node scripts/release-status.mjs --publish\n" +
       "To refresh the page only: mise exec -- node scripts/release-status.mjs --write\n",
   );
 }

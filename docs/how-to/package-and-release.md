@@ -91,24 +91,45 @@ not marked Latest.
 
 Both come from the versions already in the tree. The script reads `package.json` and the
 `## [version] - YYYY-MM-DD` section of the changelog, refuses a version with no section or a date
-that is not a real calendar day, and does nothing to GitHub unless `--publish` is passed. Pass one
-of `--publish`, `--write` and `--dry-run`; they are modes, not flags to combine:
+that is not a real calendar day, and does nothing to GitHub by default. Pass one of `--draft`,
+`--publish`, `--write` and `--dry-run`; they are modes, not flags to combine:
 
 ```sh
 mise exec -- node scripts/release-status.mjs             # dry run: every command and body
+mise exec -- node scripts/release-status.mjs --draft     # create or update the drafts
+mise exec -- node scripts/release-status.mjs --publish   # publish the drafts, then write RELEASES.md
 mise exec -- node scripts/release-status.mjs --write     # refresh RELEASES.md only
-mise exec -- node scripts/release-status.mjs --publish   # create or update the releases
 ```
 
-A missing tag is created at the commit that added its changelog section; an existing tag is never
-moved. Every per-app release is created when missing and edited in place when it exists; the artifact
-itself already exists on the signed remote or on the rolling release.
+Publication is two phases because a published GitHub release is immutable: its tag, assets and body
+lock at publication. The order is draft → attach assets → publish.
 
-[`RELEASES.md`](../../RELEASES.md) is the human mirror of the Latest release. It can be written
-before publication, so a row whose release does not exist yet says **pending** instead of linking a
-page that is not there; `--publish` rewrites the page with real links once the releases exist.
-`--write` needs no tag plan, so a row whose tag or release cannot be resolved yet is written as
-**pending** rather than stopping the refresh.
+1. `--draft` creates every per-app release and the rolling release as a draft, with its body and tag
+   plan. Rerunning it updates the same drafts, so it is idempotent; an app whose current version is
+   already published is skipped, not edited, and it never writes `RELEASES.md`.
+2. Attach the artifacts the release carries while it is still a draft. For Suite Go that is
+   `node scripts/android-release.mjs --upload <apk>`; `--publish` builds the APK and attaches it in
+   one step.
+3. `--publish` refreshes each draft body from the assets it now carries, publishes the drafts with
+   `gh release edit --draft=false`, and writes `RELEASES.md` with real links.
+
+`--publish` only flips drafts, so it cannot clobber a published asset or body. An app that is already
+published is immutable and is skipped with a message naming it; the run continues for the others. A
+version with no draft is refused instead, because publishing it would attach nothing: run `--draft`
+first. `--publish` writes `RELEASES.md` from the state GitHub has after the run, so repeating it once
+everything is out refreshes the page and changes nothing on GitHub.
+
+There is one rolling release per date. A second publication on the same day needs `--date` with a new
+day, because the earlier `suite-YYYY.MM.DD` tag is already published and cannot be reused.
+
+A missing tag is created at the commit that added its changelog section; an existing tag is never
+moved.
+
+[`RELEASES.md`](../../RELEASES.md) is the human mirror of the Latest release. `--write` and
+`--publish` write it; `--draft` does not. It can be written before publication, so a row whose release
+is not published yet says **pending** instead of linking a page that is not there. `--write` needs no
+tag plan, so a row whose tag or release cannot be resolved yet is written as **pending** rather than
+stopping the refresh.
 
 The signed Flatpak remote above remains the update path. Per-app releases carry no app binaries, and
 GitHub Packages is not used for the Flatpaks.
@@ -125,8 +146,9 @@ mise exec -- node scripts/release-suite.mjs --target lan --publish    # the suit
 
 It runs, in order: `node scripts/gate.mjs --fresh`; `pnpm --filter @suite/shell package:dir`;
 `node scripts/flatpak.mjs --app shell`; `node scripts/flatpak-remote.mjs --target s3|lan --publish`;
-`node scripts/release-status.mjs --publish`; `node scripts/android-release.mjs --publish`; then
-`node scripts/release-status.mjs --publish` again so the rolling body and `RELEASES.md` link the APK.
+`node scripts/release-status.mjs --draft`; `node scripts/android-release.mjs --publish`, which attaches
+the APK to those drafts; `node scripts/release-status.mjs --publish`, which publishes the drafts and
+writes `RELEASES.md` with the APK link.
 
 `--target s3` is the public store and the update path people install from; it reads its own bucket,
 distribution and credentials inside `flatpak-remote.mjs`, and `release-suite.mjs` passes only the
@@ -142,21 +164,25 @@ sequence prints the install lines for `run.suite.shell` and the APK path and ali
 
 ## Suite Go (Android)
 
-Suite Go's artifact is an APK on the rolling release, not on `go-v<version>`. It sits after the
-release that will carry it:
+Suite Go's artifact is an APK on the rolling release, not on `go-v<version>`. The rolling release is
+drafted first, the APK is attached to the draft, and only then is the release published:
 
 ```sh
-mise exec -- node scripts/release-status.mjs --publish   # creates the rolling release
-mise exec -- node scripts/android-release.mjs --publish  # builds and uploads the stable APK
+mise exec -- node scripts/release-status.mjs --draft     # draft the rolling release
+mise exec -- node scripts/android-release.mjs --publish  # build and attach the stable APK to the draft
 mise exec -- node scripts/android-release.mjs --channel slop --publish
-mise exec -- node scripts/release-status.mjs --publish   # relinks the body and RELEASES.md
+mise exec -- node scripts/release-status.mjs --publish   # publish the drafts and write RELEASES.md
 ```
 
-The first command creates the rolling release with empty assets. Until the stable APK is uploaded,
-the Go row names the file instead of linking it and the body says the asset is not attached; the
-release script prints a non-fatal warning naming the upload command. Run
-`release-status.mjs --publish` again after the upload so the GitHub body and `RELEASES.md` link the
-download instead of describing it as missing.
+The order is the point: an asset cannot be added after a release is published. Until the stable APK
+is attached, the Go row names the file instead of linking it and the draft body says the APK is
+attached during the same promotion. `--publish` re-renders the body from the draft's assets before it
+flips the draft, so the published page links the download. Running `--draft` again after publication
+skips the released page with a message rather than editing it.
+
+`release-status.mjs` has no `--channel` input: the row always names the stable
+`suite-go-<version>.apk`. A pre-release APK is an extra asset on the same rolling release and is not
+the row's install link.
 
 `--channel` accepts `stable` (the default), `slop`, `nightly` and `preview`. The stable asset keeps
 `suite-go-<version>.apk` and the `suite-go.apk` alias, so
