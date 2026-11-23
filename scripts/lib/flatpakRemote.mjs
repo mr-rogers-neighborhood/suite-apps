@@ -7,6 +7,10 @@
  * prints the same install line, and the documentation links the URL rather than
  * restating it. This module is the one place the URL is written down.
  *
+ * A publication builds one branch; the public remote holds every channel. The
+ * merge functions here are what keep one publication from replacing a summary
+ * that names the refs it did not build.
+ *
  * Everything here is pure string work, so the cache split and the exact `aws`
  * commands can be tested without a bucket, a distribution or a credential.
  */
@@ -318,6 +322,149 @@ export function s3UploadCommands({ repo, flatpakrepoPath, bucket }) {
       cache(`${REMOTE_NAME}.flatpakrepo`),
     ]),
   ];
+}
+
+/** One value per name, sorted, so a ref set prints and compares the same way twice. */
+function sortedUnique(values) {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * The object files a summary needs for a ref this repository did not build.
+ *
+ * `flatpak build-update-repo` reads the commit, its metadata and the metadata of
+ * its root tree to name a ref in the summary. It does not read file contents.
+ * The metadata subset of `objects/` is a few MiB where the trees are hundreds,
+ * so a publication downloads only what the summary needs to name a channel it
+ * did not build.
+ */
+export const SUMMARY_OBJECT_INCLUDES = [
+  "*.commit",
+  "*.commitmeta",
+  "*.commitmeta2",
+  "*.dirtree",
+  "*.dirmeta",
+];
+
+/**
+ * The commands that bring the refs already on the bucket into the local repo.
+ *
+ * The direction is bucket to local: a publication builds one branch locally and
+ * must not sign a summary that forgets the channels somebody else published.
+ * Neither command deletes. An object the bucket lacks is this run's own build,
+ * and a ref the bucket lacks is the ref this run is about to add.
+ */
+export function s3MergeCommands({ repo, bucket }) {
+  return [
+    aws(["s3", "sync", s3Url(bucket, "refs"), `${repo}/refs`, "--no-progress"]),
+    aws([
+      "s3",
+      "sync",
+      s3Url(bucket, "objects"),
+      `${repo}/objects`,
+      "--no-progress",
+      "--exclude",
+      "*",
+      ...SUMMARY_OBJECT_INCLUDES.flatMap((pattern) => ["--include", pattern]),
+    ]),
+  ];
+}
+
+/** True when the bucket's ref listing names at least one ref. */
+export function hasPublishedRefs(listing) {
+  return String(listing ?? "")
+    .split(/\r?\n/u)
+    .some((line) => line.trim().length > 0);
+}
+
+/**
+ * Whether this run merges the refs already published before it signs.
+ *
+ * A first publication has no refs to merge, and `--no-merge-published` is the
+ * deliberate opt-out for a bucket whose refs this run means to replace. The
+ * default is to merge: a summary that omits a channel hides an install that is
+ * still in the bucket.
+ */
+export function shouldMergePublishedRefs({
+  target,
+  noMergePublished = false,
+  bucketHasRefs = false,
+} = {}) {
+  return target === "s3" && !noMergePublished && bucketHasRefs;
+}
+
+/** The refs the bucket has that this run did not build. */
+export function foreignRefs(localRefs, mergedRefs) {
+  const local = new Set(localRefs);
+  return sortedUnique(mergedRefs.filter((ref) => !local.has(ref)));
+}
+
+/** The merged refs a summary must keep that this run did not publish. */
+export function preservedRefs(builtRefs, mergedRefs) {
+  const built = new Set(builtRefs);
+  return sortedUnique(mergedRefs.filter((ref) => !built.has(ref)));
+}
+
+/** The distinct app ids a set of refs names. */
+export function appIdsOf(refs) {
+  return sortedUnique(
+    refs
+      .filter((ref) => ref.startsWith("app/"))
+      .map((ref) => ref.split("/")[1])
+      .filter((id) => typeof id === "string" && id.length > 0),
+  );
+}
+
+/**
+ * The `flatpak build-update-repo` arguments for a summary naming every channel.
+ *
+ * When a merged ref was not built here its tree is not here, so appstream
+ * cannot be regenerated from it: `--no-update-appstream` keeps the ref that was
+ * merged instead of replacing it with metadata for the local branches only.
+ * Static deltas cannot be made for those refs either, so each foreign app id is
+ * ignored rather than logging a failure per ref.
+ */
+export function buildUpdateRepoArguments({ repo, keyId, foreignRefs: merged = [] }) {
+  const args = ["build-update-repo", ...STATIC_DELTA_ARGUMENTS];
+  if (merged.length > 0) {
+    args.push("--no-update-appstream");
+    for (const appId of appIdsOf(merged)) {
+      args.push(`--static-delta-ignore-ref=${appId}`);
+    }
+  }
+  args.push(`--gpg-sign=${keyId}`, repo);
+  return args;
+}
+
+/** The refs an `ostree summary --view` lists, one `* <ref>` line each. */
+export function refsFromSummaryView(view) {
+  const refs = String(view ?? "")
+    .split(/\r?\n/u)
+    .map((line) => line.match(/^\*\s+(\S+)\s*$/u)?.[1])
+    .filter((ref) => typeof ref === "string" && ref.length > 0);
+  return sortedUnique(refs);
+}
+
+/** The merged refs a summary does not advertise. */
+export function missingSummaryRefs({ mergedRefs, summaryRefs }) {
+  const advertised = new Set(summaryRefs);
+  return sortedUnique(mergedRefs.filter((ref) => !advertised.has(ref)));
+}
+
+/**
+ * Why a signed summary may not be published, or null.
+ *
+ * This is the check that closes incident #278: the summary is the only place a
+ * client learns which refs exist, so a summary that drops one hides a channel
+ * while its ref and objects stay in the bucket.
+ */
+export function summaryPreservationProblem({ mergedRefs, summaryRefs }) {
+  const missing = missingSummaryRefs({ mergedRefs, summaryRefs });
+  if (missing.length === 0) return null;
+  return (
+    `the signed summary does not advertise ${missing.length} merged ref(s): ` +
+    `${missing.join(", ")}. Refusing to publish a summary that would hide a channel.`
+  );
 }
 
 /** The one invalidation a publication needs, after the upload finishes. */

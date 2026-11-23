@@ -39,8 +39,12 @@ node scripts/flatpak-remote.mjs --target s3 --publish    # upload, then invalida
 `--target s3` reads `SUITE_FLATPAK_S3_BUCKET` and `SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION` (or
 `--bucket` and `--distribution`), and refuses to publish without them or when `aws` is not on `PATH`.
 The dry run prints every `aws s3 sync`, `aws s3 cp` and `aws cloudfront create-invalidation` command
-and runs none of them. Publication signs the summary, verifies it, writes the `.flatpakrepo`, then
-uploads the same bytes; it never builds a second repository.
+and runs none of them. A publication first merges the refs already on the bucket into the repository
+it built, then signs a summary naming every channel, verifies it, writes the `.flatpakrepo`, and
+uploads the same bytes; it never builds a second repository. A summary that lost a merged ref refuses
+before any upload, and a first publication has nothing to merge.
+[Packaging channels](../reference/packaging-channels.md#one-summary-names-every-channel) owns the
+rule, the appstream caveat and `--no-merge-published`.
 
 A pipeline that built the repository in an earlier step names it instead of relying on the default:
 

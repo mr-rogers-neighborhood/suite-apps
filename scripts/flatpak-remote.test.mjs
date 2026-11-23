@@ -7,15 +7,26 @@ import {
   NO_CACHE_CONTROL,
   REMOTE_NAME,
   STATIC_DELTA_ARGUMENTS,
+  SUMMARY_OBJECT_INCLUDES,
+  appIdsOf,
+  buildUpdateRepoArguments,
   cacheControlFor,
   cacheControlProblem,
   commandText,
   commitFileText,
   flatpakrepoUrl,
+  foreignRefs,
+  hasPublishedRefs,
   invalidationCommand,
+  missingSummaryRefs,
   normalizeRemoteUrl,
+  preservedRefs,
+  refsFromSummaryView,
   s3ConfigProblems,
+  s3MergeCommands,
   s3UploadCommands,
+  shouldMergePublishedRefs,
+  summaryPreservationProblem,
   targetProblem,
 } from "./lib/flatpakRemote.mjs";
 import { parseArgs } from "./flatpak-remote.mjs";
@@ -183,6 +194,229 @@ describe("the S3 upload commands", () => {
   });
 });
 
+describe("merging the published refs before signing", () => {
+  const steps = s3MergeCommands({ repo, bucket });
+
+  it("copies the bucket's refs into the repository this run will sign", () => {
+    assert.equal(steps.length, 2);
+    assert.deepEqual(steps[0].args, [
+      "s3",
+      "sync",
+      `s3://${bucket}/refs`,
+      `${repo}/refs`,
+      "--no-progress",
+    ]);
+  });
+
+  it("downloads only the object metadata a summary needs, never a tree", () => {
+    const args = steps[1].args;
+    assert.deepEqual(args.slice(0, 6), [
+      "s3",
+      "sync",
+      `s3://${bucket}/objects`,
+      `${repo}/objects`,
+      "--no-progress",
+      "--exclude",
+    ]);
+    assert.equal(args[6], "*");
+    assert.deepEqual(
+      args.slice(7),
+      SUMMARY_OBJECT_INCLUDES.flatMap((pattern) => ["--include", pattern]),
+    );
+    assert.deepEqual(SUMMARY_OBJECT_INCLUDES, [
+      "*.commit",
+      "*.commitmeta",
+      "*.commitmeta2",
+      "*.dirtree",
+      "*.dirmeta",
+    ]);
+  });
+
+  it("never deletes a ref or an object", () => {
+    for (const step of steps) assert.ok(!step.args.includes("--delete"));
+  });
+});
+
+describe("when there is nothing to merge", () => {
+  it("recognises an empty bucket ref listing", () => {
+    assert.equal(hasPublishedRefs(""), false);
+    assert.equal(hasPublishedRefs("\n   \n"), false);
+    assert.equal(hasPublishedRefs("2026-11-23 13:44:11   65 refs/heads/appstream/x86_64\n"), true);
+  });
+
+  it("skips the merge on a first publication", () => {
+    assert.equal(
+      shouldMergePublishedRefs({ target: "s3", bucketHasRefs: false }),
+      false,
+    );
+    assert.equal(shouldMergePublishedRefs({ target: "s3", bucketHasRefs: true }), true);
+  });
+
+  it("skips the merge for the local target or the explicit opt-out", () => {
+    assert.equal(
+      shouldMergePublishedRefs({
+        target: "s3",
+        noMergePublished: true,
+        bucketHasRefs: true,
+      }),
+      false,
+    );
+    assert.equal(shouldMergePublishedRefs({ target: "lan", bucketHasRefs: true }), false);
+  });
+});
+
+describe("the refs a publication did not build", () => {
+  const local = [
+    "app/run.suite.slop.shell/x86_64/nightly",
+    "appstream/x86_64",
+    "appstream2/x86_64",
+    "runtime/run.suite.slop.shell.Debug/x86_64/nightly",
+  ];
+  const merged = [
+    ...local,
+    "app/run.suite.planner/x86_64/master",
+    "app/run.suite.shell/x86_64/master",
+    "runtime/run.suite.shell.Debug/x86_64/master",
+  ];
+
+  it("names the refs the bucket had and this build did not", () => {
+    assert.deepEqual(foreignRefs(local, merged), [
+      "app/run.suite.planner/x86_64/master",
+      "app/run.suite.shell/x86_64/master",
+      "runtime/run.suite.shell.Debug/x86_64/master",
+    ]);
+  });
+
+  it("names every merged ref this publication did not publish", () => {
+    assert.deepEqual(preservedRefs(["app/run.suite.slop.shell/x86_64/nightly"], merged), [
+      "app/run.suite.planner/x86_64/master",
+      "app/run.suite.shell/x86_64/master",
+      "appstream/x86_64",
+      "appstream2/x86_64",
+      "runtime/run.suite.shell.Debug/x86_64/master",
+      "runtime/run.suite.slop.shell.Debug/x86_64/nightly",
+    ]);
+  });
+
+  it("names only app ids, so runtime and appstream refs add no flag", () => {
+    assert.deepEqual(appIdsOf(merged), [
+      "run.suite.planner",
+      "run.suite.shell",
+      "run.suite.slop.shell",
+    ]);
+  });
+});
+
+describe("the build-update-repo arguments", () => {
+  const keyId = "5953E6C8EB75F60DBEDCC2BFF0E0BFD6974A681D";
+
+  it("keeps the previous arguments when every ref was built here", () => {
+    assert.deepEqual(buildUpdateRepoArguments({ repo, keyId }), [
+      "build-update-repo",
+      ...STATIC_DELTA_ARGUMENTS,
+      `--gpg-sign=${keyId}`,
+      repo,
+    ]);
+  });
+
+  it("preserves appstream and skips deltas for the refs it did not build", () => {
+    assert.deepEqual(
+      buildUpdateRepoArguments({
+        repo,
+        keyId,
+        foreignRefs: [
+          "app/run.suite.shell/x86_64/master",
+          "runtime/run.suite.shell.Debug/x86_64/master",
+          "app/run.suite.canvas/x86_64/master",
+        ],
+      }),
+      [
+        "build-update-repo",
+        ...STATIC_DELTA_ARGUMENTS,
+        "--no-update-appstream",
+        "--static-delta-ignore-ref=run.suite.canvas",
+        "--static-delta-ignore-ref=run.suite.shell",
+        `--gpg-sign=${keyId}`,
+        repo,
+      ],
+    );
+  });
+});
+
+describe("refusing a summary that lost a ref", () => {
+  const commit = "a".repeat(64);
+  const threeRefs = [
+    "* app/run.suite.shell/x86_64/master",
+    "    Latest Commit (892 bytes):",
+    `      ${commit}`,
+    "    Timestamp (ostree.commit.timestamp): 2026-11-23T13:44:11-07",
+    "",
+    "* app/run.suite.slop.shell/x86_64/nightly",
+    "    Latest Commit (1.1 kB):",
+    `      ${"b".repeat(64)}`,
+    "    Timestamp (ostree.commit.timestamp): 2026-11-23T13:44:11-07",
+    "",
+    "* appstream/x86_64",
+    "    Latest Commit (1.0 kB):",
+    `      ${"c".repeat(64)}`,
+    "    Timestamp (ostree.commit.timestamp): 2026-11-23T13:44:11-07",
+    "",
+  ].join("\n");
+
+  it("reads the refs a summary advertises from the view", () => {
+    assert.deepEqual(refsFromSummaryView(threeRefs), [
+      "app/run.suite.shell/x86_64/master",
+      "app/run.suite.slop.shell/x86_64/nightly",
+      "appstream/x86_64",
+    ]);
+    assert.deepEqual(refsFromSummaryView(""), []);
+  });
+
+  it("accepts a summary that names every merged ref", () => {
+    const summaryRefs = refsFromSummaryView(threeRefs);
+    assert.equal(
+      summaryPreservationProblem({
+        mergedRefs: [
+          "app/run.suite.shell/x86_64/master",
+          "app/run.suite.slop.shell/x86_64/nightly",
+          "appstream/x86_64",
+        ],
+        summaryRefs,
+      }),
+      null,
+    );
+    assert.deepEqual(
+      missingSummaryRefs({ mergedRefs: summaryRefs, summaryRefs }),
+      [],
+    );
+  });
+
+  it("refuses a fixture summary that dropped the stable ref", () => {
+    const nightlyOnly = [
+      "* app/run.suite.slop.shell/x86_64/nightly",
+      "    Latest Commit (1.1 kB):",
+      `      ${"b".repeat(64)}`,
+      "",
+      "* appstream/x86_64",
+      "    Latest Commit (1.0 kB):",
+      `      ${"c".repeat(64)}`,
+      "",
+    ].join("\n");
+    const mergedRefs = [
+      "app/run.suite.shell/x86_64/master",
+      "app/run.suite.slop.shell/x86_64/nightly",
+      "appstream/x86_64",
+    ];
+    const summaryRefs = refsFromSummaryView(nightlyOnly);
+    assert.deepEqual(missingSummaryRefs({ mergedRefs, summaryRefs }), [
+      "app/run.suite.shell/x86_64/master",
+    ]);
+    const problem = summaryPreservationProblem({ mergedRefs, summaryRefs });
+    assert.match(problem, /app\/run\.suite\.shell\/x86_64\/master/u);
+    assert.match(problem, /Refusing to publish a summary that would hide a channel/u);
+  });
+});
+
 describe("the CloudFront invalidation", () => {
   it("invalidates only the mutable paths", () => {
     const step = invalidationCommand({ distribution });
@@ -240,6 +474,12 @@ describe("publishing an existing repository", () => {
     const options = parseArgs(["--target", "s3"]);
     assert.equal(options.fromRepo, null);
     assert.equal(options.commitFile, null);
+    assert.equal(options.noMergePublished, false);
+  });
+
+  it("takes the explicit opt-out from merging the published refs", () => {
+    const options = parseArgs(["--target", "s3", "--no-merge-published"]);
+    assert.equal(options.noMergePublished, true);
   });
 
   it("refuses a flag without its value", () => {

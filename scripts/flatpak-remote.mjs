@@ -39,6 +39,12 @@
  * by this run; the commits are not rewritten, so the file is what an attestation
  * should name.
  *
+ * An S3 publication merges the refs already in the bucket before it signs, so
+ * one channel's publication keeps every other channel's ref in the summary. It
+ * refuses to upload a summary that lost one. `--no-merge-published` replaces
+ * that summary deliberately, which is only right for a first publication or a
+ * bucket whose refs are meant to go away.
+ *
  * Usage:
  *   node scripts/flatpak-remote.mjs                       # dry run, local target
  *   node scripts/flatpak-remote.mjs --publish             # sign and copy to suite-dev
@@ -68,14 +74,21 @@ import {
   DEFAULT_PUBLIC_URL,
   DEFAULT_TARGET,
   REMOTE_NAME,
-  STATIC_DELTA_ARGUMENTS,
+  buildUpdateRepoArguments,
   commandText,
   commitFileText,
   flatpakrepoUrl,
+  foreignRefs,
+  hasPublishedRefs,
   invalidationCommand,
   normalizeRemoteUrl,
+  preservedRefs,
+  refsFromSummaryView,
   s3ConfigProblems,
+  s3MergeCommands,
   s3UploadCommands,
+  shouldMergePublishedRefs,
+  summaryPreservationProblem,
   targetProblem,
 } from "./lib/flatpakRemote.mjs";
 import { dirtyTreeProblem, gateProblems } from "./release.mjs";
@@ -112,6 +125,9 @@ const USAGE = `usage: node scripts/flatpak-remote.mjs [options]
                       $SUITE_FLATPAK_REPO or <state>/repo
   --commit-file <path> write "<commit>  <ref>" for each published ref before
                       the upload, so the attestation names the shipped commits
+  --no-merge-published
+                      publish only the refs built here; the summary replaces the
+                      published one instead of naming every channel (S3 only)
   --help              print this text
 
 Environment overrides: SUITE_FLATPAK_STATE, SUITE_FLATPAK_REPO,
@@ -133,6 +149,7 @@ export function parseArgs(argv) {
     distribution: null,
     fromRepo: null,
     commitFile: null,
+    noMergePublished: false,
     help: false,
   };
 
@@ -176,6 +193,8 @@ export function parseArgs(argv) {
     } else if (arg === "--commit-file") {
       options.commitFile = takeValue(index, "--commit-file");
       index += 1;
+    } else if (arg === "--no-merge-published") {
+      options.noMergePublished = true;
     } else {
       throw new Error(`unknown option ${arg}`);
     }
@@ -302,6 +321,16 @@ function storeKey() {
   return { keyId, publicKey: exported.stdout };
 }
 
+/** Every ref name in one repository, before or after a merge. */
+function refsInRepo(repo) {
+  // This ostree build only accepts the repository as `--repo=<path>`, not as
+  // two arguments.
+  return capture("ostree", [`--repo=${repo}`, "refs"])
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
 /** Every ref in one repository, and the branches the app refs name. */
 function repositoryRefs(repo) {
   if (!existsSync(repo)) {
@@ -311,12 +340,7 @@ function repositoryRefs(repo) {
     throw new Error(`${repo} has no summary; run scripts/flatpak.mjs first`);
   }
 
-  // This ostree build only accepts the repository as `--repo=<path>`, not as
-  // two arguments.
-  const refs = capture("ostree", [`--repo=${repo}`, "refs"])
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+  const refs = refsInRepo(repo);
   const appRefs = refs.filter((ref) => ref.startsWith("app/"));
   const branches = [...new Set(appRefs.map((ref) => ref.split("/")[3]).filter(Boolean))];
   return { refs, appRefs, branches };
@@ -544,6 +568,9 @@ async function main() {
   }
 
   const onBranch = branchRefs(appRefs, branch);
+  // Every ref this build made, runtime and app, so a preserved-ref report does
+  // not call this run's own runtime a channel it did not build.
+  const builtRefs = refs.filter((ref) => ref.split("/")[3] === branch);
   const publishedCommits = onBranch
     .map((ref) => ({ ref, commit: commitOf(repo, ref) }))
     .sort((left, right) => left.ref.localeCompare(right.ref));
@@ -602,12 +629,36 @@ async function main() {
         );
         for (const problem of missing) process.stdout.write(`  - ${problem}\n`);
       }
+      if (options.noMergePublished) {
+        process.stdout.write(
+          "\n--no-merge-published: the summary would name only the refs built here\n",
+        );
+      } else {
+        process.stdout.write(
+          "\nbefore signing, it would merge the refs already in the bucket so the " +
+            "summary keeps every channel:\n",
+        );
+        for (const step of s3MergeCommands({ repo, bucket: bucketForCommands })) {
+          printStep(step);
+        }
+        const kept = preservedRefs(builtRefs, refs);
+        process.stdout.write("\nrefs it would keep without building them:\n");
+        if (kept.length === 0) {
+          process.stdout.write("  (none: this repository holds only this run's refs)\n");
+        } else {
+          for (const ref of kept) process.stdout.write(`  ${ref}\n`);
+        }
+        process.stdout.write(
+          "  (a ref only the bucket has is found during the merge; a first " +
+            "publication merges nothing)\n",
+        );
+      }
       const { uploads, invalidation } = publicationCommands({
         repo,
         bucket: bucketForCommands,
         distribution: distributionForCommands,
       });
-      process.stdout.write("\nwould run:\n");
+      process.stdout.write("\nwould then sign a summary naming every merged ref and run:\n");
       for (const step of uploads) printStep(step);
       process.stdout.write("\nthen invalidate only the mutable paths:\n");
       printStep(invalidation);
@@ -629,11 +680,55 @@ async function main() {
     return;
   }
 
+  let mergedRefs = refs;
+  let foreign = [];
+  if (target === "s3" && !options.noMergePublished) {
+    // Only a listing is read here: an empty one is a first publication, and the
+    // merge would have nothing to copy.
+    const listing = capture("aws", ["s3", "ls", `s3://${bucket}/refs/`, "--recursive"]);
+    if (
+      shouldMergePublishedRefs({
+        target,
+        noMergePublished: options.noMergePublished,
+        bucketHasRefs: hasPublishedRefs(listing),
+      })
+    ) {
+      process.stdout.write("\n=== merge published refs ===\n");
+      for (const step of s3MergeCommands({ repo, bucket })) runStep(step);
+      mergedRefs = refsInRepo(repo);
+      foreign = foreignRefs(refs, mergedRefs);
+      process.stdout.write(`\nmerged ${foreign.length} ref(s) this run did not build\n`);
+      for (const ref of foreign) process.stdout.write(`  + ${ref}\n`);
+    } else {
+      process.stdout.write("\nfirst publication: the bucket has no refs to merge\n");
+    }
+  } else if (target === "s3") {
+    process.stdout.write(
+      "\n--no-merge-published: the summary will name only this run's refs\n",
+    );
+  }
+
   process.stdout.write("\n=== sign summary ===\n");
   // A repository built by an older `scripts/flatpak.mjs` has no deltas yet;
   // regenerating here costs CPU once and gives the publication its `deltas/`.
-  run("flatpak", ["build-update-repo", ...STATIC_DELTA_ARGUMENTS, `--gpg-sign=${keyId}`, repo]);
+  // With a foreign ref, appstream stays as it was merged and its delta is
+  // skipped: its tree is not here, so neither can be made from this branch.
+  run("flatpak", buildUpdateRepoArguments({ repo, keyId, foreignRefs: foreign }));
   verifySignedSummary(repo);
+
+  // Refuse before the upload: a summary that names fewer refs than the merge
+  // brought in hides a channel whose ref and objects are still in the bucket.
+  const summaryRefs = refsFromSummaryView(
+    capture("ostree", [`--repo=${repo}`, "summary", "--view"]),
+  );
+  const lost = summaryPreservationProblem({ mergedRefs, summaryRefs });
+  if (lost !== null) throw new Error(lost);
+  process.stdout.write(`summary names ${summaryRefs.length} refs\n`);
+  const kept = preservedRefs(builtRefs, mergedRefs);
+  if (kept.length > 0) {
+    process.stdout.write("preserved refs this run did not build:\n");
+    for (const ref of kept) process.stdout.write(`  ${ref}\n`);
+  }
   // The upload syncs `deltas/` and `delta-indexes/`; empty trees upload nothing
   // and keep a first publication (no parent commit to diff) working.
   mkdirSync(join(repo, "deltas"), { recursive: true });
