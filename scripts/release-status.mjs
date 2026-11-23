@@ -2,22 +2,15 @@
 /**
  * The Suite's GitHub releases, generated from the versions already in the tree.
  *
- * GitHub shows one "Latest" release per repository, and this repository ships
- * several apps from one tag namespace. The release page therefore has two
- * shapes:
- *
- * - **One rolling Suite release**, tagged `suite-YYYY.MM.DD`, marked Latest. Its
- *   body is a table of every app's current version, its release date, a link to
- *   that app's own release and how it is installed: a Flatpak command, or the
- *   release-signed Suite Go APK attached to this same release. Each row also names
- *   the release channel and product maturity; channels belong to the superapp
- *   (Suite Shell and Suite Go), and the legacy mini-apps are marked frozen. When
- *   `.dev/release/release-manifest.json` exists, the body also carries the
- *   artifact digests and the commands that verify a download (D6.2).
- * - **One release per app**, tagged `<app>-v<version>`, kept as history and
- *   never marked Latest. It carries the changelog section and an install block;
- *   it carries no app binaries, because the signed Flatpak remote is the update
- *   path.
+ * GitHub shows one "Latest" release per repository. This repository publishes
+ * the rolling Suite release, tagged `suite-YYYY.MM.DD` and marked Latest, plus
+ * the pre-release channel pages `suite-<channel>-<date>`. The body names the two
+ * superapps and how each is installed: a Flatpak command for Suite Shell, or the
+ * release-signed Suite Go APK attached to this same release. Each names its
+ * release channel and product maturity. Per-app releases are retired; a pack
+ * carries a signed version and has no release page. When
+ * `.dev/release/release-manifest.json` exists, the body also carries the
+ * artifact digests and the commands that verify a download (D6.2).
  *
  * The version has one home: the app's `package.json`. The date has one home:
  * the `## [version] - YYYY-MM-DD` heading in its changelog. This script reads
@@ -27,19 +20,17 @@
  * Publication is two phases, because published releases are immutable (D6.3):
  * the tag, every asset and the body lock when the release is published.
  *
- * 1. `--draft` creates or updates every per-app release and the rolling release
- *    as a draft, with its body and tag plan. Assets are attached while the
- *    release is still a draft. Rerunning it updates the same drafts and writes
- *    no page.
- * 2. `--publish` refreshes each draft body from the assets it now carries,
- *    publishes the drafts with `gh release edit --draft=false`, then writes
+ * 1. `--draft` creates or updates the rolling release as a draft, with its body
+ *    and tag plan. Assets are attached while the release is still a draft.
+ *    Rerunning it updates the same draft and writes no page.
+ * 2. `--publish` refreshes the draft body from the assets it now carries,
+ *    publishes it with `gh release edit --draft=false`, then writes
  *    `RELEASES.md` with real links. A release that is already published is
  *    never edited: it is skipped with a message and the page is rewritten from
- *    the current state. A version with no draft is refused.
+ *    the current state. A release with no draft is refused.
  *
- * Backfilling a tag is deliberate: a missing tag is created at the commit that
- * added the changelog section (`git log -S`), never at HEAD, and an existing tag
- * is never moved. When that commit cannot be found the run refuses.
+ * A missing aggregate tag is created at HEAD, the snapshot the page describes;
+ * an existing tag is never moved.
  *
  * Usage:
  *   node scripts/release-status.mjs            # dry run: commands and bodies
@@ -98,7 +89,8 @@ export const PRODUCT_MATURITY = ["pre-alpha", "alpha", "beta", "1.0"];
 export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
 
 /**
- * Every app a table names. Each section keeps this order.
+ * Every app whose version and date the aggregate reads. Each section keeps this
+ * order, and only the two superapps are rendered on a release page.
  *
  * `kind` says where the installed bytes come from, and `installCell` is the one
  * place that turns it into a cell:
@@ -115,9 +107,12 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  * Go. It is absent on apps that are not superapps. `maturity` is the product
  * label and is independent of the channel, so a `stable` build may be `alpha`.
  * `frozen` marks a legacy app that keeps its code and last artifact but gets no
- * new release or channel.
+ * new release or channel; Status owns that inventory, so the release page does
+ * not render it.
  *
- * `flatpakId` is null outside the Flatpak rows.
+ * `flatpakId` is null outside the Flatpak rows. Per-app tags are retired, so no
+ * entry carries a tag prefix: the rolling `suite-YYYY.MM.DD` tag is the only one
+ * a release run creates.
  */
 export const APPS = [
   {
@@ -125,7 +120,6 @@ export const APPS = [
     name: "Suite Shell",
     packageJson: "apps/shell/package.json",
     changelog: "apps/shell/CHANGELOG.md",
-    tagPrefix: "shell-v",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.shell",
@@ -137,7 +131,6 @@ export const APPS = [
     name: "Suite Start",
     packageJson: "apps/start/package.json",
     changelog: "apps/start/CHANGELOG.md",
-    tagPrefix: "start-v",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.start",
@@ -147,7 +140,6 @@ export const APPS = [
     name: "Suite Go",
     packageJson: "apps/go/package.json",
     changelog: "apps/go/CHANGELOG.md",
-    tagPrefix: "go-v",
     kind: "apk",
     section: "mobile",
     flatpakId: null,
@@ -159,7 +151,6 @@ export const APPS = [
     name: "Suite Canvas",
     packageJson: "apps/canvas/desktop/package.json",
     changelog: "apps/canvas/CHANGELOG.md",
-    tagPrefix: "canvas-v",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.canvas",
@@ -171,7 +162,6 @@ export const APPS = [
     name: "Suite Planner",
     packageJson: "apps/planner/package.json",
     changelog: "apps/planner/CHANGELOG.md",
-    tagPrefix: "planner-v",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.planner",
@@ -183,7 +173,6 @@ export const APPS = [
     name: "Suite Budget",
     packageJson: "apps/budget/package.json",
     changelog: "apps/budget/CHANGELOG.md",
-    tagPrefix: "budget-v",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.budget",
@@ -195,7 +184,6 @@ export const APPS = [
     name: "Suite Sync",
     packageJson: "apps/sync/package.json",
     changelog: "apps/sync/CHANGELOG.md",
-    tagPrefix: "sync-v",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.sync",
@@ -205,7 +193,6 @@ export const APPS = [
     name: "Suite Help",
     packageJson: "apps/help/package.json",
     changelog: "apps/help/CHANGELOG.md",
-    tagPrefix: "help-v",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.help",
@@ -216,8 +203,8 @@ export const APPS = [
 const USAGE = `usage: node scripts/release-status.mjs [options]
 
   --dry-run            print every command and body; the default
-  --draft              create or update the releases as drafts
-  --publish            publish the existing drafts, then write ${RELEASES_FILE}
+  --draft              create or update the rolling release as a draft
+  --publish            publish the existing draft, then write ${RELEASES_FILE}
   --write              write ${RELEASES_FILE} and stop short of GitHub
   --date <YYYY-MM-DD>  date for the aggregate tag (default: the newest app release)
   --channel <name>     stable (default), slop, nightly or preview; names the APK asset
@@ -233,12 +220,9 @@ A release is created as a draft, its assets are attached while it is a draft, an
 --publish flips it. A published release is immutable and is never edited.
 
 The versions come from each app's package.json; the dates from its changelog.
+Only the rolling release and the pre-release channel pages exist; per-app tags
+are retired.
 `;
-
-/** The tag one app's version is released under. */
-export function tagFor(app, version) {
-  return `${app.tagPrefix}${version}`;
-}
 
 /** The aggregate tag, dotted as the owner chose: `suite-2026.11.21`. */
 export function aggregateTag(date, channel = "stable") {
@@ -270,11 +254,6 @@ export function currentAggregateTag({ load = read, channel = "stable" } = {}) {
 /** A release's page on GitHub. */
 export function releaseUrl(tag) {
   return `https://github.com/${RELEASE_REPO}/releases/tag/${tag}`;
-}
-
-/** The repository's Latest release, which is the rolling Suite snapshot. */
-export function latestReleaseUrl() {
-  return `https://github.com/${RELEASE_REPO}/releases/latest`;
 }
 
 /** The newest published preview and nightly releases, for the stable body. */
@@ -599,26 +578,25 @@ export function planTag({ tag, version, changelog, localCommit, remoteCommit, ch
 }
 
 /**
- * What a per-app tag-plan problem means in this mode.
+ * The superapps a release page names, in reading order.
  *
- * A page refresh writes a table and needs no tag, so the row is marked
- * **pending** and the page is still written. `--publish` and the dry run print
- * commands that would create a tag and a release, so they need a complete plan
- * and refuse.
+ * A pack carries a signed version and has no release page, so it is not a row:
+ * only Suite Shell and Suite Go appear. The other `APPS` entries stay for their
+ * version and changelog facts, which the aggregate date reads.
  */
-export function tagPlanDisposition(problem, mode) {
-  if (problem === null) return { problem: null, pending: false };
-  if (mode === "write") return { problem: null, pending: true };
-  return { problem, pending: false };
+export const SUPERAPP_IDS = ["shell", "go"];
+
+/** The two superapp entries from a collected tree, by id and in page order. */
+export function superappEntries(entries) {
+  return SUPERAPP_IDS.map((id) => entries.find((entry) => entry.app.id === id)).filter(Boolean);
 }
 
 /**
  * The shared table rows, used by the aggregate body and by RELEASES.md.
  *
- * The release body is written by `--publish`, after every per-app release
- * exists, so it always links. The page may be written before publication, so
- * with `markPending` it says a row is pending rather than linking a 404. An
- * entry marked `pending` by a guard is pending in either row.
+ * The table names the two superapps and how each is installed. Per-app releases
+ * are retired, so there is no Release column and no pending row: a page that
+ * names a release which will never exist is the thing this shape avoids.
  *
  * `tag` and `apkLive` describe the aggregate release the APK lives on. The
  * subset passed in is the section being rendered, so callers can split desktop
@@ -627,27 +605,22 @@ export function tagPlanDisposition(problem, mode) {
  */
 export function aggregateRows(
   entries,
-  { markPending = false, tag = null, apkLive = false, draft = false, channel = "stable" } = {},
+  { tag = null, apkLive = false, draft = false, channel = "stable" } = {},
 ) {
   return entries.map((entry) => {
-    const { app, version, date, tag: appTag } = entry;
-    const released = date ?? "—";
-    const pending = entry.pending === true || (markPending && entry.published !== true);
-    const release = pending
-      ? `\`${appTag}\` (pending)`
-      : `[\`${appTag}\`](${releaseUrl(appTag)})`;
+    const { app, version } = entry;
     const install = installCell(app, { version, tag, apkLive, draft, channel });
     return (
       `| [${app.name}](${blobUrl(app.changelog)}) | ${channelLabel(app, channel)} | ` +
-      `${maturityLabel(app)} | ${version} | ${released} | ${release} | ${install} |`
+      `${maturityLabel(app)} | ${version} | ${install} |`
     );
   });
 }
 
 /** The header every generated table carries. */
 export const AGGREGATE_TABLE_HEADER = [
-  "| App | Channel | Maturity | Version | Released | Release | Install |",
-  "| --- | --- | --- | --- | --- | --- | --- |",
+  "| App | Channel | Maturity | Version | Install |",
+  "| --- | --- | --- | --- | --- |",
 ];
 
 /**
@@ -848,12 +821,14 @@ export function artifactsSection(manifest, { tag = null, draft = false, channel 
 }
 
 /**
- * The aggregate release body: every current version, in two tables.
+ * The aggregate release body: the two superapps and how they install.
  *
- * The versions are the table's purpose and appear once each. The prose does not
- * repeat one; the release title says which day this snapshot is. The remote is
- * added before the tables, because every `flatpak install` cell needs it and a
- * reader who starts at a table would run a command that cannot work yet.
+ * The rolling release is the snapshot, so the title says which day it is and
+ * the current-versions table restates the two versions a reader installs. The
+ * remote is added before the table, because every `flatpak install` cell needs
+ * it and a reader who starts at the table would run a command that cannot work
+ * yet. A pack carries a signed version and has no release page, so no pack row
+ * is invented.
  */
 export function aggregateReleaseBody(
   entries,
@@ -867,17 +842,16 @@ export function aggregateReleaseBody(
     manifest = null,
   },
 ) {
-  const desktop = entriesForSection(entries, "desktop");
-  const otherDesktop = desktop.filter((entry) => entry.app.id !== "shell");
-  const shell = entries.find((entry) => entry.app.id === "shell") ?? null;
-  const go = entries.find((entry) => entry.app.id === "go") ?? null;
+  const superapps = superappEntries(entries);
+  const shell = superapps.find((entry) => entry.app.id === "shell") ?? null;
+  const go = superapps.find((entry) => entry.app.id === "go") ?? null;
   // The Shell install block is always present, even on a tree whose Shell row
   // could not be collected, so it reads its id from the app table.
   const shellApp = APPS.find((app) => app.id === "shell");
   return [
     `**Suite Shell** is the desktop superapp; **Suite Go** is the mobile superapp. This is the ${date} build` +
       (channel === "stable" ? "." : `, published on the **${channel}** channel.`),
-    "The split apps remain on the same signed remote, below; the legacy ones are frozen.",
+    "Only the two superapps have a release page; a pack carries a signed version and no page.",
     "",
     ...(preReleases.length === 0
       ? []
@@ -902,13 +876,10 @@ export function aggregateReleaseBody(
     "## Suite Go (mobile)",
     "",
     ...(go === null ? [] : [...releaseLabels(go.app, channel), ""]),
-    ...goInstallNote(entries, { tag, apkLive, draft, channel }),
-    "## Also on the remote",
+    ...goInstallNote(superapps, { tag, apkLive, draft, channel }),
+    "## Current versions",
     "",
-    ...aggregateTable(otherDesktop, { tag, apkLive, draft, channel }),
-    "",
-    "`frozen` marks a legacy app: its code and last artifact stay, and it gets no new",
-    "pre-release channel until it becomes a pack.",
+    ...aggregateTable(superapps, { tag, apkLive, draft, channel }),
     "",
     ...artifactsSection(manifest, { tag, draft, channel }),
     "## Update",
@@ -923,100 +894,34 @@ export function aggregateReleaseBody(
 }
 
 /**
- * One app's release body: its changelog section, then how to install it.
- *
- * No version is restated outside the title `gh` sets; the section is the note.
- * The APK entry is the one that cannot assume its artifact: `apkLive` is read
- * from the rolling release's assets, and without it the body says where the
- * truth is rather than claiming an attachment that may not exist yet. `draft`
- * is the same fact one phase earlier: the release being written is a draft, and
- * `--publish` re-renders it from the assets it carries before flipping it.
- */
-export function appReleaseBody(
-  app,
-  section,
-  { tag = null, apkLive = false, draft = false, channel = "stable" } = {},
-) {
-  // The rolling release is the page a person should read; this one is the note
-  // for a version. Say so first, so a direct link from the table does not look
-  // like a second, competing install page.
-  const lines = [
-    `Current versions and the install table are on [the latest Suite release](${latestReleaseUrl()}).`,
-    "This page is the release note for this app.",
-    "",
-    ...releaseLabels(app, channel),
-  ];
-  if (isLegacyFrozen(app)) {
-    lines.push(
-      "- **State:** frozen until it becomes a pack; its code and last artifact stay, and it gets no new pre-release channel.",
-    );
-  }
-  lines.push("", section.trim(), "", "## Install", "");
-
-  if (app.kind === "apk") {
-    const releaseLink = tag === null ? latestReleaseUrl() : releaseUrl(tag);
-    lines.push(
-      "Suite Go is a mobile app, not a Flatpak.",
-      apkLive
-        ? `This build's release-signed APK is attached to [the rolling Suite release](${releaseLink}).`
-        : draft
-          ? `This build's release-signed APK is uploaded to [the rolling Suite release](${releaseLink}) ` +
-            "while that release is a draft, so the download is live once it is published."
-          : `Its release-signed APK is published on [the rolling Suite release](${releaseLink}); that ` +
-            "release's Mobile table says whether this build is attached yet.",
-      "This per-app entry is history and carries no binary.",
-      "",
-      `[How to sideload it](${blobUrl("apps/go/README.md")}) is in Suite Go's README.`,
-      "",
-    );
-  } else {
-    lines.push(
-      "The signed Flatpak remote is the update path. This release carries no app binaries.",
-      "",
-      "```sh",
-      `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
-      installCommand(app, channel),
-      "flatpak update --user",
-      "```",
-      "",
-      `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,
-      "",
-      "Flatpak owns the deployment; this section is the release note.",
-      "",
-    );
-  }
-
-  return lines.join("\n");
-}
-
-/**
  * `RELEASES.md`: the same data, as the human mirror of the Latest release.
  *
  * The generated comment is deliberate. A version belongs in `package.json`; this
  * file restates it because it is a mirror, and a mirror that is typed by hand
  * drifts.
  *
- * The page can be written before publication, so a row that has no published
- * release says **pending** instead of linking a page that does not exist.
- * `--write` writes it from the tree; `--publish` rewrites it with real links
- * after the drafts are published. `--draft` never writes it.
+ * The page names the two superapps and no per-app release, so it never has a
+ * **pending** row for a page that will never exist. Before publication it says
+ * the rolling release is not published yet. `--write` writes it from the tree;
+ * `--publish` rewrites it once the release is public. `--draft` never writes it.
  */
 export function releasesPage(
   entries,
   { date, tag, aggregatePublished = false, apkLive = false, channel = "stable" },
 ) {
+  const superapps = superappEntries(entries);
   const latest = aggregatePublished
     ? [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
-        `[aggregate Suite Shell + Suite Go ${date} release](${releaseUrl(tag)}), which is the repository's`,
-        "\"Latest\" release on GitHub. The per-app releases stay as history and carry no app",
-        "binaries.",
+        `[rolling Suite Shell + Suite Go ${date} release](${releaseUrl(tag)}), which is the repository's`,
+        "\"Latest\" release on GitHub. Only the two superapps have a release page; a pack carries",
+        "a signed version.",
       ]
     : [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
-        `rolling Suite Shell + Suite Go ${date} release, which is not published yet. A row marked **pending**`,
-        "has no published release to link yet: `--draft` creates the drafts, and `--publish` publishes",
-        "them and refreshes this page. The per-app releases stay as history and carry no app binaries.",
+        `rolling Suite Shell + Suite Go ${date} release, which is not published yet. \`--draft\``,
+        "creates the draft, its assets are attached while it is a draft, and `--publish` publishes",
+        "it and refreshes this page.",
       ];
 
   return [
@@ -1045,25 +950,19 @@ export function releasesPage(
     "not channels. Maturity is separate: `pre-alpha`, `alpha`, `beta` or `1.0`, so a `stable`-channel",
     "build can still be `alpha`.",
     "",
-    "`frozen` marks a legacy app: Canvas, Planner, Budget and Help keep their code and last artifact,",
-    "and they get no new pre-release channel until they become packs. Start and Sync are not",
-    "superapps and are not frozen; their rows name no channel.",
-    "",
-    ...aggregateSection("Desktop", entriesForSection(entries, "desktop"), {
-      markPending: true,
+    ...aggregateSection("Desktop", entriesForSection(superapps, "desktop"), {
       tag,
       apkLive,
       channel,
     }),
     "",
-    ...aggregateSection("Mobile", entriesForSection(entries, "mobile"), {
-      markPending: true,
+    ...aggregateSection("Mobile", entriesForSection(superapps, "mobile"), {
       tag,
       apkLive,
       channel,
     }),
     "",
-    ...goInstallNote(entries, { tag, apkLive, channel }),
+    ...goInstallNote(superapps, { tag, apkLive, channel }),
     "## Update",
     "",
     "Once the remote is added, the desktop apps update with:",
@@ -1216,14 +1115,6 @@ function remoteTagCommit(tag) {
   return { known: true, commit: commit === undefined || commit.length === 0 ? null : commit };
 }
 
-/** The commit that added `## [version]` to this changelog, or null. */
-function changelogCommit(app, version) {
-  const result = git(["log", "-1", "--format=%H", `-S## [${version}]`, "--", app.changelog]);
-  if (result.status !== 0) return null;
-  const commit = result.stdout.trim();
-  return commit.length === 0 ? null : commit;
-}
-
 /**
  * Every release that already exists, by tag, or null when the read failed.
  *
@@ -1267,16 +1158,15 @@ function currentHead() {
 }
 
 /**
- * Read the versions, sections and dates, and decide every tag.
+ * Read the versions, sections and dates from the tree.
  *
- * Everything that can refuse the run is collected before a single command is
- * printed, so a dry run shows the whole picture or names every reason it stops.
- * `mode` is `"write"` for a page refresh, which needs no tag decision, so an
- * offline origin lookup or a missing changelog commit marks that row pending
- * instead of blocking the page.
+ * No tag is planned here: per-app tags are retired, so `--write` needs no tag
+ * lookup and succeeds on a checkout where no per-app tag exists. Every other
+ * problem is collected before a single command is printed, so a dry run shows
+ * the whole picture or names every reason it stops. `load` is injectable so a
+ * test can prove the read needs no git state.
  */
-function collect({ mode = "dry-run" } = {}) {
-  const strictTags = mode !== "write";
+export function collectReleases({ load = read } = {}) {
   const problems = [];
   const entries = [];
 
@@ -1284,8 +1174,8 @@ function collect({ mode = "dry-run" } = {}) {
     let version = null;
     let changelog;
     try {
-      version = versionFromPackage(read(app.packageJson));
-      changelog = read(app.changelog);
+      version = versionFromPackage(load(app.packageJson));
+      changelog = load(app.changelog);
     } catch (error) {
       problems.push(`${app.name}: ${error.message}`);
       continue;
@@ -1300,7 +1190,7 @@ function collect({ mode = "dry-run" } = {}) {
     if (section === null) {
       problems.push(
         `${app.name} ${version} has no '## [${version}]' heading in ${app.changelog}. ` +
-          "A release note is what the tag promises, so it has to exist before the tag.",
+          "A release note is what the section carries, so it has to exist before the release.",
       );
       continue;
     }
@@ -1315,35 +1205,11 @@ function collect({ mode = "dry-run" } = {}) {
       continue;
     }
 
-    const tag = tagFor(app, version);
-    const localCommit = localTagCommit(tag);
-    const remote = remoteTagCommit(tag);
-    if (strictTags && !remote.known) problems.push(`${tag}: ${remoteLookupProblem(tag)}`);
-    const plan = planTag({
-      tag,
-      version,
-      changelog: app.changelog,
-      localCommit,
-      remoteCommit: remote.known ? remote.commit : null,
-      changelogCommit: localCommit === null && remote.commit === null
-        ? changelogCommit(app, version)
-        : null,
-    });
-    const disposition = tagPlanDisposition(plan.problem, mode);
-    if (disposition.problem !== null) problems.push(disposition.problem);
-
     entries.push({
       app,
       version,
       date: changelogDate(changelog, version),
       section,
-      tag,
-      plan,
-      localCommit,
-      remoteKnown: remote.known,
-      remoteCommit: remote.commit,
-      pending: disposition.pending,
-      published: false,
     });
   }
 
@@ -1361,28 +1227,6 @@ function tagStatus(item, backfill) {
   }
   if (!item.remoteKnown) return "unknown: origin tag lookup failed";
   return backfill(item.plan.commit);
-}
-
-function summarize(entry, releases) {
-  const release = releases?.find((row) => row.tagName === entry.tag) ?? null;
-  let releaseLine = "unknown (gh release list failed)";
-  if (releases !== null) {
-    releaseLine =
-      entry.actionProblem === null || entry.actionProblem === undefined
-        ? actionLabel(entry)
-        : `${actionLabel(entry)}: ${entry.actionProblem}`;
-  }
-  const lines = [`${entry.app.name} ${entry.version} · ${entry.tag} · ${entry.date ?? "undated"}`];
-  lines.push(`  release    ${releaseLine}`);
-  lines.push(
-    `  tag        ${tagStatus(
-      entry,
-      (commit) =>
-        `backfill ${commit.slice(0, 12)} — the commit that added ` +
-        `'## [${entry.version}]' to ${entry.app.changelog}`,
-    )}`,
-  );
-  return lines.join("\n");
 }
 
 /** Where the aggregate tag may be created: the snapshot HEAD describes. */
@@ -1462,8 +1306,62 @@ export function publishReleaseArgs({ tag, notesPath, latest, prerelease = false 
   ];
 }
 
-/** Create or update every release as a draft; never write the page. */
-function mainDraft({ entries, aggregate, date, tag, releases, notes, prerelease }) {
+/**
+ * The git and gh steps one run would take for the rolling release.
+ *
+ * `--draft`, the dry run and `--publish` share this one plan, so the dry run
+ * cannot print a command the real run would not take. Only the rolling release
+ * is named: per-app tags and releases are retired, so there is no second tag to
+ * create and no `--latest=false` per-app publication.
+ */
+export function aggregateReleaseCommands({
+  mode,
+  aggregate,
+  tag,
+  date,
+  channel = "stable",
+  prerelease = false,
+}) {
+  const notesPath = join(NOTES_DIR, `${tag}.md`);
+  if (mode === "publish") {
+    if (aggregate.action !== "publish") return [];
+    return [
+      ...(aggregate.plan.createLocal
+        ? [{ command: "git", args: ["tag", tag, aggregate.plan.commit] }]
+        : []),
+      {
+        command: "gh",
+        args: publishReleaseArgs({
+          tag,
+          notesPath,
+          latest: channel === "stable",
+          prerelease,
+        }),
+      },
+    ];
+  }
+
+  if (aggregate.action !== "create" && aggregate.action !== "edit") return [];
+  return [
+    ...(aggregate.plan.createLocal
+      ? [{ command: "git", args: ["tag", tag, aggregate.plan.commit] }]
+      : []),
+    {
+      command: "gh",
+      args: draftReleaseArgs({
+        tag,
+        title: `Suite Shell + Suite Go — ${date}`,
+        notesPath,
+        action: aggregate.action,
+        target: aggregate.plan.commit,
+        prerelease,
+      }),
+    },
+  ];
+}
+
+/** Create or update the rolling release as a draft; never write the page. */
+function mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel }) {
   if (releases === null) {
     throw new Error(
       "gh release list failed; refusing to draft into a repository it cannot read",
@@ -1473,45 +1371,25 @@ function mainDraft({ entries, aggregate, date, tag, releases, notes, prerelease 
   mkdirSync(join(ROOT, NOTES_DIR), { recursive: true });
   for (const item of notes) writeFileSync(join(ROOT, item.path), item.body);
 
-  for (const entry of entries) {
-    if (entry.action !== "create" && entry.action !== "edit") continue;
-    if (entry.plan.createLocal) run("git", ["tag", entry.tag, entry.plan.commit]);
-    run(
-      "gh",
-      draftReleaseArgs({
-        tag: entry.tag,
-        title: `${entry.app.name} ${entry.version}`,
-        notesPath: join(NOTES_DIR, `${entry.tag}.md`),
-        action: entry.action,
-        target: entry.plan.commit,
-        prerelease,
-      }),
-    );
-  }
-
-  if (aggregate.action === "create" || aggregate.action === "edit") {
-    if (aggregate.plan.createLocal) run("git", ["tag", tag, aggregate.plan.commit]);
-    run(
-      "gh",
-      draftReleaseArgs({
-        tag,
-        title: `Suite Shell + Suite Go — ${date}`,
-        notesPath: join(NOTES_DIR, `${tag}.md`),
-        action: aggregate.action,
-        target: aggregate.plan.commit,
-        prerelease,
-      }),
-    );
+  for (const step of aggregateReleaseCommands({
+    mode: "draft",
+    aggregate,
+    tag,
+    date,
+    channel,
+    prerelease,
+  })) {
+    run(step.command, step.args);
   }
 
   process.stdout.write(
-    `\nDraft step complete. ${RELEASES_FILE} is written when the drafts are published.\n` +
-      "Attach every asset while the releases are drafts, then run:\n" +
+    `\nDraft step complete. ${RELEASES_FILE} is written when the release is published.\n` +
+      "Attach every asset while the release is a draft, then run:\n" +
       "  mise exec -- node scripts/release-status.mjs --publish\n",
   );
 }
 
-/** Publish the drafts, then write the page with real links. */
+/** Publish the rolling draft, then write the page with real links. */
 function mainPublish({
   entries,
   aggregate,
@@ -1522,7 +1400,6 @@ function mainPublish({
   apkLive,
   channel,
   prerelease,
-  preReleases,
 }) {
   if (releases === null) {
     throw new Error("gh release list failed; refusing to publish into a repository it cannot read");
@@ -1531,38 +1408,21 @@ function mainPublish({
   mkdirSync(join(ROOT, NOTES_DIR), { recursive: true });
   for (const item of notes) writeFileSync(join(ROOT, item.path), item.body);
 
-  for (const entry of entries) {
-    if (entry.action !== "publish") continue;
-    if (entry.plan.createLocal) run("git", ["tag", entry.tag, entry.plan.commit]);
-    run(
-      "gh",
-      publishReleaseArgs({
-        tag: entry.tag,
-        notesPath: join(NOTES_DIR, `${entry.tag}.md`),
-        latest: false,
-      }),
-    );
+  for (const step of aggregateReleaseCommands({
+    mode: "publish",
+    aggregate,
+    tag,
+    date,
+    channel,
+    prerelease,
+  })) {
+    run(step.command, step.args);
   }
 
-  if (aggregate.action === "publish") {
-    if (aggregate.plan.createLocal) run("git", ["tag", tag, aggregate.plan.commit]);
-    run(
-      "gh",
-      publishReleaseArgs({
-        tag,
-        notesPath: join(NOTES_DIR, `${tag}.md`),
-        latest: channel === "stable",
-        prerelease,
-      }),
-    );
-  }
-
-  // Every release named on the page is public now, so the refresh links instead
-  // of saying "pending". The APK link is live only when the draft already
-  // carried the asset; it could not be attached after publication. A pre-release
-  // publication does not own the stable page, so it leaves the file alone.
+  // The APK link is live only when the draft already carried the asset; it
+  // could not be attached after publication. A pre-release publication does not
+  // own the stable page, so it leaves the file alone.
   if (channel === "stable") {
-    for (const entry of entries) entry.published = true;
     writeReleasesPage(
       "publish",
       releasesPage(entries, { date, tag, aggregatePublished: true, apkLive }),
@@ -1693,44 +1553,11 @@ async function main(argv) {
     );
   }
 
-  const { problems, entries } = collect({ mode });
+  const { problems, entries } = collectReleases();
   const knownReleases = releases ?? [];
 
   const fatalProblems = [];
   const skipped = [];
-  for (const entry of entries) {
-    const row = knownReleases.find((candidate) => candidate.tagName === entry.tag) ?? null;
-    entry.exists = row !== null;
-    entry.isDraft = row?.isDraft === true;
-    entry.isLatest = row?.isLatest === true;
-    entry.published = row !== null && row.isDraft === false;
-
-    if (prerelease) {
-      // A pre-release channel publishes one aggregate release, not per-app ones.
-      entry.action = "skip";
-      entry.actionProblem = null;
-    } else if (releases === null && mode === "publish") {
-      entry.action = "refuse";
-      entry.actionProblem =
-        "gh release list failed; refusing to publish releases it cannot read";
-    } else {
-      const phase = decidePhase(mode, {
-        exists: entry.exists,
-        isDraft: entry.isDraft,
-        tag: entry.tag,
-      });
-      entry.action = phase.action;
-      entry.actionProblem = phase.problem;
-    }
-
-    if (entry.actionProblem !== null && mode !== "write") {
-      // A refused or skipped release that is already public still links; only
-      // one with no public release is pending in the page a refusal rewrites.
-      if (entry.action === "refuse" && entry.published !== true) entry.pending = true;
-      if (entry.action === "refuse") fatalProblems.push(entry.actionProblem);
-      else skipped.push(entry.actionProblem);
-    }
-  }
 
   if (problems.length > 0) throw new Error(problems.join("\n\n"));
 
@@ -1794,18 +1621,7 @@ async function main(argv) {
     manifest,
   });
   const page = releasesPage(entries, { date, tag, aggregatePublished, apkLive, channel });
-  const notes = [
-    ...entries.map((entry) => ({
-      path: join(NOTES_DIR, `${entry.tag}.md`),
-      body: appReleaseBody(entry.app, entry.section, {
-        tag,
-        apkLive,
-        draft: draftBodies,
-        channel,
-      }),
-    })),
-    { path: join(NOTES_DIR, `${tag}.md`), body },
-  ];
+  const notes = [{ path: join(NOTES_DIR, `${tag}.md`), body }];
 
   process.stdout.write(`\nSuite releases · ${mode === "dry-run" ? "dry run" : mode}\n`);
   if (releases === null) {
@@ -1820,8 +1636,6 @@ async function main(argv) {
         (mode === "publish" ? ` → ${tag} after this run\n` : "\n"),
     );
   }
-
-  for (const entry of entries) process.stdout.write(`\n${summarize(entry, releases)}\n`);
 
   process.stdout.write(
     `\nSuite Shell + Suite Go ${date} · ${tag} · aggregate\n` +
@@ -1858,14 +1672,13 @@ async function main(argv) {
       apkLive,
       channel,
       prerelease,
-      preReleases,
     });
     return;
   }
 
   if (mode === "draft") {
     if (fatalProblems.length > 0) throw new Error(fatalProblems.join("\n\n"));
-    mainDraft({ entries, aggregate, date, tag, releases, notes, prerelease });
+    mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel });
     return;
   }
 
@@ -1875,50 +1688,15 @@ async function main(argv) {
     return;
   }
 
-  for (const entry of entries) {
-    if (entry.action !== "create" && entry.action !== "edit") continue;
-    if (entry.plan.createLocal) {
-      process.stdout.write(
-        `\n  $ ${commandText("git", ["tag", entry.tag, entry.plan.commit])}`,
-      );
-    }
-    process.stdout.write(
-      `\n  $ ${commandText(
-        "gh",
-        draftReleaseArgs({
-          tag: entry.tag,
-          title: `${entry.app.name} ${entry.version}`,
-          notesPath: join(NOTES_DIR, `${entry.tag}.md`),
-          action: entry.action,
-          target: entry.plan.commit,
-        }),
-      )}\n`,
-    );
-  }
-
-  if (aggregate.action === "create" || aggregate.action === "edit") {
-    if (aggregate.plan.createLocal) {
-      process.stdout.write(`\n  $ ${commandText("git", ["tag", tag, aggregate.plan.commit])}`);
-    }
-    process.stdout.write(
-      `\n  $ ${commandText(
-        "gh",
-        draftReleaseArgs({
-          tag,
-          title: `Suite Shell + Suite Go — ${date}`,
-          notesPath: join(NOTES_DIR, `${tag}.md`),
-          action: aggregate.action,
-          target: aggregate.plan.commit,
-        }),
-      )}\n`,
-    );
-  }
-
-  for (const entry of entries) {
-    process.stdout.write(`\n--- ${entry.app.name} ${entry.version} · draft body ---\n\n`);
-    process.stdout.write(
-      appReleaseBody(entry.app, entry.section, { tag, apkLive, draft: true, channel }),
-    );
+  for (const step of aggregateReleaseCommands({
+    mode: "draft",
+    aggregate,
+    tag,
+    date,
+    channel,
+    prerelease,
+  })) {
+    process.stdout.write(`\n  $ ${commandText(step.command, step.args)}\n`);
   }
 
   process.stdout.write(`\n--- ${tag} · draft body ---\n\n`);

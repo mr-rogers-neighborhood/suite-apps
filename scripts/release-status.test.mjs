@@ -9,16 +9,16 @@ import {
   MANIFEST_FILE,
   aggregateDate,
   aggregateReleaseBody,
+  aggregateReleaseCommands,
   aggregateSection,
   aggregateTag,
-  appReleaseBody,
   changelogDate,
   changelogDateProblem,
   channelLabel,
+  collectReleases,
   currentAggregateTag,
   draftAction,
   draftReleaseArgs,
-  entriesForSection,
   flatpakrepoUrl,
   goApkName,
   goApkUrl,
@@ -38,48 +38,52 @@ import {
   releaseLabels,
   releasesPage,
   remoteLookupProblem,
-  tagFor,
-  tagPlanDisposition,
+  superappEntries,
   writesReleasesPage,
 } from "./release-status.mjs";
 
+const shell = APPS.find((app) => app.id === "shell");
 const start = APPS.find((app) => app.id === "start");
 const go = APPS.find((app) => app.id === "go");
 const sync = APPS.find((app) => app.id === "sync");
 
-/** Three apps in the shape collect() builds, enough for a table. */
+const shellEntry = {
+  app: shell,
+  version: "0.2.0",
+  date: "2026-11-22",
+  section: "### Added\n\n- **The host.** It exists.",
+};
+
+/** The mobile superapp entry. */
+const goEntry = {
+  app: go,
+  version: "0.1.0",
+  date: "2026-11-18",
+  section: "### Added\n\n- **The first version.** It exists.",
+};
+
+/** Every app in the shape collectReleases() builds; only shell and go render. */
 const entries = [
+  shellEntry,
   {
     app: start,
     version: "0.5.1",
     date: "2026-11-21",
-    tag: "start-v0.5.1",
     section: "### Changed\n\n- **Something.** It changed.",
   },
   {
     app: APPS.find((app) => app.id === "canvas"),
     version: "0.1.11",
     date: "2026-11-20",
-    tag: "canvas-v0.1.11",
     section: "### Fixed\n\n- **A package.** It packaged.",
   },
-  { app: sync, version: "0.11.3", date: "2026-11-20", tag: "sync-v0.11.3", section: "### Added" },
+  { app: sync, version: "0.11.3", date: "2026-11-20", section: "### Added" },
+  goEntry,
 ];
 
-/** The mobile entry, added only where a test needs the second table. */
-const goEntry = {
-  app: go,
-  version: "0.1.0",
-  date: "2026-11-18",
-  tag: "go-v0.1.0",
-  section: "### Added\n\n- **The first version.** It exists.",
-};
-
 describe("tags and dates", () => {
-  it("names an app tag from its prefix and version", () => {
-    assert.equal(tagFor(start, "0.5.1"), "start-v0.5.1");
-    assert.equal(tagFor(go, "0.1.0"), "go-v0.1.0");
-    assert.equal(tagFor(sync, "0.11.3"), "sync-v0.11.3");
+  it("retires per-app tags: no app carries a tag prefix", () => {
+    for (const app of APPS) assert.equal(app.tagPrefix, undefined);
   });
 
   it("writes the aggregate tag with dots", () => {
@@ -114,7 +118,7 @@ describe("tags and dates", () => {
   });
 
   it("dates the aggregate by the newest app, not the wall clock", () => {
-    assert.equal(aggregateDate(entries), "2026-11-21");
+    assert.equal(aggregateDate(entries), "2026-11-22");
     assert.equal(aggregateDate(entries, "2026-11-19"), "2026-11-19");
     assert.throws(() => aggregateDate(entries, "soon"), /YYYY-MM-DD/u);
     assert.throws(() => aggregateDate(entries, "2026-02-31"), /real YYYY-MM-DD/u);
@@ -126,14 +130,14 @@ describe("tags and dates", () => {
   });
 });
 
-describe("tag choice", () => {
+describe("the rolling tag plan", () => {
   const base = {
-    tag: "start-v0.5.1",
-    version: "0.5.1",
-    changelog: "apps/start/CHANGELOG.md",
+    tag: "suite-2026.11.21",
+    version: "suite-2026.11.21",
+    changelog: "HEAD",
   };
 
-  it("backfills a missing tag at the commit that added the section", () => {
+  it("creates a missing rolling tag at HEAD", () => {
     const plan = planTag({
       ...base,
       localCommit: null,
@@ -141,7 +145,7 @@ describe("tag choice", () => {
       changelogCommit: "0fb48469e5de7f812a6322092396d69f669712d3",
     });
     assert.deepEqual(plan, {
-      tag: "start-v0.5.1",
+      tag: "suite-2026.11.21",
       commit: "0fb48469e5de7f812a6322092396d69f669712d3",
       createLocal: true,
       problem: null,
@@ -191,13 +195,13 @@ describe("tag choice", () => {
     });
     assert.equal(plan.commit, null);
     assert.match(plan.problem, /Tagging HEAD/u);
-    assert.match(plan.problem, /apps\/start\/CHANGELOG\.md/u);
+    assert.match(plan.problem, /HEAD/u);
   });
 
   it("refuses to decide a tag when the origin lookup failed", () => {
-    const problem = remoteLookupProblem("start-v0.5.1");
+    const problem = remoteLookupProblem("suite-2026.11.21");
     assert.match(problem, /git ls-remote/u);
-    assert.match(problem, /start-v0\.5\.1/u);
+    assert.match(problem, /suite-2026\.11\.21/u);
     assert.match(problem, /Refusing/u);
   });
 });
@@ -266,14 +270,6 @@ describe("the publish phase", () => {
     assert.deepEqual(aggregate.slice(0, 3), ["release", "edit", tag]);
     assert.ok(aggregate.includes("--draft=false"));
     assert.ok(aggregate.includes("--latest"));
-
-    const perApp = publishReleaseArgs({
-      tag: "start-v0.5.1",
-      notesPath: ".dev/releases/start-v0.5.1.md",
-      latest: false,
-    });
-    assert.ok(perApp.includes("--draft=false"));
-    assert.ok(perApp.includes("--latest=false"));
   });
 
   it("refuses to edit an already-published release, and does not republish it", () => {
@@ -291,15 +287,6 @@ describe("the publish phase", () => {
     assert.match(phase.problem, /has no draft release/u);
     assert.match(phase.problem, /--draft/u);
   });
-
-  it("does not fail a release over an app that is already out", () => {
-    // A normal release bumps one app; every other app's current version is
-    // already published and must be skipped, not turned into a fatal refusal.
-    const published = publishAction({ exists: true, isDraft: false, tag: "start-v0.5.0" });
-    assert.equal(published.action, "skip");
-    const draft = publishAction({ exists: true, isDraft: true, tag: "shell-v0.2.1" });
-    assert.equal(draft.action, "publish");
-  });
 });
 
 describe("RELEASES.md writers", () => {
@@ -311,40 +298,66 @@ describe("RELEASES.md writers", () => {
   });
 });
 
-describe("tag plans by mode", () => {
-  const problem =
-    "no start-v0.5.1 exists and no commit adds '## [0.5.1]' to apps/start/CHANGELOG.md.";
+describe("per-app releases are retired", () => {
+  const tag = "suite-2026.11.21";
+  const date = "2026-11-21";
+  const commit = "0fb48469e5de7f812a6322092396d69f669712d3";
 
-  it("marks the row pending for --write instead of refusing", () => {
-    assert.deepEqual(tagPlanDisposition(problem, "write"), { problem: null, pending: true });
-  });
-
-  it("still refuses a tag-plan problem for --draft, --publish and the dry run", () => {
-    assert.deepEqual(tagPlanDisposition(problem, "draft"), { problem, pending: false });
-    assert.deepEqual(tagPlanDisposition(problem, "publish"), { problem, pending: false });
-    assert.deepEqual(tagPlanDisposition(problem, "dry-run"), { problem, pending: false });
-  });
-
-  it("keeps a resolved plan unpending in every mode", () => {
-    for (const mode of ["write", "draft", "publish", "dry-run"]) {
-      assert.deepEqual(tagPlanDisposition(null, mode), { problem: null, pending: false });
-    }
-  });
-
-  it("writes a pending row for --write even when the release exists", () => {
-    const pending = entries.map((entry) => ({
-      ...entry,
-      published: true,
-      pending: entry.app.id === "sync",
-    }));
-    const page = releasesPage(pending, {
-      date: "2026-11-21",
-      tag: "suite-2026.11.21",
-      aggregatePublished: true,
+  it("a dry run plans the aggregate release and no per-app release or tag", () => {
+    const commands = aggregateReleaseCommands({
+      mode: "draft",
+      aggregate: { action: "create", plan: { createLocal: true, commit } },
+      tag,
+      date,
     });
-    assert.match(page, /`sync-v0\.11\.3` \(pending\)/u);
-    assert.doesNotMatch(page, /releases\/tag\/sync-v0\.11\.3/u);
-    assert.match(page, /releases\/tag\/start-v0\.5\.1/u);
+    assert.deepEqual(commands[0], { command: "git", args: ["tag", tag, commit] });
+    assert.equal(commands.length, 2);
+    assert.match(commands[1].args.join(" "), /release create suite-2026\.11\.21/u);
+    assert.doesNotMatch(JSON.stringify(commands), /-v\d/u);
+  });
+
+  it("does not recreate a missing per-app tag", () => {
+    const commands = aggregateReleaseCommands({
+      mode: "draft",
+      aggregate: { action: "create", plan: { createLocal: false, commit } },
+      tag,
+      date,
+    });
+    assert.equal(commands.length, 1);
+    assert.ok(
+      commands.every((step) =>
+        step.args.every(
+          (arg) => !/(?:shell|start|go|canvas|planner|budget|sync|help)-v/u.test(arg),
+        ),
+      ),
+    );
+  });
+
+  it("writes the page from the tree without any per-app tag", () => {
+    // A checkout with no `*-v*` tag still has every package.json and changelog,
+    // so collecting entries must not read git or invent a tag to plan.
+    const files = {};
+    for (const app of APPS) {
+      files[app.packageJson] = JSON.stringify({ version: "1.0.0" });
+      files[app.changelog] =
+        "## [1.0.0] - 2026-11-23\n\n### Added\n\n- **It exists.**\n";
+    }
+    const collected = collectReleases({ load: (path) => files[path] ?? "" });
+    assert.deepEqual(collected.problems, []);
+    assert.equal(collected.entries.length, APPS.length);
+    for (const entry of collected.entries) {
+      assert.equal(entry.tag, undefined);
+      assert.equal(entry.plan, undefined);
+      assert.equal(entry.pending, undefined);
+    }
+
+    const page = releasesPage(collected.entries, {
+      date: "2026-11-23",
+      tag: "suite-2026.11.23",
+    });
+    assert.doesNotMatch(page, /\(pending\)/u);
+    assert.match(page, /\| \[Suite Shell\]/u);
+    assert.match(page, /\| \[Suite Go\]/u);
   });
 });
 
@@ -376,135 +389,79 @@ describe("channels and maturity", () => {
     }
   });
 
-  it("shows channel, maturity and frozen in the generated table and notes", () => {
-    const shell = APPS.find((app) => app.id === "shell");
-    const goApp = APPS.find((app) => app.id === "go");
-    const withSuperapps = [
-      {
-        app: shell,
-        version: "0.2.0",
-        date: "2026-11-22",
-        tag: "shell-v0.2.0",
-        section: "### Added\n\n- **The host.** It exists.",
-      },
-      ...entries,
-      {
-        app: goApp,
-        version: "0.1.0",
-        date: "2026-11-18",
-        tag: "go-v0.1.0",
-        section: "### Added\n\n- **The first version.** It exists.",
-      },
-    ];
-    const body = aggregateReleaseBody(withSuperapps, { date: "2026-11-22" });
+  it("shows channel, maturity and install for the two superapps", () => {
+    const body = aggregateReleaseBody(entries, { date: "2026-11-22" });
     assert.match(body, /desktop superapp; \*\*Suite Go\*\* is the mobile superapp/u);
     assert.match(body, /\*\*Channel:\*\* stable/u);
     assert.match(body, /\*\*Maturity:\*\* alpha/u);
-    assert.match(body, /\| \[Suite Canvas\]\([^)]*\) \| frozen \| alpha \|/u);
-
-    const frozen = appReleaseBody(
-      APPS.find((app) => app.id === "canvas"),
-      "### Fixed\n\n- **A package.** It packaged.",
-    );
-    assert.match(frozen, /\*\*Channel:\*\* frozen/u);
-    assert.match(frozen, /frozen until it becomes a pack/u);
+    assert.match(body, /\| \[Suite Shell\]\([^)]*\) \| stable \| alpha \| 0\.2\.0 \|/u);
+    assert.match(body, /\| \[Suite Go\]\([^)]*\) \| stable \| pre-alpha \| 0\.1\.0 \|/u);
+    assert.doesNotMatch(body, /\| \[Suite Canvas\]/u);
+    assert.doesNotMatch(body, /frozen/u);
   });
 
-  it("renders the new columns in RELEASES.md", () => {
-    const published = entries.map((entry) => ({ ...entry, published: true }));
-    const page = releasesPage(published, {
-      date: "2026-11-21",
-      tag: "suite-2026.11.21",
+  it("renders the two superapp rows in RELEASES.md with no Release column", () => {
+    const page = releasesPage(entries, {
+      date: "2026-11-22",
+      tag: "suite-2026.11.22",
       aggregatePublished: true,
     });
     assert.match(page, /## Channels and maturity/u);
-    assert.match(page, /\| App \| Channel \| Maturity \| Version \| Released \| Release \| Install \|/u);
+    assert.ok(page.includes(AGGREGATE_TABLE_HEADER[0]));
+    assert.doesNotMatch(page, /Released \| Release/u);
     assert.match(page, /a `stable`-channel\s+build can still be `alpha`/u);
+    assert.match(page, /\| \[Suite Shell\]/u);
+    assert.match(page, /\| \[Suite Go\]/u);
+    assert.doesNotMatch(page, /\| \[Suite Start\]/u);
   });
 });
 
 describe("release bodies", () => {
-  it("points at the rolling release, then the changelog section and the signed remote", () => {
-    const body = appReleaseBody(start, entries[0].section);
-    assert.match(body, /^Current versions and the install table are on/u);
-    assert.match(body, /releases\/latest/u);
-    assert.match(body, /### Changed/u);
-    assert.match(body, /flatpak install --user suite run\.suite\.start/u);
+  it("renders only the two superapps with version, channel and install", () => {
+    assert.deepEqual(
+      superappEntries(entries).map((entry) => entry.app.id),
+      ["shell", "go"],
+    );
+    const body = aggregateReleaseBody(entries, { date: "2026-11-22" });
+    assert.match(body, /Suite Shell/u);
+    assert.match(body, /Suite Go/u);
+    assert.match(body, /\| \[Suite Shell\]\([^)]*\) \| stable \| alpha \| 0\.2\.0 \|/u);
+    assert.match(body, /\| \[Suite Go\]\([^)]*\) \| stable \| pre-alpha \| 0\.1\.0 \|/u);
+    assert.match(body, /flatpak install --user suite run\.suite\.shell/u);
     assert.match(body, new RegExp(flatpakrepoUrl().replaceAll(".", "\\."), "u"));
-    assert.match(body, /carries no app binaries/u);
-  });
-
-  it("does not restate the version in a per-app body", () => {
-    const body = appReleaseBody(start, entries[0].section);
-    assert.doesNotMatch(body, /0\.5\.1/u);
+    assert.doesNotMatch(body, /\| \[Suite Start\]/u);
+    assert.doesNotMatch(body, /\| \[Suite Canvas\]/u);
+    assert.doesNotMatch(body, /-v\d/u);
   });
 
   it("gives the relay the same Flatpak install block as every desktop app", () => {
-    const body = appReleaseBody(sync, entries[2].section);
     assert.equal(installCommand(sync), "flatpak install --user suite run.suite.sync");
-    assert.match(body, /flatpak install --user suite run\.suite\.sync/u);
-    assert.doesNotMatch(body, /server tarball|SHA256SUMS/u);
-  });
-
-  it("states whether the Go APK is attached in the per-app body", () => {
-    const live = appReleaseBody(go, goEntry.section, {
-      tag: "suite-2026.11.21",
-      apkLive: true,
-    });
-    assert.match(live, /is attached to \[the rolling Suite release\]/u);
-    assert.match(live, /releases\/tag\/suite-2026\.11\.21/u);
-    assert.doesNotMatch(live, /Mobile table says whether/u);
-
-    const pending = appReleaseBody(go, goEntry.section, { tag: "suite-2026.11.21" });
-    assert.match(pending, /Mobile table says whether this build is attached yet/u);
-    assert.doesNotMatch(pending, /is attached to/u);
-    assert.match(pending, /releases\/tag\/suite-2026\.11\.21/u);
-
-    const unknown = appReleaseBody(go, goEntry.section);
-    assert.match(unknown, /releases\/latest/u);
-    assert.match(unknown, /Mobile table says whether/u);
-  });
-
-  it("builds one aggregate row per app with version, date, link and install", () => {
-    const body = aggregateReleaseBody(entries, { date: "2026-11-21" });
-    assert.match(body, /Suite Shell/u);
-    assert.match(body, /Suite Go/u);
-    for (const entry of entries) {
-      assert.match(body, new RegExp(entry.tag, "u"));
-      assert.match(body, new RegExp(`\\| \\[${entry.app.name}\\]`, "u"));
-      assert.match(body, new RegExp(`\\| ${entry.version.replaceAll(".", "\\.")} \\|`, "u"));
-    }
-    assert.match(body, /releases\/tag\/start-v0\.5\.1/u);
-    assert.match(body, /flatpak install --user suite run\.suite\.start/u);
-    assert.match(body, /flatpak install --user suite run\.suite\.sync/u);
-  });
-
-  it("renders the relay as the Flatpak it now is", () => {
-    assert.equal(installCell(sync), "`flatpak install --user suite run.suite.sync`");
+    assert.equal(
+      installCell(sync),
+      "`flatpak install --user suite run.suite.sync`",
+    );
     assert.equal(installCell(start), "`flatpak install --user suite run.suite.start`");
   });
 
-  it("marks links pending before publication", () => {
-    const page = releasesPage(entries, { date: "2026-11-21", tag: "suite-2026.11.21" });
+  it("never marks a row pending for a page that will not exist", () => {
+    const page = releasesPage(entries, { date: "2026-11-22", tag: "suite-2026.11.22" });
     assert.match(page, /not published yet/u);
-    assert.match(page, /`start-v0\.5\.1` \(pending\)/u);
-    assert.match(page, /`sync-v0\.11\.3` \(pending\)/u);
-    assert.doesNotMatch(page, /releases\/tag\/start-v0\.5\.1/u);
-    assert.doesNotMatch(page, /releases\/tag\/suite-2026\.11\.21/u);
+    assert.doesNotMatch(page, /\(pending\)/u);
+    assert.doesNotMatch(page, /-v\d/u);
+    assert.doesNotMatch(page, /releases\/tag\/suite-2026\.11\.22/u);
   });
 
-  it("writes RELEASES.md as the mirror of the Latest release once published", () => {
-    const published = entries.map((entry) => ({ ...entry, published: true }));
-    const page = releasesPage(published, {
-      date: "2026-11-21",
-      tag: "suite-2026.11.21",
+  it("writes RELEASES.md as the mirror of the rolling release once published", () => {
+    const page = releasesPage(entries, {
+      date: "2026-11-22",
+      tag: "suite-2026.11.22",
       aggregatePublished: true,
     });
     assert.match(page, /^# Suite releases/u);
     assert.match(page, /Generated by `scripts\/release-status\.mjs`/u);
     assert.match(page, /signed Flatpak remote is the update path/u);
-    assert.match(page, /releases\/tag\/suite-2026\.11\.21/u);
-    assert.match(page, /releases\/tag\/start-v0\.5\.1/u);
+    assert.match(page, /releases\/tag\/suite-2026\.11\.22/u);
+    assert.doesNotMatch(page, /-v\d/u);
     assert.doesNotMatch(page, /\(pending\)/u);
     for (const header of AGGREGATE_TABLE_HEADER) assert.ok(page.includes(header));
     assert.match(page, /GitHub Packages is not used for the Flatpaks/u);
@@ -524,29 +481,19 @@ describe("sections and the Suite Go APK", () => {
     );
     assert.equal(go.packageJson, "apps/go/package.json");
     assert.equal(go.changelog, "apps/go/CHANGELOG.md");
-    assert.equal(go.tagPrefix, "go-v");
     assert.equal(go.kind, "apk");
   });
 
   it("carries the host as Suite Shell, first in the desktop table", () => {
-    const shell = APPS.find((app) => app.id === "shell");
     assert.equal(shell.name, "Suite Shell");
     assert.equal(shell.packageJson, "apps/shell/package.json");
     assert.equal(shell.changelog, "apps/shell/CHANGELOG.md");
-    assert.equal(shell.tagPrefix, "shell-v");
     assert.equal(shell.kind, "flatpak");
     assert.equal(shell.section, "desktop");
     assert.equal(shell.flatpakId, "run.suite.shell");
     assert.equal(installCommand(shell), "flatpak install --user suite run.suite.shell");
 
-    const shellEntry = {
-      app: shell,
-      version: "0.1.0",
-      date: "2026-11-22",
-      tag: "shell-v0.1.0",
-      section: "### Added\n\n- **The host.** It exists.",
-    };
-    const desktop = aggregateSection("Desktop", [shellEntry, ...entries], {
+    const desktop = aggregateSection("Desktop", [shellEntry], {
       tag: "suite-2026.11.22",
     });
     const rows = desktop.filter((line) => line.startsWith("| ["));
@@ -602,8 +549,7 @@ describe("sections and the Suite Go APK", () => {
   });
 
   it("promises no APK link in a draft body, and says it is attached before publication", () => {
-    const withGo = [...entries, goEntry];
-    const draft = aggregateReleaseBody(withGo, {
+    const draft = aggregateReleaseBody(entries, {
       date: "2026-11-21",
       tag: "suite-2026.11.21",
       draft: true,
@@ -613,13 +559,6 @@ describe("sections and the Suite Go APK", () => {
     assert.doesNotMatch(draft, /releases\/download/u);
     assert.doesNotMatch(draft, /carries its release-signed APK/u);
     assert.doesNotMatch(draft, /not attached to this release/u);
-
-    const goDraft = appReleaseBody(go, goEntry.section, {
-      tag: "suite-2026.11.21",
-      draft: true,
-    });
-    assert.match(goDraft, /while that release is a draft/u);
-    assert.doesNotMatch(goDraft, /Mobile table says whether/u);
   });
 
   it("puts the store instruction above the tables and Update below them", () => {
@@ -628,10 +567,10 @@ describe("sections and the Suite Go APK", () => {
       tag: "suite-2026.11.21",
     });
     const remote = body.indexOf("flatpak remote-add");
-    const also = body.indexOf("## Also on the remote");
+    const table = body.indexOf("## Current versions");
     const update = body.indexOf("## Update");
-    assert.ok(remote >= 0 && also > remote);
-    assert.ok(update > also);
+    assert.ok(remote >= 0 && table > remote);
+    assert.ok(update > table);
 
     const page = releasesPage(entries, { date: "2026-11-21", tag: "suite-2026.11.21" });
     const pageDesktop = page.indexOf("## Desktop");
@@ -640,8 +579,7 @@ describe("sections and the Suite Go APK", () => {
   });
 
   it("says in the aggregate body whether the APK link is live", () => {
-    const withGo = [...entries, goEntry];
-    const live = aggregateReleaseBody(withGo, {
+    const live = aggregateReleaseBody(entries, {
       date: "2026-11-21",
       tag: "suite-2026.11.21",
       apkLive: true,
@@ -651,7 +589,7 @@ describe("sections and the Suite Go APK", () => {
     assert.match(live, /releases\/download\/suite-2026\.11\.21\/suite-go-0\.1\.0\.apk/u);
     assert.match(live, /## Suite Go \(mobile\)/u);
 
-    const missing = aggregateReleaseBody(withGo, {
+    const missing = aggregateReleaseBody(entries, {
       date: "2026-11-21",
       tag: "suite-2026.11.21",
     });
@@ -810,16 +748,6 @@ describe("channel releases", () => {
 });
 
 describe("release notes name their channel", () => {
-  const shell = APPS.find((app) => app.id === "shell");
-  const shellEntry = {
-    app: shell,
-    version: "0.2.0",
-    date: "2026-11-22",
-    tag: "shell-v0.2.0",
-    section: "### Added\n\n- **The host.** It exists.",
-  };
-  const withSuperapps = [shellEntry, ...entries, goEntry];
-
   /** The text between two headings, so a label is read under the right app. */
   function between(body, heading, next) {
     const start = body.indexOf(heading);
@@ -829,7 +757,7 @@ describe("release notes name their channel", () => {
   }
 
   it("says nightly under Suite Shell and Suite Go", () => {
-    const body = aggregateReleaseBody(withSuperapps, {
+    const body = aggregateReleaseBody(entries, {
       date: "2026-11-23",
       tag: "suite-nightly-2026.11.23",
       channel: "nightly",
@@ -839,13 +767,13 @@ describe("release notes name their channel", () => {
       /\*\*Channel:\*\* nightly/u,
     );
     assert.match(
-      between(body, "## Suite Go (mobile)", "## Also on the remote"),
+      between(body, "## Suite Go (mobile)", "## Current versions"),
       /\*\*Channel:\*\* nightly/u,
     );
   });
 
   it("says preview on a preview body", () => {
-    const body = aggregateReleaseBody(withSuperapps, {
+    const body = aggregateReleaseBody(entries, {
       date: "2026-11-23",
       tag: "suite-preview-2026.11.23",
       channel: "preview",
@@ -856,7 +784,7 @@ describe("release notes name their channel", () => {
   });
 
   it("installs the pre-release id on its branch, not the stable id", () => {
-    const body = aggregateReleaseBody(withSuperapps, {
+    const body = aggregateReleaseBody(entries, {
       date: "2026-11-23",
       tag: "suite-nightly-2026.11.23",
       channel: "nightly",
@@ -866,34 +794,17 @@ describe("release notes name their channel", () => {
     assert.ok(!body.includes("flatpak install --user suite run.suite.shell"));
     assert.ok(!body.includes("flatpak run run.suite.shell"));
 
-    const stable = aggregateReleaseBody(withSuperapps, { date: "2026-11-23" });
+    const stable = aggregateReleaseBody(entries, { date: "2026-11-23" });
     assert.ok(stable.includes("flatpak install --user suite run.suite.shell\n"));
     assert.ok(!stable.includes("run.suite.slop.shell"));
   });
 
   it("still says stable on a stable body", () => {
-    const body = aggregateReleaseBody(withSuperapps, { date: "2026-11-23" });
+    const body = aggregateReleaseBody(entries, { date: "2026-11-23" });
     assert.match(
       between(body, "## Suite Shell (desktop)", "## Suite Go (mobile)"),
       /\*\*Channel:\*\* stable/u,
     );
-  });
-
-  it("still calls a frozen row frozen, and names no channel for the others", () => {
-    const body = aggregateReleaseBody(withSuperapps, {
-      date: "2026-11-23",
-      channel: "nightly",
-    });
-    assert.match(body, /\| \[Suite Canvas\]\([^)]*\) \| frozen \|/u);
-    assert.match(body, /\| \[Suite Start\]\([^)]*\) \| — \|/u);
-
-    const frozen = appReleaseBody(
-      APPS.find((app) => app.id === "canvas"),
-      "### Fixed\n\n- **A package.** It packaged.",
-      { channel: "nightly" },
-    );
-    assert.match(frozen, /\*\*Channel:\*\* frozen/u);
-    assert.doesNotMatch(frozen, /\*\*Channel:\*\* nightly/u);
   });
 
   it("keeps releaseLabels on the standalone release channel too", () => {
@@ -909,14 +820,6 @@ describe("release notes name their channel", () => {
 });
 
 describe("the Artifacts section", () => {
-  const shell = APPS.find((app) => app.id === "shell");
-  const shellEntry = {
-    app: shell,
-    version: "0.2.0",
-    date: "2026-11-22",
-    tag: "shell-v0.2.0",
-    section: "### Added\n\n- **The host.** It exists.",
-  };
   const flatpakCommit = "c".repeat(64);
   const flatpakSha = "d".repeat(64);
   const apkSha = "e".repeat(64);
@@ -955,7 +858,7 @@ describe("the Artifacts section", () => {
       const read = readManifest(path);
       assert.ok(read !== null);
 
-      const body = aggregateReleaseBody([shellEntry, ...entries, goEntry], {
+      const body = aggregateReleaseBody(entries, {
         date: "2026-11-23",
         tag,
         channel: "nightly",
@@ -972,7 +875,7 @@ describe("the Artifacts section", () => {
       assert.ok(body.includes("flatpak install --user suite run.suite.slop.shell//nightly"));
       assert.ok(body.includes("flatpak info run.suite.slop.shell//nightly"));
 
-      const draft = aggregateReleaseBody([shellEntry, ...entries, goEntry], {
+      const draft = aggregateReleaseBody(entries, {
         date: "2026-11-23",
         tag,
         channel: "nightly",
@@ -987,7 +890,7 @@ describe("the Artifacts section", () => {
   });
 
   it("has no Artifacts section when no manifest exists", () => {
-    const body = aggregateReleaseBody([shellEntry, ...entries, goEntry], {
+    const body = aggregateReleaseBody(entries, {
       date: "2026-11-23",
       tag: "suite-2026.11.23",
     });
