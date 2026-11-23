@@ -1,0 +1,355 @@
+# Publication: the one workflow that signs and ships a channel.
+#
+# It runs only from `workflow_dispatch` on `main`. There is no pull-request
+# trigger, and no tag trigger: the scripts read the version from the tree and
+# `scripts/release-status.mjs --publish` creates the `<app>-v<version>` and
+# `suite-YYYY.MM.DD` tags at the changelog commit. A release tag is therefore
+# followed by a dispatch; it never starts a second build from another tree.
+#
+# `publish` is off by default. A dispatch with it off runs the gate, builds and
+# bundles both artifacts, and stops: the rehearsal for a real promotion. Turning
+# it on runs in the `release` environment, which must require reviewers and be
+# restricted to `main` and release tags (ci.md C9.3, delivery.md D1.4, D5.5).
+# The approval is the human review of a preview (D3.3) and of a stable promotion
+# (D3.4). A stable dispatch is expected to name the commit already published as
+# preview; the approval is what checks that, because the scripts read the version
+# from the tree and keep no channel ledger.
+#
+# The signing keys are environment secrets, never repository secrets and never
+# visible to a pull request:
+#
+#   SUITE_STORE_KEY               armored GPG private key for the origin summary
+#   SUITE_STORE_KEY_ID            its fingerprint, so the scripts sign with it
+#   SUITE_GO_KEYSTORE             base64 of the Android release keystore
+#   SUITE_GO_KEYSTORE_PASSWORD    its store password
+#   SUITE_GO_KEY_ALIAS            its key alias (the scripts default to suite-go)
+#   SUITE_GO_KEY_PASSWORD         its key password (defaults to the store password)
+#
+# The S3 target also needs the repository variable `AWS_RELEASE_ROLE_ARN` (the
+# role GitHub OIDC assumes, whose trust policy allows this repository's `release`
+# environment), and the bucket and distribution the remote scripts already read:
+# `SUITE_FLATPAK_S3_BUCKET` and `SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION`.
+# `AWS_RELEASE_REGION` is optional and defaults to us-east-1. The `lan` target
+# stays a workstation operation: a runner has neither the SSH key nor the host.
+#
+# The order is the one `scripts/release-suite.mjs` documents: prove HEAD, build
+# once, bundle and attest, publish the signed remote, create or update the
+# rolling release, attach the APK, then relink the release body and RELEASES.md.
+#
+# Known limits, recorded rather than hidden:
+#
+# - Two steps are rebuilds in the existing scripts: `android-release.mjs
+#   --publish` builds the APK again, and `flatpak-remote.mjs --publish` signs a
+#   fresh summary and static deltas. The attestation covers the build this job
+#   made, so the published asset is the same source and identity, not necessarily
+#   the same bytes. Publishing the exact attested file needs an upload mode in
+#   those scripts.
+# - The Flatpak remote is published before the GitHub release. A failure after
+#   that leaves the signed remote ahead of the human mirror; Flatpak recovers by
+#   branch repoint, the mirror by re-running the dispatch.
+# - `release-status.mjs` has no channel input, so a `preview` dispatch still
+#   refreshes the rolling `suite-YYYY.MM.DD` release. The APK is channel-named,
+#   but the release body looks for the stable name.
+# - `RELEASES.md` is rewritten in the runner and not committed; the mirror on
+#   `main` updates when someone commits the generated file.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Channel to build (preview or stable)
+        required: true
+        type: choice
+        default: preview
+        options:
+          - preview
+          - stable
+      publish:
+        description: Sign and publish; off runs the same build without touching a channel
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish-${{ inputs.channel }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: release
+    # This one job holds the approval, the keys and the release upload, so the
+    # write scope covers the whole job. It exists for `gh release create`/`upload`
+    # and the tag creation; the repository default stays `contents: read`.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      SUITE_FLATPAK_REPO: ${{ github.workspace }}/.dev/flatpak-repo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `release-status.mjs` finds the commit that added a changelog section
+          # with `git log -S`; a depth-1 clone cannot answer that.
+          fetch-depth: 0
+
+      - name: pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 12.17.0
+
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Java
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Playwright browser (Canvas stories)
+        run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
+
+      - name: Gate tooling
+        run: sudo apt-get update && sudo apt-get install -y xvfb flatpak flatpak-builder
+
+      - name: Flatpak runtimes
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk//25.08 \
+            org.electronjs.Electron2.BaseApp//25.08
+
+      # C1.3: the release runs the same command a person runs. `--fresh` proves
+      # the commit in a clean export and writes .dev/gate-status.json; the
+      # publishing scripts refuse without it.
+      - name: Fresh gate with e2e
+        run: node scripts/gate.mjs --fresh
+
+      - name: Import the store and Android keys
+        if: inputs.publish
+        env:
+          SUITE_STORE_KEY: ${{ secrets.SUITE_STORE_KEY }}
+          SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
+          SUITE_GO_KEYSTORE_B64: ${{ secrets.SUITE_GO_KEYSTORE }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUITE_STORE_KEY}" ] || [ -z "${SUITE_STORE_KEY_ID}" ]; then
+            echo "SUITE_STORE_KEY and SUITE_STORE_KEY_ID are required; a published remote is always GPG-signed" >&2
+            exit 1
+          fi
+          if [ -z "${SUITE_GO_KEYSTORE_B64}" ]; then
+            echo "SUITE_GO_KEYSTORE is required; a debug-signed APK is never a release" >&2
+            exit 1
+          fi
+
+          gnupg="${RUNNER_TEMP}/gnupg"
+          mkdir -p "${gnupg}"
+          chmod 700 "${gnupg}"
+          export GNUPGHOME="${gnupg}"
+          printf '%s\n' "${SUITE_STORE_KEY}" | gpg --batch --import
+          gpg --batch --list-keys "${SUITE_STORE_KEY_ID}" >/dev/null
+
+          # The publish scripts sign with --batch. Prove the imported key can
+          # sign unattended before an hour of gate and build work happens.
+          printf 'suite release\n' | \
+            gpg --batch --yes --local-user "${SUITE_STORE_KEY_ID}" --armor --detach-sign >/dev/null
+
+          keys="${RUNNER_TEMP}/keys"
+          mkdir -p "${keys}"
+          printf '%s' "${SUITE_GO_KEYSTORE_B64}" | base64 -d > "${keys}/suite-go-release.jks"
+          chmod 600 "${keys}/suite-go-release.jks"
+
+          # GNUPGHOME and the keystore path are not secrets; the passwords are
+          # supplied only to the steps that need them.
+          {
+            echo "GNUPGHOME=${gnupg}"
+            echo "SUITE_GO_KEYSTORE=${keys}/suite-go-release.jks"
+          } >> "${GITHUB_ENV}"
+
+      - name: Build the Shell Flatpak (${{ inputs.channel }})
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
+        run: |
+          set -euo pipefail
+          args=(--app shell)
+          if [ "${CHANNEL}" != "stable" ]; then args+=(--channel "${CHANNEL}"); fi
+          node scripts/flatpak.mjs "${args[@]}" --no-install
+
+      - name: Bundle the Shell Flatpak for attestation
+        env:
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          mkdir -p .dev/release
+          if [ "${CHANNEL}" = "stable" ]; then
+            id=run.suite.shell
+            branch=master
+          else
+            id=run.suite.slop.shell
+            branch="${CHANNEL}"
+          fi
+          flatpak build-bundle "${SUITE_FLATPAK_REPO}" \
+            ".dev/release/suite-shell-${CHANNEL}.flatpak" "${id}" "${branch}"
+
+      - name: Build the Suite Go release APK (${{ inputs.channel }})
+        id: apk
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          SUITE_GO_KEYSTORE_PASSWORD: ${{ secrets.SUITE_GO_KEYSTORE_PASSWORD }}
+          SUITE_GO_KEY_ALIAS: ${{ secrets.SUITE_GO_KEY_ALIAS }}
+          SUITE_GO_KEY_PASSWORD: ${{ secrets.SUITE_GO_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node scripts/android-release.mjs --channel "${CHANNEL}"
+
+          # The stable channel also writes the `suite-go.apk` alias; attest and
+          # upload the versioned file, not a second name for the same bytes.
+          apk="$(find apps/go/.dev/release -maxdepth 1 -name 'suite-go-*.apk' ! -name 'suite-go.apk' -print -quit)"
+          if [ -z "${apk}" ]; then
+            echo "the APK build named no versioned suite-go-*.apk" >&2
+            exit 1
+          fi
+          echo "path=${apk}" >> "${GITHUB_OUTPUT}"
+
+      - name: Generate the SPDX SBOM
+        run: |
+          set -euo pipefail
+          mkdir -p .dev/release
+          pnpm sbom --sbom-format spdx --out .dev/release/suite-apps.spdx.json
+          test -s .dev/release/suite-apps.spdx.json
+
+      # Evidence before publication (D4.1 step 3, D5.4). A rehearsal changes
+      # nothing outside the runner, so it stops before these.
+      - name: Attest the Flatpak bundle provenance
+        if: inputs.publish
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: .dev/release/suite-shell-${{ inputs.channel }}.flatpak
+
+      - name: Attest the APK provenance
+        if: inputs.publish
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.apk.outputs.path }}
+
+      - name: Attest the Flatpak bundle SBOM
+        if: inputs.publish
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: .dev/release/suite-shell-${{ inputs.channel }}.flatpak
+          sbom-path: .dev/release/suite-apps.spdx.json
+
+      - name: Attest the APK SBOM
+        if: inputs.publish
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: ${{ steps.apk.outputs.path }}
+          sbom-path: .dev/release/suite-apps.spdx.json
+
+      - name: Check the S3 publishing configuration
+        if: inputs.publish
+        env:
+          ROLE_ARN: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          BUCKET: ${{ vars.SUITE_FLATPAK_S3_BUCKET }}
+          DISTRIBUTION: ${{ vars.SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "${ROLE_ARN}" ] || missing+=("repository variable AWS_RELEASE_ROLE_ARN")
+          [ -n "${BUCKET}" ] || missing+=("SUITE_FLATPAK_S3_BUCKET")
+          [ -n "${DISTRIBUTION}" ] || missing+=("SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION")
+          if [ "${#missing[@]}" -ne 0 ]; then
+            printf 'The s3 target also needs:\n'
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+      - name: AWS credentials (OIDC)
+        if: inputs.publish && vars.AWS_RELEASE_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          role-session-name: suite-release-${{ inputs.channel }}
+          aws-region: ${{ vars.AWS_RELEASE_REGION || 'us-east-1' }}
+
+      - name: Publish the signed Flatpak remote
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          PUBLISH: ${{ inputs.publish }}
+          SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
+          SUITE_FLATPAK_S3_BUCKET: ${{ vars.SUITE_FLATPAK_S3_BUCKET }}
+          SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION: ${{ vars.SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION }}
+        run: |
+          set -euo pipefail
+          args=(--target s3)
+          if [ "${CHANNEL}" != "stable" ]; then args+=(--channel "${CHANNEL}"); fi
+          if [ "${PUBLISH}" = "true" ]; then args+=(--publish); fi
+          node scripts/flatpak-remote.mjs "${args[@]}"
+
+      # The rolling release must exist before the APK can be attached; a fresh
+      # repository has none, and `android-release.mjs --publish` refuses without
+      # one. This is the first of the two `release-status` steps in
+      # `scripts/release-suite.mjs`.
+      - name: Create or update the rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "${PUBLISH}" = "true" ]; then args+=(--publish); fi
+          node scripts/release-status.mjs "${args[@]}"
+
+      - name: Publish the Suite Go APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ inputs.channel }}
+          PUBLISH: ${{ inputs.publish }}
+          SUITE_GO_KEYSTORE_PASSWORD: ${{ secrets.SUITE_GO_KEYSTORE_PASSWORD }}
+          SUITE_GO_KEY_ALIAS: ${{ secrets.SUITE_GO_KEY_ALIAS }}
+          SUITE_GO_KEY_PASSWORD: ${{ secrets.SUITE_GO_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          args=(--channel "${CHANNEL}")
+          if [ "${PUBLISH}" = "true" ]; then args+=(--publish); fi
+          node scripts/android-release.mjs "${args[@]}"
+
+      - name: Relink the release body and RELEASES.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "${PUBLISH}" = "true" ]; then args+=(--publish); fi
+          node scripts/release-status.mjs "${args[@]}"
+
+      - name: Upload the SBOM
+        if: inputs.publish
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: suite-${{ inputs.channel }}-sbom
+          path: .dev/release/suite-apps.spdx.json
+          # The path is under the ignored `.dev/` directory, which the artifact
+          # action skips by default.
+          include-hidden-files: true
+          retention-days: 90
+          if-no-files-found: error

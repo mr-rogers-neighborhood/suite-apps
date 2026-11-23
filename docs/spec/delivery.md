@@ -8,6 +8,19 @@ Status: draft 0.1. Target for packaging, channels and release. Today's state is 
 [#222](https://github.com/mrrnbhd/suite-apps/issues/222). The product contract is
 [superapp.md](superapp.md); the pipeline is [ci.md](ci.md); the platform matrix is [platforms.md](platforms.md).
 
+The publication workflow is `.github/workflows/release.yml`: a manual
+`workflow_dispatch` for the `preview` or `stable` channel, with no pull-request or tag trigger.
+`publish` is off by default, so a dispatch rehearses the same gate, build and bundle without touching
+a channel; turning it on runs in the `release` environment, which is restricted to `main` and release
+tags and requires reviewers. Only the S3 target is wired; the `lan` target stays a workstation
+operation. An owner configures that environment with the secrets `SUITE_STORE_KEY`,
+`SUITE_STORE_KEY_ID`, `SUITE_GO_KEYSTORE`, `SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_ALIAS` and
+`SUITE_GO_KEY_PASSWORD`, and the variables `AWS_RELEASE_ROLE_ARN`, `SUITE_FLATPAK_S3_BUCKET` and
+`SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION`. A release tag is followed by a dispatch. The workflow header
+records the known limits: the APK and the Flatpak summary are rebuilt at publish time, `preview`
+still refreshes the rolling release, and `RELEASES.md` is regenerated in the runner rather than
+committed.
+
 ## 1. Principles
 
 **D1.1** Build once per **identity**. The same commit, lockfile and inputs produce one artifact for
