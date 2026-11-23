@@ -3,11 +3,14 @@
 Status: draft 0.1. Phases 1 and 2 are live: Actions is enabled, `.github/workflows/ci.yml` maps a
 pull request's diff to gate rows with `scripts/affected.mjs` and requires the `ci` aggregator,
 `.github/workflows/main.yml` runs the full fresh gate on every push to `main`, and Start's e2e runs on
-the merge queue and on a pull request whose affected set includes Start or Shell. The merge queue is
-still enabled from the repository UI, not this workflow (C2.6); the `main` ruleset requires the `ci`
-check. The VM remains the full independent gate. Packaging, attestations, the Windows/macOS/iOS
-matrix and VM retirement are Phase 3+. The delivery contract is [delivery.md](delivery.md); the
-platform matrix is [platforms.md](platforms.md); the product contract is [superapp.md](superapp.md).
+the merge queue and on a pull request whose affected set includes Start or Shell. `.github/workflows/nightly.yml`
+runs the full fresh gate with e2e at 02:00 UTC, then builds the host Flatpak and the Go debug APK,
+attests both and keeps them as artifacts. Nightly does not publish: publication still needs the signed
+Flatpak remote and the release keystore in a protected environment. The merge queue is still enabled
+from the repository UI, not this workflow (C2.6); the `main` ruleset requires the `ci` check. The VM
+remains the full independent gate. The Windows/macOS/iOS matrix and VM retirement are Phase 4+. The
+delivery contract is [delivery.md](delivery.md); the platform matrix is [platforms.md](platforms.md);
+the product contract is [superapp.md](superapp.md).
 
 ## 1. Principles
 
