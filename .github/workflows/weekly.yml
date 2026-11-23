@@ -1,0 +1,221 @@
+# Weekly gate and repository hygiene: the fresh gate, actionlint, the action
+# pin audit, and cache cleanup (C4.3, C5.4, C10).
+#
+# The full platform matrix runs daily in platforms.yml. This weekly run is the
+# gate plus the repository hygiene that does not belong on every pull request,
+# so do not duplicate platform builds here.
+name: weekly
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: weekly-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Playwright browser (Canvas stories)
+        run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
+      - name: Xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Fresh gate with e2e
+        run: node scripts/gate.mjs --fresh
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: "1.27.x"
+          cache: false
+      - name: actionlint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint" -ignore 'SC2016' .github/workflows/*.yml
+
+  pin-audit:
+    name: pin-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Every action is pinned by a full commit SHA
+        run: |
+          set -eu
+          # A local reusable workflow (`uses: ./...`) has no commit to pin.
+          # Every other reference must name a 40-hex commit, not a tag or
+          # branch (C9.4).
+          violations="$(grep -rEn '^[[:space:]]*uses:[[:space:]]*' .github/workflows \
+            | grep -v 'uses:[[:space:]]*\./' \
+            | grep -vE 'uses:[[:space:]]*[^[:space:]]+@[0-9a-f]{40}([[:space:]]|$)' \
+            || true)"
+          if [ -n "$violations" ]; then
+            echo "::error::Found action references without a full commit SHA:"
+            echo "$violations"
+            exit 1
+          fi
+          echo "All action references name a 40-hex commit."
+
+  cache-cleanup:
+    name: cache-cleanup
+    # The only job with write access: deleting a cache needs `actions: write`.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: write
+    steps:
+      - name: Delete caches for closed pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          default_branch="$(gh repo view "$GITHUB_REPOSITORY" --json defaultBranchRef --jq .defaultBranchRef.name)"
+          prs="$(gh pr list --repo "$GITHUB_REPOSITORY" --state all --limit 5000 --json number,state)"
+          caches="$(gh cache list --repo "$GITHUB_REPOSITORY" --limit 5000 --json id,ref)"
+
+          PRS_JSON="$prs" CACHES_JSON="$caches" DEFAULT_BRANCH="$default_branch" node -e '
+            const states = new Map(
+              JSON.parse(process.env.PRS_JSON).map((pr) => [String(pr.number), pr.state]),
+            );
+            const caches = JSON.parse(process.env.CACHES_JSON);
+            const doomed = caches.filter((entry) => {
+              // Branch and merge-queue caches are not pull-request caches.
+              const match = /^refs\/pull\/(\d+)\//.exec(entry.ref ?? "");
+              if (match === null) return false;
+              // The default branch is never a pull request; keep its cache.
+              if (entry.ref === `refs/heads/${process.env.DEFAULT_BRANCH}`) return false;
+              const state = states.get(match[1]);
+              return state === "CLOSED" || state === "MERGED";
+            });
+            console.error(
+              doomed.length === 0
+                ? "No cache entries for closed pull requests."
+                : `Deleting ${doomed.length} cache entry(ies) for closed pull requests.`,
+            );
+            process.stdout.write(doomed.map((entry) => `${entry.id}\n`).join(""));
+          ' > doomed-caches.txt
+
+          while read -r id; do
+            [ -n "$id" ] || continue
+            gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
+          done < doomed-caches.txt
+
+  report:
+    name: report
+    needs: [gate, actionlint, pin-audit, cache-cleanup]
+    # One issue, not one per week: green closes it, red opens or updates it.
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: Open, update or close the rolling weekly issue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GATE: ${{ needs.gate.result }}
+          ACTIONLINT: ${{ needs.actionlint.result }}
+          PINS: ${{ needs.pin-audit.result }}
+          CACHE: ${{ needs.cache-cleanup.result }}
+        with:
+          script: |
+            const label = "ci-weekly";
+            const title = "Weekly gate is red";
+            const results = {
+              "weekly-gate": process.env.GATE,
+              actionlint: process.env.ACTIONLINT,
+              "pin-audit": process.env.PINS,
+              "cache-cleanup": process.env.CACHE,
+            };
+            const failed = Object.entries(results).filter(
+              ([, result]) => result !== "success" && result !== "skipped",
+            );
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            try {
+              await github.rest.issues.createLabel({
+                ...context.repo,
+                name: label,
+                color: "d73a4a",
+                description: "The scheduled weekly gate or hygiene check failed",
+              });
+            } catch (error) {
+              if (error.status !== 422) throw error;
+            }
+
+            const open = await github.rest.issues.listForRepo({
+              ...context.repo,
+              labels: label,
+              state: "open",
+              per_page: 1,
+            });
+
+            if (failed.length === 0) {
+              if (open.data.length === 0) return;
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: open.data[0].number,
+                body: `Weekly is green again on \`${context.sha}\`. ${runUrl}`,
+              });
+              await github.rest.issues.update({
+                ...context.repo,
+                issue_number: open.data[0].number,
+                state: "closed",
+              });
+              return;
+            }
+
+            const body = [
+              `The weekly run failed on \`${context.sha}\`.`,
+              "",
+              `Failed: ${failed.map(([name, result]) => `\`${name}\` (${result})`).join(", ")}`,
+              "",
+              `Run: ${runUrl}`,
+            ].join("\n");
+
+            if (open.data.length > 0) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: open.data[0].number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                ...context.repo,
+                title,
+                body,
+                labels: [label],
+              });
+            }
