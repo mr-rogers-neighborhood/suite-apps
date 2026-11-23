@@ -33,6 +33,5 @@
 
 ## Review
 
-This pull request is review-only until a review worker has commented and the owner's gate passes on
-this head. The review worker may comment or request changes but never merges, and no GitHub Actions
-workflow is assumed.
+The `ci` workflow (once enabled) and the owning gate are the evidence. A review worker may comment
+or request changes but never merges; the coordinator runs the gate and the merge queue.
