@@ -5,6 +5,7 @@ import {
   classifyReleaseView,
   goApkAssetName,
   GO_APK_ALIAS,
+  newestManifestTags,
   parseApksignerFingerprint,
   parseArgs,
   parseBadging,
@@ -12,6 +13,7 @@ import {
   resolveUploadIdentity,
   uploadNames,
   versionCodeFor,
+  versionCodePreflight,
 } from "./android-release.mjs";
 import { groupedFingerprint, normaliseFingerprint } from "./lib/androidKey.mjs";
 
@@ -216,6 +218,153 @@ describe("versionCode", () => {
   it("refuses a base that is not a positive integer", () => {
     assert.throws(() => versionCodeFor(0, "stable"), /positive integer/u);
     assert.throws(() => versionCodeFor(1.5, "stable"), /positive integer/u);
+  });
+});
+
+describe("versionCode monotonicity", () => {
+  const PRE_RELEASE_ID = "run.suite.slop.go";
+
+  function fakeGh({ releases = [], manifests = {} } = {}) {
+    const calls = [];
+    const gh = (args) => {
+      calls.push(args);
+      if (args[0] === "release" && args[1] === "list") {
+        return { status: 0, stdout: JSON.stringify(releases), stderr: "", error: null };
+      }
+      if (args[0] === "release" && args[1] === "download") {
+        const tag = args[2];
+        if (!Object.hasOwn(manifests, tag)) {
+          return { status: 1, stdout: "", stderr: "no assets match the file pattern", error: null };
+        }
+        return { status: 0, stdout: JSON.stringify(manifests[tag]), stderr: "", error: null };
+      }
+      return {
+        status: 1,
+        stdout: "",
+        stderr: `unexpected gh command: ${args.join(" ")}`,
+        error: null,
+      };
+    };
+    gh.calls = calls;
+    return gh;
+  }
+
+  function apkManifest(versionCode, { id = PRE_RELEASE_ID, channel = "nightly" } = {}) {
+    const artifact = { kind: "apk", id, versionName: `0.1.0-${channel}` };
+    if (versionCode !== undefined) artifact.versionCode = versionCode;
+    return { format: 1, channel, artifacts: [artifact] };
+  }
+
+  it("reads only the stable tag family for stable", () => {
+    const tags = newestManifestTags(
+      [
+        { tagName: "suite-2026.11.22", isDraft: false },
+        { tagName: "suite-preview-2026.11.22", isDraft: false },
+        { tagName: "suite-nightly-2026.11.21", isDraft: false },
+      ],
+      "stable",
+    );
+    assert.deepEqual(tags, ["suite-2026.11.22"]);
+  });
+
+  it("reads the newest published tag in each pre-release family", () => {
+    const tags = newestManifestTags(
+      [
+        { tagName: "suite-preview-2026.11.22", isDraft: false },
+        { tagName: "suite-preview-2026.11.21", isDraft: false },
+        { tagName: "suite-nightly-2026.11.22", isDraft: false },
+        { tagName: "suite-slop-2026.11.20", isDraft: true },
+        { tagName: "suite-2026.11.22", isDraft: false },
+      ],
+      "nightly",
+    );
+    assert.deepEqual(tags, [
+      "suite-nightly-2026.11.22",
+      "suite-preview-2026.11.22",
+    ]);
+  });
+
+  it("refuses nightly 12 after preview 13 on the shared pre-release id", () => {
+    const verdict = versionCodePreflight({
+      channel: "nightly",
+      packageId: PRE_RELEASE_ID,
+      versionCode: 12,
+      gh: fakeGh({
+        releases: [
+          { tagName: "suite-preview-2026.11.22", isDraft: false },
+          { tagName: "suite-nightly-2026.11.21", isDraft: false },
+        ],
+        manifests: {
+          "suite-preview-2026.11.22": apkManifest(13, { channel: "preview" }),
+          "suite-nightly-2026.11.21": apkManifest(12),
+        },
+      }),
+    });
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.previous, 13);
+    assert.match(verdict.message, /lower than 13/u);
+    assert.match(verdict.message, /base bump/u);
+  });
+
+  it("permits an equal code as a rebuild of the same app version", () => {
+    const verdict = versionCodePreflight({
+      channel: "nightly",
+      packageId: PRE_RELEASE_ID,
+      versionCode: 12,
+      gh: fakeGh({
+        releases: [{ tagName: "suite-nightly-2026.11.22", isDraft: false }],
+        manifests: { "suite-nightly-2026.11.22": apkManifest(12) },
+      }),
+    });
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.previous, 12);
+    assert.match(verdict.note, /rebuild/u);
+  });
+
+  it("permits a higher code from a bumped base", () => {
+    const verdict = versionCodePreflight({
+      channel: "nightly",
+      packageId: PRE_RELEASE_ID,
+      versionCode: 14,
+      gh: fakeGh({
+        releases: [{ tagName: "suite-preview-2026.11.22", isDraft: false }],
+        manifests: {
+          "suite-preview-2026.11.22": apkManifest(13, { channel: "preview" }),
+        },
+      }),
+    });
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.previous, 13);
+    assert.equal(verdict.note, null);
+  });
+
+  it("passes with a note when no published release carries a manifest", () => {
+    const verdict = versionCodePreflight({
+      channel: "nightly",
+      packageId: PRE_RELEASE_ID,
+      versionCode: 12,
+      gh: fakeGh({
+        releases: [{ tagName: "suite-nightly-2026.11.22", isDraft: false }],
+      }),
+    });
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.previous, null);
+    assert.match(verdict.note, /No published release manifest/u);
+  });
+
+  it("passes with a different note when the manifest predates versionCode", () => {
+    const verdict = versionCodePreflight({
+      channel: "nightly",
+      packageId: PRE_RELEASE_ID,
+      versionCode: 12,
+      gh: fakeGh({
+        releases: [{ tagName: "suite-nightly-2026.11.22", isDraft: false }],
+        manifests: { "suite-nightly-2026.11.22": apkManifest(undefined) },
+      }),
+    });
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.previous, null);
+    assert.match(verdict.note, /records no versionCode/u);
   });
 });
 

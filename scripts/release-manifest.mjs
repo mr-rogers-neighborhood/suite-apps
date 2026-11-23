@@ -11,6 +11,12 @@
  * The manifest is attached to the rolling release draft before the draft is
  * published, so it becomes immutable with the release.
  *
+ * The APK artifact also records the channel's `versionCode` and `versionName`, so
+ * the next publication can prove that its code is at least the one already
+ * published on the same package id (delivery.md D4.2). The code comes from
+ * `versionCodeFor` in `scripts/android-release.mjs`, not a second copy of the
+ * formula.
+ *
  * Usage:
  *   node scripts/release-manifest.mjs \
  *     --channel preview \
@@ -29,9 +35,32 @@ import { createHash } from "node:crypto";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CHANNEL_PACKAGE_ID, versionCodeFor } from "./android-release.mjs";
 import { ANDROID_RELEASE_CERT_SHA256 } from "./lib/androidKey.mjs";
+import { channelProblem, isPreRelease } from "./lib/channel.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+
+/** Where the version and the base both live. */
+const GO_CONFIG = join(ROOT, "apps", "go", "app.config.json");
+
+/**
+ * The version name and code one channel's Suite Go APK carries.
+ *
+ * The build reads the same `app.config.json`, so the manifest records the values
+ * the artifact was built with rather than a second, drifting guess.
+ */
+export function apkIdentityFor(config, channel) {
+  const problem = channelProblem(channel);
+  if (problem !== null) throw new Error(problem);
+  if (typeof config?.version !== "string" || config.version.length === 0) {
+    throw new Error("apps/go/app.config.json names no version");
+  }
+  return {
+    versionName: isPreRelease(channel) ? `${config.version}-${channel}` : config.version,
+    versionCode: versionCodeFor(config.versionCode, channel),
+  };
+}
 
 export function sha256File(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -122,6 +151,18 @@ function main(argv) {
     );
   }
 
+  const apkIdentity = apkIdentityFor(
+    JSON.parse(readFileSync(GO_CONFIG, "utf8")),
+    options.channel,
+  );
+  const expectedApkId = CHANNEL_PACKAGE_ID[options.channel];
+  if (options.apkId !== expectedApkId) {
+    throw new Error(
+      `--apk-id ${options.apkId} is not ${expectedApkId}, the ${options.channel} package ` +
+        "id: the manifest would record a versionCode for another artifact.",
+    );
+  }
+
   const manifest = buildManifest({
     channel: options.channel,
     commit,
@@ -139,6 +180,7 @@ function main(argv) {
       {
         kind: "apk",
         id: options.apkId,
+        ...apkIdentity,
         file: relative(ROOT, options.apk),
         sha256: sha256File(options.apk),
         size: statSync(options.apk).size,

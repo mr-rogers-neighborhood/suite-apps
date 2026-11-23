@@ -25,8 +25,10 @@
  *
  * Within a channel the digit is fixed, so bumping the base always increases the code. Promotion
  * raises the digit, so slop → nightly → preview installs as an update on the shared pre-release id.
- * A demotion lowers it, which Android refuses: uninstall `run.suite.slop.go` first. The full rule
- * is in `apps/go/docs/reference/android.md`.
+ * A demotion lowers it, which Android refuses, so a release build reads the newest published
+ * manifest for the package id and refuses a lower code before Gradle runs (delivery.md D4.2). An
+ * equal code is a rebuild of the same app version. The full rule is in
+ * `apps/go/docs/reference/android.md`.
  *
  * Usage:
  *   node scripts/android-release.mjs                    # stable, build and name the APK
@@ -200,6 +202,211 @@ export function versionCodeFor(base, channel) {
     );
   }
   return code;
+}
+
+/** The asset name every publication attaches for D2.1. */
+export const RELEASE_MANIFEST_ASSET = "release-manifest.json";
+
+/** The date part of every aggregate release tag: `YYYY.MM.DD`. */
+const AGGREGATE_TAG_DATE = "\\d{4}\\.\\d{2}\\.\\d{2}";
+
+/**
+ * Run one `gh` command with output captured.
+ *
+ * Exported and injectable so the monotonicity check can be tested without a
+ * network, a token or a published release.
+ */
+export function ghRunner({ cwd = ROOT, env = process.env } = {}) {
+  return (args) => {
+    const result = spawnSync("gh", args, {
+      cwd,
+      env,
+      encoding: "utf8",
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    return {
+      status: result.status ?? null,
+      stdout: String(result.stdout ?? ""),
+      stderr: String(result.stderr ?? ""),
+      error: result.error ?? null,
+    };
+  };
+}
+
+function ghFailure(action, result) {
+  const detail =
+    result.error?.message ?? (result.stderr.trim() || `gh exited ${result.status}`);
+  return new Error(`${action}:\n  ${detail}\nCheck \`gh auth status\`, then run this again.`);
+}
+
+/**
+ * The tag shape whose newest manifest this channel must compare against.
+ *
+ * Stable publishes `suite-YYYY.MM.DD`. A pre-release shares
+ * `run.suite.slop.go` across slop, nightly and preview, so one channel's newest
+ * manifest cannot answer what the shared id already carries: all three families
+ * do.
+ */
+export function manifestTagPattern(channel) {
+  const problem = channelProblem(channel);
+  if (problem !== null) throw new Error(problem);
+  if (isPreRelease(channel)) {
+    return new RegExp(
+      `^suite-(?:${PRE_RELEASE_CHANNELS.join("|")})-${AGGREGATE_TAG_DATE}$`,
+      "u",
+    );
+  }
+  return new RegExp(`^suite-${AGGREGATE_TAG_DATE}$`, "u");
+}
+
+/**
+ * The newest published release tag per tag family, newest first within a family.
+ *
+ * A draft is still being written, so it is not evidence of what was published.
+ * The tag carries its date, so lexical order is chronological for one shape.
+ */
+export function newestManifestTags(releases, channel) {
+  const pattern = manifestTagPattern(channel);
+  const published = (releases ?? [])
+    .filter((row) => row?.isDraft === false)
+    .map((row) => row.tagName)
+    .filter((tag) => typeof tag === "string" && pattern.test(tag))
+    .sort((left, right) => right.localeCompare(left));
+
+  if (!isPreRelease(channel)) return published.slice(0, 1);
+
+  return PRE_RELEASE_CHANNELS.map((family) => {
+    const prefix = `suite-${family}-`;
+    return published.find((tag) => tag.startsWith(prefix)) ?? null;
+  }).filter((tag) => tag !== null);
+}
+
+/** The published releases `gh` can see, with just the fields the check needs. */
+export function readReleaseIndex(gh) {
+  const result = gh(["release", "list", "--limit", "200", "--json", "tagName,isDraft"]);
+  if (result.error) throw ghFailure("could not run gh to list releases", result);
+  if (result.status !== 0) throw ghFailure("could not list GitHub releases", result);
+  let releases;
+  try {
+    releases = JSON.parse(result.stdout);
+  } catch {
+    throw new Error("gh release list did not print JSON");
+  }
+  if (!Array.isArray(releases)) throw new Error("gh release list did not print a list");
+  return releases;
+}
+
+/**
+ * One release's manifest, or null when that release carries none.
+ *
+ * A release from before manifests existed is not a failure: the check passes
+ * with a visible note until a code is recorded. A `gh` that cannot run, or an
+ * unreadable manifest, is a failure, because then no assertion is possible.
+ */
+export function readPublishedManifest(tag, gh) {
+  const result = gh([
+    "release",
+    "download",
+    tag,
+    "--pattern",
+    RELEASE_MANIFEST_ASSET,
+    "--output",
+    "-",
+  ]);
+  if (result.error) {
+    throw ghFailure(`could not download ${RELEASE_MANIFEST_ASSET} from ${tag}`, result);
+  }
+  if (result.status !== 0) {
+    const text = result.stderr.trim();
+    if (/no assets match|release not found|not found|HTTP 404/iu.test(text)) return null;
+    throw ghFailure(`could not download ${RELEASE_MANIFEST_ASSET} from ${tag}`, result);
+  }
+  try {
+    return JSON.parse(result.stdout);
+  } catch {
+    throw new Error(`${tag}'s ${RELEASE_MANIFEST_ASSET} is not JSON`);
+  }
+}
+
+/**
+ * The highest code recorded for one package id, and whether its artifact was seen.
+ *
+ * A manifest from another channel can sit on a release this check reads; its APK
+ * id differs, so it is ignored. `sawArtifact` distinguishes "no manifest for this
+ * package id yet" from "a manifest for it predates the versionCode field".
+ */
+export function highestPublishedVersionCode(manifests, packageId) {
+  let highest = null;
+  let sawArtifact = false;
+  for (const manifest of manifests ?? []) {
+    if (manifest === null || manifest === undefined) continue;
+    if (!Array.isArray(manifest.artifacts)) continue;
+    for (const artifact of manifest.artifacts) {
+      if (artifact?.kind !== "apk" || artifact.id !== packageId) continue;
+      sawArtifact = true;
+      if (!Number.isInteger(artifact.versionCode)) continue;
+      if (highest === null || artifact.versionCode > highest) highest = artifact.versionCode;
+    }
+  }
+  return { highest, sawArtifact };
+}
+
+/**
+ * Whether this code may ship, given the manifests already published for the id.
+ *
+ * Lower never ships. Equal is a nightly rebuild of the same app version with
+ * changed bytes, which sideload accepts with `-r`. No recorded code passes with
+ * a note, once, because the release that records the first code cannot compare
+ * against itself.
+ */
+export function versionCodeVerdict({ channel, packageId, versionCode, manifests = [] }) {
+  const { highest, sawArtifact } = highestPublishedVersionCode(manifests, packageId);
+
+  if (highest === null) {
+    return {
+      ok: true,
+      previous: null,
+      note: sawArtifact
+        ? "The newest published manifest for this package id records no versionCode yet, so " +
+          "this release records the first code; the next release is compared against it."
+        : "No published release manifest records a versionCode for this package id, so this " +
+          "release records the first code; the next release is compared against it.",
+    };
+  }
+
+  if (versionCode < highest) {
+    return {
+      ok: false,
+      previous: highest,
+      message:
+        `refusing the ${channel} build: versionCode ${versionCode} is lower than ${highest}, ` +
+        `the highest code already published for ${packageId}.\n` +
+        "A lower code never ships. Raise versionCode in apps/go/app.config.json until the new " +
+        "code is at least the published one; a return to a lower channel digit needs a base " +
+        "bump, and an uninstall on one phone cannot make the release sequence legal.",
+    };
+  }
+
+  return {
+    ok: true,
+    previous: highest,
+    note:
+      versionCode === highest
+        ? `versionCode ${versionCode} equals the highest published code; an equal code is a ` +
+          "rebuild of the same app version with changed bytes."
+        : null,
+  };
+}
+
+/** Read the evidence and decide, with `gh` injectable for an offline test. */
+export function versionCodePreflight({ channel, packageId, versionCode, gh = ghRunner() }) {
+  const tags = newestManifestTags(readReleaseIndex(gh), channel);
+  const manifests = tags.map((tag) => readPublishedManifest(tag, gh));
+  return {
+    ...versionCodeVerdict({ channel, packageId, versionCode, manifests }),
+    tags,
+    manifests,
+  };
 }
 
 /**
@@ -572,6 +779,30 @@ function uploadCommand({ tag, artifact }) {
       "--clobber",
     ],
   ];
+}
+
+/**
+ * Refuse a build whose code would move backwards on its package id (D4.2).
+ *
+ * This runs before Gradle, so a bad `app.config.json` base is a sentence rather
+ * than a finished artifact that cannot be published. `--upload` skips it: that
+ * path checks the bytes it was handed, and the build that produced them already
+ * asserted this.
+ */
+function assertVersionCodeCanShip({ config, channel }) {
+  const versionCode = versionCodeFor(config.versionCode, channel);
+  const packageId = CHANNEL_PACKAGE_ID[channel];
+  const verdict = versionCodePreflight({ channel, packageId, versionCode });
+  if (!verdict.ok) throw new Error(verdict.message);
+
+  process.stdout.write(`\n${GREEN}versionCode${RESET} ${versionCode} · ${packageId}\n`);
+  process.stdout.write(
+    verdict.previous === null
+      ? `  no published code yet; this release records ${versionCode}\n`
+      : `  highest published ${verdict.previous}; this build is ${versionCode}\n`,
+  );
+  if (verdict.note !== null) process.stdout.write(`  ${DIM}${verdict.note}${RESET}\n`);
+  return versionCode;
 }
 
 /**
@@ -1007,6 +1238,8 @@ async function main(argv) {
         "The APK name follows app.config.json, so the two have to agree before a release.",
     );
   }
+
+  assertVersionCodeCanShip({ config, channel });
 
   const toolchain = resolveToolchain();
   if (toolchain.problems.length > 0) {

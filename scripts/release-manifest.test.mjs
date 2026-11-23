@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
-import { buildManifest, sha256File } from "./release-manifest.mjs";
+import { apkIdentityFor, buildManifest, sha256File } from "./release-manifest.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
@@ -115,5 +115,77 @@ describe("release manifest", () => {
     );
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /checksum/u);
+  });
+});
+
+describe("APK channel identity", () => {
+  const config = JSON.parse(readFileSync(join(ROOT, "apps/go/app.config.json"), "utf8"));
+
+  it("records the stable version name and the base with digit 0", () => {
+    const identity = apkIdentityFor(config, "stable");
+    assert.equal(identity.versionName, config.version);
+    assert.equal(identity.versionCode, config.versionCode * 10);
+  });
+
+  it("records the channel suffix and its digit on every pre-release channel", () => {
+    for (const [channel, digit] of [
+      ["slop", 1],
+      ["nightly", 2],
+      ["preview", 3],
+    ]) {
+      const identity = apkIdentityFor(config, channel);
+      assert.equal(identity.versionName, `${config.version}-${channel}`);
+      assert.equal(identity.versionCode, config.versionCode * 10 + digit);
+    }
+  });
+
+  it("writes the code and name onto the APK artifact for stable and preview", () => {
+    for (const [channel, apkId, digit] of [
+      ["stable", "run.suite.go", 0],
+      ["preview", "run.suite.slop.go", 3],
+    ]) {
+      const dir = mkdtempSync(join(tmpdir(), "suite-manifest-"));
+      const flatpak = join(dir, "suite-shell.flatpak");
+      const commitFile = join(dir, "suite-shell.commit");
+      const apk = join(dir, "suite-go.apk");
+      const out = join(dir, "release-manifest.json");
+      writeFileSync(flatpak, "flatpak bytes");
+      writeFileSync(commitFile, `${"f".repeat(64)}\n`);
+      writeFileSync(apk, "apk bytes");
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          join(ROOT, "scripts", "release-manifest.mjs"),
+          "--channel",
+          channel,
+          "--flatpak",
+          flatpak,
+          "--flatpak-id",
+          channel === "stable" ? "run.suite.shell" : "run.suite.slop.shell",
+          "--flatpak-branch",
+          channel === "stable" ? "master" : channel,
+          "--flatpak-commit-file",
+          commitFile,
+          "--apk",
+          apk,
+          "--apk-id",
+          apkId,
+          "--out",
+          out,
+        ],
+        { cwd: ROOT, encoding: "utf8" },
+      );
+
+      assert.equal(result.status, 0, result.stderr);
+      const manifest = JSON.parse(readFileSync(out, "utf8"));
+      const artifact = manifest.artifacts.find((entry) => entry.kind === "apk");
+      assert.equal(artifact.id, apkId);
+      assert.equal(artifact.versionCode % 10, digit);
+      assert.equal(
+        artifact.versionName,
+        channel === "stable" ? config.version : `${config.version}-${channel}`,
+      );
+    }
   });
 });
