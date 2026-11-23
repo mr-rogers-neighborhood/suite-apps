@@ -6,9 +6,11 @@
 # `suite-YYYY.MM.DD` tags at the changelog commit. A release tag is therefore
 # followed by a dispatch; it never starts a second build from another tree.
 #
-# `publish` is off by default. A dispatch with it off runs the gate, builds and
-# bundles both artifacts, and stops: the rehearsal for a real promotion. Turning
-# it on runs in the `release` environment, which must require reviewers and be
+# `publish` is off by default. A dispatch with it off runs the gate, builds,
+# signs and bundles both artifacts, and stops: the rehearsal for a real
+# promotion. It still needs the environment secrets, because the Android release
+# APK cannot be built or verified without the release key. Turning `publish` on
+# runs in the `release` environment, which must require reviewers and be
 # restricted to `main` and release tags (ci.md C9.3, delivery.md D1.4, D5.5).
 # The approval is the human review of a preview (D3.3) and of a stable promotion
 # (D3.4). A stable dispatch is expected to name the commit already published as
@@ -141,8 +143,10 @@ jobs:
       - name: Fresh gate with e2e
         run: node scripts/gate.mjs --fresh
 
+      # Always: the release APK cannot be built without the keystore, and a
+      # rehearsal that skipped signing would not prove the publish path. The
+      # step fails early and loudly when the environment has no secrets.
       - name: Import the store and Android keys
-        if: inputs.publish
         env:
           SUITE_STORE_KEY: ${{ secrets.SUITE_STORE_KEY }}
           SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}

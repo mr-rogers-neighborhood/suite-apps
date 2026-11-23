@@ -11,8 +11,9 @@ Status: draft 0.1. Target for packaging, channels and release. Today's state is 
 The publication workflow is `.github/workflows/release.yml`: a manual
 `workflow_dispatch` for the `preview` or `stable` channel, with no pull-request or tag trigger.
 `publish` is off by default, so a dispatch rehearses the same gate, build and bundle without touching
-a channel; turning it on runs in the `release` environment, which is restricted to `main` and release
-tags and requires reviewers. Only the S3 target is wired; the `lan` target stays a workstation
+a channel; it still needs the environment secrets, because the Android release APK cannot be built or
+verified without the release key. Turning it on runs in the `release` environment, which is restricted
+to `main` and release tags and requires reviewers. Only the S3 target is wired; the `lan` target stays a workstation
 operation. An owner configures that environment with the secrets `SUITE_STORE_KEY`,
 `SUITE_STORE_KEY_ID`, `SUITE_GO_KEYSTORE`, `SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_ALIAS` and
 `SUITE_GO_KEY_PASSWORD`, and the variables `AWS_RELEASE_ROLE_ARN`, `SUITE_FLATPAK_S3_BUCKET` and
