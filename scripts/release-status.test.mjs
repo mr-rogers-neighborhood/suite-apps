@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import {
   APPS,
   AGGREGATE_TABLE_HEADER,
+  MANIFEST_FILE,
   aggregateDate,
   aggregateReleaseBody,
   aggregateSection,
@@ -29,6 +33,8 @@ import {
   pruneCandidates,
   publishAction,
   publishReleaseArgs,
+  readManifest,
+  releaseAssetUrl,
   releaseLabels,
   releasesPage,
   remoteLookupProblem,
@@ -735,6 +741,15 @@ describe("arguments", () => {
     assert.equal(parseArgs([]).channel, "stable");
     assert.throws(() => parseArgs(["--channel", "canary"]), /unknown channel/u);
   });
+
+  it("parses --manifest and defaults it to no override", () => {
+    assert.equal(parseArgs([]).manifest, null);
+    assert.equal(
+      parseArgs(["--manifest", "some/manifest.json"]).manifest,
+      "some/manifest.json",
+    );
+    assert.throws(() => parseArgs(["--manifest"]), /--manifest needs a value/u);
+  });
 });
 
 describe("channel releases", () => {
@@ -793,3 +808,196 @@ describe("channel releases", () => {
     ]);
   });
 });
+
+describe("release notes name their channel", () => {
+  const shell = APPS.find((app) => app.id === "shell");
+  const shellEntry = {
+    app: shell,
+    version: "0.2.0",
+    date: "2026-11-22",
+    tag: "shell-v0.2.0",
+    section: "### Added\n\n- **The host.** It exists.",
+  };
+  const withSuperapps = [shellEntry, ...entries, goEntry];
+
+  /** The text between two headings, so a label is read under the right app. */
+  function between(body, heading, next) {
+    const start = body.indexOf(heading);
+    assert.ok(start >= 0, `${heading} is missing`);
+    const end = body.indexOf(next, start + heading.length);
+    return body.slice(start, end === -1 ? body.length : end);
+  }
+
+  it("says nightly under Suite Shell and Suite Go", () => {
+    const body = aggregateReleaseBody(withSuperapps, {
+      date: "2026-11-23",
+      tag: "suite-nightly-2026.11.23",
+      channel: "nightly",
+    });
+    assert.match(
+      between(body, "## Suite Shell (desktop)", "## Suite Go (mobile)"),
+      /\*\*Channel:\*\* nightly/u,
+    );
+    assert.match(
+      between(body, "## Suite Go (mobile)", "## Also on the remote"),
+      /\*\*Channel:\*\* nightly/u,
+    );
+  });
+
+  it("says preview on a preview body", () => {
+    const body = aggregateReleaseBody(withSuperapps, {
+      date: "2026-11-23",
+      tag: "suite-preview-2026.11.23",
+      channel: "preview",
+    });
+    assert.match(body, /\*\*Channel:\*\* preview/u);
+    assert.doesNotMatch(body, /\*\*Channel:\*\* stable/u);
+    assert.ok(body.includes("flatpak install --user suite run.suite.slop.shell//preview"));
+  });
+
+  it("installs the pre-release id on its branch, not the stable id", () => {
+    const body = aggregateReleaseBody(withSuperapps, {
+      date: "2026-11-23",
+      tag: "suite-nightly-2026.11.23",
+      channel: "nightly",
+    });
+    assert.ok(body.includes("flatpak install --user suite run.suite.slop.shell//nightly"));
+    assert.ok(body.includes("flatpak run run.suite.slop.shell//nightly"));
+    assert.ok(!body.includes("flatpak install --user suite run.suite.shell"));
+    assert.ok(!body.includes("flatpak run run.suite.shell"));
+
+    const stable = aggregateReleaseBody(withSuperapps, { date: "2026-11-23" });
+    assert.ok(stable.includes("flatpak install --user suite run.suite.shell\n"));
+    assert.ok(!stable.includes("run.suite.slop.shell"));
+  });
+
+  it("still says stable on a stable body", () => {
+    const body = aggregateReleaseBody(withSuperapps, { date: "2026-11-23" });
+    assert.match(
+      between(body, "## Suite Shell (desktop)", "## Suite Go (mobile)"),
+      /\*\*Channel:\*\* stable/u,
+    );
+  });
+
+  it("still calls a frozen row frozen, and names no channel for the others", () => {
+    const body = aggregateReleaseBody(withSuperapps, {
+      date: "2026-11-23",
+      channel: "nightly",
+    });
+    assert.match(body, /\| \[Suite Canvas\]\([^)]*\) \| frozen \|/u);
+    assert.match(body, /\| \[Suite Start\]\([^)]*\) \| — \|/u);
+
+    const frozen = appReleaseBody(
+      APPS.find((app) => app.id === "canvas"),
+      "### Fixed\n\n- **A package.** It packaged.",
+      { channel: "nightly" },
+    );
+    assert.match(frozen, /\*\*Channel:\*\* frozen/u);
+    assert.doesNotMatch(frozen, /\*\*Channel:\*\* nightly/u);
+  });
+
+  it("keeps releaseLabels on the standalone release channel too", () => {
+    assert.deepEqual(releaseLabels(shell, "preview"), [
+      "- **Channel:** preview",
+      "- **Maturity:** alpha",
+    ]);
+    assert.deepEqual(releaseLabels(shell), [
+      "- **Channel:** stable",
+      "- **Maturity:** alpha",
+    ]);
+  });
+});
+
+describe("the Artifacts section", () => {
+  const shell = APPS.find((app) => app.id === "shell");
+  const shellEntry = {
+    app: shell,
+    version: "0.2.0",
+    date: "2026-11-22",
+    tag: "shell-v0.2.0",
+    section: "### Added\n\n- **The host.** It exists.",
+  };
+  const flatpakCommit = "c".repeat(64);
+  const flatpakSha = "d".repeat(64);
+  const apkSha = "e".repeat(64);
+  const manifest = {
+    format: 1,
+    channel: "nightly",
+    commit: "a".repeat(40),
+    lockfile: { path: "pnpm-lock.yaml", sha256: "b".repeat(64) },
+    artifacts: [
+      {
+        kind: "flatpak",
+        id: "run.suite.slop.shell",
+        branch: "nightly",
+        commit: flatpakCommit,
+        file: ".dev/release/suite-shell-nightly.flatpak",
+        sha256: flatpakSha,
+        size: 1024,
+      },
+      {
+        kind: "apk",
+        id: "run.suite.slop.go",
+        file: "apps/go/.dev/release/suite-go-nightly-0.1.0.apk",
+        sha256: apkSha,
+        size: 2048,
+      },
+    ],
+    signers: { flatpak: null, android: "0".repeat(64) },
+  };
+  const tag = "suite-nightly-2026.11.23";
+
+  it("reads both digests, the manifest link and the verify commands", () => {
+    const dir = mkdtempSync(join(tmpdir(), "suite-release-manifest-"));
+    try {
+      const path = join(dir, MANIFEST_FILE);
+      writeFileSync(path, JSON.stringify(manifest));
+      const read = readManifest(path);
+      assert.ok(read !== null);
+
+      const body = aggregateReleaseBody([shellEntry, ...entries, goEntry], {
+        date: "2026-11-23",
+        tag,
+        channel: "nightly",
+        manifest: read,
+      });
+
+      assert.match(body, /## Artifacts/u);
+      assert.ok(body.includes(flatpakCommit), "the OSTree commit is named");
+      assert.ok(body.includes(flatpakSha), "the Flatpak bundle digest is named");
+      assert.ok(body.includes(apkSha), "the APK digest is named");
+      assert.ok(body.includes("branch `nightly`"), "the Flatpak branch is named");
+      assert.ok(body.includes(`[${MANIFEST_FILE}](${releaseAssetUrl(tag, MANIFEST_FILE)})`));
+      assert.match(body, /sha256sum -c suite-go-nightly-0\.1\.0\.apk\.sha256/u);
+      assert.ok(body.includes("flatpak install --user suite run.suite.slop.shell//nightly"));
+      assert.ok(body.includes("flatpak info run.suite.slop.shell//nightly"));
+
+      const draft = aggregateReleaseBody([shellEntry, ...entries, goEntry], {
+        date: "2026-11-23",
+        tag,
+        channel: "nightly",
+        draft: true,
+        manifest: read,
+      });
+      assert.ok(draft.includes(apkSha), "a draft may state a digest: the bytes are already built");
+      assert.match(draft, /these are\s+the final bytes/u);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("has no Artifacts section when no manifest exists", () => {
+    const body = aggregateReleaseBody([shellEntry, ...entries, goEntry], {
+      date: "2026-11-23",
+      tag: "suite-2026.11.23",
+    });
+    assert.doesNotMatch(body, /## Artifacts/u);
+    assert.doesNotMatch(body, /sha256sum/u);
+    assert.doesNotMatch(body, /release-manifest\.json/u);
+    assert.equal(
+      readManifest(join(tmpdir(), "suite-no-such-manifest", MANIFEST_FILE)),
+      null,
+    );
+  });
+});
+
