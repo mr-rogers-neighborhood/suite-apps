@@ -12,7 +12,7 @@ owns the rationale, and [Status](status.md) owns what exists.
   dependency order.
 - The gate is local and CI runs the same command. `--fresh` proves a commit, not the working tree. A
   pull request runs the rows its diff can break (`scripts/affected.mjs`), `main` runs the full fresh
-  gate, and the merge queue adds Start's e2e; the VM stays the independent gate.
+  gate, and the merge queue adds Start's e2e. The `vm` remote and its gate are retired.
 - `@suite/desktop` is shared Electron policy. Canvas's shell is `@suite/canvas-desktop`.
 - Suite Help (`apps/help`) is the documentation reader and it is a shipped app. It indexes every
   file and declaration, renders the handbook from `docs/`, and keeps module notes in

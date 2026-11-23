@@ -97,21 +97,8 @@ phrases.
 2. Re-run that app's check alone.
 3. If the failure is in another app, report it rather than editing that app to make this one pass.
 
-## The independent gate
+## CI is the proof
 
-`git push vm main` queues the same `--fresh` gate on the `suite-dev` machine in a capped unit. Read the
-result with:
-
-```sh
-ssh suite-dev cat ~/ci/status.json
-ssh suite-dev tail -f ~/ci/logs/<sha>.log
-```
-
-The run is capped at 5 GiB high and 6 GiB max, and takes a lock so a second push waits rather than
-doubling memory. See `scripts/ci/` for the setup.
-
-The hook checks the transient unit a second after queueing it. If the unit did not start, the push
-prints a `remote: post-receive: … nothing will gate <sha>` line and the hook exits non-zero: the
-branch is updated, but no run exists. Treat that line as an ungated push — fix the cause shown by
-`sudo journalctl -u suite-gate-<sha12>-<timestamp>`, then push a new commit (re-pushing an unchanged
-ref does not run the hook).
+`main` runs the full fresh gate on every push (`main-gate`), and the merge queue runs the affected
+rows plus Start's e2e. The `vm` remote and the `scripts/ci/` hook are retired; nothing else needs to be
+scheduled, and `suite-dev` remains only the LAN Flatpak test host.

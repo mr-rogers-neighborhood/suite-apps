@@ -197,14 +197,7 @@ opens to the three-mode explorer, and the Handbook is the `/handbook` route; its
 under `docs/`. Production is served from `suite-help://app/`, with SPA fallback to `index.html`;
 there is no `next start` and no loopback HTTP server.
 
-## The independent gate
+## CI is the proof
 
-`git push vm main` queues the same `--fresh` gate on the `suite-dev` machine, in a memory-capped
-unit. The result is in `~/ci/status.json` there:
-
-```sh
-ssh suite-dev cat ~/ci/status.json
-ssh suite-dev tail -f ~/ci/logs/<sha>.log
-```
-
-See `scripts/ci/` and [Run the gate](../how-to/run-the-gate.md).
+`main` runs the full fresh gate on every push, and the merge queue runs the affected rows plus Start's
+e2e. The `vm` remote and `scripts/ci/` are retired; see [Run the gate](../how-to/run-the-gate.md).
