@@ -54,7 +54,7 @@ jobs:
       # Authenticode, no auto-update. `directories.output` is `release`, so the
       # artifact lands in apps/shell/release.
       - name: Package the unsigned Windows zip
-        run: pnpm --filter @suite/shell exec electron-builder --win zip
+        run: pnpm --filter @suite/shell exec electron-builder --win zip --publish never
       - name: SBOM
         run: pnpm sbom --sbom-format spdx --out suite-shell-windows-x64.spdx.json
       - name: Attest provenance
@@ -108,7 +108,7 @@ jobs:
       # `--mac zip` because a dmg needs a signing/notarization story this build
       # does not have; the arch is the runner's own arm64.
       - name: Package the unsigned macOS zip
-        run: pnpm --filter @suite/shell exec electron-builder --mac zip
+        run: pnpm --filter @suite/shell exec electron-builder --mac zip --publish never
       - name: SBOM
         run: pnpm sbom --sbom-format spdx --out suite-shell-macos-arm64.spdx.json
       - name: Attest provenance
