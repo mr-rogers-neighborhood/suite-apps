@@ -160,7 +160,7 @@ download instead of describing it as missing.
 
 `--channel` accepts `stable` (the default), `slop`, `nightly` and `preview`. The stable asset keeps
 `suite-go-<version>.apk` and the `suite-go.apk` alias, so
-`https://github.com/mr-rogers-neighborhood/suite-apps/releases/latest/download/suite-go.apk` always
+`https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk` always
 names the newest stable build. A pre-release is `suite-go-<channel>-<version>.apk` and has no stable
 alias.
 

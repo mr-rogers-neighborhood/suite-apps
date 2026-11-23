@@ -43,7 +43,7 @@ import { registerSyncIpc } from "./sync/ipc.js";
 const APP_ID = "run.suite.canvas";
 
 /** Where "Support Suite…" goes. One line, so it can point at whatever page should take money. */
-const SUPPORT_URL = "https://github.com/mr-rogers-neighborhood/suite-apps";
+const SUPPORT_URL = "https://github.com/mrrnbhd/suite-apps";
 
 // The single-instance lock lives in `userData`, so two copies of the shell need
 // two directories. A test or a second demo profile sets this; a normal launch

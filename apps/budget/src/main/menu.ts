@@ -4,7 +4,7 @@ import { app, BrowserWindow, dialog, Menu, type MenuItemConstructorOptions, shel
 const isMac = process.platform === "darwin";
 
 /** Where "Support Suite…" goes. One line, so it can point at whatever page should take money. */
-const SUPPORT_URL = "https://github.com/mr-rogers-neighborhood/suite-apps";
+const SUPPORT_URL = "https://github.com/mrrnbhd/suite-apps";
 
 function send(command: AppCommand): void {
   BrowserWindow.getFocusedWindow()?.webContents.send("ui:command", command);

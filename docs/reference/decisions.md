@@ -121,7 +121,7 @@ suite stays separate Flatpaks plus Start.
   pack's own scoped files. Import is not a move, and the host does not rewrite the source.
 - Start remains the shipping hub until the pack is proven. The pack proof does not move Start's
   catalogue, routing or updates into the host.
-- Go's format split is [#202](https://github.com/mr-rogers-neighborhood/suite-apps/issues/202); that
+- Go's format split is [#202](https://github.com/mrrnbhd/suite-apps/issues/202); that
   issue owns the detail. The desktop pack format does not converge here.
 
 ## Packaging

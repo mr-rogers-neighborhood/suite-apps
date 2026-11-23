@@ -3,7 +3,7 @@
 You need Node and pnpm, pinned in the root `package.json`. Nothing else: no database, no container, no account.
 
 ```sh
-git clone https://github.com/mr-rogers-neighborhood/suite-apps.git
+git clone https://github.com/mrrnbhd/suite-apps.git
 cd suite-apps/src
 pnpm install
 pnpm dev

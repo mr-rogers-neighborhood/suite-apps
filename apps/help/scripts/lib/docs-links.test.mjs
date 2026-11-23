@@ -47,13 +47,13 @@ describe("rewriteHref", () => {
 
   it("sends a link that leaves docs/ to GitHub", () => {
     expect(rewrite("../apps/help/README.md", "README.md")).toBe(
-      "https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/help/README.md",
+      "https://github.com/mrrnbhd/suite-apps/blob/main/apps/help/README.md",
     );
     expect(rewrite("../../apps/help/README.md", "reference/help.md")).toBe(
-      "https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/help/README.md",
+      "https://github.com/mrrnbhd/suite-apps/blob/main/apps/help/README.md",
     );
     expect(rewrite("../apps/canvas/handbook/", "README.md")).toBe(
-      "https://github.com/mr-rogers-neighborhood/suite-apps/tree/main/apps/canvas/handbook/",
+      "https://github.com/mrrnbhd/suite-apps/tree/main/apps/canvas/handbook/",
     );
   });
 
@@ -113,7 +113,7 @@ describe("rewriteLinks", () => {
         dirs,
       ),
     ).toBe(
-      "[`RELEASES.md`](https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/RELEASES.md) is the mirror.",
+      "[`RELEASES.md`](https://github.com/mrrnbhd/suite-apps/blob/main/RELEASES.md) is the mirror.",
     );
   });
 });

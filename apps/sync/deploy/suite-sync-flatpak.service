@@ -1,6 +1,6 @@
 [Unit]
 Description=Suite Sync relay (the Flatpak, running headless as you)
-Documentation=https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/apps/sync/docs/how-to/relay.md
+Documentation=https://github.com/mrrnbhd/suite-apps/blob/main/apps/sync/docs/how-to/relay.md
 After=network-online.target
 Wants=network-online.target
 

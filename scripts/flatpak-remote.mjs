@@ -369,7 +369,7 @@ function flatpakrepoText({ publicKey, branch, url }) {
     "Title=Suite",
     "Comment=Suite apps, signed by the Suite store key",
     `Url=${base}/`,
-    "Homepage=https://github.com/mr-rogers-neighborhood/suite-apps",
+    "Homepage=https://github.com/mrrnbhd/suite-apps",
     `DefaultBranch=${branch}`,
     `GPGKey=${publicKey.toString("base64")}`,
     "",

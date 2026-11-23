@@ -67,7 +67,7 @@ export function HandbookPage() {
             Tours
           </Link>
           <a
-            href="https://github.com/mr-rogers-neighborhood/suite-apps"
+            href="https://github.com/mrrnbhd/suite-apps"
             target="_blank"
             rel="noreferrer"
             className="rounded-lg p-1.5 hover:bg-fd-accent"
@@ -305,7 +305,7 @@ function HandbookArticle({ page }: { page: NonNullable<ReturnType<typeof source.
           <p className="text-sm leading-6 text-fd-muted-foreground">{page.data.description}</p>
         ) : null}
         <a
-          href={`https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/${sourcePathFor(page.path)}`}
+          href={`https://github.com/mrrnbhd/suite-apps/blob/main/${sourcePathFor(page.path)}`}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 rounded-lg border border-fd-border px-2.5 py-1 text-xs text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"

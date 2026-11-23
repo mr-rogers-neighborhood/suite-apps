@@ -12,8 +12,8 @@ import { posix } from "node:path";
 
 export const HANDBOOK_BASE = "/handbook";
 
-const GITHUB_BLOB = "https://github.com/mr-rogers-neighborhood/suite-apps/blob/main/";
-const GITHUB_TREE = "https://github.com/mr-rogers-neighborhood/suite-apps/tree/main/";
+const GITHUB_BLOB = "https://github.com/mrrnbhd/suite-apps/blob/main/";
+const GITHUB_TREE = "https://github.com/mrrnbhd/suite-apps/tree/main/";
 
 /** Split `path#fragment` into the path and the fragment, including its `#`. */
 function splitHash(href) {

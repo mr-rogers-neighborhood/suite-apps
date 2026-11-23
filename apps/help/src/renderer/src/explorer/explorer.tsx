@@ -558,7 +558,7 @@ export function Explorer() {
             Tours
           </Link>
           <a
-            href="https://github.com/mr-rogers-neighborhood/suite-apps"
+            href="https://github.com/mrrnbhd/suite-apps"
             target="_blank"
             rel="noreferrer"
             className="rounded-lg p-1.5 hover:bg-fd-accent"

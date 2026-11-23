@@ -59,6 +59,6 @@ manifest signature and every file hash verified against the pinned key before ex
 ## Reporting a vulnerability
 
 Use GitHub's private security advisory for
-[mr-rogers-neighborhood/suite-apps](https://github.com/mr-rogers-neighborhood/suite-apps/security/advisories/new).
+[mrrnbhd/suite-apps](https://github.com/mrrnbhd/suite-apps/security/advisories/new).
 Do not open a public issue for a vulnerability. Include the version, the platform, and the smallest
 reproduction you can.
