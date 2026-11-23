@@ -52,6 +52,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { changelogSection, versionFromPackage } from "./release.mjs";
+import { CHANNELS, channelProblem } from "./lib/channel.mjs";
 import {
   DEFAULT_PUBLIC_URL,
   REMOTE_NAME,
@@ -207,6 +208,7 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --publish            publish the existing drafts, then write ${RELEASES_FILE}
   --write              write ${RELEASES_FILE} and stop short of GitHub
   --date <YYYY-MM-DD>  date for the aggregate tag (default: the newest app release)
+  --channel <name>     stable (default), slop, nightly or preview; names the APK asset
   --help               print this text
 
 Pass one of --draft, --publish, --write and --dry-run.
@@ -281,13 +283,13 @@ export function installCommand(app) {
 }
 
 /** The APK a Suite Go version attaches to the rolling release. */
-export function goApkName(version) {
-  return `suite-go-${version}.apk`;
+export function goApkName(version, channel = "stable") {
+  return channel === "stable" ? `suite-go-${version}.apk` : `suite-go-${channel}-${version}.apk`;
 }
 
 /** The Go APK's download URL on the aggregate release. */
-export function goApkUrl(tag, version) {
-  return releaseAssetUrl(tag, goApkName(version));
+export function goApkUrl(tag, version, channel = "stable") {
+  return releaseAssetUrl(tag, goApkName(version, channel));
 }
 
 /**
@@ -301,13 +303,13 @@ export function goApkUrl(tag, version) {
  */
 export function installCell(
   app,
-  { version = null, tag = null, apkLive = false, draft = false } = {},
+  { version = null, tag = null, apkLive = false, draft = false, channel = "stable" } = {},
 ) {
   if (app.kind === "flatpak") return `\`${installCommand(app)}\``;
   if (app.kind === "apk") {
-    const name = version === null ? "suite-go.apk" : goApkName(version);
+    const name = version === null ? "suite-go.apk" : goApkName(version, channel);
     if (apkLive && tag !== null && version !== null) {
-      return `[${name}](${goApkUrl(tag, version)})`;
+      return `[${name}](${goApkUrl(tag, version, channel)})`;
     }
     if (draft) return `\`${name}\` (attached to this draft before publication)`;
     return `\`${name}\` (not uploaded yet)`;
@@ -540,7 +542,7 @@ export function tagPlanDisposition(problem, mode) {
  */
 export function aggregateRows(
   entries,
-  { markPending = false, tag = null, apkLive = false, draft = false } = {},
+  { markPending = false, tag = null, apkLive = false, draft = false, channel = "stable" } = {},
 ) {
   return entries.map((entry) => {
     const { app, version, date, tag: appTag } = entry;
@@ -549,7 +551,7 @@ export function aggregateRows(
     const release = pending
       ? `\`${appTag}\` (pending)`
       : `[\`${appTag}\`](${releaseUrl(appTag)})`;
-    const install = installCell(app, { version, tag, apkLive, draft });
+    const install = installCell(app, { version, tag, apkLive, draft, channel });
     return (
       `| [${app.name}](${blobUrl(app.changelog)}) | ${channelLabel(app)} | ` +
       `${maturityLabel(app)} | ${version} | ${released} | ${release} | ${install} |`
@@ -599,13 +601,13 @@ export function aggregateSection(title, entries, options = {}) {
  * same promotion: it is uploaded to the draft and the link is live once
  * `--publish` flips it, so the draft must not claim the asset already exists.
  */
-function goInstallNote(entries, { tag = null, apkLive = false, draft = false }) {
+function goInstallNote(entries, { tag = null, apkLive = false, draft = false, channel = "stable" }) {
   const go = entries.find((entry) => entry.app.kind === "apk") ?? null;
   if (go === null) return [];
-  const name = goApkName(go.version);
+  const name = goApkName(go.version, channel);
   if (apkLive && tag !== null) {
     return [
-      `Suite Go is not a Flatpak. This release carries its release-signed APK, [${name}](${goApkUrl(tag, go.version)}),`,
+      `Suite Go is not a Flatpak. This release carries its release-signed APK, [${name}](${goApkUrl(tag, go.version, channel)}),`,
       "with a SHA-256 checksum beside it; sideload it with `adb install -r -t`.",
       "",
     ];
@@ -635,14 +637,15 @@ function goInstallNote(entries, { tag = null, apkLive = false, draft = false }) 
  */
 export function aggregateReleaseBody(
   entries,
-  { date, tag = null, apkLive = false, draft = false },
+  { date, tag = null, apkLive = false, draft = false, channel = "stable" },
 ) {
   const desktop = entriesForSection(entries, "desktop");
   const otherDesktop = desktop.filter((entry) => entry.app.id !== "shell");
   const shell = entries.find((entry) => entry.app.id === "shell") ?? null;
   const go = entries.find((entry) => entry.app.id === "go") ?? null;
   return [
-    `**Suite Shell** is the desktop superapp; **Suite Go** is the mobile superapp. This is the ${date} build.`,
+    `**Suite Shell** is the desktop superapp; **Suite Go** is the mobile superapp. This is the ${date} build` +
+      (channel === "stable" ? "." : `, published on the **${channel}** channel.`),
     "The split apps remain on the same signed remote, below; the legacy ones are frozen.",
     "",
     "## Suite Shell (desktop)",
@@ -659,10 +662,10 @@ export function aggregateReleaseBody(
     "## Suite Go (mobile)",
     "",
     ...(go === null ? [] : [...releaseLabels(go.app), ""]),
-    ...goInstallNote(entries, { tag, apkLive, draft }),
+    ...goInstallNote(entries, { tag, apkLive, draft, channel }),
     "## Also on the remote",
     "",
-    ...aggregateTable(otherDesktop, { tag, apkLive, draft }),
+    ...aggregateTable(otherDesktop, { tag, apkLive, draft, channel }),
     "",
     "`frozen` marks a legacy app: its code and last artifact stay, and it gets no new",
     "pre-release channel until it becomes a pack.",
@@ -691,7 +694,7 @@ export function aggregateReleaseBody(
 export function appReleaseBody(
   app,
   section,
-  { tag = null, apkLive = false, draft = false } = {},
+  { tag = null, apkLive = false, draft = false, channel = "stable" } = {},
 ) {
   // The rolling release is the page a person should read; this one is the note
   // for a version. Say so first, so a direct link from the table does not look
@@ -759,7 +762,7 @@ export function appReleaseBody(
  */
 export function releasesPage(
   entries,
-  { date, tag, aggregatePublished = false, apkLive = false },
+  { date, tag, aggregatePublished = false, apkLive = false, channel = "stable" },
 ) {
   const latest = aggregatePublished
     ? [
@@ -817,7 +820,7 @@ export function releasesPage(
       apkLive,
     }),
     "",
-    ...goInstallNote(entries, { tag, apkLive }),
+    ...goInstallNote(entries, { tag, apkLive, channel }),
     "## Update",
     "",
     "Once the remote is added, the desktop apps update with:",
@@ -847,6 +850,7 @@ export function parseArgs(argv) {
     dryRun: false,
     write: false,
     date: null,
+    channel: "stable",
     help: false,
   };
 
@@ -1344,6 +1348,9 @@ async function main(argv) {
     return;
   }
 
+  const channelMiss = channelProblem(options.channel);
+  if (channelMiss !== null) throw new Error(channelMiss);
+
   const mode = options.draft
     ? "draft"
     : options.publish
@@ -1425,7 +1432,8 @@ async function main(argv) {
   // draft can already carry the APK: the upload happens between `--draft` and
   // `--publish`, and the publish phase re-renders the body from this read.
   const goEntry = entries.find((entry) => entry.app.kind === "apk") ?? null;
-  const goAsset = goEntry === null ? null : goApkName(goEntry.version);
+  const channel = options.channel;
+  const goAsset = goEntry === null ? null : goApkName(goEntry.version, channel);
   const aggregateAssets = aggregateExists ? releaseAssets(tag) : null;
   const apkLive =
     goAsset !== null &&
@@ -1438,8 +1446,14 @@ async function main(argv) {
   // A draft body says the APK is attached during the same promotion; a published
   // body states what the release actually carries.
   const draftBodies = mode === "draft" || mode === "dry-run";
-  const body = aggregateReleaseBody(entries, { date, tag, apkLive, draft: draftBodies });
-  const page = releasesPage(entries, { date, tag, aggregatePublished, apkLive });
+  const body = aggregateReleaseBody(entries, {
+    date,
+    tag,
+    apkLive,
+    draft: draftBodies,
+    channel,
+  });
+  const page = releasesPage(entries, { date, tag, aggregatePublished, apkLive, channel });
   const notes = [
     ...entries.map((entry) => ({
       path: join(NOTES_DIR, `${entry.tag}.md`),
@@ -1447,6 +1461,7 @@ async function main(argv) {
         tag,
         apkLive,
         draft: draftBodies,
+        channel,
       }),
     })),
     { path: join(NOTES_DIR, `${tag}.md`), body },
@@ -1551,7 +1566,7 @@ async function main(argv) {
   for (const entry of entries) {
     process.stdout.write(`\n--- ${entry.app.name} ${entry.version} · draft body ---\n\n`);
     process.stdout.write(
-      appReleaseBody(entry.app, entry.section, { tag, apkLive, draft: true }),
+      appReleaseBody(entry.app, entry.section, { tag, apkLive, draft: true, channel }),
     );
   }
 

@@ -48,8 +48,9 @@
 # - The Flatpak summary is re-signed by `flatpak-remote.mjs` at publish time; the
 #   OSTree commit does not change, so the workflow attests the commit (bundled)
 #   rather than the summary. The APK is uploaded from the bytes this job built.
-# - `release-status.mjs` has no channel input, so a `preview` dispatch still
-#   refreshes the rolling `suite-YYYY.MM.DD` release.
+# - A `preview` dispatch still refreshes the rolling `suite-YYYY.MM.DD` release;
+#   it names the preview APK and channel in the body rather than pretending it is
+#   the stable build.
 # - `RELEASES.md` is rewritten in the runner and not committed; the mirror on
 #   `main` updates when someone commits the generated file.
 # - The `lan` target stays a workstation operation: a runner has neither the SSH
@@ -367,7 +368,8 @@ jobs:
         if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/release-status.mjs --draft
+          CHANNEL: ${{ inputs.channel }}
+        run: node scripts/release-status.mjs --draft --channel "${CHANNEL}"
 
       - name: Attach the manifest to the draft
         if: inputs.publish
@@ -408,7 +410,8 @@ jobs:
         if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/release-status.mjs --publish
+          CHANNEL: ${{ inputs.channel }}
+        run: node scripts/release-status.mjs --publish --channel "${CHANNEL}"
 
       - name: Upload the artifacts
         if: inputs.publish

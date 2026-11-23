@@ -707,3 +707,22 @@ describe("arguments", () => {
     assert.throws(() => parseArgs(["--latest"]), /unknown option/u);
   });
 });
+
+describe("channel-aware notes", () => {
+  it("names the preview APK on the rolling release", () => {
+    assert.equal(goApkName("0.1.0", "preview"), "suite-go-preview-0.1.0.apk");
+    assert.match(goApkUrl("suite-2026.11.21", "0.1.0", "preview"), /suite-go-preview-0\.1\.0\.apk$/u);
+    assert.equal(goApkName("0.1.0"), "suite-go-0.1.0.apk");
+  });
+
+  it("says which channel the rolling release was last published from", () => {
+    const body = aggregateReleaseBody([...entries, goEntry], {
+      date: "2026-11-21",
+      tag: "suite-2026.11.21",
+      apkLive: true,
+      channel: "preview",
+    });
+    assert.match(body, /published on the \*\*preview\*\* channel/u);
+    assert.match(body, /suite-go-preview-0\.1\.0\.apk/u);
+  });
+});
