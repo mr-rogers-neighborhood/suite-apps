@@ -21,9 +21,9 @@ operation. An owner configures that environment with the secrets `SUITE_STORE_KE
 `SUITE_STORE_KEY_ID`, `SUITE_GO_KEYSTORE`, `SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_ALIAS` and
 `SUITE_GO_KEY_PASSWORD`, and the variables `AWS_RELEASE_ROLE_ARN`, `SUITE_FLATPAK_S3_BUCKET` and
 `SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION`. A release tag is followed by a dispatch. Publication is
-three steps in one run: `release-status.mjs --draft` creates the releases as drafts,
+three steps in one run: `release-status.mjs --draft` creates the rolling release as a draft,
 `android-release.mjs --upload` attaches the exact attested APK, and `release-status.mjs --publish`
-flips the drafts and writes `RELEASES.md`. `--channel` names the APK asset, the channel in the body, and the release itself: stable is
+flips the draft and writes `RELEASES.md`. `--channel` names the APK asset, the channel in the body, and the release itself: stable is
 `suite-YYYY.MM.DD` and Latest; `nightly` and `preview` are `suite-<channel>-YYYY.MM.DD`, marked
 pre-release and never Latest, so they stay immutable and out of the stable page. Nightly keeps the
 newest 14 releases (`--prune --channel nightly --keep 14`); the stable body links the newest preview
@@ -136,9 +136,9 @@ key.
 
 ## 6. Releases, tags and notes
 
-**D6.1** One rolling `suite-YYYY.MM.DD` release is the Latest human mirror. Per-app releases are
-`<app>-v<version>` and are not Latest. The signed Flatpak remote is the update path; GitHub Releases
-are the mirror and the APK download.
+**D6.1** The rolling `suite-YYYY.MM.DD` release is the only GitHub release; the two channel pages,
+`suite-preview-<date>` and `suite-nightly-<date>`, are the other two. Per-app tags are retired. The
+signed Flatpak remote is the update path; GitHub Releases are the mirror and the APK download.
 
 **D6.2** Release notes carry the channel and product maturity separately, plus the artifact digest
 and the verification command. A note without a digest is incomplete.

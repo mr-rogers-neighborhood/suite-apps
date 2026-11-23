@@ -159,7 +159,7 @@ suite stays separate Flatpaks plus Start.
 - `scripts/flatpak.mjs` builds the local deployment and signs the repository summary with the store
   key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to the public
   `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`. The relay publishes on
-  the same remote; its `sync-v<version>` tarball release is retired history, and `scripts/release.mjs`
+  the same remote; its `sync-v<version>` tarball release is retired, and `scripts/release.mjs`
   now holds only the shared release helpers and the gate proof.
 - The relay app's store and certificate pair live under the app's own data directory
   (`$XDG_DATA_HOME/suite-sync`), not in a documents folder, and its one host grant outside the
@@ -168,8 +168,8 @@ suite stays separate Flatpaks plus Start.
   when Tailscale is running, and `network` only after a confirmation in the window — the app's form
   of the CLI's `--trust-all-remote`. `SUITE_SYNC_BIND` overrides it for a test or a host unit, and
   the window says the reach is fixed rather than pretending the selector decides.
-- A version lives in one place and a tag names one app's release. [Version ownership](../how-to/package-and-release.md#version-ownership)
-  states which file owns it and which prefix the tag uses.
+- A version lives in one place and the rolling release carries it; per-app tags are retired.
+  [Version ownership](../how-to/package-and-release.md#version-ownership) states which file owns it.
 - The Flatpak store key signs the OSTree summary. Flatpak verifies the summary and every object's
   content hash on install and update. The relay's update key signed the retired tarball's
   `SHA256SUMS`; no shipped artifact carries it any more.
