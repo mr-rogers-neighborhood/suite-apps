@@ -42,6 +42,21 @@ The dry run prints every `aws s3 sync`, `aws s3 cp` and `aws cloudfront create-i
 and runs none of them. Publication signs the summary, verifies it, writes the `.flatpakrepo`, then
 uploads the same bytes; it never builds a second repository.
 
+A pipeline that built the repository in an earlier step names it instead of relying on the default:
+
+```sh
+node scripts/flatpak-remote.mjs --target s3 \
+  --from-repo "$SUITE_FLATPAK_REPO" \
+  --commit-file .dev/release/flatpak-commits --publish
+```
+
+`--from-repo` falls back to `SUITE_FLATPAK_REPO` and then `~/suite-flatpak/repo`, so a run that
+built the repository this time needs no extra flag. `--commit-file` is written after this run signs
+the summary and before the upload: one `<commit>  <ref>` line for each app ref on the published
+branch. The summary is re-signed by the publish, with the same key and the same semantics; the
+commits are not rewritten, so attest the commit file rather than the signed summary. The file is
+written before the upload starts, so a failed upload leaves behind the commits the run tried to ship.
+
 The cache rule follows from the names. The content-addressed trees (`objects/**`, `refs/**`,
 `summaries/**`, `deltas/**`, `delta-indexes/**`) sync with
 `Cache-Control: public,max-age=31536000,immutable` and no `--delete`, because an old object or delta
@@ -171,6 +186,28 @@ is a different signer, so it cannot update a release install.
 [Suite Go's README](../../apps/go/README.md#install-the-apk) owns the install path, and [Android
 notes](../../apps/go/docs/reference/android.md#release-signing-and-channels) own the channels, the
 `versionCode` rule and the keystore.
+
+A pipeline that already built and attested the APK uploads those exact bytes with `--upload`:
+
+```sh
+mise exec -- node scripts/android-release.mjs --upload .dev/release/suite-go-0.1.0.apk --publish
+mise exec -- node scripts/android-release.mjs --upload "$APK" --channel slop --publish
+```
+
+The upload path never runs Gradle and never reads the keystore. It checks the APK's certificate
+against the pinned release certificate, reads the package id and version name from `aapt`, and
+stages the same bytes under the asset name, writing the checksum into `apps/go/.dev/release`. A
+stable APK names its own channel; a pre-release shares `run.suite.slop.go` across slop, nightly and
+preview, so `--channel` is required and is checked against both the package id and the version name
+suffix. Without `--publish` the command verifies the APK and prints the upload only, like the build
+path.
+
+An `--upload` publish needs a draft rolling release. A published release is refused because its
+assets are locked; `--allow-published` is the explicit exception, and only for a repository that has
+not enabled immutable releases. An unknown immutability state is refused rather than guessed. The
+build path (`--publish` without `--upload`) still builds and uploads in one step for a workstation,
+and re-hashes the staged APK immediately before the upload so the bytes sent are the bytes it
+checked.
 
 ## The relay
 
