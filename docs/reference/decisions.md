@@ -10,8 +10,9 @@ owns the rationale, and [Status](status.md) owns what exists.
 - Shared packages are `workspace:*`. Never reintroduce a git-tag pin or a `link:` path.
 - Each app owns its gate. The root gate builds shared packages once, then runs each app's gate in
   dependency order.
-- The gate is local. `--fresh` proves a commit, not the working tree. No CI service gates a pull
-  request.
+- The gate is local and CI runs the same command. `--fresh` proves a commit, not the working tree. A
+  pull request runs the rows its diff can break (`scripts/affected.mjs`), `main` runs the full fresh
+  gate, and the merge queue adds Start's e2e; the VM stays the independent gate.
 - `@suite/desktop` is shared Electron policy. Canvas's shell is `@suite/canvas-desktop`.
 - Suite Help (`apps/help`) is the documentation reader and it is a shipped app. It indexes every
   file and declaration, renders the handbook from `docs/`, and keeps module notes in

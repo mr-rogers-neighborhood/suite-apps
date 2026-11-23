@@ -1,6 +1,7 @@
 # Run the gate
 
-The gate is local. Every claim about a change being verified names the command that produced it.
+The gate is local, and CI runs the same command. Every claim about a change being verified names the
+command that produced it.
 
 ## A normal change
 
@@ -23,6 +24,19 @@ mise exec -- node scripts/gate.mjs
 ```sh
 mise exec -- node scripts/gate.mjs --only canvas
 ```
+
+## What CI runs
+
+CI selects rows from the diff, it does not guess: the `detect` job calls the same helper a person can
+call, then each row runs the gate above.
+
+```sh
+mise exec -- node scripts/affected.mjs --base origin/main
+```
+
+A docs-only change selects no app; a shared-package change selects every app that depends on it; a
+path the map does not understand selects every row. Run it before pushing to see what the pull request
+will run.
 
 ## Prove the commit, not the tree
 

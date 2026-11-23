@@ -30,22 +30,9 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pruneGateExports } from "./lib/gateExports.mjs";
+import { PIPELINE } from "./lib/pipeline.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-
-/** App roots inside the monorepo, in the order their gates must run. */
-const PIPELINE = [
-  { repo: "sync", package: "@suite/sync-server" },
-  { repo: "start", package: "@suite/start", e2e: true },
-  // The host spike. It depends on the shared Electron policy and theme, not on
-  // any app, so it runs beside the shipped apps until the migration is proven.
-  { repo: "shell", package: "@suite/shell" },
-  { repo: "help", package: "@suite/help" },
-  { repo: "canvas", package: "@suite/canvas" },
-  { repo: "planner", package: "@suite/planner" },
-  { repo: "budget", package: "@suite/budget" },
-  { repo: "go", package: "@suite/go-app" },
-];
 
 const argv = process.argv.slice(2);
 const fresh = argv.includes("--fresh");
@@ -209,6 +196,7 @@ const scripts =
             "--test",
             "scripts/pack.test.mjs",
             "scripts/budget-pack.test.mjs",
+            "scripts/affected.test.mjs",
             "scripts/channel.test.mjs",
             "scripts/shell-channel.test.mjs",
             "scripts/android-release.test.mjs",
@@ -220,7 +208,7 @@ const scripts =
         return {
           ok: result.status === 0,
           detail:
-            result.status === 0 ? "pack, channel, release and spec tests" : `exit ${result.status}`,
+            result.status === 0 ? "pack, channel, affected, release and spec tests" : `exit ${result.status}`,
         };
       })();
 

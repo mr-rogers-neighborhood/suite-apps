@@ -15,14 +15,18 @@ mise exec -- node scripts/gate.mjs                 # this working tree
 mise exec -- node scripts/gate.mjs --only canvas
 mise exec -- node scripts/gate.mjs --fresh         # this commit, clean install
 mise exec -- node scripts/gate.mjs --no-e2e        # skip Start's e2e suite
+mise exec -- node scripts/affected.mjs --base origin/main  # rows a diff selects
 ```
 
-The gate builds the workspace libraries (`packages/*` and `apps/*/packages/*`) once, runs
-`node --test scripts/pack.test.mjs scripts/budget-pack.test.mjs scripts/channel.test.mjs` for the
-scripts that no app's gate covers, then runs each app's own `check:full` in dependency order. It
-writes `.dev/gate-status.json`. `--fresh` exports `HEAD` with `git archive`, installs from the
-lockfile, and runs the same order in that clean tree. The cross-app Playwright suite runs after the
-checks, under `xvfb-run` when there is no display.
+The gate builds the workspace libraries (`packages/*` and `apps/*/packages/*`) once, runs the root
+scripts' `node --test` checks (pack, budget pack, affected, channel, release and spec), then runs each
+app's own `check:full` in dependency order. It writes `.dev/gate-status.json`. `--fresh` exports
+`HEAD` with `git archive`, installs from the lockfile, and runs the same order in that clean tree. The
+cross-app Playwright suite runs after the checks, under `xvfb-run` when there is no display.
+
+CI does not run a second pipeline: `detect` calls `scripts/affected.mjs`, and each selected row calls
+`node scripts/gate.mjs --only <app>`. `scripts/affected.mjs` reads the workspace graph, so a shared
+package reaches every consumer; a path it does not map selects every row.
 
 Run heavy checks under a cap so a fan-out cannot take the desktop with it:
 

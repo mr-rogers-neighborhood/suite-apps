@@ -1,0 +1,39 @@
+# The trunk proof: every push to `main` runs the whole gate from a fresh export
+# of the commit, the same command a person runs. The VM remains the independent
+# copy until the matrix matches it for a month (ci.md, Migration 6).
+#
+# e2e stays on the merge queue and nightly; a trunk push must not spend its
+# budget on a desktop suite that already ran on the queue entry.
+name: main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  main-gate:
+    name: main-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Fresh gate
+        run: node scripts/gate.mjs --fresh --no-e2e
