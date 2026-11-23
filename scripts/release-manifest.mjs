@@ -1,0 +1,164 @@
+#!/usr/bin/env node
+/**
+ * The release manifest: one JSON entry point for everything a channel ships.
+ *
+ * D2.1 asks for a digest, a source commit, a lockfile hash and a signer identity
+ * for every artifact, and for the channel to point at a manifest entry rather
+ * than a folder. This writes that file for one publication: the two artifacts
+ * this repository ships, their hashes, the commit they came from, the lockfile
+ * that resolved their dependencies, and the keys that signed them.
+ *
+ * The manifest is attached to the rolling release draft before the draft is
+ * published, so it becomes immutable with the release.
+ *
+ * Usage:
+ *   node scripts/release-manifest.mjs \
+ *     --channel preview \
+ *     --flatpak .dev/release/suite-shell-preview.flatpak \
+ *     --flatpak-id run.suite.slop.shell \
+ *     --flatpak-branch preview \
+ *     --flatpak-commit-file .dev/release/suite-shell-preview.commit \
+ *     --apk apps/go/.dev/release/suite-go-preview-0.1.0.apk \
+ *     --apk-id run.suite.slop.go \
+ *     --out .dev/release/release-manifest.json
+ *
+ * spec: D2.1
+ */
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { ANDROID_RELEASE_CERT_SHA256 } from "./lib/androidKey.mjs";
+
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+
+export function sha256File(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+/** The manifest object, from values the caller already proved. */
+export function buildManifest({ channel, commit, lockfileSha, artifacts, signers }) {
+  return {
+    format: 1,
+    channel,
+    commit,
+    lockfile: { path: "pnpm-lock.yaml", sha256: lockfileSha },
+    artifacts,
+    signers,
+  };
+}
+
+function takeValue(argv, index, flag) {
+  const value = argv[index + 1];
+  if (value === undefined || value.startsWith("--")) {
+    throw new Error(`${flag} needs a value`);
+  }
+  return value;
+}
+
+function main(argv) {
+  const options = {
+    channel: null,
+    flatpak: null,
+    flatpakId: null,
+    flatpakBranch: null,
+    flatpakCommitFile: null,
+    apk: null,
+    apkId: null,
+    out: null,
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--channel") {
+      options.channel = takeValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--flatpak") {
+      options.flatpak = takeValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--flatpak-id") {
+      options.flatpakId = takeValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--flatpak-branch") {
+      options.flatpakBranch = takeValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--flatpak-commit-file") {
+      options.flatpakCommitFile = takeValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--apk") {
+      options.apk = takeValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--apk-id") {
+      options.apkId = takeValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--out") {
+      options.out = takeValue(argv, index, arg);
+      index += 1;
+    } else {
+      throw new Error(`unknown option ${arg}`);
+    }
+  }
+
+  for (const [flag, value] of [
+    ["--channel", options.channel],
+    ["--flatpak", options.flatpak],
+    ["--flatpak-id", options.flatpakId],
+    ["--flatpak-branch", options.flatpakBranch],
+    ["--flatpak-commit-file", options.flatpakCommitFile],
+    ["--apk", options.apk],
+    ["--apk-id", options.apkId],
+    ["--out", options.out],
+  ]) {
+    if (value === null) throw new Error(`${flag} is required`);
+  }
+
+  const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  const lockfileSha = sha256File(join(ROOT, "pnpm-lock.yaml"));
+  const flatpakCommit = readFileSync(options.flatpakCommitFile, "utf8").trim();
+  if (!/^[0-9a-f]{64}$/u.test(flatpakCommit)) {
+    throw new Error(
+      `${options.flatpakCommitFile} does not carry one OSTree commit checksum: ${flatpakCommit}`,
+    );
+  }
+
+  const manifest = buildManifest({
+    channel: options.channel,
+    commit,
+    lockfileSha,
+    artifacts: [
+      {
+        kind: "flatpak",
+        id: options.flatpakId,
+        branch: options.flatpakBranch,
+        commit: flatpakCommit,
+        file: relative(ROOT, options.flatpak),
+        sha256: sha256File(options.flatpak),
+        size: statSync(options.flatpak).size,
+      },
+      {
+        kind: "apk",
+        id: options.apkId,
+        file: relative(ROOT, options.apk),
+        sha256: sha256File(options.apk),
+        size: statSync(options.apk).size,
+      },
+    ],
+    signers: {
+      flatpak: process.env.SUITE_STORE_KEY_ID?.trim() || null,
+      android: ANDROID_RELEASE_CERT_SHA256,
+    },
+  });
+
+  writeFileSync(options.out, `${JSON.stringify(manifest, null, 2)}\n`);
+  process.stdout.write(`${options.out}\n`);
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  try {
+    main(process.argv.slice(2));
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exit(1);
+  }
+}

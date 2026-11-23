@@ -197,6 +197,7 @@ const scripts =
             "scripts/pack.test.mjs",
             "scripts/budget-pack.test.mjs",
             "scripts/affected.test.mjs",
+            "scripts/release-manifest.test.mjs",
             "scripts/channel.test.mjs",
             "scripts/shell-channel.test.mjs",
             "scripts/android-release.test.mjs",

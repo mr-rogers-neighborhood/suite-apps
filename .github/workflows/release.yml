@@ -271,6 +271,36 @@ jobs:
           pnpm sbom --sbom-format spdx --out .dev/release/suite-apps.spdx.json
           test -s .dev/release/suite-apps.spdx.json
 
+      # D2.1: one manifest per publication, naming the commit, the lockfile and
+      # the artifact digests. It is attached to the draft before publication, so
+      # it becomes immutable with the release.
+      - name: Write the release manifest
+        if: inputs.publish
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          APK: ${{ steps.apk.outputs.path }}
+          SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
+        run: |
+          set -euo pipefail
+          if [ "${CHANNEL}" = "stable" ]; then
+            app_id=run.suite.shell
+            branch=master
+            apk_id=run.suite.go
+          else
+            app_id=run.suite.slop.shell
+            branch="${CHANNEL}"
+            apk_id=run.suite.slop.go
+          fi
+          node scripts/release-manifest.mjs \
+            --channel "${CHANNEL}" \
+            --flatpak ".dev/release/suite-shell-${CHANNEL}.flatpak" \
+            --flatpak-id "${app_id}" \
+            --flatpak-branch "${branch}" \
+            --flatpak-commit-file ".dev/release/suite-shell-${CHANNEL}.commit" \
+            --apk "${APK}" \
+            --apk-id "${apk_id}" \
+            --out .dev/release/release-manifest.json
+
       # Evidence before publication (D4.1 step 3, D5.4). A rehearsal changes
       # nothing outside the runner, so it stops before these.
       - name: Attest the Flatpak provenance
@@ -298,6 +328,12 @@ jobs:
         with:
           subject-path: ${{ steps.apk.outputs.path }}
           sbom-path: .dev/release/suite-apps.spdx.json
+
+      - name: Attest the release manifest
+        if: inputs.publish
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: .dev/release/release-manifest.json
 
       - name: Check the S3 publishing configuration
         if: inputs.publish
@@ -332,6 +368,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/release-status.mjs --draft
+
+      - name: Attach the manifest to the draft
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$(node --input-type=module \
+            -e "import('./scripts/release-status.mjs').then((m) => console.log(m.currentAggregateTag()))")"
+          test -n "${tag}"
+          gh release upload "${tag}" .dev/release/release-manifest.json --clobber
 
       - name: Upload the exact APK into the draft
         if: inputs.publish
@@ -370,6 +417,7 @@ jobs:
           name: suite-${{ inputs.channel }}-release
           path: |
             .dev/release/suite-apps.spdx.json
+            .dev/release/release-manifest.json
             .dev/release/suite-shell-${{ inputs.channel }}.commit
             .dev/release/suite-shell-${{ inputs.channel }}.flatpak
             ${{ steps.apk.outputs.path }}
