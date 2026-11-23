@@ -142,9 +142,18 @@ shape**, the same rule the desktop Flatpaks follow ([Channels](../../../../docs/
 
 `base` is `versionCode` in `apps/go/app.config.json`. The digit is fixed per channel, so a release
 that bumps the base always increases the code within that channel. Promotion raises the digit, so
-slop → nightly → preview installs as an update on the shared pre-release id. A demotion lowers it,
-which Android refuses: run `adb uninstall run.suite.slop.go` first. Stable and pre-release ids never
-collide, so their sequences are independent.
+slop → nightly → preview installs as an update on the shared pre-release id. Stable and pre-release
+ids never collide, so their sequences are independent.
+
+A lower code never ships. Before Gradle runs, `scripts/android-release.mjs` reads the newest
+published release manifest for the package id — stable from `suite-<date>`, a pre-release from the
+newest `suite-slop-*`, `suite-nightly-*` and `suite-preview-*` — and refuses when the new `versionCode`
+is lower than any code recorded there. An equal code is allowed: a nightly rebuild of the same app
+version keeps the code and changes the bytes, and sideload accepts it with `-r`. A return to a lower
+digit (preview → nightly) therefore needs a base bump in `apps/go/app.config.json`, never an
+uninstall. The first release after this rule records the first code; every release after it is
+compared against that manifest. Uninstalling `run.suite.slop.go` still makes a demotion install on
+one phone, but it cannot make a lower release legal.
 
 Build and name:
 
