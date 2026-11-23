@@ -31,7 +31,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Flatpak | Working | Signed local store and a published public remote at `flatpak.suite.run`, with `suite-dev` as the local test host: Canvas, Planner, Budget, Help and Start install and update through Flatpak; Start compares a deployment with its own origin; [Packaging channels](packaging-channels.md#flatpak) owns the remote |
 | macOS and Windows | Not built | No signing identity, so nothing is published |
 | Accessibility | Partial | Contrast is machine-checked in the desktop apps; Canvas runs axe over its Storybook stories, Planner and Start have no axe gate, Budget's Storybook panel does not fail the build, and the relay's loopback console has no axe; no full manual pass recorded. The statements own the detail: [Canvas](../../apps/canvas/ACCESSIBILITY.md), [Planner](../../apps/planner/ACCESSIBILITY.md), [Budget](../../apps/budget/ACCESSIBILITY.md), [Start](../../apps/start/ACCESSIBILITY.md), [Sync](../../apps/sync/ACCESSIBILITY.md) |
-| The gate | Working | Local, at the root; `--fresh` proves a commit rather than a working tree |
+| The gate | Working | Local, at the root; `--fresh` proves a commit rather than a working tree. A pull request runs the rows its diff can break, `main` runs the full fresh gate, and the merge queue adds Start's e2e |
 
 ## Reading the table
 
@@ -43,8 +43,10 @@ is not on a channel; Canvas, Planner, Budget and Help stay frozen until they bec
 in parentheses (`Frozen (alpha)`) is the product label the app carried when it froze, separate from
 the release channels the superapp uses.
 
-The gate is local by decision. Nothing checks a pull request, and nothing runs overnight. The evidence
-is a command that can be run; see [Commands](commands.md).
+The gate is one command, and CI runs that command rather than a second path. A pull request runs the
+rows its diff can break, `main` runs the full fresh gate, and the merge queue adds Start's e2e.
+Nothing runs overnight yet, and `suite-dev` remains the independent full gate. The evidence is a
+command that can be run; see [Commands](commands.md).
 
 ## Where to go next
 

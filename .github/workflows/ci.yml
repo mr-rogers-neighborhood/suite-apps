@@ -1,18 +1,15 @@
-# Phase 1 of the CI spec: fast static checks on every change, a manual full gate,
-# and one aggregator the merge queue can require. The VM gate remains the full
-# independent proof until the matrix lands.
+# Phase 2 of the CI spec: a pull request runs the checks its diff can break, the
+# merge queue adds Start's e2e suite, and the root checks stay unconditional.
+# The full fresh gate on `main` lives in main.yml; nightly packaging is Phase 3.
 #
-# The spec check is conditional because this workflow lands before the spec PR;
-# it turns on automatically when scripts/spec.test.mjs exists. The affected-app
-# matrix, e2e, packaging and release jobs are Phase 2+; see docs/spec/ci.md.
+# The affected map is scripts/affected.mjs, which reads the workspace graph. A
+# path it does not understand selects every row; it never silently skips one.
 name: ci
 
 on:
   pull_request:
     branches: [main]
   merge_group:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -23,6 +20,34 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  detect:
+    name: detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.affected.outputs.matrix }}
+      e2e: ${{ steps.affected.outputs.e2e }}
+      docs_only: ${{ steps.affected.outputs.docs_only }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve the base
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "merge_group" ]; then
+            echo "SUITE_BASE=${{ github.event.merge_group.base_sha }}" >> "$GITHUB_ENV"
+          elif [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            git fetch --no-tags origin "+refs/heads/${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+            echo "SUITE_BASE=origin/${GITHUB_BASE_REF}" >> "$GITHUB_ENV"
+          else
+            git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+            echo "SUITE_BASE=origin/main" >> "$GITHUB_ENV"
+          fi
+      - name: Affected rows
+        id: affected
+        run: node scripts/affected.mjs --base "$SUITE_BASE"
+
   fast:
     name: fast
     runs-on: ubuntu-latest
@@ -30,8 +55,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -55,14 +78,79 @@ jobs:
       - name: Scripts without a build
         run: >-
           node --test
+          scripts/affected.test.mjs
           scripts/channel.test.mjs
           scripts/shell-channel.test.mjs
           scripts/android-release.test.mjs
           scripts/release-status.test.mjs
 
+  apps:
+    name: apps (${{ matrix.repo }})
+    needs: detect
+    if: needs.detect.result == 'success' && needs.detect.outputs.matrix != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Base ref for `--changed`
+        if: matrix.repo != 'none' && github.event_name == 'pull_request'
+        run: git fetch --no-tags origin "+refs/heads/${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+      - name: Install
+        if: matrix.repo != 'none'
+        run: pnpm install --frozen-lockfile
+      - name: Playwright browser (Canvas stories)
+        if: matrix.repo == 'canvas'
+        run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
+      - name: Nothing affected
+        if: matrix.repo == 'none'
+        run: echo "No app gate is affected by this change."
+      - name: Gate ${{ matrix.repo }}
+        if: matrix.repo != 'none'
+        run: node scripts/gate.mjs --only "${{ matrix.repo }}" --no-e2e
+
+  e2e:
+    name: e2e
+    needs: detect
+    if: needs.detect.result == 'success' && (github.event_name == 'merge_group' || needs.detect.outputs.e2e == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Start e2e
+        run: node scripts/gate.mjs --only start --e2e
+
   full-gate:
     name: full-gate
-    # Phase 1 runs the full fresh gate on demand. Phase 2 wires it to main.
+    # Kept for an on-demand full tree until Phase 3's nightly owns it.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -84,12 +172,18 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [fast, full-gate]
+    needs: [detect, fast, apps, e2e, full-gate]
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate
         run: |
+          test "${{ needs.detect.result }}" = "success"
           test "${{ needs.fast.result }}" = "success"
+          test "${{ needs.apps.result }}" = "success"
+          if [ "${{ needs.e2e.result }}" != "success" ] && [ "${{ needs.e2e.result }}" != "skipped" ]; then
+            echo "e2e: ${{ needs.e2e.result }}"
+            exit 1
+          fi
           if [ "${{ needs.full-gate.result }}" != "success" ] && [ "${{ needs.full-gate.result }}" != "skipped" ]; then
             echo "full-gate: ${{ needs.full-gate.result }}"
             exit 1
