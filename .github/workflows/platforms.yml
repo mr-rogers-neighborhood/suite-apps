@@ -220,7 +220,7 @@ jobs:
         run: |
           set -euo pipefail
           cd apps/shell/release
-          shasum -a 256 *.zip > SHA256SUMS
+          shasum -a 256 ./*.zip > SHA256SUMS
           cat > README.txt <<'EOF'
           Suite Shell - unsigned macOS test build
 
@@ -294,7 +294,7 @@ jobs:
         run: |
           set -euo pipefail
           cd apps/shell/release
-          shasum -a 256 *.zip > SHA256SUMS
+          shasum -a 256 ./*.zip > SHA256SUMS
           cat > README.txt <<'EOF'
           Suite Shell - unsigned macOS Intel test build
 
