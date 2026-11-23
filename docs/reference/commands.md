@@ -155,6 +155,23 @@ Suite Go's APK and relinks it. Without `--publish` it prints every step and chan
 individual commands and the gate-proof rule are in [Package and
 release](../how-to/package-and-release.md#release-suite-shell-the-host).
 
+## Delivery signals
+
+```sh
+mise exec -- node scripts/delivery-signals.mjs --since 30
+```
+
+Reads this repository's releases, Actions runs and `main` commits through `gh` and prints one table.
+`--json` prints the same model as a document; `--fixture <path>` computes offline from a saved one.
+Releases count per channel (`stable`, `nightly`, `preview`, `slop`) by publication date. Lead time is
+the median and p90 from a nightly run's `headSha` committer date to the run's creation, so it measures
+the pipeline, not an install. Change-fail is the share of completed `main` push and `merge_group` runs
+of this repository's own workflows that failed, which says nothing about a red nightly or release run.
+Rework is the share of non-merge `main` commits whose subject starts with `revert` or, for a `fix`,
+whose changed path an earlier commit in the window also changed; it is a churn proxy, not a defect
+rate. The footer of the table states each rule and each gap. `.github/workflows/signals.yml` runs it
+every Monday at 04:30 UTC and appends the table to the run summary.
+
 ## Docs
 
 ```sh

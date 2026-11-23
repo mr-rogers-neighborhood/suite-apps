@@ -1,0 +1,39 @@
+# Delivery signals (D9.1, D9.2): publication frequency per channel, merge → nightly
+# lead time, change-fail rate and rework rate, appended to the run summary.
+#
+# It reads releases, Actions runs and main commits through gh and writes nothing
+# back: no issue, no comment, no artifact. A failed read fails the job instead of
+# summarizing a partial window.
+name: signals
+
+on:
+  schedule:
+    - cron: "30 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: signals
+  cancel-in-progress: false
+
+jobs:
+  signals:
+    name: delivery-signals
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Delivery signals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/delivery-signals.mjs --since 30 | tee -a "$GITHUB_STEP_SUMMARY"
