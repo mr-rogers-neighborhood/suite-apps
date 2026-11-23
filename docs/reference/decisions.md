@@ -1,6 +1,8 @@
 # Decisions
 
-The rules that shape this repository. Each is current; the code follows it.
+The rules that shape this repository. Each is current; the code follows it. Cross-boundary host, pack,
+relay and catalogue behavior is owned by the [superapp specification](../spec/superapp.md); this page
+owns the rationale, and [Status](status.md) owns what exists.
 
 ## Workspace
 
@@ -261,9 +263,11 @@ suite stays separate Flatpaks plus Start.
 ## Product boundary
 
 - A document is a file the user owns. The hub returns a path or bytes; it never parses a document.
-- No account, no telemetry, no project-operated server.
+- No account, no telemetry, no project-operated document, sync, identity or account service. The
+  signed Flatpak store is distribution only.
 - Sync is a server the user runs. It persists and authenticates; it does not own the truth.
-- Collaboration is a session while devices are connected. A sleeping device is not woken.
+- Collaboration is a session while devices are connected. A sleeping device may be signalled, but it
+  is never woken to accept document data or a write.
 - A reminder is a delivery, not a subscription: the container passes a title and a time to the
   platform, stores nothing, and carries nothing on the next launch. A pack asks again, and a denied
   permission is shown rather than swallowed.

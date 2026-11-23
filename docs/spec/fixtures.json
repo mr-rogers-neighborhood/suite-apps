@@ -1,0 +1,107 @@
+{
+  "_comment": "The minimum positive and negative corpus for the superapp spec. `valid` must validate; each `invalid` entry must fail, and its clause must exist in superapp.md and ledger.md.",
+  "valid": {
+    "format": "suite.pack",
+    "id": "chart",
+    "name": "Chart",
+    "description": "A local-first chart pack.",
+    "version": "1.2.0",
+    "entry": "index.html",
+    "contractVersion": 2,
+    "publisher": { "key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "id": "suite" },
+    "capabilities": ["documents", "network", "sync", "identity.pack"],
+    "optionalCapabilities": ["notifications"],
+    "documents": [
+      {
+        "id": "chart",
+        "format": "suite.chart",
+        "version": 3,
+        "mode": "single",
+        "migrations": [{ "from": 1, "to": 2, "entry": "migrate-1-2.html" }],
+        "projection": "project.html",
+        "criticalFields": ["title"]
+      }
+    ],
+    "blobs": [{ "store": "assets", "class": "asset" }],
+    "sync": { "documents": ["chart"], "blobs": ["assets"] },
+    "network": { "allow": ["https://api.example.com"] },
+    "platforms": ["desktop", "mobile"],
+    "input": ["pointer", "keyboard"],
+    "defaultLocale": "en",
+    "locales": ["en", "fr"],
+    "widgets": [
+      {
+        "id": "summary",
+        "title": "Summary",
+        "size": "2x1",
+        "capabilities": ["capture"],
+        "action": { "type": "capture", "fields": [] },
+        "settings": [],
+        "data": { "scope": "projection", "read": ["title"] }
+      }
+    ],
+    "codeWidgets": [
+      {
+        "id": "chart-card",
+        "title": "Chart card",
+        "size": "1x1",
+        "capabilities": ["capture"],
+        "action": { "type": "capture", "fields": [] },
+        "settings": [],
+        "data": { "scope": "projection", "read": ["title"] },
+        "entry": "widget.html",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "fallback": {
+          "id": "chart-card",
+          "title": "Chart card",
+          "size": "1x1",
+          "capabilities": ["capture"],
+          "action": { "type": "capture", "fields": [] },
+          "settings": [],
+          "data": { "scope": "projection", "read": ["title"] }
+        }
+      }
+    ],
+    "components": [{ "kind": "map", "fallback": "web" }],
+    "contributions": {
+      "commands": [],
+      "menus": [],
+      "fileExtensions": [".chart"],
+      "deepLinks": ["chart"]
+    },
+    "subpackages": [{ "id": "reports", "entry": "reports/index.html" }],
+    "addons": [
+      {
+        "id": "chart-export",
+        "version": "1.0.0",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "export": { "entry": "export.html" },
+    "license": "MIT",
+    "source": "https://example.com/chart",
+    "files": [
+      { "path": "index.html", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bytes": 1200 },
+      { "path": "migrate-1-2.html", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "bytes": 400 },
+      { "path": "project.html", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "bytes": 400 },
+      { "path": "widget.html", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "bytes": 800 },
+      { "path": "reports/index.html", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "bytes": 900 },
+      { "path": "export.html", "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "bytes": 500 }
+    ],
+    "signature": "c2lnbmF0dXJl"
+  },
+  "invalid": [
+    { "clause": "S3.5", "name": "missing signature", "delete": ["signature"] },
+    { "clause": "S3.7", "name": "unknown top-level field", "set": { "telemetry": true } },
+    { "clause": "S3.6", "name": "entry escapes the pack", "set": { "entry": "../evil.html" } },
+    { "clause": "S3.1", "name": "file path escapes the pack", "set": { "files": [{ "path": "../index.html", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bytes": 1 }] } },
+    { "clause": "S4.1", "name": "unknown capability", "set": { "capabilities": ["documents", "root"] } },
+    { "clause": "S4.4", "name": "wildcard network origin", "set": { "network": { "allow": ["https://*.example.com"] } } },
+    { "clause": "S4.4", "name": "empty network allowlist", "set": { "network": { "allow": [] } } },
+    { "clause": "S2.1", "name": "publisher without a key", "set": { "publisher": { "id": "suite" } } },
+    { "clause": "S9.2", "name": "code widget without fallback", "set": { "codeWidgets": [{ "id": "chart-card", "title": "Chart card", "size": "1x1", "capabilities": ["capture"], "action": { "type": "capture" }, "entry": "widget.html", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" }] } },
+    { "clause": "S9.4", "name": "unknown widget data scope", "set": { "widgets": [{ "id": "summary", "title": "Summary", "size": "1x1", "capabilities": ["capture"], "action": {}, "data": { "scope": "everything" } }] } },
+    { "clause": "S3.9", "name": "add-on with a bad hash", "set": { "addons": [{ "id": "chart-export", "version": "1.0.0", "sha256": "not-a-hash" }] } },
+    { "clause": "S10.4", "name": "empty input profile", "set": { "input": [] } }
+  ]
+}

@@ -79,7 +79,8 @@ Never restate a version in prose here. Link to the file that holds it.
 ## Editing rules
 
 - **The explorer is the structure.** Browser, Modules and Tours are the reading model. Reference
-  facts are generated; do not create a parallel section by hand.
+  facts are generated; do not create a parallel section by hand. The one normative exception is
+  [docs/spec](spec/README.md): it is a target contract, and its ledger is the evidence.
 - **Do not add a new Diátaxis page.** The four old sections are a notes archive. A new explanation
   goes in `docs/modules/`; a new guided path goes in `docs/tours/`. The
   [idea tracker](reference/ideas.md) is the one planning exception the owner asked for; it owns no
