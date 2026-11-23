@@ -1,7 +1,11 @@
 # Nightly proof: the full gate with e2e, then the two artifacts that carry this
-# repository's installs. It builds and attests; it does not publish. A nightly
-# artifact is not a release, and publication still needs the signed Flatpak
-# remote and the release keystore in a protected environment (ci.md, C9).
+# repository's installs.
+#
+# While `NIGHTLY_PUBLISH` is unset, this builds the debug APK and an unsigned
+# Flatpak bundle and attests them without touching a channel. Set the repository
+# variable to `true` once the `release` environment holds its keys, and the run
+# switches to `release.yml`: the same full gate, the release-signed APK and the
+# signed Flatpak, published to the nightly channel without a reviewer (D3.2).
 #
 # A failure opens or updates one issue instead of a new one per night (C10.1).
 name: nightly
@@ -21,6 +25,7 @@ concurrency:
 jobs:
   gate:
     name: nightly-gate
+    if: vars.NIGHTLY_PUBLISH != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -47,6 +52,7 @@ jobs:
   package-linux:
     name: package-linux
     needs: gate
+    if: vars.NIGHTLY_PUBLISH != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -108,6 +114,7 @@ jobs:
   package-android:
     name: package-android
     needs: gate
+    if: vars.NIGHTLY_PUBLISH != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -165,9 +172,24 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  # The publishing mode. It runs the whole release workflow, including its own
+  # full gate, so the nightly proof and the artifact that ships are the same run.
+  publish:
+    name: publish-nightly
+    if: vars.NIGHTLY_PUBLISH == 'true'
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/release.yml
+    with:
+      channel: nightly
+      publish: true
+    secrets: inherit
+
   report:
     name: report
-    needs: [gate, package-linux, package-android]
+    needs: [gate, package-linux, package-android, publish]
     # Green nights close the rolling issue; red ones open or update it. One
     # issue, not one per night (C10.1).
     if: always()
@@ -183,16 +205,21 @@ jobs:
           GATE: ${{ needs.gate.result }}
           LINUX: ${{ needs.package-linux.result }}
           ANDROID: ${{ needs.package-android.result }}
+          PUBLISH: ${{ needs.publish.result }}
         with:
           script: |
             const label = "ci-nightly";
             const title = "Nightly gate is red";
+            // One of the two modes runs; the other is skipped by design.
             const results = {
               gate: process.env.GATE,
               "package-linux": process.env.LINUX,
               "package-android": process.env.ANDROID,
+              "publish-nightly": process.env.PUBLISH,
             };
-            const failed = Object.entries(results).filter(([, result]) => result !== "success");
+            const failed = Object.entries(results).filter(
+              ([, result]) => result !== "success" && result !== "skipped",
+            );
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
             try {

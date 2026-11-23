@@ -12,13 +12,19 @@ The publication workflow is `.github/workflows/release.yml`: a manual
 `workflow_dispatch` for the `preview` or `stable` channel, with no pull-request or tag trigger.
 `publish` is off by default, so a dispatch rehearses the same gate, build and bundle without touching
 a channel; it still needs the environment secrets, because the Android release APK cannot be built or
-verified without the release key. Turning it on runs in the `release` environment, which is restricted
-to `main` and release tags and requires reviewers. Only the S3 target is wired; the `lan` target stays a workstation
+verified without the release key. Turning it on runs in two environments: `approval` (required
+reviewers, restricted to `main` and release tags) gates `preview` and `stable`, and `release` (also
+restricted to `main` and release tags, no reviewers) holds the keys and publishes. The nightly skips
+`approval` and runs the same workflow for the nightly channel once the `NIGHTLY_PUBLISH` variable is
+set. Only the S3 target is wired; the `lan` target stays a workstation
 operation. An owner configures that environment with the secrets `SUITE_STORE_KEY`,
 `SUITE_STORE_KEY_ID`, `SUITE_GO_KEYSTORE`, `SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_ALIAS` and
 `SUITE_GO_KEY_PASSWORD`, and the variables `AWS_RELEASE_ROLE_ARN`, `SUITE_FLATPAK_S3_BUCKET` and
-`SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION`. A release tag is followed by a dispatch. The workflow header
-records the known limits: the APK and the Flatpak summary are rebuilt at publish time, `preview`
+`SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION`. A release tag is followed by a dispatch. Publication is
+three steps in one run: `release-status.mjs --draft` creates the releases as drafts,
+`android-release.mjs --upload` attaches the exact attested APK, and `release-status.mjs --publish`
+flips the drafts and writes `RELEASES.md`. The workflow header records the known limits: the Flatpak
+summary is re-signed while the OSTree commit stays fixed (the commit is what is attested), `preview`
 still refreshes the rolling release, and `RELEASES.md` is regenerated in the runner rather than
 committed.
 
