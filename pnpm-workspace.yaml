@@ -10,8 +10,8 @@ linkWorkspacePackages: true
 allowBuilds:
   esbuild: true
   electron: true
-  # Only electron-builder's Windows target reaches this, and the Suite does not
-  # build Windows artifacts here.
+  # Only electron-builder's Windows installer target reaches this. The Suite
+  # builds an unsigned Windows test zip, never an NSIS installer.
   electron-winstaller: false
 
 packageExtensions:

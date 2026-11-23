@@ -60,6 +60,12 @@ electronFuses:
   onlyLoadAppFromAsar: true
   grantFileProtocolExtraPrivileges: false
 
+# A zip, not NSIS: the Windows build is an unsigned test artifact, and an
+# installer would imply a signing and update story this tree does not have yet.
+win:
+  target:
+    - zip
+
 linux:
   target:
     - dir
