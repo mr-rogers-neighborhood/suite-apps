@@ -84,15 +84,24 @@ jobs:
         run: |
           flatpak build-bundle "$GITHUB_WORKSPACE/.nightly/flatpak-repo" suite-shell-nightly.flatpak \
             run.suite.slop.shell nightly
+      - name: SBOM
+        run: pnpm sbom --sbom-format spdx --out suite-shell-nightly.spdx.json
       - name: Attest the bundle
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: suite-shell-nightly.flatpak
+      - name: Attest the SBOM
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: suite-shell-nightly.flatpak
+          sbom-path: suite-shell-nightly.spdx.json
       - name: Upload the bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: suite-shell-nightly-flatpak
-          path: suite-shell-nightly.flatpak
+          path: |
+            suite-shell-nightly.flatpak
+            suite-shell-nightly.spdx.json
           retention-days: 14
           if-no-files-found: error
 
@@ -135,15 +144,24 @@ jobs:
           ./gradlew assembleStableDebug
           cp app/build/outputs/apk/stable/debug/app-stable-debug.apk \
             "$GITHUB_WORKSPACE/suite-go-debug.apk"
+      - name: SBOM
+        run: pnpm sbom --sbom-format spdx --out suite-go-debug.spdx.json
       - name: Attest the APK
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: suite-go-debug.apk
+      - name: Attest the SBOM
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: suite-go-debug.apk
+          sbom-path: suite-go-debug.spdx.json
       - name: Upload the APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: suite-go-nightly-debug-apk
-          path: suite-go-debug.apk
+          path: |
+            suite-go-debug.apk
+            suite-go-debug.spdx.json
           retention-days: 14
           if-no-files-found: error
 
