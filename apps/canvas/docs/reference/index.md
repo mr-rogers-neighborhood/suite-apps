@@ -6,6 +6,7 @@ Facts to look up: the data model, the commands, the quotas, the security boundar
 
 | Article | What it covers | Updated |
 | --- | --- | --- |
+| [Decisions](decisions.md) | The rules that shape Canvas. The architecture and data model pages describe how they are implemented. | 2026-11-22 |
 | [Desktop](desktop.md) | The Canvas desktop application. It is the same renderer the web build serves, wrapped in a main process that owns a file the user chose. It does not c… | 2026-11-21 |
 | [Glossary](glossary.md) | One definition per term, in the sense this repository uses it. The model behind them is architecture.md, and the code identifiers are listed beside ea… | 2026-11-21 |
 | [Interface](ui.md) | How the shell, the library, the panels, the styling surfaces and the command palette are assembled, and the focus, keyboard and theme rules they share… | 2026-11-21 |
@@ -16,4 +17,3 @@ Facts to look up: the data model, the commands, the quotas, the security boundar
 | [Architecture](architecture.md) | Canvas is two processes and two packages. The renderer is a web app; the shell is Electron and owns the file. The renderer reaches no network. The she… | 2026-11-20 |
 | [Coding conventions](conventions.md) | The rules as rules. The model they serve is architecture.md. The procedure that applies them is ../how-to/add-a-feature.md, and the gate is ../how-to/… | 2026-11-20 |
 | [Data model](data-model.md) | This page does not cover how the canvas draws these records; architecture.md and canvas.md own that. It describes the records @suite/graph stores, the… | 2026-11-20 |
-| [Decisions](decisions.md) | The rules that shape Canvas. The architecture and data model pages describe how they are implemented. | 2026-11-20 |
