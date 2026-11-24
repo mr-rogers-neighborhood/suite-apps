@@ -14,6 +14,39 @@ them.
 `SUITE_START_DOCUMENTS` moves the shared root for Start. Each app also has its own library override;
 see [Environment](environment.md).
 
+## Host documents
+
+The shell's document service keeps a pack's documents under its own data root, one folder per
+container and pack:
+
+```
+<shell data root>/documents/<container>/<pack>/<name>
+```
+
+Each file is a host-owned envelope (S6.1). The pack's bytes are the payload at the end of the file;
+the host writes and reads the rest and never parses the payload.
+
+```
+offset 0    8 bytes   magic, the ASCII text "SUITEDOC"
+offset 8    2 bytes   envelope version, big-endian (1 today)
+offset 10   4 bytes   header length, big-endian
+offset 14   n bytes   header: canonical UTF-8 JSON, keys in this order —
+                      documentId, packId, payloadChecksum, payloadLength, publisher, schemaVersion
+offset 14+n           payload: exactly payloadLength bytes and no trailer
+```
+
+`payloadChecksum` is `sha256:` plus the lower-case hex digest of the payload bytes as stored. The
+header is canonical by construction — a fixed key order, no whitespace and no optional fields — so
+two hosts encode the same header as the same bytes. An unknown header key is a corrupt header, not a
+field to ignore: a newer envelope raises the envelope version instead.
+
+The host owns durability (S6.2). Writes to one document are serialized; each write goes to a
+temporary `<name>.tmp-<id>`, is flushed, and is renamed over the document; the previous copy stays
+beside it as `<name>.bak`. On open, an unfinished temporary file is discarded, and a document that is
+missing while its `.bak` is present is restored from the backup. A file whose header or checksum does
+not verify is renamed to `<name>.corrupt-<timestamp>` and refused, so the person keeps the only copy
+and no fresh document is created in its place.
+
 ## `.canvas`
 
 Canvas writes a JSON envelope whose `kind` is `suite.canvas` and whose `version` is 3 (a `.suite`
@@ -83,6 +116,14 @@ Planner enforces this in `decodeWorkspaceFile` and again in `WorkspaceDocument.f
 a file can arrive through the store or straight from the hub. Budget checks both numbers on import
 and refuses a newer file rather than treating it as damaged. Canvas has checked its envelope and
 schema versions since the legacy `suite.workspace` kind and migrates that kind on import.
+
+Host documents use the same rule at two levels (S6.4). The **envelope** version belongs to the host:
+a file above it is refused with a sentence naming both versions and the file's path in the data root,
+and the host does not touch it, fall back to `.bak` or create a fresh document in its place. The
+**schema** version belongs to the pack: the host compares it with the newest schema the caller says
+it understands — 1 until a manifest declares otherwise (S6.3) — and refuses a newer one the same way.
+A file with no `SUITEDOC` magic was written before the envelope; this build refuses it and leaves its
+bytes untouched until the pack schema work supplies a migration.
 
 ## Encryption and backups
 

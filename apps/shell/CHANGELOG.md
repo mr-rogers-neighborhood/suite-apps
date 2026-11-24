@@ -5,7 +5,13 @@ shipped host.
 
 ## [Unreleased]
 
-No changes yet.
+### Changed
+
+- **Documents carry a host envelope.** Each pack document is a magic-and-version prefix, a canonical
+  header (publisher, pack, document, schema, payload length, payload checksum) and the pack's payload
+  bytes untouched. Saves are serialized, atomic, backed up and recovered after a crash; a file that
+  does not verify is quarantined, a newer envelope or schema is refused with its path, and a
+  pre-envelope file is left as it is until a pack migration exists.
 
 ## [0.2.0] - 2026-11-22
 

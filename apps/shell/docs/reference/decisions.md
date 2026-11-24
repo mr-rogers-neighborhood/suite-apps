@@ -65,6 +65,15 @@ The rules that shape the Suite host.
 - A document id is a file name inside the sender's pack root, never a path. Slashes, `..`, absolute
   paths and control characters are refused before the filesystem is reached. A files path is
   relative and slash-separated; the same refusals apply before `realpath` and `lstat`.
+- The host document service writes an envelope: magic and envelope version, then a canonical JSON
+  header (publisher, pack, document, schema, payload length, payload checksum), then the pack's
+  payload bytes. The host reads the header and checks the payload hash; it never interprets the
+  payload. A rewrite copies the payload byte for byte, so a field the pack added survives.
+- The host owns durability for documents as it does for files: one write at a time per document, a
+  flushed temporary file renamed into place, the previous copy as `<name>.bak`, crash recovery from
+  that copy, and a `.corrupt-<timestamp>` quarantine for a file that does not verify. A newer
+  envelope or schema is refused with a sentence and the file's path in the data root, never replaced
+  by a fresh document and never rewritten by an older build.
 - Writes are atomic: a temporary file in the same root, then a rename. Backups and temp files live
   under the same pack root.
 - `documents` and `files` are separate services with separate roots and capabilities. A pack cannot

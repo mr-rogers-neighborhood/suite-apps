@@ -277,6 +277,15 @@ containers has two separate document roots. A document id is a name inside that 
 never a path. `save` writes bytes atomically. The host does not parse a document, so the pack owns
 its format. `welcome` stores a JSON note; `scratch` stores plain UTF-8 text.
 
+Each document is a host envelope: magic, envelope version, publisher, pack id, document id, schema
+version, payload length and a SHA-256 of the payload, then the pack's bytes untouched. The host reads
+the header and verifies the payload hash; it never decodes the payload. Saves are serialized, kept
+atomic, backed up as `<name>.bak` and recovered after a crash; a file that does not verify is
+quarantined as `<name>.corrupt-<timestamp>` and refused, and a newer envelope or schema is refused
+with a sentence naming the file rather than replaced by a fresh document. `list` reports the payload
+size, not the envelope size. A file written before the envelope is refused and left as it is until
+the pack schema work supplies a migration.
+
 The `files` service requires the `files` capability. It is a separate root from `documents`, created
 lazily per `(container, pack)` at `files/<container>/<pack>` and never inside the pack's code
 directory. Paths are relative and slash-separated; `..`, absolute paths, symlinks and non-regular
