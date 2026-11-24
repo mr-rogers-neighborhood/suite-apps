@@ -12,6 +12,7 @@ import {
   aggregateReleaseCommands,
   aggregateSection,
   aggregateTag,
+  alreadyPublishedMessage,
   changelogDate,
   changelogDateProblem,
   channelLabel,
@@ -34,6 +35,7 @@ import {
   preReleaseLinks,
   pruneCandidates,
   publishAction,
+  publishedCheck,
   publishReleaseArgs,
   readIndexRelease,
   readManifest,
@@ -45,6 +47,7 @@ import {
   releasesPage,
   remoteLookupProblem,
   superappEntries,
+  workflowInputDate,
   writesReleasesPage,
 } from "./release-status.mjs";
 
@@ -250,7 +253,7 @@ describe("publication dates", () => {
     for (const [channel, tag] of Object.entries(expected)) {
       const { tagDate } = releaseDates(collected.entries, { channel, now: onNov23 });
       assert.equal(aggregateTag(tagDate, channel), tag, channel);
-      assert.equal(currentAggregateTag({ load, channel, now: onNov23 }), tag, channel);
+      assert.equal(currentAggregateTag({ load, channel, now: onNov23, env: {} }), tag, channel);
     }
   });
 });
@@ -433,6 +436,114 @@ describe("RELEASES.md writers", () => {
     assert.equal(writesReleasesPage("publish"), true);
     assert.equal(writesReleasesPage("draft"), false);
     assert.equal(writesReleasesPage("dry-run"), false);
+  });
+});
+
+describe("the already-published check", () => {
+  const tag = "suite-nightly-2026.11.24";
+
+  it("stops a second nightly with one sentence naming the tag and the gate", () => {
+    const sentence = alreadyPublishedMessage(tag);
+    assert.match(sentence, /^suite-nightly-2026\.11\.24 is already published;/u);
+    assert.match(sentence, /stops before the gate/u);
+    assert.match(sentence, /leaves it untouched/u);
+    assert.ok(!sentence.includes("\n"), "the early exit prints one sentence, not a paragraph");
+  });
+
+  it("stops for a published release, and lets a missing one through", () => {
+    assert.deepEqual(publishedCheck([{ tagName: tag, isDraft: false }], tag), {
+      published: true,
+      sentence: alreadyPublishedMessage(tag),
+    });
+    assert.deepEqual(publishedCheck([], tag), { published: false, sentence: null });
+    assert.deepEqual(publishedCheck([{ tagName: "suite-nightly-2026.11.23" }], tag), {
+      published: false,
+      sentence: null,
+    });
+  });
+
+  it("lets a draft through, so a rerun updates the same draft", () => {
+    assert.deepEqual(publishedCheck([{ tagName: tag, isDraft: true }], tag), {
+      published: false,
+      sentence: null,
+    });
+  });
+});
+
+describe("the opt-in second publication", () => {
+  const event = (payload) => {
+    const dir = mkdtempSync(join(tmpdir(), "suite-event-"));
+    const path = join(dir, "event.json");
+    writeFileSync(path, JSON.stringify(payload));
+    return { path, dir };
+  };
+
+  it("reads the date a dispatch named, and none when it named none", () => {
+    const named = event({ inputs: { date: "2026-11-25" } });
+    try {
+      assert.equal(workflowInputDate({ GITHUB_EVENT_PATH: named.path }), "2026-11-25");
+    } finally {
+      rmSync(named.dir, { recursive: true, force: true });
+    }
+    const empty = event({ inputs: { date: "" } });
+    try {
+      assert.equal(workflowInputDate({ GITHUB_EVENT_PATH: empty.path }), null);
+    } finally {
+      rmSync(empty.dir, { recursive: true, force: true });
+    }
+    const scheduled = event({ schedule: "0 2 * * *" });
+    try {
+      assert.equal(workflowInputDate({ GITHUB_EVENT_PATH: scheduled.path }), null);
+    } finally {
+      rmSync(scheduled.dir, { recursive: true, force: true });
+    }
+    assert.equal(workflowInputDate({}), null, "a local run has no triggering event");
+  });
+
+  it("refuses a named date that is not a calendar date instead of reusing today's tag", () => {
+    const bad = event({ inputs: { date: "2026-02-31" } });
+    try {
+      assert.throws(
+        () => workflowInputDate({ GITHUB_EVENT_PATH: bad.path }),
+        /date input is "2026-02-31"/u,
+      );
+    } finally {
+      rmSync(bad.dir, { recursive: true, force: true });
+    }
+  });
+
+  it("names another tag date, never today's published one by default", () => {
+    const files = {
+      "apps/start/package.json": '{"version":"0.5.1"}',
+      "apps/start/CHANGELOG.md": "## [0.5.1] - 2026-11-21\n",
+    };
+    const load = (path) => files[path] ?? "";
+    assert.equal(
+      currentAggregateTag({
+        load,
+        channel: "nightly",
+        now: new Date("2026-11-24T02:00:00Z"),
+        env: {},
+      }),
+      "suite-nightly-2026.11.24",
+    );
+    assert.equal(
+      currentAggregateTag({
+        load,
+        channel: "nightly",
+        date: "2026-11-25",
+        now: new Date("2026-11-24T02:00:00Z"),
+        env: {},
+      }),
+      "suite-nightly-2026.11.25",
+    );
+    assert.equal(
+      aggregateTag(
+        releaseDates(entries, { channel: "nightly", date: "2026-11-25" }).tagDate,
+        "nightly",
+      ),
+      "suite-nightly-2026.11.25",
+    );
   });
 });
 
@@ -744,7 +855,7 @@ describe("sections and the Suite Go APK", () => {
       "apps/go/CHANGELOG.md": "## [0.1.0] - 2026-11-18\n",
     };
     assert.equal(
-      currentAggregateTag({ load: (path) => files[path] ?? "" }),
+      currentAggregateTag({ load: (path) => files[path] ?? "", env: {} }),
       "suite-2026.11.21",
     );
   });
@@ -766,6 +877,16 @@ describe("arguments", () => {
     assert.equal(parseArgs(["--draft"]).draft, true);
     assert.equal(parseArgs(["--write"]).write, true);
     assert.equal(parseArgs(["--dry-run"]).dryRun, true);
+  });
+
+  it("reads --check-published as its own mode", () => {
+    const options = parseArgs(["--check-published", "--channel", "nightly"]);
+    assert.equal(options.checkPublished, true);
+    assert.equal(options.channel, "nightly");
+    assert.throws(
+      () => parseArgs(["--check-published", "--draft"]),
+      /pick different modes/u,
+    );
   });
 
   it("refuses any two modes together", () => {
