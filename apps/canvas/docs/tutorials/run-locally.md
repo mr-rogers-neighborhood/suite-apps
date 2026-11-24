@@ -28,7 +28,7 @@ pnpm --filter @suite/desktop package:dir
 ```
 
 The unpacked binary lands in `desktop/release/linux-unpacked`. Start it directly; a pack install goes
-through Suite Shell's catalogue.
+through Suite Desk's catalogue.
 
 ## Where a document goes
 
@@ -44,6 +44,6 @@ window.
 
 ## Working on the whole suite
 
-Suite Shell (the host) and Suite Sync (the service) are in this repository now, beside Canvas. The
+Suite Desk (the host) and Suite Sync (the service) are in this repository now, beside Canvas. The
 root gate runs every app in dependency order and owns the cross-app checks; start with the
 [root docs](../../../../docs/README.md) and [Run the gate](../../../../docs/how-to/run-the-gate.md).

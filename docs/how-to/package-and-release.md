@@ -103,7 +103,7 @@ desktop-entry rule.
 
 GitHub shows one "Latest" release per repository, so this repository has one rolling Suite release
 tagged `suite-YYYY.MM.DD` and marked Latest. It names the two superapps, each with its current
-version, channel, maturity and install: a `flatpak install` command for Suite Shell, the APK asset
+version, channel, maturity and install: a `flatpak install` command for Suite Desk, the APK asset
 for Suite Go. A pack carries a signed version and has no release page, and per-app releases are
 retired.
 
@@ -179,9 +179,9 @@ tag exists.
 The signed Flatpak remote above remains the update path. GitHub Packages is not used for the
 Flatpaks.
 
-## Release Suite Shell (the host)
+## Release Suite Desk (the host)
 
-Suite Shell is the desktop host and the first row of the rolling release's Desktop table. One command runs
+Suite Desk is the desktop host and the first row of the rolling release's Desktop table. One command runs
 its publish sequence in the order that keeps every artifact on a commit the gate proved:
 
 ```sh

@@ -58,8 +58,8 @@ packs keep the previous version. No channel may silently erase the last good art
 
 | Artifact | Identity | Form | Signed by | Public |
 | --- | --- | --- | --- | --- |
-| Suite Shell stable | `run.suite.shell` | Flatpak OSTree commit on `master` | Store key (summary) | Yes, own remote |
-| Suite Shell pre-release | `run.suite.slop.shell` | Flatpak commit on `slop`, `nightly` or `preview` | Store key | Yes, own remote |
+| Suite Desk stable | `run.suite.shell` | Flatpak OSTree commit on `master` | Store key (summary) | Yes, own remote |
+| Suite Desk pre-release | `run.suite.slop.shell` | Flatpak commit on `slop`, `nightly` or `preview` | Store key | Yes, own remote |
 | Suite Go stable | `run.suite.go` | APK, stable asset | Android release key | Yes, GitHub release |
 | Suite Go pre-release | `run.suite.slop.go` | APK, channel asset | Android release key | Yes, GitHub release |
 | Pack | `publisher/id` | `.suitepack` + manifest | Publisher key | Yes, file or catalogue |

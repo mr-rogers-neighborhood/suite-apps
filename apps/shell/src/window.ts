@@ -100,7 +100,7 @@ export class ShellWindow {
       minWidth: 760,
       minHeight: 520,
       show: false,
-      title: "Suite Shell",
+      title: "Suite Desk",
       backgroundColor: "#0b0d12",
     });
 
@@ -229,7 +229,7 @@ export class ShellWindow {
     const state = this.state();
     this.#chrome.webContents.send(CHROME_STATE, state);
     const active = state.tabs.find((tab) => tab.id === state.activeTabId);
-    this.window.setTitle(active === undefined ? "Suite Shell" : `${active.title} — Suite Shell`);
+    this.window.setTitle(active === undefined ? "Suite Desk" : `${active.title} — Suite Desk`);
   }
 
   async openPack(packId: string, launch: PackLaunchContext = LAUNCHER_CONTEXT): Promise<void> {

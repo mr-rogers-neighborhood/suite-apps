@@ -234,7 +234,7 @@ The rules that shape the Suite host.
 
 ## Channels
 
-- Shell is a superapp, so it carries one channel for the whole product. Stable is `run.suite.shell` on
+- Suite Desk is a superapp, so it carries one channel for the whole product. Stable is `run.suite.shell` on
   `master`. One pre-release id, `run.suite.slop.shell`, carries `slop`, `nightly` and `preview` on
   branches of the same names; the display name, desktop entry, metainfo, icon and launcher follow the
   pre-release id.

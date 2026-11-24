@@ -146,7 +146,7 @@ describe("arguments", () => {
 describe("the install commands", () => {
   it("names the host install and the APK path and alias", () => {
     const lines = installLines("0.1.0");
-    assert.ok(lines.includes("Suite Shell (desktop):"));
+    assert.ok(lines.includes("Suite Desk (desktop):"));
     assert.ok(lines.some((line) => line.includes("flatpak install --user suite run.suite.shell")));
     assert.ok(lines.includes("Suite Go (mobile):"));
     assert.ok(lines.some((line) => line.includes("flatpak run run.suite.shell")));

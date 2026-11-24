@@ -1,8 +1,8 @@
-# Suite Shell
+# Suite Desk
 
 The desktop host. One installed Electron app; each app is a sandboxed, signed pack opened as a tab.
 
-Suite Shell is the desktop host and the only desktop install path. Canvas, Planner, Budget and Help
+Suite Desk is the desktop host and the only desktop install path. Canvas, Planner, Budget and Help
 remain frozen Flatpaks beside it, and Sync is still the relay Flatpak until #315. The host boundary
 it proves is:
 
@@ -66,7 +66,7 @@ refused by Go and a Go `.pack` is refused here until the formats are unified (#2
 
 ## Install as a Flatpak
 
-The host installs as the Flatpak **Suite Shell**, id `run.suite.shell`:
+The host installs as the Flatpak **Suite Desk**, id `run.suite.shell`:
 
 ```sh
 flatpak install --user suite run.suite.shell
@@ -86,7 +86,7 @@ flatpak install --user suite-local run.suite.slop.shell//nightly
 ```
 
 All three pre-release channels share the one pre-release id; the branch, the desktop name (`Suite
-Shell (nightly)`) and the desktop entry, metainfo, icon and launcher names carry the channel. Moving
+Desk (nightly)`) and the desktop entry, metainfo, icon and launcher names carry the channel. Moving
 from `slop` to `nightly` replaces the one pre-release install, so a machine holds stable plus at most
 one pre-release.
 
@@ -212,7 +212,7 @@ hand a link to the OS browser without `network`.
 ## The shape
 
 ```text
-Suite Shell (one BaseWindow)
+Suite Desk (one BaseWindow)
 ├── chrome view (full window, sandboxed renderer)
 │   ├── tab strip
 │   └── content area

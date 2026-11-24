@@ -5,7 +5,7 @@
  * GitHub shows one "Latest" release per repository. This repository publishes
  * the rolling Suite release, tagged `suite-YYYY.MM.DD` and marked Latest, plus
  * the pre-release channel pages `suite-<channel>-<date>`. The body names the two
- * superapps and how each is installed: a Flatpak command for Suite Shell, or the
+ * superapps and how each is installed: a Flatpak command for Suite Desk, or the
  * release-signed Suite Go APK attached to this same release. Each names its
  * release channel and product maturity. Per-app releases are retired; a pack
  * carries a signed version and has no release page. When
@@ -127,7 +127,7 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  * so a section is only a title plus its rows and the shape can be reused by a
  * page that splits the same data differently.
  *
- * `channel` names the release channel of a superapp row: Suite Shell and Suite
+ * `channel` names the release channel of a superapp row: Suite Desk and Suite
  * Go. It is absent on apps that are not superapps. `maturity` is the product
  * label and is independent of the channel, so a `stable` build may be `alpha`.
  * `frozen` marks a legacy app that keeps its code and last artifact but gets no
@@ -146,7 +146,7 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
 export const APPS = [
   {
     id: "shell",
-    name: "Suite Shell",
+    name: "Suite Desk",
     packageJson: "apps/shell/package.json",
     changelog: "apps/shell/CHANGELOG.md",
     kind: "flatpak",
@@ -710,7 +710,7 @@ export function planTag({ tag, version, changelog, localCommit, remoteCommit, ch
  * The superapps a release page names, in reading order.
  *
  * A pack carries a signed version and has no release page, so it is not a row:
- * only Suite Shell and Suite Go appear. The other `APPS` entries stay for their
+ * only Suite Desk and Suite Go appear. The other `APPS` entries stay for their
  * version and changelog facts, which the aggregate date reads.
  */
 export const SUPERAPP_IDS = ["shell", "go"];
@@ -1053,7 +1053,7 @@ export function aggregateReleaseBody(
   // could not be collected, so it reads its id from the app table.
   const shellApp = APPS.find((app) => app.id === "shell");
   return [
-    `**Suite Shell** is the desktop superapp; **Suite Go** is the mobile superapp. ` +
+    `**Suite Desk** is the desktop superapp; **Suite Go** is the mobile superapp. ` +
       (channel === "stable"
         ? `This is the ${date} build.`
         : `This is the ${date} snapshot, published on the **${channel}** channel on ${tagDate}.`),
@@ -1068,7 +1068,7 @@ export function aggregateReleaseBody(
           ),
           "",
         ]),
-    "## Suite Shell (desktop)",
+    "## Suite Desk (desktop)",
     "",
     ...(shell === null ? [] : [...releaseLabels(shell.app, channel), ""]),
     "```sh",
@@ -1120,13 +1120,13 @@ export function releasesPage(
   const latest = aggregatePublished
     ? [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
-        `[rolling Suite Shell + Suite Go ${date} release](${releaseUrl(tag)}), which is the repository's`,
+        `[rolling Suite Desk + Suite Go ${date} release](${releaseUrl(tag)}), which is the repository's`,
         "\"Latest\" release on GitHub. Only the two superapps have a release page; a pack carries",
         "a signed version.",
       ]
     : [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
-        `rolling Suite Shell + Suite Go ${date} release, which is not published yet. \`--draft\``,
+        `rolling Suite Desk + Suite Go ${date} release, which is not published yet. \`--draft\``,
         "creates the draft, its assets are attached while it is a draft, and `--publish` publishes",
         "it and refreshes this page.",
       ];
@@ -1153,7 +1153,7 @@ export function releasesPage(
     "## Channels and maturity",
     "",
     "A channel is a promise about a build: `slop`, `nightly`, `preview` or `stable`. Channels are on",
-    "the superapp, Suite Shell and Suite Go, not on individual mini-apps. Packs carry signed versions,",
+    "the superapp, Suite Desk and Suite Go, not on individual mini-apps. Packs carry signed versions,",
     "not channels. Maturity is separate: `pre-alpha`, `alpha`, `beta` or `1.0`, so a `stable`-channel",
     "build can still be `alpha`.",
     "",
@@ -1561,7 +1561,7 @@ export function aggregateReleaseCommands({
       command: "gh",
       args: draftReleaseArgs({
         tag,
-        title: `Suite Shell + Suite Go — ${date}`,
+        title: `Suite Desk + Suite Go — ${date}`,
         notesPath,
         action: aggregate.action,
         target: aggregate.plan.commit,
@@ -1892,7 +1892,7 @@ async function main(argv) {
   }
 
   process.stdout.write(
-    `\nSuite Shell + Suite Go ${snapshotDate} build · ${tag} · aggregate\n` +
+    `\nSuite Desk + Suite Go ${snapshotDate} build · ${tag} · aggregate\n` +
       (tagDate === snapshotDate ? "" : `  tag date   ${tagDate} (snapshot ${snapshotDate})\n`) +
       `  release    ${
         releases === null

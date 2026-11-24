@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=Suite Shell
+Name=Suite Desk
 Comment=The desktop Suite host: one window for your apps
 Exec=run.suite.shell %U
 Icon=run.suite.shell

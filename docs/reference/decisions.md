@@ -49,7 +49,7 @@ owns the rationale, and [Status](status.md) owns what exists.
 
 ## Desktop host
 
-- **One desktop host.** `apps/shell` (`@suite/shell`) is the desktop host. It is one Electron app
+- **One desktop host, named Suite Desk.** `apps/shell` (`@suite/shell`) is the desktop host. It is one Electron app
   that opens signed, sandboxed packs as tabs, and it owns the catalogue, Home, the Screens manager,
   routing and pack updates. Start is gone (#314); the frozen Flatpaks remain installable with their
   documented `flatpak install` lines. The host is alpha, and the pack bar below is still how a pack
@@ -87,6 +87,24 @@ owns the rationale, and [Status](status.md) owns what exists.
   rejected here.
 - The W3C MiniApp model contributed the host, the manifest, declared capabilities and the lifecycle.
   Its packaging specification is retired, so there is no compliance target.
+
+### The desktop host is Suite Desk (#335)
+
+- The desktop host's product name is **Suite Desk**, replacing Suite Shell; Suite Go keeps its name.
+  The pair reads as two places — the desk and the go — rather than two technologies, and "shell" stays
+  an implementation word for the Electron chrome.
+- This is **Tier 1**: words, labels and the mark only. `@suite/shell`, `apps/shell`,
+  `run.suite.shell`, `run.suite.slop.shell`, the signed remote's refs and the release table's tag
+  names keep their identity, so an existing install updates in place and no data path moves.
+- **Tier 2 is deferred.** Changing the Flatpak id to `run.suite.desk`, the pre-release id to
+  `run.suite.slop.desk`, the package to `@suite/desk`, the directory to `apps/desk`, and the refs and
+  tags to match is a new application id: an existing install does not update into it, and it is a
+  second app until the old card is removed. That cost is paid once the retirements have landed and
+  there is one architecture to rename, not as part of a words change.
+- Both hosts carry the mark Start used: the shell's `apps/shell/build/icon.png` and its sized set
+  under `apps/shell/build/icons/` are Start's own artwork, recovered from the commit before Start's
+  retirement (#314), and Go's launcher icons are generated from the same bytes. The name differs
+  between the hosts; the logo does not.
 
 ## Blobs and export
 
@@ -240,7 +258,7 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
 
 ## Packaging
 
-- Flatpak is the only Linux desktop form: Suite Shell, Canvas, Planner, Budget and Help. `run.suite.sync`
+- Flatpak is the only Linux desktop form: Suite Desk, Canvas, Planner, Budget and Help. `run.suite.sync`
   is retired as a shipped app (#315): no new build is published, the signed remote keeps its last
   published ref, and the relay's code runs as a host capability rather than a separate app. The last
   published app also runs the CLI headlessly with `flatpak run --command=suite-sync`. There is no
@@ -251,7 +269,7 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
 - A deployment updates from its own `origin` remote, so a copy from `suite-local` is not measured
   against the public `suite` store. Flatpak reads that origin; the host does not compare commits.
 - The channels are `slop`, `nightly`, `preview` and `stable`, and they belong to the superapp: Suite
-  Shell on the desktop and Suite Go on mobile. `slop` stays the session channel; `nightly` and
+  Desk on the desktop and Suite Go on mobile. `slop` stays the session channel; `nightly` and
   `preview` replace `canary` and `beta`, which are refused rather than aliased. A mini-app does not
   carry a channel; when it ships as a pack it carries a signed version.
 - Product maturity is separate from the channel: `pre-alpha`, `alpha`, `beta` and `1.0`. A

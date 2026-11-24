@@ -1,5 +1,5 @@
 /**
- * Suite Shell's channel-specific Flatpak pieces.
+ * Suite Desk's channel-specific Flatpak pieces.
  *
  * The identities in `channel.mjs` describe every app: one stable id and one
  * pre-release id shared by `slop`, `nightly` and `preview`. Shell differs from a

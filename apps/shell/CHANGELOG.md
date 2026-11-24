@@ -26,7 +26,7 @@ shipped host.
 
 ### Changed
 
-- **Suite Shell is the only desktop host.** Install it once, then install, update, remove and
+- **Suite Desk is the only desktop host.** Install it once, then install, update, remove and
   reinstall packs from its catalogue. Suite Start is retired (#314): the frozen Flatpaks keep their
   `flatpak install` lines, and no second hub lists or updates them.
 - **Documents carry a host envelope.** Each pack document is a magic-and-version prefix, a canonical
@@ -64,7 +64,7 @@ shipped host.
   current installed pack; a malformed, unknown or uninstalled target is refused with a sentence.
 - **The external file surface.** A host-owned picker hands a pack opaque handles, and import copies
   a person's file into the pack root without exposing a host path.
-- **Packaging as `run.suite.shell`.** The host now builds as a Flatpak named Suite Shell, with a narrower
+- **Packaging as `run.suite.shell`.** The host now builds as a Flatpak named Suite Desk, with a narrower
   sandbox than Start: no host Flatpak service, no host filesystem grants, and no scheme handler yet.
 
 ## [0.1.0] - 2026-11-22

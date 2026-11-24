@@ -11,26 +11,26 @@ import { shellDataRoot, shellPreReleaseManifest } from "./lib/shellChannel.mjs";
 
 const PRE_RELEASE = ["slop", "nightly", "preview"];
 
-describe("Suite Shell channel identity", () => {
+describe("Suite Desk channel identity", () => {
   it("keeps stable and gives every pre-release one id and its own branch", () => {
     assert.equal(flatpakId("shell", "stable"), "run.suite.shell");
     for (const channel of PRE_RELEASE) {
       assert.equal(flatpakId("shell", channel), "run.suite.slop.shell");
       assert.equal(branchFor(channel), channel);
-      assert.equal(displayName("Suite Shell", channel), `Suite Shell (${channel})`);
+      assert.equal(displayName("Suite Desk", channel), `Suite Desk (${channel})`);
     }
-    assert.equal(displayName("Suite Shell", "stable"), "Suite Shell");
+    assert.equal(displayName("Suite Desk", "stable"), "Suite Desk");
     assert.equal(channelRecord({ app: "shell", channel: "nightly" }).stableId, "run.suite.shell");
   });
 
   it("names the desktop entry, icon and startup class after the pre-release id", () => {
     const entry = desktopEntry({
       id: "run.suite.slop.shell",
-      name: "Suite Shell (nightly)",
+      name: "Suite Desk (nightly)",
       comment: "The desktop Suite host",
       categories: "Utility;",
     });
-    assert.match(entry, /^Name=Suite Shell \(nightly\)$/mu);
+    assert.match(entry, /^Name=Suite Desk \(nightly\)$/mu);
     assert.match(entry, /^Exec=run\.suite\.slop\.shell %U$/mu);
     assert.match(entry, /^Icon=run\.suite\.slop\.shell$/mu);
     assert.match(entry, /^StartupWMClass=run\.suite\.slop\.shell$/mu);
