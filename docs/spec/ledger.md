@@ -74,7 +74,7 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S11.3–S11.4 | Search and shared space | Absent | No metadata index, pack search entry or `documents.shared` |
 | S11.5 | Platform APIs | Future | Deferred by contract |
 | S12.1 | Side-load | Implemented | `apps/shell/src/installedPacks.test.ts` installs a signed archive with no catalogue or network |
-| S12.2–S12.5 | Catalogue and revocation | Absent | No signed index, sequence, attestation, review state or revocation |
+| S12.2–S12.5 | Catalogue and revocation | Partial | `packages/pack/src/catalogue.test.ts` verifies an operator-signed index with sequence, previous, expiry and threshold; the build is `scripts/pack-index.mjs`. Reviews, attestations, provenance and revocation are absent |
 | S12.6 | Updates | Partial | Additive installs keep the previous version; no delta or rollback pointer |
 | S12.7 | Install TOCTOU | Absent | The installed bytes are not compared with the displayed catalogue entry |
 | S12.8 | Channels | Implemented | `docs/explanation/channels.md` and `docs/reference/packaging-channels.md` own the model; `scripts/flatpak-remote.mjs` publishes the signed remote |
