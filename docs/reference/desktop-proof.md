@@ -2,8 +2,9 @@
 
 Every desktop Electron app owns one Playwright proof scenario tagged `@proof` that opens a real
 document, performs a user action, and asserts the visible result. The runner produces a short
-markdown **Proof of Changes** block alongside step screenshots and a Playwright trace, matching the
-evidence role `.revyl/config.yaml` plays for Suite Go on mobile.
+markdown **Proof of Changes** block alongside step screenshots and a Playwright trace, the desktop
+counterpart to the evidence `.revyl/config.yaml` provided for Suite Go on mobile before that harness
+was parked (2026-11-24).
 
 ## The `@proof` tag
 
