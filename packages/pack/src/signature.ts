@@ -1,4 +1,10 @@
-import { hashes, keygen, sign as nobleSign, verify as nobleVerify } from "@noble/ed25519";
+import {
+  hashes,
+  keygen,
+  getPublicKey as noblePublicKey,
+  sign as nobleSign,
+  verify as nobleVerify,
+} from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
 import {
   canonicalManifestBytes,
@@ -47,25 +53,42 @@ export async function generatePackKeyPair(): Promise<{
   };
 }
 
+/** The public half of an Ed25519 signing key, standard base64. */
+export function publicKeyFromSecret(privateKeyBase64: string): string {
+  return bytesToBase64(noblePublicKey(base64ToBytes(privateKeyBase64)));
+}
+
+/**
+ * Sign bytes. The manifest and the catalogue index carry separate documents,
+ * but both are Ed25519 over canonical bytes with standard base64.
+ */
+export function signBytes(bytes: Uint8Array, privateKeyBase64: string): string {
+  return bytesToBase64(nobleSign(bytes, base64ToBytes(privateKeyBase64)));
+}
+
+/** Verify bytes against a standard-base64 Ed25519 signature. A malformed value is a refusal. */
+export function verifyBytes(
+  bytes: Uint8Array,
+  signatureBase64: string,
+  publicKeyBase64: string,
+): boolean {
+  try {
+    return nobleVerify(base64ToBytes(signatureBase64), bytes, base64ToBytes(publicKeyBase64));
+  } catch {
+    return false;
+  }
+}
+
 /** Sign a manifest core. The build script adds the returned `signature`. */
 export function signPackManifest(manifest: PackManifestCore, privateKeyBase64: string): string {
-  const signature = nobleSign(canonicalManifestBytes(manifest), base64ToBytes(privateKeyBase64));
-  return bytesToBase64(signature);
+  return signBytes(canonicalManifestBytes(manifest), privateKeyBase64);
 }
 
 export async function verifyPackSignature(
   manifest: PackManifest,
   publicKeyBase64: string,
 ): Promise<boolean> {
-  try {
-    return nobleVerify(
-      base64ToBytes(manifest.signature),
-      canonicalManifestBytes(manifest),
-      base64ToBytes(publicKeyBase64),
-    );
-  } catch {
-    return false;
-  }
+  return verifyBytes(canonicalManifestBytes(manifest), manifest.signature, publicKeyBase64);
 }
 
 export interface PackFileMismatch {

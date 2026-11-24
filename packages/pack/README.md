@@ -52,10 +52,71 @@ The install identity is `(publisher id, pack id)`. A different publisher under a
 }
 ```
 
+## Catalogue index
+
+A catalogue is an optional list of signed packs (S12.2). The index is a versioned JSON document
+signed by **operator** keys — a trust root separate from a pack's publisher key. A host with no
+operator key can still side-load packs (S12.1); it just has no catalogue. Nothing here verifies an
+index with a pack key, and nothing verifies a pack with an operator key.
+
+```json
+{
+  "format": "suite.catalogue",
+  "version": 1,
+  "sequence": 7,
+  "generatedAt": "2026-01-01T00:00:00.000Z",
+  "previous": "…digest of the index this replaces…",
+  "expires": "2026-02-01T00:00:00.000Z",
+  "threshold": 2,
+  "entries": [
+    {
+      "id": "canvas",
+      "name": "Canvas",
+      "publisher": "suite",
+      "version": "0.2.0",
+      "description": "A whiteboard for the Suite.",
+      "capabilities": ["files", "relay"],
+      "size": 12345,
+      "sha256": "…archive SHA-256…",
+      "url": "https://packs.suite.run/canvas-0.2.0.suitepack"
+    }
+  ],
+  "signatures": [{ "key": "…operator public key…", "signature": "…" }]
+}
+```
+
+- `sequence` increases; an equal or lower value is a rollback and is refused.
+- `previous` is the `packIndexDigest` of the index being replaced. Sequence 1 omits it; every later
+  index must name its predecessor.
+- `expires` is an instant; an index past it is refused.
+- `threshold` is inside the signed bytes, so it cannot be lowered without the operator signatures. A
+  host counts distinct pinned operator keys whose signature verifies and requires that many.
+- An entry is safe only when `id`, `publisher` id, version, hash and URL pass the same rules a pack
+  does. The host still verifies the downloaded pack's manifest signature and file hashes (S12.7); an
+  index entry is a claim, not the proof.
+
+`parsePackIndexJson`, `verifyPackIndex` and `packIndexDigest` are the shared implementation. The
+canonical bytes reuse the S3.3 rules in `canonical.ts`: fixed field order, an absent optional field
+omitted, nested keys in code-unit order, entries and capabilities sorted, and a duplicate key
+refused before parsing. The index's `signatures` is excluded, exactly as a manifest's `signature`
+is. Limits are `MAX_INDEX_BYTES`, `MAX_INDEX_ENTRIES` and `MAX_INDEX_SIGNATURES`.
+
+The index is produced from the archives the pack build already writes, not by hand:
+
+```sh
+mise exec -- pnpm pack:index -- --out index.json --url-base https://packs.suite.run/ \
+  --sequence 7 --previous <digest> --expires 2026-02-01T00:00:00.000Z \
+  --key <operator key> dist/*.suitepack
+```
+
+Each archive's manifest signature and every file hash are verified before its entry is written.
+Publishing the file to a store, review attestations and revocation are later seams.
+
 ## What this package owns
 
 - `parsePackManifest` and the Zod schema, with actionable issues.
 - `canonicalManifestBytes`, the exact bytes a signature covers. Capabilities and files are sorted (paths by UTF-16 code unit, never by locale); command and menu order is preserved.
+- `canonicalPackIndexBytes`, `parsePackIndexJson`, `verifyPackIndex`, `signPackIndex` and `packIndexDigest`: the catalogue index, signed by operator keys.
 - `packFitsHost` and `packAllows`.
 - `signPackManifest`, `verifyPackSignature`, `digestPackFiles`, `verifyPackFiles`, `sha256Hex`.
 - `publisherKeyFingerprint`, `checkPublisherTrust` and `addTrustedPublisher`: the publisher fingerprint, the trust-store match and the fingerprint-confirmed addition.
