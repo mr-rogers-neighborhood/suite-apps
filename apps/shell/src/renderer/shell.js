@@ -19,6 +19,7 @@ const elements = {
   screenEyebrow: document.querySelector(".screen-title .eyebrow"),
   widgets: document.querySelector("#widgets"),
   notice: document.querySelector("#notice"),
+  reminderStatus: document.querySelector("#reminder-status"),
   editToggle: document.querySelector("#edit-toggle"),
   editBar: document.querySelector("#edit-bar"),
   widgetChoice: document.querySelector("#widget-choice"),
@@ -42,6 +43,7 @@ let state = {
   installedVersions: [],
   theme: { mode: "dark", values: {} },
   notice: null,
+  reminderStatus: null,
 };
 let query = "";
 let editing = false;
@@ -695,6 +697,8 @@ function renderScreen() {
 
   elements.notice.hidden = state.notice === null;
   elements.notice.textContent = state.notice ?? "";
+  elements.reminderStatus.hidden = state.reminderStatus === null;
+  elements.reminderStatus.textContent = state.reminderStatus ?? "";
   elements.screenName.textContent = view ? view.name : screenTab.title;
   elements.screenEyebrow.textContent = view ? "Screen" : "Unavailable screen";
 

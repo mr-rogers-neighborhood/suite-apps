@@ -30,6 +30,44 @@ const packId = separator > 0 ? host.slice(separator + 1) : host;
 // cannot read the token out, copy it, or mint a handle of its own.
 const issuedTokens = new WeakMap();
 
+// Declared projections (S6.3). The pack binds the entry its manifest names; the
+// host calls it with a read-only handle for one document. The map is local, so
+// another renderer cannot borrow a handler by naming this pack's entry.
+const projections = new Map();
+
+function projectionHandle(request) {
+  return {
+    id: typeof request.id === "string" ? request.id : "",
+    version: typeof request.version === "number" ? request.version : 0,
+    read: () => ipcRenderer.invoke("suite:projection:read", request.requestId),
+  };
+}
+
+ipcRenderer.on("suite:projection:invoke", (_event, request) => {
+  const handler = projections.get(request.entry);
+  if (typeof handler !== "function") {
+    void ipcRenderer.invoke(
+      "suite:projection:failed",
+      request.requestId,
+      `no projection is bound to ${request.entry}`,
+    );
+    return;
+  }
+  let pending;
+  try {
+    pending = handler(projectionHandle(request));
+  } catch (error) {
+    void ipcRenderer.invoke("suite:projection:failed", request.requestId, String(error));
+    return;
+  }
+  pending
+    .then((rows) => ipcRenderer.invoke("suite:projection:done", request.requestId, rows))
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      return ipcRenderer.invoke("suite:projection:failed", request.requestId, message);
+    });
+});
+
 function externalHandle(issued) {
   if (issued === null || typeof issued !== "object" || typeof issued.token !== "string") {
     return null;
@@ -126,4 +164,26 @@ contextBridge.exposeInMainWorld("suite", {
   },
   setTitle: (title) => ipcRenderer.send("suite:pack:set-title", title),
   openExternal: (url) => ipcRenderer.invoke("suite:pack:open-external", url),
+  // A deep link that arrives while this tab is already open. The first launch is
+  // read through `launch()`; this is the same context pushed to a live page.
+  onDeepLink: (listener) => {
+    const handler = (_event, url) => listener(url);
+    ipcRenderer.on("suite:pack:deep-link", handler);
+    return () => ipcRenderer.removeListener("suite:pack:deep-link", handler);
+  },
+  // A declared projection entry. The host names the entry from the manifest and
+  // supplies a handle scoped to the one document; the pack supplies display rows.
+  projections: {
+    register: (entry, handler) => {
+      if (typeof entry !== "string" || typeof handler !== "function") {
+        throw new Error("a projection needs an entry name and a handler");
+      }
+      projections.set(entry, handler);
+      ipcRenderer.send("suite:projection:register", entry);
+      return () => {
+        if (projections.get(entry) === handler) projections.delete(entry);
+        ipcRenderer.send("suite:projection:unregister", entry);
+      };
+    },
+  },
 });

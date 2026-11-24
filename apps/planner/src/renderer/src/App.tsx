@@ -1,6 +1,5 @@
 import { todayKey } from "@suite/planner-core";
 import { useEffect, useState } from "react";
-import { ReminderScheduler } from "./app/ReminderScheduler";
 import { Shell } from "./app/Shell";
 import { Toast } from "./app/Toast";
 import { PlannerLauncher } from "./launcher/PlannerLauncher";
@@ -30,16 +29,45 @@ export function App({ replica, created }: { replica: DocumentReplica; created: b
       setNotice(`Reminder · ${reminder.title}`);
     });
 
+    // A reminder click opens the host, which routes `suite://planner/task/<id>`.
+    // Resolving it belongs here, once the pack is running with its document.
+    const resolveDeepLink = (url: string): void => {
+      const match = /^suite:\/\/planner\/task\/(.+)$/u.exec(url);
+      if (match === null) return;
+      try {
+        setView("inbox");
+        useUiStore.getState().selectTask(decodeURIComponent(match[1] ?? ""));
+      } catch {
+        // A malformed id is the host's refusal to show, not a second route.
+      }
+    };
+
+    const launch = (
+      globalThis as {
+        __suitePlannerLaunch?: Promise<{ readonly kind: string; readonly url?: string }>;
+      }
+    ).__suitePlannerLaunch;
+    if (launch !== undefined) {
+      void launch
+        .then((context) => {
+          if (context.kind === "deep-link" && typeof context.url === "string") {
+            resolveDeepLink(context.url);
+          }
+        })
+        .catch(() => undefined);
+    }
+    const offDeepLink = bridge.onDeepLink?.(resolveDeepLink);
+
     return () => {
       offCommand();
       offReminder();
+      offDeepLink?.();
     };
   }, [focusCapture, setNotice, setSelectedDate, setView]);
 
   return (
     <WorkspaceContext.Provider value={replica}>
       {begun ? <Shell /> : <PlannerLauncher onBegin={() => setBegun(true)} />}
-      <ReminderScheduler />
       <Toast />
     </WorkspaceContext.Provider>
   );

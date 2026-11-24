@@ -21,6 +21,7 @@ import {
   packPartition,
   tabViewTarget,
 } from "./packs.js";
+import { clearProjectionEntries } from "./reminderProjections.js";
 import type { ScreenStore } from "./screens.js";
 import { clearPackSender, setPackSender } from "./senders.js";
 import {
@@ -28,6 +29,7 @@ import {
   CHROME_ORIGIN,
   CHROME_STATE,
   type InstalledVersionView,
+  PACK_EVENT,
   type PackLaunchContext,
   type PackShellTab,
   type ScreenView,
@@ -66,6 +68,7 @@ export class ShellWindow {
   readonly #launchContexts = new Map<string, PackLaunchContext>();
   #theme: ThemeView;
   #notice: string | null = null;
+  #reminderStatus: string | null = null;
   #closed = false;
 
   constructor(options: {
@@ -176,6 +179,7 @@ export class ShellWindow {
       installedVersions: this.#installedVersions,
       theme: this.#theme,
       notice: this.#notice,
+      reminderStatus: this.#reminderStatus,
     };
   }
 
@@ -265,6 +269,10 @@ export class ShellWindow {
       this.#launchContexts.set(open.id, launch);
       this.#notice = null;
       await this.activateTab(open.id);
+      const view = this.#views.get(open.id);
+      if (view !== undefined && !view.webContents.isDestroyed()) {
+        view.webContents.send(PACK_EVENT.deepLink, parsed.value.url);
+      }
       return;
     }
 
@@ -335,6 +343,7 @@ export class ShellWindow {
       this.window.contentView.removeChildView(view);
       if (!view.webContents.isDestroyed()) {
         clearPackSender(view.webContents.id);
+        clearProjectionEntries(view.webContents.id);
         // A page's `beforeunload` may cancel `window.close`, leaving a token
         // owned by a tab that is no longer open. Closing without waiting
         // destroys the contents, so `destroyed` and the lock release run.
@@ -444,6 +453,13 @@ export class ShellWindow {
     this.broadcast();
   }
 
+  /** Show the reminder permission state, or clear it on Home. */
+  setReminderStatus(message: string | null): void {
+    if (this.#reminderStatus === message) return;
+    this.#reminderStatus = message;
+    this.broadcast();
+  }
+
   openExternal(url: string): void {
     try {
       const parsed = new URL(url);
@@ -492,6 +508,8 @@ export class ShellWindow {
       packId: pack.id,
       tabId: tab.id,
       pack,
+      webContentsId,
+      webContents: view.webContents,
     });
 
     view.webContents.setWindowOpenHandler(({ url }) => {
@@ -535,6 +553,7 @@ export class ShellWindow {
     });
     view.webContents.once("destroyed", () => {
       clearPackSender(webContentsId);
+      clearProjectionEntries(webContentsId);
       // Locks are owned by the tab id. A destroyed view cannot release its own
       // writer, so the host does it here.
       this.#onViewClosed?.(tab.id);
@@ -567,6 +586,7 @@ export class ShellWindow {
     for (const view of this.#views.values()) {
       if (!view.webContents.isDestroyed()) {
         clearPackSender(view.webContents.id);
+        clearProjectionEntries(view.webContents.id);
         view.webContents.close({ waitForBeforeUnload: false });
       }
     }

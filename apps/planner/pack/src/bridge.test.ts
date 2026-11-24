@@ -1,3 +1,4 @@
+import type { ProjectedReminder, ProjectionDocument } from "@suite/pack-runtime";
 import {
   decodeWorkspaceFile,
   encodeWorkspaceFile,
@@ -200,14 +201,55 @@ describe("the pack's Planner bridge", () => {
     await expect(pack.bridge.importWorkspace()).rejects.toThrow(/no file picker/u);
   });
 
-  it("reports the host platform and the reminder gap without inventing a schedule", async () => {
+  it("reports the host platform", async () => {
     const { pack } = setup();
     active = pack;
 
     expect(await pack.bridge.platform()).toBe("linux");
-    expect(await pack.bridge.syncReminders?.([{ id: "a", title: "Draft", at: 1_000 }])).toEqual({
-      permission: "unsupported",
+  });
+
+  it("binds the declared reminder projection to the host's scoped handle", async () => {
+    const registered: {
+      handler: ((document: ProjectionDocument) => Promise<readonly ProjectedReminder[]>) | null;
+    } = { handler: null };
+    const documents = memoryDocuments();
+    const pack = createPlannerPack({
+      host: {
+        documents,
+        files: memoryFiles(),
+        packId: "planner",
+        projections: {
+          register: (entry, next) => {
+            expect(entry).toBe("reminders");
+            registered.handler = next;
+            return () => undefined;
+          },
+        },
+      },
+      now: () => now,
     });
-    expect(await pack.bridge.requestNotifications?.()).toBe("unsupported");
+    active = pack;
+
+    const doc = WorkspaceDocument.create({ now });
+    const task = doc.createTask(
+      { title: "Draft the plan", remindAt: "2026-11-24T10:00:00.000Z" },
+      now,
+    );
+    if (registered.handler === null) throw new Error("the projection was not registered");
+    const rows = await registered.handler({
+      id: "planner",
+      version: 2,
+      read: async () => doc.snapshot(),
+    });
+
+    expect(rows).toEqual([
+      {
+        id: task.id,
+        title: "Draft the plan",
+        body: "",
+        at: Date.parse("2026-11-24T10:00:00.000Z"),
+        deepLink: `suite://planner/task/${task.id}`,
+      },
+    ]);
   });
 });

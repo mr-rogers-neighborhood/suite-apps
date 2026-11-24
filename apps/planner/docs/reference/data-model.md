@@ -89,9 +89,9 @@ A day holds no task list: the tasks point at it.
 `weekStartsOn`, `workdayStart`, `workdayEnd`, `dailyCapacityMinutes`, `defaultEstimateMinutes`,
 `theme`, `remindersEnabled`, `notificationsAskedAt`.
 
-`notificationsAskedAt` arrived with schema 2. It records when this build first asked the platform
-for notification permission, because a revoked permission resets the platform to "ask again" and
-the app should report that rather than re-open the prompt on every edit.
+`notificationsAskedAt` arrived with schema 2. It recorded when this build first asked the platform
+for notification permission. The host now owns that permission and its own ask record; a new
+document keeps the field for compatibility but the pack no longer writes it.
 
 ### workspaceMeta
 

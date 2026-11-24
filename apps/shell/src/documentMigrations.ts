@@ -94,6 +94,11 @@ export class DocumentEntryError extends Error {
 export function findDocument(documents: readonly PackDocument[], id: string): PackDocument {
   const matches = documents.filter((document) => document.id === id);
   if (matches.length === 0) {
+    // A lone `multi` declaration covers every document name a pack writes, the
+    // same rule the envelope's schema stamp uses. Planner calls its file
+    // `planner` while its declaration is the `workspace` format.
+    const sole = documents.length === 1 ? documents[0] : undefined;
+    if (sole !== undefined && sole.mode === "multi") return sole;
     throw new DocumentEntryError(
       "undeclared",
       `This pack does not declare a document named ${id}.`,

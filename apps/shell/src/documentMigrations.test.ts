@@ -165,6 +165,26 @@ describe("declared documents", () => {
   });
 
   // spec: S6.3
+  it("runs a lone multi declaration for a file whose name differs from its id", async () => {
+    const multi: PackDocument = {
+      id: "workspace",
+      format: declaration.format,
+      version: declaration.version,
+      mode: "multi",
+      ...(declaration.migrations === undefined ? {} : { migrations: declaration.migrations }),
+      ...(declaration.projection === undefined ? {} : { projection: declaration.projection }),
+    };
+    await oldNote();
+    const host = new DocumentMigrations(store);
+
+    const migrated = await host.migrate(scope, [multi], "note", runner());
+    expect(migrated.to).toBe(3);
+
+    const projected = await host.project(scope, [multi], "note", runner());
+    expect(decode(projected)).toEqual({ title: "A note", tags: [] });
+  });
+
+  // spec: S6.3
   it("refuses an undeclared document and a chain with a gap before writing", async () => {
     const payload = await oldNote();
     const host = new DocumentMigrations(store);

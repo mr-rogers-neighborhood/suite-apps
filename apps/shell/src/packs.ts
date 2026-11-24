@@ -41,7 +41,13 @@ export const HOST_VERSION = 1;
  * not implement is refused rather than loaded into a broken bridge. Add a name
  * here in the same change that adds the service.
  */
-export const HOST_CAPABILITIES = ["documents", "files", "identity.pack", "network"] as const;
+export const HOST_CAPABILITIES = [
+  "documents",
+  "files",
+  "identity.pack",
+  "network",
+  "notifications",
+] as const;
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 
