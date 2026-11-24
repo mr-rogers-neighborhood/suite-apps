@@ -3,11 +3,18 @@
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": [],
+    "types": ["node", "vite/client"],
     "paths": {
       "@suite/planner-core": ["../packages/core/src/index.ts"],
+      "@suite/pack-runtime": ["../../../packages/pack-runtime/src/index.ts"],
       "@renderer/*": ["../src/renderer/src/*"]
     }
   },
-  "include": ["src/**/*.ts", "vite.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "../src/renderer/src/platform/window.d.ts",
+    "*.config.ts",
+    "*.config.mts"
+  ]
 }

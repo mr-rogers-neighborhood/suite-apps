@@ -660,6 +660,60 @@ describe("publisher trust at install", () => {
     }
   });
 
+  // spec: S2.5, S6.3
+  it("installs the Planner pack with its declared workspace and shows the four install facts", async () => {
+    const root = await temporaryRoot();
+    const keys = await generatePackKeyPair();
+    const pack = await fixture({
+      keys,
+      id: "planner",
+      name: "Suite Planner",
+      version: "0.5.1",
+      capabilities: ["documents", "files"],
+      documents: [{ id: "workspace", format: "suite.planner", version: 2, mode: "multi" }],
+      payload: {
+        "index.html": encoder.encode(
+          '<!doctype html><div id="root"></div><script type="module" src="./assets/app.js"></script>',
+        ),
+        "assets/app.js": encoder.encode("console.log('planner');"),
+      },
+    });
+    const installed = await install(root, pack);
+
+    expect(installed).toMatchObject({
+      id: "planner",
+      name: "Suite Planner",
+      version: "0.5.1",
+      capabilities: ["documents", "files"],
+      documents: [{ id: "workspace", format: "suite.planner", version: 2, mode: "multi" }],
+    });
+    expect(await readFile(join(installed.root, "assets", "app.js"), "utf8")).toContain("planner");
+
+    const summary = packInstallSummary(pack.manifest, {
+      id: installed.publisher.id,
+      key: keys.publicKeyBase64,
+      fingerprint: installed.publisher.fingerprint,
+    });
+    expect(summary).toEqual({
+      id: "planner",
+      name: "Suite Planner",
+      version: "0.5.1",
+      capabilities: ["documents", "files"],
+      publisher: { id: "suite", fingerprint: await publisherKeyFingerprint(keys.publicKeyBase64) },
+    });
+    const sentence = describePackInstall(summary, "install");
+    for (const fact of [
+      "Suite Planner",
+      "planner",
+      "0.5.1",
+      "suite",
+      installed.publisher.fingerprint,
+      "documents, files",
+    ]) {
+      expect(sentence).toContain(fact);
+    }
+  });
+
   // spec: S2.1
   it("loads a pre-S2.1 install without a publisher only under the first-party key", async () => {
     const root = await temporaryRoot();

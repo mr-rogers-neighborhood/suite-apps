@@ -32,6 +32,14 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 - **Blurring an unchanged due or reminder time leaves the record alone.** The field shows minutes,
   so a stored timestamp with seconds was rewritten shorter just by leaving the field.
 
+### Changed
+
+- **Planner installs as a signed desktop pack, not only a phone container.** The same renderer now
+  opens inside the Suite Shell: the host owns the document envelope, atomic write and backup, while
+  the pack owns the schema and a task and a day page round-trip through export and import. Reminders
+  say they are unavailable because the host has no notification service yet, and sync stays in the
+  desktop app rather than the pack.
+
 ## [0.5.1] - 2026-11-21
 
 ### Added

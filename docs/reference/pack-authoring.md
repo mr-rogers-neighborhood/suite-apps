@@ -47,18 +47,21 @@ rather than failed. Declaring it is the step that opts into the rule.
 
 ## Build and test
 
-The app's own scripts own the commands; there is no shared pack build entry point. Budget is the
-worked example:
+The app's own scripts own the commands; there is no shared pack build entry point. Budget and
+Planner are the worked examples:
 
 ```sh
 mise exec -- pnpm --dir apps/budget run test:pack
 mise exec -- pnpm --dir apps/budget run typecheck:all
 mise exec -- pnpm budget:pack
+
+mise exec -- pnpm --dir apps/planner run test:pack
+mise exec -- pnpm --dir apps/planner run typecheck:all
+mise exec -- pnpm planner:pack
 ```
 
-Budget builds to `apps/budget/.dev/pack` and signs the archive from there. The output path is the
-app's, under a generated directory the root `.gitignore` already covers; never point it back into
-`pack/`.
+Both build to `apps/<app>/.dev/pack` and sign the archive from there. The output path is the app's,
+under a generated directory the root `.gitignore` already covers; never point it back into `pack/`.
 
 The app's `test:pack` script runs the pack tests from the app directory, with the pack's config and
 an explicit `root`. That is what keeps `node_modules` out of `pack/` while the tests still import
