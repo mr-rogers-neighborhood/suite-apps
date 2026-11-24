@@ -17,7 +17,7 @@ import { DocumentMigrations, findDocument } from "./documentMigrations.js";
 import { DocumentStore, declaredDocumentSchemaVersion } from "./documents.js";
 import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
-import { HOME_SCREEN_ID, openHomeScreen } from "./home.js";
+import { openHomeScreen } from "./home.js";
 import { catalogueIndexUrlFor, loadCatalogueIndex } from "./indexTrust.js";
 import {
   checkPackArchive,
@@ -81,7 +81,7 @@ import {
   ReminderQueue,
   ReminderScheduler,
 } from "./reminders.js";
-import { ScreenStore } from "./screens.js";
+import { SCREENS_INDEX_FILENAME, ScreenSet } from "./screens.js";
 import { type PackSender, packSender } from "./senders.js";
 import {
   type CatalogueEntry,
@@ -132,7 +132,7 @@ protocol.registerSchemesAsPrivileged([
 
 let window: ShellWindow | null = null;
 let spaceStore: SpaceStore | null = null;
-let screenStore: ScreenStore | null = null;
+let screenStore: ScreenSet | null = null;
 /**
  * One document store per publisher. The first-party publisher keeps the
  * `documents/<container>/<pack>` layout; any other publisher has its own root,
@@ -267,10 +267,13 @@ async function bootstrap(): Promise<void> {
   await refreshCatalogue();
   await refreshPacks();
   spaceStore = await SpaceStore.open(join(dataRoot, "spaces.loro"));
-  // The host's own Screen. Home is created here and opened before any pack view
+  // The host's own Screens. Home is created here and opened before any pack view
   // exists, so the first window a person sees is the shell's composition rather
   // than an empty launcher.
-  screenStore = await ScreenStore.open(join(dataRoot, "screens", `${HOME_SCREEN_ID}.loro`));
+  screenStore = await ScreenSet.open({
+    directory: join(dataRoot, "screens"),
+    indexFile: join(dataRoot, SCREENS_INDEX_FILENAME),
+  });
   await openHomeScreen(screenStore, spaceStore);
   // One store per (container, pack) under the publisher's root. This is host
   // data, deliberately separate from the pack's code root.
@@ -637,6 +640,36 @@ function registerIpc(): void {
     if (typeof registryId !== "string" || typeof size !== "string") return undefined;
     await window?.resizeScreenWidget(registryId, size);
     return window?.state();
+  });
+  onChrome(CHROME_IPC.createScreen, async (name) => {
+    if (typeof name !== "string") return undefined;
+    await window?.createScreen(name);
+    return window?.state();
+  });
+  onChrome(CHROME_IPC.renameScreen, async (screenId, name) => {
+    if (typeof screenId !== "string" || typeof name !== "string") return undefined;
+    await window?.renameScreen(screenId, name);
+    return window?.state();
+  });
+  onChrome(CHROME_IPC.duplicateScreen, async (screenId) => {
+    if (typeof screenId !== "string") return undefined;
+    await window?.duplicateScreen(screenId);
+    return window?.state();
+  });
+  onChrome(CHROME_IPC.deleteScreen, async (screenId, replacementId) => {
+    if (typeof screenId !== "string") return undefined;
+    if (replacementId !== null && typeof replacementId !== "string") return undefined;
+    await window?.deleteScreen(screenId, replacementId);
+    return window?.state();
+  });
+  onChrome(CHROME_IPC.setHomeScreen, async (screenId) => {
+    if (typeof screenId !== "string") return undefined;
+    await window?.setHomeScreen(screenId);
+    return window?.state();
+  });
+  onChrome(CHROME_IPC.openScreen, async (screenId) => {
+    if (typeof screenId !== "string") return;
+    await window?.openScreen(screenId);
   });
 
   onPack(PACK_IPC.launch, (sender): PackLaunchContext => {

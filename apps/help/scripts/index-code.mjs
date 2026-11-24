@@ -827,7 +827,7 @@ async function main() {
     "packages/desktop",
     "packages/theme",
     "packages/ui",
-    "apps/start",
+    "apps/shell",
     "apps/canvas/packages/graph",
     "apps/canvas/desktop",
     "apps/canvas",

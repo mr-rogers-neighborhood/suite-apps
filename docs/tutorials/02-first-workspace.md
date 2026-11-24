@@ -5,12 +5,14 @@ card, a second board, and an exported copy.
 
 ## Install Canvas
 
-1. Open Suite Start.
-2. Find the **Canvas** card and choose **Install**.
-3. When the card says it is installed, choose **Open**.
+Canvas is a frozen Flatpak, so install it from the signed remote:
 
-Start places the app under `~/Applications/Suite/Canvas/<version>` and writes a menu entry, so Canvas
-can also be opened without the hub.
+```sh
+flatpak install --user suite run.suite.canvas
+```
+
+Flatpak writes the menu entry, so Canvas opens without a hub. If the app later becomes a pack, install
+it from the shell's catalogue instead.
 
 ## Create a workspace
 

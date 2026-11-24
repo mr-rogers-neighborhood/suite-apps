@@ -9,9 +9,7 @@
  */
 export const PIPELINE = [
   { repo: "sync", package: "@suite/sync-server" },
-  { repo: "start", package: "@suite/start", e2e: true },
-  // The host spike. It depends on the shared Electron policy and theme, not on
-  // any app, so it runs beside the shipped apps until the migration is proven.
+  // The host. It depends on the shared Electron policy and theme, not on any app.
   { repo: "shell", package: "@suite/shell" },
   { repo: "help", package: "@suite/help" },
   { repo: "canvas", package: "@suite/canvas" },

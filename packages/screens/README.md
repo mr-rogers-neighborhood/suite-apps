@@ -1,8 +1,8 @@
 # `@suite/screens`
 
 The shared Screens contract. It is the shape a host renders and the document it renders
-from, with no window, no React, no Electron, no DOM and no file IO. Start and the shell
-both use it; Go's launcher reuses the descriptor shape later, not a second contract.
+from, with no window, no React, no Electron, no DOM and no file IO. The desktop shell
+uses it; Go's launcher reuses the descriptor shape later, not a second contract.
 
 The decision is [Widgets and Screens](../../docs/reference/decisions.md#widgets-and-screens).
 
@@ -13,7 +13,7 @@ The decision is [Widgets and Screens](../../docs/reference/decisions.md#widgets-
   "id": "home",
   "name": "Home",
   "widgets": [
-    { "registryId": "start.apps", "size": "full" },
+    { "registryId": "shell.apps", "size": "full" },
     { "registryId": "planner.quick-task", "size": "2x1", "settings": { "project": "inbox" } }
   ]
 }
@@ -39,13 +39,10 @@ of app data.
   set/clear a setting). The host owns the path, the atomic write and the backup. Every
   unknown widget id and unknown setting survives a mutation and a snapshot.
 - `src/registry.ts` — `createWidgetRegistry`: resolve an app's declared `widgets` under
-  its id, resolve a host widget the same way (`start.apps`), apply settings defaults,
+  its id, resolve a host widget the same way (`shell.apps`), apply settings defaults,
   validate settings, and build the capture payload `{ widget, action, values, settings }`.
   An unknown setting stays on the Screen and is reported; it is not sent to an app whose
   descriptor cannot use it.
-- `src/migrate.ts` — Start's current `dashboard.json`. A corrupt, empty or newer file is
-  refused with one sentence and no partial Screen. Unknown widget ids are copied, not
-  dropped.
 - `src/fixture.ts` and `src/fixtures/home.screen.json` — one shared composition and the
   code that turns it into a Loro document, so two host renderers use the same fixture.
 
@@ -58,24 +55,6 @@ of app data.
   export, import and sync come later.
 - App data. A capture carries strings to the app; the app writes through its own document
   layer.
-
-## Start's migration rule
-
-The old file is:
-
-```json
-{
-  "format": "suite.start.dashboard",
-  "version": 1,
-  "widgets": [{ "id": "start.apps", "size": "full" }]
-}
-```
-
-`migrateStartDashboard` accepts exactly version 1 of that shape and returns one Screen
-with id `start-home` and name `Home`. A newer version, a bad entry, a repeated id or an
-empty widget list refuses the whole migration with a sentence the host can show. The host
-writes the new document and keeps the old file as a backup; the package has no clock and
-no filesystem, so it cannot do either itself.
 
 ## Tests
 

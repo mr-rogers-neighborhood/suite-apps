@@ -206,10 +206,10 @@ describe("the profile check mirrors FactoryProfileSchema", () => {
 
     const extra = copy();
     extra.apps.push({
-      id: "start",
-      path: "apps/start",
-      manifest: "apps/start/package.json",
-      slop_build_path: "apps/start/slop",
+      id: "sync",
+      path: "apps/sync",
+      manifest: "apps/sync/package.json",
+      slop_build_path: "apps/sync/slop",
     });
     assert.match(failures(extra).join("\n"), /must list canvas, planner, budget, help/u);
   });

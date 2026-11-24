@@ -4,8 +4,7 @@ import type { KeyValueStore, SuiteGoModuleId } from "@suite/go";
  * What a person opened last, across modules.
  *
  * This belongs to the shell rather than to any module because "the thing I opened
- * last" spans domains — the same reason Suite Start keeps its own recents list
- * beside each app's. The title was supplied by the module that saved the document;
+ * last" spans domains. The title was supplied by the module that saved the document;
  * the shell cannot derive one from bytes and must not try.
  */
 export interface RecentEntry {

@@ -1,6 +1,6 @@
 # Suite documentation
 
-The cross-cutting documentation for the Suite: the hub, the apps, the sync server, and the
+The cross-cutting documentation for the Suite: the host, the apps, the sync server, and the
 monorepo they live in. Each app keeps its own `docs/` beside its code; this tree owns what more than
 one app needs.
 
@@ -42,7 +42,6 @@ derived.
 | Canvas | [README](../apps/canvas/README.md) · [docs](../apps/canvas/docs/README.md) · [handbook](../apps/canvas/handbook/) |
 | Planner | [README](../apps/planner/README.md) · [docs](../apps/planner/docs/reference/architecture.md) |
 | Budget | [README](../apps/budget/README.md) · [docs](../apps/budget/docs/reference/architecture.md) |
-| Start | [README](../apps/start/README.md) · [install](../apps/start/docs/how-to/install.md) · [packaging](../apps/start/docs/how-to/package.md) |
 | Help | [README](../apps/help/README.md) · [AGENTS](../apps/help/AGENTS.md) |
 | Sync | [README](../apps/sync/README.md) · [protocol](../apps/sync/docs/protocol.md) · [threat model](../apps/sync/docs/threat-model.md) |
 | Go | [README](../apps/go/README.md) · [contract](../apps/go/docs/reference/contract.md) |

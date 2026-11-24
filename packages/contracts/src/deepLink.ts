@@ -4,7 +4,7 @@ import { suiteAppIdSchema } from "./appManifest.js";
  * `suite://<app>/<segments…>?<query>` — the one link shape the suite shares.
  *
  * Parsing is deliberately paranoid, because the input arrives from the operating
- * system: a browser, a mail client, or a shortcut file can all hand Start an
+ * system: a browser, a mail client, or a shortcut file can all hand the host an
  * arbitrary string. Three things are checked before a router sees anything:
  *
  * 1. **The scheme is ours.** No `file:`, no `https:`, nothing protocol-relative.

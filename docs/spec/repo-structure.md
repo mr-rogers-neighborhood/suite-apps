@@ -13,10 +13,10 @@ lives under `packages/` only when two or more apps consume it. An app's private 
 `apps/<app>/packages/`.
 
 **R1.3** The desktop host is `apps/shell` (`@suite/shell`), and it is the way in: it reads a verified
-index, installs packs and opens them. Start is a legacy hub being retired
-([#314](https://github.com/mrrnbhd/suite-apps/issues/314)); it is not a host and takes no new feature
-while it waits. Go is the mobile host. The relay is `apps/sync`, with its app and server packages beside
-it.
+index, installs packs and opens them. It is the only desktop install path. The legacy Start hub was
+retired in [#314](https://github.com/mrrnbhd/suite-apps/issues/314); its catalogue and Home moved
+here, and a frozen Flatpak keeps its documented `flatpak install` line. Go is the mobile host. The
+relay is `apps/sync`, with its app and server packages beside it.
 
 **R1.4** Flatpak manifests live in `packaging/flatpak/`. The spec lives in `docs/spec/`. An app's
 own docs stay in `apps/<app>/docs/`.
@@ -108,8 +108,8 @@ Do not big-bang move the tree. The order is:
    launch in a window, install/update/remove. Do not port the next app until the first passes.
 4. **Retire the old path.** When a legacy app is a pack, remove its Flatpak release lane, keep its
    last artifact, and mark it frozen.
-5. **Retire the hub.** Start's catalogue, routing and update surface move into the shell and Start is
-   deleted (#314). There is one install path once the shell catalogue carries packs, not two.
+5. **Retire the hub.** Start's Home and Screens manager moved into the shell and the rest of the hub
+   was removed (#314); there is one install path, the shell catalogue, not two.
 
 ## 7. Non-goals
 

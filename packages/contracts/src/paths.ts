@@ -37,10 +37,10 @@ export interface SuitePaths {
   /** Machine-local state: locks, caches, and anything that must not sync. */
   readonly data: string;
   /**
-   * Where Start installs apps, one folder per app and version under it.
+   * The legacy folder-copy root, one folder per app and version under it.
    *
-   * Suite-wide rather than per app: it is the same root for every app, and an app
-   * reads it only to know where its own install was placed.
+   * Suite-wide rather than per app: it is the same root for every app. The host
+   * installs packs instead, so this is read only by an older frozen layout.
    */
   readonly applications: string;
   /** Where a document's lock file belongs. Always under `data`. */

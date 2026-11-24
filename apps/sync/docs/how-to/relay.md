@@ -130,18 +130,13 @@ pnpm --filter @suite/sync-server run build:all
 node apps/sync/dist/cli.js --version
 ```
 
-### How Start finds a relay
+### How the relay runs
 
-Suite Start spawns `suite-sync serve` directly. It looks in this order:
-
-1. `SUITE_SYNC_BIN`, if it is set. It has to point at the executable; Start does not fall back to
-   another copy when the named path is missing.
-2. a `suite-sync` beside Start's own binary (or in its resources directory);
-3. `suite-sync` on `PATH`.
-
-A Flatpak install is none of those: its launcher only exists inside the sandbox. Start does not
-supervise the tray app's relay and does not need to. Enter the address and pin the app shows in each
-app's Sync dialog, and leave Start as a launcher.
+The tray app embeds the relay; there is no separate process for a launcher to spawn. The headless
+form runs the same code through `flatpak run --command=suite-sync run.suite.sync serve …`, or through
+the built CLI from a checkout (`apps/sync/src/cli.ts`). No Suite process supervises a relay it did not
+start. Enter
+the address and pin the app shows in each app's Sync dialog.
 
 ## 2. Choose an address, honestly
 
@@ -312,19 +307,17 @@ address and pin, so nothing has to be typed.
 ## Running the relay somewhere else
 
 A relay on a NAS, a Raspberry Pi or a spare desktop is the ordinary shape. Do steps 1–4 there and
-leave it running; the machine with Start does not need a relay of its own.
+leave it running; the machine with the host does not need a relay of its own.
 
-Start's Sync pane manages only a relay it can find: `SUITE_SYNC_BIN`, a copy shipped beside Start,
-then `suite-sync` on `PATH`. A Flatpak install is not on that path, so Start reports no relay and stays
-a launcher. Enter that `wss://` address and its fingerprint in each app's Sync dialog. A relay on
-`127.0.0.1` is private to the machine that runs it, which is the right default and the wrong setting
-for one that exists to be reached.
+No Suite process manages a relay it did not start. Enter that `wss://` address and its fingerprint in
+each app's Sync dialog. A relay on `127.0.0.1` is private to the machine that runs it, which is the
+right default and the wrong setting for one that exists to be reached.
 
 The certificate pair belongs on the relay machine too. The pin each app stores is that certificate's
 SHA-256, so replacing the pair means entering the new fingerprint once on every device.
 
 The relay's store belongs to that machine — back up the app's data directory, not the laptop — and
-Start's pane shows the store of a relay it started, not the store of one across the network.
+the tray app shows the store of the relay it started, not the store of one across the network.
 
 ## Building and publishing a release
 

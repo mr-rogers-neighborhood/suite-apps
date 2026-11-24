@@ -11,21 +11,20 @@ and zypak, so the sandbox gets Electron's sandbox without a setuid
 record and icons.
 
 The grants are the product boundary in another form. An app reaches one
-documents folder and, where it syncs, the network; the hub reaches the host's
-Flatpak service because it is the package manager. `scripts/flatpak.mjs` signs
-the repository summary with the store key and adds the remote with the public
-half.
+documents folder and, where it syncs, the network; the host is the narrow one
+because it installs packs into its own data directory and leaves Flatpak
+deployments to Flatpak. `scripts/flatpak.mjs` signs the repository summary with
+the store key and adds the remote with the public half.
 
-## file: packaging/flatpak/run.suite.start.yml
+## file: packaging/flatpak/run.suite.shell.yml
 
-The hub's manifest is the wide one because the hub installs, updates and removes
-other apps. `--talk-name=org.freedesktop.Flatpak` is the grant behind
-`flatpak-spawn --host`, which is effectively host command execution; it is the
-trade that lets a sandboxed package manager use the host's own Flatpak.
-Documents are mounted read-only: Start routes a file to its owner, it never
-writes one.
+The host's sandbox is `--share=ipc`, `--share=network`, Wayland with an X11
+fallback, and `--device=dri`. The network namespace carries a pack that declares
+the `network` capability; the per-pack session policy and that capability still
+decide whether it may reach HTTPS or WSS. There is no host Flatpak service and no
+host filesystem grant: the host does not manage deployments, and the document
+picker and links go through the portals.
 
-The writable paths are the surface Start actually owns: `~/Applications/Suite`,
-the desktop entries and icons it installs, and its own records under
-`xdg-data/suite` and `xdg-config/suite`. An app's manifest grants one documents
-folder instead, which is the same split the package backends enforce.
+Its desktop entry claims `x-scheme-handler/suite`, so a `suite://` link reaches
+the host. A pre-release channel rewrites the manifest id and strips that claim,
+so stable remains the one handler.

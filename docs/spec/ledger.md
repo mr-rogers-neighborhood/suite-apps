@@ -33,7 +33,7 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S4.6 | Capability table | Partial | The spec table is new; hosts implement a subset. The shell serves `notifications`: `apps/shell/src/reminders.ts` keeps the host-owned queue, `apps/shell/src/reminderDelivery.ts` binds it to the OS, and `apps/shell/src/reminders.test.ts` drives the scheduler with a fake clock; Planner declares the capability and a `reminders` projection. It also serves `recents`: `apps/shell/src/recents.ts` keeps the host record and its first-use answer, `apps/shell/src/main.ts` gates the call on the declared capability, and Canvas declares `recents` in `apps/canvas/pack/manifest.json`. The media, sync and commands families are still target rows |
 | S4.7 | Pack keys | Partial | `apps/shell/src/packIdentityKey.ts` returns only the derived public key and fingerprint; the derived secret and the device key stay in the main process, and `signPackRecord` refuses a `relay-frame`, `role-record` or `membership-change` before Ed25519. `apps/shell/src/packIdentityKey.test.ts` "returns the public identity and no device key or derived secret", "exposes only a public identity and a scoped sign call on the bridge" and "refuses a relay frame, a role record and a membership change" cover the bridge surface and each forbidden signature. Gap: Suite Go does not derive the same key or expose `identity.pack` yet, so cross-host parity is owed |
 | S4.8 | Refusal | Implemented | `apps/shell/src/installedPacks.ts` names the unimplemented capability in its refusal; `apps/shell/src/installedPacks.test.ts` and `apps/go/packages/go/src/pack.test.ts` cover the refusal |
-| S5.1 | Deep links | Partial | `suite://` parser exists; version pin is absent; `/workspace/` compatibility is Start-only |
+| S5.1 | Deep links | Partial | `suite://` parser exists; version pin is absent; `/workspace/` compatibility went with Start (#314) |
 | S5.2 | Document/widget URIs | Absent | No document or widget route |
 | S5.3 | Single instance | Partial | Single-instance lock exists; the shell can open several tabs for one pack |
 | S5.4 | Lifecycle events | Partial | Launch/hide/close exist; suspend/resume are absent |
@@ -61,7 +61,7 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S7.10 | Presence and wake | Partial | Canvas presence exists; no background refresh or signal |
 | S7.11 | Replaceable relay | Partial | Self-hosted relay works; no third-party or object-store adapter |
 | S8.1–S8.8 | Branches and review | Absent | Loro `fork`/`diff`/`applyDiff` exist; no branch model, review or retention |
-| S9.1 | Declarative widgets | Partial | Start renders them; the shell is partial; capture handoff is absent |
+| S9.1 | Declarative widgets | Partial | The shell renders them; capture handoff is absent |
 | S9.2–S9.3 | Code widgets | Absent | No sandboxed widget runtime or fallback |
 | S9.4–S9.5 | Widget data and capture | Partial | Capture contract exists; data scopes and delivery do not |
 | S9.6 | Screen ownership | Implemented | `apps/shell/src/screens.ts` owns the Screen document; `apps/shell/src/screens.test.ts` keeps widget settings in it |
@@ -117,6 +117,6 @@ claim.
 | S4.2–S4.5 | No general consent record (the reminder and recents prompts each store their own answer) and no network allowlist; external links and associations bypass the boundary | Shell, Go |
 | S7.2–S7.6 | No per-document key, relay verification, header index or gap recovery | Sync |
 | S9.2–S9.4 | No code-widget sandbox, fallback or data scope | Shell |
-| S14.1, S14.5 | Export and key recovery are absent, so the longevity test fails | Shell, Start, Sync |
+| S14.1, S14.5 | Export and key recovery are absent, so the longevity test fails | Shell, Sync |
 | S4.1, S6.8 | Resolved for the file and library surface. Canvas can now reveal a document where the host keeps it, list the host's recents and forget a row without deleting the document, learn which documents changed while it was closed and which change while it is open, and import a folder through the host's bounded copy. The remaining S6.8 gap is declared export-entry binding, not the file surface; the sync relay stays S7.1 | Shell |
 | S7.1 | The Canvas pack has no relay service, so collaboration is unavailable there rather than duplicated in the pack; the frozen desktop app keeps sync | Sync, shell |

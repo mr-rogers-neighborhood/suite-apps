@@ -192,9 +192,9 @@ rather than leaving the order to whoever remembers.
 `electron-builder.yml`. The Flatpak is the published Linux build; it registers the `.canvas` MIME
 association through the packaged desktop entry, so a document opens without a separate installer.
 
-The app claims no URL scheme of its own. `suite://` belongs to Suite Start, which routes a link by
-launching this app with it, and a second scheme that nothing registers would be a promise the app does
-not keep.
+The app claims no URL scheme of its own. `suite://` belongs to Suite Shell, the host, which routes a
+link by launching this app with it, and a second scheme that nothing registers would be a promise the
+app does not keep.
 
 Electron fuses are set: `runAsNode` and `NODE_OPTIONS` off, ASAR integrity on, and app code loadable only
 from the ASAR. Without them a modified binary can be told to run any Node script.

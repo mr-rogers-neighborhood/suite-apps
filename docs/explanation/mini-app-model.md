@@ -34,11 +34,11 @@ standard; the white paper documents the capability tiers in its security and pri
 
 | Mechanism | In Suite |
 | --- | --- |
-| Host plus downloaded packs | Suite Shell on the desktop and Suite Go on mobile. Start is a legacy hub being retired |
+| Host plus downloaded packs | Suite Shell on the desktop and Suite Go on mobile |
 | A manifest beside the executable | `suite.app.json` for desktop discovery; `manifest.json` inside a `.suitepack` for both hosts |
 | Declared capabilities | Pack `capabilities`, enforced by the host; see [Go decisions](../../apps/go/docs/reference/decisions.md) |
-| One instance per app | Start installs one copy per app; the shell keeps one running instance per container and opens tabs into it |
-| Addressable app entry | `suite://<app>/<path>`; Start's `/workspace/` form remains a compatibility route |
+| One instance per app | The shell keeps one running instance per container and opens tabs into it |
+| Addressable app entry | `suite://<app>/<path>`; the old `/workspace/` form went with Start (#314) |
 | A widget in a host surface | A descriptor a host renders on its dashboard; no app code runs in the host |
 | A document boundary | The container never reads a document; `.canvas`, `.planner` and `.budget` belong to their apps |
 
@@ -69,7 +69,7 @@ standard; the white paper documents the capability tiers in its security and pri
 
 `apps/shell` tests the same model on the desktop with one Electron host: a tab per pack, a custom
 protocol origin per pack, a session partition per pack, and a scoped document API. It is a spike, not
-the shipping path; the released desktop apps remain separate Flatpaks and Start.
+the shipping path; the frozen desktop apps remain separate Flatpaks.
 [Decisions](../reference/decisions.md#desktop-host) owns the direction, and
 [the host's README](../../apps/shell/README.md) states what works.
 

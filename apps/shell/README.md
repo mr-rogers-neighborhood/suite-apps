@@ -1,9 +1,10 @@
-# Suite Shell (spike)
+# Suite Shell
 
 The desktop host. One installed Electron app; each app is a sandboxed, signed pack opened as a tab.
 
-This is a spike, not the shipping desktop app. Canvas, Planner, Budget, Help, Start and Sync remain
-separate Flatpaks. The point of this tree is to prove the host boundary before anything migrates:
+Suite Shell is the desktop host and the only desktop install path. Canvas, Planner, Budget and Help
+remain frozen Flatpaks beside it, and Sync is still the relay Flatpak until #315. The host boundary
+it proves is:
 
 - one window, a host-owned tab strip, pack views and host-rendered Screen tabs;
 - each pack on its own `suite-pack://<container>.<id>` origin and its own session partition;
@@ -97,8 +98,9 @@ Slop` folder: files still cross only through the portals.
 
 Packs live in the sandbox data directory, `~/.var/app/run.suite.shell`, not in the checkout. A
 development pack under `packs/` therefore does not load in the Flatpak, and `SUITE_SHELL_DEV_PACKS=1`
-stays a convenience of an unpackaged build. The Flatpak does not register `suite://` yet: Start keeps
-the scheme in this phase, and the host routes a link that reaches it.
+stays a convenience of an unpackaged build. The Flatpak's desktop entry claims
+`x-scheme-handler/suite`, and the app claims the scheme at runtime, so a `suite://` link reaches the
+host.
 
 ## Installing, updating and removing a pack
 
@@ -471,8 +473,7 @@ decision record owns that trade.
 - tab tear-off and split view (the view tree is ready; the UI is not);
 - host-rendered pack contributions (commands, menus, toolbar, status; widgets are host-rendered here,
   but a pack's non-widget contributions still are not);
-- the Screens manager (create, rename, duplicate, delete, set Home) and a portable `.screen` file with
-  export/import;
+- a portable `.screen` file with export/import;
 - containers and saved spaces in the UI (the space document already carries a space id);
 - space-document sync, shared spaces, presence and follow;
 - Windows and macOS packaging.

@@ -12,7 +12,8 @@ owns the rationale, and [Status](status.md) owns what exists.
   dependency order.
 - The gate is local and CI runs the same command. `--fresh` proves a commit, not the working tree. A
   pull request runs the rows its diff can break (`scripts/affected.mjs`), `main` runs the full fresh
-  gate, and the merge queue adds Start's e2e. The `vm` remote and its gate are retired.
+  gate, and a row marked with an e2e suite runs it on the merge queue. No row marks one after Start's
+  retirement (#314). The `vm` remote and its gate are retired.
 - `@suite/desktop` is shared Electron policy. Canvas's shell is `@suite/canvas-desktop`.
 - Suite Help (`apps/help`) is the documentation reader and it is a shipped app. It indexes every
   file and declaration, renders the handbook from `docs/`, and keeps module notes in
@@ -48,13 +49,13 @@ owns the rationale, and [Status](status.md) owns what exists.
 
 ## Desktop host
 
-- **Direction: one desktop host.** `apps/shell` (`@suite/shell`) is the intended desktop host. It is
-  one Electron app that opens signed, sandboxed packs as tabs, and it takes over Start's role as the
-  hub. It is a spike today: the released desktop suite is still separate Flatpaks plus Start, and
-  that remains the shipping form until the migration is proven.
-- **The migration is proven by an app, not by a window.** [Shipping packs](#shipping-packs) is the
-  bar, and Budget is the first witness. The host also carries Start's catalogue, routing and update
-  surface before Start stops shipping.
+- **One desktop host.** `apps/shell` (`@suite/shell`) is the desktop host. It is one Electron app
+  that opens signed, sandboxed packs as tabs, and it owns the catalogue, Home, the Screens manager,
+  routing and pack updates. Start is gone (#314); the frozen Flatpaks remain installable with their
+  documented `flatpak install` lines. The host is alpha, and the pack bar below is still how a pack
+  earns a place.
+- **The shipping bar is proven by an app, not by a window.** [Shipping packs](#shipping-packs) is the
+  bar, and Budget is the first witness.
 - The host is not the same-process container that [Architecture](../explanation/architecture.md)
   rejects: each pack gets its own `WebContentsView`, custom-protocol origin and session partition.
   One renderer that mounts every domain is still rejected, because it loses per-app isolation,
@@ -72,11 +73,10 @@ owns the rationale, and [Status](status.md) owns what exists.
   status, widgets). A pack draws only its content; it never renders into host DOM.
 - Signed packs are the release rule. The spike loads directory packs for development and must not
   ship as a release path.
-- A host agent is not built now. The Flatpak session helper (`org.freedesktop.Flatpak` through
-  `flatpak-spawn --host`) is what the sandboxed hub uses behind the same
-  [`PackageBackend`](../../apps/start/docs/reference/decisions.md); that grant is effectively host
-  command execution. A D-Bus agent remains the alternative if the permission set grows, and it would
-  be a second package manager until it earns its keep.
+- A host agent is not built now. The host installs packs into its own data directory and leaves
+  Flatpak deployments to Flatpak; it holds no host command execution grant. A D-Bus agent remains
+  the alternative if a future surface needs to manage deployments, and it would be a second package
+  manager until it earns its keep.
 - No service owns sync membership or keys. One service owning them would collapse the sandbox
   isolation; [sync is a capability](../../apps/sync/docs/reference/sync-capability.md) that moves
   sealed frames and readable membership.
@@ -140,31 +140,61 @@ owns the rationale, and [Status](status.md) owns what exists.
 ### Shipping packs
 
 The acceptance bar for a shipping desktop pack. A real shipping app must run as a signed pack with its
-documents and consented export/import; Budget is the first witness. Until one app passes, the released
-suite stays separate Flatpaks plus Start.
+documents and consented export/import; Budget is the first witness. The host installs packs; the
+frozen apps remain separate Flatpaks until each passes.
 
 - The pack owns its document format. The host brokers bytes and never parses it, so a pack's schema,
   migrations and file layout stay its own.
 - A one-time import of an existing document leaves the originals untouched and keeps a copy inside the
   pack's own scoped files. Import is not a move, and the host does not rewrite the source.
-- Start is a legacy hub being retired ([#314](https://github.com/mrrnbhd/suite-apps/issues/314)). The
-  shell owns install, routing and update; a feature that belongs there does not get built into Start
-  first.
+- The shell owns install, routing, Home and Screens ([#314](https://github.com/mrrnbhd/suite-apps/issues/314)).
+  Start is retired; a feature that belongs to the host does not get a second home.
 - Go's format split is [#202](https://github.com/mrrnbhd/suite-apps/issues/202); that
   issue owns the detail. The desktop pack format does not converge here.
 
+## Retiring Start (#314)
+
+Start was removed once the host installed a pack from the catalogue (#223, #331) and Home was the
+default surface. The pieces that were still Start's moved or were dropped deliberately:
+
+| Start responsibility | Where it went, or why it was dropped |
+| --- | --- |
+| Discover, install, update and remove legacy Flatpaks; update Start itself | Dropped. Flatpak owns a deployment and a frozen app or the host has one `flatpak install` line; `flatpak update --user` is the update path. The host is not a package manager. |
+| Pack install, update, reinstall and remove in the catalogue | Already the host catalogue; unchanged by the removal. |
+| Cards, categories, icons, pre-release tiers and update states | The host's pack tiles and catalogue own the pack shape. Start's pre-release card tiers and its own update row were about Flatpak branches and a self-updating hub; both are dropped with that surface. |
+| Home composition and the inline widget edit | Already in `apps/shell/src/home.ts`; the Start copy was deleted. |
+| The Screens manager (list, create, rename, duplicate, delete, set Home) | Moved to the host: `apps/shell/src/screens.ts` owns the set and `screens.json`, the window exposes it, and the chrome draws the manager. The manager's rules and tests moved with it. |
+| The `start.recents` widget and the document index | Dropped. Start's cross-app list was fed by scanning `~/Documents`; the host never opens a document path and a pack owns its own recents. Shipping a host list would require the documents-folder service the shell does not have. |
+| The Sync tab's deployment states | Dropped. It showed whether the `run.suite.sync` Flatpak was installed; no host surface manages a Flatpak. The relay's delivery and tray are #315, not this change, and its install line stays until that issue lands. |
+| The Suite Help card | The host catalogue and Home; Help is a pack source and a frozen Flatpak, not a card Start owns. |
+| `suite-start-cli` | Dropped. It existed to exercise Start's routing without a window; the host's `deepLink.ts` and its tests own `suite://` routing, and there is no user CLI. |
+| File associations and routing | `suite://` routing is the host's (`deepLink.ts`); the host now also claims `x-scheme-handler/suite` in its desktop entry. Extension-based file routing is dropped: a pack owns its documents and the host never receives a path for one, while a frozen Flatpak registers its own MIME type. |
+| Clearing the old `hub.json` | Dropped. It cleared a stale relay report in the host home directory; the shell is sandboxed and never wrote that file, so it has no host path to clear. |
+| Theme, window icon, shortcuts, folder-copy records | Dropped with the Flatpak launcher: the shell has its own theme, icon and window, and a pack has no folder-copy install to reveal or forget. |
+
+Start's own suite went with it. The rules the host now owns moved to the host's tests: the Screen-set
+tests (last Screen, Home replacement, rename, duplicate, persistence) are in
+`apps/shell/src/screens.test.ts`, and `suite://` parsing already lives in
+`apps/shell/src/deepLink.test.ts`. The Flatpak card, store-channel, package-backend, folder-record,
+CLI and renderer tests for Start's removed surfaces were deleted with those surfaces.
+
+A person's Start data directory (`~/.config/suite/start`: `installs.json`, `screens/`,
+`screens.json`, `dashboard.json` and `hub.json`) is orphaned. Nothing in the tree reads or writes it
+after this change, and this issue explicitly rules out a migration tool. The directory is left in
+place, untouched; a person may delete it. Documents the frozen apps wrote under
+`~/Documents/Suite` are app-owned and are not part of Start's directory, so they are unaffected.
+
 ## Packaging
 
-- Flatpak is the only Linux desktop form: Canvas, Planner, Budget, Help, Start and Sync. Sync's app is
-  also the relay: its tray keeps an embedded relay serving, and the same Flatpak runs the CLI
+- Flatpak is the only Linux desktop form: Suite Shell, Canvas, Planner, Budget, Help and Sync. Sync's
+  app is also the relay: its tray keeps an embedded relay serving, and the same Flatpak runs the CLI
   headlessly with `flatpak run --command=suite-sync`. There is no AppImage, Arch package, `deb`, `rpm`
   or `snap`.
-- Start never writes a deployment. It installs, updates and removes by asking Flatpak, launches with
-  `flatpak run`, and reveals a deployment. A folder copy a person places is first-class but not
-  Start's: the card offers Open, Reveal and Forget, and Start does not update it.
-- An installed deployment is compared with its own `origin` remote's commit, so a copy from
-  `suite-local` is not measured against the public `suite` store. A fresh install probes `suite`
-  first, then `suite-local`.
+- Flatpak owns a Flatpak deployment. No Suite process writes into a deployment, replaces it or offers
+  an update button; `flatpak update --user` is the path. The host is only the writer for its own
+  packs.
+- A deployment updates from its own `origin` remote, so a copy from `suite-local` is not measured
+  against the public `suite` store. Flatpak reads that origin; the host does not compare commits.
 - The channels are `slop`, `nightly`, `preview` and `stable`, and they belong to the superapp: Suite
   Shell on the desktop and Suite Go on mobile. `slop` stays the session channel; `nightly` and
   `preview` replace `canary` and `beta`, which are refused rather than aliased. A mini-app does not
@@ -183,8 +213,8 @@ suite stays separate Flatpaks plus Start.
   the digit so a channel move is an update on the shared pre-release id; a demotion requires an
   uninstall.
 - Canvas, Planner, Budget and Help are frozen legacy apps until they become packs: their code and last
-  artifact stay, and no new pre-release channel is published for them. Start and Sync are neither
-  superapps nor frozen, so their rows name no channel.
+  artifact stay, and no new pre-release channel is published for them. Sync is neither a superapp nor
+  frozen, so its row names no channel.
 - `scripts/flatpak.mjs` builds the local deployment and signs the repository summary with the store
   key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to the public
   `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`. The relay publishes on
@@ -237,13 +267,13 @@ suite stays separate Flatpaks plus Start.
   No app bundle, script, style or document runs in the host. The white paper's widget is a page a
   host mounts (§2.1.5, §3.1.5, §4.5); a host that never reads a document cannot mount that page, so
   the contract is the declarative part the model implies.
-- There is one descriptor shape, used by Start and the desktop shell. It is
+- There is one descriptor shape, used by the desktop host and the packs it renders. It is
   `{ id, title, size, capabilities, action, settings? }`, in `suite.app.json` for desktop and in a
   pack's `manifest.json` for Go, validated by `@suite/contracts`. `id` is app-local lower kebab-case
   and the host registers it as `<app id>.<widget id>` — `planner.quick-task` — so an app cannot
   claim a host id. A host widget uses the same registry-id shape under the host's own app id, but it
-  resolves through the host's own table: `start.apps` and `start.recents` are not app declarations,
-  and the registry is for app declarations. `size` is one of `1x1`, `2x1`, `full`. Go reuses
+  resolves through the host's own table: `shell.apps` is not an app declaration, and the registry is
+  for app declarations. `size` is one of `1x1`, `2x1`, `full`. Go reuses
   this descriptor in its launcher and an Android home-screen widget is a native adapter over it; Go
   does not get a second descriptor.
 - `settings` is a list of instance fields: `{ id, label, type, default?, required?, maxLength? }`,
@@ -269,16 +299,15 @@ suite stays separate Flatpaks plus Start.
   accepts no code, HTML, path, document bytes or app-data field; that refusal is the point. The
   package carries no React, Electron, DOM or file IO: the host owns the path, the atomic write and
   the backup, and the package only produces and reads snapshots.
-- **Home is a role**, not an app and not a fixed window. Start's dashboard becomes a Screen named
-  Home with id `start-home`; the shell's Home is the same role over the same descriptor table. A
-  Screen tab is an open surface beside app tabs: it belongs to the host chrome, not to a pack, and
-  no app can draw into it. A Screen can be opened from a tile, a launcher entry or an Android
+- **Home is a role**, not an app and not a fixed window. The shell's Home is a Screen named Home with
+  id `shell-home`, the first role over one descriptor table. A Screen tab is an open surface beside
+  app tabs: it belongs to the host chrome, not to a pack, and no app can draw into it. A Screen can be opened from a tile, a launcher entry or an Android
   home-screen widget, and Screens do not nest inline inside other Screens.
 - The Home manager is the host's, not an app's. It adds, removes, moves, resizes and configures
   placements, with an inline edit mode for quick reorder, resize and add. The host-owned Screens
-  manager creates, renames, duplicates and deletes a Screen, sets Home, and imports or exports the
-  portable file. Start owns its manager in this slice; the shell owns its own later. Neither asks an
-  app to manage the layout, and there is no separate Suite Screens app.
+  manager creates, renames, duplicates and deletes a Screen, sets Home, and later imports or exports
+  the portable file. The shell owns it; no app manages the layout, and there is no separate Suite
+  Screens app. This manager moved from Start to the host with #314.
 - A Screen owns order, size and placement. Every host renders the same composition responsively;
   there is no per-device placement override in v1.
 - Unknown is visible. A registry id this build cannot resolve stays in the document and is drawn as
@@ -286,18 +315,18 @@ suite stays separate Flatpaks plus Start.
   reported. Showing less than the Screen says, silently, is the failure this rule prevents.
   Reinstalling or updating the app brings its widget and its settings back without the person
   rebuilding the layout.
-- Migration keeps a backup. Start's current `dashboard.json` is `{ format: "suite.start.dashboard",
-  version: 1, widgets: [{ id, size }] }`; migration copies every entry in order, including an id this
-  build cannot resolve. A corrupt, empty or newer file is refused whole with a sentence the host
-  shows, and the old file is written aside before the Screen replaces it. A partial migration is not
-  allowed because the person cannot tell which half survived. Go's current home is its default Home
-  Screen when Go adopts the contract; this slice migrates Start only.
+- Migration keeps a backup. A host that changes a Screen shape copies the old bytes aside before the
+  new document replaces them; a corrupt, empty or newer file is refused whole. Start's
+  `dashboard.json` migration was removed with Start (#314): its data directory was never in the
+  shell's sandbox, and this issue rules out a migration tool. The file stays where Start left it,
+  untouched; see the retirement record above. Go's current home is its default Home Screen when Go
+  adopts the contract.
 - The Screen is local to this host and device in this slice. A portable `.screen` file, import and
   export, and sync are later; the document format is designed not to block them, but none of them
   ships here. The Screen is not stored in an app document and is not owned by an app.
 - The registry is what this host build can draw: its own widgets plus the app widgets whose action it
-  implements and whose manifest parses. One descriptor shape means Start and the shell register the
-  same app declaration, and a host that does not draw a widget leaves its entry in the unknown case.
+  implements and whose manifest parses. A host that does not draw a widget leaves its entry in the
+  unknown case.
 - Composite layout is constrained: a row or carousel groups widgets under the same size classes. It
   is not a page builder and cannot place content outside the grid.
 - The name is **Screen**, not View, Board or Space. The Home Screen is the one named Home, and
@@ -348,7 +377,7 @@ suite stays separate Flatpaks plus Start.
 
 ## Product boundary
 
-- A document is a file the user owns. The hub returns a path or bytes; it never parses a document.
+- A document is a file the user owns. The host returns bytes; it never parses a document.
 - No account, no telemetry, no project-operated document, sync, identity or account service. The
   signed Flatpak store is distribution only.
 - Sync is a server the user runs. It persists and authenticates; it does not own the truth.
