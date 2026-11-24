@@ -95,7 +95,7 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S15.7 | License and source | Absent | No manifest license/source fields |
 | S16.1 | Ledger | Partial | This ledger is clause-level; evidence is still incomplete |
 | S16.2 | Required tests | Absent | The conformance suite is not built |
-| S16.3 | Test tags | Partial | `scripts/spec.test.mjs` checks fixtures and IDs; no `// spec:` tags |
+| S16.3 | Test tags | Partial | `scripts/spec.test.mjs` checks fixtures, IDs and tags; two `// spec:` tags exist, most clauses are untagged |
 | S16.4 | Fixtures | Partial | `fixtures.json` exists; the host matrix does not |
 | S16.5 | Constants | Partial | Some limits exist in code; budgets and README values are absent |
 | S17.1–S17.5 | Future work | Future | TV/IoT, payments, platform APIs, registry, branch-scoped grants |

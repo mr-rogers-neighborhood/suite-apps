@@ -1,11 +1,12 @@
 /**
- * The spec's own check: clause coverage, schema coherence and the fixture corpus.
+ * The spec's own check: clause coverage, ledger evidence, spec tags, schema coherence and the
+ * fixture corpus.
  *
  * Dependency-free on purpose. It validates the JSON Schema subset the manifest uses, so the prose,
  * the schema and the fixtures cannot drift without this failing.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -19,6 +20,30 @@ const SCHEMA = JSON.parse(
 const FIXTURES = JSON.parse(
   readFileSync(join(ROOT, "docs", "spec", "fixtures.json"), "utf8"),
 );
+
+/** The statuses the ledger may use. `Implemented` is a claim; the others name what is missing. */
+const STATUSES = ["Implemented", "Partial", "Absent", "Future"];
+
+/**
+ * The test files that may carry `// spec: S4.2`. Kept small and explicit: these are the files the
+ * gate already runs that could plausibly cover a clause. A tag in an unlisted file is unchecked.
+ */
+const TAG_SCAN_FILES = [
+  "scripts/spec.test.mjs",
+  "scripts/pack.test.mjs",
+  "scripts/budget-pack.test.mjs",
+  "scripts/affected.test.mjs",
+  "scripts/release-manifest.test.mjs",
+  "scripts/channel.test.mjs",
+  "scripts/shell-channel.test.mjs",
+  "scripts/android-release.test.mjs",
+  "scripts/release-status.test.mjs",
+  "scripts/delivery-signals.test.mjs",
+  "scripts/flatpak-remote.test.mjs",
+  "packages/pack/src/manifest.test.ts",
+  "packages/pack/src/signature.test.ts",
+  "packages/pack-host/src/archive.test.ts",
+];
 
 function resolveRef(ref) {
   assert.match(ref, /^#\//u, `unsupported $ref ${ref}`);
@@ -131,14 +156,104 @@ function clauseIds(text) {
   return [...text.matchAll(/\*\*(S\d+\.\d+)\*\*/gu)].map((match) => match[1]);
 }
 
-function ledgerIds(text) {
-  const ids = [];
-  for (const match of text.matchAll(
-    /^\| (S\d+\.\d+(?:[–-]S\d+\.\d+)?) \| [^|]+ \| (Implemented|Partial|Absent|Future) \|/gmu,
-  )) {
-    ids.push(...expandRange(match[1]));
+/**
+ * The ledger's main table, one object per row. Parsing is status-agnostic so an unknown status is
+ * reported by the status check instead of silently dropping the row from coverage.
+ */
+function ledgerRows(text) {
+  const rows = [];
+  for (const match of text
+    .split("## Blocking gaps")[0]
+    .matchAll(
+      /^\| (S\d+\.\d+(?:[–-]S\d+\.\d+)?) \| ([^|]+) \| ([^|]+) \| (.*?) \|$/gmu,
+    )) {
+    rows.push({
+      clauses: expandRange(match[1]),
+      status: match[3].trim(),
+      evidence: match[4].trim(),
+    });
   }
-  return ids;
+  return rows;
+}
+
+function ledgerIds(text) {
+  return ledgerRows(text).flatMap((row) => row.clauses);
+}
+
+/** A token that names a place in the tree rather than a concept. */
+function isPathLike(token) {
+  if (token.includes("://")) return false;
+  if (token.startsWith("@suite/")) return true;
+  if (token.includes("/")) return true;
+  return /^[\w.-]+\.(?:[cm]?[jt]sx?|json|md|ya?ml|toml)$/u.test(token);
+}
+
+/** Backticked and bare path citations in an evidence cell, deduplicated in source order. */
+function citedPaths(evidence) {
+  const citations = [];
+  for (const match of evidence.matchAll(/`([^`]+)`/gu)) {
+    const token = match[1].trim();
+    if (isPathLike(token)) citations.push(token);
+  }
+  // Bare citations are only paths when they look like files; prose such as "Shell/Go" is not one.
+  for (const match of evidence.matchAll(
+    /(?:^|[\s(])(@suite\/[A-Za-z0-9_.-]+|[A-Za-z0-9_./-]+\.(?:[cm]?[jt]sx?|json|md|ya?ml|toml))(?=$|[\s),.;:])/gu,
+  )) {
+    if (isPathLike(match[1])) citations.push(match[1]);
+  }
+  return [...new Set(citations)];
+}
+
+let fileIndex = null;
+
+/** Find a filename cited without a directory, without walking the generated output. */
+function findFileNamed(name) {
+  if (fileIndex === null) {
+    fileIndex = new Map();
+    const skip = new Set([
+      "node_modules",
+      "dist",
+      ".git",
+      ".generated",
+      ".turbo",
+      "build",
+      "coverage",
+    ]);
+    const walk = (relative) => {
+      for (const entry of readdirSync(join(ROOT, relative), { withFileTypes: true })) {
+        const child = relative === "" ? entry.name : `${relative}/${entry.name}`;
+        if (entry.isDirectory()) {
+          if (!skip.has(entry.name)) walk(child);
+        } else if (!fileIndex.has(entry.name)) {
+          fileIndex.set(entry.name, child);
+        }
+      }
+    };
+    for (const base of ["scripts", "packages", "apps", "docs"]) walk(base);
+  }
+  return fileIndex.get(name) ?? null;
+}
+
+/** Whether an evidence citation points at something that exists today. */
+function resolvesCitation(citation) {
+  const token = citation.replace(/[.,;:]+$/u, "");
+  if (token.startsWith("@suite/")) {
+    const name = token.slice("@suite/".length);
+    return ["packages", "apps"].some((base) => existsSync(join(ROOT, base, name)));
+  }
+  if (existsSync(join(ROOT, token))) return true;
+  if (!token.includes("/")) return findFileNamed(token) !== null;
+  return false;
+}
+
+/** `// spec: S4.2` tags in a test file. */
+function specTags(text) {
+  return [...text.matchAll(/^\s*\/\/\s*spec:\s*(S\d+\.\d+)\b/gmu)].map((match) => match[1]);
+}
+
+/** Tags that name no clause in the spec, or a clause with no ledger row. */
+function unknownSpecTags(text, clauses, ledger) {
+  return specTags(text).filter((tag) => !clauses.has(tag) || !ledger.has(tag));
 }
 
 function fixtureVariant(fixture) {
@@ -157,11 +272,48 @@ describe("the superapp spec", () => {
     assert.equal(new Set(ledger).size, ledger.length, "duplicate clause in the ledger");
   });
 
+  // spec: S16.1
   it("records only known statuses", () => {
-    const table = LEDGER.split("## Blocking gaps")[0];
-    for (const match of table.matchAll(/^\| S[\d.]+(?:[–-]S[\d.]+)? \| [^|]+ \| ([^|]+) \|/gmu)) {
-      assert.match(match[1].trim(), /^(Implemented|Partial|Absent|Future)$/u);
+    for (const row of ledgerRows(LEDGER)) {
+      assert.ok(
+        STATUSES.includes(row.status),
+        `${row.clauses.join(", ")}: status ${JSON.stringify(row.status)} is not one of ${STATUSES.join(", ")}`,
+      );
     }
+  });
+
+  // spec: S16.3
+  it("gives every implemented clause evidence it can point at", () => {
+    for (const row of ledgerRows(LEDGER)) {
+      if (row.status !== "Implemented") continue;
+      assert.ok(
+        row.evidence.length > 0 && !/^(?:[-—]|n\/?a|none|todo|tbd)\.?$/iu.test(row.evidence),
+        `${row.clauses.join(", ")}: implemented with no evidence`,
+      );
+      for (const citation of citedPaths(row.evidence)) {
+        assert.ok(
+          resolvesCitation(citation),
+          `${row.clauses.join(", ")}: evidence cites ${citation}, which does not exist`,
+        );
+      }
+    }
+  });
+
+  // spec: S16.3
+  it("points every spec tag at a clause with a ledger row", () => {
+    const clauses = new Set(clauseIds(SPEC));
+    const ledger = new Set(ledgerIds(LEDGER));
+    for (const file of TAG_SCAN_FILES) {
+      assert.ok(existsSync(join(ROOT, file)), `tag scan list is stale: ${file} is gone`);
+      const unknown = unknownSpecTags(readFileSync(join(ROOT, file), "utf8"), clauses, ledger);
+      assert.deepEqual(
+        unknown,
+        [],
+        `${file}: ${unknown.join(", ")} is not a clause with a ledger row`,
+      );
+    }
+    // The check refuses an unknown clause and accepts a known one; no real file is edited to prove it.
+    assert.deepEqual(unknownSpecTags("// spec: S99.1\n// spec: S3.4\n", clauses, ledger), ["S99.1"]);
   });
 
   it("names the schema, ledger, fixtures and agent order", () => {
