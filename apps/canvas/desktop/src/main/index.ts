@@ -101,21 +101,12 @@ async function openInRenderer(info: OpenDocumentInfo): Promise<void> {
 function applyMenu(): void {
   const documentOpen = store !== null;
   const template: MenuItemConstructorOptions[] = [
-    // The suite menu. Every item is a deep link Start resolves, so with Start
-    // absent they do nothing rather than fail: the window this belongs to is
-    // already the app that handles the files it opens.
+    // The suite menu. Every item is a deep link the host resolves, so with no
+    // handler installed they do nothing rather than fail: the window this belongs
+    // to is already the app that handles the files it opens.
     {
       label: "Suite",
       submenu: [
-        {
-          label: "Open Suite Start",
-          click: () => {
-            void shell.openExternal("suite://start/").catch(() => {
-              // No handler installed: the launcher is not on this machine.
-            });
-          },
-        },
-        { type: "separator" },
         {
           label: "Open Canvas",
           click: () => {
@@ -135,12 +126,6 @@ function applyMenu(): void {
           },
         },
         { type: "separator" },
-        {
-          label: "Show in Start",
-          click: () => {
-            void shell.openExternal("suite://start/").catch(() => {});
-          },
-        },
         {
           // The one ask in the product. No account, no paywall, nothing gated;
           // the source is MIT and stays that way whether or not anyone uses it.
@@ -516,7 +501,7 @@ if (!gotLock) {
     attachFile(path);
   });
 
-  // No `open-url` handler: `suite://` belongs to Start, which routes a link by
+  // No `open-url` handler: `suite://` belongs to the host, which routes a link by
   // launching this app with it in `argv`. A scheme this app does not register can
   // never deliver this event, and listening for one would be a promise it cannot
   // keep.

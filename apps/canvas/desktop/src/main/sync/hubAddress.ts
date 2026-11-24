@@ -5,11 +5,12 @@ import { hubReportPath, parseHubState, type SuiteHub } from "@suite/contracts";
 /**
  * Where the hub says it listens, read from the hub's own report.
  *
- * Start writes `hub.json` into its own data directory whenever the host starts, stops or
- * changes scope, and this is the other half of that promise: sharing a workspace should not
- * begin with copying an address out of another window. A file that is absent, unreadable or
- * about another format is simply "no answer" — the dialog falls back to its default and stays
- * editable, because a person can always type an address.
+ * An older Start wrote `hub.json` into the suite data directory whenever it started, stopped
+ * or changed scope. No current writer exists after Start's retirement (#314), but Canvas still
+ * reads the report if a machine has one: sharing a workspace should not begin with copying an
+ * address out of another window. A file that is absent, unreadable or about another format is
+ * simply "no answer" — the dialog falls back to its default and stays editable, because a person
+ * can always type an address.
  */
 export interface HubReport {
   readonly running: boolean;

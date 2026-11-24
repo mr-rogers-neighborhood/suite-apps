@@ -21,6 +21,12 @@ const elements = {
   notice: document.querySelector("#notice"),
   reminderStatus: document.querySelector("#reminder-status"),
   editToggle: document.querySelector("#edit-toggle"),
+  screensToggle: document.querySelector("#screens-toggle"),
+  screensPanel: document.querySelector("#screens-panel"),
+  screensList: document.querySelector("#screens-list"),
+  screensNote: document.querySelector("#screens-note"),
+  screenNewName: document.querySelector("#screen-new-name"),
+  createScreen: document.querySelector("#create-screen"),
   editBar: document.querySelector("#edit-bar"),
   widgetChoice: document.querySelector("#widget-choice"),
   addWidget: document.querySelector("#add-widget"),
@@ -37,6 +43,9 @@ let state = {
   activeTabId: null,
   surface: "launcher",
   screens: [],
+  screenList: [],
+  homeScreenId: "",
+  screenManagerNote: null,
   packs: [],
   catalogue: [],
   catalogueSource: "",
@@ -47,6 +56,7 @@ let state = {
 };
 let query = "";
 let editing = false;
+let managingScreens = false;
 let shouldFocusSearch = true;
 let appsView = {
   packs: null,
@@ -684,6 +694,115 @@ function renderChoices(view) {
   elements.addWidget.disabled = choices.length === 0;
 }
 
+/**
+ * The Screens manager.
+ *
+ * Home is a role, not a file name: Set Home changes which Screen the next launch opens.
+ * The last Screen is kept, and deleting Home asks which Screen replaces it before the
+ * button can run. The page draws only the list the host sends.
+ */
+function renderScreensPanel() {
+  elements.screensToggle.textContent = managingScreens ? "Done" : "Screens";
+  elements.screensToggle.setAttribute("aria-expanded", String(managingScreens));
+  elements.screensPanel.hidden = !managingScreens;
+  if (!managingScreens) return;
+
+  elements.screensNote.hidden = state.screenManagerNote === null;
+  elements.screensNote.textContent = state.screenManagerNote ?? "";
+  elements.screensList.replaceChildren();
+
+  const screens = state.screenList;
+  for (const screen of screens) {
+    const row = element("li", "screen-row");
+    row.dataset.screenId = screen.id;
+
+    const heading = element("div", "screen-row-heading");
+    const badges = element("span", "screen-badges");
+    if (screen.home) badges.append(element("span", "screen-badge", "Home"));
+    if (screen.open) badges.append(element("span", "screen-badge", "Open"));
+    heading.append(element("span", "screen-row-name", screen.name), badges);
+    row.append(heading);
+
+    const tools = element("div", "screen-row-tools");
+    const open = actionButton("Open", () => runAction(api.openScreen(screen.id)));
+    open.disabled = screen.open;
+    open.setAttribute("aria-label", `Open ${screen.name}`);
+
+    const home = actionButton("Set Home", () => runAction(api.setHomeScreen(screen.id)));
+    home.disabled = screen.home;
+    home.setAttribute("aria-label", `Make ${screen.name} the Home Screen`);
+
+    const duplicate = actionButton("Duplicate", () => runAction(api.duplicateScreen(screen.id)));
+    duplicate.setAttribute("aria-label", `Duplicate ${screen.name}`);
+
+    const remove = actionButton(
+      "Delete",
+      () => runAction(api.deleteScreen(screen.id, null)),
+      "action-danger",
+    );
+    const last = screens.length <= 1;
+    remove.disabled = last;
+    remove.setAttribute(
+      "aria-label",
+      last ? `Delete ${screen.name} (the last Screen cannot be deleted)` : `Delete ${screen.name}`,
+    );
+
+    tools.append(open, home, duplicate, remove);
+    row.append(tools);
+
+    const rename = element("div", "screen-rename");
+    const input = element("input", "field screen-rename-input");
+    input.value = screen.name;
+    input.maxLength = 120;
+    input.setAttribute("aria-label", `New name for ${screen.name}`);
+    const renameButton = actionButton("Rename", () =>
+      runAction(api.renameScreen(screen.id, input.value)),
+    );
+    renameButton.setAttribute("aria-label", `Rename ${screen.name}`);
+    rename.append(input, renameButton);
+    row.append(rename);
+
+    if (screen.home && !last) {
+      const replacement = element("div", "screen-replacement");
+      replacement.append(
+        element(
+          "p",
+          "screens-note",
+          "Choose which Screen becomes Home before this one is deleted.",
+        ),
+      );
+      const select = element("select", "screen-replacement-select");
+      select.setAttribute("aria-label", `New Home in place of ${screen.name}`);
+      for (const choice of screens) {
+        if (choice.id === screen.id) continue;
+        const option = element("option", null, choice.name);
+        option.value = choice.id;
+        select.append(option);
+      }
+      const confirm = actionButton(
+        "Delete Home and use the chosen Screen",
+        () => runAction(api.deleteScreen(screen.id, select.value)),
+        "action-danger",
+      );
+      replacement.append(select, confirm);
+      row.append(replacement);
+    }
+
+    elements.screensList.append(row);
+  }
+
+  if (screens.length <= 1) {
+    elements.screensList.append(
+      element(
+        "li",
+        "screens-note",
+        "This is the last Screen. The host keeps it so there is always a surface to add another on.",
+      ),
+    );
+  }
+  elements.createScreen.disabled = false;
+}
+
 function updateFocus() {
   if (!shouldFocusSearch) return;
   if (state.surface !== "screen" || appsView.search === null) return;
@@ -703,6 +822,7 @@ function renderScreen() {
 
   if (!visible) {
     editing = false;
+    managingScreens = false;
     appsView = {
       packs: null,
       packCount: null,
@@ -723,7 +843,10 @@ function renderScreen() {
 
   if (view === undefined || !view.available) {
     editing = false;
+    managingScreens = false;
     elements.editToggle.hidden = true;
+    elements.screensToggle.hidden = true;
+    elements.screensPanel.hidden = true;
     elements.editBar.hidden = true;
     elements.widgets.replaceChildren(
       element(
@@ -736,9 +859,12 @@ function renderScreen() {
   }
 
   elements.editToggle.hidden = false;
+  elements.screensToggle.hidden = false;
+  if (managingScreens) editing = false;
   elements.editToggle.textContent = editing ? "Done" : "Edit";
   elements.editToggle.setAttribute("aria-pressed", String(editing));
   elements.editBar.hidden = !editing;
+  renderScreensPanel();
   renderChoices(view);
   renderWidgets(view);
   updateFocus();
@@ -766,7 +892,21 @@ function bindChrome() {
 
   elements.editToggle.addEventListener("click", () => {
     editing = !editing;
+    managingScreens = false;
     paint();
+  });
+
+  elements.screensToggle.addEventListener("click", () => {
+    managingScreens = !managingScreens;
+    editing = false;
+    paint();
+  });
+
+  elements.createScreen.addEventListener("click", () => {
+    const name = elements.screenNewName.value.trim();
+    if (name.length === 0) return;
+    runAction(api.createScreen(name));
+    elements.screenNewName.value = "";
   });
 
   elements.addWidget.addEventListener("click", () => {

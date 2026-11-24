@@ -187,7 +187,10 @@ export function computeAffected({ paths, projects, rows }) {
   }
 
   const closure = dependentClosure(projects, direct);
-  const e2e = !global && (closure.has("@suite/start") || closure.has("@suite/shell"));
+  // A row owns an e2e suite only when the pipeline marks it. No row does after
+  // Start's suite left, but the flag stays a property of the row rather than a
+  // hard-coded app name.
+  const e2e = !global && rows.some((row) => row.e2e === true && closure.has(row.package));
   const selected = global ? rows : rows.filter((row) => closure.has(row.package));
 
   return { rows: selected, docsOnly, spec, global, e2e, changed: changed.length };

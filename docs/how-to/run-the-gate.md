@@ -49,34 +49,25 @@ mise exec -- node scripts/gate.mjs --fresh
 
 Use it when uncommitted files could be hiding a dependency, or when you are about to publish.
 
-`--no-e2e` skips the cross-app Playwright suite for a quick loop. It does not make the run equivalent
-to a full gate; say that the e2e suite was skipped.
+`--no-e2e` skips any row marked with a Playwright suite for a quick loop. No row marks one after
+Start's retirement, so it is currently the same run with the hook left in place.
 
 `--only <repo>` writes a status that names that repository. It is a loop, not a suite proof:
 The Flatpak publisher and `release-status.mjs` refuse a publish on it, so run the full gate before a
 release.
 
-The suite launches the real Electron app, so the gate runs it under `xvfb-run` whenever that is
-installed — including on a desktop session, where it would otherwise open a burst of windows over
-whatever the person is doing. With no `xvfb-run`, a desktop session skips the suite and the status
-file records `e2e: false`; install Xvfb, run the gate on the VM, or pass `--e2e` to accept the
-windows. A headless host with neither a display nor `xvfb-run` fails the run rather than pretending
-it passed.
+A row that marks an e2e suite would launch the real Electron app, so the gate runs it under
+`xvfb-run` whenever that is installed — including on a desktop session, where it would otherwise open
+a burst of windows over whatever the person is doing. No row marks one today, so the e2e lines stay
+out of the report.
 
 ## Flaky tests
 
-A test tagged `@quarantine` is a known flake, not a silent skip. It still runs in the nightly and
-weekly gates and reports its result there. The merge queue sets `SUITE_QUARANTINE_SKIP=1` on Start's
-e2e step, and `apps/start/playwright.config.ts` then excludes `@quarantine` from that run:
-
-```sh
-SUITE_QUARANTINE_SKIP=1 mise exec -- pnpm --filter @suite/start e2e
-```
-
-The same config asks for one retry, so a single transient timeout does not read as a red pull
-request. A second failure is a bug to fix or a test to quarantine, not a reason to raise the retry
-count. Do not set `SUITE_QUARANTINE_SKIP` on the nightly or weekly run, or the flake stops being
-reported at all.
+A test tagged `@quarantine` is a known flake, not a silent skip. The tag belongs to a Playwright
+suite; no app ships one after Start's retirement. When the first host suite arrives, it still runs in
+the nightly and weekly gates, the merge queue sets `SUITE_QUARANTINE_SKIP=1`, and the suite's config
+excludes `@quarantine` there. A second failure is a bug to fix or a test to quarantine, not a reason
+to raise the retry count.
 
 ## Export retention
 
@@ -115,6 +106,6 @@ phrases.
 ## CI is the proof
 
 `main` runs the full fresh gate on every push (`main-gate`), and the merge queue runs the affected
-rows plus Start's e2e. The weekly workflow reruns the fresh gate with the action pin audit and cache
+rows. The weekly workflow reruns the fresh gate with the action pin audit and cache
 cleanup, and the platform matrix keeps its own daily schedule. The `vm` remote and the `scripts/ci/`
 hook are retired, and `suite-dev` remains only the LAN Flatpak test host.

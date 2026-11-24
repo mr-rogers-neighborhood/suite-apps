@@ -9,12 +9,12 @@ share a process, a document or a trust boundary. This page describes those bound
 | Role | Apps | Owns |
 | --- | --- | --- |
 | Document owner | Canvas, Planner, Budget, Go's domain modules | One document per workspace, its schema and its writes |
-| Host | Suite Start (desktop), Suite Go (mobile) | Installing, launching, routing, and handing over a path or bytes |
+| Host | Suite Shell (desktop), Suite Go (mobile) | Installing packs, rendering their tabs, routing a link, and handing over bytes |
 | Service | Suite Sync | A transport, a membership log and a persisted room |
 
-The hub is not a host in the browser sense. Start launches a separate signed process and returns a
-path or a URL; it never proxies document bytes and cannot edit a document. Go mounts a domain module
-inside its own window, but the module owns the document.
+The host is not a document editor. The shell opens a signed pack in its own origin and session, hands
+it bytes, and never parses them; it cannot edit a document. Go mounts a domain module inside its own
+window, but the module owns the document.
 
 ## The document rule
 
@@ -33,14 +33,14 @@ them.
 
 ## Host boundaries
 
-Suite Start and Suite Go enforce the same separation in different places:
+Suite Shell and Suite Go enforce the same separation in different places:
 
-- **Start is not in the data path.** It writes an install record and launches an executable. A
-  manifest (`suite.app.json`) says what an app is; the install record says where the executable is. A
-  manifest may not name a binary, so a tampered manifest cannot redirect a launch.
-- **Start owns only what it installed.** A copy Start placed is Start's to update and remove. A copy
-  a person placed is not Start's to update. Two copies of one app cannot run at once because they
-  share a profile and its single-instance lock.
+- **The host is not in the document path.** It verifies a signed pack, extracts it under its own data
+  directory and opens a renderer on a pack-owned origin. The scoped document API carries opaque bytes
+  and a pack id, never another pack's path.
+- **The host owns only its packs.** A pack is removed version by version; its documents and files
+  live outside the pack root and stay until the person removes them. A frozen Flatpak is not the
+  host's to update: Flatpak owns that deployment.
 - **Go never learns a domain.** It routes on what a module declares. There is no
   `if (module.id === "planner")` in the shell, and a change that needs one belongs in that domain's
   module.
@@ -62,21 +62,17 @@ and a server a person runs on a device they control. It never defines an app sch
 
 ## The desktop superapp boundary
 
-Desktop Suite is separate sandboxed apps plus Start as the shell. It is not one application that
-mounts domain code. Start owns the catalogue, the channels, routing and updates; Flatpak is the host
-runtime when an app is installed that way, and Start asks it to install, update or remove rather than
-writing a deployment itself. The hub ships as a Flatpak too: inside that sandbox it reaches the host's
-Flatpak service through the Flatpak session helper. Documents and keys stay with the app: Start hands
-over a path or bytes, never parses them, and sync keys never enter it.
+Desktop Suite is the host plus signed packs, with the frozen Flatpaks still shipped beside them. It is
+not one application that mounts domain code. [`apps/shell`](../../apps/shell/README.md) is one
+Electron app with a `WebContentsView` per pack, each in its own custom-protocol origin and session
+partition, rendering a signed pack instead of launching a separate process. It owns the catalogue,
+Home and the Screens manager; Flatpak owns the host's own deployment and the frozen apps' deployments.
+Documents and keys stay with the app: the host hands over bytes, never parses them, and sync keys
+never enter it.
 
-That is the released form, and it remains so until the migration is proven.
-[`apps/shell`](../../apps/shell/README.md) is the intended successor: one Electron app with a
-`WebContentsView` per pack, each in its own custom-protocol origin and session partition, rendering a
-signed pack instead of launching a separate process. It is not the same-process mount this section
-rejects, because the boundary moves from the OS sandbox to a per-pack renderer, origin and session. A
-real shipping app — Budget first — has to run as a signed pack with its documents and consented
-export/import before Start stops shipping. [Shipping packs](../reference/decisions.md#shipping-packs)
-owns the rule; the released apps remain separate Flatpaks and Start until then.
+That is the released form after Start's retirement (#314). It is not the same-process mount this
+section rejects, because the boundary moves from the OS sandbox to a per-pack renderer, origin and
+session. [Shipping packs](../reference/decisions.md#shipping-packs) owns the rule.
 
 ### Why not one container window
 
@@ -90,14 +86,14 @@ boundary.
 
 ### Why not a host agent now
 
-A host agent that owns installations is not built now. A sandboxed Start reaches the host's own
-Flatpak through the Flatpak session helper (`org.freedesktop.Flatpak`, used with
-`flatpak-spawn --host`), behind the same `PackageBackend` the native build implements. That grant is
-effectively host command execution; it is the trade that lets a Flatpak hub manage deployments.
+The host is not a Flatpak package manager. It verifies and unpacks signed packs into its own data
+directory, and Flatpak handles the host's own deployment and the frozen apps. A host agent that
+managed Flatpak deployments is not built, because no suite surface asks for one after Start's
+retirement.
 
 A D-Bus agent remains the alternative if the permission set grows. It would be a second package
 manager until it earns its keep: install, update, remove and launch would exist twice, with its own
-trust boundary, and it would duplicate what Start already does through the seam.
+trust boundary.
 
 ### Why not one service owning sync keys
 
@@ -117,8 +113,8 @@ target: the MiniApp Packaging specification is
 it. The [Suite superapp specification](../spec/superapp.md) is the target for the host and pack
 contract; [The mini-app model](mini-app-model.md) owns the comparison.
 
-The two host seams are named rather than implied: [Start's decisions](../../apps/start/docs/reference/decisions.md)
-state the `PackageBackend` rule, and [the sync capability](../../apps/sync/docs/reference/sync-capability.md)
+The two host seams are named rather than implied: [the shell's decisions](../../apps/shell/docs/reference/decisions.md)
+state the pack boundary, and [the sync capability](../../apps/sync/docs/reference/sync-capability.md)
 states the sealed-frame contract.
 
 ## Shared packages
@@ -127,10 +123,10 @@ Only code used by more than one app belongs in a shared package:
 
 | Package | Used by | Owns |
 | --- | --- | --- |
-| `@suite/contracts` | Start, apps | `suite.app`, deployment, deep-link parsing, contract versioning |
-| `@suite/files` | Start, apps | Envelope mechanics, base64, size limits, backup naming |
+| `@suite/contracts` | Host, apps | `suite.app`, deployment, deep-link parsing, contract versioning |
+| `@suite/files` | Apps | Envelope mechanics, base64, size limits, backup naming |
 | `@suite/document-runtime` | Planner, Budget | Renderer replica with the single `observe` site, and the atomic main-process store |
-| `@suite/screens` | Start, desktop host | The `suite.screen` shape, its Loro document, the widget registry and Start's dashboard migration; the host owns file IO |
+| `@suite/screens` | Desktop host | The `suite.screen` shape, its Loro document and the widget registry; the host owns file IO |
 | `@suite/desktop` | Desktop apps | Electron security policy: sandbox, context isolation, fuses |
 | `@suite/theme` | Desktop apps | Shared theme variables |
 | `@suite/ui` | Desktop apps | Menu bar, modal, sync status and other shared chrome |

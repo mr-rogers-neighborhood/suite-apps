@@ -1,6 +1,7 @@
-# Phase 2 of the CI spec: a pull request runs the checks its diff can break, the
-# merge queue adds Start's e2e suite, and the root checks stay unconditional.
-# The full fresh gate on `main` lives in main.yml; nightly packaging is Phase 3.
+# Phase 2 of the CI spec: a pull request runs the checks its diff can break, and
+# the root checks stay unconditional. The full fresh gate on `main` lives in
+# main.yml; nightly packaging is Phase 3. Start's Playwright suite left with
+# Start (#314), so there is no e2e job until a host suite marks a pipeline row.
 #
 # The affected map is scripts/affected.mjs, which reads the workspace graph. A
 # path it does not understand selects every row; it never silently skips one.
@@ -169,42 +170,6 @@ jobs:
         if: matrix.repo != 'none'
         run: node scripts/gate.mjs --only "${{ matrix.repo }}" --no-e2e
 
-  e2e:
-    name: e2e
-    needs: detect
-    # The fork rule of C2.4 also covers the heavy suite: a fork PR waits for
-    # the `ci:full` label. The merge queue and dispatch keep their behavior.
-    if: >-
-      needs.detect.result == 'success' &&
-      (github.event_name == 'merge_group' || needs.detect.outputs.e2e == 'true') &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.head.repo.full_name == github.repository ||
-       contains(github.event.pull_request.labels.*.name, 'ci:full'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: pnpm
-        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-        with:
-          version: 12.17.0
-      - name: Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: pnpm
-      - name: Install
-        run: pnpm install --frozen-lockfile
-      - name: Xvfb
-        run: sudo apt-get update && sudo apt-get install -y xvfb
-      - name: Start e2e
-        env:
-          # Quarantine applies to the merge queue only: the suite still runs a
-          # quarantined test nightly, where a flake is reported (C5.4).
-          SUITE_QUARANTINE_SKIP: ${{ github.event_name == 'merge_group' && '1' || '' }}
-        run: node scripts/gate.mjs --only start --e2e
-
   full-gate:
     name: full-gate
     # Kept for an on-demand full tree until Phase 3's nightly owns it.
@@ -233,7 +198,7 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [detect, fast, workflows, apps, e2e, full-gate]
+    needs: [detect, fast, workflows, apps, full-gate]
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate
@@ -243,10 +208,6 @@ jobs:
           test "${{ needs.workflows.result }}" = "success"
           if [ "${{ needs.apps.result }}" != "success" ] && [ "${{ needs.apps.result }}" != "skipped" ]; then
             echo "apps: ${{ needs.apps.result }}"
-            exit 1
-          fi
-          if [ "${{ needs.e2e.result }}" != "success" ] && [ "${{ needs.e2e.result }}" != "skipped" ]; then
-            echo "e2e: ${{ needs.e2e.result }}"
             exit 1
           fi
           if [ "${{ needs.full-gate.result }}" != "success" ] && [ "${{ needs.full-gate.result }}" != "skipped" ]; then

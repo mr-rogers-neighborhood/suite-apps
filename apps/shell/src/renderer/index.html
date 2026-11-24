@@ -29,12 +29,27 @@
             <p class="eyebrow">Screen</p>
             <h1 id="screen-name">Home</h1>
           </div>
+          <button id="screens-toggle" class="edit-toggle" type="button" aria-expanded="false">
+            Screens
+          </button>
           <button id="edit-toggle" class="edit-toggle" type="button" aria-pressed="false">
             Edit
           </button>
         </header>
 
         <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+
+        <section id="screens-panel" class="screens-panel" aria-label="Screens" hidden>
+          <p id="screens-note" class="screens-note" role="status" aria-live="polite" hidden></p>
+          <ul id="screens-list" class="screens-list"></ul>
+          <div class="screen-create">
+            <label for="screen-new-name">New Screen name</label>
+            <input id="screen-new-name" class="field" type="text" maxlength="120" />
+            <button id="create-screen" class="action action-primary" type="button">
+              Create Screen
+            </button>
+          </div>
+        </section>
         <p id="reminder-status" class="notice" role="status" aria-live="polite" hidden></p>
 
         <div id="edit-bar" class="edit-bar" hidden>

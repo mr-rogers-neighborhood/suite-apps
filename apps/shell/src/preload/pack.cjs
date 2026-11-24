@@ -30,6 +30,10 @@ const packId = separator > 0 ? host.slice(separator + 1) : host;
 // cannot read the token out, copy it, or mint a handle of its own.
 const issuedTokens = new WeakMap();
 
+// How many local listeners hold the one host watch. The host watches per tab, so
+// the first listener starts it and the last one stops it.
+let changeListeners = 0;
+
 // Declared projections (S6.3). The pack binds the entry its manifest names; the
 // host calls it with a read-only handle for one document. The map is local, so
 // another renderer cannot borrow a handler by naming this pack's entry.
@@ -121,6 +125,36 @@ contextBridge.exposeInMainWorld("suite", {
       return ipcRenderer.invoke("suite:documents:save", id, bytes);
     },
     remove: (id) => ipcRenderer.invoke("suite:documents:remove", id),
+    // The host opens the file manager at the document's own location. The pack
+    // names the document and gets its summary back, never a path.
+    reveal: (id) => ipcRenderer.invoke("suite:documents:reveal", id),
+    // What changed while this pack was closed. The host compares its record with
+    // the files, so a change missed while the host was off is still reported.
+    pendingChanges: () => ipcRenderer.invoke("suite:documents:pending-changes"),
+    // While the pack is open the host pushes ids. Nothing is delivered while it
+    // is closed, so the pack never polls a directory.
+    onChanged: (listener) => {
+      if (typeof listener !== "function") {
+        throw new Error("a document change listener is a function");
+      }
+      const handler = (_event, documentIds) => {
+        if (Array.isArray(documentIds)) listener(documentIds);
+      };
+      ipcRenderer.on("suite:documents:changed", handler);
+      changeListeners += 1;
+      if (changeListeners === 1) void ipcRenderer.invoke("suite:documents:watch", true);
+      return () => {
+        ipcRenderer.removeListener("suite:documents:changed", handler);
+        changeListeners = Math.max(0, changeListeners - 1);
+        if (changeListeners === 0) void ipcRenderer.invoke("suite:documents:watch", false);
+      };
+    },
+  },
+  // The host's recent list. Another pack's row carries no document id, so a pack
+  // cannot enumerate or open a document it does not own (S11.1).
+  recents: {
+    list: () => ipcRenderer.invoke("suite:recents:list"),
+    forget: (documentId) => ipcRenderer.invoke("suite:recents:forget", documentId),
   },
   files: {
     list: (path) => ipcRenderer.invoke("suite:files:list", path),
@@ -161,6 +195,9 @@ contextBridge.exposeInMainWorld("suite", {
       }
       return ipcRenderer.invoke("suite:files:import-external", token, name);
     },
+    // The person picks a folder and the host copies it under this pack's own
+    // root. The result is a relative directory and its files, never a path.
+    importFolder: (destination) => ipcRenderer.invoke("suite:files:import-folder", destination),
   },
   setTitle: (title) => ipcRenderer.send("suite:pack:set-title", title),
   openExternal: (url) => ipcRenderer.invoke("suite:pack:open-external", url),

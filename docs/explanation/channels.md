@@ -77,7 +77,7 @@ signed version. A pack update is a version update, not a channel move.
 - **Legacy apps are frozen.** Canvas, Planner, Budget and Help remain the separate Flatpaks at their
   last artifacts. Their code stays in the tree, but they get no new release and no new pre-release
   channel until they become packs.
-- **Start and Sync are not superapps; both are legacy surfaces on the way out.** Start is the hub
+- **Sync is not a superapp; it is a legacy surface on the way out.** The host owns desktop channels,
   today and retires once the host catalogue installs packs ([#314](https://github.com/mrrnbhd/suite-apps/issues/314));
   Sync's tray app retires as the relay becomes a host capability
   ([#315](https://github.com/mrrnbhd/suite-apps/issues/315)). Neither carries a channel, and neither
@@ -150,7 +150,7 @@ machine is where it was. These steps are not.
   owns the rule.
 - **A copied document diverges once edited.** Copy-on-open makes the channel's copy its own document;
   export back refuses the stable folder rather than overwriting it, and is not a merge.
-- **Removing the pre-release data deletes the pre-release documents.** Start removes the channel's
+- **Removing the pre-release data deletes the pre-release documents.** The host removes the channel's
   data directory only after a confirmation; the stable folder is never in that path.
 - **A store-key rotation does not reach an installed remote.** The remote carries the public half
   Flatpak verifies; a new store key needs the remote re-added with the new `.flatpakrepo` before a

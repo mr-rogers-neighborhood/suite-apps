@@ -29,8 +29,8 @@ For the product story and the influences behind it, read
 - **Nothing is trapped.** Export a `.budget` file, plain JSON records, transactions as CSV, or QIF.
   Import CSV, QIF, native JSON, or another `.budget`.
 - **Offline by design.** No network client, no updater, no analytics. Bank sync is deliberately
-  absent. Updates arrive through the Flatpak remote; Suite Start asks Flatpak, and never replaces a
-  deployment itself.
+  absent. Updates arrive through the Flatpak remote; Flatpak owns the deployment, and no Suite
+  process replaces it.
 - **One shipped form.** Budget ships as the Flatpak `run.suite.budget`. A pre-release is a separate
   branch with its own id and data folder.
 
@@ -64,7 +64,7 @@ xvfb-run -a pnpm e2e:smoke
 
 ## Working in the monorepo
 
-The apps, the hub and the sync server share one repository and one gate. Start with the
+The host, the apps and the sync server share one repository and one gate. Start with the
 [root README](../../README.md), then [Commands](../../docs/reference/commands.md) for the gate and
 [Repository layout](../../docs/reference/repo-layout.md) for where each package lives.
 

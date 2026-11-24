@@ -1,17 +1,16 @@
 # Security
 
-Suite Start is the hub. It discovers installed apps, launches one, and routes `suite://` links and
-files. It holds no document and proxies no bytes, so the surface is the launcher itself:
+Suite Go is the mobile host. It installs a signed pack from the catalogue and renders it inside its
+own window; it holds no document parser and proxies no document bytes. The surface is the host
+itself:
 
-- A manifest (`suite.app.json`) is data, and it may not name an executable. The only place an executable
-  path lives is `installs.json`, which Start writes and re-validates on read; a tampered manifest cannot
-  redirect a launch.
-- A deep link arrives from the operating system and is untrusted. The parser refuses credentials, a
-  port, a fragment, an encoded `..`, control characters and an app it does not know.
-- The renderer is sandboxed (`contextIsolation`, `sandbox`, no `nodeIntegration`), served from
-  `start://launcher` rather than `file://`, and every IPC channel checks the sender.
-- The packaged binary sets the Electron fuses: no `runAsNode`, no `NODE_OPTIONS`, no CLI inspect
-  arguments, ASAR integrity on, and app code loadable only from the ASAR.
+- A pack is verified before it is installed and its files are re-verified on load. A changed file is
+  a refusal, not a running module.
+- A manifest is data. It declares capabilities, documents and contributions, and the host refuses a
+  capability it does not implement rather than skipping it.
+- A deep link arrives from another app and is untrusted. The parser refuses credentials, a port, a
+  fragment, an encoded `..`, control characters and a pack it does not know.
+- Modules receive a document handle; the container does not know the format and never reads one.
 
 ## Reporting a vulnerability
 

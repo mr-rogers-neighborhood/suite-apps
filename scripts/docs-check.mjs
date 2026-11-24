@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const docs = join(root, "docs");
 const SECTIONS = ["tutorials", "how-to", "reference", "explanation"];
-const APPS = ["canvas", "planner", "budget", "start", "sync", "go"];
+const APPS = ["canvas", "planner", "budget", "sync", "go"];
 const ROOT_PAGES = [
   "README.md",
   "AGENTS.md",
@@ -51,20 +51,12 @@ const BANNED = [
     why: "Planner syncs; only Budget has no network client",
   },
   {
-    pattern: /\bPlaywright is not part of any per-change gate\b/i,
-    why: "the root gate runs Start's e2e suite",
-  },
-  {
     pattern: /changes its data folder/i,
     why: "every pre-release tier keeps the one Suite Slop folder",
   },
   {
     pattern: /SUITE_START_CATALOG|SUITE_START_VERSION/,
     why: "the hub reads its catalogue and feed base; these variables were retired",
-  },
-  {
-    pattern: /\.local\/share\/suite\/start/,
-    why: "Start's install records live under the suite config directory",
   },
 ];
 /** Repositories the monorepo replaced. A line that calls one archived is allowed. */

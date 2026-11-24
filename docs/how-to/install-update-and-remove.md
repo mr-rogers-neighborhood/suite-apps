@@ -1,66 +1,62 @@
 # Install, update and remove apps
 
-Suite Shell is the desktop host and the way in. [Install it](../../README.md#the-hosts) once, then
-install, update, remove and reinstall packs from its catalogue. A `.suitepack` file still installs on
-its own. [The shell's README](../../apps/shell/README.md#installing-updating-and-removing-a-pack) owns
-that lifecycle.
+Suite Shell is the desktop host and the way in. [Install the host](../../apps/shell/README.md#install-as-a-flatpak)
+once, then install, update, remove and reinstall packs from its catalogue. A `.suitepack` file still
+installs on its own. [The shell's README](../../apps/shell/README.md#installing-updating-and-removing-a-pack)
+owns that lifecycle, and neither the host nor an app edits a document.
 
-Suite Start remains the legacy hub for the Flatpak apps it installed, and #314 retires it. The
-sections below describe that path. Neither the shell nor Start edits a document, and removing an app
-does not remove documents.
+The frozen Canvas, Planner, Budget and Help Flatpaks keep the one `flatpak install` line the release
+page prints. Suite Start no longer exists (#314); its catalogue and Home moved into the shell. Suite
+Sync is still the `run.suite.sync` Flatpak until #315 retires that artifact.
 
-## Install a legacy Flatpak
+## Install the host
 
-1. Open Suite Start.
-2. On an app card, choose **Install**.
-3. When it finishes, choose **Open**.
+```sh
+flatpak remote-add --user --if-not-exists --from suite https://flatpak.suite.run/suite.flatpakrepo
+flatpak install --user suite run.suite.shell
+```
 
-Start reads the Flatpak remote `suite` first and then `suite-local`. When either offers the app, the
-card says `Not installed yet · from the store` and Install asks Flatpak to install it. There is no
-download, manifest feed or second copy to place.
+Updates arrive through Flatpak: `flatpak update --user` replaces the deployment, and the host does not
+check for or install its own update. From a checkout, `node scripts/flatpak.mjs --app shell` builds the
+same unpacked tree into the local store.
 
-## Add a copy you built
+## Install a pack
 
-Choose **Add app…**, then select the executable. Start reads the `suite.app.json` beside it and writes
-the install record. A copy you placed this way is first-class, but Start does not update it: the card
-offers Open, Reveal and Forget rather than Update and Uninstall, and its updates are yours to make.
+Home's `shell.apps` widget shows the catalogue. A trusted entry offers **Install**, **Update** or
+**Reinstall** as its state requires; a refused entry stays visible with the sentence that explains it
+and cannot be installed. A `.suitepack` file can also be opened on its own. Removing a pack leaves its
+documents and files on disk until the person removes them.
 
-## Update a legacy Flatpak
+## Install a frozen Flatpak
 
-Choose **Update** on a Flatpak card, or **Check for updates** to ask the store again.
+The frozen apps are not packs yet. Each keeps its last signed deployment:
 
-Start reads the deployment's own `origin` remote and compares that remote's commit, so a copy
-installed from `suite-local` is not measured against the public `suite` store. When the origin offers a
-different commit, the card says `update available` and **Update** asks Flatpak to replace the
-deployment. A running app keeps the old commit until it restarts: Flatpak swaps the deployment
-underneath it, and Start does not close an app it did not start.
+```sh
+flatpak install --user suite run.suite.canvas
+flatpak install --user suite run.suite.planner
+flatpak install --user suite run.suite.budget
+flatpak install --user suite run.suite.help
+```
 
-Start does not update a folder copy; it only launches it.
+The signed remote is the same one the host uses. A new build updated the deployment with
+`flatpak update --user`; the apps are frozen, so there is no new release until each becomes a pack.
 
-## Remove a legacy app
+## Install the relay
 
-- **Uninstall** on a Flatpak card asks Flatpak to remove the deployment.
-- **Forget** on a placed copy removes the record only.
-- Start never deletes a document.
+Suite Sync is still delivered as the `run.suite.sync` Flatpak until #315 moves the tray into the host:
 
-One copy per app is the rule. A Flatpak deployment and a folder copy share a profile and its
-single-instance lock, so only one can run; when both exist, Start shows the Flatpak and lists the
-folder copy as a duplicate to remove.
+```sh
+flatpak install --user suite run.suite.sync
+```
 
-## Update the hub
+The relay remains a separate trust boundary: it stores sealed frames, never a document.
 
-The hub is a Flatpak. Its row says `Flatpak` and offers **Update Start** only when the installed
-`run.suite.start` commit differs from the newest commit on that deployment's own origin. A placed
-copy, a current build and a failed check offer no button. Flatpak replaces the deployment, and the
-new build starts on the next launch. `flatpak update --user run.suite.start` does the same thing
-without the button. A hub cannot replace its own running binary, and Start no longer keeps a second
-version to roll back to.
+## What happened to Suite Start
 
-## Flatpak visibility
-
-Start reads the Flatpak installation selected by `XDG_DATA_HOME`. If a tool points that at a
-per-session directory, run Start or the app with `XDG_DATA_HOME=$HOME/.local/share` to see the real
-user installation.
+Suite Start was the legacy Flatpak hub. It has been removed; nothing in the tree reads its install
+records or its Screen files, and no migration runs. Install the host and its packs instead. A person
+who still has Start installed can remove it with `flatpak uninstall --user run.suite.start`; the
+documents the frozen apps wrote in `~/Documents/Suite` are untouched.
 
 See [Packaging channels](../reference/packaging-channels.md) for the form, the signed remote and who
 updates it.

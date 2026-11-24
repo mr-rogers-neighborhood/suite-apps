@@ -7,7 +7,7 @@ const screen: Screen = {
   id: "home",
   name: "Home",
   widgets: [
-    { registryId: "start.apps", size: "full" },
+    { registryId: "shell.apps", size: "full" },
     {
       registryId: "planner.quick-task",
       size: "2x1",
@@ -73,7 +73,7 @@ describe("the Screen shape", () => {
     expect(
       parseScreen({
         ...screen,
-        widgets: [{ registryId: "start.apps", size: "full", [key]: "widget.js" }],
+        widgets: [{ registryId: "shell.apps", size: "full", [key]: "widget.js" }],
       }).ok,
     ).toBe(false);
   });
@@ -82,7 +82,7 @@ describe("the Screen shape", () => {
     expect(
       parseScreen({
         ...screen,
-        widgets: [{ registryId: "start.apps", size: "full", settings: { project: 7 } }],
+        widgets: [{ registryId: "shell.apps", size: "full", settings: { project: 7 } }],
       }).ok,
     ).toBe(false);
   });
@@ -97,7 +97,7 @@ describe("the Screen shape", () => {
     expect(
       parseScreen({
         ...screen,
-        widgets: [{ registryId: "start.apps.extra", size: "full" }],
+        widgets: [{ registryId: "shell.apps.extra", size: "full" }],
       }).ok,
     ).toBe(false);
   });
@@ -106,8 +106,8 @@ describe("the Screen shape", () => {
     const parsed = parseScreen({
       ...screen,
       widgets: [
-        { registryId: "start.apps", size: "full" },
-        { registryId: "start.apps", size: "1x1" },
+        { registryId: "shell.apps", size: "full" },
+        { registryId: "shell.apps", size: "1x1" },
       ],
     });
     expect(parsed.ok).toBe(false);
@@ -115,7 +115,7 @@ describe("the Screen shape", () => {
 
   it("refuses an unknown size class", () => {
     expect(
-      parseScreen({ ...screen, widgets: [{ registryId: "start.apps", size: "3x1" }] }).ok,
+      parseScreen({ ...screen, widgets: [{ registryId: "shell.apps", size: "3x1" }] }).ok,
     ).toBe(false);
   });
 

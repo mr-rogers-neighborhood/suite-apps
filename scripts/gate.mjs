@@ -7,9 +7,9 @@
  * typecheck against, and, with `--fresh`, that the tree under test came from the
  * commit rather than from whatever is lying around.
  *
- * Order is dependency order: sync publishes the protocol, start publishes the
- * shared packages, then the apps. `suite-go` is last because it consumes the
- * same theme and UI packages through the phone.
+ * Order is dependency order: sync publishes the protocol, then the host and the
+ * apps. `suite-go` is last because it consumes the same theme and UI packages
+ * through the phone.
  *
  * `--fresh` is the difference between "this tree passes" and "this commit
  * passes". It exports HEAD with `git archive` into `.dev/gate/<sha>`, installs

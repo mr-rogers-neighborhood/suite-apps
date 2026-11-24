@@ -7,6 +7,9 @@ shipped host.
 
 ### Added
 
+- **The Screens manager belongs to the host.** A person can create, rename, duplicate and delete a
+  Screen and choose which one is Home. `screens.json` remembers the role, the last Screen is kept,
+  and deleting Home asks for its replacement first. The rule and its tests moved from Start (#314).
 - **The catalogue reads the published index.** The operator key is pinned in the shell, and the
   index is verified before an entry is listed: signature, `sequence`, `previous` and `expires` are
   all checked against the last verified head. A tampered, unsigned, wrong-operator, expired or
@@ -23,9 +26,9 @@ shipped host.
 
 ### Changed
 
-- **Suite Shell is the way in.** Install the host once, then install, update, remove and reinstall
-  packs from its catalogue. Suite Start remains the legacy hub for the Flatpak apps until #314
-  retires it; it is no longer the entry point for an app.
+- **Suite Shell is the only desktop host.** Install it once, then install, update, remove and
+  reinstall packs from its catalogue. Suite Start is retired (#314): the frozen Flatpaks keep their
+  `flatpak install` lines, and no second hub lists or updates them.
 - **Documents carry a host envelope.** Each pack document is a magic-and-version prefix, a canonical
   header (publisher, pack, document, schema, payload length, payload checksum) and the pack's payload
   bytes untouched. Saves are serialized, atomic, backed up and recovered after a crash; a file that

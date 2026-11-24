@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -19,8 +19,10 @@ let files: PackFilesService;
 let service: ExternalFilesService;
 let chosenOpen: string | null;
 let chosenSave: string | null;
+let chosenFolder: string | null;
 let openCalls: number;
 let saveCalls: number;
+let folderCalls: number;
 
 const dialog: ExternalDialog = {
   async pickOpen() {
@@ -31,6 +33,10 @@ const dialog: ExternalDialog = {
     saveCalls += 1;
     return chosenSave;
   },
+  async pickFolder() {
+    folderCalls += 1;
+    return chosenFolder;
+  },
 };
 
 beforeEach(async () => {
@@ -39,8 +45,10 @@ beforeEach(async () => {
   service = new ExternalFilesService(dialog, files);
   chosenOpen = null;
   chosenSave = null;
+  chosenFolder = null;
   openCalls = 0;
   saveCalls = 0;
+  folderCalls = 0;
 });
 
 afterEach(async () => {
@@ -351,5 +359,111 @@ describe("the external file service", () => {
       expect(error.message).not.toContain(root);
       expect(error.message).not.toContain("missing.txt");
     }
+  });
+});
+
+describe("folder import", () => {
+  async function folder(name: string, files: Record<string, string>): Promise<string> {
+    const directory = join(root, name);
+    for (const [relative, text] of Object.entries(files)) {
+      const target = join(directory, relative);
+      await mkdir(join(target, ".."), { recursive: true });
+      await writeFile(target, text);
+    }
+    await mkdir(directory, { recursive: true });
+    return directory;
+  }
+
+  it("copies a nested folder into the pack root and returns relative entries", async () => {
+    chosenFolder = await folder("vault", {
+      "Home.md": "# Home",
+      "notes/Alpha.md": "alpha",
+    });
+    const who = sender("canvas");
+    const imported = await service.importFolder(who);
+
+    expect(imported?.path).toBe("imports/vault");
+    expect(imported?.entries.map((entry) => entry.path).sort()).toEqual([
+      "imports/vault/Home.md",
+      "imports/vault/notes/Alpha.md",
+    ]);
+    expect(JSON.stringify(imported)).not.toContain(root);
+    expect(decode(await files.read(scopeOf(who), "imports/vault/notes/Alpha.md"))).toBe("alpha");
+  });
+
+  it("gives a second import of the same folder a free name", async () => {
+    chosenFolder = await folder("vault", { "Home.md": "# Home" });
+    const who = sender("canvas");
+
+    expect((await service.importFolder(who))?.path).toBe("imports/vault");
+    expect((await service.importFolder(who))?.path).toBe("imports/vault-2");
+  });
+
+  it("refuses a destination that already holds something", async () => {
+    chosenFolder = await folder("vault", { "Home.md": "# Home" });
+    const who = sender("canvas");
+    await files.write(scopeOf(who), "imports/taken/old.md", encode("old"));
+
+    await expect(service.importFolder(who, "imports/taken")).rejects.toThrow("already exists");
+    // The old copy is untouched: a collision refuses, it does not merge.
+    expect(await files.stat(scopeOf(who), "imports/taken/old.md")).not.toBeNull();
+  });
+
+  it("treats cancellation as a null value", async () => {
+    chosenFolder = null;
+    expect(await service.importFolder(sender("canvas"))).toBeNull();
+  });
+
+  it("refuses a pack without files before the folder dialog opens", async () => {
+    chosenFolder = await folder("vault", { "Home.md": "# Home" });
+    await expect(
+      service.importFolder(sender("canvas", { capabilities: ["documents"] })),
+    ).rejects.toThrow("not enabled");
+    expect(folderCalls).toBe(0);
+  });
+
+  it.each([
+    [
+      "too many entries",
+      { maxEntries: 2 },
+      { "a.md": "a", "b.md": "b", "c.md": "c" },
+      "more files",
+    ],
+    ["an oversized file", { maxFileBytes: 4 }, { "big.md": "too large" }, "larger than"],
+    [
+      "too many bytes",
+      { maxTotalBytes: 6 },
+      { "a.md": "1234", "b.md": "5678" },
+      "larger than this host",
+    ],
+  ])("refuses %s and writes nothing", async (_label, limits, contents, message) => {
+    chosenFolder = await folder("bounded", contents);
+    service = new ExternalFilesService(dialog, files, { folderLimits: limits });
+    const who = sender("canvas");
+
+    await expect(service.importFolder(who)).rejects.toThrow(message);
+    expect(await files.stat(scopeOf(who), "imports/bounded")).toBeNull();
+  });
+
+  it("refuses a symlink and writes nothing", async () => {
+    const directory = await folder("linked", { "real.md": "real" });
+    await symlink(join(directory, "real.md"), join(directory, "alias.md"));
+    chosenFolder = directory;
+    const who = sender("canvas");
+
+    await expect(service.importFolder(who)).rejects.toThrow("symbolic link");
+    expect(await files.stat(scopeOf(who), "imports/linked")).toBeNull();
+  });
+
+  it("refuses a destination that leaves the pack root", async () => {
+    chosenFolder = await folder("vault", { "Home.md": "# Home" });
+    const who = sender("canvas");
+
+    await expect(service.importFolder(who, "../escape")).rejects.toThrow(
+      "invalid folder destination",
+    );
+    await expect(service.importFolder(who, "/tmp/escape")).rejects.toThrow(
+      "invalid folder destination",
+    );
   });
 });

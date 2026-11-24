@@ -32,6 +32,12 @@ export const CHROME_IPC = {
   removeWidget: "suite:shell:remove-widget",
   moveWidget: "suite:shell:move-widget",
   resizeWidget: "suite:shell:resize-widget",
+  createScreen: "suite:shell:create-screen",
+  renameScreen: "suite:shell:rename-screen",
+  duplicateScreen: "suite:shell:duplicate-screen",
+  deleteScreen: "suite:shell:delete-screen",
+  setHomeScreen: "suite:shell:set-home-screen",
+  openScreen: "suite:shell:open-screen",
 } as const;
 
 /** Pushed, not invoked: the chrome redraws from the last state it received. */
@@ -47,6 +53,11 @@ export const PACK_IPC = {
   openDocument: "suite:documents:open",
   saveDocument: "suite:documents:save",
   removeDocument: "suite:documents:remove",
+  revealDocument: "suite:documents:reveal",
+  pendingDocumentChanges: "suite:documents:pending-changes",
+  watchDocuments: "suite:documents:watch",
+  listRecents: "suite:recents:list",
+  forgetRecent: "suite:recents:forget",
   listFiles: "suite:files:list",
   statFile: "suite:files:stat",
   makeFileDirectory: "suite:files:mkdir",
@@ -63,6 +74,7 @@ export const PACK_IPC = {
   writeExternalFile: "suite:files:write-external",
   closeExternalFile: "suite:files:close-external",
   importExternalFile: "suite:files:import-external",
+  importExternalFolder: "suite:files:import-folder",
   setTitle: "suite:pack:set-title",
   openExternal: "suite:pack:open-external",
 } as const;
@@ -88,6 +100,7 @@ export const PACK_PROJECTION = {
 /** Main-process pushes a pack may listen for. */
 export const PACK_EVENT = {
   deepLink: "suite:pack:deep-link",
+  documentsChanged: "suite:documents:changed",
 } as const;
 
 export type {
@@ -98,10 +111,13 @@ export type {
   FileLock,
   FileReadOptions,
   FileWriteOptions,
+  ImportedFolder,
   PackLaunchContext,
   ProjectedReminder,
   ProjectionDocument,
   ProjectionsService,
+  RecentDocument,
+  RecentsService,
 } from "@suite/pack-runtime";
 export { PACK_CAPABILITIES, type PackCapability };
 
@@ -276,6 +292,15 @@ export interface ScreenView {
   readonly choices: readonly ScreenChoiceView[];
 }
 
+/** One Screen in the manager's list. `open` means a tab currently shows it. */
+export interface ScreenSummaryView {
+  readonly id: string;
+  readonly name: string;
+  readonly home: boolean;
+  readonly open: boolean;
+  readonly readable: boolean;
+}
+
 export interface ThemeView {
   /** The resolved preset id, after any stored-id rename. */
   readonly preset: string;
@@ -288,6 +313,11 @@ export interface ShellState {
   readonly activeTabId: string | null;
   readonly surface: ShellSurface;
   readonly screens: readonly ScreenView[];
+  /** Every Screen on this device, for the manager. */
+  readonly screenList: readonly ScreenSummaryView[];
+  readonly homeScreenId: string;
+  /** A manager refusal or note, such as deleting the last Screen. */
+  readonly screenManagerNote: string | null;
   readonly packs: readonly PackSummary[];
   readonly catalogue: readonly CatalogueEntry[];
   /** Which source the catalogue is showing, in a sentence the chrome can print. */

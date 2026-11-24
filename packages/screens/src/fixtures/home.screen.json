@@ -4,8 +4,7 @@
   "id": "home",
   "name": "Home",
   "widgets": [
-    { "registryId": "start.apps", "size": "full" },
-    { "registryId": "start.recents", "size": "2x1" },
+    { "registryId": "shell.apps", "size": "full" },
     {
       "registryId": "planner.quick-task",
       "size": "1x1",

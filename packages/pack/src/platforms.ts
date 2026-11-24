@@ -54,7 +54,7 @@ export const SHELL_HOST = {
   id: "shell",
   name: "Suite",
   kind: "desktop",
-  capabilities: ["documents", "files", "identity.pack", "network", "notifications"],
+  capabilities: ["documents", "files", "identity.pack", "network", "notifications", "recents"],
 } as const satisfies HostDeclaration;
 
 /** Suite Go on a phone. It has no `files` bridge, so a pack that needs one is not mobile-ready. */

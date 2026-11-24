@@ -7,11 +7,11 @@ and that decides who may update them.
 
 | Form | Built for | Who owns the files | Updates arrive by | Root |
 | --- | --- | --- | --- | --- |
-| Flatpak | Canvas, Planner, Budget, Help, the hub, the host and Sync | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
+| Flatpak | Suite Shell, Canvas, Planner, Budget, Help and Sync | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
 | Release APK | Suite Go | the person, through `adb` or the file manager | the person installs the next APK | no |
 
-There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, Sync is an
-app the hub lists like the rest, and Suite Go has no Play Store listing.
+There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, Sync is
+the relay's Flatpak, and Suite Go has no Play Store listing.
 
 Canvas, Planner, Budget and Help are **frozen legacy apps**: their code and last Flatpak artifact stay
 available, but they get no new release and no new pre-release channel until they become packs. Suite
@@ -22,31 +22,25 @@ The release channels a build can carry, and what each promises, are [Channels](.
 
 ## The rule
 
-**Start asks the writer that owns the deployment. It never replaces a Flatpak itself.**
+**Flatpak owns a Flatpak deployment; the host owns its packs.**
 
-Flatpak owns every desktop deployment. Start lists it, launches it, reveals it, and asks Flatpak to
-install, update or remove it. A folder copy a person places is not Start's either: the card offers
-Open, Reveal and Forget, and its updates are the person's to make.
+The frozen apps and the host are Flatpaks. Flatpak installs, updates and removes them, and no Suite
+process writes into a deployment or replaces it. A person uses the one `flatpak install` line the
+release page prints, and `flatpak update --user` for every installed ref.
 
-That is why there are two writers, and neither is Start:
-
-- **The hub is a Flatpak.** Flatpak owns `run.suite.start`, and its own row offers **Update Start**
-  only when the installed commit differs from the newest commit on that deployment's own origin. A
-  hub cannot replace its own running binary; Flatpak replaces the deployment and the new build starts
-  next launch.
-- **The apps are Flatpaks.** Start asks Flatpak to install or update a deployment. A placed folder
-  copy is first-class but separate: Start can open, reveal and forget it, not update it.
+The host is a different writer for packs. It verifies a signed `.suitepack`, extracts it under its own
+data directory, and keeps the old version until a person removes it. That is the pack lifecycle, not
+a second Flatpak manager.
 
 ## Flatpak
 
-Canvas, Planner, Budget, Help, the hub, the host and Sync each have a manifest beside the others:
+Suite Shell, Canvas, Planner, Budget, Help and Sync each have a manifest beside the others:
 
 ```
 packaging/flatpak/run.suite.canvas.yml
 packaging/flatpak/run.suite.planner.yml
 packaging/flatpak/run.suite.budget.yml
 packaging/flatpak/run.suite.help.yml
-packaging/flatpak/run.suite.start.yml
 packaging/flatpak/run.suite.shell.yml
 packaging/flatpak/run.suite.sync.yml
 ```
@@ -65,7 +59,6 @@ Nothing in the tree has an i18n framework or a translated string, so electron-bu
 node scripts/flatpak.mjs                       # Canvas: package, build, publish, install
 node scripts/flatpak.mjs --app planner         # Planner, same path
 node scripts/flatpak.mjs --app budget          # Budget, same path
-node scripts/flatpak.mjs --app start           # the hub, same path
 node scripts/flatpak.mjs --app shell           # the host, same path
 node scripts/flatpak.mjs --app help             # Help
 node scripts/flatpak.mjs --app sync             # the relay: tray app and headless CLI
@@ -78,11 +71,9 @@ Canvas stays the default so an existing habit keeps working. The script exports 
 `~/suite-flatpak/repo`, adds it as the user remote `suite-local`, and installs from that remote, so
 `flatpak update` is the real update path.
 
-Start does not assume that name for an installed app. It reads the deployment's own `origin` remote
-and compares that remote's commit, so a copy installed from `suite-local` is not measured against the
-public `suite` store. A fresh install probes `suite` first, then `suite-local`. When the origin offers
-a different commit the card says `update available`, and **Update** asks Flatpak to replace the
-deployment.
+A deployment updates from the remote it was installed from: Flatpak reads its own `origin`, so a copy
+from `suite-local` is not measured against the public `suite` store. The host does not compare commits
+or offer an update button; `flatpak update --user` is the path for every Flatpak.
 
 A stable Canvas, Planner or Budget reaches one documents folder and nothing broader:
 
@@ -120,22 +111,6 @@ The second is a launcher that runs the app's own binary with `ELECTRON_RUN_AS_NO
 base app carries no Node runtime. `scripts/flatpak.mjs` refuses `--channel` for Sync: it ships no
 `suite.app.json`, and a channel would be a second mailbox on the same data.
 
-### The hub as a Flatpak
-
-`node scripts/flatpak.mjs --app start` builds `run.suite.start` from the same unpacked tree and zypak
-base. Its exported desktop entry registers `x-scheme-handler/suite`, and `run.suite.start` is both the
-application id and the window's WM class. The hub has no pre-release identity, so `--channel` is
-refused for `start`.
-
-The hub's sandbox is wider because it is the package manager. The manifest grants the host Flatpak
-service (`org.freedesktop.Flatpak`, used through `flatpak-spawn --host`), the applications and icons
-under `xdg-data`, `xdg-data/suite`, `xdg-config/suite`, and the documents tree read-only. The host
-service is effectively host command execution: that is the trade that lets a sandboxed hub run the
-host's `flatpak` and manage deployments. It never writes a document.
-
-When Flatpak deploys the hub, its own row says `Flatpak` and offers **Update Start**. Flatpak replaces
-the deployment, and the new build starts next launch.
-
 ### Suite Shell as a Flatpak
 
 `node scripts/flatpak.mjs --app shell` builds `run.suite.shell` as **Suite Shell**, from the same unpacked
@@ -146,10 +121,10 @@ decide whether a pack may reach HTTPS or WSS. It has no `--talk-name=org.freedes
 host filesystem grant, because the host is not the package manager: it installs packs into its own
 data directory, `~/.var/app/run.suite.shell`, and the picker and links go through the document and
 desktop portals.
-Its desktop entry carries no scheme handler yet; Start keeps `x-scheme-handler/suite` in this phase.
-The host has no `suite.app.json`, so a pre-release is generated by rewriting this manifest rather than
-reading a second one; `--channel` is accepted for Suite Shell, as
-[Pre-release channels](#pre-release-channels) describes.
+Its desktop entry claims `x-scheme-handler/suite`, and the app claims the scheme at runtime, so a
+`suite://` link reaches the host after Start's retirement. The host has no `suite.app.json`, so a
+pre-release is generated by rewriting this manifest rather than reading a second one; `--channel` is
+accepted for Suite Shell, as [Pre-release channels](#pre-release-channels) describes.
 
 ```sh
 flatpak install --user suite run.suite.shell
@@ -157,8 +132,7 @@ flatpak install --user suite run.suite.shell
 
 **OSTree owns updates inside Flatpak.** The sandbox sets `FLATPAK_ID`, and Canvas, Planner and Budget
 then skip their own update check and write a "not checked" report instead of offering a download.
-`flatpak update` replaces the deployment, and Start's card asks Flatpak for the update. There is no
-second copy or rollback version for Start to keep.
+`flatpak update` replaces the deployment. There is no second copy or rollback version.
 
 `scripts/store-key.sh` makes the store's signing key once. When it has run, `flatpak.mjs` signs the
 repository summary, exports the public key beside the fingerprint in `~/suite-flatpak`, and adds the
@@ -170,7 +144,7 @@ script says so.
 ### The signed remote
 
 The same signed repository is published to the public store at
-<https://flatpak.suite.run/>, so another machine installs and updates the apps and the hub without
+<https://flatpak.suite.run/>, so another machine installs and updates the host and the apps without
 building them. The store is a private S3 bucket read through CloudFront with an ACM certificate; DNS
 is at Cloudflare. [`scripts/lib/flatpakRemote.mjs`](../../scripts/lib/flatpakRemote.mjs) owns the URL,
 the S3 cache classes and the invalidation paths.
@@ -265,7 +239,7 @@ The `.flatpakrepo` file embeds the store's public key in `GPGKey=`, so `remote-a
 and `flatpak` verifies the summary from the first fetch. `flatpak remote-ls suite` lists the apps and
 branches the remote offers.
 
-The stable apps and the hub are on `master`, which the file names as `DefaultBranch`, so the command
+The host and the stable apps are on `master`, which the file names as `DefaultBranch`, so the command
 above needs no branch. Publishing a pre-release channel writes the same repository on branch `slop`,
 `nightly` or `preview`; the default branch stays `master`, so adding a channel does not change what a
 stable install resolves to. Install a pre-release explicitly:
@@ -296,7 +270,7 @@ before the build. A pre-release branch is not published for a frozen legacy app 
 Budget or Help), and the builder refuses to create one unless `--session` names a factory session
 build, which is local only. Suite Shell carries a channel too: `run.suite.slop.shell` on the same
 three branches, with its data in the pre-release Flatpak sandbox rather than a `Documents/Suite Slop`
-folder. Start and Sync refuse `--channel`: neither is a superapp.
+folder. Sync refuses `--channel`: it is not a superapp.
 
 The generated manifest uses `run.suite.slop.<app>` for the app id, command, desktop file and icon
 name, and `NoDisplay=false` keeps the card visible beside stable. Its desktop entry carries **no**
@@ -317,12 +291,8 @@ step, because it carries the public key an attacker on the path could replace. T
 store, and compare its `GPGKey` with `~/suite-flatpak/suite-store.gpg` on the publisher when the
 network is not trusted.
 
-Start lists Flatpak installs, including its own deployment, launches them through `flatpak run`, asks
-Flatpak to remove one, and — when the store offers the app — asks Flatpak to install it or to replace a
-deployment whose origin offers a different commit. Start reads the commits and never writes a
-deployment itself. The signed local store has been exercised end to end: a second published commit
-turns the card into `update available`, and **Update** returns it to `Flatpak` with the new commit
-deployed.
+The signed local store has been exercised end to end: a second published commit is what
+`flatpak update --user` deploys. No Suite process reads or writes a deployment to decide that.
 
 `XDG_DATA_HOME` decides which Flatpak installation is visible. A tool that points it at a per-session
 directory, such as Orca, hides the real user installation; run with
@@ -360,9 +330,9 @@ A contributor builds it from a checkout instead: `node scripts/flatpak.mjs --app
 The `sync-v<version>` tarball releases are retired: they remain downloadable history, and nothing in
 this repository builds, signs or documents one as an install path any more.
 
-Suite Start installs and opens the `run.suite.sync` Flatpak from the same store, and never supervises
-the relay. The tray app owns the relay, its address, relay code and fingerprint; each device enters
-that address and pin in its own Sync dialog.
+The tray app owns the relay, its address, relay code and fingerprint; each device enters that address
+and pin in its own Sync dialog. The host does not supervise the relay. The `run.suite.sync` Flatpak
+remains until #315 moves the tray into the host.
 
 ## Android APK
 

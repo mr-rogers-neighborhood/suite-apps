@@ -9,7 +9,6 @@
  *   node scripts/flatpak.mjs                 # Canvas stable: package, build, install
  *   node scripts/flatpak.mjs --app planner   # Planner stable, same path
  *   node scripts/flatpak.mjs --app budget    # Budget stable, same path
- *   node scripts/flatpak.mjs --app start     # Start (the hub) stable, same path
  *   node scripts/flatpak.mjs --app help      # Help stable, same path
  *   node scripts/flatpak.mjs --app sync      # Sync (the tray relay) stable, same path
  *   node scripts/flatpak.mjs --app shell     # Suite Shell (the host) stable, same path
@@ -110,18 +109,6 @@ const APPS = {
     metainfo: join(ROOT, "packaging", "flatpak", "run.suite.help.metainfo.xml"),
     unpacked: join(ROOT, "apps", "help", "release", "linux-unpacked"),
   },
-  start: {
-    id: "run.suite.start",
-    name: "Suite Start",
-    package: "@suite/start",
-    project: join(ROOT, "apps", "start"),
-    folder: "start",
-    binary: "suite-start",
-    manifest: join(ROOT, "packaging", "flatpak", "run.suite.start.yml"),
-    desktop: join(ROOT, "packaging", "flatpak", "run.suite.start.desktop"),
-    metainfo: join(ROOT, "packaging", "flatpak", "run.suite.start.metainfo.xml"),
-    unpacked: join(ROOT, "apps", "start", "release", "linux-unpacked"),
-  },
   shell: {
     id: "run.suite.shell",
     name: "Suite Shell",
@@ -196,12 +183,12 @@ if (session && isPreRelease(channel)) {
   );
 }
 
-// Start ships no suite.app.json, so it has no pre-release app identity to
-// generate. Refuse before a package build or a manifest is written. Sync is the
-// same: it is a server that happens to have a tray, and a channel would be a
-// second mailbox on the same data. The Shell does have a channel: it rewrites
-// its own manifest rather than reading suite.app.json, so it is not listed here.
-const noPreRelease = { start: "Suite Start", sync: "Suite Sync" };
+// Sync ships no suite.app.json, so it has no pre-release app identity to
+// generate. Refuse before a package build or a manifest is written: it is a
+// server that happens to have a tray, and a channel would be a second mailbox on
+// the same data. The Shell does have a channel: it rewrites its own manifest
+// rather than reading suite.app.json, so it is not listed here.
+const noPreRelease = { sync: "Suite Sync" };
 if (Object.hasOwn(noPreRelease, appName) && isPreRelease(channel)) {
   process.stderr.write(
     `${noPreRelease[appName]} has no pre-release identity: it ships no suite.app.json\n`,
