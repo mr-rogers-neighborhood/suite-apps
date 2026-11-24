@@ -46,6 +46,8 @@ const TAG_SCAN_FILES = [
   "packages/pack/src/trust.test.ts",
   "packages/pack-host/src/archive.test.ts",
   "apps/shell/src/documentMigrations.test.ts",
+  "apps/shell/src/blobs.test.ts",
+  "apps/shell/src/exportBundle.test.ts",
   "apps/shell/src/installedPacks.test.ts",
   "apps/shell/src/packIdentity.test.ts",
   "apps/shell/src/publisherTrust.test.ts",

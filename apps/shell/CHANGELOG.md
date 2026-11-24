@@ -20,6 +20,12 @@ shipped host.
   invokes each declared entry with a handle scoped to that document. The schema stamp makes a second
   run a no-op, a failed entry restores the backup, and a projection refuses a document whose schema
   is not current. The entry runner is injected; binding it to a pack renderer is still open.
+- **Blobs are classified and export is a bundle.** A pack's `asset`, `derived` and `cache` blobs live
+  in three pack-scoped, content-addressed stores; a read re-hashes and refuses a mismatch, and
+  clearing cache touches no asset or derived blob. Export runs the pack's declared `export` entry
+  with a host save handle, writes every asset as its original bytes with a verified SHA-256 and a
+  manifest entry, and records a missing export entry as `packExport: null` while still exporting the
+  assets. The entry runner is injected and the stores are not on the bridge yet.
 
 ## [0.2.0] - 2026-11-22
 
