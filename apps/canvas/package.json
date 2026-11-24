@@ -32,6 +32,7 @@
     "e2e:canvas": "pnpm --filter @suite/e2e e2e:canvas",
     "e2e:changed": "pnpm --filter @suite/e2e e2e:changed",
     "e2e:desktop": "pnpm --filter @suite/e2e e2e:desktop",
+    "e2e:proof": "pnpm --filter @suite/e2e e2e:proof",
     "e2e:doctor": "pnpm --filter @suite/e2e e2e:doctor",
     "e2e:full": "pnpm --filter @suite/e2e e2e:full",
     "e2e:headed": "pnpm --filter @suite/e2e e2e:headed",

@@ -177,5 +177,29 @@ describe("workspace reading", () => {
     const selected = new Set(result.rows.map((row) => row.repo));
     assert.ok(selected.size >= 2, "a shared Electron policy package reaches several apps");
     assert.equal(result.global, false);
+    assert.deepEqual(
+      result.proofRows.map((row) => row.repo),
+      ["shell", "help", "canvas", "planner", "budget"],
+    );
+  });
+
+  it("selects only the affected desktop app for proofRows", () => {
+    const projects = readProjects(ROOT);
+    const budgetOnly = computeAffected({
+      paths: ["apps/budget/src/main/index.ts"],
+      projects,
+      rows: PIPELINE,
+    });
+    assert.deepEqual(
+      budgetOnly.proofRows.map((row) => row.repo),
+      ["budget"],
+    );
+
+    const goOnly = computeAffected({
+      paths: ["apps/go/src/App.tsx"],
+      projects,
+      rows: PIPELINE,
+    });
+    assert.deepEqual(goOnly.proofRows, []);
   });
 });

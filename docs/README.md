@@ -67,6 +67,7 @@ one copy is already wrong.
 | App renderer bridge contracts | [Bridges](reference/bridges.md) |
 | WCAG 2.2 coverage and manual tests | [Accessibility](reference/accessibility/wcag-22-map.md) |
 | Commands and the gate | [Commands](reference/commands.md) |
+| Desktop Proof of Changes (`@proof`) | [Desktop proof](reference/desktop-proof.md) |
 | Flatpak, Android APK, update ownership | [Packaging channels](reference/packaging-channels.md) |
 | Document files, folders and backups | [File formats](reference/file-formats.md) |
 | Environment variables | [Environment](reference/environment.md) |

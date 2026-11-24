@@ -27,6 +27,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.affected.outputs.matrix }}
+      proof_matrix: ${{ steps.affected.outputs.proof_matrix }}
+      proof_any: ${{ steps.affected.outputs.proof_any }}
       e2e: ${{ steps.affected.outputs.e2e }}
       docs_only: ${{ steps.affected.outputs.docs_only }}
     steps:
@@ -80,6 +82,7 @@ jobs:
         run: >-
           node --test
           scripts/affected.test.mjs
+          scripts/proof-of-changes.test.mjs
           scripts/release-manifest.test.mjs
           scripts/channel.test.mjs
           scripts/shell-channel.test.mjs
@@ -169,6 +172,55 @@ jobs:
       - name: Gate ${{ matrix.repo }}
         if: matrix.repo != 'none'
         run: node scripts/gate.mjs --only "${{ matrix.repo }}" --no-e2e
+
+  proof:
+    name: proof (${{ matrix.repo }})
+    # Evidence, not a required check (matching C8.3 for Revyl): runs only for
+    # the desktop rows whose diff can break them, and writes the "Proof of
+    # Changes" block to the step summary alongside uploaded screenshot/trace
+    # artifacts.
+    needs: detect
+    if: >-
+      needs.detect.result == 'success' && needs.detect.outputs.proof_matrix != '' &&
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository ||
+       contains(github.event.pull_request.labels.*.name, 'ci:full'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.proof_matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Electron system libraries and Xvfb
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb
+          pnpm --dir apps/budget exec playwright install-deps chromium
+      - name: Proof of Changes (${{ matrix.repo }})
+        run: node scripts/proof-of-changes.mjs --only "${{ matrix.repo }}"
+      - name: Write Proof of Changes summary
+        if: always() && hashFiles('.dev/proof/index.md') != ''
+        run: cat .dev/proof/index.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload proof artifacts (${{ matrix.repo }})
+        if: always() && hashFiles('.dev/proof/**') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-proof-${{ matrix.repo }}
+          path: .dev/proof/
+          retention-days: 14
 
   full-gate:
     name: full-gate

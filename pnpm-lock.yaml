@@ -743,6 +743,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.6.4
         version: 2.6.4
+      '@playwright/test':
+        specifier: ^1.64.1
+        version: 1.65.1
       '@tailwindcss/vite':
         specifier: ^4.3.4
         version: 4.3.5(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
@@ -989,6 +992,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.6.4
         version: 2.6.4
+      '@playwright/test':
+        specifier: ^1.64.1
+        version: 1.65.1
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6

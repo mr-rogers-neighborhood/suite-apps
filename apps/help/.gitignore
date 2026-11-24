@@ -6,4 +6,6 @@ coverage
 .generated
 .source
 public/data
+test-results
+playwright-report
 *.log
