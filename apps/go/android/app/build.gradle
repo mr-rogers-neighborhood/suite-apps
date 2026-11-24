@@ -4,8 +4,8 @@ apply plugin: 'com.android.application'
 // cannot disagree. The defaults keep a bare `./gradlew` working without the script. Bound to locals
 // rather than inlined: the Groovy DSL reads an inline `?:` inside `defaultConfig` as part of the
 // property call and reports the result as "Value is null".
-def suiteVersionCode = (project.findProperty("suiteVersionCode") ?: "2") as Integer
-def suiteVersionName = (project.findProperty("suiteVersionName") ?: "0.1.0").toString()
+def suiteVersionCode = (project.findProperty("suiteVersionCode") ?: "3") as Integer
+def suiteVersionName = (project.findProperty("suiteVersionName") ?: "0.2.0").toString()
 
 // The channel identity table. `scripts/android-release.mjs` owns the same numbers and the artifact
 // names; it reads the built APK back with `aapt` and refuses a package id or versionCode that does

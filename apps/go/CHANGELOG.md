@@ -7,7 +7,15 @@ the Android build reads; `package.json` and Gradle repeat it because the build n
 release is tagged `go-v<version>`; the APK itself is attached to the rolling Suite release. The rules
 are in [Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
 
-## Unreleased
+## [0.2.0] - 2026-11-24
+
+### Added
+
+- **The catalogue installs from the signed index.** **Browse apps** fetches the published index
+  from the store's own origin, verifies the operator signature, and refuses a tampered, expired or
+  rolled-back index before a row is shown. The row then installs, updates, reinstalls or removes the
+  version it displayed. The index, the pinned key and the verifier are the same ones the desktop
+  host reads, so the phone and the desktop agree on what is offered.
 
 ### Changed
 
@@ -18,6 +26,9 @@ are in [Version ownership](../../docs/how-to/package-and-release.md#version-owne
 - **Every installed file is verified again when packs are discovered.** A pack edited after
   install is refused with the same `files` reason rather than trusted because its manifest was
   signed once.
+- **A publish cannot go backwards.** Before Gradle runs, the release path reads the newest published
+  release manifest for the package id and refuses a `versionCode` lower than one already shipped, so
+  a channel move cannot strand an install.
 
 ### Fixed
 
