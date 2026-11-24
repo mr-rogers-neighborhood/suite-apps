@@ -6,7 +6,7 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | Clauses | Area | Status | Evidence / gap |
 | --- | --- | --- | --- |
 | S1.1–S1.4 | Roles and terms | Partial | Host/pack/relay exist; catalogue does not; pack identity is not publisher-scoped |
-| S1.5 | Non-goals | Implemented | No account, telemetry, DRM or remote kill switch in the tree |
+| S1.5 | Non-goals | Implemented | Review rule in `.github/pull_request_template.md`; `apps/budget/scripts/check-shape.mjs` bans a network client; no tree-wide test |
 | S1.6 | Server scope | Partial | No document/sync/identity service; the Flatpak store is distribution; all-servers-off is untested |
 | S2.1–S2.5 | Publisher trust | Absent | One pinned Suite key; no publisher field, trust store, rotation chain, revocation or install fingerprint |
 | S2.6 | Pack identity | Partial | Device key exists; no per-pack derived key; packs cannot sign relay frames |
@@ -18,7 +18,7 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S3.4 | Golden vector | Absent | No committed manifest/canonical/signature vector |
 | S3.5 | Manifest fields | Partial | `@suite/pack` parses every required and optional field family and `fixtures.json` covers each; the build path still signs under the pinned Suite key, so `publisher` is not required or emitted, and canonical bytes do not cover the new fields |
 | S3.6 | Id, entry, files | Implemented | `@suite/pack` validates id, safe paths, hashes and byte counts |
-| S3.7 | Unknown fields | Implemented | Strict Zod schemas refuse unknown fields and capabilities |
+| S3.7 | Unknown fields | Implemented | `packages/pack/src/manifest.test.ts` refuses an unknown field and an unknown capability |
 | S3.8 | Subpackages | Absent | No lazy entry or prefetch path |
 | S3.9 | Add-ons | Absent | No signed module, pin or capability intersection |
 | S3.10 | Determinism | Partial | Deterministic archive writer exists; absent-field encoding is inconsistent |
@@ -28,7 +28,7 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S4.5 | Associations | Absent | Deep links and file extensions are not namespaced or consented |
 | S4.6 | Capability table | Partial | The spec table is new; hosts implement a subset |
 | S4.7 | Pack keys | Partial | Packs do not get the device key today; no `identity.pack` API or test |
-| S4.8 | Refusal | Implemented | Shell/Go refuse an unimplemented capability by name |
+| S4.8 | Refusal | Implemented | `apps/shell/src/installedPacks.ts` names the unimplemented capability in its refusal; `apps/shell/src/installedPacks.test.ts` and `apps/go/packages/go/src/pack.test.ts` cover the refusal |
 | S5.1 | Deep links | Partial | `suite://` parser exists; version pin is absent; `/workspace/` compatibility is Start-only |
 | S5.2 | Document/widget URIs | Absent | No document or widget route |
 | S5.3 | Single instance | Partial | Single-instance lock exists; the shell can open several tabs for one pack |
@@ -60,23 +60,23 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S9.1 | Declarative widgets | Partial | Start renders them; the shell is partial; capture handoff is absent |
 | S9.2–S9.3 | Code widgets | Absent | No sandboxed widget runtime or fallback |
 | S9.4–S9.5 | Widget data and capture | Partial | Capture contract exists; data scopes and delivery do not |
-| S9.6 | Screen ownership | Implemented | Screens are host-owned; settings go through the host |
+| S9.6 | Screen ownership | Implemented | `apps/shell/src/screens.ts` owns the Screen document; `apps/shell/src/screens.test.ts` keeps widget settings in it |
 | S9.7–S9.8 | Screen export and identity | Absent | No `.screen` file; no pack identity in the widget frame |
 | S10.1–S10.4 | Native, transitions, input | Absent | No declarative native components, host transitions or input-profile refusal |
-| S10.5 | No spinners | Implemented | Local edits do not wait on a network round trip |
+| S10.5 | No spinners | Implemented | `apps/canvas/src/collab/loroPersistence.test.ts` applies offline edits; `apps/shell/src/documents.ts` has no network client |
 | S10.6–S10.7 | Prefetch and TTI | Absent | No warm view, prefetch or TTI budget |
-| S11.1 | No ambient data | Implemented | Packs cannot enumerate another pack's documents |
+| S11.1 | No ambient data | Implemented | `apps/shell/src/documents.test.ts` refuses another pack's document; `apps/shell/src/documents.ts` scopes by container and pack |
 | S11.2 | Explicit handles | Partial | External picker and handles exist; share/drag is partial |
 | S11.3–S11.4 | Search and shared space | Absent | No metadata index, pack search entry or `documents.shared` |
 | S11.5 | Platform APIs | Future | Deferred by contract |
-| S12.1 | Side-load | Implemented | A local catalogue and file install verify and install without a network |
+| S12.1 | Side-load | Implemented | `apps/shell/src/installedPacks.test.ts` installs a signed archive with no catalogue or network |
 | S12.2–S12.5 | Catalogue and revocation | Absent | No signed index, sequence, attestation, review state or revocation |
 | S12.6 | Updates | Partial | Additive installs keep the previous version; no delta or rollback pointer |
 | S12.7 | Install TOCTOU | Absent | The installed bytes are not compared with the displayed catalogue entry |
-| S12.8 | Channels | Implemented | Channels and the Flatpak remote are documented and shipped |
-| S13.1 | Threat model | Implemented | Sync and app threat models exist |
+| S12.8 | Channels | Implemented | `docs/explanation/channels.md` and `docs/reference/packaging-channels.md` own the model; `scripts/flatpak-remote.mjs` publishes the signed remote |
+| S13.1 | Threat model | Implemented | `apps/sync/docs/threat-model.md` and `apps/shell/SECURITY.md` name the actors and mitigations |
 | S13.2 | Host boundary | Partial | Desktop has per-pack origin/session; mobile is same-origin |
-| S13.3 | Sandbox | Implemented | `contextIsolation`, sandbox, CSP, navigation lock and no Node |
+| S13.3 | Sandbox | Implemented | `apps/shell/src/window.ts` sets context isolation, sandbox, no Node and the navigation lock; `packages/desktop/src/csp.test.ts` covers the CSP |
 | S13.4 | Key and relay verification | Partial | Device key is not exposed; relay verification is disabled in shipped paths |
 | S13.5 | Privacy | Partial | E2E sync and no telemetry; local files are not encrypted at rest |
 | S13.6 | Update proof | Partial | Signature refusal exists; capability diff is absent |
