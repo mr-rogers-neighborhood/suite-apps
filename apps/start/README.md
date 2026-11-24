@@ -6,9 +6,10 @@ control.
 
 ## Install it
 
-Suite Start is the one app you fetch by hand; every other app in the suite arrives through it.
-[Installing Suite Start](docs/how-to/install.md) owns the signed Flatpak remote, `flatpak install`,
-the first launch and the card states worth recognising. [Packaging](docs/how-to/package.md) explains
+Suite Start is the legacy hub for the Flatpaks it manages. Suite Shell is the desktop host and the
+way in: install the host once and install packs from its catalogue. [Installing Suite Start](docs/how-to/install.md)
+owns Start's signed Flatpak remote, `flatpak install`, the first launch and the card states worth
+recognising. [Packaging](docs/how-to/package.md) explains
 why Flatpak is the only Linux desktop form: Start asks the writer that owns each deployment and never
 replaces one itself. Everything below describes the code rather than the download.
 

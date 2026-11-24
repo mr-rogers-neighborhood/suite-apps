@@ -1,9 +1,15 @@
 # Install, update and remove apps
 
-Suite Start manages the apps it installed. It never edits a document, and removing an app does not
-remove documents. Linux desktop apps are Flatpaks, so Start asks Flatpak to change every deployment.
+Suite Shell is the desktop host and the way in. [Install it](../../README.md#the-hosts) once, then
+install, update, remove and reinstall packs from its catalogue. A `.suitepack` file still installs on
+its own. [The shell's README](../../apps/shell/README.md#installing-updating-and-removing-a-pack) owns
+that lifecycle.
 
-## Install
+Suite Start remains the legacy hub for the Flatpak apps it installed, and #314 retires it. The
+sections below describe that path. Neither the shell nor Start edits a document, and removing an app
+does not remove documents.
+
+## Install a legacy Flatpak
 
 1. Open Suite Start.
 2. On an app card, choose **Install**.
@@ -19,7 +25,7 @@ Choose **Add app…**, then select the executable. Start reads the `suite.app.js
 the install record. A copy you placed this way is first-class, but Start does not update it: the card
 offers Open, Reveal and Forget rather than Update and Uninstall, and its updates are yours to make.
 
-## Update
+## Update a legacy Flatpak
 
 Choose **Update** on a Flatpak card, or **Check for updates** to ask the store again.
 
@@ -31,7 +37,7 @@ underneath it, and Start does not close an app it did not start.
 
 Start does not update a folder copy; it only launches it.
 
-## Remove
+## Remove a legacy app
 
 - **Uninstall** on a Flatpak card asks Flatpak to remove the deployment.
 - **Forget** on a placed copy removes the record only.
