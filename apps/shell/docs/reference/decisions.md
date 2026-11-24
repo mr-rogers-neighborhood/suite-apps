@@ -197,7 +197,7 @@ The rules that shape the Suite host.
   another publisher may not. The person may record an unsigned local advisory. A recorded advisory
   refuses a new install and marks the catalogue entry refused, but the installed-version scan never
   consults it: an installed pack keeps running until the person disables or removes it. A catalogue
-  operator issuer is deferred until a catalogue trust root exists.
+  operator issuer is deferred until the shell pins operator keys from the signed index.
 - The local catalogue is a directory of `.suitepack` files, `<dataRoot>/catalogue` by default and
   `SUITE_SHELL_CATALOGUE` when set. Every archive is read and verified before it is listed; a refused
   archive still lists with its refusal sentence and can never be installed. Listing extracts nothing.

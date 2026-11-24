@@ -26,6 +26,7 @@
     "keys": "node scripts/keys.mjs",
     "android:key": "node scripts/android-release.mjs",
     "pack": "node scripts/pack.mjs",
+    "pack:index": "node scripts/pack-index.mjs",
     "budget:pack": "node scripts/budget-pack.mjs",
     "format": "pnpm --filter \"./apps/*\" --filter \"./apps/*/*\" --filter \"./packages/*\" --workspace-concurrency=1 run format",
     "build": "pnpm --filter \"./apps/*\" --filter \"./apps/*/*\" --filter \"./packages/*\" --workspace-concurrency=1 run build",

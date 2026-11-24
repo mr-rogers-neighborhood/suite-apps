@@ -180,7 +180,7 @@ export async function checkPublisherRotation(
     );
   }
 
-  if (!verifyBytes(statement.signature, rotationStatementBytes(statement), statement.previousKey)) {
+  if (!verifyBytes(rotationStatementBytes(statement), statement.signature, statement.previousKey)) {
     return refusal(
       "bad-signature",
       `The rotation for ${statement.publisher} is not signed by its outgoing key.`,

@@ -195,6 +195,7 @@ const scripts =
           [
             "--test",
             "scripts/pack.test.mjs",
+            "scripts/pack-index.test.mjs",
             "scripts/budget-pack.test.mjs",
             "scripts/affected.test.mjs",
             "scripts/release-manifest.test.mjs",

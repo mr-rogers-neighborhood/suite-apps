@@ -145,9 +145,9 @@ A revocation is a signed advisory delivered as a small JSON file. **Add revocati
 pack's own publisher signs with the key that signed the pack (a retired key still counts), and the
 person may record an unsigned local advisory. A publisher cannot revoke another publisher's pack. A
 recorded advisory blocks a new install and marks the catalogue entry as refused; it never disables
-or removes an installed pack. A catalogue operator is a valid issuer in the spec but cannot issue
-here until a catalogue trust root exists. Advisories live in `<dataRoot>/trust/revocations.json`
-beside the publisher store.
+or removes an installed pack. A catalogue operator is a valid issuer in the spec, but the shell does
+not pin operator keys yet, so that form is refused until it does. Advisories live in
+`<dataRoot>/trust/revocations.json` beside the publisher store.
 
 **Uninstall** removes exactly `<dataRoot>/packs/<id>/<version>`. A symlinked install root, id
 directory or version directory is refused, and the version must resolve inside the real pack root;

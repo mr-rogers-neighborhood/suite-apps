@@ -1,4 +1,10 @@
-import { hashes, keygen, sign as nobleSign, verify as nobleVerify } from "@noble/ed25519";
+import {
+  hashes,
+  keygen,
+  getPublicKey as noblePublicKey,
+  sign as nobleSign,
+  verify as nobleVerify,
+} from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
 import {
   canonicalManifestBytes,
@@ -47,21 +53,24 @@ export async function generatePackKeyPair(): Promise<{
   };
 }
 
+/** The public half of an Ed25519 signing key, standard base64. */
+export function publicKeyFromSecret(privateKeyBase64: string): string {
+  return bytesToBase64(noblePublicKey(base64ToBytes(privateKeyBase64)));
+}
+
 /**
- * Sign arbitrary bytes with an Ed25519 secret key.
- *
- * A manifest is not the only signed object in the trust model: a key rotation
- * statement and a revocation advisory are signed the same way (S2.3, S2.4). They
- * define their own canonical bytes; this is only the primitive.
+ * Sign bytes. The manifest, the catalogue index, a key rotation statement and a
+ * revocation advisory are separate documents, but all are Ed25519 over
+ * canonical bytes with standard base64 (S2.3, S2.4).
  */
 export function signBytes(bytes: Uint8Array, privateKeyBase64: string): string {
   return bytesToBase64(nobleSign(bytes, base64ToBytes(privateKeyBase64)));
 }
 
-/** Verify a detached Ed25519 signature over arbitrary bytes. */
+/** Verify bytes against a standard-base64 Ed25519 signature. A malformed value is a refusal. */
 export function verifyBytes(
-  signatureBase64: string,
   bytes: Uint8Array,
+  signatureBase64: string,
   publicKeyBase64: string,
 ): boolean {
   try {
@@ -80,7 +89,7 @@ export async function verifyPackSignature(
   manifest: PackManifest,
   publicKeyBase64: string,
 ): Promise<boolean> {
-  return verifyBytes(manifest.signature, canonicalManifestBytes(manifest), publicKeyBase64);
+  return verifyBytes(canonicalManifestBytes(manifest), manifest.signature, publicKeyBase64);
 }
 
 export interface PackFileMismatch {

@@ -217,7 +217,7 @@ export function checkRevocationAdvisory(
   const signature = advisory.signature;
   if (
     signature === undefined ||
-    !keys.some((key) => verifyBytes(signature, revocationAdvisoryBytes(advisory), key))
+    !keys.some((key) => verifyBytes(revocationAdvisoryBytes(advisory), signature, key))
   ) {
     return {
       ok: false,

@@ -18,6 +18,12 @@
       "import": "./dist/capabilities.js",
       "default": "./dist/capabilities.js"
     },
+    "./catalogue": {
+      "types": "./dist/catalogue.d.ts",
+      "development": "./src/catalogue.ts",
+      "import": "./dist/catalogue.js",
+      "default": "./dist/catalogue.js"
+    },
     "./manifest": {
       "types": "./dist/manifest.d.ts",
       "development": "./src/manifest.ts",
