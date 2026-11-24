@@ -41,6 +41,9 @@ export const PACK_FORMAT = "suite.pack";
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 const SHA256_HEX = /^[0-9a-f]{64}$/u;
+// Host kinds are an open vocabulary: this only rejects malformed values, never
+// an unknown one. See `manifest.schema.json` in docs/spec.
+const PLATFORM_KIND = /^[a-z][a-z0-9-]{0,31}$/u;
 
 /**
  * Which document a pack renders in.
@@ -111,6 +114,11 @@ export interface PackManifestCore {
   readonly isolation: PackIsolation;
   /** What it may ask the host for. Empty means it may render and nothing else. */
   readonly capabilities: readonly PackCapability[];
+  /**
+   * Host kinds this pack is meant for. Opaque values: an unknown kind parses and
+   * simply matches no host. Absent means unknown, never universal.
+   */
+  readonly platforms?: readonly string[];
   readonly files: readonly PackFile[];
   /**
    * The host surfaces the pack offers, under the same contract a desktop app declares.
@@ -263,6 +271,31 @@ export function parsePackManifest(value: unknown): PackParse {
     }
   }
 
+  // Host kinds are opaque (S3.5). A kind this build has never heard of is still a
+  // valid declaration; only the shape is checked, because rejecting it here would
+  // make the pack uninstallable on every host.
+  const platforms: string[] = [];
+  if (raw.platforms !== undefined) {
+    if (!Array.isArray(raw.platforms)) {
+      fail("platforms", "an array of host kinds");
+    } else {
+      const seen = new Set<string>();
+      raw.platforms.forEach((candidate, index) => {
+        if (typeof candidate !== "string" || !PLATFORM_KIND.test(candidate)) {
+          fail(`platforms.${index}`, "a lower-case host kind");
+          return;
+        }
+        if (seen.has(candidate)) {
+          fail(`platforms.${index}`, `duplicate ${candidate}`);
+          return;
+        }
+        seen.add(candidate);
+        platforms.push(candidate);
+      });
+      if (platforms.length === 0) fail("platforms", "at least one host kind");
+    }
+  }
+
   // The widgets a pack declares are the same descriptors a desktop app puts in
   // `suite.app.json`, validated by the same contract, so a host renders both without a
   // second shape. Empty is the ordinary case and is left out of the canonical bytes.
@@ -305,6 +338,7 @@ export function parsePackManifest(value: unknown): PackParse {
       independent: raw.independent as boolean,
       isolation,
       capabilities,
+      ...(platforms.length > 0 ? { platforms } : {}),
       files,
       ...(widgets.length > 0 ? { widgets } : {}),
       signature,
@@ -331,6 +365,11 @@ export function canonicalManifestBytes(manifest: PackManifestCore): Uint8Array {
     independent: manifest.independent,
     isolation: manifest.isolation,
     capabilities: manifest.capabilities,
+    // Omitted when absent, like every optional field: a manifest written before
+    // host kinds were declared keeps the same canonical bytes and signature.
+    ...(manifest.platforms !== undefined && manifest.platforms.length > 0
+      ? { platforms: manifest.platforms }
+      : {}),
     files: manifest.files.map((file) => ({
       path: file.path,
       sha256: file.sha256,

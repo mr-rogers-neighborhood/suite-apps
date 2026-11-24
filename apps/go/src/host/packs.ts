@@ -14,6 +14,7 @@ import {
   verifyPackSignature,
 } from "@suite/go";
 import { SUITE_PACK_PUBLIC_KEY } from "@suite/pack/pinned-key";
+import { GO_HOST, platformFit } from "@suite/pack/platforms";
 import {
   buildPackArchive,
   PackArchiveError,
@@ -89,13 +90,7 @@ export const HOST_VERSION = 1;
  * (`HOST_CAPABILITIES` in `apps/shell/src/packs.ts`) because the two hosts serve different
  * surfaces; they agree on the manifests and on the refusal, not on this set.
  */
-export const GO_HOST_CAPABILITIES = [
-  "documents",
-  "storage",
-  "recents",
-  "notifications",
-  "network",
-] as const satisfies readonly PackCapability[];
+export const GO_HOST_CAPABILITIES = GO_HOST.capabilities;
 
 export interface InstalledPack {
   readonly manifest: PackManifest;
@@ -114,6 +109,7 @@ export type InstallFailureReason =
   | "digest"
   | "host"
   | "capability"
+  | "platform"
   | "policy"
   | "failed";
 
@@ -386,6 +382,7 @@ export function createPackStore(
     contractVersion: options.contractVersion ?? HOST_CONTRACT_VERSION,
     hostVersion: options.hostVersion ?? HOST_VERSION,
   };
+  const platformHost = { ...GO_HOST, capabilities: servedCapabilities };
   const archiveLimits: PackArchiveLimits = {
     maxArchiveBytes: MAX_ARCHIVE_BYTES,
     ...options.archiveLimits,
@@ -450,6 +447,13 @@ export function createPackStore(
     const capability = unsupportedCapability(manifest, servedCapabilities);
     if (capability !== null) {
       return refuse("capability", `${id} ${version}: ${capability}`);
+    }
+
+    // S4.8: a pack that does not name this phone's kind, or needs a capability it
+    // lacks, is refused when it is read rather than when its first call fails.
+    const platform = platformFit(manifest, platformHost);
+    if (platform.state === "unavailable") {
+      return refuse("platform", `${id} ${version}: ${platform.reason}`);
     }
 
     let listing: InstalledListing;
@@ -646,6 +650,15 @@ export function createPackStore(
       const capability = unsupportedCapability(manifest, servedCapabilities);
       if (capability !== null) {
         return { ok: false, reason: "capability", message: capability };
+      }
+
+      const platform = platformFit(manifest, platformHost);
+      if (platform.state === "unavailable") {
+        return {
+          ok: false,
+          reason: "platform",
+          message: platform.reason ?? "That pack is not available on this phone.",
+        };
       }
 
       const listed = new Set(manifest.files.map((file) => file.path));

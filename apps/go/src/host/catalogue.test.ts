@@ -4,7 +4,6 @@ import {
   type PackIndexCore,
   type PackIndexEntry,
   packIndexDigest,
-  publisherKeyFingerprint,
   signPackIndex,
 } from "@suite/pack";
 import { describe, expect, it } from "vitest";
@@ -13,7 +12,6 @@ import {
   createCatalogue,
   DEFAULT_CATALOGUE_INDEX_URL,
   INDEX_HEAD_KEY,
-  SUITE_INDEX_PUBLIC_KEY,
 } from "./catalogue.js";
 import type { InstalledPack, PackStore } from "./packs.js";
 
@@ -188,25 +186,16 @@ function catalogueFor(
     store,
     fetch: fetch.fetch,
     now: NOW,
-    // Pinning a test key keeps the production key out of fixtures; the real pin is checked below.
+    // Pinning a test key keeps the production key out of fixtures; the shared pin is tested in
+    // `packages/pack/src/pinnedKey.test.ts`.
     operatorKeys: [operator.publicKeyBase64],
   });
   return { catalogue, values, fetch };
 }
 
-describe("the catalogue operator pin", () => {
-  it("is the key whose fingerprint the desktop documents", async () => {
-    expect(await publisherKeyFingerprint(SUITE_INDEX_PUBLIC_KEY)).toBe(
-      "77:F5:4E:74:8A:AF:47:67:45:31:E9:4F:A7:6A:CA:72:F2:85:95:F1:EF:61:40:62:61:36:AC:AC:47:CB:3B:A1",
-    );
-  });
-
+describe("the catalogue index source", () => {
   it("reads the same published index as the desktop shell", () => {
     expect(DEFAULT_CATALOGUE_INDEX_URL).toBe("https://flatpak.suite.run/index.json");
-  });
-
-  it("is a 32-byte Ed25519 public key", () => {
-    expect(Uint8Array.from(atob(SUITE_INDEX_PUBLIC_KEY)).byteLength).toBe(32);
   });
 });
 
@@ -233,6 +222,36 @@ describe("loading a catalogue index", () => {
       ["probe", "2.0.0", "update"],
     ]);
     expect(loaded.entries.find((row) => row.id === "probe")?.installedVersion).toBe("1.0.0");
+  });
+
+  it("marks a pack needing an unserved capability unavailable and refuses it before download", async () => {
+    const text = signedText([entry({ capabilities: ["documents", "files"] })]);
+    const { catalogue, fetch } = catalogueFor(text);
+
+    const loaded = await catalogue.load();
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.entries[0]?.platform).toEqual({
+      state: "unavailable",
+      reason: "not available on Go — needs `files`",
+    });
+
+    const result = await catalogue.install("probe", "1.0.0");
+    expect(result).toMatchObject({ ok: false, reason: "platform" });
+    expect(fetch.requested).toEqual([DEFAULT_CATALOGUE_INDEX_URL]);
+  });
+
+  it("reports a desktop-only pack as built for desktop, not unknown", async () => {
+    const text = signedText([entry({ capabilities: ["documents"], platforms: ["desktop"] })]);
+    const { catalogue } = catalogueFor(text);
+
+    const loaded = await catalogue.load();
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.entries[0]?.platform).toEqual({
+      state: "unavailable",
+      reason: "not available on Go — built for `desktop`",
+    });
   });
 
   it("refuses an unsigned index", async () => {

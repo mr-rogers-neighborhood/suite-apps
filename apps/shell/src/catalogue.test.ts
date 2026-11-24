@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   digestPackFiles,
+  GO_HOST,
   generatePackKeyPair,
   PACK_FORMAT,
+  type PackCapability,
   type PackManifest,
   type PackManifestCore,
   signPackManifest,
@@ -50,6 +52,8 @@ interface FixtureOptions {
   /** What the archive actually contains, when it should not match the manifest. */
   readonly archivePayload?: Record<string, Uint8Array>;
   readonly unsigned?: boolean;
+  readonly capabilities?: readonly PackCapability[];
+  readonly platforms?: readonly string[];
 }
 
 interface Fixture {
@@ -72,9 +76,10 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
     entry: "index.html",
     contractVersion: 1,
     publisher: { id: "suite", key: keys.publicKeyBase64 },
-    capabilities: [],
+    capabilities: options.capabilities ?? [],
     files: await digestPackFiles(payload),
     ...(options.description === undefined ? {} : { description: options.description }),
+    ...(options.platforms === undefined ? {} : { platforms: options.platforms }),
   };
   const manifest = {
     ...core,
@@ -186,6 +191,57 @@ describe("catalogue scanning", () => {
     expect(view.trusted).toBe(true);
     expect(view).not.toHaveProperty("file");
     expect(view).not.toHaveProperty("reason");
+  });
+
+  // spec: S3.5
+  it("treats a manifest without platforms as unknown, never supported", async () => {
+    const root = await temporaryRoot();
+    const fixturePack = await fixture();
+    await writeArchive(root, "demo-1.0.0.suitepack", fixturePack.archive);
+
+    const entries = await loadCatalogue(root, trust(fixturePack.publicKey));
+    expect(entries[0]?.platform.state).toBe("unknown");
+    expect(entries[0]?.platform.reason).toContain("declares no platforms");
+  });
+
+  // spec: S4.8
+  it("lists a pack Go cannot run and refuses its install with the reason", async () => {
+    const root = await temporaryRoot();
+    const packsRoot = await temporaryRoot();
+    const fixturePack = await fixture({
+      capabilities: ["documents", "files"],
+      platforms: ["desktop", "mobile"],
+    });
+    await writeArchive(root, "demo-1.0.0.suitepack", fixturePack.archive);
+
+    const entries = await loadCatalogue(root, trust(fixturePack.publicKey), null, GO_HOST);
+    expect(entries[0]?.platform).toEqual({
+      state: "unavailable",
+      reason: "not available on Go — needs `files`",
+    });
+
+    const entry = entries[0];
+    if (entry === undefined) throw new Error("missing entry");
+    await expect(
+      installCataloguePack(entry, packsRoot, trust(fixturePack.publicKey)),
+    ).rejects.toMatchObject({
+      reason: "platform",
+      message: "not available on Go — needs `files`",
+    });
+    expect(await readdir(packsRoot)).toEqual([]);
+  });
+
+  // spec: S3.5
+  it("refuses a pack that does not declare this host's kind", async () => {
+    const root = await temporaryRoot();
+    const fixturePack = await fixture({ platforms: ["desktop"] });
+    await writeArchive(root, "demo-1.0.0.suitepack", fixturePack.archive);
+
+    const entries = await loadCatalogue(root, trust(fixturePack.publicKey), null, GO_HOST);
+    expect(entries[0]?.platform).toEqual({
+      state: "unavailable",
+      reason: "not available on Go — built for `desktop`",
+    });
   });
 
   it("lists an archive signed by another key as refused and will not install it", async () => {

@@ -3,8 +3,8 @@
 Four keys sign things the Suite ships, and no private half belongs in this repository. Each one
 has a public half pinned in the source that verifies it, so the question a build actually needs
 answered is narrow: **is the key on this machine the key this tree trusts?** `pnpm keys` answers it
-for the pack and update keys; `pnpm android:key` answers it for the Android keystore, and the
-shell's own test answers it for the catalogue operator pin.
+for the pack and update keys, `pnpm android:key` answers it for the Android keystore, and
+`packages/pack/src/pinnedKey.test.ts` answers it for the catalogue operator pin.
 
 ## What exists
 
@@ -12,8 +12,14 @@ shell's own test answers it for the catalogue operator pin.
 | --- | --- | --- | --- | --- |
 | Pack signing | a signed app pack the phone and the desktop install | Ed25519 | `pack-key` | `SUITE_PACK_PUBLIC_KEY`, `packages/pack/src/pinnedKey.ts` |
 | Update signing | nothing the suite ships any more; it signed the retired relay tarball's `SHA256SUMS` | Ed25519 | `update-key.pem` | `SUITE_UPDATE_PUBLIC_KEY`, `packages/desktop/src/updateSignature.ts` |
-| Catalogue operator | the signed pack index | Ed25519 | `SUITE_INDEX_KEY` in the `release` environment | `SUITE_INDEX_PUBLIC_KEY`, `apps/shell/src/indexTrust.ts` |
+| Catalogue operator | the signed pack index | Ed25519 | `SUITE_INDEX_KEY` in the `release` environment | `SUITE_INDEX_PUBLIC_KEY`, `packages/pack/src/pinnedKey.ts` |
 | Android release | every Suite Go APK, on all four channels | RSA-4096 certificate | `suite-go-release.jks` and `suite-go-release.pass` | `ANDROID_RELEASE_CERT_SHA256`, `scripts/lib/androidKey.mjs` |
+
+The catalogue operator pin's fingerprint is
+`77:F5:4E:74:8A:AF:47:67:45:31:E9:4F:A7:6A:CA:72:F2:85:95:F1:EF:61:40:62:61:36:AC:AC:47:CB:3B:A1`.
+That is the value `SUITE_INDEX_PUBLIC_KEY` hashes to, and the one test beside the pin recomputes it
+with the same SHA-256 rule `publisherKeyFingerprint` applies. Both hosts import the constant, so a
+rotation changes it once and ships one release.
 
 The Flatpak store key is a separate secret with a different job; [Packaging
 channels](../reference/packaging-channels.md#signing) owns it and this page does not restate it.
@@ -116,6 +122,15 @@ no release signs with this key, so it has no artifact to trust; it and its pin a
 retired deliberately, and `pnpm keys status` still proves the two agree. The Flatpak store key is
 separate and rotates on the remote; see [Packaging
 channels](../reference/packaging-channels.md#signing).
+
+**Catalogue operator key.** Put the new private key in `SUITE_INDEX_KEY` and set
+`SUITE_INDEX_KEY_FINGERPRINT` to its fingerprint, so the release refuses to sign with anything else.
+Then update `SUITE_INDEX_PUBLIC_KEY` and `SUITE_INDEX_PUBLIC_KEY_FINGERPRINT` in
+`packages/pack/src/pinnedKey.ts` in the same release that publishes the first index signed by the new
+key. Both hosts import that constant, so one edit moves the phone and the desktop together. A host
+still on the old release refuses the new index until it updates, which is a named refusal a person
+sees rather than a catalogue that half works. The signing key and the host pin stay separate values:
+the release can sign with a key a host does not trust yet, and that is what makes staging possible.
 
 **Android release key.** Generate a new keystore, pin its digest in `ANDROID_RELEASE_CERT_SHA256`,
 and rebuild every channel. Android compares the certificate of an update with the installed app's,

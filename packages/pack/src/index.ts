@@ -72,7 +72,27 @@ export {
   parsePackManifest,
   parsePackManifestJson,
 } from "./manifest.js";
-export { SUITE_PACK_PUBLIC_KEY, SUITE_PUBLISHER_ID } from "./pinnedKey.js";
+export {
+  SUITE_INDEX_PUBLIC_KEY,
+  SUITE_INDEX_PUBLIC_KEY_FINGERPRINT,
+  SUITE_PACK_PUBLIC_KEY,
+  SUITE_PUBLISHER_ID,
+} from "./pinnedKey.js";
+export {
+  GO_HOST,
+  HOST_DECLARATIONS,
+  type HostDeclaration,
+  type HostKind,
+  hostsOfKind,
+  isSafePackPlatform,
+  type PackPlatformClaim,
+  type PlatformFit,
+  type PlatformFitState,
+  type PlatformFitView,
+  platformFit,
+  platformFitView,
+  SHELL_HOST,
+} from "./platforms.js";
 export {
   base64ToBytes,
   bytesToBase64,

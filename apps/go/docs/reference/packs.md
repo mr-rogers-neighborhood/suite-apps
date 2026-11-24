@@ -49,8 +49,8 @@ will run something other than what was signed.
 **Browse apps** on home shows what the published index offers next to what is installed. The
 index is `https://flatpak.suite.run/index.json`, the same URL the desktop shell reads, and it is
 verified by `@suite/pack`'s `parsePackIndexJson` and `verifyPackIndex` — Go does not implement a
-second parser. The operator key is pinned in `src/host/catalogue.ts`; its fingerprint test is
-repeated there so the comment and the value cannot drift.
+second parser. The operator key is pinned once in `packages/pack/src/pinnedKey.ts` and imported by
+both hosts, so a rotation is one constant and one release rather than two edits that can disagree.
 
 Every one of these is a refusal before a row appears, not a warning beside it:
 
@@ -256,4 +256,3 @@ Two details that cost time and are worth keeping:
 | Preload               | prefetch on long-press, wifi-only                                                                              |
 | Cross-pack imports    | the packer should fail the build when one pack imports another                                                 |
 | Catalogue on a device | the index and archive paths are unit-tested; a phone still needs a signed index and one install walked through |
-| Operator-key rotation | the index pin is a second copy of the desktop's until `@suite/pack` exports it                                 |

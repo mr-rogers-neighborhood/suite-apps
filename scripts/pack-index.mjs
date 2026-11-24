@@ -120,6 +120,7 @@ async function entryFor(path, urlBase) {
     version: manifest.version,
     ...(manifest.description === undefined ? {} : { description: manifest.description }),
     capabilities: manifest.capabilities,
+    ...(manifest.platforms === undefined ? {} : { platforms: manifest.platforms }),
     size: bytes.byteLength,
     sha256: await sha256Hex(bytes),
     url,

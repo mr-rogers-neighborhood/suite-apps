@@ -99,6 +99,7 @@ describe("pack-index build", () => {
     assert.equal(canvasEntry.version, "0.2.0");
     assert.equal(canvasEntry.description, "A whiteboard for the Suite.");
     assert.deepEqual(canvasEntry.capabilities, ["files", "relay"]);
+    assert.deepEqual(canvasEntry.platforms, ["desktop"]);
     assert.equal(canvasEntry.url, "https://packs.suite.run/canvas-0.2.0.suitepack");
     const canvasBytes = readFileSync(canvas);
     assert.equal(canvasEntry.size, statSync(canvas).size);

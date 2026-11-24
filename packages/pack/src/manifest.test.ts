@@ -160,6 +160,22 @@ describe("the pack manifest", () => {
     expect(parsed.issues.some((issue) => issue.message.includes("duplicate"))).toBe(true);
   });
 
+  // spec: S3.5
+  it("accepts a host kind this tree has never heard of", () => {
+    const parsed = parsePackManifest(manifest({ platforms: ["desktop", "tv", "watch"] }));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.platforms).toEqual(["desktop", "tv", "watch"]);
+  });
+
+  // spec: S3.5
+  it("still refuses a malformed platform value or a duplicate", () => {
+    const malformed = parsePackManifest(manifest({ platforms: ["Desktop"] }));
+    expect(malformed.ok).toBe(false);
+    const duplicate = parsePackManifest(manifest({ platforms: ["desktop", "desktop"] }));
+    expect(duplicate.ok).toBe(false);
+  });
+
   it("refuses an unknown capability and an unknown field", () => {
     const parsed = parsePackManifest(manifest({ capabilities: ["files", "root"], extra: true }));
     expect(parsed.ok).toBe(false);

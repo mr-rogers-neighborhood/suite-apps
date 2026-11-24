@@ -17,6 +17,7 @@ import manifestText from "../manifest.json?raw";
 const manifest = JSON.parse(manifestText) as {
   readonly version: string;
   readonly capabilities: readonly string[];
+  readonly platforms?: readonly string[];
   readonly documents?: readonly {
     readonly id: string;
     readonly format: string;
@@ -42,5 +43,10 @@ describe("Canvas's declared document", () => {
     // import and folder import; `recents` is the host's recent list. The pack asks for no path and
     // no filesystem of its own, and sync is still a host gap rather than a capability to claim.
     expect(manifest.capabilities).toEqual(["documents", "files", "recents"]);
+  });
+
+  it("declares the desktop host it needs", () => {
+    // Canvas needs a file picker and a document folder, which the mobile host does not serve.
+    expect(manifest.platforms).toEqual(["desktop"]);
   });
 });

@@ -13,6 +13,7 @@ import {
 import { dirname, join, sep } from "node:path";
 import {
   checkPublisherTrust,
+  type HostDeclaration,
   isPublisherKey,
   isSafePackId,
   isSafePackPath,
@@ -20,7 +21,9 @@ import {
   type PackManifest,
   packFitsHost,
   parsePackManifest,
+  platformFit,
   type ResolvedPublisher,
+  SHELL_HOST,
   SUITE_PUBLISHER_ID,
   type TrustedPublisher,
   verifyPackFiles,
@@ -64,6 +67,8 @@ export interface PackTrustOptions {
   readonly hostContractVersion: number;
   readonly hostVersion: number;
   readonly hostCapabilities: readonly PackCapability[];
+  /** The kind this host reports. Defaults to the desktop shell's `desktop`. */
+  readonly hostKind?: string;
   /** Permit replacing an id's publisher. The migration changes no stored data. */
   readonly allowPublisherMigration?: boolean;
   /**
@@ -103,6 +108,7 @@ export interface InstalledPackIssue {
     | "files"
     | "host"
     | "capability"
+    | "platform"
     | "revocation"
     | "extra-files"
     | "io";
@@ -1106,6 +1112,22 @@ async function verifyManifest(
       refusal: {
         reason: "capability",
         message: `${manifest.id} asks for unimplemented ${unsupported.join(", ")}.`,
+      },
+    };
+  }
+
+  const host: HostDeclaration = {
+    ...SHELL_HOST,
+    capabilities: options.hostCapabilities,
+    kind: options.hostKind ?? SHELL_HOST.kind,
+  };
+  const platform = platformFit(manifest, host);
+  if (platform.state === "unavailable") {
+    return {
+      ok: false,
+      refusal: {
+        reason: "platform",
+        message: platform.reason ?? "That pack is not available on this host.",
       },
     };
   }

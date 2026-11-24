@@ -3,6 +3,7 @@ import { z } from "zod";
 import { canonicalJsonValue, compareCodeUnits, findDuplicateJsonKey } from "./canonical.js";
 import { PACK_CAPABILITIES, type PackCapability } from "./capabilities.js";
 import type { PackContributions } from "./contributions.js";
+import { isSafePackPlatform, type PackPlatform } from "./platforms.js";
 
 /**
  * A Suite pack.
@@ -125,7 +126,7 @@ export interface PackNetwork {
   readonly allow: readonly string[];
 }
 
-export type PackPlatform = "desktop" | "mobile";
+export type { PackPlatform } from "./platforms.js";
 export type PackInput = "pointer" | "touch" | "keyboard";
 
 /** The slice of a document a widget may read or write. */
@@ -331,8 +332,10 @@ const networkSchema = z
   })
   .strict();
 
+// Deliberately a string, not an enum: see `platforms.ts` and the schema's
+// `$comment`. A pack may name a kind this host has never heard of.
 const platformsSchema = z
-  .array(z.enum(["desktop", "mobile"]))
+  .array(z.string().refine(isSafePackPlatform, "a lower-case host kind"))
   .min(1)
   .refine(unique, "duplicate item");
 

@@ -17,6 +17,9 @@
  *   4. `manifest.json` names no field, value or capability the shipped schema
  *      does not define (S3.7). The field list is read from
  *      `docs/spec/manifest.schema.json`; this file does not repeat it.
+ *   5. Every declared `platforms` kind that this tree has a host for can actually
+ *      run the pack: the host's served capabilities cover its required list. A
+ *      kind no host declares is left alone, because the vocabulary is open (S3.5).
  *
  * A pack is declared by its app, not inferred from a directory: `package.json`
  * carries `"suite": { "pack": true }`. The declaration is what lets the rule
@@ -27,6 +30,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+// The host declarations are the same values the shell and Go import. Node's type
+// stripping loads this source file without a build step; the file has no runtime
+// imports of its own.
+import { HOST_DECLARATIONS, platformFit } from "../packages/pack/src/platforms.ts";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -98,6 +105,15 @@ function deref(schema, root) {
   return node;
 }
 
+/** The JSON types the schema names, for the handful this check needs. */
+function matchesType(type, value) {
+  if (type === "array") return Array.isArray(value);
+  if (type === "integer") return Number.isInteger(value);
+  if (type === "number") return typeof value === "number";
+  if (type === "object") return value !== null && typeof value === "object" && !Array.isArray(value);
+  return typeof value === type;
+}
+
 /**
  * The manifest against the schema's field names, enum values and constants.
  *
@@ -116,6 +132,10 @@ export function schemaProblems(schema, manifest) {
       return;
     }
 
+    if (resolved.type !== undefined && !matchesType(resolved.type, value)) {
+      problems.push(`${path}: must be ${resolved.type}`);
+      return;
+    }
     if (resolved.const !== undefined && value !== resolved.const) {
       problems.push(`${path}: must be ${JSON.stringify(resolved.const)}`);
     }
@@ -124,8 +144,22 @@ export function schemaProblems(schema, manifest) {
         `${path}: ${JSON.stringify(value)} is not a value manifest.schema.json defines`,
       );
     }
+    if (
+      typeof value === "string" &&
+      Array.isArray(resolved.enum) === false &&
+      typeof resolved.pattern === "string" &&
+      !new RegExp(resolved.pattern, "u").test(value)
+    ) {
+      problems.push(`${path}: ${JSON.stringify(value)} does not match ${resolved.pattern}`);
+    }
 
     if (Array.isArray(value)) {
+      if (resolved.minItems !== undefined && value.length < resolved.minItems) {
+        problems.push(`${path}: fewer than ${resolved.minItems} items`);
+      }
+      if (resolved.uniqueItems === true && new Set(value).size !== value.length) {
+        problems.push(`${path}: duplicate items`);
+      }
       if (resolved.items !== undefined) {
         value.forEach((item, index) => visit(resolved.items, item, `${path}[${index}]`));
       }
@@ -174,6 +208,45 @@ function walkPack(packDir, problems) {
 
   walk(packDir);
   return tests;
+}
+
+/**
+ * Every declared host kind this tree can judge must be able to run the pack.
+ *
+ * A pack may name a kind with no host here (`tv`, `xr`, …); the vocabulary is
+ * open and this checker has no coverage declaration to compare, so it says
+ * nothing. A kind we do know — `desktop` or `mobile` — either covers the pack's
+ * required capabilities or the declaration is a lie the build must not sign.
+ */
+export function platformProblems(manifest) {
+  const platforms = manifest?.platforms;
+  if (!Array.isArray(platforms) || platforms.length === 0) return [];
+  const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
+
+  const problems = [];
+  for (const platform of platforms) {
+    if (typeof platform !== "string") continue;
+    const hosts = HOST_DECLARATIONS.filter((host) => host.kind === platform);
+    if (hosts.length === 0) continue;
+    const fits = hosts.map((host) =>
+      platformFit({ platforms: [platform], capabilities }, host),
+    );
+    if (fits.some((fit) => fit.state === "available")) continue;
+    const reason = fits.find((fit) => fit.reason !== null)?.reason ?? "no host can run it";
+    problems.push(
+      `platforms ${JSON.stringify(platform)} cannot run with these capabilities: ${reason}`,
+    );
+  }
+  return problems;
+}
+
+/** `desktop only`, `desktop, mobile`, or `unknown (no platforms declared)`. */
+export function platformsSummary(manifest) {
+  const platforms = manifest?.platforms;
+  if (!Array.isArray(platforms) || platforms.length === 0) {
+    return "unknown (no platforms declared)";
+  }
+  return platforms.length === 1 ? `${platforms[0]} only` : platforms.join(", ");
 }
 
 /**
@@ -258,6 +331,9 @@ export function checkPackShape({
     for (const problem of schemaProblems(schema, manifest)) {
       problems.push(`${relative(root, manifestPath)}: ${problem}`);
     }
+    for (const problem of platformProblems(manifest)) {
+      problems.push(`${relative(root, manifestPath)}: ${problem}`);
+    }
   }
 
   packs.sort((left, right) => left.app.localeCompare(right.app));
@@ -288,7 +364,11 @@ is docs/reference/pack-authoring.md.
 
   const result = checkPackShape();
   for (const pack of result.packs) {
-    process.stdout.write(`ok    ${pack.app.padEnd(10)} ${pack.dir}\n`);
+    const manifestPath = join(ROOT, pack.dir, "manifest.json");
+    const manifest = isFile(manifestPath) ? readJson(manifestPath) : null;
+    process.stdout.write(
+      `ok    ${pack.app.padEnd(10)} ${pack.dir}  packs for: ${platformsSummary(manifest)}\n`,
+    );
   }
   for (const pack of result.skipped) {
     process.stdout.write(`skip  ${pack.app.padEnd(10)} ${pack.dir} (${pack.reason})\n`);

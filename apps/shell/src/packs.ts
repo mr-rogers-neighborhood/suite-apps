@@ -11,6 +11,7 @@ import {
   packAllows,
   packDocumentSchema,
 } from "@suite/pack/manifest";
+import { platformFit, SHELL_HOST } from "@suite/pack/platforms";
 import { z } from "zod";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { FIRST_PARTY_PUBLISHER_ID, packStorageKey } from "./packIdentity.js";
@@ -35,20 +36,14 @@ export const HOST_CONTRACT_VERSION = PACK_CONTRACT_VERSION;
 export const HOST_VERSION = 1;
 
 /**
- * The capabilities this spike actually serves.
+ * The capabilities this host actually serves.
  *
- * The shared vocabulary is wider; a pack that declares a service this host does
- * not implement is refused rather than loaded into a broken bridge. Add a name
- * here in the same change that adds the service.
+ * The declaration lives in `@suite/pack/platforms` beside the Go host's, so the
+ * catalogue compares one shared fact rather than a copy. The shared vocabulary is
+ * wider; a pack that declares a service this host does not implement is refused
+ * rather than loaded into a broken bridge.
  */
-export const HOST_CAPABILITIES = [
-  "documents",
-  "files",
-  "identity.pack",
-  "network",
-  "notifications",
-  "recents",
-] as const;
+export const HOST_CAPABILITIES = SHELL_HOST.capabilities;
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 
@@ -68,6 +63,9 @@ const manifestSchema = z
       .optional(),
     capabilities: z.array(z.enum(PACK_CAPABILITIES)).default([]),
     documents: z.array(packDocumentSchema).max(64).optional(),
+    // Opaque host kinds (S3.5): a development pack may name a kind this host has
+    // never heard of, and the fit check below decides what that means.
+    platforms: z.array(z.string()).min(1).optional(),
     widgets: suiteWidgetsSchema.optional(),
   })
   .strict();
@@ -188,6 +186,18 @@ function readPack(directory: string): PackInfo | null {
       console.warn(
         `[shell] ${parsed.data.id} asks for unimplemented ${unsupported.join(", ")}; refusing it`,
       );
+      return null;
+    }
+
+    const platform = platformFit(
+      {
+        ...(parsed.data.platforms === undefined ? {} : { platforms: parsed.data.platforms }),
+        capabilities: parsed.data.capabilities,
+      },
+      SHELL_HOST,
+    );
+    if (platform.state === "unavailable") {
+      console.warn(`[shell] ${parsed.data.id} is ${platform.reason}; refusing it`);
       return null;
     }
 

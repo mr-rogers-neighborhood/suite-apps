@@ -101,6 +101,15 @@ function collectFiles(base, skip, current = base, found = Object.create(null)) {
   return found;
 }
 
+/** `desktop only`, `desktop, mobile`, or `unknown (no platforms declared)`. */
+export function platformsSummary(manifest) {
+  const platforms = manifest?.platforms;
+  if (!Array.isArray(platforms) || platforms.length === 0) {
+    return "unknown (no platforms declared)";
+  }
+  return platforms.length === 1 ? `${platforms[0]} only` : platforms.join(", ");
+}
+
 function positiveInteger(value, flag) {
   const number = Number(value);
   if (!Number.isInteger(number) || number <= 0) {
@@ -199,6 +208,11 @@ export async function bundlePack({
       ? SUITE_PUBLISHER_ID
       : await publisherKeyDigest(actualPublicKey));
 
+  // These build scripts produce desktop packs. A source manifest may name more
+  // (or other) kinds explicitly; keeping the declaration in the signed bytes is
+  // what lets a mobile host refuse the pack instead of discovering it at launch.
+  const platforms = source.platforms ?? ["desktop"];
+
   const core = {
     format: PACK_FORMAT,
     id,
@@ -210,6 +224,7 @@ export async function bundlePack({
     ...(minimumHost === undefined ? {} : { minimumHostVersion: minimumHost }),
     publisher: { id: publisherId, key: actualPublicKey },
     capabilities: Array.isArray(source.capabilities) ? source.capabilities : [],
+    platforms,
     ...(source.documents === undefined ? {} : { documents: source.documents }),
     ...(source.contributions === undefined ? {} : { contributions: source.contributions }),
     ...(source.widgets === undefined ? {} : { widgets: source.widgets }),
@@ -340,6 +355,7 @@ async function main(argv) {
       `id=${built.manifest.id} v${built.manifest.version}\n`,
   );
   process.stdout.write(`${built.outPath}.sha256  ${built.sha256}\n`);
+  process.stdout.write(`packs for: ${platformsSummary(built.manifest)}\n`);
   return 0;
 }
 

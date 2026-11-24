@@ -5,10 +5,15 @@ import {
   type PackCapability,
   type PackIndexEntry,
   type PackIndexFailureReason,
+  type PlatformFitView,
   packIndexDigest,
   parsePackIndexJson,
+  platformFit,
+  platformFitView,
+  SUITE_INDEX_PUBLIC_KEY,
   verifyPackIndex,
 } from "@suite/pack";
+import { GO_HOST } from "@suite/pack/platforms";
 import {
   type InstallFailureReason,
   type InstallOutcome,
@@ -19,7 +24,8 @@ import {
 /**
  * The published catalogue, read on the phone.
  *
- * This is the same index the desktop shell reads: the same pinned operator key, the same
+ * This is the same index the desktop shell reads: the same pinned operator key, imported from
+ * `@suite/pack` (`packages/pack/src/pinnedKey.ts`) rather than copied, the same
  * `https://flatpak.suite.run/index.json`, and the same `@suite/pack` verifier. Go does not parse
  * or check the index itself. `parsePackIndexJson` refuses an oversized file, a duplicate key and a
  * malformed entry; `verifyPackIndex` refuses an unsigned index, a changed one, one signed by a key
@@ -30,19 +36,6 @@ import {
  * in the app's own key-value store so a replay is refused on the next launch too. The head is
  * written only after every check passed.
  */
-
-/**
- * The one catalogue operator key this host trusts.
- *
- * Fingerprint: `77:F5:4E:74:8A:AF:47:67:45:31:E9:4F:A7:6A:CA:72:F2:85:95:F1:EF:61:40:62:61:36:AC:AC:47:CB:3B:A1`.
- *
- * It is the same key as `SUITE_INDEX_PUBLIC_KEY` in `apps/shell/src/indexTrust.ts`. A test
- * recomputes the fingerprint, so the comment cannot drift from the value. The two copies are a
- * deliberate limit of this change: the operator pin has no shared home yet, and `@suite/pack` is
- * outside Go's ownership. Rotating it means editing both pins in one release; the fingerprint
- * check in each gate is what makes a missed edit fail rather than silently split the catalogue.
- */
-export const SUITE_INDEX_PUBLIC_KEY = "g/0ccvgNKdfiHC+i5wPDQqvPVhAyxBX8ZjrdzTi1zF8=";
 
 /** The published index, beside the Flatpak summary on the store's own origin (same as desktop). */
 export const DEFAULT_CATALOGUE_INDEX_URL = "https://flatpak.suite.run/index.json";
@@ -72,6 +65,14 @@ export interface CatalogueEntry {
   readonly description: string | null;
   readonly version: string;
   readonly capabilities: readonly PackCapability[];
+  /**
+   * What this phone knows about the pack's `platforms`.
+   *
+   * The index does not carry a platform declaration, so a covered capability
+   * set is `unknown` here — never `available`. The archive's manifest is read at
+   * install and the store refuses a kind this phone is not (S4.8).
+   */
+  readonly platform: PlatformFitView;
   readonly sizeBytes: number;
   readonly sha256: string;
   readonly url: string;
@@ -275,6 +276,7 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
           description: entry.description ?? null,
           version: entry.version,
           capabilities: entry.capabilities,
+          platform: cataloguePlatform(entry.platforms, entry.capabilities),
           sizeBytes: entry.size,
           sha256: entry.sha256,
           url: entry.url,
@@ -307,6 +309,24 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
         ok: false,
         reason: "invalid",
         message: `${entry.name} ${entry.version} is already the newest installed version. Reinstall only replaces the same version.`,
+      };
+    }
+
+    // The index carries capabilities, so a definite mismatch is refused before the
+    // archive is downloaded. A platform-only mismatch is caught by the pack store
+    // once it reads the manifest.
+    const fit = platformFit(
+      {
+        ...(entry.platforms === undefined ? {} : { platforms: entry.platforms }),
+        capabilities: entry.capabilities,
+      },
+      GO_HOST,
+    );
+    if (fit.state === "unavailable") {
+      return {
+        ok: false,
+        reason: "platform",
+        message: fit.reason ?? "That pack is not available on this phone.",
       };
     }
 
@@ -366,6 +386,36 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
   return { load, install, remove, head: readHead };
 }
 
+/**
+ * What the index lets this phone know about a pack's platforms.
+ *
+ * A current index carries the manifest's declaration, so the row can say the
+ * pack is built for `desktop` without downloading it. An older index has no
+ * declaration: a covered capability set is then unknown, never available. The
+ * archive's manifest is read at install either way, where the pack store refuses
+ * a kind this phone is not (S4.8).
+ */
+function cataloguePlatform(
+  platforms: readonly string[] | undefined,
+  capabilities: readonly PackCapability[],
+): PlatformFitView {
+  const fit = platformFit(
+    {
+      ...(platforms === undefined ? {} : { platforms }),
+      capabilities,
+    },
+    GO_HOST,
+  );
+  if (fit.state === "unknown") {
+    return {
+      state: "unknown",
+      reason:
+        "platform unknown — the catalogue index carries no platform declaration; the install checks the pack",
+    };
+  }
+  return platformFitView(fit);
+}
+
 /** What the row offers: nothing installed, an older version, the same version, or a newer one. */
 export function actionFor(
   installedVersion: string | null,
@@ -390,6 +440,7 @@ function entryToCatalogue(entry: PackIndexEntry): CatalogueEntry {
     description: entry.description ?? null,
     version: entry.version,
     capabilities: entry.capabilities,
+    platform: cataloguePlatform(entry.platforms, entry.capabilities),
     sizeBytes: entry.size,
     sha256: entry.sha256,
     url: entry.url,

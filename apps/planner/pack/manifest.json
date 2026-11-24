@@ -6,6 +6,7 @@
   "entry": "index.html",
   "contractVersion": 1,
   "capabilities": ["documents", "files", "notifications"],
+  "platforms": ["desktop"],
   "documents": [
     {
       "id": "workspace",
