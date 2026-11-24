@@ -16,7 +16,7 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S3.2 | Archive bounds | Partial | Archive caps exist; document, blob, frame and widget bounds are not all enforced |
 | S3.3 | Canonical bytes | Partial | Canonicalizer exists, but new fields are unsigned, absent fields emit `null`, duplicate keys are not rejected |
 | S3.4 | Golden vector | Absent | No committed manifest/canonical/signature vector |
-| S3.5 | Manifest fields | Partial | Core fields exist; publisher, documents, blobs, sync, network, components and add-ons are absent |
+| S3.5 | Manifest fields | Partial | `@suite/pack` parses every required and optional field family and `fixtures.json` covers each; the build path still signs under the pinned Suite key, so `publisher` is not required or emitted, and canonical bytes do not cover the new fields |
 | S3.6 | Id, entry, files | Implemented | `@suite/pack` validates id, safe paths, hashes and byte counts |
 | S3.7 | Unknown fields | Implemented | Strict Zod schemas refuse unknown fields and capabilities |
 | S3.8 | Subpackages | Absent | No lazy entry or prefetch path |

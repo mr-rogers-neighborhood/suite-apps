@@ -46,6 +46,7 @@ describe("the pack manifest", () => {
     expect(parsed.value.contributions?.fileExtensions).toEqual([".canvas"]);
   });
 
+  // spec: S3.5
   it("accepts every optional field family the spec names", () => {
     const parsed = parsePackManifest(
       manifest({
