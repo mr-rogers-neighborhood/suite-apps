@@ -47,7 +47,6 @@ describe("the reminder delivery binding", () => {
     const delivery = createReminderDelivery(
       {
         isSupported: () => true,
-        ask: async () => "granted",
         create: () => notification,
       },
       { onRoute: (clicked) => routed.push(clicked) },
@@ -64,7 +63,6 @@ describe("the reminder delivery binding", () => {
     const unsupported = createReminderDelivery(
       {
         isSupported: () => false,
-        ask: async () => "granted",
         create: () => fakeNotification(),
       },
       { onRoute: () => undefined },
@@ -74,7 +72,6 @@ describe("the reminder delivery binding", () => {
     const failed = createReminderDelivery(
       {
         isSupported: () => true,
-        ask: async () => "granted",
         create: () => {
           throw new Error("no notification service");
         },

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/desktop";
 import { isPublisherKeyTrusted, type PackDocument, SUITE_PUBLISHER_ID } from "@suite/pack";
+import { isPackCapability, type PackCapability } from "@suite/pack/capabilities";
 import {
   app,
   dialog,
@@ -21,6 +22,16 @@ import {
   installCataloguePack,
   loadCatalogue,
 } from "./catalogue.js";
+import {
+  CAPABILITY_DENIALS,
+  CAPABILITY_REASONS,
+  CAPABILITY_TITLES,
+  ConsentDeniedError,
+  type ConsentPackVersion,
+  ConsentRecord,
+  type ConsentRequest,
+  consentTierFor,
+} from "./consent.js";
 import { LAUNCHER_CONTEXT, suiteLinkFromArgv } from "./deepLink.js";
 import { DocumentMigrations, findDocument } from "./documentMigrations.js";
 import { DocumentStore, declaredDocumentSchemaVersion } from "./documents.js";
@@ -106,6 +117,7 @@ import {
   PACK_EVENT,
   PACK_IPC,
   PACK_SCHEME,
+  type PackConsentView,
   type PackInfoView,
   type PackLaunchContext,
   type ThemeView,
@@ -177,6 +189,8 @@ let externalFiles: ExternalFilesService | null = null;
  */
 let deviceKey: DeviceKey | null = null;
 let trustStore: PublisherTrustStore | null = null;
+/** The one consent record (S4.2, S4.3), beside the publisher trust store. */
+let consentRecord: ConsentRecord | null = null;
 /** Advisories that refuse a new install. They never disable an installed pack. */
 let revocations: readonly RevocationAdvisory[] = [];
 let packs: readonly PackInfo[] = [];
@@ -275,6 +289,11 @@ async function bootstrap(): Promise<void> {
       return preinstalledTrustStore();
     },
   );
+  // One consent record for every capability, beside the publisher trust store
+  // (S4.3). A malformed file starts empty, so each capability is asked again.
+  consentRecord = await ConsentRecord.open(
+    join(trustRootFor(dataRoot, process.env), "consent.json"),
+  );
   // A malformed advisory file is reported and treated as empty; it is host
   // state, not a trust root, so it does not fail the launch.
   revocations = await openRevocations(trustRootFor(dataRoot, process.env))
@@ -300,6 +319,7 @@ async function bootstrap(): Promise<void> {
 
   await refreshCatalogue();
   await refreshPacks();
+  await migrateLegacyConsentRecords();
   spaceStore = await SpaceStore.open(join(dataRoot, "spaces.loro"));
   // The host's own Screens. Home is created here and opened before any pack view
   // exists, so the first window a person sees is the shell's composition rather
@@ -420,6 +440,114 @@ function documentsFor(sender: PackSender): DocumentStore {
 function recentsService(): RecentsStore {
   if (recentsStore === null) throw new Error("the recent list is not ready");
   return recentsStore;
+}
+
+function consentService(): ConsentRecord {
+  if (consentRecord === null) throw new Error("the consent record is not ready");
+  return consentRecord;
+}
+
+/**
+ * Move the two hand-rolled answers into the one record, once.
+ *
+ * The old recents answer carries a publisher and pack; it is attached to the
+ * version installed today and marked `recents-v1`. The old notification answer
+ * was host-wide and names no pack, so it is not copied: notifications are asked
+ * per pack at the token tier, and this log says why a person sees that question
+ * again. Both legacy files are rewritten only after the record has been written.
+ */
+async function migrateLegacyConsentRecords(): Promise<void> {
+  const record = consentRecord;
+  const recents = recentsStore;
+  const reminders = reminderQueue;
+  if (record === null || recents === null || reminders === null) return;
+
+  const installed: ConsentPackVersion[] = packs.map((pack) => ({
+    publisherId: pack.publisher?.id ?? SUITE_PUBLISHER_ID,
+    packId: pack.id,
+    version: pack.version,
+  }));
+
+  try {
+    const result = await record.migrateLegacy({
+      recents: recents.legacyPermissions(),
+      notifications: reminders.legacyPermission(),
+      installed,
+    });
+    await recents.discardLegacyPermissions();
+    await reminders.discardLegacyPermission();
+    if (result.notifications === "reasked") {
+      console.info(
+        "[shell] the old notification permission named no pack; each pack is asked at its next reminder",
+      );
+    }
+  } catch (error) {
+    console.warn("[shell] the legacy consent answers could not be migrated", error);
+  }
+}
+
+function consentRequestFor(pack: PackInfo, capability: PackCapability): ConsentRequest {
+  return {
+    publisherId: pack.publisher?.id ?? SUITE_PUBLISHER_ID,
+    packId: pack.id,
+    version: pack.version,
+    capability,
+    reason: CAPABILITY_REASONS[capability] ?? capability,
+  };
+}
+
+/** Only this pack's answers, for its card. No other pack's entry is read here. */
+function consentViewsFor(pack: PackInfo): readonly PackConsentView[] {
+  if (consentRecord === null) return [];
+  return consentRecord.viewsFor({
+    publisherId: pack.publisher?.id ?? SUITE_PUBLISHER_ID,
+    packId: pack.id,
+    version: pack.version,
+  });
+}
+
+/** The pack list the chrome paints, with each pack's own answers attached. */
+function packViews(): readonly PackInfo[] {
+  return packs.map((pack) => ({ ...pack, consent: consentViewsFor(pack) }));
+}
+
+/**
+ * The one consent surface (S4.2).
+ *
+ * Every capability asks here, in the moment, at the tier the spec names for it.
+ * The dialog names the pack, the capability, the tier and the pack's stated
+ * reason; `ConsentRecord` remembers the answer and stops a remembered denial
+ * from opening this dialog again.
+ */
+async function askConsent(pack: PackInfo, capability: PackCapability): Promise<boolean> {
+  if (window === null) return false;
+  const tier = consentTierFor(capability);
+  const reason = CAPABILITY_REASONS[capability] ?? capability;
+  const answer = await dialog.showMessageBox(window.window, {
+    type: "question",
+    title: CAPABILITY_TITLES[capability] ?? `Allow ${capability}?`,
+    message: `${pack.name} wants to ${reason}.`,
+    detail: consentDetail(tier),
+    buttons: ["Don't allow", "Allow"],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  return answer.response === 1;
+}
+
+function consentDetail(tier: ReturnType<typeof consentTierFor>): string {
+  if (tier === "install") return "This was shown when the app was installed.";
+  if (tier === "every-use") return "Suite asks every time this is used.";
+  if (tier === "token") {
+    return "Suite asks once; this grant expires after thirty days and is asked again then.";
+  }
+  return "Suite asks once for this version and remembers your answer, including a refusal.";
+}
+
+async function ensurePackConsent(pack: PackInfo, capability: PackCapability): Promise<boolean> {
+  const request = consentRequestFor(pack, capability);
+  return consentService().ensure(request, () => askConsent(pack, capability));
 }
 
 function libraryService(): LibraryWatch {
@@ -569,7 +697,7 @@ function installedVersionViews(): readonly InstalledVersionView[] {
 
 /** Replace the window's pack data from the module's last scan. */
 function publishPackData(): void {
-  window?.setPackData(packs, catalogueView(), installedVersionViews(), catalogueSource);
+  window?.setPackData(packViews(), catalogueView(), installedVersionViews(), catalogueSource);
 }
 
 function themeView(): ThemeView {
@@ -645,7 +773,7 @@ function openWindow(): void {
   }
   let created: ShellWindow | null = null;
   created = new ShellWindow({
-    packs,
+    packs: packViews(),
     catalogue: catalogueView(),
     catalogueSource,
     installedVersions: installedVersionViews(),
@@ -711,6 +839,18 @@ function registerIpc(): void {
   onChrome(CHROME_IPC.installCataloguePack, async (id, version) => {
     if (typeof id !== "string" || typeof version !== "string") return;
     await installPackFromCatalogue(id, version);
+  });
+  onChrome(CHROME_IPC.reaskConsent, async (id, capability) => {
+    if (typeof id !== "string" || !isPackCapability(capability)) return;
+    const pack = packs.find((candidate) => candidate.id === id);
+    if (pack === undefined) return;
+    // The person cleared the answer by choosing this on the card, so the next
+    // `ensure` asks. A pack has no path to this call.
+    await consentService().forget(consentRequestFor(pack, capability));
+    await ensurePackConsent(pack, capability);
+    publishPackData();
+    await reminderScheduler?.refresh();
+    return window?.state();
   });
   onChrome(CHROME_IPC.importRevocation, async () => {
     await importRevocationFromFile();
@@ -866,11 +1006,16 @@ function registerIpc(): void {
       libraryService().unsubscribe(sender.tabId);
     }
   });
-  onPack(PACK_IPC.listRecents, (sender) => {
+  onPack(PACK_IPC.listRecents, async (sender) => {
     if (!packAllows(sender.pack, "recents")) {
       throw new Error("the recents capability is not enabled for this pack");
     }
-    return recentsService().list(recentsScopeFor(sender), () => askRecentsPermission(sender));
+    const allowed = await ensurePackConsent(sender.pack, "recents");
+    publishPackData();
+    if (!allowed) {
+      throw new ConsentDeniedError(CAPABILITY_DENIALS.recents ?? "Recent documents are off.");
+    }
+    return recentsService().list(recentsScopeFor(sender));
   });
   onPack(PACK_IPC.forgetRecent, async (sender, id) => {
     if (!packAllows(sender.pack, "recents") || typeof id !== "string") return;
@@ -1014,30 +1159,6 @@ function externalDialog(): ExternalDialog {
 }
 
 /**
- * Ask once for the recent list, and remember the answer with the list.
- *
- * This is the same first-use question the reminder permission asks (S4.2): the
- * host asks on behalf of one pack, records the answer and never asks again. The
- * shell has no general consent record (S4.3), so the answer lives beside the
- * rows it gates rather than in a shared grant file.
- */
-async function askRecentsPermission(sender: PackSender): Promise<boolean> {
-  if (window === null) return false;
-  const answer = await dialog.showMessageBox(window.window, {
-    type: "question",
-    title: "Allow recent files?",
-    message: `${sender.pack.name} wants to read the host's recent-files list.`,
-    detail:
-      "Suite records which document was opened and when, never its contents. The app sees names for its own documents; another app's row shows only the app and time.",
-    buttons: ["Don't allow", "Allow"],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true,
-  });
-  return answer.response === 1;
-}
-
-/**
  * Ask for one archive, verify it, install it, and redraw the launcher.
  *
  * The picker is host chrome. A pack never gets a path, and this IPC is not in the
@@ -1114,6 +1235,7 @@ async function installPackFromFile(): Promise<void> {
       packTrustOptions(),
     );
     const previous = before.find((pack) => pack.id === installed.id) ?? null;
+    await recordInstallConsent(installed);
     await refreshPacks();
     publishPackData();
     const opened = shouldOpenAfterInstall(current.state().tabs, installed.id);
@@ -1127,6 +1249,25 @@ async function installPackFromFile(): Promise<void> {
     );
   } catch (error) {
     current.setNotice(installRefusal(error));
+  }
+}
+
+/**
+ * Record the install-time capabilities after a verified install.
+ *
+ * The confirmation showed the publisher, id, version and capability list, so an
+ * `install`-tier capability is answered. First-use and token capabilities are
+ * deliberately left unanswered; they are asked where they are used.
+ */
+async function recordInstallConsent(pack: InstalledPackInfo): Promise<void> {
+  if (consentRecord === null) return;
+  try {
+    await consentRecord.recordInstall({
+      pack: { publisherId: pack.publisher.id, packId: pack.id, version: pack.version },
+      capabilities: pack.capabilities,
+    });
+  } catch (error) {
+    console.warn("[shell] the install consent could not be recorded", error);
   }
 }
 
@@ -1414,6 +1555,7 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
       packTrustOptions(),
       { replace: action === "reinstall" },
     );
+    await recordInstallConsent(installed);
     await refreshPacks();
     publishPackData();
 
@@ -1480,6 +1622,15 @@ async function uninstallPackVersionFrom(id: string, version: string): Promise<vo
   }
 
   await refreshPacks();
+  // A pack id with no version left is removed, so its consent goes too. An
+  // older version kept after an update still holds the record it was granted.
+  if (!installedVersions.some((entry) => entry.id === id)) {
+    await consentService()
+      .clearForPack(id)
+      .catch((error: unknown) => {
+        console.warn("[shell] the consent record could not be cleared for a removed pack", error);
+      });
+  }
   publishPackData();
   const closed =
     plan.closeTabs.length > 0
@@ -1500,10 +1651,35 @@ const reminderClock: ReminderClock = {
 };
 
 /**
+ * The notification token's remembered answer, without opening a dialog.
+ *
+ * `prompt` means unanswered or past the token's thirty days; the scheduler asks
+ * through the one consent surface. A denial is returned and shown, never
+ * re-asked by the pack.
+ */
+function reminderPermissionFor(packId: string): ReminderPermission {
+  if (!Notification.isSupported()) return "unsupported";
+  const pack = packs.find((candidate) => candidate.id === packId);
+  if (pack === undefined) return "denied";
+  const state = consentService().state(consentRequestFor(pack, "notifications"));
+  if (state === "granted") return "granted";
+  if (state === "denied") return "denied";
+  return "prompt";
+}
+
+async function ensureReminderConsent(packId: string): Promise<ReminderPermission> {
+  if (!Notification.isSupported()) return "unsupported";
+  const pack = packs.find((candidate) => candidate.id === packId);
+  if (pack === undefined) return "denied";
+  return (await ensurePackConsent(pack, "notifications")) ? "granted" : "denied";
+}
+
+/**
  * Start the host scheduler.
  *
  * It reads only the queue. A denied or unsupported permission is a sentence on
- * Home, not a silently lost reminder; the rows stay queued until a later grant.
+ * Home and a refusal on the pack's card, not a silently lost reminder; the rows
+ * stay queued until the person asks again from that card.
  */
 function startReminderScheduler(): void {
   const queue = reminderQueue;
@@ -1524,8 +1700,13 @@ function startReminderScheduler(): void {
     queue,
     clock: reminderClock,
     delivery,
+    consent: {
+      state: reminderPermissionFor,
+      ensure: ensureReminderConsent,
+    },
     onPermission: (permission) => {
       window?.setReminderStatus(reminderSentence(permission));
+      publishPackData();
     },
     onFailed: (row, error) => {
       console.warn(`[shell] the reminder “${row.title}” failed`, error);
@@ -1541,28 +1722,13 @@ function startReminderScheduler(): void {
 /**
  * The Electron platform.
  *
- * Electron's main-process `Notification` has no permission probe, so the host
- * asks the person once and records the answer with the queue. A system with no
- * notification channel answers `unsupported`; a denial is visible on Home.
+ * Electron's main-process `Notification` has no permission probe. The consent
+ * question lives in the scheduler's surface, not here; this half only creates
+ * and shows a row. A system with no notification channel answers `unsupported`.
  */
 function reminderPlatform(): ReminderPlatform {
   return {
     isSupported: () => Notification.isSupported(),
-    ask: async (): Promise<ReminderPermission> => {
-      if (window === null) return "denied";
-      const answer = await dialog.showMessageBox(window.window, {
-        type: "question",
-        title: "Allow reminders?",
-        message: "Suite can show reminders from your apps after they are closed.",
-        detail:
-          "Suite schedules and shows the notification; the app only declares which tasks are reminders. Your system notification settings still apply.",
-        buttons: ["Don't show reminders", "Allow reminders"],
-        defaultId: 0,
-        cancelId: 0,
-        noLink: true,
-      });
-      return answer.response === 1 ? "granted" : "denied";
-    },
     create: (row) => {
       const notification = new Notification({
         title: row.title,

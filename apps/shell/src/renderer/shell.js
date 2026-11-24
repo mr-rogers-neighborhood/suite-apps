@@ -206,11 +206,23 @@ function countLabel(total, noun) {
   return total === 0 ? "" : `${total} ${noun}${total === 1 ? "" : "s"}`;
 }
 
+const CONSENT_LABELS = {
+  recents: "recent files",
+  notifications: "reminders",
+};
+
+function consentLabel(capability) {
+  return CONSENT_LABELS[capability] ?? capability;
+}
+
 function installedCard(pack) {
   const tile = element("div", "tile");
   const card = element("button", "card");
   card.type = "button";
   card.title = `Open ${pack.name}`;
+  const denials = Array.isArray(pack.consent)
+    ? pack.consent.filter((entry) => entry.answer === "denied")
+    : [];
 
   const top = element("div", "card-top");
   const dot = element("span", "card-dot");
@@ -245,10 +257,26 @@ function installedCard(pack) {
   if (pack.capabilities.length === 0) meta.append(element("span", "pill", "no capabilities"));
 
   card.append(top, description, ...(publisher === null ? [] : [publisher]), meta);
+  for (const consent of denials) {
+    card.append(
+      element(
+        "p",
+        "card-warning",
+        `You denied ${consentLabel(consent.capability)}. The host keeps that answer until you ask again.`,
+      ),
+    );
+  }
   card.addEventListener("click", () => run(api.openPack(pack.id)));
   tile.append(card);
 
   const actions = element("div", "tile-actions");
+  for (const consent of denials) {
+    actions.append(
+      actionButton(`Ask again about ${consentLabel(consent.capability)}`, () =>
+        run(api.reaskConsent(pack.id, consent.capability)),
+      ),
+    );
+  }
   const older = state.installedVersions.filter(
     (version) => version.id === pack.id && !version.current,
   );

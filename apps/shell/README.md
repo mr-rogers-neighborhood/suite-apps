@@ -11,6 +11,8 @@ it proves is:
 - renderer-only packs: no Node, no raw filesystem, no network unless the manifest declares it;
 - a scoped document API that carries opaque bytes and never a path;
 - a scoped `files` service with relative paths, host-owned backups and locks;
+- one host-owned consent record for every capability: install, first use, every use and token, with
+  a refusal shown on the pack's card and re-askable only there;
 - a host-owned reminder queue: a pack declares a projection, the host validates display rows and
   schedules them with the pack closed; a denial is visible and a removed pack takes its rows with it;
 - a user-consented external file surface: a host-owned picker, opaque handles, single-file import
@@ -50,7 +52,8 @@ directory is `packs/<id>/` beside the checkout and only loads when that switch i
 under Electron's `userData` directory (`~/.config/Suite/shell` on Linux); `SUITE_SHELL_DATA` and
 `SUITE_SHELL_USER_DATA` override the data and profile directories for a test. The local catalogue
 is `<dataRoot>/catalogue`; `SUITE_SHELL_CATALOGUE` points it at another directory. The publisher
-trust store is `<dataRoot>/trust/publishers.json`; `SUITE_SHELL_TRUST` points it elsewhere. The
+trust store is `<dataRoot>/trust/publishers.json` and the consent record is
+`<dataRoot>/trust/consent.json`; `SUITE_SHELL_TRUST` points both elsewhere. The
 catalogue index is `https://flatpak.suite.run/index.json`; `SUITE_SHELL_INDEX` points at another
 index or, with `none`, leaves only the local directory.
 
