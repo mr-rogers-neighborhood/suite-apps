@@ -5,11 +5,15 @@ Planner's renderer built as a signed desktop pack. The layout is the convention 
 steps live in [the pack authoring reference](../../../docs/reference/pack-authoring.md).
 
 - `manifest.json` is the source manifest; its version tracks `apps/planner/package.json`, and its
-  `documents` entry declares the workspace at `SCHEMA_VERSION` from `@suite/planner-core`.
+  `documents` entry declares the workspace at `SCHEMA_VERSION` from `@suite/planner-core` with the
+  `reminders` projection.
 - `src/prelude.ts` installs `window.suitePlanner` over the host's `window.suite`; `src/main.ts`
   imports it before the renderer.
 - `src/bridge.ts` is the adapter: the host document envelope carries a Loro snapshot unchanged, and
   the pack owns the schema, the debounced snapshot writes and export/import.
+- `src/projection.ts` is the declared reminder projection: it returns display rows from one
+  snapshot and never schedules, polls or shows a notification. The host calls it on save and on
+  open, then owns the queue and delivery.
 - `src/PackRender.test.tsx` mounts Planner's own renderer over the same services the shell's preload
   exposes and exercises a task, a day page, and an export/import pair.
 - `vite.config.ts` builds into `apps/planner/.dev/pack`, outside this source tree.

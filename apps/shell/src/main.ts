@@ -2,9 +2,9 @@ import { mkdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/desktop";
-import { isPublisherKeyTrusted, SUITE_PUBLISHER_ID } from "@suite/pack";
+import { isPublisherKeyTrusted, type PackDocument, SUITE_PUBLISHER_ID } from "@suite/pack";
 import { cssVariables, defaultTheme } from "@suite/theme";
-import { app, dialog, ipcMain, nativeTheme, net, protocol } from "electron";
+import { app, dialog, ipcMain, Notification, nativeTheme, net, protocol } from "electron";
 import {
   type CataloguePack,
   catalogueEntry,
@@ -13,6 +13,7 @@ import {
   loadCatalogue,
 } from "./catalogue.js";
 import { LAUNCHER_CONTEXT, suiteLinkFromArgv } from "./deepLink.js";
+import { DocumentMigrations, findDocument } from "./documentMigrations.js";
 import { DocumentStore, declaredDocumentSchemaVersion } from "./documents.js";
 import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
@@ -68,6 +69,16 @@ import {
   preinstalledTrustStore,
   trustRootFor,
 } from "./publisherTrust.js";
+import { createReminderDelivery, type ReminderPlatform } from "./reminderDelivery.js";
+import { RendererProjectionRunner, registerProjectionChannels } from "./reminderProjections.js";
+import {
+  type ProjectedReminder,
+  parseProjectedReminders,
+  type ReminderClock,
+  type ReminderPermission,
+  ReminderQueue,
+  ReminderScheduler,
+} from "./reminders.js";
 import { ScreenStore } from "./screens.js";
 import { type PackSender, packSender } from "./senders.js";
 import {
@@ -141,6 +152,9 @@ let catalogue: readonly CataloguePack[] = [];
 let catalogueSource = "The local catalogue directory is in use.";
 let installedVersions: readonly InstalledVersion[] = [];
 let pendingDeepLink: string | null = null;
+/** The host-owned reminder queue. A pack's rows outlive the pack being closed. */
+let reminderQueue: ReminderQueue | null = null;
+let reminderScheduler: ReminderScheduler | null = null;
 
 /** The compressed archive cap this host opens from the picker. The reader enforces its own entry limits too. */
 const MAX_INSTALL_BYTES = MAX_ARCHIVE_BYTES;
@@ -190,6 +204,7 @@ if (!gotLock) {
     }
   });
   app.on("before-quit", () => {
+    reminderScheduler?.stop();
     void spaceStore?.flush().catch((error: unknown) => {
       console.warn("[shell] space document flush failed", error);
     });
@@ -227,6 +242,9 @@ async function bootstrap(): Promise<void> {
       console.warn("[shell] the revocation advisories could not be opened", error);
       return [];
     });
+  // The reminder queue is host state under the profile, not pack data. Opening it
+  // before the pack scan lets a removed pack's rows be pruned in the same pass.
+  reminderQueue = await ReminderQueue.open(join(dataRoot, "reminders.json"));
   // The catalogue is a drop directory. Creating it is a convenience; an absent
   // or overridden path still scans as an empty catalogue.
   await mkdir(catalogueRootFor(dataRoot, process.env), { recursive: true }).catch(
@@ -255,6 +273,7 @@ async function bootstrap(): Promise<void> {
   registerIpc();
   nativeTheme.on("updated", () => window?.setTheme(themeView()));
   openWindow();
+  startReminderScheduler();
 
   const startupLink = pendingDeepLink ?? suiteLinkFromArgv(process.argv);
   pendingDeepLink = null;
@@ -405,6 +424,7 @@ async function refreshPacks(): Promise<void> {
 
   packs = mergePackSources({ installed: scan.packs, development });
   installedVersions = scan.versions;
+  await pruneReminders();
   console.info(
     `[shell] ${packs.length} pack(s) available; ${catalogue.length} catalogue archive(s)`,
   );
@@ -477,6 +497,7 @@ function serveProtocols(): void {
 }
 
 function registerIpc(): void {
+  registerProjectionChannels();
   onChrome(CHROME_IPC.state, () => window?.state());
   onChrome(CHROME_IPC.openPack, async (packId) => {
     if (typeof packId !== "string") return;
@@ -570,18 +591,22 @@ function registerIpc(): void {
       schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, name),
     });
   });
-  onPack(PACK_IPC.openDocument, (sender, id) => {
+  onPack(PACK_IPC.openDocument, async (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
-    return documentsFor(sender).open(sender.containerId, sender.packId, id, {
+    const opened = await documentsFor(sender).open(sender.containerId, sender.packId, id, {
       schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, id),
     });
+    if (opened !== null) await refreshPackReminders(sender, id);
+    return opened;
   });
-  onPack(PACK_IPC.saveDocument, (sender, id, bytes) => {
+  onPack(PACK_IPC.saveDocument, async (sender, id, bytes) => {
     if (!packAllows(sender.pack, "documents")) return undefined;
     if (typeof id !== "string" || !(bytes instanceof Uint8Array)) return undefined;
-    return documentsFor(sender).save(sender.containerId, sender.packId, id, bytes, {
+    const saved = await documentsFor(sender).save(sender.containerId, sender.packId, id, bytes, {
       schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, id),
     });
+    await refreshPackReminders(sender, id);
+    return saved;
   });
   onPack(PACK_IPC.removeDocument, (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
@@ -1162,6 +1187,174 @@ async function uninstallPackVersionFrom(id: string, version: string): Promise<vo
   window.setNotice(
     `${id} ${version} was removed. Its documents and files were left in place.${closed}`,
   );
+}
+
+/** The wall clock. The scheduler is tested with a fake one in `reminders.test.ts`. */
+const reminderClock: ReminderClock = {
+  now: () => Date.now(),
+  setTimer: (at, fire) => {
+    const timer = setTimeout(fire, Math.max(0, at - Date.now()));
+    return { cancel: () => clearTimeout(timer) };
+  },
+};
+
+/**
+ * Start the host scheduler.
+ *
+ * It reads only the queue. A denied or unsupported permission is a sentence on
+ * Home, not a silently lost reminder; the rows stay queued until a later grant.
+ */
+function startReminderScheduler(): void {
+  const queue = reminderQueue;
+  if (queue === null) return;
+
+  const delivery = createReminderDelivery(reminderPlatform(), {
+    onRoute: (row) => {
+      window?.focus();
+      handleDeepLink(row.deepLink);
+    },
+    onFailed: (row, message) => {
+      console.warn(`[shell] the reminder “${row.title}” could not be shown: ${message}`);
+      window?.setReminderStatus(`“${row.title}” could not be shown.`);
+    },
+  });
+
+  reminderScheduler = new ReminderScheduler({
+    queue,
+    clock: reminderClock,
+    delivery,
+    onPermission: (permission) => {
+      window?.setReminderStatus(reminderSentence(permission));
+    },
+    onFailed: (row, error) => {
+      console.warn(`[shell] the reminder “${row.title}” failed`, error);
+      window?.setReminderStatus(`“${row.title}” could not be shown.`);
+    },
+  });
+
+  void reminderScheduler.start().catch((error: unknown) => {
+    console.warn("[shell] the reminder scheduler did not start", error);
+  });
+}
+
+/**
+ * The Electron platform.
+ *
+ * Electron's main-process `Notification` has no permission probe, so the host
+ * asks the person once and records the answer with the queue. A system with no
+ * notification channel answers `unsupported`; a denial is visible on Home.
+ */
+function reminderPlatform(): ReminderPlatform {
+  return {
+    isSupported: () => Notification.isSupported(),
+    ask: async (): Promise<ReminderPermission> => {
+      if (window === null) return "denied";
+      const answer = await dialog.showMessageBox(window.window, {
+        type: "question",
+        title: "Allow reminders?",
+        message: "Suite can show reminders from your apps after they are closed.",
+        detail:
+          "Suite schedules and shows the notification; the app only declares which tasks are reminders. Your system notification settings still apply.",
+        buttons: ["Don't show reminders", "Allow reminders"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      return answer.response === 1 ? "granted" : "denied";
+    },
+    create: (row) => {
+      const notification = new Notification({
+        title: row.title,
+        ...(row.body.length > 0 ? { body: row.body } : {}),
+        urgency: "normal",
+      });
+      return {
+        onClick: (listener) => {
+          notification.on("click", listener);
+        },
+        onFailed: (listener) => {
+          notification.on("failed", (_event, error) => listener(error));
+        },
+        show: () => notification.show(),
+      };
+    },
+  };
+}
+
+function reminderSentence(permission: ReminderPermission): string | null {
+  if (permission === "denied") {
+    return "Reminders are off: Suite is not allowed to show notifications.";
+  }
+  if (permission === "unsupported") {
+    return "Reminders are not available on this system.";
+  }
+  return null;
+}
+
+/**
+ * Refresh one pack's rows from its declared projection.
+ *
+ * Called on save and on open, and nowhere else: a background refresh would be
+ * the pack running by another name. A transport failure keeps the last good
+ * rows; a projection that returns an invalid row removes them, because the host
+ * will not schedule a row it cannot trust.
+ */
+async function refreshPackReminders(sender: PackSender, documentId: string): Promise<void> {
+  const queue = reminderQueue;
+  if (queue === null || !packAllows(sender.pack, "notifications")) return;
+
+  let declaration: PackDocument | null = null;
+  try {
+    declaration = findDocument(sender.pack.documents ?? [], documentId);
+  } catch {
+    return;
+  }
+  if (declaration.projection === undefined) return;
+
+  let projected: Uint8Array;
+  try {
+    projected = await new DocumentMigrations(documentsFor(sender)).project(
+      { containerId: sender.containerId, packId: sender.packId },
+      sender.pack.documents ?? [],
+      documentId,
+      new RendererProjectionRunner(sender),
+    );
+  } catch (error) {
+    console.warn(`[shell] ${sender.packId} did not project its reminders`, error);
+    return;
+  }
+
+  let rows: readonly ProjectedReminder[];
+  try {
+    rows = parseProjectedReminders(decodeProjection(projected), sender.packId);
+  } catch (error) {
+    console.warn(`[shell] ${sender.packId} projected an invalid reminder row`, error);
+    await queue.removePack(sender.packId);
+    await reminderScheduler?.refresh();
+    return;
+  }
+
+  await queue.replacePack(sender.packId, rows, Date.now());
+  await reminderScheduler?.refresh();
+}
+
+/** Drop rows for packs that are gone, or that no longer declare notifications. */
+async function pruneReminders(): Promise<void> {
+  const queue = reminderQueue;
+  if (queue === null) return;
+  const allowed = new Set(
+    packs.filter((pack) => pack.capabilities.includes("notifications")).map((pack) => pack.id),
+  );
+  await queue.prune(allowed);
+  await reminderScheduler?.refresh();
+}
+
+function decodeProjection(bytes: Uint8Array): unknown {
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new Error("the projection did not return JSON");
+  }
 }
 
 function onChrome<T>(channel: string, handler: (...args: unknown[]) => T): void {

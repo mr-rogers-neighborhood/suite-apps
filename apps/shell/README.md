@@ -10,6 +10,8 @@ separate Flatpaks. The point of this tree is to prove the host boundary before a
 - renderer-only packs: no Node, no raw filesystem, no network unless the manifest declares it;
 - a scoped document API that carries opaque bytes and never a path;
 - a scoped `files` service with relative paths, host-owned backups and locks;
+- a host-owned reminder queue: a pack declares a projection, the host validates display rows and
+  schedules them with the pack closed; a denial is visible and a removed pack takes its rows with it;
 - a user-consented external file surface: a host-owned picker, opaque handles and import;
 - a catalogue that reads local `.suitepack` files and the operator-signed published index, with
   verified install/refusal entries;

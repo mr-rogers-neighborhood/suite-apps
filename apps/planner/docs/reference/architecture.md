@@ -67,11 +67,13 @@ id on load), `.planner` serializer, workspace directory and rolling backup.
 authority and writes it, then broadcasts `workspace:replaced` with a new snapshot. The renderer
 replaces its replica and re-subscribes.
 
-**Reminders.** Main keeps its own document, so the scheduler ticks with no window open. A due task
-gets `remindedAt` as a leaf write, which is what stops it repeating. Changing or clearing
-`remindAt` resets `remindedAt`, so a new time is a new reminder rather than one the app believes it
-already delivered. A pack has no main process scheduler: the renderer hands the pending set over
-`syncReminders` and the host cancels any id that is no longer in it.
+**Reminders.** In the released Flatpak main keeps its own document, so the scheduler ticks with no
+window open. A due task gets `remindedAt` as a leaf write, which is what stops it repeating.
+Changing or clearing `remindAt` resets `remindedAt`, so a new time is a new reminder rather than one
+the app believes it already delivered. The pack has no scheduler and no timer: the manifest declares
+the `reminders` projection, the pack binds it, and the host calls it on save and on open to receive
+display rows. The host owns the queue, permission, delivery and click route; the pack resolves a
+clicked `suite://planner/task/<id>` once it is running.
 
 ## Navigation
 

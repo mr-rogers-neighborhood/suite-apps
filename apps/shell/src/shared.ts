@@ -67,6 +67,29 @@ export const PACK_IPC = {
   openExternal: "suite:pack:open-external",
 } as const;
 
+/**
+ * The declared-entry channels (S6.3).
+ *
+ * The host invokes a manifest's projection entry in the pack's own renderer,
+ * scoped to one document. `read` is the host's answer to the handle the pack
+ * receives; `done` and `failed` end the call. `register` tells the host the
+ * pack has bound an entry, so a save does not wait for a handler that will
+ * never answer.
+ */
+export const PACK_PROJECTION = {
+  invoke: "suite:projection:invoke",
+  register: "suite:projection:register",
+  unregister: "suite:projection:unregister",
+  read: "suite:projection:read",
+  done: "suite:projection:done",
+  failed: "suite:projection:failed",
+} as const;
+
+/** Main-process pushes a pack may listen for. */
+export const PACK_EVENT = {
+  deepLink: "suite:pack:deep-link",
+} as const;
+
 export type {
   FileEntry,
   FileFilter,
@@ -76,6 +99,9 @@ export type {
   FileReadOptions,
   FileWriteOptions,
   PackLaunchContext,
+  ProjectedReminder,
+  ProjectionDocument,
+  ProjectionsService,
 } from "@suite/pack-runtime";
 export { PACK_CAPABILITIES, type PackCapability };
 
@@ -255,6 +281,8 @@ export interface ShellState {
   readonly installedVersions: readonly InstalledVersionView[];
   readonly theme: ThemeView;
   readonly notice: string | null;
+  /** A host sentence about reminders, such as a denied permission. Null is the quiet state. */
+  readonly reminderStatus: string | null;
 }
 
 /** A document as the host lists it. `id` is a file name inside the pack's root. */

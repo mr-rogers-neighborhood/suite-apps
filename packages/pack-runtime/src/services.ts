@@ -161,6 +161,38 @@ export interface NotificationsService {
   cancelAll(): Promise<void>;
 }
 
+/** The read-only handle a declared projection receives. It names one document and no path. */
+export interface ProjectionDocument {
+  readonly id: string;
+  readonly version: number;
+  read(): Promise<Uint8Array>;
+}
+
+/** One display row a projection returns. The host adds the pack id and capture time. */
+export interface ProjectedReminder {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  /** Epoch milliseconds, not a wall-clock string. */
+  readonly at: number;
+  /** A `suite://<pack-id>/...` link the host routes on click. */
+  readonly deepLink: string;
+}
+
+/**
+ * The pack-owned half of a declared projection (S6.3).
+ *
+ * A pack binds the entry its manifest names. The host calls only that entry,
+ * with a handle scoped to the document it already resolved. The pack formats
+ * the rows; the host schedules and delivers them.
+ */
+export interface ProjectionsService {
+  register(
+    entry: string,
+    handler: (document: ProjectionDocument) => Promise<readonly ProjectedReminder[]>,
+  ): Disposable;
+}
+
 export interface DocumentSummary {
   readonly id: string;
   readonly name: string;
@@ -225,6 +257,7 @@ export interface PackHost {
   readonly relay: RelayService;
   readonly commands: CommandsService;
   readonly notifications: NotificationsService;
+  readonly projections: ProjectionsService;
   readonly theme: ThemeTokens;
   readonly lifecycle: Lifecycle;
 }

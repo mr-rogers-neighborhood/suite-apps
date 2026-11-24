@@ -139,6 +139,13 @@ export type PlannerBridge = {
   onWorkspaceReplaced(listener: (snapshot: Uint8Array) => void): () => void;
   onReminder(listener: (reminder: ReminderEvent) => void): () => void;
   /**
+   * A Suite link the host routes to this tab while it is already open.
+   *
+   * The first launch arrives through `launch()` before the renderer starts; this
+   * subscription is for the reminder click that arrives after it.
+   */
+  onDeepLink?(listener: (url: string) => void): () => void;
+  /**
    * Hand the pending reminders to the host, when the host can deliver them.
    *
    * Absent on the desktop app, whose main process runs the scheduler itself and can notify while

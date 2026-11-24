@@ -5,13 +5,14 @@
   "version": "0.5.1",
   "entry": "index.html",
   "contractVersion": 1,
-  "capabilities": ["documents", "files"],
+  "capabilities": ["documents", "files", "notifications"],
   "documents": [
     {
       "id": "workspace",
       "format": "suite.planner",
       "version": 2,
-      "mode": "multi"
+      "mode": "multi",
+      "projection": "reminders"
     }
   ]
 }

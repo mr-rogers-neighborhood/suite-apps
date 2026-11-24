@@ -108,8 +108,8 @@ The rules that shape the Suite host.
   applies to every name. The entry is pack code and runs in the pack's renderer; the main process
   never imports pack code and never parses the payload. The envelope's schema version records a
   completed step, so a second run writes nothing; a failed entry restores the one backup, so the old
-  document stays readable. The runner is injected, so binding it to a pack renderer is the remaining
-  seam.
+  document stays readable. A declared projection is bound to the pack's own renderer
+  (`reminderProjections.ts`); a migration entry still waits for its own write handle.
 - A pack's blobs are three content-addressed class stores under
   `blobs/<container>/<pack>/<class>/<sha256>`; see
   [Blobs and export](../../../docs/reference/decisions.md#blobs-and-export). `blobs.ts` re-hashes a
@@ -120,6 +120,23 @@ The rules that shape the Suite host.
   under the same pack root.
 - `documents` and `files` are separate services with separate roots and capabilities. A pack cannot
   list, open, save, read or remove another pack's documents or files, even if it knows the name.
+
+## Reminders
+
+- A reminder is host mechanism with pack meaning. The pack declares a projection in its manifest
+  (`documents[].projection`) and binds that entry in its prelude; the host calls it on save and on
+  open with a read-only handle, and receives display rows: id, title, body, instant and deep link.
+  The pack never schedules, polls or formats a notification.
+- The host owns the queue at `<dataRoot>/reminders.json` (permission, ask time and rows). A row
+  carries the pack id and a captured-at time. The queue survives the pack closing and a host
+  restart, and the scheduler reads only the rows, so nothing runs when the pack is closed.
+- The host asks for notification permission once and records the answer. A denial or an unsupported
+  system is a sentence on Home, not a silent drop; the rows stay queued for a later grant.
+- Rows are refreshed only on save and on open. A projection that returns invalid rows removes the
+  pack's rows; a transport failure keeps the last good rows. A click focuses the host and routes the
+  deep link, and the pack resolves it once it is running.
+- Removing a pack's last version prunes its rows; a pack that drops `notifications` loses them too.
+  Nothing outlives its pack.
 
 ## UI ownership
 

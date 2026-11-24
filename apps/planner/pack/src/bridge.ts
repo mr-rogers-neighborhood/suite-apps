@@ -1,14 +1,20 @@
-import type { DocumentsService, FileHandle, FilesService } from "@suite/pack-runtime";
+import type {
+  DocumentsService,
+  FileHandle,
+  FilesService,
+  PackLaunchContext,
+  ProjectionsService,
+} from "@suite/pack-runtime";
 import {
   decodeWorkspaceFile,
   type ExportResult,
   encodeWorkspaceFile,
   type ImportResult,
   type PlannerBridge,
-  type ReminderSchedule,
   WorkspaceDocument,
   type WorkspaceInfo,
 } from "@suite/planner-core";
+import { projectReminders, REMINDER_PACK_ID, REMINDER_PROJECTION } from "./projection";
 
 /**
  * Planner's bridge, built out of the host's `window.suite` services.
@@ -60,10 +66,16 @@ interface PackLifecycle {
  * person sees in the app's error modal.
  */
 export interface PlannerPackHost {
+  readonly packId?: string | undefined;
   readonly documents?: DocumentsService | undefined;
   readonly files?: Partial<FilesService> | undefined;
   readonly info?: (() => Promise<SuiteInfo>) | undefined;
   readonly lifecycle?: PackLifecycle | undefined;
+  readonly launch?: (() => Promise<PackLaunchContext>) | undefined;
+  /** A link the host routes to this tab while it is already open. */
+  readonly onDeepLink?: ((listener: (url: string) => void) => () => void) | undefined;
+  /** The declared-projection seam. The host calls the entry the manifest names. */
+  readonly projections?: ProjectionsService | undefined;
 }
 
 export interface PlannerPackOptions {
@@ -122,6 +134,19 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
   let opening: Promise<void> | null = null;
   const replacements = new Set<(snapshot: Uint8Array) => void>();
   const cleanups: Array<() => void> = [];
+  const packId = host.packId ?? REMINDER_PACK_ID;
+
+  // The manifest names `reminders`. The pack binds that entry; the host supplies
+  // a read-only handle for the document it already resolved. A projection that
+  // runs on save must not schedule, poll or show anything itself.
+  if (host.projections !== undefined) {
+    cleanups.push(
+      host.projections.register(REMINDER_PROJECTION, async (projected) => {
+        const bytes = await projected.read();
+        return projectReminders(bytes, { packId, now: clock() });
+      }),
+    );
+  }
 
   function fail(context: string, error: unknown): void {
     console.error(`Suite Planner pack: ${context}`, error);
@@ -417,14 +442,9 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
       return () => undefined;
     },
 
-    // This host has no notification service, so the app says reminders are unavailable instead of
-    // pretending they are scheduled. It is a capability gap, not a private path.
-    async syncReminders(_reminders: readonly ReminderSchedule[]) {
-      return { permission: "unsupported" };
-    },
-
-    async requestNotifications() {
-      return "unsupported";
+    // A reminder click on an already-open tab arrives here, not in `launch()`.
+    onDeepLink(listener) {
+      return host.onDeepLink?.(listener) ?? (() => undefined);
     },
 
     onCommand() {

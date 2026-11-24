@@ -349,6 +349,8 @@ suite stays separate Flatpaks plus Start.
 - Sync is a server the user runs. It persists and authenticates; it does not own the truth.
 - Collaboration is a session while devices are connected. A sleeping device may be signalled, but it
   is never woken to accept document data or a write.
-- A reminder is a delivery, not a subscription: the container passes a title and a time to the
-  platform, stores nothing, and carries nothing on the next launch. A pack asks again, and a denied
-  permission is shown rather than swallowed.
+- A reminder is a delivery, not a subscription. On a desktop host the host keeps the rows a pack
+  projects, so a reminder fires while the pack is closed and survives a host restart; the pack never
+  schedules, polls or formats a notification. A denied permission is shown rather than swallowed.
+  A host may instead hand a reminder to the platform's alarm and keep nothing, as Suite Go does; the
+  pack declares the same rows either way.
