@@ -216,8 +216,10 @@ The public remote is one OSTree repository and one `summary`, and every channel 
 publication therefore does not sign from the local repository alone: with `--target s3 --publish` it
 first copies `refs/` and the metadata subset of `objects/` (`*.commit`, `*.commitmeta`,
 `*.commitmeta2`, `*.dirtree`, `*.dirmeta`) from the bucket into the repository `flatpak.mjs` built,
-then signs a summary naming every ref the refs tree holds. The refs this run did not build are its
-**foreign refs**; a nightly publication keeps stable and preview this way instead of replacing them.
+then signs a summary naming every ref the refs tree holds. The refs this build made are written back
+after the copy, so the merge cannot replace the branch being published with the previous commit; the
+signed summary names the new build. The refs this run did not build are its **foreign refs**; a
+nightly publication keeps stable and preview this way instead of replacing them.
 
 After signing, the publisher reads the refs the new summary advertises and refuses to upload when a
 merged ref is missing. A summary that omits a ref hides an install whose ref and objects are still in

@@ -83,6 +83,7 @@ import {
   invalidationCommand,
   normalizeRemoteUrl,
   preservedRefs,
+  restoreRefCommands,
   refsFromSummaryView,
   s3ConfigProblems,
   s3MergeCommands,
@@ -571,6 +572,9 @@ async function main() {
   // Every ref this build made, runtime and app, so a preserved-ref report does
   // not call this run's own runtime a channel it did not build.
   const builtRefs = refs.filter((ref) => ref.split("/")[3] === branch);
+  // The merge below copies the bucket's refs over these, so record what this
+  // build made before it starts; they are put back after the sync (D4.3).
+  const builtCommitRefs = builtRefs.map((ref) => ({ ref, commit: commitOf(repo, ref) }));
   const publishedCommits = onBranch
     .map((ref) => ({ ref, commit: commitOf(repo, ref) }))
     .sort((left, right) => left.ref.localeCompare(right.ref));
@@ -695,9 +699,15 @@ async function main() {
     ) {
       process.stdout.write("\n=== merge published refs ===\n");
       for (const step of s3MergeCommands({ repo, bucket })) runStep(step);
+      // The sync rewrote every ref the bucket also has, including this run's
+      // own branch. Put the built commits back before anything is signed.
+      for (const step of restoreRefCommands({ repo, builtRefs: builtCommitRefs })) runStep(step);
       mergedRefs = refsInRepo(repo);
-      foreign = foreignRefs(refs, mergedRefs);
-      process.stdout.write(`\nmerged ${foreign.length} ref(s) this run did not build\n`);
+      foreign = foreignRefs(builtRefs, mergedRefs);
+      process.stdout.write(
+        `\nmerged ${foreign.length} ref(s) this run did not build; ` +
+          `restored ${builtCommitRefs.length} built ref(s)\n`,
+      );
       for (const ref of foreign) process.stdout.write(`  + ${ref}\n`);
     } else {
       process.stdout.write("\nfirst publication: the bucket has no refs to merge\n");
