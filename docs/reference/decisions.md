@@ -336,6 +336,11 @@ suite stays separate Flatpaks plus Start.
 - **Consequence: staleness is a real state, not an edge case.** A declaration captured yesterday may
   describe a document that has since moved. The host refreshes a declaration on save and on open, and
   never later — a background refresh would be the pack running again by another name.
+- **A change notice is the host's, not a background pack.** When a document changes on disk while a
+  pack is closed, the host records the change itself and hands the pack a pending list on its next
+  start; while the pack is open the host watches and pushes ids. The pack never polls a directory and
+  is never woken to answer a question. "The library changed" is a fact the host observed, not a
+  projection the pack ran.
 - **Anti-pattern.** A proxy API that lets a pack perform a privileged act but own the policy invisibly:
   a pack-side scheduler, a pack that formats and posts its own notification through a generic channel,
   a pack that runs its own backup beside the host's. If two copies of a policy can disagree, the

@@ -121,6 +121,41 @@ The rules that shape the Suite host.
 - `documents` and `files` are separate services with separate roots and capabilities. A pack cannot
   list, open, save, read or remove another pack's documents or files, even if it knows the name.
 
+## The person's files and library
+
+- The host owns where a document lives, so "show me my file" is a host action. A pack names a
+  document it already owns; `documents.reveal` resolves it with `DocumentStore.locate`, and the main
+  process opens the platform file manager at that absolute path. The pack receives the summary and
+  never the path. A missing document returns `null` and opens nothing.
+- The host records every open in a recent list at `<dataRoot>/recents.json`: one record across
+  packs, keyed by `(container, publisher, pack, document)`. The host never reads the document, so a
+  row is metadata: pack id, document name (the id) and the open time. A pack sees its own rows with a
+  document id, and another pack's row as pack id and time only — no document id and no name — because
+  S11.1 forbids one pack enumerating another's documents. The host's own launcher may still read the
+  whole record. `forget` deletes the row and leaves the document.
+- The recent record **survives a pack removal**. It is the person's history rather than the pack's
+  data, and the publisher id is part of the key, so a later install by another publisher under the
+  same pack id is a different app. Uninstalling does not silently erase where the person has been;
+  they remove a row with forget, or the app records a fresh open.
+- `recents` is a First use capability. The host asks once per pack, on the first list, and stores the
+  answer with the list (granted or denied, plus the ask time). A denial is a sentence, not an empty
+  list. This is the reminder queue's one-time question applied to the recent list; the general
+  consent record with a tier table (S4.3) is still absent, and the ledger says so.
+- The host watches a pack's own document directory only while one of its tabs is open. It keeps a
+  fingerprint per document at `<dataRoot>/library.json`, so `documents.pendingChanges` compares the
+  files with what the pack last saw and reports ids, including a change made while the pack was
+  closed or the host was off. The first look at a pack is a baseline, never a flood of "changed"
+  rows. While a tab is open the host pushes ids on the `suite:documents:changed` event; nothing is
+  delivered to a closed pack, and a pack never polls. The pack's own save is marked seen, so it is
+  not reported back to the pack as an external change.
+- Folder import is a host copy, not a pack read. `files.importFolder` opens a host directory picker,
+  walks the choice with the archive reader's discipline (safe relative names, regular files only, no
+  symlinks, bounded entry count, per-file size and total size), and only then writes into the pack's
+  own `files` root under `imports/<name>`. A refused import writes nothing and removes its partial
+  directory. The pack receives a relative destination and the `FileEntry` list; the source path is
+  spent in the main process. A second import gets a free name, and an explicit destination that
+  already exists is refused rather than merged.
+
 ## Reminders
 
 - A reminder is host mechanism with pack meaning. The pack declares a projection in its manifest

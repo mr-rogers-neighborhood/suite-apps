@@ -5,7 +5,7 @@
   "version": "0.1.12",
   "entry": "index.html",
   "contractVersion": 1,
-  "capabilities": ["documents", "files"],
+  "capabilities": ["documents", "files", "recents"],
   "documents": [
     {
       "id": "canvas",

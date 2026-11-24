@@ -470,6 +470,16 @@ export class ShellWindow {
     }
   }
 
+  /**
+   * Show a file the host owns in the platform file manager.
+   *
+   * The path is resolved by the document store in the main process; no pack ever
+   * sees it. The window is host chrome, so the action is the host's.
+   */
+  revealFile(path: string): void {
+    shell.showItemInFolder(path);
+  }
+
   focus(): void {
     if (this.#closed) return;
     if (this.window.isMinimized()) this.window.restore();

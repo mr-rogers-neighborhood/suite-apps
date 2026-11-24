@@ -7,7 +7,7 @@ import {
 import { describe, expect, it } from "vitest";
 import type { BridgeCreateRequest, BridgeSaveRequest } from "../../src/host/bridge";
 import { createCanvasPack } from "./bridge";
-import { memoryDocuments, memoryFiles, textOf } from "./test/fakeHost";
+import { memoryDocuments, memoryFiles, memoryRecents, textOf } from "./test/fakeHost";
 
 const WORKSPACE_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -241,16 +241,101 @@ describe("Canvas's pack bridge", () => {
     });
   });
 
-  it("lists the store as recents and refuses to delete a document to forget one", async () => {
+  it("lists the host's recents for its own documents and forgets a row without the canvas", async () => {
     const { workspace } = sample("A remembered board");
     const documents = memoryDocuments({
       "doc-a": envelopeOf(workspace, "doc-a"),
     });
-    const pack = createCanvasPack({ host: { documents }, boundaries: false });
+    const recents = memoryRecents([
+      { packId: "canvas", documentId: "doc-a", name: "doc-a", openedAt: 2_000 },
+      // Another pack's row: no document id, so this pack cannot open it.
+      { packId: "planner", documentId: null, name: null, openedAt: 1_500 },
+    ]);
+    const pack = createCanvasPack({ host: { documents, recents }, boundaries: false });
+
+    // Adopting the canvas is what remembers its display name; the recent row still carries only id.
+    await pack.bridge.loadDocument();
     const files = await pack.bridge.recentFiles();
     expect(files).toHaveLength(1);
+    expect(files[0]?.path).toBe("doc-a");
     expect(files[0]?.name).toBe("Pack workspace");
     expect(files[0]?.folder).toBe("Suite Canvas");
+
+    await pack.bridge.forgetRecent("doc-a");
+    expect(recents.forgotten).toEqual(["doc-a"]);
+    expect(documents.files.has("doc-a")).toBe(true);
+  });
+
+  it("notices a denied recent list instead of listing another pack's documents", async () => {
+    const recents = memoryRecents();
+    recents.deny = "Recent documents are off; this app may not read the host's recent list.";
+    const pack = createCanvasPack({
+      host: { documents: memoryDocuments(), recents },
+      boundaries: false,
+    });
+
+    await expect(pack.bridge.recentFiles()).resolves.toEqual([]);
+    expect(pack.notices().at(-1)).toContain("Recent files are unavailable");
+  });
+
+  it("reveals the open canvas through the host and never sees a path", async () => {
+    const { workspace } = sample("A revealed board");
+    const documents = memoryDocuments({ "doc-a": envelopeOf(workspace, "doc-a") });
+    const pack = createCanvasPack({ host: { documents }, boundaries: false });
+    await pack.bridge.loadDocument();
+
+    await expect(pack.reveal()).resolves.toBe(true);
+    expect(documents.revealed).toEqual(["doc-a"]);
+    expect(pack.notices().join(" ")).not.toContain("/");
+  });
+
+  it("imports a folder through the host's own copy", async () => {
+    const files = memoryFiles();
+    files.folder = {
+      path: "imports/vault",
+      entries: [
+        {
+          path: "imports/vault/Home.md",
+          name: "Home.md",
+          kind: "file",
+          size: 3,
+          mtimeMs: 1_000,
+        },
+      ],
+    };
+    const pack = createCanvasPack({
+      host: { documents: memoryDocuments(), files },
+      boundaries: false,
+    });
+
+    await expect(pack.importFolder()).resolves.toEqual(files.folder);
+    expect(files.folderCalls).toEqual([undefined]);
+  });
+
+  it("reads a change the host noticed while closed and pushes one while open", async () => {
+    const { workspace } = sample("A watched board");
+    const documents = memoryDocuments({ "doc-a": envelopeOf(workspace, "doc-a") });
+    documents.pending.push("doc-a");
+    const pack = createCanvasPack({ host: { documents }, boundaries: true });
+
+    await pack.bridge.loadDocument();
+    expect(pack.libraryChanges()).toEqual(["doc-a"]);
+    expect(pack.notices().at(-1)).toContain("changed on disk while Canvas was closed");
+
+    documents.emitChange(["doc-a"]);
+    expect(pack.libraryChanges()).toEqual(["doc-a"]);
+    expect(pack.notices().at(-1)).toContain("changed on disk. Reopen");
+
+    pack.dispose();
+  });
+
+  it("falls back to the store when a host has no recents service", async () => {
+    const { workspace } = sample("A legacy board");
+    const documents = memoryDocuments({ "doc-a": envelopeOf(workspace, "doc-a") });
+    const pack = createCanvasPack({ host: { documents }, boundaries: false });
+
+    const files = await pack.bridge.recentFiles();
+    expect(files[0]?.name).toBe("Pack workspace");
 
     await pack.bridge.forgetRecent("doc-a");
     expect(documents.files.has("doc-a")).toBe(true);

@@ -38,8 +38,9 @@ describe("Canvas's declared document", () => {
   });
 
   it("asks the host only for what it uses", () => {
-    // `documents` holds the workspace; `files` is the picker export and import cross. A documents
-    // folder, a recents service, a watch and sync are host gaps, not capabilities to claim.
-    expect(manifest.capabilities).toEqual(["documents", "files"]);
+    // `documents` holds the workspace and its reveal/watch surface; `files` is the picker export,
+    // import and folder import; `recents` is the host's recent list. The pack asks for no path and
+    // no filesystem of its own, and sync is still a host gap rather than a capability to claim.
+    expect(manifest.capabilities).toEqual(["documents", "files", "recents"]);
   });
 });

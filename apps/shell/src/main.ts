@@ -34,6 +34,7 @@ import {
   packInstallSummary,
   uninstallPackVersion,
 } from "./installedPacks.js";
+import { type LibraryScope, LibraryWatch, revealDocument } from "./library.js";
 import { planUninstall } from "./lifecycle.js";
 import { documentScopeLabel, documentsRootFor } from "./packIdentity.js";
 import {
@@ -69,6 +70,7 @@ import {
   preinstalledTrustStore,
   trustRootFor,
 } from "./publisherTrust.js";
+import { type RecentsScope, RecentsStore } from "./recents.js";
 import { createReminderDelivery, type ReminderPlatform } from "./reminderDelivery.js";
 import { RendererProjectionRunner, registerProjectionChannels } from "./reminderProjections.js";
 import {
@@ -87,10 +89,12 @@ import {
   CHROME_IPC,
   CHROME_ORIGIN,
   CHROME_SCHEME,
+  type DocumentSummary,
   type FileReadOptions,
   type FileRemoveOptions,
   type FileWriteOptions,
   type InstalledVersionView,
+  PACK_EVENT,
   PACK_IPC,
   PACK_SCHEME,
   type PackInfoView,
@@ -155,6 +159,9 @@ let pendingDeepLink: string | null = null;
 /** The host-owned reminder queue. A pack's rows outlive the pack being closed. */
 let reminderQueue: ReminderQueue | null = null;
 let reminderScheduler: ReminderScheduler | null = null;
+/** The host's recent list and the seen fingerprints its document watch compares. */
+let recentsStore: RecentsStore | null = null;
+let libraryWatch: LibraryWatch | null = null;
 
 /** The compressed archive cap this host opens from the picker. The reader enforces its own entry limits too. */
 const MAX_INSTALL_BYTES = MAX_ARCHIVE_BYTES;
@@ -245,6 +252,10 @@ async function bootstrap(): Promise<void> {
   // The reminder queue is host state under the profile, not pack data. Opening it
   // before the pack scan lets a removed pack's rows be pruned in the same pass.
   reminderQueue = await ReminderQueue.open(join(dataRoot, "reminders.json"));
+  // The recent list and the seen fingerprints are host state too. Both are
+  // opened before the pack scan so a pack that is gone leaves no live watch.
+  recentsStore = await RecentsStore.open(join(dataRoot, "recents.json"));
+  libraryWatch = await LibraryWatch.open(join(dataRoot, "library.json"));
   // The catalogue is a drop directory. Creating it is a convenience; an absent
   // or overridden path still scans as an empty catalogue.
   await mkdir(catalogueRootFor(dataRoot, process.env), { recursive: true }).catch(
@@ -364,6 +375,74 @@ function documentsFor(sender: PackSender): DocumentStore {
   return store;
 }
 
+function recentsService(): RecentsStore {
+  if (recentsStore === null) throw new Error("the recent list is not ready");
+  return recentsStore;
+}
+
+function libraryService(): LibraryWatch {
+  if (libraryWatch === null) throw new Error("the document library is not ready");
+  return libraryWatch;
+}
+
+function recentsScopeFor(sender: PackSender): RecentsScope {
+  return {
+    containerId: sender.containerId,
+    publisherId: sender.pack.publisher?.id ?? SUITE_PUBLISHER_ID,
+    packId: sender.packId,
+  };
+}
+
+function libraryScopeFor(sender: PackSender): LibraryScope {
+  return recentsScopeFor(sender);
+}
+
+/**
+ * Record a document the pack opened.
+ *
+ * The recent row is host state and the seen fingerprint keeps the watch honest,
+ * so neither is allowed to fail the open itself: a person losing a list is not a
+ * reason to lose the document.
+ */
+async function rememberOpened(
+  sender: PackSender,
+  document: Pick<DocumentSummary, "id" | "size" | "updatedAt">,
+): Promise<void> {
+  try {
+    await libraryService().markSeen(documentsFor(sender), libraryScopeFor(sender), [document]);
+    await recentsService().record(recentsScopeFor(sender), document.id, Date.now());
+  } catch (error) {
+    console.warn("[shell] the recent list could not be updated", error);
+  }
+}
+
+/** A save by the pack is not an external change, so it is marked seen. */
+async function markSeen(
+  sender: PackSender,
+  document: Pick<DocumentSummary, "id" | "size" | "updatedAt">,
+): Promise<void> {
+  try {
+    await libraryService().markSeen(documentsFor(sender), libraryScopeFor(sender), [document]);
+  } catch (error) {
+    console.warn("[shell] the document watch could not be updated", error);
+  }
+}
+
+async function forgetDocument(sender: PackSender, id: string): Promise<void> {
+  await Promise.all([
+    libraryService()
+      .forget(libraryScopeFor(sender), id)
+      .catch((error: unknown) => {
+        console.warn("[shell] the document watch could not forget a document", error);
+      }),
+    recentsService()
+      .forget(recentsScopeFor(sender), id)
+      .catch((error: unknown) => {
+        console.warn("[shell] the recent list could not forget a document", error);
+      }),
+  ]);
+}
+
 /**
  * Rebuild the catalogue from the published index, or from the local directory
  * when the index is unavailable.
@@ -472,6 +551,7 @@ function openWindow(): void {
     onViewClosed: (tabId) => {
       files?.releaseOwner(tabId);
       externalFiles?.releaseOwner(tabId);
+      libraryWatch?.unsubscribe(tabId);
     },
     onClosed: () => {
       if (window === created) window = null;
@@ -585,18 +665,23 @@ function registerIpc(): void {
     if (!packAllows(sender.pack, "documents")) return [];
     return documentsFor(sender).list(sender.containerId, sender.packId);
   });
-  onPack(PACK_IPC.createDocument, (sender, name) => {
+  onPack(PACK_IPC.createDocument, async (sender, name) => {
     if (!packAllows(sender.pack, "documents") || typeof name !== "string") return undefined;
-    return documentsFor(sender).create(sender.containerId, sender.packId, name, {
+    const created = await documentsFor(sender).create(sender.containerId, sender.packId, name, {
       schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, name),
     });
+    await rememberOpened(sender, created);
+    return created;
   });
   onPack(PACK_IPC.openDocument, async (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
     const opened = await documentsFor(sender).open(sender.containerId, sender.packId, id, {
       schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, id),
     });
-    if (opened !== null) await refreshPackReminders(sender, id);
+    if (opened !== null) {
+      await rememberOpened(sender, opened);
+      await refreshPackReminders(sender, id);
+    }
     return opened;
   });
   onPack(PACK_IPC.saveDocument, async (sender, id, bytes) => {
@@ -605,12 +690,57 @@ function registerIpc(): void {
     const saved = await documentsFor(sender).save(sender.containerId, sender.packId, id, bytes, {
       schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, id),
     });
+    await markSeen(sender, saved);
     await refreshPackReminders(sender, id);
     return saved;
   });
-  onPack(PACK_IPC.removeDocument, (sender, id) => {
+  onPack(PACK_IPC.removeDocument, async (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
-    return documentsFor(sender).remove(sender.containerId, sender.packId, id);
+    await documentsFor(sender).remove(sender.containerId, sender.packId, id);
+    await forgetDocument(sender, id);
+  });
+
+  // The four halves of the person's file and library surface. Each answers with
+  // ids or relative paths; the absolute path of a document stays in this process.
+  onPack(PACK_IPC.revealDocument, async (sender, id) => {
+    if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
+    return revealDocument(
+      documentsFor(sender),
+      { containerId: sender.containerId, packId: sender.packId },
+      id,
+      (path) => window?.revealFile(path),
+    );
+  });
+  onPack(PACK_IPC.pendingDocumentChanges, async (sender) => {
+    if (!packAllows(sender.pack, "documents")) return [];
+    return libraryService().pending(documentsFor(sender), libraryScopeFor(sender));
+  });
+  onPack(PACK_IPC.watchDocuments, async (sender, watching) => {
+    if (!packAllows(sender.pack, "documents")) return;
+    if (watching === true) {
+      await libraryService().subscribe(
+        documentsFor(sender),
+        libraryScopeFor(sender),
+        sender.tabId,
+        (documentIds) => {
+          if (!sender.webContents.isDestroyed()) {
+            sender.webContents.send(PACK_EVENT.documentsChanged, [...documentIds]);
+          }
+        },
+      );
+    } else {
+      libraryService().unsubscribe(sender.tabId);
+    }
+  });
+  onPack(PACK_IPC.listRecents, (sender) => {
+    if (!packAllows(sender.pack, "recents")) {
+      throw new Error("the recents capability is not enabled for this pack");
+    }
+    return recentsService().list(recentsScopeFor(sender), () => askRecentsPermission(sender));
+  });
+  onPack(PACK_IPC.forgetRecent, async (sender, id) => {
+    if (!packAllows(sender.pack, "recents") || typeof id !== "string") return;
+    await recentsService().forget(recentsScopeFor(sender), id);
   });
 
   onPack(PACK_IPC.listFiles, (sender, path) => {
@@ -677,6 +807,9 @@ function registerIpc(): void {
   onPack(PACK_IPC.importExternalFile, (sender, token, name) => {
     return externalService().importFile(sender, token, name);
   });
+  onPack(PACK_IPC.importExternalFolder, (sender, destination) => {
+    return externalService().importFolder(sender, destination);
+  });
 
   onPack(PACK_IPC.openExternal, (sender, url) => {
     if (typeof url !== "string") return;
@@ -733,7 +866,41 @@ function externalDialog(): ExternalDialog {
       if (selection.canceled) return null;
       return selection.filePath ?? null;
     },
+    async pickFolder() {
+      if (window === null) return null;
+      const selection = await dialog.showOpenDialog(window.window, {
+        title: "Import a folder",
+        buttonLabel: "Import",
+        properties: ["openDirectory"],
+      });
+      if (selection.canceled) return null;
+      return selection.filePaths[0] ?? null;
+    },
   };
+}
+
+/**
+ * Ask once for the recent list, and remember the answer with the list.
+ *
+ * This is the same first-use question the reminder permission asks (S4.2): the
+ * host asks on behalf of one pack, records the answer and never asks again. The
+ * shell has no general consent record (S4.3), so the answer lives beside the
+ * rows it gates rather than in a shared grant file.
+ */
+async function askRecentsPermission(sender: PackSender): Promise<boolean> {
+  if (window === null) return false;
+  const answer = await dialog.showMessageBox(window.window, {
+    type: "question",
+    title: "Allow recent files?",
+    message: `${sender.pack.name} wants to read the host's recent-files list.`,
+    detail:
+      "Suite records which document was opened and when, never its contents. The app sees names for its own documents; another app's row shows only the app and time.",
+    buttons: ["Don't allow", "Allow"],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  return answer.response === 1;
 }
 
 /**

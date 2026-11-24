@@ -47,6 +47,11 @@ export const PACK_IPC = {
   openDocument: "suite:documents:open",
   saveDocument: "suite:documents:save",
   removeDocument: "suite:documents:remove",
+  revealDocument: "suite:documents:reveal",
+  pendingDocumentChanges: "suite:documents:pending-changes",
+  watchDocuments: "suite:documents:watch",
+  listRecents: "suite:recents:list",
+  forgetRecent: "suite:recents:forget",
   listFiles: "suite:files:list",
   statFile: "suite:files:stat",
   makeFileDirectory: "suite:files:mkdir",
@@ -63,6 +68,7 @@ export const PACK_IPC = {
   writeExternalFile: "suite:files:write-external",
   closeExternalFile: "suite:files:close-external",
   importExternalFile: "suite:files:import-external",
+  importExternalFolder: "suite:files:import-folder",
   setTitle: "suite:pack:set-title",
   openExternal: "suite:pack:open-external",
 } as const;
@@ -88,6 +94,7 @@ export const PACK_PROJECTION = {
 /** Main-process pushes a pack may listen for. */
 export const PACK_EVENT = {
   deepLink: "suite:pack:deep-link",
+  documentsChanged: "suite:documents:changed",
 } as const;
 
 export type {
@@ -98,10 +105,13 @@ export type {
   FileLock,
   FileReadOptions,
   FileWriteOptions,
+  ImportedFolder,
   PackLaunchContext,
   ProjectedReminder,
   ProjectionDocument,
   ProjectionsService,
+  RecentDocument,
+  RecentsService,
 } from "@suite/pack-runtime";
 export { PACK_CAPABILITIES, type PackCapability };
 

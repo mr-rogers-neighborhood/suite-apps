@@ -47,6 +47,7 @@ export const HOST_CAPABILITIES = [
   "identity.pack",
   "network",
   "notifications",
+  "recents",
 ] as const;
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
