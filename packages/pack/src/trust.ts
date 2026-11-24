@@ -72,6 +72,15 @@ export function isPublisherKey(value: string): boolean {
   }
 }
 
+/** A key a rotation retired. It still verifies already installed versions (S2.3). */
+export interface RetiredPublisherKey {
+  /** Standard base64 of the raw 32-byte Ed25519 public key. */
+  readonly key: string;
+  readonly fingerprint: string;
+  /** The last sequence this key was current at. */
+  readonly sequence: number;
+}
+
 /** One key a host has chosen to trust, and the stable id it belongs to. */
 export interface TrustedPublisher {
   readonly id: string;
@@ -80,6 +89,13 @@ export interface TrustedPublisher {
   /** The digest at the time the key was added. Recomputed when it matters. */
   readonly fingerprint?: string;
   readonly source?: "preinstalled" | "added";
+  /** The last rotation sequence this host accepted for the id (S2.3). */
+  readonly sequence?: number;
+  /**
+   * Keys this id rotated away from. They verify installed versions, never a new
+   * install: a new archive must be signed by the current key.
+   */
+  readonly retiredKeys?: readonly RetiredPublisherKey[];
 }
 
 /** A publisher resolved through the store, with the fingerprint this host computes. */
@@ -115,6 +131,11 @@ export interface PublisherTrustOptions {
   readonly allowMissingPublisher?: boolean;
   /** The id the preinstalled first-party key carries. Defaults to `suite`. */
   readonly firstPartyId?: string;
+  /**
+   * Resolve a key a rotation retired under the same id. Only an installed-version
+   * scan passes this: a new install must use the current key (S2.3).
+   */
+  readonly allowRetiredKeys?: boolean;
 }
 
 async function resolve(entry: TrustedPublisher): Promise<ResolvedPublisher> {
@@ -177,7 +198,14 @@ export async function checkPublisherTrust(
   }
 
   const fingerprint = await publisherKeyFingerprint(publisher.key);
-  const entry = store.find((candidate) => candidate.key === publisher.key);
+  const current = store.find((candidate) => candidate.key === publisher.key);
+  const retired =
+    current === undefined && options.allowRetiredKeys === true
+      ? store.find((candidate) =>
+          candidate.retiredKeys?.some((candidateKey) => candidateKey.key === publisher.key),
+        )
+      : undefined;
+  const entry = current ?? retired;
   if (entry === undefined) {
     const named = publisher.id === undefined ? "(no id)" : publisher.id;
     return {
@@ -203,12 +231,14 @@ export async function checkPublisherTrust(
 
   // S2.2: a publisher id is stable across rotation, so a manifest that omits one
   // has only its key to name it. The store confirms the key is trusted; the id
-  // is the key's digest, which is what an added key without an id also gets.
-  const id = publisher.id ?? (await publisherKeyDigest(publisher.key));
+  // is the key's digest for the current key, and the id the store holds for a
+  // retired one (its digest is no longer the id).
+  const id =
+    publisher.id ?? (retired === undefined ? await publisherKeyDigest(publisher.key) : entry.id);
   return {
     ok: true,
     legacy: false,
-    publisher: { id, key: entry.key, fingerprint },
+    publisher: { id, key: publisher.key, fingerprint },
   };
 }
 

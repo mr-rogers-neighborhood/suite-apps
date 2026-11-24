@@ -27,6 +27,7 @@ import {
   verifyPackSignature,
 } from "@suite/pack";
 import { readPackArchive } from "@suite/pack-host";
+import { isPackRevoked, type RevocationAdvisory } from "./packRevocation.js";
 import type { PackInfo } from "./packs.js";
 import type { PackCapability, PackPublisherView } from "./shared.js";
 
@@ -65,6 +66,12 @@ export interface PackTrustOptions {
   readonly hostCapabilities: readonly PackCapability[];
   /** Permit replacing an id's publisher. The migration changes no stored data. */
   readonly allowPublisherMigration?: boolean;
+  /**
+   * Signed revocation advisories (S2.4). They refuse a *new* install; the
+   * installed-version scan never consults them, so a running pack is not
+   * disabled.
+   */
+  readonly revocations?: readonly RevocationAdvisory[];
 }
 
 /** A pack installed under the host's pack root. `root` is its version directory. */
@@ -87,6 +94,7 @@ export interface InstalledPackIssue {
     | "files"
     | "host"
     | "capability"
+    | "revocation"
     | "extra-files"
     | "io";
   readonly message: string;
@@ -381,6 +389,9 @@ export async function checkPackArchive(
     () => [...archive.files.keys()],
     async (path) => archive.files.get(path) ?? null,
     options,
+    // A new install (and the catalogue listing that offers it) consults the
+    // revocation advisories; the installed-version scan deliberately does not.
+    { refuseRevoked: true },
   );
   if (!verification.ok) {
     return {
@@ -488,9 +499,15 @@ export async function installPackArchive(
       manifest.version,
     );
   }
-  if (identity !== null && identity.id === publisher.id && identity.key !== publisher.key) {
+  if (
+    identity !== null &&
+    identity.id === publisher.id &&
+    identity.key !== publisher.key &&
+    !isRetiredKeyUnder(options.publishers, publisher.id, identity.key)
+  ) {
     // Same id, different key, no signed rotation: refuse rather than trust a
-    // silently swapped key. Rotation itself belongs to S2.3.
+    // silently swapped key. A rotation retires the old key in the trust store
+    // (S2.3), and only then may the new current key install beside it.
     throw new InstalledPackError(
       {
         reason: "publisher",
@@ -543,7 +560,9 @@ export async function installPackArchive(
       );
     }
     await rename(temporary, target);
-    if (identity === null || migrating) await writeInstalledIdentity(idRoot, publisher);
+    if (identity === null || migrating || identity.key !== publisher.key) {
+      await writeInstalledIdentity(idRoot, publisher);
+    }
   } catch (error) {
     await rm(temporary, { recursive: true, force: true }).catch(() => undefined);
     if (error instanceof InstalledPackError) throw error;
@@ -731,6 +750,16 @@ interface InstalledIdentity {
   readonly id: string;
   readonly key: string;
   readonly fingerprint: string;
+}
+
+/** Whether a rotation retired this key under the id, so a newer key may take over. */
+function isRetiredKeyUnder(
+  publishers: readonly TrustedPublisher[],
+  publisherId: string,
+  key: string,
+): boolean {
+  const entry = publishers.find((candidate) => candidate.id === publisherId);
+  return entry?.retiredKeys?.some((retired) => retired.key === key) === true;
 }
 
 function singlePublisher(publisherIds: ReadonlySet<string>): string | null {
@@ -952,8 +981,10 @@ async function verifyInstalledDirectory(
     },
     options,
     // A pre-S2.1 install has no publisher field. It is accepted only under the
-    // preinstalled first-party key; a new archive is never this lenient.
-    { allowMissingPublisher: true },
+    // preinstalled first-party key; a new archive is never this lenient. A
+    // rotation retires the old key rather than deleting it, so a version signed
+    // before the rotation still verifies (S2.3). Revocations never apply here.
+    { allowMissingPublisher: true, allowRetiredKeys: true },
   );
   if (!verification.ok) return refuse(verification.refusal);
 
@@ -982,15 +1013,17 @@ async function verifyManifest(
   present: () => readonly string[],
   read: (path: string) => Promise<Uint8Array | null>,
   options: PackTrustOptions,
-  trustOptions: { readonly allowMissingPublisher?: boolean } = {},
+  trustOptions: {
+    readonly allowMissingPublisher?: boolean;
+    readonly allowRetiredKeys?: boolean;
+    readonly refuseRevoked?: boolean;
+  } = {},
 ): Promise<ManifestVerification> {
-  const trust = await checkPublisherTrust(
-    manifest.publisher,
-    options.publishers,
-    trustOptions.allowMissingPublisher === true
-      ? { allowMissingPublisher: true, firstPartyId: SUITE_PUBLISHER_ID }
-      : { firstPartyId: SUITE_PUBLISHER_ID },
-  );
+  const trust = await checkPublisherTrust(manifest.publisher, options.publishers, {
+    ...(trustOptions.allowMissingPublisher === true ? { allowMissingPublisher: true } : {}),
+    ...(trustOptions.allowRetiredKeys === true ? { allowRetiredKeys: true } : {}),
+    firstPartyId: SUITE_PUBLISHER_ID,
+  });
   if (!trust.ok) {
     return {
       ok: false,
@@ -1008,6 +1041,22 @@ async function verifyManifest(
       refusal: {
         reason: "untrusted",
         message: `${manifest.id} ${manifest.version} is not signed by publisher ${trust.publisher.id} (key fingerprint ${trust.publisher.fingerprint}).`,
+        fingerprint: trust.publisher.fingerprint,
+      },
+    };
+  }
+
+  // S2.4: a signed advisory blocks a new install. This check belongs to the
+  // archive/catalogue path only, never the installed-version scan.
+  if (
+    trustOptions.refuseRevoked === true &&
+    isPackRevoked(options.revocations ?? [], trust.publisher.id, manifest.id)
+  ) {
+    return {
+      ok: false,
+      refusal: {
+        reason: "revocation",
+        message: `${manifest.id} from publisher ${trust.publisher.id} has been revoked by a signed advisory and cannot be installed. An installed copy keeps running; disabling or removing it is your choice.`,
         fingerprint: trust.publisher.fingerprint,
       },
     };

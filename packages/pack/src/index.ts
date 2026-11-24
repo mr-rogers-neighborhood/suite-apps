@@ -52,7 +52,9 @@ export {
   generatePackKeyPair,
   type PackFileMismatch,
   sha256Hex,
+  signBytes,
   signPackManifest,
+  verifyBytes,
   verifyPackFiles,
   verifyPackSignature,
 } from "./signature.js";
@@ -72,5 +74,6 @@ export {
   publisherKeyDigest,
   publisherKeyFingerprint,
   type ResolvedPublisher,
+  type RetiredPublisherKey,
   type TrustedPublisher,
 } from "./trust.js";

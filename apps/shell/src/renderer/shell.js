@@ -169,6 +169,22 @@ function actionButton(label, onClick, className) {
   return button;
 }
 
+function trustAction(action, label) {
+  const button = element("button", "install", label);
+  button.type = "button";
+  button.addEventListener("click", () => {
+    button.disabled = true;
+    Promise.resolve(action())
+      .catch((error) => {
+        showNotice(error instanceof Error ? error.message : "The host refused that action.");
+      })
+      .finally(() => {
+        button.disabled = false;
+      });
+  });
+  return button;
+}
+
 function countLabel(total, noun) {
   return total === 0 ? "" : `${total} ${noun}${total === 1 ? "" : "s"}`;
 }
@@ -438,7 +454,14 @@ function renderAppsWidget(body) {
         install.disabled = false;
       });
   });
-  available.append(availableHead, muted, catalogue, install);
+
+  // A rotation statement and a revocation advisory are signed files the person
+  // chooses, the same way a pack is. Neither one closes a running pack.
+  const rotate = trustAction(api.rotatePublisher, "Rotate a key…");
+  const revoke = trustAction(api.importRevocation, "Add revocation…");
+  const actions = element("div", "trust-actions");
+  actions.append(install, rotate, revoke);
+  available.append(availableHead, muted, catalogue, actions);
 
   body.append(installed, available);
   appsView = { packs, packCount, catalogue, catalogueCount, search: input };

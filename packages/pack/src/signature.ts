@@ -47,25 +47,40 @@ export async function generatePackKeyPair(): Promise<{
   };
 }
 
+/**
+ * Sign arbitrary bytes with an Ed25519 secret key.
+ *
+ * A manifest is not the only signed object in the trust model: a key rotation
+ * statement and a revocation advisory are signed the same way (S2.3, S2.4). They
+ * define their own canonical bytes; this is only the primitive.
+ */
+export function signBytes(bytes: Uint8Array, privateKeyBase64: string): string {
+  return bytesToBase64(nobleSign(bytes, base64ToBytes(privateKeyBase64)));
+}
+
+/** Verify a detached Ed25519 signature over arbitrary bytes. */
+export function verifyBytes(
+  signatureBase64: string,
+  bytes: Uint8Array,
+  publicKeyBase64: string,
+): boolean {
+  try {
+    return nobleVerify(base64ToBytes(signatureBase64), bytes, base64ToBytes(publicKeyBase64));
+  } catch {
+    return false;
+  }
+}
+
 /** Sign a manifest core. The build script adds the returned `signature`. */
 export function signPackManifest(manifest: PackManifestCore, privateKeyBase64: string): string {
-  const signature = nobleSign(canonicalManifestBytes(manifest), base64ToBytes(privateKeyBase64));
-  return bytesToBase64(signature);
+  return signBytes(canonicalManifestBytes(manifest), privateKeyBase64);
 }
 
 export async function verifyPackSignature(
   manifest: PackManifest,
   publicKeyBase64: string,
 ): Promise<boolean> {
-  try {
-    return nobleVerify(
-      base64ToBytes(manifest.signature),
-      canonicalManifestBytes(manifest),
-      base64ToBytes(publicKeyBase64),
-    );
-  } catch {
-    return false;
-  }
+  return verifyBytes(manifest.signature, canonicalManifestBytes(manifest), publicKeyBase64);
 }
 
 export interface PackFileMismatch {

@@ -5,13 +5,20 @@ import {
   addTrustedPublisher as addToStore,
   isPublisherKey,
   isSafePublisherId,
+  normalisePublisherFingerprint,
   type PublisherAddition,
   type PublisherAdditionRequest,
+  type ResolvedPublisher,
   SUITE_PACK_PUBLIC_KEY,
   SUITE_PUBLISHER_ID,
   type TrustedPublisher,
 } from "@suite/pack";
 import { publisherKeyFingerprint } from "@suite/pack/trust";
+import {
+  checkPublisherRotation,
+  type RotationCheck,
+  type RotationStatement,
+} from "./publisherRotation.js";
 
 /**
  * The host's publisher trust store (S2.1).
@@ -98,12 +105,53 @@ function parseStore(text: string): readonly TrustedPublisher[] | null {
     if (entry.source !== undefined && entry.source !== "preinstalled" && entry.source !== "added") {
       return null;
     }
+    if (
+      entry.sequence !== undefined &&
+      (typeof entry.sequence !== "number" ||
+        !Number.isSafeInteger(entry.sequence) ||
+        entry.sequence < 0)
+    ) {
+      return null;
+    }
+
+    const retiredKeys: { key: string; fingerprint: string; sequence: number }[] = [];
+    if (entry.retiredKeys !== undefined) {
+      if (!Array.isArray(entry.retiredKeys)) return null;
+      for (const candidateKey of entry.retiredKeys) {
+        if (
+          typeof candidateKey !== "object" ||
+          candidateKey === null ||
+          Array.isArray(candidateKey)
+        ) {
+          return null;
+        }
+        const retired = candidateKey as Record<string, unknown>;
+        if (typeof retired.key !== "string" || !isPublisherKey(retired.key)) return null;
+        if (typeof retired.fingerprint !== "string") return null;
+        if (
+          typeof retired.sequence !== "number" ||
+          !Number.isSafeInteger(retired.sequence) ||
+          retired.sequence < 0
+        ) {
+          return null;
+        }
+        retiredKeys.push({
+          key: retired.key,
+          fingerprint: retired.fingerprint,
+          sequence: retired.sequence,
+        });
+      }
+    }
+
     const source = entry.source;
+    const sequence = entry.sequence;
     entries.push({
       id: entry.id,
       key: entry.key,
       ...(entry.fingerprint === undefined ? {} : { fingerprint: entry.fingerprint }),
       ...(source === undefined ? {} : { source }),
+      ...(sequence === undefined ? {} : { sequence }),
+      ...(retiredKeys.length === 0 ? {} : { retiredKeys }),
     });
   }
   return entries;
@@ -179,4 +227,87 @@ export async function addTrustedPublisher(
   if (!result.ok) return result;
   await writeStore(root, { version: TRUST_STORE_VERSION, publishers: result.store });
   return result;
+}
+
+/** A rotation the person has confirmed by fingerprint (S2.3). */
+export interface PublisherRotationRequest {
+  readonly statement: RotationStatement;
+  /** The fingerprint the host showed and the person confirmed. */
+  readonly fingerprint: string;
+}
+
+export type PublisherRotationResult =
+  | {
+      readonly ok: true;
+      readonly publisher: ResolvedPublisher;
+      readonly sequence: number;
+      readonly store: PublisherTrustStore;
+    }
+  | Extract<RotationCheck, { readonly ok: false }>
+  | {
+      readonly ok: false;
+      readonly reason: "fingerprint-mismatch";
+      readonly message: string;
+      readonly fingerprint: string | null;
+    };
+
+/**
+ * Replace a publisher's current key after the person confirmed the new one.
+ *
+ * Verification and the write are deliberately separate: `checkPublisherRotation`
+ * shows the new fingerprint and this function requires the value the person saw.
+ * The old key moves to `retiredKeys`; it still verifies installed versions, but
+ * a new install must use the current key. The sequence is recorded with the new
+ * key, so the same statement cannot be replayed against a later store.
+ */
+export async function applyPublisherRotation(
+  root: string,
+  request: PublisherRotationRequest,
+): Promise<PublisherRotationResult> {
+  const current = await openPublisherTrust(root);
+  const check = await checkPublisherRotation(request.statement, current.publishers);
+  if (!check.ok) return check;
+
+  const confirmed = normalisePublisherFingerprint(request.fingerprint);
+  if (confirmed === null || confirmed !== check.preview.newFingerprint) {
+    return {
+      ok: false,
+      reason: "fingerprint-mismatch",
+      fingerprint: check.preview.newFingerprint,
+      message: `The new key's fingerprint is ${check.preview.newFingerprint}; the value confirmed was ${request.fingerprint}. Nothing was changed.`,
+    };
+  }
+
+  const publishers: TrustedPublisher[] = [];
+  for (const entry of current.publishers) {
+    if (entry.id !== check.preview.publisherId) {
+      publishers.push(entry);
+      continue;
+    }
+    const previousFingerprint = entry.fingerprint ?? (await publisherKeyFingerprint(entry.key));
+    const retired = [
+      ...(entry.retiredKeys ?? []).filter((key) => key.key !== entry.key),
+      { key: entry.key, fingerprint: previousFingerprint, sequence: entry.sequence ?? 0 },
+    ];
+    publishers.push({
+      ...entry,
+      key: request.statement.newKey,
+      fingerprint: check.preview.newFingerprint,
+      sequence: check.preview.sequence,
+      retiredKeys: retired,
+    });
+  }
+
+  const store: PublisherTrustStore = { version: TRUST_STORE_VERSION, publishers };
+  await writeStore(root, store);
+  return {
+    ok: true,
+    publisher: {
+      id: check.preview.publisherId,
+      key: request.statement.newKey,
+      fingerprint: check.preview.newFingerprint,
+    },
+    sequence: check.preview.sequence,
+    store,
+  };
 }
