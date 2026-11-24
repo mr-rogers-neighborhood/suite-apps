@@ -34,7 +34,7 @@ standard; the white paper documents the capability tiers in its security and pri
 
 | Mechanism | In Suite |
 | --- | --- |
-| Host plus downloaded packs | Suite Desk on the desktop and Suite Go on mobile. Start is a legacy hub being retired |
+| Host plus downloaded packs | Suite Shell on the desktop and Suite Go on mobile. Start is a legacy hub being retired |
 | A manifest beside the executable | `suite.app.json` for desktop discovery; `manifest.json` inside a `.suitepack` for both hosts |
 | Declared capabilities | Pack `capabilities`, enforced by the host; see [Go decisions](../../apps/go/docs/reference/decisions.md) |
 | One instance per app | Start installs one copy per app; the shell keeps one running instance per container and opens tabs into it |

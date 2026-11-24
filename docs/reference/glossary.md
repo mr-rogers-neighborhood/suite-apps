@@ -9,7 +9,7 @@ belong to it; Canvas's is [here](../../apps/canvas/docs/reference/glossary.md).
 | **App** | A user-facing product. UI copy says "app", because the hub installs apps. |
 | **Domain** | The architecture word for an app's subject matter. Go hosts domains; a pack carries one. It is the same three things as Canvas, Planner and Budget. |
 | **Pack** | A built bundle a domain module is delivered as: a manifest, declared capabilities and the module's code. |
-| **Host** | The process that launches a pack and routes to it: Suite Desk on the desktop, Suite Go on mobile. A host never reads a document payload. Start is a legacy hub being retired. |
+| **Host** | The process that launches a pack and routes to it: Suite Shell on the desktop, Suite Go on mobile. A host never reads a document payload. Start is a legacy hub being retired. |
 | **Hub** | Suite Start specifically: install, update, remove, launch, route. Legacy; being retired. |
 | **Manifest** | Three shapes with one word: `suite.app.json` beside a desktop app, `manifest.json` inside a `.suitepack`, and the update-feed manifest. The [superapp spec](../spec/superapp.md) owns the pack manifest. |
 | **Install record** | `installs.json` under `~/.config/suite/start`. It is the only place an executable path lives. |

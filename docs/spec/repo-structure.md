@@ -12,10 +12,11 @@ the pipeline is [ci.md](ci.md); the delivery contract is [delivery.md](delivery.
 lives under `packages/` only when two or more apps consume it. An app's private packages stay under
 `apps/<app>/packages/`.
 
-**R1.3** The desktop host is `apps/shell` (`@suite/shell`), and it is the way in: it lists packs from
-a verified index, installs them and opens them. Start is a legacy hub being retired
-([#314](https://github.com/mrrnbhd/suite-apps/issues/314)); it is not a host and takes no new feature.
-Go is the mobile host. The relay is `apps/sync`, with its app and server packages beside it.
+**R1.3** The desktop host is `apps/shell` (`@suite/shell`), and it is the way in: it reads a verified
+index, installs packs and opens them. Start is a legacy hub being retired
+([#314](https://github.com/mrrnbhd/suite-apps/issues/314)); it is not a host and takes no new feature
+while it waits. Go is the mobile host. The relay is `apps/sync`, with its app and server packages beside
+it.
 
 **R1.4** Flatpak manifests live in `packaging/flatpak/`. The spec lives in `docs/spec/`. An app's
 own docs stay in `apps/<app>/docs/`.
