@@ -1,6 +1,6 @@
 # What Suite is
 
-Suite is a set of local-first apps, a hub that installs and updates them, and sync you run yourself.
+Suite is a host that installs and runs local-first apps as packs, and sync you run yourself.
 
 - **Canvas** is for visual thinking and research: cards, boards, writing and links in one document.
 - **Planner** is a daily planner: inbox, estimates, capacity and a local calendar.

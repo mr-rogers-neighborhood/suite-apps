@@ -77,8 +77,11 @@ signed version. A pack update is a version update, not a channel move.
 - **Legacy apps are frozen.** Canvas, Planner, Budget and Help remain the separate Flatpaks at their
   last artifacts. Their code stays in the tree, but they get no new release and no new pre-release
   channel until they become packs.
-- **Start and Sync are not superapps and are not frozen.** Start is the hub that installs and opens
-  the others; Sync is the relay a person runs. Neither carries a channel.
+- **Start and Sync are not superapps; both are legacy surfaces on the way out.** Start is the hub
+  today and retires once the host catalogue installs packs ([#314](https://github.com/mrrnbhd/suite-apps/issues/314));
+  Sync's tray app retires as the relay becomes a host capability
+  ([#315](https://github.com/mrrnbhd/suite-apps/issues/315)). Neither carries a channel, and neither
+  gets a new feature while it waits.
 
 Freezing is about releases, not deletion: a person can still install the last stable artifact, and the
 history stays. It also means no new `slop`, `nightly` or `preview` build is published for a legacy
