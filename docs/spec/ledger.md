@@ -14,14 +14,14 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S2.8 | Portable key | Absent | No user-held portable identity, export or recovery |
 | S3.1 | Archive safety | Implemented | `packages/pack-host/src/archive.ts` refuses traversal, duplicates, symlinks and device entries |
 | S3.2 | Archive bounds | Partial | Archive caps exist; document, blob, frame and widget bounds are not all enforced |
-| S3.3 | Canonical bytes | Partial | Canonicalizer exists, but new fields are unsigned, absent fields emit `null`, duplicate keys are not rejected |
+| S3.3 | Canonical bytes | Partial | `@suite/pack` signs every schema field in a fixed order, omits an absent optional field instead of emitting `null`, sorts capabilities and files, and `parsePackManifestJson` refuses duplicate keys before `JSON.parse`; `manifest.test.ts` proves field coverage, omission, sorting, nested key order and duplicate rejection, and `signature.test.ts` proves RFC 8032 Ed25519 with standard base64. The shell and the Go host still call `JSON.parse` and then `parsePackManifest`, so duplicate-key rejection is not wired at the host entry point, and the S3.4 golden vector is still absent |
 | S3.4 | Golden vector | Absent | No committed manifest/canonical/signature vector |
-| S3.5 | Manifest fields | Partial | `@suite/pack` parses every required and optional field family and `fixtures.json` covers each; the build path still signs under the pinned Suite key, so `publisher` is not required or emitted, and canonical bytes do not cover the new fields |
+| S3.5 | Manifest fields | Partial | `@suite/pack` parses every required and optional field family and `fixtures.json` covers each; the build path still signs under the pinned Suite key, so `publisher` is not required or emitted |
 | S3.6 | Id, entry, files | Implemented | `@suite/pack` validates id, safe paths, hashes and byte counts |
 | S3.7 | Unknown fields | Implemented | `packages/pack/src/manifest.test.ts` refuses an unknown field and an unknown capability |
 | S3.8 | Subpackages | Absent | No lazy entry or prefetch path |
 | S3.9 | Add-ons | Absent | No signed module, pin or capability intersection |
-| S3.10 | Determinism | Partial | Deterministic archive writer exists; absent-field encoding is inconsistent |
+| S3.10 | Determinism | Implemented | `packages/pack-host/src/archive.test.ts` "builds the same bytes when the clock moves" proves the fixed timestamp, and `buildPackArchive` writes payloads in `comparePackPaths` order; `packages/pack/src/manifest.test.ts` "two builds of the same tree produce the same canonical bytes, hash and signature" proves absent optionals no longer shift the manifest bytes |
 | S4.1 | Capability closure | Partial | Shell serves only `documents/files/network`; no optional-capability degradation |
 | S4.2–S4.3 | Consent tiers and record | Absent | No consent screen, tier mapping or local grant record |
 | S4.4 | Network allowlist | Partial | Shell allows any `https`/`wss`; external links bypass the session; no origin list |
@@ -107,7 +107,7 @@ claim.
 
 | Clause | Why it blocks | Owner |
 | --- | --- | --- |
-| S3.3–S3.4 | New fields are unsigned and there is no golden vector, so a second implementation cannot verify the format | Pack |
+| S3.3–S3.4 | Duplicate JSON keys are refused only by the library text parser, which the shell and Go host do not call, and there is no golden vector, so a second implementation cannot verify the format | Pack |
 | S2.1–S2.5 | No publisher identity, trust store, rotation or revocation; side-loading is first-party only | Pack, shell |
 | S6.3 | No host-invoked migration or projection entry, so the pack-owned schema is declared nowhere and the host cannot run it | Shell, document-runtime |
 | S4.2–S4.5 | No consent record or network allowlist; external links and associations bypass the boundary | Shell, Go |

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  base64ToBytes,
+  bytesToBase64,
   digestPackFiles,
   generatePackKeyPair,
   PACK_CONTRACT_VERSION,
@@ -40,6 +42,25 @@ describe("pack signatures", () => {
     const signed: PackManifest = { ...unsigned, signature };
 
     expect(await verifyPackSignature(signed, keys.publicKeyBase64)).toBe(true);
+  });
+
+  // spec: S3.3
+  it("signs RFC 8032 Ed25519 and carries standard base64", async () => {
+    const unsigned = await core();
+    // RFC 8032 §7.1 test vector 1: the published key pair for a fixed seed.
+    // A signature made from the seed must verify against the published public
+    // key, which pins the curve and the key derivation rather than only our own
+    // round trip. Base64 is the standard alphabet, not base64url.
+    const secretKey = "nWGxne/9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A=";
+    const publicKey = "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=";
+
+    const signature = signPackManifest(unsigned, secretKey);
+    expect(base64ToBytes(secretKey)).toHaveLength(32);
+    expect(base64ToBytes(publicKey)).toHaveLength(32);
+    expect(base64ToBytes(signature)).toHaveLength(64);
+    expect(signature).toMatch(/^[A-Za-z0-9+/]+={0,2}$/u);
+    expect(bytesToBase64(base64ToBytes(signature))).toBe(signature);
+    expect(await verifyPackSignature({ ...unsigned, signature }, publicKey)).toBe(true);
   });
 
   it("refuses a changed capability or signature", async () => {

@@ -525,55 +525,293 @@ export function parsePackManifest(value: unknown): PackParse {
 }
 
 /**
+ * Parse `manifest.json` text, refusing a duplicate key before `JSON.parse` sees it.
+ *
+ * `JSON.parse` keeps the last of two identical keys without a word, so a manifest could show one
+ * `entry` or `signature` to a verifier and another to whatever reads it next. That is a signature
+ * bypass, not a formatting wart. The scan walks the raw text, decodes string escapes, and reports
+ * the second key with its path; only a text with no duplicate keys reaches the parser.
+ */
+export function parsePackManifestJson(text: string): PackParse {
+  const duplicate = findDuplicateJsonKey(text);
+  if (duplicate !== null) {
+    return {
+      ok: false,
+      issues: [
+        {
+          path: duplicate.path,
+          message: `duplicate key ${JSON.stringify(duplicate.key)}`,
+        },
+      ],
+    };
+  }
+
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (error) {
+    return {
+      ok: false,
+      issues: [
+        {
+          path: "",
+          message: error instanceof Error ? error.message : "not valid JSON",
+        },
+      ],
+    };
+  }
+  return parsePackManifest(value);
+}
+
+interface DuplicateJsonKey {
+  readonly key: string;
+  readonly path: string;
+}
+
+type JsonFrame =
+  | { readonly kind: "object"; readonly path: readonly string[]; readonly keys: Set<string> }
+  | { readonly kind: "array"; readonly path: readonly string[]; index: number };
+
+function isJsonWhitespace(character: string | undefined): boolean {
+  return character === " " || character === "\n" || character === "\r" || character === "\t";
+}
+
+/** A duplicate key in raw JSON text, or `null`. Invalid JSON is left to `JSON.parse` to refuse. */
+function findDuplicateJsonKey(text: string): DuplicateJsonKey | null {
+  const frames: JsonFrame[] = [];
+  let pendingKey: string | null = null;
+  let index = 0;
+
+  const parentPath = (): readonly string[] => {
+    const parent = frames[frames.length - 1];
+    if (parent === undefined) return [];
+    if (parent.kind === "array") return [...parent.path, String(parent.index)];
+    return pendingKey === null ? parent.path : [...parent.path, pendingKey];
+  };
+
+  const skipWhitespace = (): void => {
+    while (isJsonWhitespace(text[index])) index += 1;
+  };
+
+  const readString = (): string => {
+    // `index` names the opening quote.
+    index += 1;
+    let value = "";
+    while (index < text.length) {
+      const character = text[index] as string;
+      if (character === '"') {
+        index += 1;
+        return value;
+      }
+      if (character !== "\\") {
+        value += character;
+        index += 1;
+        continue;
+      }
+      const escaped = text[index + 1];
+      index += 2;
+      switch (escaped) {
+        case '"':
+          value += '"';
+          break;
+        case "\\":
+          value += "\\";
+          break;
+        case "/":
+          value += "/";
+          break;
+        case "b":
+          value += "\b";
+          break;
+        case "f":
+          value += "\f";
+          break;
+        case "n":
+          value += "\n";
+          break;
+        case "r":
+          value += "\r";
+          break;
+        case "t":
+          value += "\t";
+          break;
+        case "u": {
+          const code = text.slice(index, index + 4);
+          if (/^[0-9A-Fa-f]{4}$/u.test(code)) {
+            value += String.fromCharCode(Number.parseInt(code, 16));
+            index += 4;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    return value;
+  };
+
+  while (index < text.length) {
+    skipWhitespace();
+    const character = text[index];
+    if (character === undefined) break;
+
+    if (character === "{" || character === "[") {
+      const path = parentPath();
+      if (character === "{") {
+        frames.push({ kind: "object", path, keys: new Set() });
+      } else {
+        frames.push({ kind: "array", path, index: 0 });
+      }
+      pendingKey = null;
+      index += 1;
+      continue;
+    }
+
+    if (character === "}" || character === "]") {
+      frames.pop();
+      pendingKey = null;
+      index += 1;
+      continue;
+    }
+
+    if (character === ",") {
+      const frame = frames[frames.length - 1];
+      if (frame?.kind === "array") frame.index += 1;
+      pendingKey = null;
+      index += 1;
+      continue;
+    }
+
+    if (character === ":") {
+      index += 1;
+      continue;
+    }
+
+    if (character === '"') {
+      const value = readString();
+      let ahead = index;
+      while (isJsonWhitespace(text[ahead])) ahead += 1;
+      if (text[ahead] === ":") {
+        const frame = frames[frames.length - 1];
+        if (frame?.kind === "object") {
+          if (frame.keys.has(value)) {
+            return { key: value, path: [...frame.path, value].join(".") };
+          }
+          frame.keys.add(value);
+        }
+        pendingKey = value;
+        index = ahead + 1;
+      }
+      continue;
+    }
+
+    // A number or one of `true`, `false`, `null`: skip it. `JSON.parse` judges its shape.
+    index += 1;
+  }
+
+  return null;
+}
+
+/**
+ * A manifest field order that never changes.
+ *
+ * S3.3 makes the canonical bytes a fixed field order. The order is the schema's, minus `signature`,
+ * so a reader can compare the two lists directly. Nested objects are rebuilt with code-unit-sorted
+ * keys for the same reason: a signature may not depend on the order a JSON author happened to use.
+ */
+const MANIFEST_FIELD_ORDER: readonly (keyof PackManifestCore)[] = [
+  "format",
+  "id",
+  "name",
+  "description",
+  "version",
+  "entry",
+  "contractVersion",
+  "minimumHostVersion",
+  "publisher",
+  "capabilities",
+  "optionalCapabilities",
+  "documents",
+  "blobs",
+  "sync",
+  "network",
+  "platforms",
+  "input",
+  "defaultLocale",
+  "locales",
+  "widgets",
+  "codeWidgets",
+  "components",
+  "contributions",
+  "subpackages",
+  "addons",
+  "export",
+  "license",
+  "source",
+  "deprecated",
+  "replacement",
+  "sunset",
+  "files",
+];
+
+/**
  * The exact bytes a signature covers.
  *
- * Built field by field in a fixed order, not by `JSON.stringify(manifest)`, so a
- * signature verifies on every host. Capabilities and files are sorted (files by
- * code unit, never by locale); command and menu order is preserved because menu
- * order is an authoring decision.
+ * Built field by field in the schema's order, not by `JSON.stringify(manifest)`, so a signature
+ * verifies on every host. An optional field that is absent contributes no key at all: `null` is not
+ * a value the schema accepts, and emitting it would sign a different document from the one that was
+ * written. Capabilities (required and optional) and files are sorted by code unit, never by locale;
+ * command, menu, document and widget order is preserved because it is an authoring decision.
+ *
+ * Ed25519 over these bytes follows RFC 8032 and the signature travels as standard base64; see
+ * `signPackManifest` and `verifyPackSignature`.
  */
 export function canonicalManifestBytes(manifest: PackManifestCore): Uint8Array {
-  const canonical = {
-    format: manifest.format,
-    id: manifest.id,
-    name: manifest.name,
-    // Present only when the manifest declared one. A manifest written before
-    // this field existed therefore canonicalizes to the same bytes and keeps
-    // its signature.
-    ...(manifest.description === undefined ? {} : { description: manifest.description }),
-    version: manifest.version,
-    entry: manifest.entry,
-    contractVersion: manifest.contractVersion,
-    minimumHostVersion: manifest.minimumHostVersion ?? null,
-    capabilities: [...new Set(manifest.capabilities)].sort(),
-    contributions: normalizeContributions(manifest.contributions),
-    widgets:
-      manifest.widgets !== undefined && manifest.widgets.length > 0 ? manifest.widgets : null,
-    files: [...manifest.files]
-      .map((file) => ({ path: file.path, sha256: file.sha256, bytes: file.bytes }))
-      .sort((left, right) => comparePackPaths(left.path, right.path)),
-  };
+  const canonical: Record<string, unknown> = {};
+  for (const field of MANIFEST_FIELD_ORDER) {
+    const value = manifest[field];
+    if (value === undefined) continue;
+
+    if (field === "capabilities" || field === "optionalCapabilities") {
+      canonical[field] = [...new Set(value as readonly string[])].sort(comparePackPaths);
+    } else if (field === "files") {
+      canonical.files = (value as readonly PackFile[])
+        .map((file) => canonicalJsonValue(file) as { path: string })
+        .sort((left, right) => comparePackPaths(left.path, right.path));
+    } else if (field === "contributions") {
+      canonical.contributions = canonicalContributions(value as PackContributions);
+    } else {
+      canonical[field] = canonicalJsonValue(value);
+    }
+  }
   return new TextEncoder().encode(JSON.stringify(canonical));
 }
 
-function normalizeContributions(
-  contributions: PackContributions | undefined,
-): PackContributions | null {
-  if (contributions === undefined) return null;
-  return {
-    ...(contributions.commands !== undefined && contributions.commands.length > 0
-      ? { commands: contributions.commands }
-      : {}),
-    ...(contributions.menus !== undefined && contributions.menus.length > 0
-      ? { menus: contributions.menus }
-      : {}),
-    ...(contributions.fileExtensions !== undefined && contributions.fileExtensions.length > 0
-      ? { fileExtensions: [...new Set(contributions.fileExtensions)].sort() }
-      : {}),
-    ...(contributions.deepLinks !== undefined && contributions.deepLinks.length > 0
-      ? { deepLinks: [...new Set(contributions.deepLinks)].sort() }
-      : {}),
-  };
+/** Rebuild an object with code-unit-sorted keys, dropping only `undefined`. */
+function canonicalJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => canonicalJsonValue(item));
+  if (value !== null && typeof value === "object") {
+    const source = value as Record<string, unknown>;
+    const ordered: Record<string, unknown> = {};
+    for (const key of Object.keys(source).sort(comparePackPaths)) {
+      if (source[key] === undefined) continue;
+      ordered[key] = canonicalJsonValue(source[key]);
+    }
+    return ordered;
+  }
+  return value;
+}
+
+/** Contribution order is authored, except the two path sets, which are sorted like files. */
+function canonicalContributions(contributions: PackContributions): Record<string, unknown> {
+  const canonical = canonicalJsonValue(contributions) as Record<string, unknown>;
+  for (const field of ["fileExtensions", "deepLinks"]) {
+    const list = canonical[field];
+    if (Array.isArray(list)) {
+      canonical[field] = [...new Set(list)].sort(comparePackPaths);
+    }
+  }
+  return canonical;
 }
 
 export interface HostContract {
