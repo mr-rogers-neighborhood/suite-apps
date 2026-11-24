@@ -36,11 +36,12 @@
 #      install and run the ref.
 #   4. `release-status.mjs --publish` flips the drafts and writes RELEASES.md.
 #
-# The catalogue index is built from the packs this job staged (none yet), before
-# the draft so its operator fingerprint reaches the notes, and uploaded after the
-# Flatpak remote so an entry never names an archive that did not ship. The remote
-# is the same one, under `/packs/`; a missing operator key fails the step, while
-# an empty pack list prints that there is nothing to index.
+# The catalogue index is built from the Budget and Planner packs this job stages,
+# before the draft so its operator fingerprint reaches the notes, and uploaded
+# after the Flatpak remote so an entry never names an archive that did not ship.
+# The remote is the same one, under `/packs/`; a missing operator key or a pack
+# build failure fails the step, while a run with no pack list prints that there
+# is nothing to index.
 #
 # Signing keys are environment secrets, never repository secrets:
 #
@@ -366,9 +367,13 @@ jobs:
             --apk-id "${apk_id}" \
             --out .dev/release/release-manifest.json
 
-      # A pack is a release artifact only when a build command below names one.
-      # Empty today: #324 adds Budget by adding one --build line. The step still
-      # runs so a missing or mismatched operator key fails loudly once packs exist.
+      # A pack is a release artifact only when a --build line below names one.
+      # Both packs are built by the same scripts their app gates use, into the
+      # directory the index reads, so an entry names the bytes this run built.
+      # A build that fails stops the job here, before anything is signed or
+      # uploaded; a run with no --build prints the skip sentence instead. The
+      # index reads only .dev/release/packs, so the sample packs under
+      # apps/shell/packs stay fixtures and are never staged for publication.
       - name: Build the catalogue index
         if: inputs.publish
         env:
@@ -377,8 +382,11 @@ jobs:
           SUITE_PACK_KEY: ${{ secrets.SUITE_PACK_KEY }}
         run: |
           set -euo pipefail
-          # --build "pnpm budget:pack --out .dev/release/packs/budget-0.1.0.suitepack"
-          node scripts/release-index.mjs
+          budget_version="$(node -p 'require("./apps/budget/pack/manifest.json").version')"
+          planner_version="$(node -p 'require("./apps/planner/pack/manifest.json").version')"
+          node scripts/release-index.mjs \
+            --build "pnpm budget:pack --out .dev/release/packs/budget-${budget_version}.suitepack" \
+            --build "pnpm planner:pack --out .dev/release/packs/planner-${planner_version}.suitepack"
 
       # Evidence before publication (D4.1 step 3, D5.4). A rehearsal changes
       # nothing outside the runner, so it stops before these.

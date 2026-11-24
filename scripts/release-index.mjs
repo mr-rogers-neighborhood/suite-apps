@@ -120,7 +120,9 @@ function runShell(build) {
   const result = spawnSync("sh", ["-c", build], { stdio: "inherit", cwd: ROOT });
   if (result.error !== undefined) throw result.error;
   if (result.status !== 0) {
-    throw new Error(`pack build exited ${result.status}: ${build}`);
+    throw new Error(
+      `pack build failed: ${build} exited ${result.status}; nothing was signed`,
+    );
   }
 }
 
@@ -221,7 +223,10 @@ export async function prepareIndex({
 
   rmSync(packsDir, { recursive: true, force: true });
   mkdirSync(packsDir, { recursive: true });
-  for (const build of builds) run(build);
+  for (const build of builds) {
+    log(`building pack: ${build}\n`);
+    run(build);
+  }
 
   const archives = archivesIn(packsDir);
   if (archives.length === 0) {
@@ -391,7 +396,7 @@ function usage() {
   node scripts/release-index.mjs --publish
 
   --build <command>       build one pack and write its .suitepack into
-                          ${PACKS_DIR}; repeatable, empty today
+                          ${PACKS_DIR}; repeatable, Budget and Planner today
   --publish               upload the staged index and archives
   --packs-dir <dir>       where the build commands write archives
   --out-dir <dir>         where index.json, index.json.sig and metadata go
