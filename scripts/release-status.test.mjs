@@ -148,7 +148,7 @@ describe("publication dates", () => {
     return files;
   }
 
-  it("plans a nightly tag for the publication day while the body names the snapshot", () => {
+  it("plans a nightly tag for the publication day and names both days in the body", () => {
     const { snapshotDate, tagDate } = releaseDates(entries, {
       channel: "nightly",
       now: onNov23,
@@ -159,12 +159,41 @@ describe("publication dates", () => {
 
     const body = aggregateReleaseBody(entries, {
       date: snapshotDate,
+      tagDate,
       tag: aggregateTag(tagDate, "nightly"),
       channel: "nightly",
     });
     assert.match(
       body,
-      /This is the 2026-11-22 build, published on the \*\*nightly\*\* channel/u,
+      /This is the 2026-11-22 snapshot, published on the \*\*nightly\*\* channel on 2026-11-23/u,
+    );
+  });
+
+  it("names the snapshot and the tag day separately, and stable keeps one date", () => {
+    const nightly = aggregateReleaseBody(entries, {
+      date: "2026-11-22",
+      tagDate: "2026-11-24",
+      tag: "suite-nightly-2026.11.24",
+      channel: "nightly",
+    });
+    assert.ok(
+      nightly.includes(
+        "This is the 2026-11-22 snapshot, published on the **nightly** channel on 2026-11-24.",
+      ),
+    );
+    assert.doesNotMatch(nightly, /This is the 2026-11-22 build/u);
+
+    const stable = aggregateReleaseBody(entries, {
+      date: "2026-11-22",
+      tagDate: "2026-11-22",
+      tag: "suite-2026.11.22",
+    });
+    assert.match(stable, /This is the 2026-11-22 build\./u);
+    assert.doesNotMatch(stable, /snapshot|published on/u);
+    assert.equal(
+      stable.match(/2026-\d{2}-\d{2}/gu)?.length ?? 0,
+      1,
+      "stable's tag is the snapshot, so the body names one date",
     );
   });
 

@@ -497,10 +497,11 @@ export function aggregateDate(entries, override = null) {
  * The two dates one release run carries (D6.1).
  *
  * The snapshot date is the newest changelog date, and the body keeps naming it:
- * "This is the <snapshot> build". The tag date is the day the release is
- * published: stable keeps the snapshot date, while nightly and preview use
- * today in UTC, so a daily publication gets a new `suite-<channel>-YYYY.MM.DD`
- * even when no app version changed.
+ * "This is the <snapshot> build". On a pre-release channel the body names the
+ * tag date too, because that tag moves every day and the snapshot does not. The
+ * tag date is the day the release is published: stable keeps the snapshot date,
+ * while nightly and preview use today in UTC, so a daily publication gets a new
+ * `suite-<channel>-YYYY.MM.DD` even when no app version changed.
  *
  * `--date` sets the tag date. On stable the tag date is also the snapshot date,
  * because the rolling tag *is* the snapshot; on a pre-release it only moves the
@@ -879,11 +880,16 @@ export function artifactsSection(manifest, { tag = null, draft = false, channel 
  * it and a reader who starts at the table would run a command that cannot work
  * yet. A pack carries a signed version and has no release page, so no pack row
  * is invented.
+ *
+ * Stable's tag is the snapshot, so the opening sentence names one day. A
+ * pre-release tag carries the publication day instead, so that sentence names
+ * both: the snapshot from the changelog and the tag date a reader sees above.
  */
 export function aggregateReleaseBody(
   entries,
   {
     date,
+    tagDate = date,
     tag = null,
     apkLive = false,
     draft = false,
@@ -899,8 +905,10 @@ export function aggregateReleaseBody(
   // could not be collected, so it reads its id from the app table.
   const shellApp = APPS.find((app) => app.id === "shell");
   return [
-    `**Suite Shell** is the desktop superapp; **Suite Go** is the mobile superapp. This is the ${date} build` +
-      (channel === "stable" ? "." : `, published on the **${channel}** channel.`),
+    `**Suite Shell** is the desktop superapp; **Suite Go** is the mobile superapp. ` +
+      (channel === "stable"
+        ? `This is the ${date} build.`
+        : `This is the ${date} snapshot, published on the **${channel}** channel on ${tagDate}.`),
     "Only the two superapps have a release page; a pack carries a signed version and no page.",
     "",
     ...(preReleases.length === 0
@@ -1680,6 +1688,7 @@ async function main(argv) {
   const draftBodies = mode === "draft" || mode === "dry-run";
   const body = aggregateReleaseBody(entries, {
     date: snapshotDate,
+    tagDate,
     tag,
     apkLive,
     draft: draftBodies,
