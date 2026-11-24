@@ -115,6 +115,30 @@ export interface CommandsService {
   execute(id: string): Promise<void>;
 }
 
+/**
+ * The pack's own identity (S2.6, S4.7).
+ *
+ * A host derives this key per `(publisher id, pack id)` from its device key and
+ * hands the pack only the public half. The pack never sees the device key or the
+ * derived secret. `sign` is the host's signing call for the pack's own data; a
+ * relay frame, a relay role record and a membership change are refused there.
+ */
+export interface PackIdentity {
+  readonly publisherId: string;
+  readonly packId: string;
+  readonly algorithm: "Ed25519";
+  readonly publicKey: string;
+  /** The key's SHA-256 fingerprint, in the same form a publisher key uses. */
+  readonly fingerprint: string;
+}
+
+export interface IdentityService {
+  /** This pack's derived public identity. */
+  pack(): Promise<PackIdentity>;
+  /** Sign bytes as this pack's own data. The host refuses relay and role use. */
+  sign(bytes: Uint8Array): Promise<string>;
+}
+
 export type NotificationPermission = "granted" | "denied" | "prompt" | "unsupported";
 
 export interface ScheduledNotification {
@@ -197,6 +221,7 @@ export interface PackHost {
   readonly files: FilesService;
   readonly documents: DocumentsService;
   readonly storage: KeyValueStore;
+  readonly identity: IdentityService;
   readonly relay: RelayService;
   readonly commands: CommandsService;
   readonly notifications: NotificationsService;

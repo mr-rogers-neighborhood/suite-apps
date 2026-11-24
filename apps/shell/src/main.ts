@@ -35,6 +35,13 @@ import {
 } from "./installedPacks.js";
 import { planUninstall } from "./lifecycle.js";
 import { documentScopeLabel, documentsRootFor } from "./packIdentity.js";
+import {
+  type DeviceKey,
+  derivePackKey,
+  openDeviceKey,
+  packIdentityView,
+  signPackRecord,
+} from "./packIdentityKey.js";
 import { devPacksEnabled, mergePackSources, shouldOpenAfterInstall } from "./packRegistry.js";
 import {
   importRevocationAdvisory,
@@ -119,6 +126,12 @@ let screenStore: ScreenStore | null = null;
 const documentStores = new Map<string, DocumentStore>();
 let files: PackFilesService | null = null;
 let externalFiles: ExternalFilesService | null = null;
+/**
+ * The host's device key (S2.6). It is the derivation root for `identity.pack`
+ * and never crosses the bridge. A malformed file leaves it null and identity
+ * calls refuse; the host does not mint a new key over one it could not read.
+ */
+let deviceKey: DeviceKey | null = null;
 let trustStore: PublisherTrustStore | null = null;
 /** Advisories that refuse a new install. They never disable an installed pack. */
 let revocations: readonly RevocationAdvisory[] = [];
@@ -133,6 +146,8 @@ let pendingDeepLink: string | null = null;
 const MAX_INSTALL_BYTES = MAX_ARCHIVE_BYTES;
 /** A rotation statement or a revocation advisory is a small JSON file. */
 const MAX_ADVISORY_BYTES = 64 * 1024;
+/** One host-mediated pack signature. Keep in sync with the preload's guard. */
+const MAX_IDENTITY_BYTES = 16 * 1024 * 1024;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -189,6 +204,13 @@ async function bootstrap(): Promise<void> {
 
   const dataRoot = dataRootFor();
   await mkdir(dataRoot, { recursive: true });
+  // The device key is host data, not pack data. A missing file is a first run
+  // and gets a fresh key; a malformed one is reported and leaves identity
+  // calls refused rather than silently changing every pack's identity.
+  deviceKey = await openDeviceKey(join(dataRoot, "identity")).catch((error: unknown) => {
+    console.warn("[shell] the device key could not be opened", error);
+    return null;
+  });
   // The trust store is read before any pack: a pack is verified against it, so a
   // failure here must fall back to the preinstalled key, never to "trust all".
   trustStore = await openPublisherTrust(trustRootFor(dataRoot, process.env)).catch(
@@ -292,6 +314,23 @@ async function reloadRevocations(): Promise<void> {
   } catch (error) {
     console.warn("[shell] the revocation advisories could not be read", error);
   }
+}
+
+/**
+ * A sender's derived pack key, or a rejection.
+ *
+ * The capability is checked at the call, the same way `filesFor` answers: a pack
+ * that did not declare `identity.pack` gets a refused call, not an empty key.
+ * The tuple is `(publisher id, pack id)`; both come from the host's mapping, so
+ * a renderer cannot name either.
+ */
+function identityFor(sender: PackSender) {
+  if (!packAllows(sender.pack, "identity.pack")) {
+    throw new Error("the identity.pack capability is not enabled for this pack");
+  }
+  if (deviceKey === null) throw new Error("the host device key is not ready");
+  const publisherId = sender.pack.publisher?.id ?? SUITE_PUBLISHER_ID;
+  return derivePackKey(deviceKey, publisherId, sender.packId);
 }
 
 /** The document store for a sender's publisher, created on first use. */
@@ -509,6 +548,15 @@ function registerIpc(): void {
       containerId: sender.containerId,
       capabilities: sender.pack.capabilities,
     };
+  });
+  onPack(PACK_IPC.identityPack, async (sender) => packIdentityView(identityFor(sender)));
+  onPack(PACK_IPC.signPackData, (sender, bytes) => {
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength > MAX_IDENTITY_BYTES) {
+      throw new Error("invalid identity payload");
+    }
+    // Only the pack's own data reaches this call. A relay frame, a role record
+    // or a membership change would be refused by `signPackRecord` itself.
+    return signPackRecord("pack-data", bytes, identityFor(sender).secretKey);
   });
   onPack(PACK_IPC.listDocuments, (sender) => {
     // An empty list is a kinder fail-closed answer than `undefined` for the one

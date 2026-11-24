@@ -15,6 +15,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 // Keep in sync with the default in @suite/pack-host. This guard only avoids
 // cloning an obviously oversized buffer across IPC; the store enforces the cap.
 const MAX_FILE_BYTES = 256 * 1024 * 1024;
+// The same kind of guard for the pack's own signing call; the host enforces it.
+const MAX_IDENTITY_BYTES = 16 * 1024 * 1024;
 
 // The host is `<container>.<pack>`. The host still derives both from the sender
 // for every call; these values are for display, not identity.
@@ -55,6 +57,18 @@ contextBridge.exposeInMainWorld("suite", {
   // The host stores the context per tab and derives the tab from the sender, so
   // a pack cannot parse a launch out of a URL or name another tab.
   launch: () => ipcRenderer.invoke("suite:pack:launch"),
+  // The pack's own key, derived by the host from `(publisher id, pack id)`.
+  // Only the public half crosses the bridge; the private half stays in the main
+  // process. `sign` is the host signing the pack's own data.
+  identity: {
+    pack: () => ipcRenderer.invoke("suite:identity:pack"),
+    sign: (bytes) => {
+      if (!bytes || typeof bytes.byteLength !== "number" || bytes.byteLength > MAX_IDENTITY_BYTES) {
+        return Promise.reject(new Error("identity payload is too large"));
+      }
+      return ipcRenderer.invoke("suite:identity:sign", bytes);
+    },
+  },
   documents: {
     list: () => ipcRenderer.invoke("suite:documents:list"),
     create: (name) => ipcRenderer.invoke("suite:documents:create", name),

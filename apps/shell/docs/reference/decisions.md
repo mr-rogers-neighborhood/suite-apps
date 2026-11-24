@@ -17,10 +17,10 @@ The rules that shape the Suite host.
 
 - No pack-supplied Node, no raw `fs`, no raw network. A pack runs in a sandboxed renderer with
   context isolation and no Node integration.
-- The host exposes a narrow capability API. The spike implements `documents`, `files` and the
-  `network` policy; `storage`, `recents`, `notifications`, `relay` and `commands` are in the shared
-  vocabulary but are refused at discovery until their service exists. A manifest never widens the
-  bridge by asking.
+- The host exposes a narrow capability API. The spike implements `documents`, `files`,
+  `identity.pack` and the `network` policy; `storage`, `recents`, `notifications`, `relay` and
+  `commands` are in the shared vocabulary but are refused at discovery until their service exists.
+  A manifest never widens the bridge by asking.
 - Browser storage is not the `storage` capability. Every pack has its own persistent session
   partition, so `localStorage` and IndexedDB are pack-local; `storage` names a host key-value service
   that this spike does not implement.
@@ -44,6 +44,32 @@ The rules that shape the Suite host.
 - Permissions are denied wholesale. Network is denied unless the manifest declares it; a
   network-capable pack may reach HTTPS and WSS only. Downloads are denied; a pack that needs to
   export a file waits for the host's file service.
+
+## Pack identity and keys
+
+- The device key is the host's, stored at `<dataRoot>/identity/device.json` with mode 0600. A
+  missing file is a first run and gets a fresh Ed25519 seed. A malformed file is refused rather
+  than replaced, because minting a new device key would silently change every pack's identity.
+  The device key never crosses the pack bridge and is not a pack capability.
+- `identity.pack` is derived per pack with HKDF-SHA256 from the device seed. The input keying
+  material is the 32-byte seed; the salt is `suite/pack-identity/v1`; the info is
+  `suite/pack-identity/v1`, a NUL, the publisher id, a NUL, the pack id; the output is 32 bytes,
+  used as an Ed25519 seed. Both ids are lower-case kebab-case, so the NUL separator cannot be
+  forged. The version label is part of the tuple, so a later derivation can be introduced without
+  reusing today's keys.
+- The tuple is **`(publisher id, pack id)`**, not the pack id alone. A container can hold the same
+  public pack id under two publishers (S2.2), and those are two install identities that must not
+  share a key. A publisher _key_ rotation keeps the publisher id (S2.3), so the pack key survives
+  it; a migration to another publisher changes the tuple and therefore the key, which is the
+  identity half of "inherits nothing".
+- The pack receives the derived **public** key, its fingerprint and a host-mediated `sign` call for
+  the pack's own data. The derived secret and the device key stay in the main process. That is why
+  the forbidden-signature rule can be enforced rather than advised: a pack has no secret to sign
+  with, and the one signing call refuses `relay-frame`, `role-record` and `membership-change`
+  before it calls Ed25519. A pack key is scoped to the pack's own data (S4.7).
+- The derivation is host-local today. Go's container does not derive `identity.pack` yet, so a pack
+  does not yet see one identity across both hosts; that parity is the remaining gap, and S4.7 stays
+  `Partial` until it lands.
 
 ## Documents and files
 

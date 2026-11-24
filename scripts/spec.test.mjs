@@ -53,6 +53,7 @@ const TAG_SCAN_FILES = [
   "apps/shell/src/exportBundle.test.ts",
   "apps/shell/src/installedPacks.test.ts",
   "apps/shell/src/packIdentity.test.ts",
+  "apps/shell/src/packIdentityKey.test.ts",
   "apps/shell/src/packRevocation.test.ts",
   "apps/shell/src/publisherRotation.test.ts",
   "apps/shell/src/publisherTrust.test.ts",

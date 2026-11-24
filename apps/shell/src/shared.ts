@@ -40,6 +40,8 @@ export const CHROME_STATE = "suite:shell:state-changed";
 export const PACK_IPC = {
   info: "suite:pack:info",
   launch: "suite:pack:launch",
+  identityPack: "suite:identity:pack",
+  signPackData: "suite:identity:sign",
   listDocuments: "suite:documents:list",
   createDocument: "suite:documents:create",
   openDocument: "suite:documents:open",
