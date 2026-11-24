@@ -202,7 +202,7 @@ jobs:
         run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
 
       - name: Gate tooling
-        run: sudo apt-get update && sudo apt-get install -y xvfb flatpak flatpak-builder ostree
+        run: sudo apt-get update && sudo apt-get install -y xvfb dbus flatpak flatpak-builder ostree
 
       - name: Flatpak runtimes
         run: |
@@ -514,9 +514,14 @@ jobs:
 
           # The commit has to run, not just exist. A window that is still up
           # after 25s is a pass: `timeout` kills it and exits 124.
+          #
+          # A hosted runner has no session bus, and zypak aborts Electron
+          # without one ("Failed to connect to session bus", exit 134), so the
+          # launch would fail on the environment rather than on the build.
+          # `platforms.yml` wraps its smoke test the same way.
           log="${work}/launch.log"
           status=0
-          xvfb-run -a timeout 25 flatpak run --branch="${branch}" "${app}" \
+          xvfb-run -a dbus-run-session -- timeout 25 flatpak run --branch="${branch}" "${app}" \
             >"${log}" 2>&1 || status=$?
           if [ "${status}" -ne 0 ] && [ "${status}" -ne 124 ]; then
             echo "flatpak run ${ref} exited ${status} before the timeout" >&2
