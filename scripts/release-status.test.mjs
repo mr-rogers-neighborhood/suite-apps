@@ -23,6 +23,7 @@ import {
   flatpakrepoUrl,
   goApkName,
   goApkUrl,
+  INDEX_RELEASE_FILE,
   installCell,
   installCommand,
   isDate,
@@ -34,6 +35,7 @@ import {
   pruneCandidates,
   publishAction,
   publishReleaseArgs,
+  readIndexRelease,
   readManifest,
   releaseAssetUrl,
   releaseDates,
@@ -1020,6 +1022,53 @@ describe("the Artifacts section", () => {
       });
       assert.ok(draft.includes(apkSha), "a draft may state a digest: the bytes are already built");
       assert.match(draft, /these are\s+the final bytes/u);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("prints the catalogue index and the operator fingerprint it must be pinned against", () => {
+    const dir = mkdtempSync(join(tmpdir(), "suite-release-index-"));
+    try {
+      const fingerprint =
+        "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99";
+      const path = join(dir, INDEX_RELEASE_FILE);
+      writeFileSync(
+        path,
+        JSON.stringify({
+          sequence: 7,
+          url: "https://flatpak.suite.run/index.json",
+          signatureUrl: "https://flatpak.suite.run/index.json.sig",
+          expires: "2026-12-01T00:00:00.000Z",
+          fingerprint,
+        }),
+      );
+      const index = readIndexRelease(path);
+      assert.ok(index !== null);
+
+      const body = aggregateReleaseBody(entries, {
+        date: "2026-11-23",
+        tag: "suite-2026.11.23",
+        index,
+      });
+      assert.match(body, /## Catalogue index/u);
+      assert.ok(body.includes("sequence 7"));
+      assert.ok(body.includes("[index.json](https://flatpak.suite.run/index.json)"));
+      assert.ok(body.includes("[index.json.sig](https://flatpak.suite.run/index.json.sig)"));
+      assert.ok(body.includes(`Catalogue operator fingerprint: \`${fingerprint}\``));
+      assert.ok(body.includes("2026-12-01T00:00:00.000Z"));
+
+      const none = aggregateReleaseBody(entries, { date: "2026-11-23" });
+      assert.doesNotMatch(none, /## Catalogue index/u);
+      assert.equal(
+        readIndexRelease(join(tmpdir(), "suite-no-such-index", INDEX_RELEASE_FILE)),
+        null,
+      );
+
+      writeFileSync(path, "{}");
+      assert.throws(() => readIndexRelease(path), /no usable sequence/u);
+      writeFileSync(path, "not json");
+      assert.throws(() => readIndexRelease(path), /not valid JSON/u);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

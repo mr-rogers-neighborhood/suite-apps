@@ -21,6 +21,33 @@ export const REMOTE_NAME = "suite";
 /** The public store every machine adds; CloudFront serves the signed repository. */
 export const DEFAULT_PUBLIC_URL = "https://flatpak.suite.run/";
 
+/**
+ * The catalogue index and pack archives live beside the Flatpak summary, on the
+ * same origin. `index.json` is re-fetched on every publication, so it is
+ * no-cache; an archive is named for the bytes it holds, so it is immutable.
+ */
+export const INDEX_FILE = "index.json";
+export const INDEX_SIGNATURE_FILE = "index.json.sig";
+export const PACKS_PREFIX = "packs/";
+
+/** The two names a catalogue publication invalidates; immutable archives do not need it. */
+export const INDEX_INVALIDATION_PATHS = [`/${INDEX_FILE}`, `/${INDEX_SIGNATURE_FILE}`];
+
+/** The signed catalogue index a host fetches. */
+export function indexUrl(base = DEFAULT_PUBLIC_URL) {
+  return `${normalizeRemoteUrl(base)}${INDEX_FILE}`;
+}
+
+/** The detached signature over the exact `index.json` bytes. */
+export function indexSignatureUrl(base = DEFAULT_PUBLIC_URL) {
+  return `${normalizeRemoteUrl(base)}${INDEX_SIGNATURE_FILE}`;
+}
+
+/** One archive URL, under the Flatpak remote's own `packs/` directory. */
+export function packArchiveUrl(fileName, base = DEFAULT_PUBLIC_URL) {
+  return `${normalizeRemoteUrl(base)}${PACKS_PREFIX}${encodeURIComponent(fileName)}`;
+}
+
 /** The two places a publication can go. `lan` is the local test remote. */
 export const TARGETS = ["lan", "s3"];
 export const DEFAULT_TARGET = "lan";
