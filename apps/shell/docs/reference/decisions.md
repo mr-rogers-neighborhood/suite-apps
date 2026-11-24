@@ -145,8 +145,15 @@ The rules that shape the Suite host.
 - The shell renders pack-declared contributions: commands, menus, toolbar items, status items,
   keybindings and widgets. Contributions are data, not DOM. The host validates and renders them.
 - A pack owns only its content. It never renders into host chrome, and the host never imports pack UI.
-- Theme tokens are host-provided. A shared component kit is optional, not a requirement; Canvas must
-  be able to be a canvas.
+- Theme is host state, not pack state. Suite Shell owns the preset and brightness on desktop (Suite
+  Go owns them on mobile), stores the pair at `<dataRoot>/theme.json`, and paints every pack view with
+  the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A pack has no
+  picker and no stored choice; a change repaints open views through `ShellWindow.setTheme` and a pack
+  installed later starts in the same theme. The two controls are in the **View** menu: light, dark or
+  follow-the-system, and Suite, Warm or Solarized. `logseq` is kept as a stored-id alias for `warm`, so
+  an old selection resolves to the warm palette rather than to a missing theme. Per-pack palettes and
+  user-authored themes remain out of scope.
+- A shared component kit is optional, not a requirement; Canvas must be able to be a canvas.
 - Documents are first-class in the launcher and recents, but tabs are app sessions. The shell indexes
   metadata and opens the owning pack through a deep link. Recents are local; space entries are
   shareable later.

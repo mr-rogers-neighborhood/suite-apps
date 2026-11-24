@@ -18,7 +18,6 @@ import { ScheduleAutoEnterNotice } from "../schedules/ScheduleAutoEnterNotice";
 import { SchedulesView } from "../schedules/SchedulesView";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore } from "../store/uiStore";
-import { ThemePicker } from "../theme/ThemePicker";
 import { BudgetMark } from "./BudgetMark";
 import { Sidebar } from "./Sidebar";
 import { ViewMenu } from "./ViewMenu";
@@ -137,11 +136,6 @@ export function Shell({
                 <Plus size={13} />
                 <span className="hidden xl:inline">Add transaction</span>
               </Button>
-            </div>
-          }
-          controls={
-            <div className="hidden lg:block">
-              <ThemePicker layout="inline" />
             </div>
           }
         />

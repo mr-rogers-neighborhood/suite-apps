@@ -7,7 +7,6 @@ import { DayCalendar } from "../calendar/DayCalendar";
 import { getBridge } from "../platform/bridge";
 import { useUiStore } from "../store/uiStore";
 import { SyncControl } from "../sync/SyncControl";
-import { ThemePicker } from "../theme/ThemePicker";
 import { PlannerMark } from "./PlannerMark";
 import { Sidebar, SidebarDrawer } from "./Sidebar";
 import { ViewMenu } from "./ViewMenu";
@@ -77,11 +76,6 @@ export function Shell() {
             <WorkspaceActions className="hidden items-center gap-2 md:flex" variant="ghost" />
           }
           sync={<SyncControl />}
-          controls={
-            <div className="hidden lg:block">
-              <ThemePicker layout="inline" />
-            </div>
-          }
         />
         <main aria-label="Planner" className="flex min-h-0 flex-1 flex-col">
           <View />

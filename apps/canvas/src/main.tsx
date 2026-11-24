@@ -13,7 +13,6 @@ import {
   refreshEstimate,
 } from "./storage/durability";
 import { initAppearance } from "./theme/useAppearanceStore";
-import { initTheme } from "./theme/useThemeStore";
 import "./styles/global.css";
 // One stylesheet per workstream, so parallel work never edits the same file.
 import "./styles/paint.css";
@@ -28,8 +27,6 @@ import "./field/annotationKind";
 import "./field/compositeKinds";
 import { CanvasMark } from "./chrome/CanvasMark";
 
-// Apply the stored theme before first paint to avoid a flash of the wrong mode.
-initTheme();
 // Before the first paint of the canvas, so a stored radius or density never flashes.
 initAppearance();
 

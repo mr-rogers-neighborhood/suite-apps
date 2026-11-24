@@ -13,8 +13,8 @@ where am I, what am I looking for, is my work saved, and who else can see it.
 From the left: the **workspace name** (click it to rename, switch workspace, pin it to the top of
 the launcher, or go back to the launcher), the **board tabs**, the board's own controls (undo,
 redo, interaction mode, version history, the outline, and the diamond that gathers a selection to
-explain it), and then **search**. From the right: the sync status pill, **Share**, and the theme
-toggle.
+explain it), and then **search**. From the right: the sync status pill and **Share**. The theme
+control is not here: it belongs to the host now.
 
 Search is not a separate page. It opens the command palette, which searches cards and boards and
 also runs commands, so "find the thing" and "do the thing" are one query

@@ -16,7 +16,6 @@ export const START_IPC = {
   removeApp: "suite:start:remove",
   installApp: "suite:start:install",
   uninstallApp: "suite:start:uninstall",
-  setTheme: "suite:start:theme",
   revealApp: "suite:start:reveal",
   recents: "suite:start:recents",
   forgetRecent: "suite:start:forget",
@@ -55,42 +54,17 @@ export const START_INSTALL_PROGRESS = "suite:start:install-progress";
 export type StartChannel = (typeof START_IPC)[keyof typeof START_IPC];
 
 /**
- * Which mode the window draws.
+ * The theme the hub draws, already resolved.
  *
- * Declared here rather than in `theme.ts` because the page imports this module and that one
- * reads the filesystem. `theme.ts` owns the rules; this owns the vocabulary.
- *
- * `system` is a *choice*, not a mode: by the time a value reaches the page it has been
- * resolved against the desktop, so a stylesheet never sees it.
- */
-export type ThemeSource = "system" | "light" | "dark";
-
-/** What a person chose: a preset, and how bright to draw it. */
-export interface ThemeChoice {
-  /** The preset's id, from `@suite/theme`. */
-  readonly preset: string;
-  readonly mode: ThemeSource;
-}
-
-/** One entry in the picker. The colours are not here: `themeValues` carries the chosen one. */
-export interface ThemeOption {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string | null;
-}
-
-/**
- * The chosen theme, already resolved.
- *
- * The page cannot import `@suite/theme` — it is plain ES modules served over `start://` with
- * no bundler — so main does the resolving and sends the answer. That keeps the renderer
- * dependency-free and puts the one place that knows how a preset becomes CSS in the process
- * that already imports the package.
+ * Start is not the host: Suite Shell owns a person's theme on desktop. The hub keeps
+ * painting the default Suite palette so its own chrome follows the desktop's brightness,
+ * but it offers no picker and stores no choice. The page cannot import `@suite/theme` — it
+ * is plain ES modules over `start://` with no bundler — so main resolves the values and
+ * sends them.
  */
 export interface ResolvedTheme {
-  readonly choice: ThemeChoice;
-  /** The preset list, for the picker. */
-  readonly options: readonly ThemeOption[];
+  /** The resolved preset id. */
+  readonly preset: string;
   /** The resolved mode, never `system`. */
   readonly mode: "light" | "dark";
   /** Every role as a custom property, ready for `style.setProperty`. */

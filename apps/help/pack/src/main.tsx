@@ -5,7 +5,6 @@ import { HashRouter } from "react-router";
 
 import { App } from "@/App";
 import "@/styles.css";
-import { initTheme } from "@/theme";
 
 /**
  * The pack's entry.
@@ -19,8 +18,6 @@ import { initTheme } from "@/theme";
  * Everything else is the same mount as `src/renderer/src/main.tsx`: the same App, the same styles,
  * the same theme. Only the router differs.
  */
-initTheme();
-
 const root = document.getElementById("root");
 if (root === null) throw new Error("Suite Help needs a #root element");
 

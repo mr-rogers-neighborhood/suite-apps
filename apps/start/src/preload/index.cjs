@@ -17,7 +17,6 @@ contextBridge.exposeInMainWorld("suiteStart", {
   // Asks Flatpak to remove a deployment; the confirmation happens in main.
   uninstallApp: (id) => ipcRenderer.invoke("suite:start:uninstall", id),
   // One of "system", "light", "dark". Main validates it before it is applied or stored.
-  setTheme: (source) => ipcRenderer.invoke("suite:start:theme", source),
   // An app id, never a path: main resolves it against its own records.
   revealApp: (id) => ipcRenderer.invoke("suite:start:reveal", id),
   // Install from the store or update a deployment, or switch one pre-release

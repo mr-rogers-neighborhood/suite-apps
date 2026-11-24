@@ -3,7 +3,6 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { PlannerMark } from "../app/PlannerMark";
 import { getBridge } from "../platform/bridge";
-import { ThemePicker } from "../theme/ThemePicker";
 
 /**
  * The screen a person lands on the first time, when there is no workspace file yet.
@@ -66,14 +65,7 @@ export function PlannerLauncher({ onBegin }: { onBegin: () => void }) {
             </p>
           )
         }
-        footer={
-          <>
-            <div className="w-[190px]">
-              <ThemePicker />
-            </div>
-            <PrivacyLine />
-          </>
-        }
+        footer={<PrivacyLine />}
       />
     </main>
   );

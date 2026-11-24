@@ -323,6 +323,10 @@ suite stays separate Flatpaks plus Start.
   | Class | Example | What the pack contributes |
   | --- | --- | --- |
   | Host mechanism, host meaning | theme, window chrome, store key | nothing; it receives the result |
+
+  Theme is the worked example: the host stores the preset and brightness with its profile, offers the
+  only picker, and paints every pack's resolved tokens. A pack that carried its own theme setting
+  would be a second identity for the same product.
   | Host mechanism, pack meaning | sync, notifications, export, migration | the declaration: scope, payload, due time, entry point |
   | Pack mechanism, pack meaning | the editing surface, the schema, a projection body | everything; the host is not involved |
 

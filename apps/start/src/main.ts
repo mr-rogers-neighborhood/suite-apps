@@ -19,7 +19,6 @@ import {
   START_HOME_SCREEN_ID,
   type WidgetRegistry,
 } from "@suite/screens";
-import { cssVariables, defaultTheme, presetById } from "@suite/theme";
 import {
   app,
   BrowserWindow,
@@ -92,16 +91,9 @@ import {
   START_INSTALL_PROGRESS,
   START_IPC,
   type SyncState,
-  type ThemeChoice,
 } from "./shared.js";
 import { isIconOf, shortcutIconPathIn, shortcutPathIn } from "./shortcuts.js";
-import {
-  isThemeChoice,
-  loadThemeChoice,
-  presetFor,
-  saveThemeChoice,
-  themeOptions,
-} from "./theme.js";
+import { resolveTheme } from "./theme.js";
 import { resolveWindowIcon } from "./windowIcon.js";
 
 /**
@@ -180,37 +172,19 @@ let window: BrowserWindow | null = null;
 let registry: RegistryStore;
 let recents: RecentsFile;
 let dataDirectory = "";
-/**
- * Which preset and mode the window draws.
- *
- * Held in memory and resolved on every read, because "follow the desktop" is a choice whose
- * answer changes while the hub is open — a laptop that dims at dusk should repaint without
- * anyone touching the picker.
- */
-let themeChoice: ThemeChoice = { preset: presetFor(null), mode: "system" };
-
 /** What the desktop currently says, which `system` resolves against. */
 function desktopPrefersDark(): boolean {
   return nativeTheme.shouldUseDarkColors;
 }
 
 /**
- * The choice, resolved: the preset, the list for the picker, and every role as a variable.
+ * The default Suite palette, resolved against the desktop.
  *
  * Resolved in main because the page cannot import `@suite/theme` — it is plain ES modules
- * over `start://` with no bundler — and because one process deciding is what keeps the
- * title bar, the scrollbars and the content from disagreeing.
+ * over `start://` with no bundler. Start is not the host, so there is no choice to send.
  */
 function resolvedTheme(): ResolvedTheme {
-  const preset = presetById(themeChoice.preset) ?? defaultTheme();
-  const mode =
-    themeChoice.mode === "system" ? (desktopPrefersDark() ? "dark" : "light") : themeChoice.mode;
-  return {
-    choice: themeChoice,
-    options: themeOptions(),
-    mode,
-    values: cssVariables(preset, mode),
-  };
+  return resolveTheme(desktopPrefersDark());
 }
 /**
  * The last Sync operation that failed, so the pane can show it without a card.
@@ -1316,29 +1290,6 @@ function registerIpc(): void {
     await broadcast();
   });
 
-  /**
-   * Remember which palette to draw.
-   *
-   * Applied through `nativeTheme` rather than a class on the page: one assignment changes
-   * what every window reports for `prefers-color-scheme`, so the stylesheet keeps one set of
-   * rules and the title bar cannot disagree with the content.
-   */
-  onIpc(START_IPC.setTheme, async (_event, choice: unknown) => {
-    if (!isThemeChoice(choice)) return;
-    const next: ThemeChoice = { preset: presetFor(choice.preset), mode: choice.mode };
-    if (next.preset === themeChoice.preset && next.mode === themeChoice.mode) return;
-    themeChoice = next;
-    // Electron owns the window frame and the scrollbars, so it is told as well; the page gets
-    // the values through state, because it cannot read the package.
-    nativeTheme.themeSource = next.mode;
-    try {
-      await saveThemeChoice(dataDirectory, next);
-    } catch (error) {
-      console.warn("[theme] could not save the choice", error);
-    }
-    await broadcast();
-  });
-
   onIpc(START_IPC.recents, async () => (await state()).recents);
 
   onIpc(START_IPC.forgetRecent, async (_event, path: unknown) => {
@@ -1485,8 +1436,6 @@ if (!gotLock) {
       return;
     }
 
-    themeChoice = await loadThemeChoice(dataDirectory);
-    nativeTheme.themeSource = themeChoice.mode;
     const paths = hostPathTable();
     const registryPath = registryPathFor(paths);
     const registryOverride = process.env.SUITE_START_REGISTRY?.trim();

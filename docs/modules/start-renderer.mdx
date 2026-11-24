@@ -46,8 +46,9 @@ Every colour role is a CSS custom property, so the stylesheet never asks which
 preset is active. `data-theme` and `data-theme-mode` are set as well, because a
 preset can change a border or shadow rule rather than only a colour.
 
-Setting this from state rather than from the control is what makes a choice in
-one window correct in the next.
+Start is not the host, so there is no control and no stored choice: main sends
+the default Suite palette resolved against the desktop, and the hub only paints
+it. Suite Shell and Suite Go own a person's theme.
 
 ## apps/start/src/renderer/apps.js#renderApps
 

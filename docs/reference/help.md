@@ -17,10 +17,10 @@ handbook and the search index ship inside the bundle, so a person needs no check
 
 ## Theme and mark
 
-Help uses `@suite/theme` rather than a palette of its own. The footer of both navigators offers a
-**Theme** preset and a **Brightness** mode — **System**, **Light** or **Dark** — stored per device
-under `suite.theme`. The preset paints the suite role variables, the Fumadocs `--color-fd-*` names
-point at those roles, and Shiki follows the resolved mode instead of a fixed code theme.
+Help uses `@suite/theme` rather than a palette of its own, and it has no theme control. The host owns
+the preset and brightness — Suite Shell's **View** menu on desktop, Suite Go's **Settings** on mobile —
+and paints the resolved role variables onto the document. The Fumadocs `--color-fd-*` names point at
+those roles, and Shiki follows `data-theme-mode` instead of a fixed code theme.
 
 The window icon, `electron-builder` icon, Flatpak icons and Start's Help card all use the same headset
 on the ink tile. Start's card mark inverts with the tile in a light theme; the packaged icon is the

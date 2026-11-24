@@ -21,6 +21,7 @@ export function Home({
   onTogglePin,
   onCatalogue,
   onInstall,
+  onSettings,
   onRemove,
   removable,
   notice,
@@ -33,6 +34,7 @@ export function Home({
   readonly onTogglePin: (moduleId: string) => void;
   readonly onCatalogue: () => void;
   readonly onInstall: () => void;
+  readonly onSettings: () => void;
   readonly onRemove: (moduleId: string) => void;
   /** Installed packs, which can be removed — as distinct from the domains that ship in the app. */
   readonly removable: ReadonlySet<string>;
@@ -96,6 +98,13 @@ export function Home({
               onClick={onInstall}
             >
               Install from file…
+            </button>
+            <button
+              type="button"
+              className="touch rounded-xl border border-[var(--hairline)] px-4 text-[15px] font-medium text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:outline-none"
+              onClick={onSettings}
+            >
+              Settings
             </button>
           </div>
         }

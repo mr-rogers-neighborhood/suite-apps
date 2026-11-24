@@ -84,16 +84,6 @@ const actions = {
     await bridge.uninstallApp(id);
     await refresh();
   },
-  /**
-   * Which palette to draw.
-   *
-   * The next state arrives carrying the answer, so the select keeps whatever was chosen
-   * rather than snapping back to a value the page guessed.
-   */
-  async setTheme(preset, mode) {
-    await bridge.setTheme({ preset, mode });
-    await refresh();
-  },
   async reveal(id) {
     await bridge.revealApp(id);
   },
@@ -176,7 +166,7 @@ function visibleApps(state) {
 function applyTheme(theme) {
   const root = document.documentElement;
   for (const [name, value] of Object.entries(theme.values)) root.style.setProperty(name, value);
-  root.dataset.theme = theme.choice.preset;
+  root.dataset.theme = theme.preset;
   root.dataset.themeMode = theme.mode;
   root.style.colorScheme = theme.mode;
 }

@@ -277,6 +277,8 @@ export interface ScreenView {
 }
 
 export interface ThemeView {
+  /** The resolved preset id, after any stored-id rename. */
+  readonly preset: string;
   readonly mode: "light" | "dark";
   readonly values: Readonly<Record<string, string>>;
 }

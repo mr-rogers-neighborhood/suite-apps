@@ -7,7 +7,6 @@ import { BudgetMark } from "../app/BudgetMark";
 import { IconButton } from "../components/IconButton";
 import { TextPrompt } from "../components/TextPrompt";
 import { useUiStore } from "../store/uiStore";
-import { ThemePicker } from "../theme/ThemePicker";
 
 export type BudgetLauncherProps = {
   entries: LibraryEntry[];
@@ -97,14 +96,7 @@ export function BudgetLauncher({
               </p>
             </div>
           }
-          footer={
-            <>
-              <div className="w-[190px]">
-                <ThemePicker />
-              </div>
-              <PrivacyLine />
-            </>
-          }
+          footer={<PrivacyLine />}
         />
       </div>
 

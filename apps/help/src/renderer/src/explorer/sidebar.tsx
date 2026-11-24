@@ -9,7 +9,6 @@ import type {
   TourStep,
   View,
 } from "@/lib/explorer-types";
-import { ThemeControl } from "@/theme-control";
 
 type Props = {
   view: View;
@@ -214,10 +213,6 @@ export function ExplorerSidebar({
             onSelectTourStep={onSelectTourStep}
           />
         )}
-      </div>
-
-      <div className="shrink-0 border-t border-fd-border p-2.5">
-        <ThemeControl compact={compact} />
       </div>
     </div>
   );

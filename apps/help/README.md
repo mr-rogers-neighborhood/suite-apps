@@ -72,14 +72,14 @@ gate.
 
 ## Theme and mark
 
-Help paints `@suite/theme`, not a palette of its own. The footer of both navigators offers a **Theme**
-preset and a **Brightness** mode: **System**, **Light** or **Dark**. The choice is stored per device
-in `localStorage` under `suite.theme`; a record with only an old mode string still reads, and a preset
-this build does not ship falls back to the default.
+Help paints `@suite/theme`, not a palette of its own, and it no longer offers a theme control. The
+host — Suite Shell's **View** menu on desktop, Suite Go's **Settings** on mobile — owns the preset and
+brightness, paints the resolved role variables onto the document, and marks the root with
+`data-theme-mode`.
 
-The preset paints the suite's role variables. `styles.css` points the Fumadocs `--color-fd-*` names at
-those roles, so the handbook and the explorer share one palette, and Shiki asks for `github-light` or
-`github-dark` from the resolved mode rather than a fixed theme.
+`styles.css` points the Fumadocs `--color-fd-*` names at those roles, so the handbook and the explorer
+share one palette, and Shiki asks for `github-light` or `github-dark` from the host's resolved mode
+rather than a fixed theme.
 
 The window icon, the `electron-builder` icon, the Flatpak icons and the Help card in Start all use the
 same headset on the ink tile. The card mark is white on the hub's ink and a light theme inverts the
