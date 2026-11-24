@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   parseProjectedReminders,
+  REMINDER_RETRY_MS,
   type ReminderClock,
   type ReminderConsent,
   type ReminderDelivery,
@@ -56,6 +57,8 @@ class ManualClock implements ReminderClock {
 interface FakeDelivery extends ReminderDelivery {
   readonly shown: ReminderRow[];
   result: ReminderShowResult;
+  error: Error | null;
+  attempts: number;
 }
 
 function delivery(result: ReminderShowResult = "shown") {
@@ -63,8 +66,12 @@ function delivery(result: ReminderShowResult = "shown") {
   const fake: FakeDelivery = {
     shown,
     result,
+    error: null,
+    attempts: 0,
     show(row) {
-      shown.push(row);
+      fake.attempts += 1;
+      if (fake.error !== null) throw fake.error;
+      if (fake.result === "shown") shown.push(row);
       return fake.result;
     },
   };
@@ -287,6 +294,52 @@ describe("the reminder scheduler", () => {
   });
 
   // spec: S4.2
+  // spec: S4.2
+  it.each([
+    ["throws", "throw"],
+    ["returns failed", "failed"],
+    ["returns denied", "denied"],
+  ] as const)(
+    "backs off when the OS %s instead of re-arming the same row in the tick",
+    async (_label, failure) => {
+      const clock = new ManualClock(NOW);
+      const fake = delivery(failure === "throw" ? "shown" : failure);
+      if (failure === "throw") fake.error = new Error("no notification service");
+      const gate = consent();
+      const scheduler = new ReminderScheduler({
+        queue,
+        clock,
+        delivery: fake,
+        consent: gate,
+      });
+      await queue.replacePack(PACK, [projected("a", NOW)], NOW);
+
+      await scheduler.start();
+      clock.advance(0);
+      await scheduler.settle();
+
+      // One attempt, and the due row is still queued: no spin in this tick.
+      expect(fake.attempts).toBe(1);
+      expect(queue.rows()).toHaveLength(1);
+
+      clock.advance(REMINDER_RETRY_MS - 1);
+      await scheduler.settle();
+      expect(fake.attempts).toBe(1);
+
+      fake.error = null;
+      fake.result = "shown";
+      clock.advance(1);
+      await scheduler.settle();
+      clock.advance(0);
+      await scheduler.settle();
+
+      expect(fake.attempts).toBe(2);
+      expect(fake.shown.map((row) => row.id)).toEqual(["a"]);
+      expect(queue.rows()).toEqual([]);
+      scheduler.stop();
+    },
+  );
+
   it("asks once, and shows a denial instead of scheduling", async () => {
     const clock = new ManualClock(NOW);
     const fake = delivery();

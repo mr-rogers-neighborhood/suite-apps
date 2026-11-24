@@ -1454,6 +1454,7 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
       packTrustOptions(),
       { replace: action === "reinstall" },
     );
+    await recordInstallConsent(installed);
     await refreshPacks();
     publishPackData();
 

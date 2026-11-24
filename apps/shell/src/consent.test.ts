@@ -81,6 +81,37 @@ describe("the consent record", () => {
     expect(store.state(request({ capability: "notifications" }))).toBe("unanswered");
   });
 
+  // spec: S4.2
+  it("records the same install-tier row from a file install and a catalogue install", async () => {
+    const store = await record();
+    const pack = { publisherId: "suite", packId: "canvas", version: "1.0.0" };
+    const capabilities: readonly PackCapability[] = ["documents", "recents", "notifications"];
+
+    await store.recordInstall({ pack, capabilities, at: 900 });
+    const fileInstall = store.entries();
+    await store.clearForPack("canvas");
+    await store.recordInstall({ pack, capabilities, at: 900 });
+
+    expect(store.entries()).toEqual(fileInstall);
+    // Only the install-tier capability is answered; the other two wait for use.
+    expect(fileInstall).toHaveLength(1);
+    expect(fileInstall[0]?.capability).toBe("documents");
+
+    // Both install paths in the main process must call the same recorder; the
+    // catalogue path once skipped it, which left a catalogue install unanswered.
+    const source = await readFile(new URL("./main.ts", import.meta.url), "utf8");
+    const filePath = source.slice(
+      source.indexOf("async function installPackFromFile"),
+      source.indexOf("async function installPackFromCatalogue"),
+    );
+    const cataloguePath = source.slice(
+      source.indexOf("async function installPackFromCatalogue"),
+      source.indexOf("function catalogueActionFor"),
+    );
+    expect(filePath).toContain("recordInstallConsent(installed)");
+    expect(cataloguePath).toContain("recordInstallConsent(installed)");
+  });
+
   // spec: S4.3
   it("records what was shown, the answer and when, and survives a reopen", async () => {
     const store = await record();

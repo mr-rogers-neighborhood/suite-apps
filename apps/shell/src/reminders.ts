@@ -56,6 +56,14 @@ export interface LegacyNotificationPermission {
 
 export const REMINDER_QUEUE_VERSION = 2;
 export const MAX_REMINDERS_PER_PACK = 200;
+/**
+ * How long a failed delivery waits before the scheduler re-evaluates.
+ *
+ * A row is not removed until the OS accepted it, so a refused or failed show
+ * stays queued. Re-asking `#ensure` in the same tick would re-arm the same due
+ * row immediately and spin; this pause is the floor between attempts.
+ */
+export const REMINDER_RETRY_MS = 60_000;
 const MAX_ID_LENGTH = 128;
 const MAX_TITLE_LENGTH = 120;
 const MAX_BODY_LENGTH = 500;
@@ -362,7 +370,8 @@ export interface ReminderSchedulerOptions {
  *
  * It never asks a pack anything: it reads the queue and arms one timer for the
  * earliest row. A row is removed only after the OS accepted it, so a failed
- * delivery is retried on the next refresh rather than lost.
+ * delivery is retried after `REMINDER_RETRY_MS` rather than lost — and never in
+ * the same tick, which would spin on a row that is still due.
  */
 export class ReminderScheduler {
   readonly #queue: ReminderQueue;
@@ -489,7 +498,7 @@ export class ReminderScheduler {
         result = await this.#delivery.show(row);
       } catch (error) {
         this.#onFailed?.(row, error);
-        await this.#ensure();
+        this.#retry(now);
         return;
       }
 
@@ -501,21 +510,35 @@ export class ReminderScheduler {
 
       if (result === "failed") {
         this.#onFailed?.(row, new Error("the reminder could not be shown"));
-        await this.#ensure();
+        this.#retry(now);
         return;
       }
 
       // The OS refused after the host had consent. That is not a person's answer,
-      // so it is reported but not written into the consent record.
-      this.#granted.delete(row.packId);
+      // so it is reported but not written into the consent record. The row stays
+      // queued, and the backoff keeps one refusal from re-arming it this tick.
       this.#permissionChanged(result);
-      await this.#ensure();
+      this.#retry(now);
       return;
     }
 
     // Re-evaluate so a second pack with no answer is asked after the first
     // pack's due rows are gone, rather than only on the next save.
     await this.#ensure();
+  }
+
+  /**
+   * Re-evaluate after a pause, never in the failed tick itself.
+   *
+   * `#ensure` re-reads the queue and consent, so it must not run while the same
+   * row is still due at `now`: the timer floor is what breaks that cycle.
+   */
+  #retry(now: number): void {
+    this.#cancel();
+    this.#timer = this.#clock.setTimer(now + REMINDER_RETRY_MS, () => {
+      this.#timer = null;
+      this.#serial(() => this.#ensure());
+    });
   }
 
   #permissionChanged(permission: ReminderPermission): void {
