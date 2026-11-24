@@ -14,8 +14,8 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S2.8 | Portable key | Absent | No user-held portable identity, export or recovery |
 | S3.1 | Archive safety | Implemented | `packages/pack-host/src/archive.ts` refuses traversal, duplicates, symlinks and device entries |
 | S3.2 | Archive bounds | Partial | Archive caps exist; document, blob, frame and widget bounds are not all enforced |
-| S3.3 | Canonical bytes | Partial | `@suite/pack` signs every schema field in a fixed order, omits an absent optional field instead of emitting `null`, sorts capabilities and files, and `parsePackManifestJson` refuses duplicate keys before `JSON.parse`; `manifest.test.ts` proves field coverage, omission, sorting, nested key order and duplicate rejection, and `signature.test.ts` proves RFC 8032 Ed25519 with standard base64. The shell and the Go host still call `JSON.parse` and then `parsePackManifest`, so duplicate-key rejection is not wired at the host entry point, and the S3.4 golden vector is still absent |
-| S3.4 | Golden vector | Absent | No committed manifest/canonical/signature vector |
+| S3.3 | Canonical bytes | Partial | `@suite/pack` signs every schema field in a fixed order, omits an absent optional field instead of emitting `null`, sorts capabilities and files, and `parsePackManifestJson` refuses duplicate keys before `JSON.parse`; `manifest.test.ts` proves field coverage, omission, sorting, nested key order and duplicate rejection, and `signature.test.ts` proves RFC 8032 Ed25519 with standard base64. The shell and the Go host still call `JSON.parse` and then `parsePackManifest`, so duplicate-key rejection is not wired at the host entry point |
+| S3.4 | Golden vector | Implemented | `docs/spec/golden/manifest.json` commits a signed manifest, `docs/spec/golden/canonical.json` its 1352 canonical bytes, `docs/spec/golden/signature.b64` the Ed25519 signature and `docs/spec/golden/public-key.b64` the public key; `scripts/spec-golden.mjs` verifies them with `node:crypto` only, and `scripts/spec-golden.test.mjs` proves the vector verifies, one flipped canonical byte fails and one flipped signature byte fails |
 | S3.5 | Manifest fields | Partial | `@suite/pack` parses every required and optional field family and `fixtures.json` covers each; the build path still signs under the pinned Suite key, so `publisher` is not required or emitted |
 | S3.6 | Id, entry, files | Implemented | `@suite/pack` validates id, safe paths, hashes and byte counts |
 | S3.7 | Unknown fields | Implemented | `packages/pack/src/manifest.test.ts` refuses an unknown field and an unknown capability |
@@ -107,7 +107,7 @@ claim.
 
 | Clause | Why it blocks | Owner |
 | --- | --- | --- |
-| S3.3–S3.4 | Duplicate JSON keys are refused only by the library text parser, which the shell and Go host do not call, and there is no golden vector, so a second implementation cannot verify the format | Pack |
+| S3.3 | Duplicate JSON keys are refused only by the library text parser, which the shell and Go host do not call | Pack |
 | S2.1–S2.5 | No publisher identity, trust store, rotation or revocation; side-loading is first-party only | Pack, shell |
 | S6.3 | The host can invoke a declared entry, but no pack renderer is bound to the runner and no app runs a declared migration yet | Shell |
 | S4.2–S4.5 | No consent record or network allowlist; external links and associations bypass the boundary | Shell, Go |

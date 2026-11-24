@@ -1,0 +1,101 @@
+{
+  "name": "Golden vector",
+  "format": "suite.pack",
+  "version": "1.0.0",
+  "id": "golden",
+  "description": "A committed pack manifest for the S3.4 conformance vector.",
+  "contractVersion": 1,
+  "entry": "index.html",
+  "publisher": {
+    "id": "golden",
+    "key": "JA8+hveTDx97TpH06zzKWOZqehcYNwdmYDMS36O80IA="
+  },
+  "capabilities": [
+    "relay",
+    "documents"
+  ],
+  "optionalCapabilities": [
+    "notifications"
+  ],
+  "documents": [
+    {
+      "version": 1,
+      "id": "golden",
+      "format": "suite.golden",
+      "projection": "project.html",
+      "migrations": [
+        {
+          "to": 2,
+          "from": 1,
+          "entry": "migrate.html"
+        }
+      ]
+    }
+  ],
+  "blobs": [
+    {
+      "class": "asset",
+      "store": "assets"
+    }
+  ],
+  "sync": {
+    "documents": [
+      "golden"
+    ],
+    "blobs": [
+      "assets"
+    ]
+  },
+  "network": {
+    "allow": [
+      "https://example.com"
+    ]
+  },
+  "platforms": [
+    "desktop"
+  ],
+  "input": [
+    "pointer",
+    "keyboard"
+  ],
+  "defaultLocale": "en",
+  "locales": [
+    "en",
+    "fr"
+  ],
+  "contributions": {
+    "deepLinks": [
+      "golden",
+      "golden-open"
+    ],
+    "fileExtensions": [
+      ".golden",
+      ".golden-data"
+    ]
+  },
+  "license": "MIT",
+  "source": "https://example.com/golden",
+  "files": [
+    {
+      "path": "index.html",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 1200
+    },
+    {
+      "path": "migrate.html",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "bytes": 400
+    },
+    {
+      "path": "assets/app.js",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "bytes": 800
+    },
+    {
+      "path": "project.html",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "bytes": 500
+    }
+  ],
+  "signature": "atOzb25tH/aSHkIPOF+A4hSZBqyXV+l2HzZv8bgUl66pqRTX1arW3zOfeqWNfZoKda3XtGXyItbH2ckDLFO4Bw=="
+}
