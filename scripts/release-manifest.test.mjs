@@ -14,6 +14,9 @@ import { apkIdentityFor, buildManifest, sha256File } from "./release-manifest.mj
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
+/** A source commit the test supplies, so a tree with no git history still runs. */
+const SOURCE_COMMIT = "a".repeat(40);
+
 describe("release manifest", () => {
   it("hashes a file with SHA-256", () => {
     const dir = mkdtempSync(join(tmpdir(), "suite-manifest-"));
@@ -67,6 +70,8 @@ describe("release manifest", () => {
         apk,
         "--apk-id",
         "run.suite.slop.go",
+        "--commit",
+        SOURCE_COMMIT,
         "--out",
         out,
       ],
@@ -108,6 +113,8 @@ describe("release manifest", () => {
         apk,
         "--apk-id",
         "run.suite.slop.go",
+        "--commit",
+        SOURCE_COMMIT,
         "--out",
         join(dir, "out.json"),
       ],
@@ -171,6 +178,8 @@ describe("APK channel identity", () => {
           apk,
           "--apk-id",
           apkId,
+          "--commit",
+          SOURCE_COMMIT,
           "--out",
           out,
         ],
