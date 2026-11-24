@@ -200,6 +200,7 @@ const scripts =
             "scripts/budget-pack.test.mjs",
             "scripts/planner-pack.test.mjs",
             "scripts/canvas-pack.test.mjs",
+            "scripts/help-pack.test.mjs",
             "scripts/pack-shape.test.mjs",
             "scripts/affected.test.mjs",
             "scripts/release-manifest.test.mjs",

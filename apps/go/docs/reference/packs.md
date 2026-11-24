@@ -44,6 +44,60 @@ listed file. A pack whose bytes changed after install is refused and reported th
 `issues()` with the same `files` reason install uses, rather than being offered as a module that
 will run something other than what was signed.
 
+## The catalogue reads the same index as the desktop
+
+**Browse apps** on home shows what the published index offers next to what is installed. The
+index is `https://flatpak.suite.run/index.json`, the same URL the desktop shell reads, and it is
+verified by `@suite/pack`'s `parsePackIndexJson` and `verifyPackIndex` — Go does not implement a
+second parser. The operator key is pinned in `src/host/catalogue.ts`; its fingerprint test is
+repeated there so the comment and the value cannot drift.
+
+Every one of these is a refusal before a row appears, not a warning beside it:
+
+| Refusal                             | Check                                 |
+| ----------------------------------- | ------------------------------------- |
+| unsigned or malformed               | `parsePackIndexJson`                  |
+| changed after signing               | an operator signature does not verify |
+| a key this host does not pin        | the pinned operator key               |
+| expired                             | `expires` against the phone's clock   |
+| lower `sequence`                    | the recorded head                     |
+| broken `previous` chain             | the recorded head's digest            |
+| fewer signatures than the threshold | `threshold` in the signed bytes       |
+
+The head is written to the app's key-value store only after every check passed, so a lower
+sequence or a broken chain is refused on the next launch as well. Refreshing on the same index is
+not a replay: the bytes are identical, so the signature and expiry are checked again and the head
+stays where it was. Nothing about the phone is sent: one request for the index and one for the
+archive a person chose, each with an `accept` header only.
+
+## Installing from a row
+
+The index entry's `sha256` and `size` are checked before the zip reader opens the archive
+(S12.7), and the manifest's id and version must match the row that was displayed. The layout is
+the desktop's: `<dataRoot>/packs/<id>/<version>/`, highest valid semver active. The desktop does
+not put the publisher id in that path — it keeps a `publisher.json` beside the versions — so Go
+matches the path exactly rather than inventing `packs/<publisher>/<id>/`.
+
+| Action    | What happens on disk                                                             |
+| --------- | -------------------------------------------------------------------------------- |
+| Install   | A new `<id>/<version>/` is written into a `.tmp-` sibling and renamed into place |
+| Update    | A second version directory appears; the previous one stays for rollback          |
+| Reinstall | The same version is swapped through a backup after the new files verified        |
+| Remove    | `packs/<id>` is removed; the pack's documents live outside it and stay           |
+
+A failed install or update leaves the previous version active: the new files were never renamed
+into a version directory, and the swap restores the old directory if the rename fails. Removal
+asks once and says the documents stay.
+
+## Capabilities Go does not serve
+
+Go serves `documents`, `storage`, `recents`, `notifications` and `network` to a pack. `files` is
+not served: the shell's own file service exists, but the frame protocol has no `files.*` request,
+so a pack that declares it would half-work. S4.8 is applied at install **and** on every load, and
+the refusal names the capability (`asks for files, which Suite Go does not serve`) rather than
+hiding the pack. The desktop has its own list because it serves a different surface; both refuse
+a pack they cannot run instead of installing it.
+
 ## Why `/_capacitor_file_/` is the whole trick
 
 A pack's code, WASM and fonts have to resolve against the pack's own directory, or every domain would
@@ -195,10 +249,11 @@ Two details that cost time and are worth keeping:
 
 ## Still open
 
-| Item               | Why it is open                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------ |
-| React sharing      | import map or per-pack WebView — decided with the isolation spike                          |
-| Pack updates       | async download, apply on next open, fall back to the installed version                     |
-| Preload            | prefetch on long-press, wifi-only                                                          |
-| Cross-pack imports | the packer should fail the build when one pack imports another                             |
-| Install screen     | available, installed, size on disk, remove — with "show in app list" kept visibly separate |
+| Item                  | Why it is open                                                                                                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| React sharing         | import map or per-pack WebView — decided with the isolation spike                                              |
+| Pack updates          | async download, apply on next open, fall back to the installed version                                         |
+| Preload               | prefetch on long-press, wifi-only                                                                              |
+| Cross-pack imports    | the packer should fail the build when one pack imports another                                                 |
+| Catalogue on a device | the index and archive paths are unit-tested; a phone still needs a signed index and one install walked through |
+| Operator-key rotation | the index pin is a second copy of the desktop's until `@suite/pack` exports it                                 |

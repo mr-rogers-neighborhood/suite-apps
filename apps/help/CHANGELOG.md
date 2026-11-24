@@ -8,7 +8,12 @@ this file and there is no AppImage release tag.
 
 ## [Unreleased]
 
-No changes yet.
+### Added
+
+- **Help is a pack.** The same explorer and handbook now build as a signed `.suitepack` for the
+  Suite host, with the generated index and compiled documentation pages inside the archive. The
+  pack asks the host for no capability: it reads only its own bundle, and hash routes keep Browser,
+  Modules, Tours and the handbook working from one entry file.
 
 ## [0.1.2] - 2026-11-21
 

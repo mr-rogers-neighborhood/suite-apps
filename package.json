@@ -30,6 +30,7 @@
     "budget:pack": "node scripts/budget-pack.mjs",
     "planner:pack": "node scripts/planner-pack.mjs",
     "canvas:pack": "node scripts/canvas-pack.mjs",
+    "help:pack": "node scripts/help-pack.mjs",
     "format": "pnpm --filter \"./apps/*\" --filter \"./apps/*/*\" --filter \"./packages/*\" --workspace-concurrency=1 run format",
     "build": "pnpm --filter \"./apps/*\" --filter \"./apps/*/*\" --filter \"./packages/*\" --workspace-concurrency=1 run build",
     "prepare": "husky"

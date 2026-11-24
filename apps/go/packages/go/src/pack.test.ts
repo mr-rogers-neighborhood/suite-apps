@@ -4,6 +4,7 @@ import {
   bytesToBase64,
   canonicalManifestBytes,
   checkNetworkPolicy,
+  comparePackVersions,
   isSafePackPath,
   type PackManifest,
   packAllows,
@@ -473,5 +474,22 @@ describe("the network a pack did not ask for", () => {
   it("refuses an undeclared pack whose entry is missing, rather than passing it", async () => {
     const manifest = await makeManifest({ capabilities: ["documents"] });
     expect(checkNetworkPolicy(manifest, {}).ok).toBe(false);
+  });
+});
+
+describe("comparePackVersions", () => {
+  it("orders by semver rather than by string", () => {
+    expect(comparePackVersions("1.10.0", "1.9.0")).toBeGreaterThan(0);
+    expect(comparePackVersions("2.0.0", "10.0.0")).toBeLessThan(0);
+    expect(comparePackVersions("1.0.0", "1.0.0")).toBe(0);
+  });
+
+  it("puts a prerelease below its release", () => {
+    expect(comparePackVersions("2.0.0-rc.1", "2.0.0")).toBeLessThan(0);
+    expect(comparePackVersions("2.0.0-beta.2", "2.0.0-beta.10")).toBeLessThan(0);
+  });
+
+  it("refuses a value that is not a pack version", () => {
+    expect(() => comparePackVersions("one", "1.0.0")).toThrow(TypeError);
   });
 });
