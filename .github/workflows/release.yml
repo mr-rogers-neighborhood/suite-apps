@@ -583,13 +583,26 @@ jobs:
           path: |
             .dev/release/suite-apps.spdx.json
             .dev/release/release-manifest.json
+            .dev/release/suite-shell-${{ inputs.channel }}.commit
+            .dev/release/suite-shell-${{ inputs.channel }}.flatpak
+            ${{ steps.apk.outputs.path }}
+          include-hidden-files: true
+          retention-days: 90
+          if-no-files-found: error
+
+      # A release with no pack stages no index and prints the skip sentence
+      # above. Skip this artifact rather than fail a publication on files that
+      # correctly do not exist; a run that staged an index still demands them.
+      - name: Upload the catalogue index artifacts
+        if: inputs.publish && hashFiles('.dev/release/index.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: suite-${{ inputs.channel }}-catalogue-index
+          path: |
             .dev/release/index.json
             .dev/release/index.json.sig
             .dev/release/index-release.json
             .dev/release/packs/*.suitepack
-            .dev/release/suite-shell-${{ inputs.channel }}.commit
-            .dev/release/suite-shell-${{ inputs.channel }}.flatpak
-            ${{ steps.apk.outputs.path }}
           include-hidden-files: true
           retention-days: 90
           if-no-files-found: error

@@ -171,13 +171,20 @@ describe("release catalogue index", () => {
     });
 
     assert.equal(published.published, true);
+
+    // Order is a contract, not list position: archives, signature, index last.
+    // A consumer must never fetch an index that names an archive not yet stored.
+    const uploadTargets = calls
+      .filter((call) => call[1] === "s3" && call[2] === "cp")
+      .map((call) => call[4]);
+    assert.deepEqual(uploadTargets, [
+      "s3://suite-store/packs/demo-0.1.0.suitepack",
+      "s3://suite-store/index.json.sig",
+      "s3://suite-store/index.json",
+    ]);
+    assert.deepEqual(calls.at(-1)?.slice(0, 2), ["aws", "cloudfront"]);
+
     const text = calls.map((call) => call.join(" ")).join("\n");
-    assert.match(text, /s3 cp .*index\.json s3:\/\/suite-store\/index\.json/u);
-    assert.match(text, /s3 cp .*index\.json\.sig s3:\/\/suite-store\/index\.json\.sig/u);
-    assert.match(
-      text,
-      /s3 cp .*demo-0\.1\.0\.suitepack s3:\/\/suite-store\/packs\/demo-0\.1\.0\.suitepack/u,
-    );
     assert.match(text, /cloudfront create-invalidation --distribution-id DISTRIBUTION/u);
     assert.match(text, /\/index\.json/u);
     assert.match(text, /\/index\.json\.sig/u);

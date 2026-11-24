@@ -82,10 +82,16 @@ export function nextIndexState(
 /**
  * The upload plan for one publication.
  *
- * `index.json` and its detached signature change on every publication and are
- * no-cache; an archive is named for its bytes and is immutable. Only the two
- * mutable names are invalidated, because CloudFront has never seen the new
- * archive names before.
+ * Order is part of the contract: every archive goes first, then the detached
+ * signature, then `index.json` last. A consumer must never be able to fetch an
+ * index that names an archive the store does not have yet; publishing the index
+ * is the commit point. `release-index.test.mjs` asserts this order, so a later
+ * edit cannot make it an accident of list position.
+ *
+ * `index.json` and its signature change on every publication and are no-cache;
+ * an archive is named for its bytes and is immutable. Only the two mutable
+ * names are invalidated, because CloudFront has never seen the new archive
+ * names before.
  */
 export function indexUploadCommands({
   bucket,
@@ -95,43 +101,46 @@ export function indexUploadCommands({
   packPaths = [],
 }) {
   const target = (key) => `s3://${bucket}/${key}`;
+  const archiveUploads = packPaths.map((path) => ({
+    command: "aws",
+    args: [
+      "s3",
+      "cp",
+      path,
+      target(`${PACKS_PREFIX}${basename(path)}`),
+      "--cache-control",
+      IMMUTABLE_CACHE_CONTROL,
+      "--no-progress",
+    ],
+  }));
+  const signatureUpload = {
+    command: "aws",
+    args: [
+      "s3",
+      "cp",
+      signaturePath,
+      target(INDEX_SIGNATURE_FILE),
+      "--cache-control",
+      NO_CACHE_CONTROL,
+      "--no-progress",
+    ],
+  };
+  const indexUpload = {
+    command: "aws",
+    args: [
+      "s3",
+      "cp",
+      indexPath,
+      target(INDEX_FILE),
+      "--cache-control",
+      NO_CACHE_CONTROL,
+      "--no-progress",
+    ],
+  };
   return [
-    {
-      command: "aws",
-      args: [
-        "s3",
-        "cp",
-        indexPath,
-        target(INDEX_FILE),
-        "--cache-control",
-        NO_CACHE_CONTROL,
-        "--no-progress",
-      ],
-    },
-    {
-      command: "aws",
-      args: [
-        "s3",
-        "cp",
-        signaturePath,
-        target(INDEX_SIGNATURE_FILE),
-        "--cache-control",
-        NO_CACHE_CONTROL,
-        "--no-progress",
-      ],
-    },
-    ...packPaths.map((path) => ({
-      command: "aws",
-      args: [
-        "s3",
-        "cp",
-        path,
-        target(`${PACKS_PREFIX}${basename(path)}`),
-        "--cache-control",
-        IMMUTABLE_CACHE_CONTROL,
-        "--no-progress",
-      ],
-    })),
+    ...archiveUploads,
+    signatureUpload,
+    indexUpload,
     {
       command: "aws",
       args: [
