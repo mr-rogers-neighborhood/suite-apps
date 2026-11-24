@@ -24,6 +24,9 @@ const COMMAND_ID = /^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*$/u;
 const MENU_ID = /^[a-z0-9][a-z0-9-]*$/u;
 const FILE_EXTENSION = /^\.[a-z0-9][a-z0-9+.-]*$/u;
 const DEEP_LINK = /^[a-z0-9][a-z0-9-]*$/u;
+const LOCALE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/u;
+const NETWORK_ORIGIN = /^(https|wss):\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/u;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what this rejects.
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/u;
 
@@ -40,6 +43,11 @@ export function isSafePackId(value: string): boolean {
  */
 export function comparePackPaths(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/** A relative HTML path that cannot leave the pack. */
+function isSafeHtmlPath(value: string): boolean {
+  return isSafePackPath(value) && value.toLowerCase().endsWith(".html");
 }
 
 /** A relative, slash-separated path that cannot leave the pack. */
@@ -61,6 +69,109 @@ export interface PackFile {
   readonly bytes: number;
 }
 
+/**
+ * The publisher whose key signed the pack.
+ *
+ * The schema requires it. The desktop host still installs manifests signed by the
+ * one pinned Suite key and has no publisher trust store, so this parser accepts the
+ * field without requiring it until that seam lands.
+ */
+export interface PackPublisher {
+  readonly key: string;
+  readonly id?: string;
+}
+
+export interface PackDocumentMigration {
+  readonly from: number;
+  readonly to: number;
+  /** A relative HTML path inside the pack. */
+  readonly entry: string;
+}
+
+/** One document format the pack declares, with its migrations and projection. */
+export interface PackDocument {
+  readonly id: string;
+  readonly format: string;
+  readonly version: number;
+  readonly mode?: "single" | "multi";
+  readonly migrations?: readonly PackDocumentMigration[];
+  readonly projection?: string;
+  readonly criticalFields?: readonly string[];
+}
+
+export type PackBlobClass = "asset" | "derived" | "cache";
+
+export interface PackBlob {
+  readonly store: string;
+  readonly class: PackBlobClass;
+}
+
+export interface PackSync {
+  readonly documents?: readonly string[];
+  readonly blobs?: readonly string[];
+}
+
+export interface PackNetwork {
+  readonly allow: readonly string[];
+}
+
+export type PackPlatform = "desktop" | "mobile";
+export type PackInput = "pointer" | "touch" | "keyboard";
+
+/** The slice of a document a widget may read or write. */
+export interface PackWidgetData {
+  readonly scope: "projection" | "scoped" | "full";
+  readonly read?: readonly string[];
+  readonly write?: readonly string[];
+}
+
+/** A widget whose interface is signed code, with a declarative fallback. */
+export interface PackCodeWidget {
+  readonly id: string;
+  readonly title: string;
+  readonly size: "1x1" | "2x1" | "full";
+  readonly capabilities: readonly "capture"[];
+  readonly action: Readonly<Record<string, unknown>>;
+  readonly settings?: readonly Readonly<Record<string, unknown>>[];
+  readonly data?: PackWidgetData;
+  readonly entry: string;
+  readonly sha256: string;
+  readonly fallback: {
+    readonly id: string;
+    readonly title: string;
+    readonly size: "1x1" | "2x1" | "full";
+    readonly capabilities: readonly "capture"[];
+    readonly action: Readonly<Record<string, unknown>>;
+    readonly settings?: readonly Readonly<Record<string, unknown>>[];
+    readonly data?: PackWidgetData;
+  };
+}
+
+export type PackComponentKind = "map" | "video" | "camera" | "model3d" | "ar.surface";
+
+/** A native surface the host may draw, or fall back to the web. */
+export interface PackComponent {
+  readonly kind: PackComponentKind;
+  readonly fallback: "web" | "none";
+}
+
+/** A lazy entry that shares this pack's signature, origin and capabilities. */
+export interface PackSubpackage {
+  readonly id: string;
+  readonly entry: string;
+}
+
+/** A separately signed artifact this pack pins. */
+export interface PackAddon {
+  readonly id: string;
+  readonly version: string;
+  readonly sha256: string;
+}
+
+export interface PackExport {
+  readonly entry: string;
+}
+
 export interface PackManifestCore {
   readonly format: typeof PACK_FORMAT;
   readonly id: string;
@@ -74,9 +185,29 @@ export interface PackManifestCore {
   readonly entry: string;
   readonly contractVersion: number;
   readonly minimumHostVersion?: number;
+  readonly publisher?: PackPublisher;
   readonly capabilities: readonly PackCapability[];
+  readonly optionalCapabilities?: readonly PackCapability[];
+  readonly documents?: readonly PackDocument[];
+  readonly blobs?: readonly PackBlob[];
+  readonly sync?: PackSync;
+  readonly network?: PackNetwork;
+  readonly platforms?: readonly PackPlatform[];
+  readonly input?: readonly PackInput[];
+  readonly defaultLocale?: string;
+  readonly locales?: readonly string[];
   readonly contributions?: PackContributions;
   readonly widgets?: readonly SuiteWidget[];
+  readonly codeWidgets?: readonly PackCodeWidget[];
+  readonly components?: readonly PackComponent[];
+  readonly subpackages?: readonly PackSubpackage[];
+  readonly addons?: readonly PackAddon[];
+  readonly export?: PackExport;
+  readonly license?: string;
+  readonly source?: string;
+  readonly deprecated?: boolean;
+  readonly replacement?: string;
+  readonly sunset?: string;
   readonly files: readonly PackFile[];
 }
 
@@ -130,6 +261,133 @@ const contributionsSchema = z
   })
   .strict();
 
+function unique<T>(items: readonly T[]): boolean {
+  return new Set(items).size === items.length;
+}
+
+const publisherSchema = z
+  .object({
+    key: z.string().min(32),
+    id: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+const documentSchema = z
+  .object({
+    id: z.string().regex(PACK_ID),
+    format: z.string().min(1),
+    version: z.number().int().positive(),
+    mode: z.enum(["single", "multi"]).optional(),
+    migrations: z
+      .array(
+        z
+          .object({
+            from: z.number().int().positive(),
+            to: z.number().int().positive(),
+            entry: z.string().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
+    projection: z.string().min(1).optional(),
+    criticalFields: z.array(z.string().min(1)).optional(),
+  })
+  .strict();
+
+const blobSchema = z
+  .object({
+    store: z.string().regex(PACK_ID),
+    class: z.enum(["asset", "derived", "cache"]),
+  })
+  .strict();
+
+const uniqueIds = z.array(z.string().min(1)).refine(unique, "duplicate item");
+
+const syncSchema = z
+  .object({
+    documents: uniqueIds.optional(),
+    blobs: uniqueIds.optional(),
+  })
+  .strict();
+
+const networkSchema = z
+  .object({
+    allow: z
+      .array(z.string().regex(NETWORK_ORIGIN))
+      .min(1)
+      .max(64)
+      .refine(unique, "duplicate item"),
+  })
+  .strict();
+
+const platformsSchema = z
+  .array(z.enum(["desktop", "mobile"]))
+  .min(1)
+  .refine(unique, "duplicate item");
+
+const inputSchema = z
+  .array(z.enum(["pointer", "touch", "keyboard"]))
+  .min(1)
+  .refine(unique, "duplicate item");
+
+const localesSchema = z.array(z.string().regex(LOCALE)).refine(unique, "duplicate item");
+
+const widgetDataSchema = z
+  .object({
+    scope: z.enum(["projection", "scoped", "full"]),
+    read: z.array(z.string().min(1)).optional(),
+    write: z.array(z.string().min(1)).optional(),
+  })
+  .strict();
+
+const widgetDescriptorSchema = z
+  .object({
+    id: z.string().regex(PACK_ID),
+    title: z.string().min(1).max(60),
+    size: z.enum(["1x1", "2x1", "full"]),
+    capabilities: z.array(z.enum(["capture"])),
+    action: z.record(z.string(), z.unknown()),
+    settings: z.array(z.record(z.string(), z.unknown())).optional(),
+    data: widgetDataSchema.optional(),
+  })
+  .strict();
+
+const codeWidgetSchema = widgetDescriptorSchema
+  .extend({
+    entry: z.string().refine(isSafeHtmlPath, "a relative HTML path inside the pack"),
+    sha256: z.string().regex(SHA256_HEX),
+    fallback: widgetDescriptorSchema,
+  })
+  .strict();
+
+const componentSchema = z
+  .object({
+    kind: z.enum(["map", "video", "camera", "model3d", "ar.surface"]),
+    fallback: z.enum(["web", "none"]),
+  })
+  .strict();
+
+const subpackageSchema = z
+  .object({
+    id: z.string().regex(PACK_ID),
+    entry: z.string().refine(isSafeHtmlPath, "a relative HTML path inside the pack"),
+  })
+  .strict();
+
+const addonSchema = z
+  .object({
+    id: z.string().regex(PACK_ID),
+    version: z.string().regex(SEMVER),
+    sha256: z.string().regex(SHA256_HEX),
+  })
+  .strict();
+
+const exportSchema = z
+  .object({
+    entry: z.string().min(1),
+  })
+  .strict();
+
 function manifestSchema(requireSignature: boolean) {
   return z
     .object({
@@ -141,10 +399,33 @@ function manifestSchema(requireSignature: boolean) {
       entry: z.string().refine(isSafePackPath, "a relative path inside the pack"),
       contractVersion: z.number().int().positive(),
       minimumHostVersion: z.number().int().positive().optional(),
+      publisher: publisherSchema.optional(),
       capabilities: z.array(z.enum(PACK_CAPABILITIES)).default([]),
+      optionalCapabilities: z.array(z.enum(PACK_CAPABILITIES)).optional(),
+      documents: z.array(documentSchema).max(64).optional(),
+      blobs: z.array(blobSchema).max(64).optional(),
+      sync: syncSchema.optional(),
+      network: networkSchema.optional(),
+      platforms: platformsSchema.optional(),
+      input: inputSchema.optional(),
+      defaultLocale: z.string().regex(LOCALE).optional(),
+      locales: localesSchema.optional(),
       contributions: contributionsSchema.optional(),
       widgets: suiteWidgetsSchema.optional(),
-      files: z.array(fileSchema).min(1),
+      codeWidgets: z.array(codeWidgetSchema).max(64).optional(),
+      components: z.array(componentSchema).max(16).optional(),
+      subpackages: z.array(subpackageSchema).max(64).optional(),
+      addons: z.array(addonSchema).max(64).optional(),
+      export: exportSchema.optional(),
+      license: z.string().min(1).max(64).optional(),
+      source: z
+        .string()
+        .regex(/^https:\/\//u)
+        .optional(),
+      deprecated: z.boolean().optional(),
+      replacement: z.string().min(1).max(64).optional(),
+      sunset: z.string().regex(ISO_DATE).optional(),
+      files: z.array(fileSchema).min(1).max(2048),
       signature: requireSignature ? z.string().min(1) : z.string().min(1).optional(),
     })
     .strict()

@@ -80,6 +80,7 @@
     "export": { "entry": "export.html" },
     "license": "MIT",
     "source": "https://example.com/chart",
+    "deprecated": false,
     "files": [
       { "path": "index.html", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bytes": 1200 },
       { "path": "migrate-1-2.html", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "bytes": 400 },
@@ -102,6 +103,23 @@
     { "clause": "S9.2", "name": "code widget without fallback", "set": { "codeWidgets": [{ "id": "chart-card", "title": "Chart card", "size": "1x1", "capabilities": ["capture"], "action": { "type": "capture" }, "entry": "widget.html", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" }] } },
     { "clause": "S9.4", "name": "unknown widget data scope", "set": { "widgets": [{ "id": "summary", "title": "Summary", "size": "1x1", "capabilities": ["capture"], "action": {}, "data": { "scope": "everything" } }] } },
     { "clause": "S3.9", "name": "add-on with a bad hash", "set": { "addons": [{ "id": "chart-export", "version": "1.0.0", "sha256": "not-a-hash" }] } },
-    { "clause": "S10.4", "name": "empty input profile", "set": { "input": [] } }
+    { "clause": "S10.4", "name": "empty input profile", "set": { "input": [] } },
+    { "clause": "S3.5", "name": "unknown pack format", "set": { "format": "suite.app" } },
+    { "clause": "S3.5", "name": "uppercase pack id", "set": { "id": "Chart" } },
+    { "clause": "S3.5", "name": "empty pack name", "set": { "name": "" } },
+    { "clause": "S3.5", "name": "version is not semver", "set": { "version": "1.2" } },
+    { "clause": "S3.5", "name": "contract version below one", "set": { "contractVersion": 0 } },
+    { "clause": "S3.5", "name": "document version below one", "set": { "documents": [{ "id": "chart", "format": "suite.chart", "version": 0 }] } },
+    { "clause": "S3.5", "name": "unknown blob class", "set": { "blobs": [{ "store": "assets", "class": "temporary" }] } },
+    { "clause": "S3.5", "name": "duplicate sync document", "set": { "sync": { "documents": ["chart", "chart"] } } },
+    { "clause": "S3.5", "name": "unknown platform", "set": { "platforms": ["desktop", "watch"] } },
+    { "clause": "S3.5", "name": "malformed locale", "set": { "locales": ["en", "not a locale"] } },
+    { "clause": "S3.5", "name": "unknown component kind", "set": { "components": [{ "kind": "hologram", "fallback": "web" }] } },
+    { "clause": "S3.5", "name": "file extension without a dot", "set": { "contributions": { "fileExtensions": ["chart"] } } },
+    { "clause": "S3.5", "name": "subpackage entry is absolute", "set": { "subpackages": [{ "id": "reports", "entry": "/reports/index.html" }] } },
+    { "clause": "S3.5", "name": "export without an entry", "set": { "export": {} } },
+    { "clause": "S3.5", "name": "empty license", "set": { "license": "" } },
+    { "clause": "S3.5", "name": "deprecated is not a boolean", "set": { "deprecated": "yes" } },
+    { "clause": "S3.5", "name": "sunset is not a date", "set": { "sunset": "soon" } }
   ]
 }
