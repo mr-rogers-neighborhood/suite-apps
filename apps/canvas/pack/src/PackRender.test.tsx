@@ -115,7 +115,8 @@ describe("Canvas as a pack", () => {
     expect(cardTitle(readWorkspaceFile(textOf(savedBytes)).workspace)).toBe("Edited in the pack");
 
     // Export through the Workspace menu, which now writes through the host's save picker.
-    fireEvent.click(screen.getByTestId("workspace-menu"));
+    // The menu is lazy-loaded, so wait for it rather than assuming it shared the board's frame.
+    fireEvent.click(await screen.findByTestId("workspace-menu"));
     fireEvent.click(await screen.findByTestId("workspace-export-backup"));
     await waitFor(() => expect(files.saved).toHaveLength(1));
 
