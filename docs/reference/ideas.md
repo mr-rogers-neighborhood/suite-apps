@@ -35,6 +35,16 @@ archive ([editing rules](../README.md#editing-rules)); this one is planning, not
 | Give every module a person's review | Generated facts are honest but thin. Reviews are the step that turns the explorer into prose a person can rely on; the baseline shows how far that is. | `docs/modules/`, `apps/help` | Not started | [Coverage baseline](#coverage-baseline) |
 | A person-run directory of friend codes? | Deliberately absent: a code resolves through each app's contacts file, never a lookup service. Reopening it would need a product decision, because it changes the trust model and adds a service to run. | `@suite/sync` | Rejected today; revisit only with a decision | [Sync decisions](../../apps/sync/docs/reference/decisions.md), [Local-first](../explanation/local-first.md) |
 
+## Parked themes
+
+A theme stops being work when nothing in the tree can act on it. It is recorded here with the reason,
+and its issues are closed as not planned rather than left open as a promise. The closed issues keep
+their bodies, so the detail is still one click away.
+
+| Theme | What it was | Why parked | Where it lives |
+| --- | --- | --- | --- |
+| Slopmaster 9000 | A factory that builds a session artifact from a change and hands it to a person to try: a session runner, an agent roster in configuration, machine-readable gate results in a spool, a hook plugin that refuses pushes and key reads, and a `slop` artifact produced from a build. | It was parked `blocked:awaiting-alpha`, and the later channel work (`slop` → `nightly` → `preview` → `stable`) already covers the part a person uses: a slop build is a local `--channel slop` install, and promotion is a boundary with checks, not a factory. | Closed issues #53–#75 on the tracker |
+
 ## Coverage baseline
 
 Snapshot from `mise exec -- pnpm docs:coverage` after `mise exec -- pnpm docs:index` on 2026-11-21. The
