@@ -26,7 +26,11 @@
  *     --flatpak-commit-file .dev/release/suite-shell-preview.commit \
  *     --apk apps/go/.dev/release/suite-go-preview-0.1.0.apk \
  *     --apk-id run.suite.slop.go \
+ *     --commit "$GITHUB_SHA" \
  *     --out .dev/release/release-manifest.json
+ *
+ * `--commit` defaults to `git rev-parse HEAD`. A tree exported without git
+ * history, such as a `--fresh` gate export, passes it explicitly.
  *
  * spec: D2.1
  */
@@ -96,6 +100,7 @@ function main(argv) {
     apk: null,
     apkId: null,
     out: null,
+    commit: null,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -124,6 +129,9 @@ function main(argv) {
     } else if (arg === "--out") {
       options.out = takeValue(argv, index, arg);
       index += 1;
+    } else if (arg === "--commit") {
+      options.commit = takeValue(argv, index, arg);
+      index += 1;
     } else {
       throw new Error(`unknown option ${arg}`);
     }
@@ -142,7 +150,12 @@ function main(argv) {
     if (value === null) throw new Error(`${flag} is required`);
   }
 
-  const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  const commit =
+    options.commit ??
+    execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  if (!/^[0-9a-f]{40}$/u.test(commit)) {
+    throw new Error(`the source commit is not one 40-character object name: ${commit}`);
+  }
   const lockfileSha = sha256File(join(ROOT, "pnpm-lock.yaml"));
   const flatpakCommit = readFileSync(options.flatpakCommitFile, "utf8").trim();
   if (!/^[0-9a-f]{64}$/u.test(flatpakCommit)) {
