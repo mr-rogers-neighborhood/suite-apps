@@ -315,17 +315,21 @@ Flatpak script does not run it.
 
 ## Version ownership
 
-A version has one home: the app's entry `package.json`. Nothing else restates it — not this page, not
-a README, not a release title. The release path reads it, refuses a changelog without a section for
-it, and stamps it into the artifact.
+A version has one owner: the app's entry `package.json`. It is repeated only where a format needs it
+— the Flatpak appdata's newest `<release>` is what `flatpak info` shows — and the builder refuses a
+build whose copy has drifted. Nothing else restates it: not this page, not a README, not a release
+title. The release path reads the owner, refuses a changelog without a section for it, and stamps it
+into the artifact.
 
 | What | Where the version lives |
 | --- | --- |
-| Start, Planner, Budget, Help | `apps/<app>/package.json` |
+| Suite Desk | `apps/shell/package.json` |
+| Planner, Budget, Help | `apps/<app>/package.json` |
 | Canvas | `apps/canvas/desktop/package.json` |
 | The relay (`suite-sync`) | `apps/sync/package.json` |
 | Suite Go | `apps/go/app.config.json` |
 | A shared package (`@suite/*`) | `packages/<name>/package.json`; consumed as `workspace:*` |
+| The Flatpak appdata | `packaging/flatpak/run.suite.<app>.metainfo.xml`; the newest `<release>` must match the owner, or `scripts/flatpak.mjs` refuses |
 
 ## Signing
 
