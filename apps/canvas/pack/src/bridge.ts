@@ -6,7 +6,14 @@ import {
   type WorkspaceFileAttachmentInputs,
   type WorkspaceFileManifest,
 } from "@suite/graph";
-import type { DocumentsService, FileHandle, FilesService } from "@suite/pack-runtime";
+import type {
+  DocumentsService,
+  FileHandle,
+  FilesService,
+  ImportedFolder,
+  RecentDocument,
+  RecentsService,
+} from "@suite/pack-runtime";
 import type {
   BridgeAttachment,
   BridgeCreateRequest,
@@ -31,9 +38,10 @@ import type {
  * exports and re-imports. The host never parses it, and the pack never sees a path.
  *
  * What this pack cannot do is the interesting part. It cannot choose a folder, watch one, reveal a
- * document in one, or open a file where it lies: the host offers a picker and a scoped document
- * store, and the pack uses exactly those. Those absences are named in the pull request and the
- * implementation ledger rather than worked around with a private path.
+ * document in one, or open a file where it lies by itself: the host offers a picker, a scoped
+ * document store, a copy into the pack's own root, a reveal action and a change notice, and the pack
+ * uses exactly those. None of them hands the pack a path, and the pack never polls a directory. The
+ * host-gap list this conversion named is closed in the same change that adds those services.
  */
 
 /** The host document id that was open, in this pack's own session storage. Not document truth. */
@@ -67,6 +75,7 @@ interface PackLifecycle {
  */
 export interface CanvasPackHost {
   readonly documents?: DocumentsService | undefined;
+  readonly recents?: RecentsService | undefined;
   readonly files?: Partial<FilesService> | undefined;
   readonly info?: (() => Promise<SuiteInfo>) | undefined;
   readonly lifecycle?: PackLifecycle | undefined;
@@ -100,6 +109,12 @@ export interface CanvasPack {
   flush(): Promise<void>;
   /** The host document id, for a device assertion. Never a path. */
   documentId(): string | null;
+  /** Show the open canvas where the host keeps it. False when it is gone. */
+  reveal(): Promise<boolean>;
+  /** Copy a person-chosen folder into this pack's own root, through the host. */
+  importFolder(): Promise<ImportedFolder | null>;
+  /** Document ids the host reported as changed, newest last. Ids, never paths. */
+  libraryChanges(): readonly string[];
   /** Sentences already shown to the person, newest last. */
   notices(): readonly string[];
   dispose(): void;
@@ -202,6 +217,54 @@ function rememberDocument(id: string | null): void {
   }
 }
 
+/**
+ * The display name of a document this pack has opened, kept as UI state.
+ *
+ * A recent list built by the host carries the document id and nothing else, because the host
+ * records an open without reading the file. Canvas already knows the workspace's name when it
+ * adopts a document, so it remembers that name here and never has to open every recent document
+ * just to paint the launcher.
+ */
+const TITLES_KEY = "suite.canvas.pack.titles";
+const MAX_REMEMBERED_TITLES = 200;
+
+function rememberedTitles(): Record<string, string> {
+  try {
+    const raw = globalThis.localStorage?.getItem(TITLES_KEY);
+    if (raw === null || raw === undefined) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    const titles: Record<string, string> = {};
+    for (const [id, value] of Object.entries(parsed)) {
+      if (typeof value === "string" && value.length > 0) titles[id] = value;
+    }
+    return titles;
+  } catch {
+    return {};
+  }
+}
+
+function rememberTitle(id: string, name: string): void {
+  if (name.length === 0 || name === id) return;
+  try {
+    const titles = rememberedTitles();
+    if (titles[id] === name) return;
+    delete titles[id];
+    titles[id] = name;
+    const ids = Object.keys(titles);
+    for (const stale of ids.slice(0, Math.max(0, ids.length - MAX_REMEMBERED_TITLES))) {
+      delete titles[stale];
+    }
+    globalThis.localStorage?.setItem(TITLES_KEY, JSON.stringify(titles));
+  } catch {
+    // A full or disabled session storage must not stop a document opening.
+  }
+}
+
+function titleFor(id: string): string {
+  return rememberedTitles()[id] ?? id;
+}
+
 export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
   const { host } = options;
   const withBoundaries = options.boundaries !== false;
@@ -216,6 +279,7 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
   let writing: Promise<void> = Promise.resolve();
   let saveFailure: string | null = null;
   const noticeLog: string[] = [];
+  const changeLog: string[] = [];
   const cleanups: Array<() => void> = [];
 
   function notice(message: string): void {
@@ -254,14 +318,35 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
 
   function adopt(id: string, parsed: ParsedWorkspaceFile, snapshot: Uint8Array): void {
     const workspaceId = parsed.file.workspaceId;
+    const name = displayName(parsed, id);
     current = {
       id,
       workspaceId,
-      info: infoFor(id, workspaceId, displayName(parsed, id)),
+      info: infoFor(id, workspaceId, name),
     };
     currentSnapshot = snapshot;
     previousAttachments = fromParsedAttachments(parsed);
     rememberDocument(id);
+    rememberTitle(id, name);
+  }
+
+  function recordChanges(documentIds: readonly string[]): void {
+    for (const id of documentIds) {
+      if (!changeLog.includes(id)) changeLog.push(id);
+    }
+  }
+
+  /** What the host noticed while this pack was closed. Ids only, and never a poll. */
+  async function pendingChanges(): Promise<readonly string[]> {
+    const service = host.documents;
+    const pending = service?.pendingChanges;
+    if (service === undefined || pending === undefined) return [];
+    try {
+      return await pending.call(service);
+    } catch (error) {
+      fail("could not read the documents that changed", error);
+      return [];
+    }
   }
 
   async function summaryOf(id: string): Promise<boolean> {
@@ -314,6 +399,9 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       return { info: current.info, snapshot: currentSnapshot };
     }
 
+    // Ask before opening: the host records an open as seen, so the pending list
+    // has to be read first or a change made while the pack was closed is lost.
+    const pending = await pendingChanges();
     const id = await resolveDocumentId();
     if (id === null) return null;
     const record = await documents().open(id);
@@ -323,6 +411,11 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
     const parsed = parseEnvelope(record.bytes);
     const snapshot = new Uint8Array(parsed.workspace.exportSnapshot());
     adopt(id, parsed, snapshot);
+    recordChanges(pending);
+    if (pending.includes(id)) {
+      // The open above already read the file as it is now, so the newer document is what is open.
+      notice("This canvas changed on disk while Canvas was closed; the newer file is open.");
+    }
     return { info: current?.info ?? infoFor(id, parsed.file.workspaceId, id), snapshot };
   }
 
@@ -399,10 +492,12 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       currentSnapshot = request.snapshot;
       previousAttachments = {};
       rememberDocument(id);
+      if (request.title !== undefined) rememberTitle(id, request.title.trim());
     }
 
     if (request.title !== undefined && request.title.trim().length > 0 && current !== null) {
       current = { ...current, info: { ...current.info, name: request.title.trim() } };
+      rememberTitle(current.id, request.title.trim());
     }
     if (request.attachments !== undefined) {
       previousAttachments = toAttachmentInputs(request.attachments);
@@ -432,6 +527,7 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       currentSnapshot = seed.snapshot;
       previousAttachments = parsedAttachments;
       rememberDocument(id);
+      rememberTitle(id, seed.title);
       reload();
       return { ok: true };
     } catch (error) {
@@ -477,6 +573,7 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
     currentSnapshot = snapshot;
     previousAttachments = fromParsedAttachments(parsed);
     rememberDocument(id);
+    rememberTitle(id, displayName(parsed, pickedName));
     reload();
   }
 
@@ -511,6 +608,37 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
   }
 
   async function recentFiles(): Promise<readonly BridgeRecentFile[]> {
+    const recents = host.recents;
+    if (recents !== undefined) {
+      let rows: readonly RecentDocument[];
+      try {
+        rows = await recents.list();
+      } catch (error) {
+        notice(`Recent files are unavailable: ${describeError(error)}`);
+        return [];
+      }
+      const entries: BridgeRecentFile[] = [];
+      for (const row of rows) {
+        // Another pack's row carries no document id: this pack cannot open it, and painting it
+        // here would claim a document this pack does not own (S11.1).
+        if (row.documentId === null) continue;
+        entries.push({
+          path: row.documentId,
+          // The host records an open without reading the document, so the display name is the
+          // one this pack remembered when it adopted the workspace.
+          name: titleFor(row.documentId),
+          folder: "Suite Canvas",
+          openedAt: row.openedAt,
+        });
+        if (entries.length >= MAX_LISTED_DOCUMENTS) break;
+      }
+      return entries;
+    }
+    return storeRecents();
+  }
+
+  /** The old listing, for a host that has no recent-file service of its own. */
+  async function storeRecents(): Promise<readonly BridgeRecentFile[]> {
     const summaries = await documents().list();
     const entries: BridgeRecentFile[] = [];
     for (const summary of summaries
@@ -535,6 +663,30 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       });
     }
     return entries;
+  }
+
+  /** Show the open canvas where the host keeps it. The pack never learns the path. */
+  async function revealDocument(): Promise<boolean> {
+    if (current === null) throw new Error("No canvas is open.");
+    const service = documents();
+    const reveal = service.reveal;
+    if (reveal === undefined) throw new Error("This host cannot show a document's folder.");
+    const summary = await reveal.call(service, current.id);
+    if (summary === null) {
+      notice("That canvas is no longer in this pack's document store.");
+      return false;
+    }
+    return true;
+  }
+
+  /** Copy a person-chosen folder into this pack's own root through the host's picker. */
+  async function importFolder(): Promise<ImportedFolder | null> {
+    const service = files();
+    const importFolderFromHost = service?.importFolder;
+    if (service === null || importFolderFromHost === undefined) {
+      throw new Error("This host cannot import a folder.");
+    }
+    return importFolderFromHost.call(service);
   }
 
   async function saveTextFile(
@@ -585,9 +737,18 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
     openDocument,
     recentFiles,
     forgetRecent: async (path) => {
-      // The host has no recents service, and the row is the document itself. Forgetting it would
-      // mean deleting the canvas, so this is a notice rather than a destructive surprise.
-      notice(`${path} stays in this pack's document store; this host has no recent-file list.`);
+      const recents = host.recents;
+      if (recents === undefined) {
+        // A host with no recents service has no row to remove; the document is not the row.
+        notice(`${path} stays in this pack's document store; this host has no recent-file list.`);
+        return;
+      }
+      try {
+        // The row goes; the document stays. That is what a person asked for.
+        await recents.forget(path);
+      } catch (error) {
+        notice(`The recent entry could not be removed: ${describeError(error)}`);
+      }
     },
     saveTextFile,
   };
@@ -608,6 +769,18 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
         }),
       );
     }
+    const documentsService = host.documents;
+    const onChanged = documentsService?.onChanged;
+    if (documentsService !== undefined && onChanged !== undefined) {
+      cleanups.push(
+        onChanged.call(documentsService, (documentIds) => {
+          recordChanges(documentIds);
+          if (current !== null && documentIds.includes(current.id)) {
+            notice("This canvas changed on disk. Reopen it to load the newer file.");
+          }
+        }),
+      );
+    }
   }
 
   if (withBoundaries) installBoundaries();
@@ -618,6 +791,9 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       await flushDocument();
     },
     documentId: () => current?.id ?? null,
+    reveal: revealDocument,
+    importFolder,
+    libraryChanges: () => [...changeLog],
     notices: () => [...noticeLog],
     dispose: () => {
       if (saveTimer !== null) {

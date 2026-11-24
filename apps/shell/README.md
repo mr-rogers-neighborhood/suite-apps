@@ -13,7 +13,10 @@ it proves is:
 - a scoped `files` service with relative paths, host-owned backups and locks;
 - a host-owned reminder queue: a pack declares a projection, the host validates display rows and
   schedules them with the pack closed; a denial is visible and a removed pack takes its rows with it;
-- a user-consented external file surface: a host-owned picker, opaque handles and import;
+- a user-consented external file surface: a host-owned picker, opaque handles, single-file import
+  and a bounded folder import that copies into the pack's own root;
+- the person's file and library surface: reveal a document where the host keeps it, a host recent
+  list, and a document watch that reports changes while the pack is closed and while it is open;
 - a catalogue that reads local `.suitepack` files and the operator-signed published index, with
   verified install/refusal entries;
 - install, update, reinstall and uninstall, version by version;

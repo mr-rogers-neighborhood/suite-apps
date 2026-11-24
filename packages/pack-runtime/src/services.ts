@@ -3,8 +3,10 @@
  *
  * These are the pack-side types. They describe the host a pack is written
  * against and the target shape of `window.suite`; the v1 desktop host implements
- * a subset (documents, files, launch and the small info surface) and refuses the
- * rest at discovery. Neither side imports Electron or Node from this package.
+ * a subset (documents with reveal and a change watch, files with a bounded
+ * folder import, the recent list, launch and the small info surface) and refuses
+ * the rest at discovery. Neither side imports Electron or Node from this
+ * package.
  */
 
 export type Disposable = () => void;
@@ -62,6 +64,23 @@ export interface FilesService {
   pickSave(suggestedName: string): Promise<FileHandle | null>;
   /** Copy an open external file into the pack's own root. */
   importFile(handle: FileHandle, name?: string): Promise<FileEntry>;
+  /**
+   * Ask the person for a folder and copy it into the pack's own root.
+   *
+   * The host owns the picker and the copy rules; the source path never crosses.
+   * The result names a relative directory inside the pack's root plus the files
+   * it holds. A host without this surface leaves it absent, so a pack can say so
+   * rather than pretend a folder import happened.
+   */
+  importFolder?(destination?: string): Promise<ImportedFolder | null>;
+}
+
+/** What a folder import leaves in the pack's own root. The source path is not here. */
+export interface ImportedFolder {
+  /** Relative, slash-separated directory inside the pack's root. */
+  readonly path: string;
+  /** Every copied file, with paths relative to the pack root, not to `path`. */
+  readonly entries: readonly FileEntry[];
 }
 
 export interface FileFilter {
@@ -210,6 +229,58 @@ export interface DocumentsService {
   open(id: string): Promise<DocumentRecord | null>;
   save(id: string, bytes: Uint8Array): Promise<DocumentSummary>;
   remove(id: string): Promise<void>;
+  /**
+   * Ask the host to show this document where the host keeps it.
+   *
+   * The pack names a document it already owns; the host opens the file manager
+   * at the device copy. The absolute path never crosses, and a host without a
+   * file manager leaves the method absent rather than inventing one.
+   */
+  reveal?(id: string): Promise<DocumentSummary | null>;
+  /**
+   * Documents that changed since this pack last saw them.
+   *
+   * The host compares its own record with the files on disk, so a change made
+   * while the pack was closed (or while the host was off) is still reported on
+   * the next start. Newest first is not guaranteed; ids only.
+   */
+  pendingChanges?(): Promise<readonly string[]>;
+  /**
+   * Ask the host to watch this pack's own documents while the pack is open.
+   *
+   * The host delivers ids, never paths. Nothing is delivered while the pack is
+   * closed; `pendingChanges` is what it reads when it starts. A pack must not
+   * poll a directory itself.
+   */
+  onChanged?(listener: (documentIds: readonly string[]) => void): Disposable;
+}
+
+/**
+ * One row of the host's recent list.
+ *
+ * `documentId` and `name` are present only for a document this pack owns.
+ * Another pack's entry keeps its pack id and time, because no pack may
+ * enumerate another pack's documents (S11.1); the host still keeps the
+ * cross-pack record for its own launcher.
+ */
+export interface RecentDocument {
+  readonly packId: string;
+  readonly documentId: string | null;
+  readonly name: string | null;
+  /** Epoch milliseconds when the host recorded the open. */
+  readonly openedAt: number;
+}
+
+/**
+ * The host's recent list (S11.3).
+ *
+ * The host records an open; a pack reads metadata, never content, and "forget"
+ * removes the row rather than deleting a document.
+ */
+export interface RecentsService {
+  list(): Promise<readonly RecentDocument[]>;
+  /** Remove this pack's row for one document. The document itself stays. */
+  forget(documentId: string): Promise<void>;
 }
 
 /** Small persisted values, namespaced per pack by the host. */
@@ -252,6 +323,7 @@ export interface PackHost {
   launch(): Promise<PackLaunchContext>;
   readonly files: FilesService;
   readonly documents: DocumentsService;
+  readonly recents: RecentsService;
   readonly storage: KeyValueStore;
   readonly identity: IdentityService;
   readonly relay: RelayService;

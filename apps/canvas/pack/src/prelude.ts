@@ -30,6 +30,9 @@ Object.assign(globalThis, {
   __suiteCanvasPack: {
     documentId: pack.documentId,
     flush: pack.flush,
+    reveal: pack.reveal,
+    importFolder: pack.importFolder,
+    libraryChanges: pack.libraryChanges,
     notices: pack.notices,
     dispose: pack.dispose,
   },

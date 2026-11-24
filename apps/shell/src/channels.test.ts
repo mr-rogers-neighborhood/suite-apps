@@ -79,9 +79,19 @@ describe("the pack bridge", () => {
       "pickOpen",
       "pickSave",
       "importFile",
+      "importFolder",
     ]) {
       expect(pack).toContain(`${method}:`);
     }
+  });
+
+  it("exposes the library half of the documents service and the recent list", () => {
+    expect(pack).toContain("documents: {");
+    for (const method of ["reveal", "pendingChanges", "onChanged"]) {
+      expect(pack).toContain(`${method}:`);
+    }
+    expect(pack).toContain("recents: {");
+    expect(pack).toContain("forget:");
   });
 
   it("keeps an external handle's token out of the object the pack receives", () => {

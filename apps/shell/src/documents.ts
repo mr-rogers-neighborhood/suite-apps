@@ -308,6 +308,17 @@ export class DocumentStore {
     return join(this.#root, containerId, packId);
   }
 
+  /**
+   * The pack's document directory, for the host's watcher.
+   *
+   * Main process only: a pack names a document, never a directory. The library
+   * watch creates it if it is absent so the first document write is not the
+   * first thing that makes a watch possible.
+   */
+  directoryFor(containerId: string, packId: string): string {
+    return this.#packRoot(containerId, packId);
+  }
+
   #path(containerId: string, packId: string, id: string): string {
     if (!isSafeDocumentId(id)) throw new Error("invalid document name");
     const directory = this.#packRoot(containerId, packId);
@@ -395,6 +406,34 @@ export class DocumentStore {
     if (read.kind === "missing") return null;
     if (read.kind === "ok") return read.header;
     return this.#refuse(read, containerId, packId, id, file);
+  }
+
+  /**
+   * Where the host keeps one document, for the host's own file-manager action.
+   *
+   * The absolute path returns to the main process only; `reveal` in
+   * `library.ts` is what turns it into a file-manager window. A pack names a
+   * document and receives the summary, never this value. A missing document is
+   * `null`; a non-regular file is refused.
+   */
+  async locate(
+    containerId: string,
+    packId: string,
+    id: string,
+  ): Promise<{ readonly path: string; readonly summary: DocumentSummary } | null> {
+    const file = this.#path(containerId, packId, id);
+    const details = await lstat(file).catch((error: unknown) => {
+      if (fsCode(error) === "ENOENT") return null;
+      throw logged("document could not be located", error);
+    });
+    if (details === null) return null;
+    if (!details.isFile()) throw new Error("document is not a regular file");
+    const read = await this.#readHeader(file);
+    const size = read.kind === "ok" ? read.header.payloadLength : details.size;
+    return {
+      path: file,
+      summary: { id, name: id, size, updatedAt: details.mtimeMs },
+    };
   }
 
   async create(
