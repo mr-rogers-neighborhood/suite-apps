@@ -293,6 +293,16 @@ entry and leaves the file unchanged; a failed entry restores the backup, so the 
 readable (S6.6). The runner that executes an entry is injected into
 `src/documentMigrations.ts`; binding it to a pack renderer is not built yet.
 
+A pack's blobs live in three content-addressed class stores under
+`blobs/<container>/<pack>/<class>/<sha256>`: `asset`, `derived` and `cache`. A manifest store name
+declares its class, a read re-hashes the bytes and refuses a mismatch, and clearing the cache removes
+only cache. Export writes every asset as its original bytes at `assets/<sha256>` in a host-chosen
+bundle, records it with its hash and length and verifies every hash, then writes `manifest.json`
+last. The pack's declared `export` entry runs first through a save handle that cannot leave the
+bundle or write the host's manifest or assets; a pack that declares no export entry is still
+exported for its assets with `packExport: null` (S6.7, S6.8). The blob stores and export entry are
+not bound to a pack renderer yet.
+
 The `files` service requires the `files` capability. It is a separate root from `documents`, created
 lazily per `(container, pack)` at `files/<container>/<pack>` and never inside the pack's code
 directory. Paths are relative and slash-separated; `..`, absolute paths, symlinks and non-regular
@@ -372,8 +382,11 @@ decision record owns that trade.
 - app-widget capture delivery (app widgets render their declared fields, but the host does not send
   a capture to the pack yet);
 - the host's blind relay transport for pack sync;
-- binding a declared migration or projection entry to a pack renderer, and any app's own migration
-  bodies (the host's chain, backup, idempotence and failed-migration path exist and are tested);
+- binding a declared migration, projection or export entry to a pack renderer, and any app's own
+  migration bodies (the host's chain, backup, idempotence and failed-migration path exist and are
+  tested);
+- backing up `asset` and `derived` blobs, and exposing the blob stores or export over the bridge
+  (the stores and the bundle writer exist and are tested);
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;
 - tab tear-off and split view (the view tree is ready; the UI is not);
@@ -409,7 +422,10 @@ The tests cover pack manifest discovery and traversal, document scoping, the `fi
 per-pack and per-container isolation, lock ownership, the external surface's filter validation,
 token ownership and cancellation, import into the pack root, declared-document resolution, a
 two-step migration's idempotence and failed-migration restore, projection refusal before the schema
-is current, catalogue trust and refusal (valid, wrong-key, tampered and unsigned), install from the
+is current, the three blob class stores and their content addressing, cache clearing that keeps
+assets and derived blobs, export-bundle manifests with a verified hash per asset, the no-export-entry
+asset fallback and the save handle's path refusal, catalogue trust and refusal (valid, wrong-key,
+tampered and unsigned), install from the
 catalogue, additive updates,
 version-only uninstall and symlink refusal, uninstall planning for open tabs, `suite://` parsing and
 refusals, launch contexts, space document open/close/title and persistence, version-1 and version-2
