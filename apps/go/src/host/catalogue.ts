@@ -276,7 +276,7 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
           description: entry.description ?? null,
           version: entry.version,
           capabilities: entry.capabilities,
-          platform: cataloguePlatform(entry.capabilities),
+          platform: cataloguePlatform(entry.platforms, entry.capabilities),
           sizeBytes: entry.size,
           sha256: entry.sha256,
           url: entry.url,
@@ -315,7 +315,13 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
     // The index carries capabilities, so a definite mismatch is refused before the
     // archive is downloaded. A platform-only mismatch is caught by the pack store
     // once it reads the manifest.
-    const fit = platformFit({ capabilities: entry.capabilities }, GO_HOST);
+    const fit = platformFit(
+      {
+        ...(entry.platforms === undefined ? {} : { platforms: entry.platforms }),
+        capabilities: entry.capabilities,
+      },
+      GO_HOST,
+    );
     if (fit.state === "unavailable") {
       return {
         ok: false,
@@ -383,12 +389,23 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
 /**
  * What the index lets this phone know about a pack's platforms.
  *
- * The index carries capabilities but no platform declaration, so a covered
- * capability set is unknown here rather than available. The archive's manifest is
- * read at install, where the pack store refuses a kind this phone is not (S4.8).
+ * A current index carries the manifest's declaration, so the row can say the
+ * pack is built for `desktop` without downloading it. An older index has no
+ * declaration: a covered capability set is then unknown, never available. The
+ * archive's manifest is read at install either way, where the pack store refuses
+ * a kind this phone is not (S4.8).
  */
-function cataloguePlatform(capabilities: readonly PackCapability[]): PlatformFitView {
-  const fit = platformFit({ capabilities }, GO_HOST);
+function cataloguePlatform(
+  platforms: readonly string[] | undefined,
+  capabilities: readonly PackCapability[],
+): PlatformFitView {
+  const fit = platformFit(
+    {
+      ...(platforms === undefined ? {} : { platforms }),
+      capabilities,
+    },
+    GO_HOST,
+  );
   if (fit.state === "unknown") {
     return {
       state: "unknown",
@@ -423,7 +440,7 @@ function entryToCatalogue(entry: PackIndexEntry): CatalogueEntry {
     description: entry.description ?? null,
     version: entry.version,
     capabilities: entry.capabilities,
-    platform: cataloguePlatform(entry.capabilities),
+    platform: cataloguePlatform(entry.platforms, entry.capabilities),
     sizeBytes: entry.size,
     sha256: entry.sha256,
     url: entry.url,

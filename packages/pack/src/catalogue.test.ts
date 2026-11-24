@@ -323,6 +323,14 @@ describe("catalogue index", () => {
     ]);
     expect(canonical.entries[0]?.capabilities).toEqual(["files", "relay"]);
 
+    // A platform declaration is signed as part of the entry, in code-unit order.
+    const withPlatforms = JSON.parse(
+      new TextDecoder().decode(
+        canonicalPackIndexBytes(core({ entries: [entry({ platforms: ["mobile", "desktop"] })] })),
+      ),
+    ) as { entries: Record<string, unknown>[] };
+    expect(withPlatforms.entries[0]?.platforms).toEqual(["desktop", "mobile"]);
+
     // An absent optional field contributes no key at all.
     const text = new TextDecoder().decode(canonicalPackIndexBytes(core({ entries: [entry()] })));
     expect(JSON.parse(text).entries[0].description).toBe("A whiteboard for the Suite.");

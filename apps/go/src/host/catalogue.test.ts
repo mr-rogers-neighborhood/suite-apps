@@ -241,6 +241,19 @@ describe("loading a catalogue index", () => {
     expect(fetch.requested).toEqual([DEFAULT_CATALOGUE_INDEX_URL]);
   });
 
+  it("reports a desktop-only pack as built for desktop, not unknown", async () => {
+    const text = signedText([entry({ capabilities: ["documents"], platforms: ["desktop"] })]);
+    const { catalogue } = catalogueFor(text);
+
+    const loaded = await catalogue.load();
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.entries[0]?.platform).toEqual({
+      state: "unavailable",
+      reason: "not available on Go — built for `desktop`",
+    });
+  });
+
   it("refuses an unsigned index", async () => {
     const unsigned = JSON.stringify({ ...core([entry()]), signatures: [] });
 
