@@ -199,12 +199,20 @@ The rules that shape the Suite host.
   publisher that owns the pack may issue it with the key that signed the pack (current or retired);
   another publisher may not. The person may record an unsigned local advisory. A recorded advisory
   refuses a new install and marks the catalogue entry refused, but the installed-version scan never
-  consults it: an installed pack keeps running until the person disables or removes it. A catalogue
-  operator issuer is deferred until the shell pins operator keys from the signed index.
-- The local catalogue is a directory of `.suitepack` files, `<dataRoot>/catalogue` by default and
-  `SUITE_SHELL_CATALOGUE` when set. Every archive is read and verified before it is listed; a refused
+  consults it: an installed pack keeps running until the person disables or removes it. The
+  catalogue operator key is now pinned for the index, but a catalogue-issued advisory still has no
+  verification path of its own and is refused.
+- The catalogue has two sources. The local directory is `.suitepack` files, `<dataRoot>/catalogue` by
+  default and `SUITE_SHELL_CATALOGUE` when set; a person may install from a file with no index and no
+  network. The published index is `https://flatpak.suite.run/index.json` by default and
+  `SUITE_SHELL_INDEX` when set (or `none` for the local directory only). Its operator key is a
+  compile-time constant in `apps/shell/src/indexTrust.ts`, not a value the index supplies. The host
+  fetches and verifies the index before listing an entry, refuses a lower `sequence`, a `previous`
+  that does not name the last verified head, and an `expires` in the past, and records that head in
+  `<dataRoot>/trust/index-head.json`. A refused or unreachable index leaves the local directory
+  usable and the catalogue names the source in use instead of falling back silently.
+  Every archive is read and verified before it is listed; a refused
   archive still lists with its refusal sentence and can never be installed. Listing extracts nothing.
-  A remote index is a later slice with the same trust decision.
 - An install is `<dataRoot>/packs/<id>/<version>/`, written to a temporary sibling and renamed into
   place. An existing version is refused, not overwritten; installs are additive, so an older version
   stays available when a newer archive fails verification.
@@ -259,7 +267,6 @@ The rules that shape the Suite host.
 
 ## What this spike deliberately leaves out
 
-- a remote pack index (the catalogue is a local directory);
 - app-widget capture delivery (app widgets render; captures are not sent);
 - the Screens manager and a portable `.screen` file with export/import;
 - the host's blind relay transport for pack sync;

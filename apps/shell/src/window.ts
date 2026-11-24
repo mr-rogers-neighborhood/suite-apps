@@ -51,6 +51,7 @@ export class ShellWindow {
   readonly #chrome: WebContentsView;
   #packs: readonly PackInfo[];
   #catalogue: readonly CatalogueEntry[];
+  #catalogueSource: string;
   #installedVersions: readonly InstalledVersionView[];
   readonly #spaces: SpaceStore;
   readonly #screens: ScreenStore;
@@ -70,6 +71,7 @@ export class ShellWindow {
   constructor(options: {
     readonly packs: readonly PackInfo[];
     readonly catalogue?: readonly CatalogueEntry[];
+    readonly catalogueSource?: string;
     readonly installedVersions?: readonly InstalledVersionView[];
     readonly spaces: SpaceStore;
     readonly screens: ScreenStore;
@@ -80,6 +82,7 @@ export class ShellWindow {
   }) {
     this.#packs = options.packs;
     this.#catalogue = options.catalogue ?? [];
+    this.#catalogueSource = options.catalogueSource ?? "";
     this.#installedVersions = options.installedVersions ?? [];
     this.#spaces = options.spaces;
     this.#screens = options.screens;
@@ -169,6 +172,7 @@ export class ShellWindow {
         publisher: pack.publisher,
       })),
       catalogue: this.#catalogue,
+      catalogueSource: this.#catalogueSource,
       installedVersions: this.#installedVersions,
       theme: this.#theme,
       notice: this.#notice,
@@ -425,10 +429,12 @@ export class ShellWindow {
     packs: readonly PackInfo[],
     catalogue: readonly CatalogueEntry[] = this.#catalogue,
     installedVersions: readonly InstalledVersionView[] = this.#installedVersions,
+    catalogueSource: string = this.#catalogueSource,
   ): void {
     this.#packs = packs;
     this.#catalogue = catalogue;
     this.#installedVersions = installedVersions;
+    this.#catalogueSource = catalogueSource;
     this.broadcast();
   }
 

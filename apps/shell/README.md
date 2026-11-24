@@ -11,7 +11,7 @@ separate Flatpaks. The point of this tree is to prove the host boundary before a
 - a scoped document API that carries opaque bytes and never a path;
 - a scoped `files` service with relative paths, host-owned backups and locks;
 - a user-consented external file surface: a host-owned picker, opaque handles and import;
-- a catalogue that reads local `.suitepack` files, and a verified index when one is present, with
+- a catalogue that reads local `.suitepack` files and the operator-signed published index, with
   verified install/refusal entries;
 - install, update, reinstall and uninstall, version by version;
 - `suite://<pack-id>/<path>` routing and a launch context per tab;
@@ -44,7 +44,9 @@ directory is `packs/<id>/` beside the checkout and only loads when that switch i
 under Electron's `userData` directory (`~/.config/Suite/shell` on Linux); `SUITE_SHELL_DATA` and
 `SUITE_SHELL_USER_DATA` override the data and profile directories for a test. The local catalogue
 is `<dataRoot>/catalogue`; `SUITE_SHELL_CATALOGUE` points it at another directory. The publisher
-trust store is `<dataRoot>/trust/publishers.json`; `SUITE_SHELL_TRUST` points it elsewhere.
+trust store is `<dataRoot>/trust/publishers.json`; `SUITE_SHELL_TRUST` points it elsewhere. The
+catalogue index is `https://flatpak.suite.run/index.json`; `SUITE_SHELL_INDEX` points at another
+index or, with `none`, leaves only the local directory.
 
 The shared pack work lives outside this app: `packages/pack` owns the manifest and signature,
 `packages/pack-runtime` owns the pack-side service types, and `packages/pack-host` owns the scoped
@@ -95,15 +97,25 @@ the scheme in this phase, and the host routes a link that reaches it.
 
 ## Installing, updating and removing a pack
 
-Home's `shell.apps` widget shows installed packs and the catalogue together. The local catalogue is a
-directory of `.suitepack` files (`<dataRoot>/catalogue`, or `SUITE_SHELL_CATALOGUE`). When #222's
-signed index has been verified, the same surface also consumes its entries through
-`VerifiedCatalogueIndex`; this app never parses or checks the index itself. Every archive is read with
-the shared archive reader and verified before it is listed: the publisher key in the manifest against
-the local trust store, the manifest signature with that key, the host contract and capability list, and
-every file hash. An indexed entry must also match the id, version, size and SHA-256 the index
-displayed. A trusted entry offers **Install**, **Update** or **Reinstall** as its state requires; a
-refused entry stays visible with its refusal sentence and cannot be installed. Listing never extracts
+Home's `shell.apps` widget shows installed packs and the catalogue together. The catalogue has two
+sources, and the widget names the one in use. The local directory is `.suitepack` files under
+`<dataRoot>/catalogue` (or `SUITE_SHELL_CATALOGUE`). The published index is
+`https://flatpak.suite.run/index.json` (or `SUITE_SHELL_INDEX`), fetched at launch and verified
+against the operator key pinned in `apps/shell/src/indexTrust.ts`. The pin is a compile-time
+constant, never a value the index supplies. An index entry is listed only after the index verified;
+the archive it names is still read and verified before it is listed, and again before install.
+
+The index refusals are named, not silent: an index changed after signing, an unsigned index, an
+index signed by an operator key this host does not pin, an expired index, a lower `sequence` than
+the last verified head (`<dataRoot>/trust/index-head.json`), and a `previous` that does not name
+that head's digest are all refused before any entry appears. When the index is refused or
+unreachable, the local directory stays usable and the widget says why the published index is not in
+use (S12.1). Every archive is read with the shared archive reader and verified: the publisher key in
+the manifest against the local trust store, the manifest signature with that key, the host contract
+and capability list, and every file hash. An indexed entry must also match the id, version, size and
+SHA-256 the index displayed. A trusted entry offers **Install**, **Update** or **Reinstall** as its
+state requires; a refused entry stays visible with its refusal sentence and cannot be installed.
+Listing never extracts
 an archive, so a refusal leaves nothing behind. Each card shows the version, archive size, publisher
 id and key fingerprint, plus the declared capabilities.
 
@@ -118,9 +130,9 @@ Before an install or update writes anything, the host shows the publisher id, ke
 id, version and capability list and waits for confirmation; the result notice repeats them. A
 development directory has no publisher and says so.
 
-The catalogue's local directory remains a first-class distribution path: a person may install from
-a file with no index and no network (S12.1). The verified index itself is #222; until it merges, Main
-passes no index and the local directory is the only source.
+The local directory remains a first-class distribution path: a person may install from a file with
+no index and no network (S12.1). The published index adds the store's catalogue; it never replaces
+the local directory or the **Add pack…** picker.
 
 The **Add pack…** button is the original file picker. The host reads at most 64 MiB, verifies the
 archive with the same rules, refuses extra files and paths that leave the pack root, and only then
@@ -156,9 +168,9 @@ A revocation is a signed advisory delivered as a small JSON file. **Add revocati
 pack's own publisher signs with the key that signed the pack (a retired key still counts), and the
 person may record an unsigned local advisory. A publisher cannot revoke another publisher's pack. A
 recorded advisory blocks a new install and marks the catalogue entry as refused; it never disables
-or removes an installed pack. A catalogue operator is a valid issuer in the spec, but the shell does
-not pin operator keys yet, so that form is refused until it does. Advisories live in
-`<dataRoot>/trust/revocations.json` beside the publisher store.
+or removes an installed pack. A catalogue operator is a valid issuer in the spec; the index key is
+pinned, but an advisory has no operator verification path yet, so that form is still refused.
+Advisories live in `<dataRoot>/trust/revocations.json` beside the publisher store.
 
 **Uninstall** removes exactly `<dataRoot>/packs/<id>/<version>`. A symlinked install root, id
 directory or version directory is refused, and the version must resolve inside the real pack root;
@@ -429,7 +441,6 @@ decision record owns that trade.
 
 ## What is not built yet
 
-- a remote pack index (the catalogue is local only);
 - app-widget capture delivery (app widgets render their declared fields, but the host does not send
   a capture to the pack yet);
 - the host's blind relay transport for pack sync;
@@ -478,7 +489,8 @@ stores and their content addressing, two publishers' blob stores
 staying apart under one pack id, cache clearing that keeps
 assets and derived blobs, export-bundle manifests with a verified hash per asset, the no-export-entry
 asset fallback and the save handle's path refusal, catalogue trust and refusal (valid, wrong-key,
-tampered and unsigned), install from the
+tampered and unsigned), the published index's pin and its refusals (tampered, unsigned, wrong
+operator, expired, rolled back and broken chain), install from the
 catalogue, additive updates,
 version-only uninstall and symlink refusal, uninstall planning for open tabs, `suite://` parsing and
 refusals, launch contexts, space document open/close/title and persistence, version-1 and version-2
