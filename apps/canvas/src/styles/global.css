@@ -170,6 +170,72 @@
   --value-explain-fill: var(--section-violet);
 }
 
+/*
+ * Standalone fallback: a pack outside a host has nobody to set the `dark` class, so the
+ * same palette follows the desktop's brightness instead. The guard leaves a host alone —
+ * the host always marks the root with `data-theme-mode`, so a forced light theme on a dark
+ * desktop still wins. Keep these values in step with the `.dark` block above; the
+ * component rules below are the few places that key off the class rather than a role.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme-mode]) {
+    color-scheme: dark;
+    --surface: #232326;
+    --surface-translucent: rgba(28, 28, 30, 0.72);
+    --hairline: rgba(255, 255, 255, 0.1);
+    --ink: #f5f5f7;
+    --ink-muted: #a8a8ad;
+    --lens-dim-opacity: 0.3;
+    --canvas: #151517;
+    --canvas-bg: var(--canvas);
+    --rf-dot: #333338;
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 18px 44px -22px rgba(0, 0, 0, 0.9);
+    --sheen: radial-gradient(120% 90% at 50% -20%, rgba(130, 130, 150, 0.18), transparent 55%);
+    --segmented-bg: rgba(255, 255, 255, 0.08);
+    --hue-slate: #94a3b8;
+    --hue-blue: #60a5fa;
+    --hue-green: #34d399;
+    --hue-amber: #fbbf24;
+    --hue-rose: #fb7185;
+    --hue-violet: #a78bfa;
+    --section-slate: var(--hue-slate);
+    --section-blue: var(--hue-blue);
+    --section-green: var(--hue-green);
+    --section-amber: var(--hue-amber);
+    --section-rose: var(--hue-rose);
+    --section-violet: var(--hue-violet);
+    --surface-strong: #2c2c31;
+    --accent: #4aa3ff;
+    --accent-strong: #7ebdff;
+    --danger: #ff6b6b;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --mention-ink: var(--section-blue);
+    --value-fan-fill: var(--section-blue);
+    --value-branch-fill: var(--section-green);
+    --value-explain-fill: var(--section-violet);
+  }
+
+  :root:not([data-theme-mode]) select,
+  :root:not([data-theme-mode]) select option {
+    background-color: var(--surface);
+    color: var(--ink);
+  }
+
+  :root:not([data-theme-mode]) .connector-dot,
+  :root:not([data-theme-mode]) .section-connector__dot {
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45);
+  }
+
+  :root:not([data-theme-mode]) .connector-peer-ring {
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35);
+  }
+
+  :root:not([data-theme-mode]) .connector-grab {
+    background: rgba(0, 0, 0, 0.35);
+  }
+}
+
 html,
 body,
 #root {

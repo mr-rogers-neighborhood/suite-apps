@@ -13,7 +13,14 @@ export type ResolvedTheme = "light" | "dark";
 
 /** The mode the host has painted onto the document right now. */
 export function resolvedTheme(): ResolvedTheme {
-  return document.documentElement.dataset.themeMode === "dark" ? "dark" : "light";
+  if (typeof document === "undefined") return "light";
+  const painted = document.documentElement.dataset.themeMode;
+  if (painted === "dark" || painted === "light") return painted;
+  // No host has painted. Follow the desktop, which is what the fallback stylesheet does.
+  return typeof globalThis.matchMedia === "function" &&
+    globalThis.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
 }
 
 /**

@@ -134,6 +134,39 @@ export function themeCss(theme: ThemeView): string {
 }
 
 /**
+ * The part of a pack view the theme touches.
+ *
+ * Electron's `WebContents` satisfies this; a test can pass a recorder. Keeping the seam
+ * explicit is what lets the headless suite prove that a theme change reaches an already
+ * painted view instead of only testing the two strings it is built from.
+ */
+export interface ThemeSurface {
+  insertCSS(css: string): Promise<string>;
+  removeInsertedCSS(key: string): Promise<void>;
+  executeJavaScript(script: string): Promise<unknown>;
+}
+
+/**
+ * Paint one resolved theme onto a pack view, replacing a previous sheet.
+ *
+ * `insertCSS` is additive, so the new sheet goes in before the old key is removed. The
+ * script carries the attributes a class-based stylesheet keys off; both halves are the
+ * host's own resolved answer, never data read back from the pack.
+ */
+export async function paintThemeSurface(
+  surface: ThemeSurface,
+  theme: ThemeView,
+  previousKey?: string,
+): Promise<string> {
+  const key = await surface.insertCSS(themeCss(theme));
+  await surface.executeJavaScript(themeAttributesScript(theme));
+  if (previousKey !== undefined && previousKey !== key) {
+    await surface.removeInsertedCSS(previousKey).catch(() => undefined);
+  }
+  return key;
+}
+
+/**
  * The attributes a pack's document carries after the host paints it.
  *
  * A stylesheet that keys off `.dark` — Canvas and Help both do — needs the class as well as

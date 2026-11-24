@@ -37,7 +37,7 @@ import {
   type ThemeView,
 } from "./shared.js";
 import type { SpaceState, SpaceStore } from "./spaces.js";
-import { themeAttributesScript, themeCss } from "./theme.js";
+import { paintThemeSurface } from "./theme.js";
 
 /** The chrome's own height. The chrome page uses the same number in its stylesheet. */
 export const TAB_BAR_HEIGHT = 56;
@@ -550,18 +550,8 @@ export class ShellWindow {
    */
   #paintPackTheme(tabId: string, view: WebContentsView): void {
     if (view.webContents.isDestroyed()) return;
-    void view.webContents
-      .insertCSS(themeCss(this.#theme))
-      .then((key) => {
-        const previous = this.#themeKeys.get(tabId);
-        this.#themeKeys.set(tabId, key);
-        if (previous !== undefined && previous !== key) {
-          void view.webContents.removeInsertedCSS(previous).catch(() => undefined);
-        }
-      })
-      .catch(() => undefined);
-    void view.webContents
-      .executeJavaScript(themeAttributesScript(this.#theme))
+    void paintThemeSurface(view.webContents, this.#theme, this.#themeKeys.get(tabId))
+      .then((key) => this.#themeKeys.set(tabId, key))
       .catch(() => undefined);
   }
 

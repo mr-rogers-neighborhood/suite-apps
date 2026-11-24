@@ -2,12 +2,13 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PRESETS } from "@suite/theme";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_THEME_CHOICE,
   isHostThemeChoice,
   isThemeSource,
   loadThemeChoice,
+  paintThemeSurface,
   presetFor,
   resolveMode,
   resolveThemeView,
@@ -119,5 +120,66 @@ describe("resolving the choice", () => {
     expect(script).toContain('root.dataset.themeMode = "dark";');
     expect(script).toContain('root.classList.toggle("dark", true);');
     expect(script).toContain('root.style.colorScheme = "dark";');
+  });
+});
+
+describe("painting a pack view", () => {
+  it("replaces the previous sheet when the host changes theme", async () => {
+    // The seam ShellWindow.setTheme uses: a pack that is already open receives the new
+    // variables and attributes immediately, and its old stylesheet is removed.
+    const inserted: string[] = [];
+    const scripts: string[] = [];
+    const removed: string[] = [];
+    let nextKey = 0;
+    const surface = {
+      insertCSS: vi.fn(async (css: string) => {
+        inserted.push(css);
+        nextKey += 1;
+        return `sheet-${nextKey}`;
+      }),
+      executeJavaScript: vi.fn(async (script: string) => {
+        scripts.push(script);
+      }),
+      removeInsertedCSS: vi.fn(async (key: string) => {
+        removed.push(key);
+      }),
+    };
+
+    const first = await paintThemeSurface(
+      surface,
+      resolveThemeView({ preset: "warm", mode: "dark" }, true),
+    );
+    expect(first).toBe("sheet-1");
+
+    const second = await paintThemeSurface(
+      surface,
+      resolveThemeView({ preset: "suite", mode: "light" }, false),
+      first,
+    );
+
+    expect(second).toBe("sheet-2");
+    expect(inserted).toHaveLength(2);
+    expect(inserted[0]).toContain("--canvas:");
+    expect(inserted[0]).toContain("color-scheme: dark");
+    expect(inserted[1]).toContain("color-scheme: light");
+    expect(inserted[1]).not.toBe(inserted[0]);
+    expect(scripts[1]).toContain('root.dataset.themeMode = "light";');
+    expect(scripts[1]).toContain('root.classList.toggle("dark", false);');
+    expect(removed).toEqual(["sheet-1"]);
+  });
+
+  it("keeps the new sheet when Electron reuses a key", async () => {
+    const surface = {
+      insertCSS: vi.fn(async () => "same-key"),
+      executeJavaScript: vi.fn(async () => undefined),
+      removeInsertedCSS: vi.fn(async () => undefined),
+    };
+    const key = await paintThemeSurface(
+      surface,
+      resolveThemeView({ preset: "suite", mode: "dark" }, true),
+      "same-key",
+    );
+    expect(key).toBe("same-key");
+    expect(surface.removeInsertedCSS).not.toHaveBeenCalled();
   });
 });
