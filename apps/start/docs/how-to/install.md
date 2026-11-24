@@ -1,8 +1,11 @@
 # Installing Suite Start
 
-Suite Start is the hub: one window that installs, updates and opens the other apps in the suite. It
-is the only piece you fetch by hand. It ships as the Flatpak `run.suite.start`, and every app it
-manages is a Flatpak too.
+Suite Start is the legacy hub for the Flatpak apps in the suite: one window that installs, updates
+and opens them. It ships as the Flatpak `run.suite.start`, and every app it manages is a Flatpak too.
+
+Suite Shell is the desktop host and the way in. [Install the host](../../../shell/README.md) once and
+pick packs from its catalogue; Start is not the entry point for those. This page stays for the
+Flatpak apps Start still manages until it is retired (#314).
 
 ## 1. Add the store
 

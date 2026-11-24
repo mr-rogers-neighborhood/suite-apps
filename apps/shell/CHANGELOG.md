@@ -7,6 +7,9 @@ shipped host.
 
 ### Changed
 
+- **Suite Shell is the way in.** Install the host once, then install, update, remove and reinstall
+  packs from its catalogue. Suite Start remains the legacy hub for the Flatpak apps until #314
+  retires it; it is no longer the entry point for an app.
 - **Documents carry a host envelope.** Each pack document is a magic-and-version prefix, a canonical
   header (publisher, pack, document, schema, payload length, payload checksum) and the pack's payload
   bytes untouched. Saves are serialized, atomic, backed up and recovered after a crash; a file that
