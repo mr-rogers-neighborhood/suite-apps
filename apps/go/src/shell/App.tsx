@@ -2,6 +2,7 @@ import { App as NativeApp } from "@capacitor/app";
 import type { CaptureIntent, ModuleHost, ModuleViewProps, SuiteGoModule } from "@suite/go";
 import { createModuleRegistry } from "@suite/go";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CatalogueEntry, createCatalogue } from "../host/catalogue.js";
 import { createDocumentStore } from "../host/documents.js";
 import { createFileService, mimeFor } from "../host/files.js";
 import { createNotifications } from "../host/notifications.js";
@@ -12,6 +13,7 @@ import { createKeyValueStore } from "../host/storage.js";
 import { paintTheme, resolveTheme, watchColorScheme } from "../host/theme.js";
 import { canvasModule } from "../modules/canvas/index.js";
 import { scratchModule } from "../modules/scratch/index.js";
+import { Catalogue } from "./Catalogue.js";
 import { Home } from "./Home.js";
 import { IsolatedModule } from "./IsolatedModule.js";
 import { MountedModule } from "./MountedModule.js";
@@ -90,14 +92,15 @@ const pins = createPins(shellStorage);
 const recents = createRecents(shellStorage);
 const files = createFileService();
 const packs = createPackStore();
+const catalogue = createCatalogue({ packs, store: createKeyValueStore("catalogue") });
 const notifications = createNotifications();
 
 /**
  * Dev handles, for `pnpm android:eval`.
  *
- * The install pipeline has no screen yet, and a pipeline nobody has run is a design. This
- * exposes the store so it can be exercised on a device; it holds no secret, and it goes away
- * with the install screen that replaces it.
+ * The catalogue is the screen a person uses now. These remain for the device checks that call a
+ * store directly — a signed file, a list, a removal — without walking the UI. They hold no
+ * secret and only reach the same pack store the screen does.
  */
 /** Set by the App once mounted; the dev hook lives at module scope and cannot see a callback. */
 let reloadPacksFromDev: () => void = () => undefined;
@@ -133,12 +136,16 @@ let IDLE_RELEASE_MS = 5 * 60_000;
 
 type Route =
   | { readonly kind: "home" }
+  | { readonly kind: "catalogue" }
   | { readonly kind: "module"; readonly moduleId: string; readonly intent?: CaptureIntent };
 
 export function App() {
   const [route, setRoute] = useState<Route>({ kind: "home" });
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
   const [installed, setInstalled] = useState<readonly InstalledPack[]>([]);
+  const [catalogueEntries, setCatalogueEntries] = useState<readonly CatalogueEntry[]>([]);
+  const [catalogueNotice, setCatalogueNotice] = useState<string | null>(null);
+  const [catalogueLoading, setCatalogueLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [pinned, setPinned] = useState<readonly string[]>([]);
   const [recent, setRecent] = useState<readonly RecentEntry[]>([]);
@@ -165,6 +172,68 @@ export function App() {
   useEffect(() => {
     reloadPacksFromDev = () => void reloadPacks();
   }, [reloadPacks]);
+
+  /**
+   * Fetch and verify the published index.
+   *
+   * A refusal keeps the rows already on screen and shows the sentence the verifier produced:
+   * clearing the list on a transient network failure would look like the catalogue emptied.
+   */
+  const refreshCatalogue = useCallback(async () => {
+    setCatalogueLoading(true);
+    try {
+      const loaded = await catalogue.load();
+      if (!loaded.ok) {
+        setCatalogueNotice(loaded.message);
+        return;
+      }
+      setCatalogueEntries(loaded.entries);
+      setCatalogueNotice(null);
+    } catch (error) {
+      setCatalogueNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCatalogueLoading(false);
+    }
+  }, []);
+
+  const openCatalogue = useCallback(() => {
+    setCatalogueNotice(null);
+    setRoute({ kind: "catalogue" });
+    void refreshCatalogue();
+  }, [refreshCatalogue]);
+
+  const installFromCatalogue = useCallback(
+    async (entry: CatalogueEntry) => {
+      setCatalogueNotice(null);
+      const result = await catalogue.install(entry.id, entry.version);
+      if (!result.ok) {
+        setCatalogueNotice(result.message);
+        return;
+      }
+      await reloadPacks();
+      await refreshCatalogue();
+      const verb =
+        result.action === "install"
+          ? "installed"
+          : result.action === "update"
+            ? "updated"
+            : "reinstalled";
+      setCatalogueNotice(`${entry.name} ${entry.version} ${verb}.`);
+    },
+    [refreshCatalogue, reloadPacks],
+  );
+
+  const removeFromCatalogue = useCallback(
+    async (id: string) => {
+      const entry = catalogueEntries.find((candidate) => candidate.id === id);
+      setCatalogueNotice(null);
+      await catalogue.remove(id);
+      await reloadPacks();
+      await refreshCatalogue();
+      setCatalogueNotice(`${entry?.name ?? id} removed. Its documents stay on this device.`);
+    },
+    [catalogueEntries, refreshCatalogue, reloadPacks],
+  );
 
   /**
    * Install a pack from a file the person chooses.
@@ -195,7 +264,7 @@ export function App() {
       await packs.uninstall(moduleId);
       await reloadPacks();
       setRoute({ kind: "home" });
-      setNotice("Removed. Its files are gone from this device.");
+      setNotice("Removed. Its documents stay on this device.");
     },
     [reloadPacks],
   );
@@ -267,6 +336,7 @@ export function App() {
   useEffect(() => {
     const subscription = NativeApp.addListener("backButton", () => {
       if (route.kind === "module") void closeModule();
+      else if (route.kind === "catalogue") setRoute({ kind: "home" });
       else void NativeApp.exitApp();
     });
     return () => {
@@ -390,6 +460,16 @@ export function App() {
             />
           );
         })()
+      ) : route.kind === "catalogue" ? (
+        <Catalogue
+          entries={catalogueEntries}
+          notice={catalogueNotice}
+          loading={catalogueLoading}
+          onRefresh={() => void refreshCatalogue()}
+          onInstall={(entry) => void installFromCatalogue(entry)}
+          onRemove={(id) => void removeFromCatalogue(id)}
+          onClose={() => setRoute({ kind: "home" })}
+        />
       ) : (
         <Home
           modules={ordered}
@@ -398,6 +478,7 @@ export function App() {
           onOpen={(moduleId) => openModule(moduleId)}
           onCapture={(body) => handleCapture(body)}
           onTogglePin={togglePin}
+          onCatalogue={openCatalogue}
           onInstall={() => void installFromFile()}
           onRemove={(moduleId) => void removeDomain(moduleId)}
           removable={new Set(installed.map((pack) => pack.manifest.id))}

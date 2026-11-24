@@ -387,6 +387,86 @@ export async function verifyPackSignature(
   }
 }
 
+/**
+ * The one version order a pack has.
+ *
+ * Semver precedence, so `1.10.0` is newer than `1.9.0`: sorting version directory names as
+ * strings would make a phone keep the older one active. The desktop host and Go must choose the
+ * same active version from the same layout, or one install on two hosts is two products.
+ *
+ * A prerelease is lower than its release (`2.0.0-rc.1` < `2.0.0`), and identifiers compare
+ * numerically when both are digits and by code unit otherwise. A malformed version throws rather
+ * than sorting somewhere arbitrary: every caller here parsed the version first.
+ */
+export function comparePackVersions(left: string, right: string): number {
+  const a = parsePackVersion(left);
+  const b = parsePackVersion(right);
+  if (a === null || b === null) {
+    throw new TypeError(`Not a pack version: ${a === null ? left : right}`);
+  }
+
+  for (let index = 0; index < 3; index += 1) {
+    const leftPart = a.core[index];
+    const rightPart = b.core[index];
+    if (leftPart === undefined || rightPart === undefined) continue;
+    if (leftPart < rightPart) return -1;
+    if (leftPart > rightPart) return 1;
+  }
+
+  return comparePrerelease(a.prerelease, b.prerelease);
+}
+
+interface ParsedPackVersion {
+  readonly core: readonly [bigint, bigint, bigint];
+  readonly prerelease: readonly string[];
+}
+
+const VERSION = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/u;
+const NUMERIC = /^\d+$/u;
+
+function parsePackVersion(value: string): ParsedPackVersion | null {
+  const match = VERSION.exec(value);
+  if (match === null) return null;
+  const major = match[1];
+  const minor = match[2];
+  const patch = match[3];
+  if (major === undefined || minor === undefined || patch === undefined) return null;
+  return {
+    core: [BigInt(major), BigInt(minor), BigInt(patch)],
+    prerelease: match[4] === undefined ? [] : match[4].split("."),
+  };
+}
+
+function comparePrerelease(left: readonly string[], right: readonly string[]): number {
+  if (left.length === 0 && right.length === 0) return 0;
+  if (left.length === 0) return 1;
+  if (right.length === 0) return -1;
+
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const a = left[index];
+    const b = right[index];
+    // A shorter set of otherwise equal identifiers has lower precedence.
+    if (a === undefined) return -1;
+    if (b === undefined) return 1;
+
+    const aNumeric = NUMERIC.test(a);
+    const bNumeric = NUMERIC.test(b);
+    if (aNumeric && bNumeric) {
+      const leftNumber = BigInt(a);
+      const rightNumber = BigInt(b);
+      if (leftNumber < rightNumber) return -1;
+      if (leftNumber > rightNumber) return 1;
+      continue;
+    }
+    if (aNumeric) return -1;
+    if (bNumeric) return 1;
+    if (a < b) return -1;
+    if (a > b) return 1;
+  }
+  return 0;
+}
+
 export interface PackFileMismatch {
   readonly path: string;
   readonly reason: "missing" | "hash" | "size";

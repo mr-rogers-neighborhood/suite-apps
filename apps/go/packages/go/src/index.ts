@@ -68,6 +68,7 @@ export {
   bytesToBase64,
   canonicalManifestBytes,
   checkNetworkPolicy,
+  comparePackVersions,
   type HostFit,
   isPackCapability,
   isSafePackPath,

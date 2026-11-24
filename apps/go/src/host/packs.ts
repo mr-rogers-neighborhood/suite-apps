@@ -2,6 +2,8 @@ import { Directory, Filesystem } from "@capacitor/filesystem";
 import {
   bytesToBase64,
   checkNetworkPolicy,
+  comparePackVersions,
+  type PackCapability,
   type PackManifest,
   packAllows,
   packDocumentSealsNetwork,
@@ -74,6 +76,27 @@ export const PACK_PUBLIC_KEY = SUITE_PACK_PUBLIC_KEY;
 export const HOST_CONTRACT_VERSION = 2;
 export const HOST_VERSION = 1;
 
+/**
+ * The pack capabilities this host actually serves.
+ *
+ * Go's frame bridge answers `documents`, `storage`, `recents` and `notifications`; `network` is
+ * the pack's own declared egress, which the host permits and holds to a sealed CSP. `files` is
+ * not served to a pack: the shell uses the file service itself, but the frame protocol has no
+ * `files.*` request, so a pack that declares it would half-work.
+ *
+ * S4.8 says a host refuses a pack naming a capability it does not implement, rather than
+ * installing it and letting the first call fail. The desktop's list is its own
+ * (`HOST_CAPABILITIES` in `apps/shell/src/packs.ts`) because the two hosts serve different
+ * surfaces; they agree on the manifests and on the refusal, not on this set.
+ */
+export const GO_HOST_CAPABILITIES = [
+  "documents",
+  "storage",
+  "recents",
+  "notifications",
+  "network",
+] as const satisfies readonly PackCapability[];
+
 export interface InstalledPack {
   readonly manifest: PackManifest;
   /** Where the pack's entry lives, as a URL the WebView can import. */
@@ -82,21 +105,46 @@ export interface InstalledPack {
   readonly bytes: number;
 }
 
+export type InstallFailureReason =
+  | "unreadable"
+  | "invalid"
+  | "unsigned"
+  | "untrusted"
+  | "files"
+  | "digest"
+  | "host"
+  | "capability"
+  | "policy"
+  | "failed";
+
 export type InstallOutcome =
   | { readonly ok: true; readonly pack: InstalledPack }
   | {
       readonly ok: false;
-      readonly reason:
-        | "unreadable"
-        | "invalid"
-        | "unsigned"
-        | "untrusted"
-        | "files"
-        | "host"
-        | "policy"
-        | "failed";
+      readonly reason: InstallFailureReason;
       readonly message: string;
     };
+
+/**
+ * The catalogue entry an archive is being installed for.
+ *
+ * S12.7: the bytes installed must be the bytes the index displayed. The digest is checked before
+ * the archive is read at all, so a changed archive costs no decompression; the id and version are
+ * checked after the manifest parses, so a readable archive cannot silently become another app.
+ */
+export interface ExpectedPack {
+  readonly id: string;
+  readonly version: string;
+  readonly sha256: string;
+  readonly size?: number;
+}
+
+export interface PackInstallOptions {
+  /** Replace the same version directory. The catalogue names this for a reinstall. */
+  readonly replace?: boolean;
+  /** The verified index entry this archive must match. */
+  readonly expected?: ExpectedPack;
+}
 
 /**
  * The URL a pack file is served from.
@@ -137,6 +185,21 @@ function refusal(
   version: string | null = null,
 ): PackIssue {
   return { id, version, reason, message };
+}
+
+/**
+ * The capability the host does not serve, or null.
+ *
+ * Named one by one rather than "unsupported pack": the person needs to know whether the app is
+ * built for a newer host or asks for something this phone does not do (S4.8).
+ */
+function unsupportedCapability(
+  manifest: Pick<PackManifest, "id" | "name" | "capabilities">,
+  served: readonly PackCapability[],
+): string | null {
+  const missing = manifest.capabilities.filter((capability) => !served.includes(capability));
+  if (missing.length === 0) return null;
+  return `${manifest.name} asks for ${missing.join(", ")}, which Suite Go does not serve.`;
 }
 
 /**
@@ -225,6 +288,16 @@ async function ensureDir(path: string): Promise<void> {
   );
 }
 
+/** Whether a file or directory exists. A missing path is `false`, never an error. */
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await Filesystem.stat({ path, directory: Directory.Data });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 interface InstalledListing {
   /** Relative slash-separated paths, `manifest.json` included. */
   readonly files: readonly string[];
@@ -273,7 +346,7 @@ export interface PackStore {
   /** Why the most recent `discover` refused a candidate. Empty when nothing was refused. */
   issues(): Promise<readonly PackIssue[]>;
   list(): Promise<readonly InstalledPack[]>;
-  install(bytes: Uint8Array): Promise<InstallOutcome>;
+  install(bytes: Uint8Array, options?: PackInstallOptions): Promise<InstallOutcome>;
   uninstall(id: string): Promise<void>;
   /** The directory a pack is installed in, for a launch URL. Kept for `uninstall` and tests. */
   directoryOf(id: string): Promise<string>;
@@ -301,11 +374,14 @@ export function createPackStore(
     readonly publicKey?: string;
     readonly contractVersion?: number;
     readonly hostVersion?: number;
+    /** The pack capabilities this host serves. Production is `GO_HOST_CAPABILITIES`. */
+    readonly capabilities?: readonly PackCapability[];
     /** Test seams for the archive caps. Production uses `MAX_ARCHIVE_BYTES` and the reader defaults. */
     readonly archiveLimits?: PackArchiveLimits;
   } = {},
 ): PackStore {
   const publicKey = options.publicKey ?? PACK_PUBLIC_KEY;
+  const servedCapabilities = options.capabilities ?? GO_HOST_CAPABILITIES;
   const host = {
     contractVersion: options.contractVersion ?? HOST_CONTRACT_VERSION,
     hostVersion: options.hostVersion ?? HOST_VERSION,
@@ -369,6 +445,11 @@ export function createPackStore(
 
     if (!(await verifyPackSignature(manifest, publicKey))) {
       return refuse("untrusted", `${id} ${version} is not signed by this host's pack key.`);
+    }
+
+    const capability = unsupportedCapability(manifest, servedCapabilities);
+    if (capability !== null) {
+      return refuse("capability", `${id} ${version}: ${capability}`);
     }
 
     let listing: InstalledListing;
@@ -448,14 +529,29 @@ export function createPackStore(
           });
           versions = listing.files
             .filter((entry) => (entry.type as string) === "directory")
+            // A crash can leave a temporary sibling of a version directory behind. It is not a
+            // version, and treating it as one would offer a half-written pack.
+            .filter((entry) => !entry.name.startsWith(".tmp-"))
             .map((entry) => entry.name);
         } catch {
           continue;
         }
 
-        // The newest version that still verifies. A directory left behind by a half-finished
-        // install is skipped rather than offered as a module that will fail to open.
-        for (const version of [...versions].sort().reverse()) {
+        // The newest version that still verifies, by semver rather than by directory name:
+        // string order puts 1.9.0 above 1.10.0. The desktop host makes the same choice from the
+        // same layout, so the phone and the desktop agree on the active version. A stray
+        // non-version directory is still visited (and refused by its manifest) rather than
+        // crashing the scan.
+        const ordered = [...versions]
+          .sort((left, right) => {
+            try {
+              return comparePackVersions(left, right);
+            } catch {
+              return left < right ? -1 : left > right ? 1 : 0;
+            }
+          })
+          .reverse();
+        for (const version of ordered) {
           const verified = await verifyInstalled(id, version);
           if (!verified.ok) {
             refused.push(verified.issue);
@@ -491,13 +587,34 @@ export function createPackStore(
       return absoluteDir(id);
     },
 
-    async install(bytes) {
+    async install(bytes, installOptions = {}) {
       if (publicKey.length === 0) {
         return {
           ok: false,
           reason: "untrusted",
           message: "This build has no pack signing key, so it cannot trust any pack yet.",
         };
+      }
+
+      // S12.7: the catalogue index displayed a digest and size. Check them before the archive is
+      // read at all, so an archive the catalogue did not name is refused without decompression.
+      const expected = installOptions.expected;
+      if (expected !== undefined) {
+        if (expected.size !== undefined && bytes.byteLength !== expected.size) {
+          return {
+            ok: false,
+            reason: "digest",
+            message: `That archive is ${bytes.byteLength} bytes; the catalogue lists ${expected.size}.`,
+          };
+        }
+        if ((await sha256Hex(bytes)) !== expected.sha256) {
+          return {
+            ok: false,
+            reason: "digest",
+            message:
+              "That archive does not match the digest the catalogue displayed; it was refused before it was opened.",
+          };
+        }
       }
 
       const read = await readEnvelope(bytes, archiveLimits);
@@ -507,12 +624,28 @@ export function createPackStore(
 
       const { manifest, files } = read.envelope;
 
+      if (
+        expected !== undefined &&
+        (manifest.id !== expected.id || manifest.version !== expected.version)
+      ) {
+        return {
+          ok: false,
+          reason: "invalid",
+          message: `That archive is ${manifest.id} ${manifest.version}; the catalogue lists ${expected.id} ${expected.version}.`,
+        };
+      }
+
       if (!(await verifyPackSignature(manifest, publicKey))) {
         return {
           ok: false,
           reason: "unsigned",
           message: "That pack's signature does not match. It may be damaged or not from Suite.",
         };
+      }
+
+      const capability = unsupportedCapability(manifest, servedCapabilities);
+      if (capability !== null) {
+        return { ok: false, reason: "capability", message: capability };
       }
 
       const listed = new Set(manifest.files.map((file) => file.path));
@@ -559,20 +692,85 @@ export function createPackStore(
       const fit = packFitsHost(manifest, host);
       if (!fit.ok) return { ok: false, reason: "host", message: fit.message };
 
+      const idRoot = `${ROOT}/${manifest.id}`;
+      const target = `${idRoot}/${manifest.version}`;
+      const temporary = `${idRoot}/.tmp-${crypto.randomUUID()}`;
+
+      // The same version is a reinstall, and only a reinstall may replace it. An update is a new
+      // version directory beside the old one, which is what lets yesterday's version keep working.
+      if ((await pathExists(target)) && installOptions.replace !== true) {
+        return {
+          ok: false,
+          reason: "failed",
+          message: `${manifest.id} ${manifest.version} is already installed; it was not replaced.`,
+        };
+      }
+
       try {
-        const dir = `${ROOT}/${manifest.id}/${manifest.version}`;
-        await ensureDir(dir);
+        // Write into a temporary sibling first: a launch that scans mid-install must never see a
+        // half-written version, and a crash leaves a `.tmp-` directory discovery ignores.
+        await ensureDir(temporary);
         // The manifest is written too, not just the payload. Discovery reads it to decide what
         // is installed, and an install that left it behind would vanish on the next launch.
-        await writeTextFile(`${dir}/manifest.json`, JSON.stringify(manifest));
+        await writeTextFile(`${temporary}/manifest.json`, JSON.stringify(manifest));
         for (const file of manifest.files) {
           const content = payload[file.path];
           if (content === undefined) continue;
           await Filesystem.writeFile({
-            path: `${dir}/${file.path}`,
+            path: `${temporary}/${file.path}`,
             data: bytesToBase64(content),
             directory: Directory.Data,
             recursive: true,
+          });
+        }
+
+        // Re-checked after the write: a concurrent install may have created the target while this
+        // one was extracting. The refusal is the same one the first check made.
+        if (await pathExists(target)) {
+          if (installOptions.replace !== true) {
+            await Filesystem.rmdir({
+              path: temporary,
+              directory: Directory.Data,
+              recursive: true,
+            }).catch(() => undefined);
+            return {
+              ok: false,
+              reason: "failed",
+              message: `${manifest.id} ${manifest.version} is already installed; it was not replaced.`,
+            };
+          }
+          // A reinstall: move the old version aside, put the verified one in place, and restore the
+          // old one if the swap fails. The previous version is intact at every point.
+          const backup = `${idRoot}/.tmp-${crypto.randomUUID()}-previous`;
+          await Filesystem.rename({
+            from: target,
+            to: backup,
+            directory: Directory.Data,
+          });
+          try {
+            await Filesystem.rename({
+              from: temporary,
+              to: target,
+              directory: Directory.Data,
+            });
+          } catch (error) {
+            await Filesystem.rename({
+              from: backup,
+              to: target,
+              directory: Directory.Data,
+            }).catch(() => undefined);
+            throw error;
+          }
+          await Filesystem.rmdir({
+            path: backup,
+            directory: Directory.Data,
+            recursive: true,
+          }).catch(() => undefined);
+        } else {
+          await Filesystem.rename({
+            from: temporary,
+            to: target,
+            directory: Directory.Data,
           });
         }
 
@@ -586,6 +784,11 @@ export function createPackStore(
         installed.set(manifest.id, pack);
         return { ok: true, pack };
       } catch (error) {
+        await Filesystem.rmdir({
+          path: temporary,
+          directory: Directory.Data,
+          recursive: true,
+        }).catch(() => undefined);
         return {
           ok: false,
           reason: "failed",
