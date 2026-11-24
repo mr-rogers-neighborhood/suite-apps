@@ -96,6 +96,12 @@ export interface FileRemoveOptions {
 /** Where a pack was found. `development` is an unsigned directory behind a switch. */
 export type PackSource = "development" | "installed";
 
+/** Who signed a pack, as the chrome shows it. The fingerprint is the key's SHA-256. */
+export interface PackPublisherView {
+  readonly id: string;
+  readonly fingerprint: string;
+}
+
 /** What the chrome needs to render a pack tile. No path and no code. */
 export interface PackSummary {
   readonly id: string;
@@ -105,6 +111,8 @@ export interface PackSummary {
   readonly entry: string;
   readonly capabilities: readonly PackCapability[];
   readonly source: PackSource;
+  /** Null only for an unsigned development directory. */
+  readonly publisher: PackPublisherView | null;
 }
 
 /**
@@ -112,7 +120,8 @@ export interface PackSummary {
  *
  * `trusted` is the host's verification result, not the archive's claim. A refused
  * archive still lists, with a sentence a person can read; it can never install.
- * The absolute path stays in the main process.
+ * The absolute path stays in the main process. The publisher fingerprint and the
+ * capability list are here because S2.5 requires both before an install.
  */
 export interface CatalogueEntry {
   readonly id: string;
@@ -122,6 +131,8 @@ export interface CatalogueEntry {
   readonly entry: string;
   readonly trusted: boolean;
   readonly refusal: string | null;
+  readonly publisher: PackPublisherView | null;
+  readonly capabilities: readonly PackCapability[];
 }
 
 /** One version directory present under the install root. */

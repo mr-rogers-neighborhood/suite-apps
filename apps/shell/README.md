@@ -42,7 +42,8 @@ The app loads signed installs from `<dataRoot>/packs/<id>/<version>`. It never r
 directory is `packs/<id>/` beside the checkout and only loads when that switch is set. Data lives
 under Electron's `userData` directory (`~/.config/Suite/shell` on Linux); `SUITE_SHELL_DATA` and
 `SUITE_SHELL_USER_DATA` override the data and profile directories for a test. The local catalogue
-is `<dataRoot>/catalogue`; `SUITE_SHELL_CATALOGUE` points it at another directory.
+is `<dataRoot>/catalogue`; `SUITE_SHELL_CATALOGUE` points it at another directory. The publisher
+trust store is `<dataRoot>/trust/publishers.json`; `SUITE_SHELL_TRUST` points it elsewhere.
 
 The shared pack work lives outside this app: `packages/pack` owns the manifest and signature,
 `packages/pack-runtime` owns the pack-side service types, and `packages/pack-host` owns the scoped
@@ -95,23 +96,42 @@ the scheme in this phase, and the host routes a link that reaches it.
 
 Home's `shell.apps` widget shows installed packs and the local catalogue together. The catalogue is a directory
 of `.suitepack` files (`<dataRoot>/catalogue`, or `SUITE_SHELL_CATALOGUE`). Each archive is read with
-the shared archive reader and verified before it is listed: the manifest signature against
-`SUITE_PACK_PUBLIC_KEY`, the host contract and capability list, and every file hash. A trusted entry
-offers **Install**; a refused entry stays visible with its refusal sentence and cannot be installed.
-Listing never extracts an archive, so a refusal leaves nothing behind.
+the shared archive reader and verified before it is listed: the publisher key in the manifest against
+the local trust store, the manifest signature with that key, the host contract and capability list, and
+every file hash. A trusted entry offers **Install**; a refused entry stays visible with its refusal
+sentence and cannot be installed. Listing never extracts an archive, so a refusal leaves nothing
+behind. Each card shows the publisher id and key fingerprint, plus the declared capabilities.
+
+The trust store is `<dataRoot>/trust/publishers.json` (`SUITE_SHELL_TRUST` moves it). It is created
+with the first-party Suite key preinstalled; that pin always wins, even if the file is edited. Another
+key is added only through the install dialog: a pack signed by an unknown key is refused with the
+key's SHA-256 fingerprint in the refusal, and **Trust this publisher** adds that key only after the
+person has seen it. A malformed store is ignored rather than guessed at, so a broken file trusts the
+first-party key and nothing else.
+
+Before an install or update writes anything, the host shows the publisher id, key fingerprint, pack
+id, version and capability list and waits for confirmation; the result notice repeats them. A
+development directory has no publisher and says so.
 
 The catalogue is a local distribution path. A remote index is a later slice with the same trust
 rule; it is not built here.
 
 The **Add pack…** button is the original file picker. The host reads at most 64 MiB, verifies the
 archive with the same rules, refuses extra files and paths that leave the pack root, and only then
-writes `<dataRoot>/packs/<id>/<version>/`. Installs are additive and an existing version is never
-overwritten. A Go `.pack` is a different manifest format and is refused; it is not an import path.
+writes `<dataRoot>/packs/<id>/<version>/`, with the active publisher recorded beside the versions.
+Installs are additive and an existing version is never overwritten. A Go `.pack` is a different
+manifest format and is refused; it is not an import path.
 
-Updating is installing a newer archive for the same id. The loader selects the highest valid version,
-so the new version runs after a restart (or immediately when no tab is open). The old version stays
-on disk until the person removes it; Home lists each non-current version with an explicit
-**Remove** action. Nothing is deleted silently.
+The install identity is `(publisher id, pack id)`. A different publisher under an existing pack id is
+refused unless the host passes the explicit migration, and even then it starts with no documents,
+files or session storage: those are keyed by both ids. The first-party publisher keeps the old
+`documents/<container>/<pack>` and `persist:<container>:<pack>` paths so an existing install is not
+moved; any other publisher gets a segment containing its id.
+
+Updating is installing a newer archive for the same id and the same publisher. The loader selects the
+highest valid version for the active publisher, so the new version runs after a restart (or
+immediately when no tab is open). The old version stays on disk until the person removes it; Home
+lists each non-current version with an explicit **Remove** action. Nothing is deleted silently.
 
 **Uninstall** removes exactly `<dataRoot>/packs/<id>/<version>`. A symlinked install root, id
 directory or version directory is refused, and the version must resolve inside the real pack root;

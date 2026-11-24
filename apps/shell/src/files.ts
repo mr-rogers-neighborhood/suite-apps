@@ -1,18 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import { isSafePublisherId } from "@suite/pack/trust";
 import { FileStoreError, PackFileStore, type RemoveOptions } from "@suite/pack-host";
 import type { FileEntry, FileReadOptions, FileWriteOptions } from "@suite/pack-runtime";
 import { isSafeContainerId } from "./container.js";
+import { FIRST_PARTY_PUBLISHER_ID, packStorageKey } from "./packIdentity.js";
 import { isSafePackId, packAllows } from "./packs.js";
 import type { PackCapability } from "./shared.js";
 
 /**
  * A pack's scoped files, keyed by the sender the host already resolved.
  *
- * One `PackFileStore` exists per `(container, pack)`, opened lazily on first use
- * under the host-owned `<dataRoot>/files/<container>/<pack>` root. The store is
- * not part of the pack's code root, so reinstalling a pack never touches the
- * person's data.
+ * One `PackFileStore` exists per `(container, publisher, pack)`, opened lazily on
+ * first use under the host-owned `<dataRoot>/files/<container>/<segment>` root.
+ * The store is not part of the pack's code root, so reinstalling a pack never
+ * touches the person's data, and a different publisher under the same id gets a
+ * different segment and therefore inherits nothing (S2.2).
  *
  * Nothing here imports Electron. The main process supplies a sender; this module
  * decides whether that sender declared `files`, maps it to a store, and owns the
@@ -23,11 +26,15 @@ export interface FilesSender {
   readonly containerId: string;
   readonly packId: string;
   readonly tabId: string;
-  readonly pack: { readonly capabilities: readonly PackCapability[] };
+  readonly pack: {
+    readonly capabilities: readonly PackCapability[];
+    readonly publisher?: { readonly id: string } | null;
+  };
 }
 
 export interface FilesScope {
   readonly containerId: string;
+  readonly publisherId: string;
   readonly packId: string;
   readonly owner: string;
 }
@@ -36,13 +43,21 @@ export interface FilesScope {
  * The scope a sender may use, or `null` when it declared no `files`.
  *
  * This is the one place the capability gate lives, so a channel that forgets to
- * check still cannot reach a store.
+ * check still cannot reach a store. A development pack has no publisher and
+ * keeps the first-party segment.
  */
 export function filesScope(sender: FilesSender): FilesScope | null {
   if (!isSafeContainerId(sender.containerId) || !isSafePackId(sender.packId)) return null;
   if (sender.tabId.length === 0) return null;
   if (!packAllows(sender.pack, "files")) return null;
-  return { containerId: sender.containerId, packId: sender.packId, owner: sender.tabId };
+  const publisherId = sender.pack.publisher?.id ?? FIRST_PARTY_PUBLISHER_ID;
+  if (!isSafePublisherId(publisherId)) return null;
+  return {
+    containerId: sender.containerId,
+    publisherId,
+    packId: sender.packId,
+    owner: sender.tabId,
+  };
 }
 
 /** What `lock` returns to the main process. The preload turns it into a `FileLock`. */
@@ -73,7 +88,10 @@ function scopeKey(scope: FilesScope): string {
   if (!isSafeContainerId(scope.containerId) || !isSafePackId(scope.packId)) {
     throw new FileStoreError("invalid-path", "invalid file scope");
   }
-  return `${scope.containerId}:${scope.packId}`;
+  if (!isSafePublisherId(scope.publisherId)) {
+    throw new FileStoreError("invalid-path", "invalid file scope");
+  }
+  return `${scope.containerId}:${scope.publisherId}:${scope.packId}`;
 }
 
 export class PackFilesService {
@@ -162,7 +180,9 @@ export class PackFilesService {
     const existing = this.#stores.get(key);
     if (existing !== undefined) return existing;
 
-    const opening = PackFileStore.open(join(this.#root, scope.containerId, scope.packId));
+    const opening = PackFileStore.open(
+      join(this.#root, scope.containerId, packStorageKey(scope.publisherId, scope.packId)),
+    );
     this.#stores.set(key, opening);
     void opening.catch(() => {
       this.#stores.delete(key);

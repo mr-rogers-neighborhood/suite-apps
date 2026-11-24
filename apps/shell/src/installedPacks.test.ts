@@ -8,18 +8,26 @@ import {
   PACK_FORMAT,
   type PackManifest,
   type PackManifestCore,
+  publisherKeyFingerprint,
   signPackManifest,
+  type TrustedPublisher,
 } from "@suite/pack";
 import { buildPackArchive } from "@suite/pack-host";
 import { afterEach, describe, expect, it } from "vitest";
+import { DocumentStore } from "./documents.js";
+import { filesScope, PackFilesService } from "./files.js";
 import {
   comparePackVersions,
+  describePackInstall,
   type InstalledPackInfo,
   installPackArchive,
   loadInstalledPacks,
   type PackTrustOptions,
+  packInstallSummary,
   uninstallPackVersion,
 } from "./installedPacks.js";
+import { documentScopeLabel, documentsRootFor } from "./packIdentity.js";
+import { packPartition } from "./packs.js";
 import type { PackCapability } from "./shared.js";
 
 const encoder = new TextEncoder();
@@ -49,6 +57,10 @@ interface FixtureOptions {
   readonly archiveFiles?: Record<string, Uint8Array>;
   /** Reuse one key pair when several versions should share a trust root. */
   readonly keys?: { readonly secretKeyBase64: string; readonly publicKeyBase64: string };
+  /** The publisher id the manifest claims. Defaults to the first-party id. */
+  readonly publisherId?: string;
+  /** Sign a manifest from before S2.1, with no publisher field at all. */
+  readonly legacyPublisher?: boolean;
 }
 
 interface Fixture {
@@ -74,6 +86,9 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
     version: options.version ?? "1.0.0",
     entry: "index.html",
     contractVersion: options.contractVersion ?? 1,
+    ...(options.legacyPublisher === true
+      ? {}
+      : { publisher: { id: options.publisherId ?? "suite", key: keys.publicKeyBase64 } }),
     capabilities: options.capabilities ?? [],
     files: await digestPackFiles(payload),
     ...(options.description === undefined ? {} : { description: options.description }),
@@ -95,7 +110,20 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
 
 function trust(publicKey: string, overrides: Partial<PackTrustOptions> = {}): PackTrustOptions {
   return {
-    publicKey,
+    publishers: [{ id: "suite", key: publicKey, source: "preinstalled" }],
+    hostContractVersion: 1,
+    hostVersion: 1,
+    hostCapabilities: ["documents", "files", "network"],
+    ...overrides,
+  };
+}
+
+function trustFor(
+  publishers: readonly TrustedPublisher[],
+  overrides: Partial<PackTrustOptions> = {},
+): PackTrustOptions {
+  return {
+    publishers,
     hostContractVersion: 1,
     hostVersion: 1,
     hostCapabilities: ["documents", "files", "network"],
@@ -149,7 +177,7 @@ describe("installed pack verification", () => {
     const scan = await loadInstalledPacks(root, trust(other.publicKeyBase64));
     expect(scan.packs).toEqual([]);
     expect(scan.issues).toHaveLength(1);
-    expect(scan.issues[0]).toMatchObject({ id: "demo", version: "1.0.0", reason: "untrusted" });
+    expect(scan.issues[0]).toMatchObject({ id: "demo", version: "1.0.0", reason: "publisher" });
   });
 
   it("refuses a file that changed after it was signed", async () => {
@@ -307,7 +335,7 @@ describe("installed pack installation", () => {
     const pack = await fixture();
     await install(root, pack);
 
-    expect(await readdir(join(root, "demo"))).toEqual(["1.0.0"]);
+    expect(await readdir(join(root, "demo"))).toEqual(["1.0.0", "publisher.json"]);
     const scan = await loadInstalledPacks(root, trust(pack.publicKey));
     expect(scan.packs[0]?.root).toBe(join(root, "demo", "1.0.0"));
   });
@@ -394,7 +422,7 @@ describe("installed pack uninstall", () => {
     await install(root, await fixture({ version: "1.1.0", keys }));
 
     await uninstallPackVersion(root, "demo", "1.0.0");
-    expect(await readdir(join(root, "demo"))).toEqual(["1.1.0"]);
+    expect(await readdir(join(root, "demo"))).toEqual(["1.1.0", "publisher.json"]);
 
     const scan = await loadInstalledPacks(root, trust(keys.publicKeyBase64));
     expect(scan.versions.map((version) => version.version)).toEqual(["1.1.0"]);
@@ -430,7 +458,7 @@ describe("installed pack uninstall", () => {
       reason: "io",
       message: expect.stringContaining("symbolic link"),
     });
-    expect(await readdir(join(actual, "demo"))).toEqual(["1.0.0"]);
+    expect(await readdir(join(actual, "demo"))).toEqual(["1.0.0", "publisher.json"]);
   });
 
   it("refuses a symlinked version directory without following it", async () => {
@@ -481,5 +509,256 @@ describe("pack version comparison", () => {
   it("compares numeric core parts as numbers", () => {
     expect(comparePackVersions("1.10.0", "1.2.0")).toBe(1);
     expect(comparePackVersions("2.0.0", "10.0.0")).toBe(-1);
+  });
+});
+
+describe("publisher trust at install", () => {
+  // spec: S2.1
+  it("refuses an archive signed by an unknown publisher and names its fingerprint", async () => {
+    const root = await temporaryRoot();
+    const stranger = await generatePackKeyPair();
+    const trusted = await generatePackKeyPair();
+    const pack = await fixture({ keys: stranger, publisherId: "acme" });
+    const fingerprint = await publisherKeyFingerprint(stranger.publicKeyBase64);
+
+    const failure = installPackArchive(pack.archive, root, trust(trusted.publicKeyBase64));
+    await expect(failure).rejects.toMatchObject({
+      reason: "publisher",
+      fingerprint,
+      message: expect.stringContaining(fingerprint),
+    });
+    await expect(failure).rejects.toThrow(/trust store/u);
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  // spec: S2.1
+  it("installs once the person has added the publisher key", async () => {
+    const root = await temporaryRoot();
+    const stranger = await generatePackKeyPair();
+    const pack = await fixture({ keys: stranger, publisherId: "acme" });
+    const options = trustFor([
+      { id: "suite", key: (await generatePackKeyPair()).publicKeyBase64, source: "preinstalled" },
+      { id: "acme", key: stranger.publicKeyBase64, source: "added" },
+    ]);
+
+    const installed = await installPackArchive(pack.archive, root, options);
+    expect(installed.publisher).toMatchObject({
+      id: "acme",
+      fingerprint: await publisherKeyFingerprint(stranger.publicKeyBase64),
+    });
+  });
+
+  // spec: S2.5
+  it("reports the publisher fingerprint, pack id, version and capabilities", async () => {
+    const root = await temporaryRoot();
+    const keys = await generatePackKeyPair();
+    const pack = await fixture({
+      keys,
+      publisherId: "acme",
+      capabilities: ["documents", "files"],
+    });
+    const options = trustFor([
+      { id: "suite", key: (await generatePackKeyPair()).publicKeyBase64, source: "preinstalled" },
+      { id: "acme", key: keys.publicKeyBase64, source: "added" },
+    ]);
+    const installed = await installPackArchive(pack.archive, root, options);
+
+    const summary = packInstallSummary(pack.manifest, {
+      id: installed.publisher.id,
+      key: keys.publicKeyBase64,
+      fingerprint: installed.publisher.fingerprint,
+    });
+    expect(summary).toEqual({
+      id: "demo",
+      name: "Demo",
+      version: "1.0.0",
+      capabilities: ["documents", "files"],
+      publisher: {
+        id: "acme",
+        fingerprint: await publisherKeyFingerprint(keys.publicKeyBase64),
+      },
+    });
+
+    const sentence = describePackInstall(summary, "update");
+    for (const fact of [
+      "Update",
+      "Demo",
+      "demo",
+      "1.0.0",
+      "acme",
+      installed.publisher.fingerprint,
+      "documents, files",
+    ]) {
+      expect(sentence).toContain(fact);
+    }
+    expect(describePackInstall({ ...summary, capabilities: [] }, "install")).toContain(
+      "no capabilities",
+    );
+  });
+
+  // spec: S2.1
+  it("loads a pre-S2.1 install without a publisher only under the first-party key", async () => {
+    const root = await temporaryRoot();
+    const pack = await fixture({ legacyPublisher: true });
+
+    // A new install must name its publisher; the old shape is not an install path.
+    await expect(install(root, pack)).rejects.toMatchObject({ reason: "publisher" });
+    expect(await readdir(root)).toEqual([]);
+
+    // An install from before this seam still loads, because its bytes verify
+    // against the one key every host preinstalls.
+    const directory = join(root, "demo", "1.0.0");
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, "manifest.json"), JSON.stringify(pack.manifest));
+    await writeFile(join(directory, "index.html"), pack.payload["index.html"] as Uint8Array);
+
+    const scan = await loadInstalledPacks(root, trust(pack.publicKey));
+    expect(scan.issues).toEqual([]);
+    expect(scan.packs[0]?.publisher.id).toBe("suite");
+
+    // A file signed by another key is never accepted under the legacy rule.
+    const other = await generatePackKeyPair();
+    const wrong = await loadInstalledPacks(root, trust(other.publicKeyBase64));
+    expect(wrong.packs).toEqual([]);
+    expect(wrong.issues[0]).toMatchObject({ reason: "untrusted" });
+  });
+});
+
+describe("publisher install identity", () => {
+  // spec: S2.2
+  it("refuses a different publisher under an existing id without a migration", async () => {
+    const dataRoot = await temporaryRoot();
+    const packsRoot = join(dataRoot, "packs");
+    const alphaKeys = await generatePackKeyPair();
+    const betaKeys = await generatePackKeyPair();
+    const options = trustFor([
+      { id: "alpha", key: alphaKeys.publicKeyBase64, source: "added" },
+      { id: "beta", key: betaKeys.publicKeyBase64, source: "added" },
+    ]);
+
+    await installPackArchive(
+      (await fixture({ keys: alphaKeys, publisherId: "alpha" })).archive,
+      packsRoot,
+      options,
+    );
+    const beta = await fixture({ keys: betaKeys, publisherId: "beta", version: "2.0.0" });
+
+    await expect(installPackArchive(beta.archive, packsRoot, options)).rejects.toMatchObject({
+      reason: "publisher",
+      message: expect.stringContaining("explicit migration"),
+    });
+
+    const identity = JSON.parse(
+      await readFile(join(packsRoot, "demo", "publisher.json"), "utf8"),
+    ) as { id: string };
+    expect(identity.id).toBe("alpha");
+    const scan = await loadInstalledPacks(packsRoot, options);
+    expect(scan.packs[0]?.publisher.id).toBe("alpha");
+  });
+
+  // spec: S2.2
+  it("does not let a new publisher take an id installed before the identity record", async () => {
+    const dataRoot = await temporaryRoot();
+    const packsRoot = join(dataRoot, "packs");
+    const suiteKeys = await generatePackKeyPair();
+    const betaKeys = await generatePackKeyPair();
+    const legacy = await fixture({ keys: suiteKeys, legacyPublisher: true });
+
+    // An install from before S2.2: a version directory, no publisher record.
+    const directory = join(packsRoot, "demo", "1.0.0");
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, "manifest.json"), JSON.stringify(legacy.manifest));
+    await writeFile(join(directory, "index.html"), legacy.payload["index.html"] as Uint8Array);
+
+    const options = trustFor([
+      { id: "suite", key: suiteKeys.publicKeyBase64, source: "preinstalled" },
+      { id: "beta", key: betaKeys.publicKeyBase64, source: "added" },
+    ]);
+    const beta = await fixture({ keys: betaKeys, publisherId: "beta", version: "2.0.0" });
+
+    await expect(installPackArchive(beta.archive, packsRoot, options)).rejects.toMatchObject({
+      reason: "publisher",
+      message: expect.stringContaining("explicit migration"),
+    });
+    expect((await loadInstalledPacks(packsRoot, options)).packs[0]?.publisher.id).toBe("suite");
+  });
+
+  // spec: S2.2
+  it("migrates only when asked and inherits no documents, files or session storage", async () => {
+    const dataRoot = await temporaryRoot();
+    const packsRoot = join(dataRoot, "packs");
+    const alphaKeys = await generatePackKeyPair();
+    const betaKeys = await generatePackKeyPair();
+    const options = trustFor([
+      { id: "alpha", key: alphaKeys.publicKeyBase64, source: "added" },
+      { id: "beta", key: betaKeys.publicKeyBase64, source: "added" },
+    ]);
+
+    await installPackArchive(
+      (await fixture({ keys: alphaKeys, publisherId: "alpha" })).archive,
+      packsRoot,
+      options,
+    );
+
+    const bytes = new TextEncoder().encode("alpha's note");
+    const alphaDocuments = new DocumentStore(
+      documentsRootFor(dataRoot, "alpha"),
+      "alpha",
+      documentScopeLabel("alpha"),
+    );
+    await alphaDocuments.create("default", "demo", "note");
+    await alphaDocuments.save("default", "demo", "note", bytes);
+
+    const files = new PackFilesService(join(dataRoot, "files"));
+    const alphaScope = filesScope({
+      containerId: "default",
+      packId: "demo",
+      tabId: "tab-alpha",
+      pack: { capabilities: ["documents", "files"], publisher: { id: "alpha" } },
+    });
+    if (alphaScope === null) throw new Error("alpha should have a files scope");
+    await files.write(alphaScope, "notes.txt", bytes);
+
+    await installPackArchive(
+      (await fixture({ keys: betaKeys, publisherId: "beta", version: "2.0.0" })).archive,
+      packsRoot,
+      { ...options, allowPublisherMigration: true },
+    );
+
+    // The new publisher starts empty, in every store the host owns.
+    const betaDocuments = new DocumentStore(
+      documentsRootFor(dataRoot, "beta"),
+      "beta",
+      documentScopeLabel("beta"),
+    );
+    expect(await betaDocuments.list("default", "demo")).toEqual([]);
+    const betaScope = filesScope({
+      containerId: "default",
+      packId: "demo",
+      tabId: "tab-beta",
+      pack: { capabilities: ["documents", "files"], publisher: { id: "beta" } },
+    });
+    if (betaScope === null) throw new Error("beta should have a files scope");
+    expect(await files.list(betaScope)).toEqual([]);
+    await expect(files.read(betaScope, "notes.txt")).rejects.toThrow();
+    expect(packPartition("demo", "default", "alpha")).not.toBe(
+      packPartition("demo", "default", "beta"),
+    );
+
+    // The previous publisher's data is untouched.
+    expect(await alphaDocuments.list("default", "demo")).toHaveLength(1);
+    expect((await alphaDocuments.open("default", "demo", "note"))?.bytes).toEqual(bytes);
+    expect((await files.list(alphaScope)).map((entry) => entry.path)).toEqual(["notes.txt"]);
+
+    // The identity record now names beta; alpha's version is reported, not loaded.
+    const identity = JSON.parse(
+      await readFile(join(packsRoot, "demo", "publisher.json"), "utf8"),
+    ) as { id: string };
+    expect(identity.id).toBe("beta");
+    const scan = await loadInstalledPacks(packsRoot, options);
+    expect(scan.packs[0]?.publisher.id).toBe("beta");
+    expect(scan.issues).toContainEqual(
+      expect.objectContaining({ id: "demo", version: "1.0.0", reason: "identity" }),
+    );
   });
 });

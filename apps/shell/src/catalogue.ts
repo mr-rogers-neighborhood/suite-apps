@@ -1,5 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { isPublisherKey } from "@suite/pack";
+import { publisherKeyDigest, publisherKeyFingerprint } from "@suite/pack/trust";
 import {
   checkPackArchive,
   InstalledPackError,
@@ -9,7 +11,7 @@ import {
   MAX_ARCHIVE_BYTES,
   type PackTrustOptions,
 } from "./installedPacks.js";
-import type { CatalogueEntry } from "./shared.js";
+import type { CatalogueEntry, PackCapability, PackPublisherView } from "./shared.js";
 
 /**
  * The local pack catalogue.
@@ -84,6 +86,8 @@ export function catalogueEntry(pack: CataloguePack): CatalogueEntry {
     entry: pack.entry,
     trusted: pack.trusted,
     refusal: pack.refusal,
+    publisher: pack.publisher,
+    capabilities: pack.capabilities,
   };
 }
 
@@ -148,6 +152,8 @@ async function inspectFile(
     entry: "",
     trusted: false,
     refusal: "The archive could not be read.",
+    publisher: null,
+    capabilities: [],
     file,
     reason: "unreadable",
   };
@@ -174,6 +180,11 @@ async function inspectFile(
       entry: manifest.entry,
       trusted: true,
       refusal: null,
+      publisher: {
+        id: check.value.publisher.id,
+        fingerprint: check.value.publisher.fingerprint,
+      },
+      capabilities: manifest.capabilities,
       file,
       reason: null,
     };
@@ -188,7 +199,30 @@ async function inspectFile(
     entry: manifest?.entry ?? fallback.entry,
     trusted: false,
     refusal: check.error.message,
+    publisher: await cataloguePublisher(manifest, check.error.fingerprint ?? null),
+    capabilities: (manifest?.capabilities ?? []) as readonly PackCapability[],
     file,
     reason: check.error.reason,
+  };
+}
+
+/**
+ * The publisher a refused archive claims, if it names a key.
+ *
+ * The fingerprint comes from the refusal when the trust decision computed one;
+ * otherwise it is computed here. A refused entry still shows who signed it, so
+ * the person can compare the value before deciding to add the key.
+ */
+async function cataloguePublisher(
+  manifest: {
+    readonly publisher?: { readonly id?: string; readonly key: string } | undefined;
+  } | null,
+  fingerprint: string | null,
+): Promise<PackPublisherView | null> {
+  const publisher = manifest?.publisher;
+  if (publisher === undefined || !isPublisherKey(publisher.key)) return null;
+  return {
+    id: publisher.id ?? (await publisherKeyDigest(publisher.key)),
+    fingerprint: fingerprint ?? (await publisherKeyFingerprint(publisher.key)),
   };
 }

@@ -166,9 +166,23 @@ The rules that shape the Suite host.
 
 - The shell owns its update path. A pack has no IPC to the updater, installer or uninstaller.
 - Signed packs are the load path. A `.suitepack` archive carries a signed `manifest.json` and the files
-  it lists. The host verifies the manifest signature and every file hash against the pinned key, and
-  refuses duplicate entries, extra files and paths that leave the pack root, before it extracts
-  anything. Only verified installs load in a packaged build.
+  it lists. The host resolves the manifest's `publisher.key` against its local trust store, verifies
+  the signature with that key, and verifies every file hash; it refuses duplicate entries, extra files
+  and paths that leave the pack root before it extracts anything. Only verified installs load in a
+  packaged build.
+- The trust store is `<dataRoot>/trust/publishers.json` (`SUITE_SHELL_TRUST` moves it). It is created
+  with the first-party Suite key preinstalled, and that pin wins over an edited file. A person adds
+  another key only after seeing its fingerprint; the install refusal shows the fingerprint, and the
+  unknown-publisher dialog adds the key only from that display. A malformed store is ignored rather
+  than guessed at, so it trusts the first-party key and nothing else.
+- Install and update show the publisher id, key fingerprint, pack id, version and capability list
+  before anything is written, and the result notice repeats them.
+- The install identity is `(publisher id, pack id)`. The active publisher is recorded beside the
+  version directories. A different publisher under an existing id is refused without the explicit
+  migration, and a different key under the same id is refused as a rotation this host cannot verify
+  yet. A migration inherits no documents, files, session storage or grants: documents, files and the
+  renderer partition are keyed by both ids. The first-party publisher keeps its pre-S2.1 storage
+  paths so an existing install is not moved.
 - The local catalogue is a directory of `.suitepack` files, `<dataRoot>/catalogue` by default and
   `SUITE_SHELL_CATALOGUE` when set. Every archive is read and verified before it is listed; a refused
   archive still lists with its refusal sentence and can never be installed. Listing extracts nothing.
@@ -176,9 +190,9 @@ The rules that shape the Suite host.
 - An install is `<dataRoot>/packs/<id>/<version>/`, written to a temporary sibling and renamed into
   place. An existing version is refused, not overwritten; installs are additive, so an older version
   stays available when a newer archive fails verification.
-- An update is installing a newer version for the same id. The loader selects the highest valid
-  version. The newer directory is additive; the old one is not deleted silently. The launcher offers
-  an explicit remove action for each non-current version.
+- An update is installing a newer version for the same id and publisher. The loader selects the
+  highest valid version for the active publisher. The newer directory is additive; the old one is not
+  deleted silently. The launcher offers an explicit remove action for each non-current version.
 - Uninstall removes exactly `<dataRoot>/packs/<id>/<version>/`. A symlinked install root, id
   directory or version directory is refused, the version must resolve inside the real pack root, and
   the path is checked before removal. A pack's documents and files live outside that root and are

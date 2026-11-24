@@ -13,6 +13,7 @@ import {
 } from "@suite/pack/manifest";
 import { z } from "zod";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
+import { FIRST_PARTY_PUBLISHER_ID, packStorageKey } from "./packIdentity.js";
 import { PACK_CAPABILITIES, PACK_SCHEME, type PackCapability, type PackSummary } from "./shared.js";
 
 export { isSafePackId, PACK_FORMAT, packAllows } from "@suite/pack/manifest";
@@ -54,6 +55,10 @@ const manifestSchema = z
     description: z.string().max(200).optional(),
     contractVersion: z.number().int().positive(),
     minimumHostVersion: z.number().int().positive().optional(),
+    publisher: z
+      .object({ key: z.string().min(32), id: z.string().min(1).max(64).optional() })
+      .strict()
+      .optional(),
     capabilities: z.array(z.enum(PACK_CAPABILITIES)).default([]),
     documents: z.array(packDocumentSchema).max(64).optional(),
     widgets: suiteWidgetsSchema.optional(),
@@ -133,8 +138,12 @@ export function externalLinkFor(
   }
 }
 
-export function packPartition(id: string, containerId = DEFAULT_CONTAINER_ID): string {
-  return `persist:${containerId}:${id}`;
+export function packPartition(
+  id: string,
+  containerId = DEFAULT_CONTAINER_ID,
+  publisherId = FIRST_PARTY_PUBLISHER_ID,
+): string {
+  return `persist:${containerId}:${packStorageKey(publisherId, id)}`;
 }
 
 function readPack(directory: string): PackInfo | null {
@@ -190,6 +199,7 @@ function readPack(directory: string): PackInfo | null {
       capabilities: parsed.data.capabilities as readonly PackCapability[],
       documents: (parsed.data.documents ?? []) as readonly PackDocument[],
       widgets: parsed.data.widgets ?? [],
+      publisher: null,
       root: directory,
       source: "development",
     };

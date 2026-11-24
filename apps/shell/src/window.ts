@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { originKey } from "@suite/desktop";
+import { SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isWidgetRegistryId } from "@suite/screens";
 import { app, BaseWindow, session, shell, WebContentsView } from "electron";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
@@ -165,6 +166,7 @@ export class ShellWindow {
         entry: pack.entry,
         capabilities: pack.capabilities,
         source: pack.source,
+        publisher: pack.publisher,
       })),
       catalogue: this.#catalogue,
       installedVersions: this.#installedVersions,
@@ -465,7 +467,9 @@ export class ShellWindow {
     const view = new WebContentsView({
       webPreferences: {
         preload: join(app.getAppPath(), "dist", "preload", "pack.cjs"),
-        session: session.fromPartition(packPartition(pack.id, this.#containerId)),
+        session: session.fromPartition(
+          packPartition(pack.id, this.#containerId, pack.publisher?.id ?? SUITE_PUBLISHER_ID),
+        ),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
@@ -582,7 +586,7 @@ function themeCss(theme: ThemeView): string {
 }
 
 function configurePackSession(pack: PackInfo, containerId: string): void {
-  const partition = packPartition(pack.id, containerId);
+  const partition = packPartition(pack.id, containerId, pack.publisher?.id ?? SUITE_PUBLISHER_ID);
   if (configuredPartitions.has(partition)) return;
   configuredPartitions.add(partition);
 

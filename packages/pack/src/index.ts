@@ -44,7 +44,7 @@ export {
   parsePackManifest,
   parsePackManifestJson,
 } from "./manifest.js";
-export { SUITE_PACK_PUBLIC_KEY } from "./pinnedKey.js";
+export { SUITE_PACK_PUBLIC_KEY, SUITE_PUBLISHER_ID } from "./pinnedKey.js";
 export {
   base64ToBytes,
   bytesToBase64,
@@ -56,3 +56,21 @@ export {
   verifyPackFiles,
   verifyPackSignature,
 } from "./signature.js";
+export {
+  addTrustedPublisher,
+  checkPublisherTrust,
+  isPublisherKey,
+  isPublisherKeyTrusted,
+  isSafePublisherId,
+  normalisePublisherFingerprint,
+  type PublisherAddition,
+  type PublisherAdditionFailureReason,
+  type PublisherAdditionRequest,
+  type PublisherTrust,
+  type PublisherTrustFailureReason,
+  type PublisherTrustOptions,
+  publisherKeyDigest,
+  publisherKeyFingerprint,
+  type ResolvedPublisher,
+  type TrustedPublisher,
+} from "./trust.js";
