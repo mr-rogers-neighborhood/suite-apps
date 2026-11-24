@@ -6,7 +6,11 @@ The rules that shape Go.
   `.budget` belong to their apps.
 - The container never learns a domain. It routes on what a module declares. There is no
   `if (module.id === "planner")` in the shell.
-- A pack declares its capabilities; the host enforces them.
+- A pack declares its capabilities; the host enforces them. A capability Go does not serve is a
+  refusal at install and at load, named in the sentence, not a pack that half-works.
+- The catalogue is the desktop's operator-signed index, verified by the shared `@suite/pack`
+  verifier against a pinned operator key. Go does not have a second catalogue format or a second
+  install source.
 - Isolation is a document boundary, not a browser origin. Capacitor serves every pack from one origin.
 - Each pack carries its own React and Loro. There is no shared runtime.
 - A module registers once per mount and disposes on leave. `disposeAll` survives a module that throws.

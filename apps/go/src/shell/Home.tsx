@@ -19,6 +19,7 @@ export function Home({
   onOpen,
   onCapture,
   onTogglePin,
+  onCatalogue,
   onInstall,
   onRemove,
   removable,
@@ -30,6 +31,7 @@ export function Home({
   readonly onOpen: (moduleId: string) => void;
   readonly onCapture: (body: string) => void;
   readonly onTogglePin: (moduleId: string) => void;
+  readonly onCatalogue: () => void;
   readonly onInstall: () => void;
   readonly onRemove: (moduleId: string) => void;
   /** Installed packs, which can be removed — as distinct from the domains that ship in the app. */
@@ -80,13 +82,22 @@ export function Home({
           if (entry && known.has(entry.moduleId)) onOpen(entry.moduleId);
         }}
         actions={
-          <button
-            type="button"
-            className="touch rounded-xl border border-[var(--hairline)] px-4 text-[15px] font-medium text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:outline-none"
-            onClick={onInstall}
-          >
-            Install an app…
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="touch rounded-xl bg-[var(--accent)] px-4 text-[15px] font-medium text-[var(--on-accent)] focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:outline-none"
+              onClick={onCatalogue}
+            >
+              Browse apps
+            </button>
+            <button
+              type="button"
+              className="touch rounded-xl border border-[var(--hairline)] px-4 text-[15px] font-medium text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:outline-none"
+              onClick={onInstall}
+            >
+              Install from file…
+            </button>
+          </div>
         }
         recentEmpty={
           <EmptyState title="Nothing opened yet">
