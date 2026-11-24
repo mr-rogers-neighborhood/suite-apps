@@ -294,6 +294,7 @@ window.suite = {
   containerId,
   info(),
   launch: () => Promise<PackLaunchContext>,
+  identity: { pack: () => Promise<PackIdentity>, sign: (bytes) => Promise<string> },
   documents: { list, create, open, save, remove },
   files: {
     list, stat, mkdir, read, write, rename, remove, backup, lock,
@@ -306,6 +307,14 @@ window.suite = {
 
 `launch()` is asynchronous because it crosses the bridge. It resolves to `{ kind: "launcher" }` for
 an ordinary open or `{ kind: "deep-link", url }` when a `suite://` link opened this tab.
+
+The `identity.pack` capability gives a pack its own key: `identity.pack()` resolves to
+`{ publisherId, packId, algorithm: "Ed25519", publicKey, fingerprint }`, derived by the host from
+`(publisher id, pack id)` and its device key. The device key and the derived secret never cross the
+bridge. `identity.sign(bytes)` asks the host to sign the pack's own data; the signing call refuses a
+relay frame, a relay role record and a membership change (S2.6, S4.7). A pack without the capability
+gets a rejected call. Suite Go does not derive this key yet, so one identity across both hosts is
+still owed.
 
 The document API requires the `documents` capability; without it, every document call returns
 nothing. `documents` is scoped by the sender's container and pack id, so the same pack in two
@@ -348,10 +357,10 @@ files are refused. Writes are atomic and may carry `expectedMtimeMs`; `backup` r
 path of a dated sibling. `lock` returns a `FileLock`, and the host releases every lock a tab held
 when its view is destroyed. A pack without `files` gets a rejected call, not an empty success.
 
-The spike serves `documents`, `files` and the `network` policy. A manifest that declares `storage`,
-`recents`, `notifications`, `relay` or `commands` is refused until the matching service exists; the
-shared capability vocabulary is wider than this host, and loading a pack into a missing service
-would only produce buttons that fail.
+The spike serves `documents`, `files`, `identity.pack` and the `network` policy. A manifest that
+declares `storage`, `recents`, `notifications`, `relay` or `commands` is refused until the matching
+service exists; the shared capability vocabulary is wider than this host, and loading a pack into a
+missing service would only produce buttons that fail.
 
 External files are the consented half of `files`: the person, not the pack, chooses what to open or
 where to save. `pickOpen(filters)` and `pickSave(suggestedName)` show a host-owned platform dialog
@@ -390,6 +399,7 @@ A pack cannot:
 - reach the network without the `network` capability, or hand a link to the OS browser through
   `openExternal` or `window.open`;
 - open a window, navigate away from its own origin, or grant itself a permission;
+- sign a relay frame, a relay role record or a membership change with its own key;
 - install or update another pack.
 
 ## Security notes
@@ -417,6 +427,7 @@ decision record owns that trade.
 ## What is not built yet
 
 - a remote pack index (the catalogue is local only);
+- `identity.pack` parity in Suite Go, so a pack sees one identity across desktop and mobile;
 - app-widget capture delivery (app widgets render their declared fields, but the host does not send
   a capture to the pack yet);
 - the host's blind relay transport for pack sync;

@@ -8,6 +8,11 @@
  * root, plus user-consented external file handles. `storage` is the small
  * key-value service the mobile container already exposes. `relay` is an opaque
  * frame transport, not a general socket.
+ *
+ * `identity.pack` is the per-pack derived identity (S2.6, S4.7); it names no
+ * device key and carries no relay role. The media and `sync` families in the
+ * spec table are still target capabilities and are not admitted here until a
+ * host serves them.
  */
 export const PACK_CAPABILITIES = [
   "documents",
@@ -18,6 +23,7 @@ export const PACK_CAPABILITIES = [
   "network",
   "relay",
   "commands",
+  "identity.pack",
 ] as const;
 
 export type PackCapability = (typeof PACK_CAPABILITIES)[number];

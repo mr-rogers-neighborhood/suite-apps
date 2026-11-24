@@ -108,6 +108,16 @@ owns the rationale, and [Status](status.md) owns what exists.
 
 ## Packs
 
+- `identity.pack` is a per-pack key derived from the host's device key, never the device key itself
+  (S2.6, S4.7). The input is the tuple `(publisher id, pack id)` under the versioned label
+  `suite/pack-identity/v1`: the pack id alone would collide when two publishers hold one id, and
+  the publisher id keeps the key stable across a publisher key rotation while a migration to
+  another publisher starts a new identity. A host gives a pack the public half and signs only the
+  pack's own data; a pack key must not sign relay frames, relay role records or membership
+  changes. The shell's derivation and signing guard are in
+  [apps/shell/src/packIdentityKey.ts](../../apps/shell/src/packIdentityKey.ts) and
+  [its decisions](../../apps/shell/docs/reference/decisions.md#pack-identity-and-keys). Suite Go
+  does not derive `identity.pack` yet, so one identity across both hosts is still owed.
 - `@suite/pack` is the desktop pack contract: manifest, capabilities, contributions, file hashes and
   Ed25519 verification. It shares the pinned key and the capability words with Suite Go, not the
   manifest: Go requires `independent` and `isolation` and has different canonical bytes, so each
