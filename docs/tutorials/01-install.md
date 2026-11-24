@@ -1,15 +1,15 @@
-# 1. Install Suite Start
+# 1. Install the desktop apps
 
-Suite Start is the hub: one window that installs, updates and opens the other apps. It is the only
-piece you fetch by hand.
+Suite Shell is the desktop host and the way in: install it once, then install packs from its
+catalogue. [The root README](../../README.md#the-hosts) owns the install line.
+
+This tutorial's Canvas workspace still runs as a frozen Flatpak, so it uses the legacy hub for the
+next two steps. Suite Start is that hub, not the host, and #314 retires it. [Installing Suite
+Start](../../apps/start/docs/how-to/install.md) owns its install procedure.
 
 **You need:** a Linux desktop. The published builds are x86_64.
 
-The install procedure has one owner: [Installing Suite Start](../../apps/start/docs/how-to/install.md).
-It covers the signed Flatpak remote, `flatpak install`, the first launch and the card states worth
-recognising.
-
 ## Next
 
-Open **Suite Start**. The window lists the apps in the suite. Continue with
-[2. Make a first workspace](02-first-workspace.md).
+Open **Suite Start** for the Canvas workspace in step 2. As apps ship as packs, the shell's catalogue
+becomes the same path.

@@ -4,7 +4,7 @@ One task at a time. These assume you know what you want to do.
 
 | Page | Job |
 | --- | --- |
-| [Install, update and remove apps](install-update-and-remove.md) | Manage the apps through the hub |
+| [Install, update and remove apps](install-update-and-remove.md) | Manage packs through the host, or legacy Flatpaks through Start |
 | [Back up and restore a document](back-up-and-restore.md) | Keep a copy, or move a workspace to another machine |
 | [Run the gate](run-the-gate.md) | Check a change before you commit |
 | [Package and release](package-and-release.md) | Produce a hub build, an app build, or a Flatpak |
