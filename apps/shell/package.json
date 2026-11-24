@@ -22,6 +22,7 @@
     "format": "biome format --write .",
     "lint": "biome check .",
     "test": "vitest run",
+    "e2e:proof": "playwright test --grep @proof",
     "verify": "pnpm check"
   },
   "dependencies": {
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^26.6.5",
     "electron": "^45.2.2",
     "electron-builder": "^26.0.12",

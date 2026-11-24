@@ -203,6 +203,7 @@ const scripts =
             "scripts/help-pack.test.mjs",
             "scripts/pack-shape.test.mjs",
             "scripts/affected.test.mjs",
+            "scripts/proof-of-changes.test.mjs",
             "scripts/release-manifest.test.mjs",
             "scripts/channel.test.mjs",
             "scripts/shell-channel.test.mjs",

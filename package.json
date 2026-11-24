@@ -13,6 +13,7 @@
     "check:all": "node scripts/gate.mjs",
     "gate:fresh": "node scripts/gate.mjs --fresh",
     "docs:check": "node scripts/docs-check.mjs",
+    "proof": "node scripts/proof-of-changes.mjs",
     "test:scripts": "node --test scripts/*.test.mjs",
     "spec:check": "node --test scripts/spec.test.mjs scripts/spec-golden.test.mjs",
     "profile:check": "node scripts/profile-check.mjs",

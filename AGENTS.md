@@ -18,6 +18,9 @@ than the working tree. Use `mise exec --` so the Node and pnpm versions pinned
 in `package.json` resolve.
 The gate runs suite-start's e2e suite after the repository checks pass, under
 `xvfb-run` when there is no display; `--no-e2e` skips it for a quick loop.
+Desktop Proof of Changes (`@proof` specs, `scripts/proof-of-changes.mjs`, and
+artifact paths) is documented in
+[docs/reference/desktop-proof.md](docs/reference/desktop-proof.md).
 
 CI is the independent proof: `.github/workflows/main.yml` runs the full fresh gate on every push to
 `main`, and the merge queue runs the affected rows plus Start's e2e. The old `vm` remote, its

@@ -11,7 +11,9 @@
       "!**/.vite",
       "!**/release",
       "!**/.generated",
-      "!**/public/data"
+      "!**/public/data",
+      "!**/test-results",
+      "!**/playwright-report"
     ]
   },
   "formatter": {
