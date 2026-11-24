@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
+import type { PackCapability } from "./capabilities.js";
 import {
   canonicalManifestBytes,
   isSafePackPath,
   PACK_CONTRACT_VERSION,
   PACK_FORMAT,
   type PackManifest,
+  type PackManifestCore,
   packAllows,
   packFitsHost,
   parsePackManifest,
+  parsePackManifestJson,
 } from "./manifest.js";
+import { digestPackFiles, generatePackKeyPair, sha256Hex, signPackManifest } from "./signature.js";
 
 const decoder = new TextDecoder();
+const encoder = new TextEncoder();
 
 function manifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -36,6 +41,88 @@ function manifest(overrides: Record<string, unknown> = {}): Record<string, unkno
   };
 }
 
+/** One value for every optional field family in `manifest.schema.json`. */
+function everyOptionalField(): Record<string, unknown> {
+  return {
+    description: "A local-first chart pack.",
+    minimumHostVersion: 2,
+    publisher: { key: "A".repeat(44), id: "suite" },
+    optionalCapabilities: ["notifications"],
+    documents: [
+      {
+        id: "chart",
+        format: "suite.chart",
+        version: 3,
+        mode: "single",
+        migrations: [{ from: 1, to: 2, entry: "migrate-1-2.html" }],
+        projection: "project.html",
+        criticalFields: ["title"],
+      },
+    ],
+    blobs: [{ store: "assets", class: "asset" }],
+    sync: { documents: ["chart"], blobs: ["assets"] },
+    network: { allow: ["https://api.example.com"] },
+    platforms: ["desktop", "mobile"],
+    input: ["pointer", "keyboard"],
+    defaultLocale: "en",
+    locales: ["en", "fr"],
+    widgets: [
+      {
+        id: "summary",
+        title: "Summary",
+        size: "2x1",
+        capabilities: ["capture"],
+        action: {
+          kind: "capture",
+          fields: [{ id: "note", label: "Note", type: "text" }],
+        },
+      },
+    ],
+    codeWidgets: [
+      {
+        id: "chart-card",
+        title: "Chart card",
+        size: "1x1",
+        capabilities: ["capture"],
+        action: { kind: "capture" },
+        settings: [],
+        entry: "widget.html",
+        sha256: "e".repeat(64),
+        fallback: {
+          id: "chart-card",
+          title: "Chart card",
+          size: "1x1",
+          capabilities: ["capture"],
+          action: { kind: "capture" },
+        },
+      },
+    ],
+    components: [{ kind: "map", fallback: "web" }],
+    subpackages: [{ id: "reports", entry: "reports/index.html" }],
+    addons: [{ id: "chart-export", version: "1.0.0", sha256: "b".repeat(64) }],
+    export: { entry: "export.html" },
+    license: "MIT",
+    source: "https://example.com/chart",
+    deprecated: false,
+    replacement: "chart-pro",
+    sunset: "2027-01-01",
+  };
+}
+
+/** Whether a parsed JSON value carries `null` anywhere. */
+function hasNull(value: unknown): boolean {
+  if (value === null) return true;
+  if (Array.isArray(value)) return value.some((item) => hasNull(item));
+  if (typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some((item) => hasNull(item));
+  }
+  return false;
+}
+
+function canonicalJson(value: PackManifest): Record<string, unknown> {
+  return JSON.parse(decoder.decode(canonicalManifestBytes(value))) as Record<string, unknown>;
+}
+
 describe("the pack manifest", () => {
   it("accepts a complete manifest", () => {
     const parsed = parsePackManifest(manifest());
@@ -48,70 +135,7 @@ describe("the pack manifest", () => {
 
   // spec: S3.5
   it("accepts every optional field family the spec names", () => {
-    const parsed = parsePackManifest(
-      manifest({
-        publisher: { key: "A".repeat(44), id: "suite" },
-        optionalCapabilities: ["notifications"],
-        documents: [
-          {
-            id: "chart",
-            format: "suite.chart",
-            version: 3,
-            mode: "single",
-            migrations: [{ from: 1, to: 2, entry: "migrate-1-2.html" }],
-            projection: "project.html",
-            criticalFields: ["title"],
-          },
-        ],
-        blobs: [{ store: "assets", class: "asset" }],
-        sync: { documents: ["chart"], blobs: ["assets"] },
-        network: { allow: ["https://api.example.com"] },
-        platforms: ["desktop", "mobile"],
-        input: ["pointer", "keyboard"],
-        defaultLocale: "en",
-        locales: ["en", "fr"],
-        widgets: [
-          {
-            id: "summary",
-            title: "Summary",
-            size: "2x1",
-            capabilities: ["capture"],
-            action: {
-              kind: "capture",
-              fields: [{ id: "note", label: "Note", type: "text" }],
-            },
-          },
-        ],
-        codeWidgets: [
-          {
-            id: "chart-card",
-            title: "Chart card",
-            size: "1x1",
-            capabilities: ["capture"],
-            action: { kind: "capture" },
-            settings: [],
-            entry: "widget.html",
-            sha256: "e".repeat(64),
-            fallback: {
-              id: "chart-card",
-              title: "Chart card",
-              size: "1x1",
-              capabilities: ["capture"],
-              action: { kind: "capture" },
-            },
-          },
-        ],
-        components: [{ kind: "map", fallback: "web" }],
-        subpackages: [{ id: "reports", entry: "reports/index.html" }],
-        addons: [{ id: "chart-export", version: "1.0.0", sha256: "b".repeat(64) }],
-        export: { entry: "export.html" },
-        license: "MIT",
-        source: "https://example.com/chart",
-        deprecated: false,
-        replacement: "chart-pro",
-        sunset: "2027-01-01",
-      }),
-    );
+    const parsed = parsePackManifest(manifest(everyOptionalField()));
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.value.publisher?.id).toBe("suite");
@@ -196,6 +220,7 @@ describe("the pack manifest", () => {
 });
 
 describe("canonical manifest bytes", () => {
+  // spec: S3.3
   it("does not depend on the order of capabilities or files", () => {
     const first = parsePackManifest(manifest({ capabilities: ["relay", "files"] }));
     const second = parsePackManifest(
@@ -210,8 +235,10 @@ describe("canonical manifest bytes", () => {
     expect(first.ok && second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
     expect(canonicalManifestBytes(first.value)).toEqual(canonicalManifestBytes(second.value));
+    expect(canonicalJson(first.value).capabilities).toEqual(["files", "relay"]);
   });
 
+  // spec: S3.3
   it("sorts file paths by code unit, not by the host's locale", () => {
     // `en-US` collation orders these `ab.html`, `ä.html`, `z.html`; `sv-SE` moves `ä` after `z`.
     // Code unit order is `ab.html`, `index.html`, `z.html`, `ä.html` in every locale, which is the
@@ -281,6 +308,7 @@ describe("canonical manifest bytes", () => {
     expect(canonicalManifestBytes(first.value)).not.toEqual(canonicalManifestBytes(second.value));
   });
 
+  // spec: S3.3
   it("adds a description to the canonical bytes only when it is present", () => {
     const plain = parsePackManifest(manifest());
     const described = parsePackManifest(manifest({ description: "Notes for the launcher." }));
@@ -299,6 +327,177 @@ describe("canonical manifest bytes", () => {
     // existed still produces the bytes its signature covers.
     expect(absent).not.toHaveProperty("description");
     expect(present.description).toBe("Notes for the launcher.");
+  });
+
+  // spec: S3.3
+  it("covers every manifest field in the schema's order", () => {
+    const parsed = parsePackManifest(manifest(everyOptionalField()));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const canonical = canonicalJson(parsed.value);
+    // The schema's properties, minus `signature`. A field added above the schema
+    // without a place here would fail this list; a field added to both without
+    // reaching canonical bytes would fail it too.
+    expect(Object.keys(canonical)).toEqual([
+      "format",
+      "id",
+      "name",
+      "description",
+      "version",
+      "entry",
+      "contractVersion",
+      "minimumHostVersion",
+      "publisher",
+      "capabilities",
+      "optionalCapabilities",
+      "documents",
+      "blobs",
+      "sync",
+      "network",
+      "platforms",
+      "input",
+      "defaultLocale",
+      "locales",
+      "widgets",
+      "codeWidgets",
+      "components",
+      "contributions",
+      "subpackages",
+      "addons",
+      "export",
+      "license",
+      "source",
+      "deprecated",
+      "replacement",
+      "sunset",
+      "files",
+    ]);
+    // A required field the fixture does not carry is still signed, so the list
+    // above is the whole of a manifest rather than a subset of one.
+    expect(canonical.files).toHaveLength(2);
+    expect(hasNull(canonical)).toBe(false);
+  });
+
+  // spec: S3.3
+  it("omits an absent optional field instead of emitting null", () => {
+    const parsed = parsePackManifest(manifest());
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const canonical = canonicalJson(parsed.value);
+    for (const field of [
+      "description",
+      "minimumHostVersion",
+      "publisher",
+      "optionalCapabilities",
+      "documents",
+      "blobs",
+      "sync",
+      "network",
+      "platforms",
+      "input",
+      "defaultLocale",
+      "locales",
+      "widgets",
+      "codeWidgets",
+      "components",
+      "subpackages",
+      "addons",
+      "export",
+      "license",
+      "source",
+      "deprecated",
+      "replacement",
+      "sunset",
+    ]) {
+      expect(canonical).not.toHaveProperty(field);
+    }
+    expect(hasNull(canonical)).toBe(false);
+  });
+
+  // spec: S3.3
+  it("does not depend on the key order of a nested object", () => {
+    const first = parsePackManifest(
+      manifest({ documents: [{ id: "chart", format: "suite.chart", version: 3 }] }),
+    );
+    const second = parsePackManifest(
+      manifest({ documents: [{ version: 3, format: "suite.chart", id: "chart" }] }),
+    );
+    expect(first.ok && second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+    expect(canonicalManifestBytes(first.value)).toEqual(canonicalManifestBytes(second.value));
+  });
+});
+
+describe("manifest JSON text", () => {
+  // spec: S3.3
+  it("refuses duplicate keys before parsing", () => {
+    const text = JSON.stringify(manifest());
+    expect(parsePackManifestJson(text).ok).toBe(true);
+
+    // `JSON.parse` keeps the last value without a word. The scan has to see the
+    // second `id` first, because a verifier and a reader that disagree on which
+    // one wins are verifying different documents.
+    const topLevel = parsePackManifestJson(
+      text.replace('"id":"canvas"', '"id":"canvas","id":"evil"'),
+    );
+    expect(topLevel.ok).toBe(false);
+    if (topLevel.ok) return;
+    expect(topLevel.issues).toEqual([{ path: "id", message: 'duplicate key "id"' }]);
+
+    const nested = parsePackManifestJson(
+      text.replace(
+        '"files":[{"path":"index.html"',
+        '"files":[{"path":"index.html","path":"evil.html"',
+      ),
+    );
+    expect(nested.ok).toBe(false);
+    if (nested.ok) return;
+    expect(nested.issues[0]?.path).toBe("files.0.path");
+  });
+
+  // spec: S3.3
+  it("refuses text that is not JSON", () => {
+    const parsed = parsePackManifestJson("{");
+    expect(parsed.ok).toBe(false);
+  });
+
+  // spec: S3.10
+  it("two builds of the same tree produce the same canonical bytes, hash and signature", async () => {
+    const tree: Record<string, Uint8Array> = {
+      "index.html": encoder.encode("<!doctype html><title>Deterministic</title>"),
+      "assets/app.js": encoder.encode("console.log('deterministic')"),
+    };
+    const keys = await generatePackKeyPair();
+
+    // `readdir` order is not promised, so a second build may feed the files in
+    // another order; the source manifest may list capabilities in another order.
+    // Neither may reach the signature.
+    const build = async (order: readonly string[], capabilities: readonly string[]) => {
+      const files = Object.fromEntries(order.map((path) => [path, tree[path] as Uint8Array]));
+      const core: PackManifestCore = {
+        format: PACK_FORMAT,
+        id: "deterministic",
+        name: "Deterministic",
+        version: "1.0.0",
+        entry: "index.html",
+        contractVersion: PACK_CONTRACT_VERSION,
+        capabilities: capabilities as readonly PackCapability[],
+        files: await digestPackFiles(files),
+      };
+      return { core, signature: signPackManifest(core, keys.secretKeyBase64) };
+    };
+
+    const first = await build(["index.html", "assets/app.js"], ["files", "relay"]);
+    const second = await build(["assets/app.js", "index.html"], ["relay", "files"]);
+
+    const firstBytes = canonicalManifestBytes(first.core);
+    const secondBytes = canonicalManifestBytes(second.core);
+    expect(secondBytes).toEqual(firstBytes);
+    expect(await sha256Hex(secondBytes)).toBe(await sha256Hex(firstBytes));
+    // Ed25519 is deterministic per RFC 8032: the same bytes and key are the same signature.
+    expect(second.signature).toBe(first.signature);
   });
 });
 

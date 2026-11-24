@@ -41,6 +41,7 @@ export {
   packAllows,
   packFitsHost,
   parsePackManifest,
+  parsePackManifestJson,
 } from "./manifest.js";
 export { SUITE_PACK_PUBLIC_KEY } from "./pinnedKey.js";
 export {
