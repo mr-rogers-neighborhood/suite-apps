@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_ROOTS = [
   "src",
+  "pack",
   "apps/collab-server/src",
   "apps/control-plane/src",
   "services",

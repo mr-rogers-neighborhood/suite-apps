@@ -48,6 +48,29 @@ The rules that shape Canvas. The architecture and data model pages describe how 
 - A removed device is revoked: the group moves to a new epoch, so the removed copy cannot read
   anything new. Membership is the authority, not an account.
 
+## Canvas as a shell pack
+
+A pack has no main process. The host owns the file; the pack owns what is inside it. The split for
+the Canvas pack (`apps/canvas/pack`) keeps the renderer, `@suite/graph` and the editor exactly as
+they are: the pack implements the `window.suiteDesktop` seam the renderer already boots from, over
+the host's `window.suite` services.
+
+| Responsibility | Owner | Why |
+| --- | --- | --- |
+| Host document envelope (magic, header, schema stamp, payload checksum) | Host | S6.1. The host carries the `.canvas` export envelope as opaque bytes and never parses a board or a card. |
+| Atomic write, backup, crash recovery, quarantine | Host | S6.2. The pack keeps no second `.bak`; two backup schemes can disagree about which copy is current. |
+| Document identity and scope | Host | The pack asks for an id; an absolute path never crosses the bridge. The `.canvas` envelope inside is the pack's payload. |
+| Schema, `WorkspaceDocument`, validation, projections, edits | Pack | The host must never learn a Canvas field. Every write still goes through `@suite/graph`. |
+| Debounced snapshot write at a durability boundary | Pack | The pack writes the whole `.canvas` envelope through `documents.save`; the host makes that write atomic. |
+| Export and import | Pack, through the host picker | The pack encodes and decodes its own `.canvas` file; the host owns the picker, the destination and the consent, and only a handle crosses the bridge. |
+| Documents folder, reveal, recents, library watch | Host, absent today | The Electron app writes `~/Documents/Suite/Canvas` and remembers recent paths. The shell has no folder, reveal, recents or watch service, so the pack lists host documents, cannot reveal one in a folder, cannot honour "forget" without deleting it, and opens no watcher. These are named gaps, not pack-side paths. |
+| Directory import (an Obsidian vault) | Host, absent today | The picker hands over one file. There is no directory capability, so a folder import is not host-mediated; the pack does not claim it. |
+| Sync socket, keys, contacts | Main, released Flatpak only | The shell has no relay service. The pack publishes no sync methods and keeps no transport, so collaboration is unavailable in the pack until phase 9 gives the host one. |
+
+The frozen Electron main process survives only for the released Flatpak, as Budget's and Planner's
+do: it still owns the documents folder, the file lock, the menus and the sync client. The pack
+imports none of `src/main` and does not duplicate the store.
+
 ## Non-goals
 
 - No CMS in the core: no routes, slugs, templates or site trees as card properties.

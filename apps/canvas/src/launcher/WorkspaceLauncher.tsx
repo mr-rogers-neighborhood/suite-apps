@@ -522,7 +522,9 @@ export function WorkspaceLauncher() {
                 fileInput.current?.click();
                 return;
               }
-              void bridge.openFileDialog();
+              void bridge.openFileDialog().catch((cause: unknown) => {
+                setError(cause instanceof Error ? cause.message : "Could not open that canvas.");
+              });
             },
           },
           {

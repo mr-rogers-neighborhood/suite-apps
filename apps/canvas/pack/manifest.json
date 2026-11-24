@@ -1,0 +1,17 @@
+{
+  "id": "canvas",
+  "name": "Suite Canvas",
+  "description": "A local-first canvas of boards, cards and links.",
+  "version": "0.1.12",
+  "entry": "index.html",
+  "contractVersion": 1,
+  "capabilities": ["documents", "files"],
+  "documents": [
+    {
+      "id": "canvas",
+      "format": "suite.canvas",
+      "version": 6,
+      "mode": "multi"
+    }
+  ]
+}

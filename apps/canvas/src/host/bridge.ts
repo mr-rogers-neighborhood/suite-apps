@@ -53,6 +53,8 @@ export interface BridgeCreateRequest {
   readonly title: string;
   readonly snapshot: Uint8Array;
   readonly manifest: BridgeSaveRequest["manifest"];
+  /** Present when the first write already carries images; absent otherwise. */
+  readonly attachments?: BridgeSaveRequest["attachments"];
 }
 
 export interface BridgeSaveRequest {
@@ -114,6 +116,17 @@ export interface DesktopBridge {
   openDocument(path: string): Promise<void>;
   recentFiles(): Promise<readonly BridgeRecentFile[]>;
   forgetRecent(path: string): Promise<void>;
+  /**
+   * Write a text file the person chooses, through the host's save picker.
+   *
+   * A pack host provides this; the Electron shell does not, and the renderer keeps its browser
+   * download path when it is absent. A `.canvas` export goes through it in a pack so the pack
+   * never writes outside the file consent the host grants.
+   */
+  saveTextFile?(
+    name: string,
+    text: string,
+  ): Promise<{ readonly saved: boolean; readonly name?: string }>;
 }
 
 export type HostKind = "web" | "desktop";
