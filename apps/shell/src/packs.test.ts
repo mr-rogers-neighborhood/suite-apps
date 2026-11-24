@@ -185,6 +185,25 @@ describe("pack request resolution", () => {
     expect(request?.file).toBe(join(root, "welcome", "index.html"));
   });
 
+  it("serves the Budget entry, its prelude and its assets from the pack root", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "budget", { capabilities: ["documents", "files"] });
+    await mkdir(join(root, "budget", "assets"), { recursive: true });
+    await writeFile(join(root, "budget", "prelude.js"), "globalThis.suiteBudget = {};\n");
+    await writeFile(join(root, "budget", "assets", "app.js"), "console.log('budget');\n");
+    const packs = discoverPacks(root);
+
+    for (const path of ["index.html", "prelude.js", "assets/app.js"]) {
+      const request = resolvePackRequest(packUrl("budget", path), packs);
+      expect(request?.pack.id).toBe("budget");
+      expect(request?.file).toBe(join(root, "budget", ...path.split("/")));
+    }
+
+    // The prelude is the pack's own script; a request that climbs out of the
+    // root never reaches it.
+    expect(resolvePackRequest(packUrl("budget", "assets/../../prelude.js"), packs)).toBeNull();
+  });
+
   it("refuses a climb before the URL parser can normalise it", async () => {
     const root = await temporaryRoot();
     await writePack(root, "welcome");

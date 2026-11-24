@@ -5,6 +5,17 @@ shipped host.
 
 ## [Unreleased]
 
+### Added
+
+- **Budget is the first real pack.** The pack's entry, prelude and assets serve over
+  `suite-pack://`, its renderer mounts over the pack bridge, and a budget round-trips through the host
+  document envelope. An export re-imports as a working document, and the bridge adds no second file
+  path. The test suite mounts the pack renderer over the same `window.suite` services the preload
+  exposes; the Electron view itself stays outside the headless gate.
+- **A pack's declared schema is what the host stamps.** A manifest document declaration now supplies
+  the envelope's schema version and the newest version the host opens. A pack that writes one format
+  under many names declares it once with `mode: "multi"`; Budget declares its snapshot at schema 1.
+
 ### Changed
 
 - **Suite Shell is the way in.** Install the host once, then install, update, remove and reinstall

@@ -335,10 +335,12 @@ size, not the envelope size. A file written before the envelope is refused and l
 A pack may declare its documents and a migration chain (S6.3). The host finds the declaration by id,
 proves the chain before it writes, takes one backup and invokes each declared entry with a handle
 scoped to that single document; the entry body is pack code, and the host passes bytes without
-parsing them. The envelope's schema version records each completed step, so a second run invokes no
-entry and leaves the file unchanged; a failed entry restores the backup, so the old document stays
-readable (S6.6). The runner that executes an entry is injected into
-`src/documentMigrations.ts`; binding it to a pack renderer is not built yet.
+parsing them. The declared `version` is the schema version the host stamps into the envelope and the
+newest it will open; a pack that writes one format under many names declares it once with
+`mode: "multi"` and the host applies it to every name. The envelope's schema version records each
+completed step, so a second run invokes no entry and leaves the file unchanged; a failed entry
+restores the backup, so the old document stays readable (S6.6). The runner that executes an entry is
+injected into `src/documentMigrations.ts`; binding it to a pack renderer is not built yet.
 
 A pack's blobs live in three content-addressed class stores under
 `blobs/<container>/<pack>/<class>/<sha256>`: `asset`, `derived` and `cache`. The first-party publisher
@@ -470,8 +472,9 @@ mise exec -- pnpm --filter @suite/shell build
 The tests cover pack manifest discovery and traversal, document scoping, the `files` service's
 per-pack and per-container isolation, lock ownership, the external surface's filter validation,
 token ownership and cancellation, import into the pack root, declared-document resolution, a
-two-step migration's idempotence and failed-migration restore, projection refusal before the schema
-is current, the three blob class stores and their content addressing, two publishers' blob stores
+declared schema version stamped into the envelope, a two-step migration's idempotence and
+failed-migration restore, projection refusal before the schema is current, the three blob class
+stores and their content addressing, two publishers' blob stores
 staying apart under one pack id, cache clearing that keeps
 assets and derived blobs, export-bundle manifests with a verified hash per asset, the no-export-entry
 asset fallback and the save handle's path refusal, catalogue trust and refusal (valid, wrong-key,
@@ -483,6 +486,6 @@ space documents with both tab kinds, Home creation and ordering, the screen stor
 quarantine, add/remove/move/resize including the keyboard's earlier/later path, unknown widget
 placeholders, and the channel names the two preloads spell out by hand. The platform dialog itself
 is not exercised: tests use an injected picker, because a native dialog cannot run headlessly. The
-Electron window, protocol registration, `open-url`/`second-instance` delivery, the rendered
-composition and an actual pack render are not exercised headlessly; their pure model and view pieces
-are.
+Electron window, protocol registration, `open-url`/`second-instance` delivery and the rendered
+composition are not exercised headlessly; their pure model and view pieces are, and Budget's pack
+renderer is mounted in its own suite over a fake `window.suite` rather than in an Electron view.

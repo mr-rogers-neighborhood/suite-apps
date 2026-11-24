@@ -7,6 +7,7 @@ import {
   DOCUMENT_MAGIC,
   DocumentRefusal,
   DocumentStore,
+  declaredDocumentSchemaVersion,
   encodeDocumentEnvelope,
 } from "./documents.js";
 
@@ -352,6 +353,54 @@ describe("the document envelope", () => {
       store.save("default", "welcome", "future-envelope.note", encode("old")),
     ).rejects.toBeInstanceOf(DocumentRefusal);
     expect(new Uint8Array(await readFile(file))).toEqual(whole);
+  });
+
+  // spec: S6.3
+  it("writes the schema a pack declares instead of the host's default", async () => {
+    const payload = encode('{"from":"schema 2"}');
+    await store.create("default", "budget", "household.budget", { schemaVersion: 2 });
+    await store.save("default", "budget", "household.budget", payload, { schemaVersion: 2 });
+
+    expect(await store.header("default", "budget", "household.budget")).toMatchObject({
+      packId: "budget",
+      documentId: "household.budget",
+      schemaVersion: 2,
+      payloadLength: payload.byteLength,
+    });
+
+    // The declared version is what makes a schema-2 document readable: a caller
+    // that still says 1 is refused by the same rule as any newer document.
+    const refused = await store
+      .open("default", "budget", "household.budget")
+      .catch((error) => error);
+    expect(refused).toBeInstanceOf(DocumentRefusal);
+    expect((refused as DocumentRefusal).kind).toBe("newer-schema");
+
+    const opened = await store.open("default", "budget", "household.budget", {
+      schemaVersion: 2,
+    });
+    expect(opened?.bytes).toEqual(payload);
+  });
+
+  it("resolves a declaration by name, or a lone multi declaration, before the host default", () => {
+    const multi = [
+      { id: "budget", format: "suite.budget.snapshot", version: 2, mode: "multi" as const },
+    ];
+    const named = [{ id: "note", format: "suite.note", version: 3, mode: "single" as const }];
+
+    expect(declaredDocumentSchemaVersion(multi, "household.budget")).toBe(2);
+    expect(declaredDocumentSchemaVersion(named, "note")).toBe(3);
+    expect(declaredDocumentSchemaVersion(named, "other.note")).toBe(1);
+    expect(declaredDocumentSchemaVersion(undefined, "note")).toBe(1);
+    expect(
+      declaredDocumentSchemaVersion(
+        [
+          { id: "one", format: "f", version: 2, mode: "multi" },
+          { id: "two", format: "f", version: 2, mode: "multi" },
+        ],
+        "other",
+      ),
+    ).toBe(1);
   });
 
   // spec: S6.4

@@ -31,6 +31,9 @@ function sourcePack() {
         entry: "index.html",
         contractVersion: 1,
         capabilities: ["documents", "files"],
+        documents: [
+          { id: "budget", format: "suite.budget.snapshot", version: 1, mode: "multi" },
+        ],
       },
       null,
       2,
@@ -65,6 +68,11 @@ describe("the signed Budget pack", () => {
     assert.equal(built.manifest.id, "budget");
     assert.equal(built.manifest.contractVersion, 1);
     assert.deepEqual(built.manifest.capabilities, ["documents", "files"]);
+    // The host stamps the schema this declaration names into the envelope, so
+    // the signed manifest must carry it, not only the source manifest.
+    assert.deepEqual(built.manifest.documents, [
+      { id: "budget", format: "suite.budget.snapshot", version: 1, mode: "multi" },
+    ]);
     assert.equal(built.manifest.contributions, undefined);
     assert.deepEqual(
       built.manifest.files.map((file) => file.path),
@@ -79,6 +87,7 @@ describe("the signed Budget pack", () => {
     assert.equal(parsed.ok, true);
     if (parsed.ok) {
       assert.equal(await verifyPackSignature(parsed.value, keys.publicKeyBase64), true);
+      assert.deepEqual(parsed.value.documents, built.manifest.documents);
       assert.deepEqual(
         await verifyPackFiles(
           parsed.value,
