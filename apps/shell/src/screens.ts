@@ -1,14 +1,5 @@
 import { randomUUID } from "node:crypto";
-import {
-  copyFile,
-  mkdir,
-  readFile,
-  readdir,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { SuiteWidgetSize } from "@suite/contracts";
 import {
@@ -192,8 +183,6 @@ function documentFor(screen: Screen): ScreenDocument {
   return created.document;
 }
 
-
-
 async function quarantine(path: string, reason: string, error?: unknown): Promise<void> {
   const backup = `${path}.corrupt-${Date.now()}`;
   try {
@@ -366,7 +355,10 @@ export class ScreenSet {
     const screen = store.state();
     const renamed = ScreenDocument.create({ ...screen, name: screenName(name) });
     await writeSnapshot(this.#file(id), renamed.export());
-    this.#stores.set(id, await ScreenStore.open(this.#file(id), { ...screen, id, name: screenName(name) }));
+    this.#stores.set(
+      id,
+      await ScreenStore.open(this.#file(id), { ...screen, id, name: screenName(name) }),
+    );
     this.#refreshSummaries();
     return true;
   }

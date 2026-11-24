@@ -204,9 +204,12 @@ describe("the Screens set", () => {
     expect(copy).not.toBeNull();
     expect(set.screen(copy ?? "")?.name).toBe("Deep work copy");
     expect(set.screen(copy ?? "")?.widgets).toEqual([{ registryId: "welcome.notes", size: "2x1" }]);
-    expect(set.summaries().map((screen) => screen.id).sort()).toEqual(
-      [HOME_SCREEN_ID, work, copy ?? ""].sort(),
-    );
+    expect(
+      set
+        .summaries()
+        .map((screen) => screen.id)
+        .sort(),
+    ).toEqual([HOME_SCREEN_ID, work, copy ?? ""].sort());
   });
 
   it("persists the Home role across a reopen", async () => {

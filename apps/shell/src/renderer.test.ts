@@ -36,6 +36,21 @@ describe("the Home composition", () => {
     expect(shell).toContain('widget.registryId === "shell.apps"');
   });
 
+  it("draws the Screens manager and calls the host actions it names", () => {
+    expect(shell).toContain("function renderScreensPanel");
+    for (const action of [
+      "createScreen",
+      "renameScreen",
+      "duplicateScreen",
+      "deleteScreen",
+      "setHomeScreen",
+      "openScreen",
+    ]) {
+      expect(shell).toContain(`api.${action}`);
+    }
+    expect(shell).not.toContain("screens.json");
+  });
+
   it("keeps document state out of the renderer", () => {
     expect(shell).not.toContain("localStorage");
     expect(shell).not.toContain("sessionStorage");

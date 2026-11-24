@@ -80,7 +80,7 @@ function run(promise) {
 
 /** A widget action answers with the new state; draw it without waiting for the push. */
 function runAction(promise) {
-  return Promise.resolve(promise)
+  Promise.resolve(promise)
     .then((next) => {
       if (next && Array.isArray(next.tabs)) {
         state = next;
@@ -691,13 +691,6 @@ function renderChoices(view) {
   elements.addWidget.disabled = choices.length === 0;
 }
 
-function actionButton(label, onClick, className = "action") {
-  const button = element("button", className, label);
-  button.type = "button";
-  button.addEventListener("click", onClick);
-  return button;
-}
-
 /**
  * The Screens manager.
  *
@@ -736,15 +729,13 @@ function renderScreensPanel() {
     home.disabled = screen.home;
     home.setAttribute("aria-label", `Make ${screen.name} the Home Screen`);
 
-    const duplicate = actionButton("Duplicate", () =>
-      runAction(api.duplicateScreen(screen.id)),
-    );
+    const duplicate = actionButton("Duplicate", () => runAction(api.duplicateScreen(screen.id)));
     duplicate.setAttribute("aria-label", `Duplicate ${screen.name}`);
 
     const remove = actionButton(
       "Delete",
       () => runAction(api.deleteScreen(screen.id, null)),
-      "action action-danger",
+      "action-danger",
     );
     const last = screens.length <= 1;
     remove.disabled = last;
@@ -771,7 +762,11 @@ function renderScreensPanel() {
     if (screen.home && !last) {
       const replacement = element("div", "screen-replacement");
       replacement.append(
-        element("p", "screens-note", "Choose which Screen becomes Home before this one is deleted."),
+        element(
+          "p",
+          "screens-note",
+          "Choose which Screen becomes Home before this one is deleted.",
+        ),
       );
       const select = element("select", "screen-replacement-select");
       select.setAttribute("aria-label", `New Home in place of ${screen.name}`);
@@ -784,7 +779,7 @@ function renderScreensPanel() {
       const confirm = actionButton(
         "Delete Home and use the chosen Screen",
         () => runAction(api.deleteScreen(screen.id, select.value)),
-        "action action-danger",
+        "action-danger",
       );
       replacement.append(select, confirm);
       row.append(replacement);
@@ -907,9 +902,8 @@ function bindChrome() {
   elements.createScreen.addEventListener("click", () => {
     const name = elements.screenNewName.value.trim();
     if (name.length === 0) return;
-    runAction(api.createScreen(name)).then(() => {
-      elements.screenNewName.value = "";
-    });
+    runAction(api.createScreen(name));
+    elements.screenNewName.value = "";
   });
 
   elements.addWidget.addEventListener("click", () => {

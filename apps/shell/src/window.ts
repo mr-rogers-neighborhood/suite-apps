@@ -169,9 +169,7 @@ export class ShellWindow {
         id: screen.id,
         name: screen.name,
         home: screen.id === this.#screens.homeId,
-        open: spaceState.tabs.some(
-          (tab) => tab.kind === "screen" && tab.screenId === screen.id,
-        ),
+        open: spaceState.tabs.some((tab) => tab.kind === "screen" && tab.screenId === screen.id),
         readable: screen.readable,
       })),
       homeScreenId: this.#screens.homeId,
