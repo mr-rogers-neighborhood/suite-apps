@@ -184,18 +184,20 @@ if (!build.ok) {
 // `check:full` runs their tests. They import the libraries built above, so they
 // run here: after the build, before any app can call the tree green. The Budget
 // round-trip uses an ephemeral key and verifies against its own public half, so
-// a clean checkout with no owner signing key still proves the signed path.
+// a clean checkout with no owner signing key still proves the signed path. The
+// pack shape check runs in the same row, so a pack that drifts fails CI here.
 const scripts =
   dry || !build.ok
     ? { ok: build.ok, detail: build.ok ? "dry run" : "not run: libraries failed" }
     : (() => {
         if (!json) process.stdout.write("\n▶ scripts\n");
-        const result = run(
+        const tests = run(
           "node",
           [
             "--test",
             "scripts/pack.test.mjs",
             "scripts/budget-pack.test.mjs",
+            "scripts/pack-shape.test.mjs",
             "scripts/affected.test.mjs",
             "scripts/release-manifest.test.mjs",
             "scripts/channel.test.mjs",
@@ -208,10 +210,13 @@ const scripts =
           ],
           workdir,
         );
+        const shape = run("node", ["scripts/pack-shape.mjs"], workdir);
+        const ok = tests.status === 0 && shape.status === 0;
         return {
-          ok: result.status === 0,
-          detail:
-            result.status === 0 ? "pack, channel, affected, release and spec tests" : `exit ${result.status}`,
+          ok,
+          detail: ok
+            ? "pack shape, pack, channel, affected, release and spec tests"
+            : `tests exit ${tests.status}, pack shape exit ${shape.status}`,
         };
       })();
 
@@ -226,15 +231,15 @@ if (!scripts.ok) {
   });
 }
 
-// The prelude's tests live in its own workspace package. They need no signing
-// key; the signed round-trip above is the key-bearing path, and this is the
-// bridge's list/create/commit/export/import behaviour.
+// The prelude's tests live with Budget's app, which owns the Vitest version. They
+// need no signing key; the signed round-trip above is the key-bearing path, and
+// this is the bridge's list/create/commit/export/import behaviour.
 const packTests =
   dry || !build.ok || !scripts.ok
     ? { ok: build.ok && scripts.ok, detail: dry ? "dry run" : "not run: earlier step failed" }
     : (() => {
         if (!json) process.stdout.write("\n▶ budget pack\n");
-        const result = run("pnpm", ["--filter", "@suite/budget-pack", "run", "test"], workdir);
+        const result = run("pnpm", ["--dir", "apps/budget", "run", "test:pack"], workdir);
         return {
           ok: result.status === 0,
           detail: result.status === 0 ? "prelude tests" : `exit ${result.status}`,
@@ -248,7 +253,7 @@ if (!json) {
 if (!packTests.ok) {
   results.push({
     repo: "budget pack",
-    package: "@suite/budget-pack",
+    package: "apps/budget (test:pack)",
     ok: false,
     detail: packTests.detail,
   });

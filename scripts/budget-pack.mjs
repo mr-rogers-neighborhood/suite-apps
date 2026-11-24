@@ -5,9 +5,9 @@
  *   pnpm budget:pack [--key <base64>] [--out <file.suitepack>] [--version <semver>]
  *
  * `apps/budget/pack/vite.config.ts` builds the renderer and the prelude into
- * `apps/budget/pack/dist`, which is the pack's source directory. This script
- * writes the generated manifest, puts the prelude script in front of the app
- * script, and hands the directory to `bundlePack`.
+ * `apps/budget/.dev/pack`, which is the pack's build output, not its source.
+ * This script writes the generated manifest there, puts the prelude script in
+ * front of the app script, and hands the directory to `bundlePack`.
  *
  * The signing key follows the repository rule: it is never in the working tree.
  * `--key` wins, then `$SUITE_PACK_KEY`, then `~/.config/suite/keys/pack-key`.
@@ -23,9 +23,9 @@ import { bundlePack, publicKeyOfSigningKey } from "./pack.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PACK_DIR = join(ROOT, "apps", "budget", "pack");
-const DIST = join(PACK_DIR, "dist");
-const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
 const APP_DIR = join(ROOT, "apps", "budget");
+const DIST = join(APP_DIR, ".dev", "pack");
+const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
 
 /**
  * Refuse a signing key the tree does not pin.
@@ -119,7 +119,7 @@ function usage() {
   --contract  override the manifest's contractVersion
   --min-host  minimum host version to record
 
-Builds the renderer and prelude into apps/budget/pack/dist, then signs the
+Builds the renderer and prelude into apps/budget/.dev/pack, then signs the
 directory with the pinned pack key. A key whose public half is not
 ${KEYS.pack.pinName} is refused before anything is signed.
 `;
@@ -171,7 +171,11 @@ async function main(argv) {
     ],
     ROOT,
   );
-  await run("pnpm", ["--dir", PACK_DIR, "exec", "vite", "build"], ROOT);
+  await run(
+    "pnpm",
+    ["--dir", APP_DIR, "exec", "vite", "build", "--config", "pack/vite.config.ts"],
+    ROOT,
+  );
 
   // `bundlePack` reads the development manifest from the directory and excludes
   // it from the payload, so the built copy carries only this build's version.

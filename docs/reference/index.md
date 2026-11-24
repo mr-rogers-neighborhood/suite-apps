@@ -7,6 +7,7 @@ Facts to look up. These pages describe the repository as it is today.
 | [Repository layout](repo-layout.md) | Directories, workspace packages and who owns what |
 | [Commands](commands.md) | The root gate, per-app checks and the toolchain |
 | [Packaging channels](packaging-channels.md) | Flatpak and the Android APK, and who may update what |
+| [Pack authoring](pack-authoring.md) | The layout, build and checks for a pack source under `apps/<app>/pack/` |
 | [File formats](file-formats.md) | `.canvas`, `.planner`, `.budget`, sync workspaces and backups |
 | [Environment](environment.md) | Variables that move data roots or configure sync |
 | [Decisions](decisions.md) | The rules that shape the repository |
