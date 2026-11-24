@@ -130,6 +130,14 @@ export interface DocumentOpenOptions {
 export interface DocumentSaveOptions {
   /** The schema version the caller writes. An existing document keeps its own. */
   readonly schemaVersion?: number;
+  /**
+   * Keep the file being replaced as `<name>.bak`. Defaults to true.
+   *
+   * A host-invoked migration takes one backup before its chain starts and then
+   * writes every step with `false`, so the backup is the document the person
+   * had, not the intermediate step that happened to run last (S6.6).
+   */
+  readonly keepBackup?: boolean;
 }
 
 function fsCode(error: unknown): string | undefined {
@@ -479,7 +487,7 @@ export class DocumentStore {
         }
 
         await mkdir(dirname(file), { recursive: true });
-        await this.#keepPrevious(file);
+        if (options.keepBackup !== false) await this.#keepPrevious(file);
         await this.#writeAtomically(
           file,
           encodeDocumentEnvelope({
@@ -530,7 +538,7 @@ export class DocumentStore {
             "its checksum does not match",
           );
         }
-        await this.#keepPrevious(file);
+        if (options.keepBackup !== false) await this.#keepPrevious(file);
         await this.#writeAtomically(
           file,
           encodeDocumentEnvelope({
@@ -546,6 +554,59 @@ export class DocumentStore {
     } catch (error) {
       if (error instanceof DocumentRefusal) throw error;
       throw logged("document could not be rewritten", error);
+    }
+  }
+
+  /**
+   * Copy the document to `<name>.bak` before a host-invoked change (S6.3, S6.6).
+   *
+   * A migration can span several steps, and every step writes; the per-save
+   * backup would leave the backup of the second step, not the document the
+   * person had. Taking it once before the chain gives the host a whole document
+   * to restore when an entry cannot finish.
+   */
+  async backup(containerId: string, packId: string, id: string): Promise<void> {
+    const file = this.#path(containerId, packId, id);
+    try {
+      await this.#withLock(file, async () => {
+        const read = await this.#headerFor(file, packId, id);
+        if (read.kind === "missing") throw new Error("document does not exist");
+        if (read.kind !== "ok") return this.#refuse(read, containerId, packId, id, file);
+        // The backup is the whole envelope, not a payload: restoring it needs no
+        // pack knowledge and re-checks every host header on the way back.
+        await copyFile(file, `${file}${BACKUP_SUFFIX}`);
+      });
+    } catch (error) {
+      if (error instanceof DocumentRefusal) throw error;
+      throw logged("document could not be backed up", error);
+    }
+  }
+
+  /**
+   * Put the previous copy back, byte for byte.
+   *
+   * This is the failed-migration path (S6.6): the document a migration replaced
+   * is readable again at its old schema, and the `.bak` is not consumed so the
+   * person keeps both copies.
+   */
+  async restore(containerId: string, packId: string, id: string): Promise<void> {
+    const file = this.#path(containerId, packId, id);
+    const backup = `${file}${BACKUP_SUFFIX}`;
+    try {
+      await this.#withLock(file, async () => {
+        const read = await this.#headerFor(backup, packId, id);
+        if (read.kind === "missing") throw new Error("document has no previous copy");
+        if (read.kind !== "ok") throw new Error("the document's previous copy is not readable");
+        const whole = await readFile(backup);
+        const payload = whole.subarray(read.payloadOffset);
+        if (checksum(payload) !== read.header.payloadChecksum) {
+          throw new Error("the document's previous copy does not verify");
+        }
+        await this.#writeAtomically(file, new Uint8Array(whole));
+      });
+    } catch (error) {
+      if (error instanceof DocumentRefusal) throw error;
+      throw logged("document could not be restored", error);
     }
   }
 

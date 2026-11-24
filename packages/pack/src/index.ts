@@ -39,6 +39,7 @@ export {
   type PackSync,
   type PackWidgetData,
   packAllows,
+  packDocumentSchema,
   packFitsHost,
   parsePackManifest,
 } from "./manifest.js";

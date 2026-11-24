@@ -272,7 +272,8 @@ const publisherSchema = z
   })
   .strict();
 
-const documentSchema = z
+/** One declared document. A host validates this shape before it looks for an entry. */
+export const packDocumentSchema = z
   .object({
     id: z.string().regex(PACK_ID),
     format: z.string().min(1),
@@ -402,7 +403,7 @@ function manifestSchema(requireSignature: boolean) {
       publisher: publisherSchema.optional(),
       capabilities: z.array(z.enum(PACK_CAPABILITIES)).default([]),
       optionalCapabilities: z.array(z.enum(PACK_CAPABILITIES)).optional(),
-      documents: z.array(documentSchema).max(64).optional(),
+      documents: z.array(packDocumentSchema).max(64).optional(),
       blobs: z.array(blobSchema).max(64).optional(),
       sync: syncSchema.optional(),
       network: networkSchema.optional(),

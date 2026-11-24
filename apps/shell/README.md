@@ -283,8 +283,15 @@ the header and verifies the payload hash; it never decodes the payload. Saves ar
 atomic, backed up as `<name>.bak` and recovered after a crash; a file that does not verify is
 quarantined as `<name>.corrupt-<timestamp>` and refused, and a newer envelope or schema is refused
 with a sentence naming the file rather than replaced by a fresh document. `list` reports the payload
-size, not the envelope size. A file written before the envelope is refused and left as it is until
-the pack schema work supplies a migration.
+size, not the envelope size. A file written before the envelope is refused and left as it is.
+
+A pack may declare its documents and a migration chain (S6.3). The host finds the declaration by id,
+proves the chain before it writes, takes one backup and invokes each declared entry with a handle
+scoped to that single document; the entry body is pack code, and the host passes bytes without
+parsing them. The envelope's schema version records each completed step, so a second run invokes no
+entry and leaves the file unchanged; a failed entry restores the backup, so the old document stays
+readable (S6.6). The runner that executes an entry is injected into
+`src/documentMigrations.ts`; binding it to a pack renderer is not built yet.
 
 The `files` service requires the `files` capability. It is a separate root from `documents`, created
 lazily per `(container, pack)` at `files/<container>/<pack>` and never inside the pack's code
@@ -365,6 +372,8 @@ decision record owns that trade.
 - app-widget capture delivery (app widgets render their declared fields, but the host does not send
   a capture to the pack yet);
 - the host's blind relay transport for pack sync;
+- binding a declared migration or projection entry to a pack renderer, and any app's own migration
+  bodies (the host's chain, backup, idempotence and failed-migration path exist and are tested);
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;
 - tab tear-off and split view (the view tree is ready; the UI is not);
@@ -398,8 +407,10 @@ mise exec -- pnpm --filter @suite/shell build
 
 The tests cover pack manifest discovery and traversal, document scoping, the `files` service's
 per-pack and per-container isolation, lock ownership, the external surface's filter validation,
-token ownership and cancellation, import into the pack root, catalogue trust and refusal (valid,
-wrong-key, tampered and unsigned), install from the catalogue, additive updates,
+token ownership and cancellation, import into the pack root, declared-document resolution, a
+two-step migration's idempotence and failed-migration restore, projection refusal before the schema
+is current, catalogue trust and refusal (valid, wrong-key, tampered and unsigned), install from the
+catalogue, additive updates,
 version-only uninstall and symlink refusal, uninstall planning for open tabs, `suite://` parsing and
 refusals, launch contexts, space document open/close/title and persistence, version-1 and version-2
 space documents with both tab kinds, Home creation and ordering, the screen store's save, backup and

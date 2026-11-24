@@ -11,7 +11,15 @@ shipped host.
   header (publisher, pack, document, schema, payload length, payload checksum) and the pack's payload
   bytes untouched. Saves are serialized, atomic, backed up and recovered after a crash; a file that
   does not verify is quarantined, a newer envelope or schema is refused with its path, and a
-  pre-envelope file is left as it is until a pack migration exists.
+  pre-envelope file is left as it is.
+
+### Added
+
+- **Declared documents migrate through the host.** A pack's manifest entries are carried into the
+  installed pack, the host proves a single migration chain before it writes, takes one backup and
+  invokes each declared entry with a handle scoped to that document. The schema stamp makes a second
+  run a no-op, a failed entry restores the backup, and a projection refuses a document whose schema
+  is not current. The entry runner is injected; binding it to a pack renderer is still open.
 
 ## [0.2.0] - 2026-11-22
 

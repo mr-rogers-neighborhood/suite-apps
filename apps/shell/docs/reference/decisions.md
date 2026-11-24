@@ -74,6 +74,13 @@ The rules that shape the Suite host.
   that copy, and a `.corrupt-<timestamp>` quarantine for a file that does not verify. A newer
   envelope or schema is refused with a sentence and the file's path in the data root, never replaced
   by a fresh document and never rewritten by an older build.
+- A pack declares its documents, migration chain and projection in the manifest. The host finds the
+  declaration by id, proves one chain to the declared version before it writes, takes one `.bak` of
+  the whole document, and invokes each declared entry with a handle scoped to that document. The
+  entry is pack code and runs in the pack's renderer; the main process never imports pack code and
+  never parses the payload. The envelope's schema version records a completed step, so a second run
+  writes nothing; a failed entry restores the one backup, so the old document stays readable. The
+  runner is injected, so binding it to a pack renderer is the remaining seam.
 - Writes are atomic: a temporary file in the same root, then a rename. Backups and temp files live
   under the same pack root.
 - `documents` and `files` are separate services with separate roots and capabilities. A pack cannot
