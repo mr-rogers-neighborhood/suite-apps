@@ -89,14 +89,13 @@ and Upcoming surfaces have their own pages: [Week](week.md),
 
 `Shell.tsx` renders the shared `@suite/ui` `MenuBar` above the active view. Its zones carry the material
 this app has: the Planner mark as a link back to today, the workspace file's name as context, a compact
-view switcher over the same `views` registry, export and import in the actions, the sync pill, and the
-theme picker in the controls. The rail stays the full navigation, and the bar's switcher is the compact
-one. Planner has no command palette and no presence, so the search and peers zones stay empty rather
+view switcher over the same `views` registry, export and import in the actions, and the sync pill. The
+rail stays the full navigation, and the bar's switcher is the compact one. The theme is host state:
+Suite Shell's **View** menu or Suite Go's **Settings** owns it, so the app carries no picker of its own. Planner has no command palette and no presence, so the search and peers zones stay empty rather
 than holding a control that does nothing.
 
 Below `md` the rail is not rendered: the bar's navigation button opens `SidebarDrawer`, which carries the
-same navigation, theme and export/import, and the bar hides its wide zones so the day view keeps the
-width. The bar therefore adds no horizontal scrolling at 360, 390 or 430 px.
+same navigation and export/import, and the bar hides its wide zones so the day view keeps the width. The bar therefore adds no horizontal scrolling at 360, 390 or 430 px.
 
 The Electron window auto-hides its native menu on Linux and Windows (`autoHideMenuBar`), so the in-app
 bar is the visible menu and the native accelerators do not draw a second copy beside it.

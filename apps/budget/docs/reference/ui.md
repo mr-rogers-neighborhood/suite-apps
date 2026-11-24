@@ -7,8 +7,8 @@ The app is one window, one budget, one month at a time.
 The top bar is the shared `@suite/ui` `MenuBar`. Its zones carry the budget's own material: the Suite
 Budget mark (a link back to **All budgets**), the budget name as context, a Plan/Accounts/Reports view
 switcher, the command palette trigger as search, Save status, undo, redo, import and **Add transaction**
-as actions, and the theme control. Below `md` the wide zones hide, leaving the rail as the navigation and
-**Add transaction** as the bar's control.
+as actions. Below `md` the wide zones hide, leaving the rail as the navigation and **Add transaction**
+as the bar's control.
 
 A left sidebar holds the budget name, the three main views (Plan, Accounts, Reports), the accounts with
 their balances, and the tools (Schedules, Payees, Rules). The footer holds Export and **All budgets**.
@@ -131,6 +131,8 @@ the a11y addon.
 
 ## Theme
 
-Dark first, system light. The surfaces and typography match Suite Planner; the accent is Suite Budget's
-green. Charts use the five chart tokens and remain legible in both schemes. The theme control sits in
-the bar's controls from `lg` up and in the rail below that, so there is one copy at every width.
+The theme belongs to the host: **View** in Suite Shell or **Settings** in Suite Go chooses Suite, Warm
+or Solarized and light, dark or follow-the-system. Budget reads the resolved role variables and has no
+picker or stored choice of its own. Charts use the five chart tokens and remain legible in both
+schemes. The static values at the top of `theme/styles.css` are only the fallback for a page opened
+outside a host; the default Suite palette keeps the app's look unchanged.

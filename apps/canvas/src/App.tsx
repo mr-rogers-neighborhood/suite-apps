@@ -40,7 +40,8 @@ import { useCanvasStore } from "./store/useCanvasStore";
 import { useUiStore } from "./store/useUiStore";
 import { useViewsStore } from "./store/viewsStore";
 import { useWorkspaceSnapshot } from "./store/workspaceStore";
-import { initTheme, useThemeStore } from "./theme/useThemeStore";
+import { SettingsHost } from "./styles/SettingsDialog";
+import { useHostTheme } from "./theme/hostTheme";
 import { viewsEnabled } from "./views/availability";
 
 /** Half of the default card box (`w-72`), so a dropped card lands under the pointer. */
@@ -48,7 +49,6 @@ const CARD_HALF_WIDTH = 144;
 const CARD_HALF_HEIGHT = 60;
 
 export default function App() {
-  useEffect(() => initTheme(), []);
   // A tab can outlive several deploys; the notice is how a reader learns that the
   // bug they are looking at was fixed an hour ago (see `staleBuild`).
   const stale = useStaleBuild();
@@ -95,10 +95,10 @@ function WorkspaceShell({
   const shellRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLElement>(null);
   const workspacePalette = useWorkspacePalette(workspace);
-  const themeMode = useThemeStore((state) => state.mode);
-  // The resolved brightness, which is what a swatch resolves against.
-  const theme = useThemeStore((state) => state.theme);
-  const palette = useSurfacePalette(shellRef, themeMode);
+  // The host paints the tokens; Canvas only reads which mode they resolved to.
+  const hostTheme = useHostTheme();
+  const themeMode = hostTheme.mode;
+  const palette = useSurfacePalette(shellRef, hostTheme.key);
 
   // Content breakpoints (ADR-0051): the band rides the board root as an
   // attribute, written straight to the element so a zoom gesture does not
@@ -127,7 +127,6 @@ function WorkspaceShell({
   const openCardFocus = useUiStore((state) => state.openCardFocus);
   const selectSection = useUiStore((state) => state.selectSection);
   const savedViews = useSavedViews(workspace);
-  const setThemeMode = useThemeStore((state) => state.setMode);
   const setLibraryTab = useUiStore((state) => state.setLibraryTab);
   const startEditing = useUiStore((state) => state.startEditing);
   const openTypeSettings = useUiStore((state) => state.openTypeSettings);
@@ -522,8 +521,6 @@ function WorkspaceShell({
         setLibraryTab,
         openTypeSettings,
         requestShare,
-        setThemeMode,
-        themeMode,
       }),
     [
       boardActions,
@@ -562,8 +559,6 @@ function WorkspaceShell({
       setLibraryTab,
       openTypeSettings,
       requestShare,
-      setThemeMode,
-      themeMode,
     ],
   );
 
@@ -665,7 +660,7 @@ function WorkspaceShell({
         leaving={leaving}
         palette={workspacePalette}
         roles={palette}
-        mode={theme}
+        mode={themeMode}
         requestLeave={requestLeave}
         setPaletteOpen={setPaletteOpen}
         standalone={standalone}
@@ -768,6 +763,9 @@ function WorkspaceShell({
         toggleLibraryGroupBySection={toggleLibraryGroupBySection}
         openInspector={openInspector}
       />
+      {/* Settings is host chrome: the theme control moved to the host, but the appearance
+          and palette controls remain this pack's own surfaces. */}
+      <SettingsHost />
       {/* One chooser for every "new card of this type" that has a real choice to make. */}
       {templateChoice ? (
         <TemplateChoiceMenu

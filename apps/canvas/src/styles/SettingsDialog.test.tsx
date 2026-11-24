@@ -5,7 +5,6 @@ import { DEFAULT_APPEARANCE } from "../theme/appearance";
 import { useAppearanceStore } from "../theme/useAppearanceStore";
 import { SettingsDialog, SettingsHost } from "./SettingsDialog";
 import { openSettings } from "./settingsEvents";
-import { ThemeToggle } from "./ThemeToggle";
 
 /**
  * Settings is the home appearance never had (ADR-0071).
@@ -27,18 +26,6 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("settings", () => {
-  it("opens from the theme switcher, and the menu closes behind it", () => {
-    render(<ThemeToggle />);
-
-    expect(dialog()).toBeNull();
-    fireEvent.click(screen.getByTestId("theme-toggle"));
-    fireEvent.click(screen.getByTestId("theme-appearance"));
-
-    expect(dialog()).not.toBeNull();
-    expect(screen.queryByTestId("theme-menu")).toBeNull();
-    expect(screen.getByTestId("appearance-dialog")).toBeTruthy();
-  });
-
   it("opens from the palette's request, not only from the menu", async () => {
     render(<SettingsHost />);
 

@@ -39,6 +39,8 @@ export {
   defaultTheme,
   PRESETS,
   presetById,
+  resolveThemeId,
+  THEME_ID_ALIASES,
 } from "./presets/index.js";
 export {
   CHART_ROLES,

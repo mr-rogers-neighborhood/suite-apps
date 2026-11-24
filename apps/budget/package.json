@@ -40,7 +40,6 @@
     "@suite/contracts": "workspace:*",
     "@suite/desktop": "workspace:*",
     "@suite/document-runtime": "workspace:*",
-    "@suite/theme": "workspace:*",
     "@suite/ui": "workspace:*",
     "clsx": "^2.1.1",
     "fuzzysort": "^4.0.2",

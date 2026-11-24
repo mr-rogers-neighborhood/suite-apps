@@ -37,6 +37,7 @@ import {
   type ThemeView,
 } from "./shared.js";
 import type { SpaceState, SpaceStore } from "./spaces.js";
+import { paintThemeSurface } from "./theme.js";
 
 /** The chrome's own height. The chrome page uses the same number in its stylesheet. */
 export const TAB_BAR_HEIGHT = 56;
@@ -61,6 +62,14 @@ export class ShellWindow {
   readonly #containerId: string;
   readonly #onViewClosed: ((tabId: string) => void) | undefined;
   readonly #views = new Map<string, WebContentsView>();
+  /**
+   * The stylesheet each pack view currently has inserted.
+   *
+   * `insertCSS` is additive, so a repaint removes the previous sheet after the new one is in
+   * place. A view that loaded after the change starts with no key and simply gains the
+   * current theme.
+   */
+  readonly #themeKeys = new Map<string, string>();
   /**
    * What each tab was opened with. It is stored here, keyed by the tab the main
    * process derived from the sender, so a pack never parses a launch out of a URL
@@ -527,6 +536,23 @@ export class ShellWindow {
   setTheme(theme: ThemeView): void {
     this.#theme = theme;
     this.broadcast();
+    // A theme is host state, so every open pack moves with it instead of waiting for a
+    // reload. The chrome is repainted by the broadcast above.
+    for (const [tabId, view] of this.#views) this.#paintPackTheme(tabId, view);
+  }
+
+  /**
+   * Paint the host's resolved tokens onto one pack view.
+   *
+   * Two halves: the stylesheet carries the values and `color-scheme`, and a constant script
+   * carries the attributes a stylesheet may key off. Neither reads anything from the pack,
+   * and both are replaced rather than appended on the next change.
+   */
+  #paintPackTheme(tabId: string, view: WebContentsView): void {
+    if (view.webContents.isDestroyed()) return;
+    void paintThemeSurface(view.webContents, this.#theme, this.#themeKeys.get(tabId))
+      .then((key) => this.#themeKeys.set(tabId, key))
+      .catch(() => undefined);
   }
 
   /** Replace the launcher's data without rebuilding the window. */
@@ -637,9 +663,9 @@ export class ShellWindow {
       this.broadcast();
     });
     view.webContents.on("did-finish-load", () => {
-      // Theme tokens are host-provided. A pack may override them, but it starts
-      // inside the same palette as the chrome without shipping a copy.
-      void view.webContents.insertCSS(themeCss(this.#theme)).catch(() => undefined);
+      // Theme tokens are host-provided. A pack may style itself from them, but it does not
+      // ship a copy of the palette and it cannot choose a different one.
+      this.#paintPackTheme(tab.id, view);
       if (this.#notice?.startsWith(pack.name) === true) {
         this.#notice = null;
         this.broadcast();
@@ -660,6 +686,7 @@ export class ShellWindow {
     view.webContents.once("destroyed", () => {
       clearPackSender(webContentsId);
       clearProjectionEntries(webContentsId);
+      this.#themeKeys.delete(tab.id);
       // Locks are owned by the tab id. A destroyed view cannot release its own
       // writer, so the host does it here.
       this.#onViewClosed?.(tab.id);
@@ -710,13 +737,6 @@ export class ShellWindow {
  * own `suite-pack://` origin; a pack with the capability may also reach HTTPS and
  * WSS. The CSP set by the protocol handler is the second line.
  */
-function themeCss(theme: ThemeView): string {
-  const variables = Object.entries(theme.values)
-    .map(([name, value]) => `${name}: ${value};`)
-    .join(" ");
-  return `:root { color-scheme: ${theme.mode}; ${variables} }`;
-}
-
 function configurePackSession(pack: PackInfo, containerId: string): void {
   const partition = packPartition(pack.id, containerId, pack.publisher?.id ?? SUITE_PUBLISHER_ID);
   if (configuredPartitions.has(partition)) return;

@@ -1,71 +1,51 @@
-import { DEFAULT_THEME_ID } from "@suite/theme";
-import { afterEach, describe, expect, it } from "vitest";
+import { REQUIRED_ROLES } from "@suite/theme";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import styles from "./styles.css?raw";
+import { resolvedTheme } from "./theme";
 
-import {
-  readStoredTheme,
-  resolvedTheme,
-  resolveTheme,
-  setThemeChoice,
-  THEME_STORAGE_KEY,
-} from "./theme";
+/** Every `:root` block's declarations, in source order. */
+function rootBlocks(): string[] {
+  return [...styles.matchAll(/:root[^{}]*\{([^}]*)\}/g)].map((match) => match[1] ?? "");
+}
 
 afterEach(() => {
-  window.localStorage.clear();
-  document.documentElement.className = "";
-  document.documentElement.removeAttribute("data-theme");
   document.documentElement.removeAttribute("data-theme-mode");
-  document.documentElement.removeAttribute("data-mode");
-  document.documentElement.removeAttribute("style");
+  vi.unstubAllGlobals();
 });
 
-describe("resolveTheme", () => {
-  it("resolves system against the desktop", () => {
-    expect(resolveTheme("system", true)).toBe("dark");
-    expect(resolveTheme("system", false)).toBe("light");
+describe("the standalone palette", () => {
+  it("defines every role in the light fallback", () => {
+    const [light] = rootBlocks();
+    expect(light).toBeDefined();
+    for (const role of REQUIRED_ROLES) {
+      expect(light, `--${role} is undefined in :root`).toContain(`--${role}:`);
+    }
   });
 
-  it("takes a chosen mode as given, whatever the desktop says", () => {
-    expect(resolveTheme("light", true)).toBe("light");
-    expect(resolveTheme("dark", false)).toBe("dark");
-  });
-});
-
-describe("readStoredTheme", () => {
-  it("follows the desktop with the default preset when nothing is stored", () => {
-    expect(readStoredTheme({ getItem: () => null })).toEqual({
-      preset: DEFAULT_THEME_ID,
-      mode: "system",
-    });
-    expect(readStoredTheme(undefined)).toEqual({ preset: DEFAULT_THEME_ID, mode: "system" });
-  });
-
-  it("reads the pair a choice is stored as", () => {
-    const storage = {
-      getItem: (key: string) =>
-        key === THEME_STORAGE_KEY ? JSON.stringify({ preset: "logseq", mode: "dark" }) : null,
-    };
-    expect(readStoredTheme(storage)).toEqual({ preset: "logseq", mode: "dark" });
-  });
-
-  it("keeps a bare mode written before presets existed", () => {
-    expect(readStoredTheme({ getItem: () => "dark" })).toEqual({
-      preset: DEFAULT_THEME_ID,
-      mode: "dark",
-    });
+  it("defines every role again for a dark desktop", () => {
+    // A host overwrites these with its own values; without a second block a standalone
+    // Help on a dark desktop has a dark window frame and undefined tokens.
+    const blocks = rootBlocks();
+    expect(blocks.length).toBeGreaterThanOrEqual(2);
+    for (const role of REQUIRED_ROLES) {
+      expect(blocks[1], `--${role} is undefined in the dark :root`).toContain(`--${role}:`);
+    }
+    expect(styles).toContain("@media (prefers-color-scheme: dark)");
   });
 });
 
-describe("setThemeChoice", () => {
-  it("paints the mode onto the root and keeps the dark class in step", () => {
-    setThemeChoice({ preset: DEFAULT_THEME_ID, mode: "dark" });
+describe("resolvedTheme", () => {
+  it("reads the mode the host painted", () => {
+    document.documentElement.dataset.themeMode = "dark";
     expect(resolvedTheme()).toBe("dark");
-    expect(document.documentElement.classList.contains("dark")).toBe(true);
-    expect(document.documentElement.dataset.mode).toBe("dark");
-    expect(document.documentElement.style.getPropertyValue("--surface")).not.toBe("");
-
-    setThemeChoice({ preset: DEFAULT_THEME_ID, mode: "light" });
+    document.documentElement.dataset.themeMode = "light";
     expect(resolvedTheme()).toBe("light");
-    expect(document.documentElement.classList.contains("dark")).toBe(false);
-    expect(document.documentElement.dataset.mode).toBe("light");
+  });
+
+  it("follows the desktop when no host has painted", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    expect(resolvedTheme()).toBe("dark");
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    expect(resolvedTheme()).toBe("light");
   });
 });

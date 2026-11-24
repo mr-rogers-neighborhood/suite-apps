@@ -50,7 +50,7 @@ let state = {
   catalogue: [],
   catalogueSource: "",
   installedVersions: [],
-  theme: { mode: "dark", values: {} },
+  theme: { preset: "suite", mode: "dark", values: {} },
   notice: null,
   reminderStatus: null,
 };
@@ -108,6 +108,9 @@ function element(tag, className, text) {
 function applyTheme() {
   const root = document.documentElement;
   root.style.colorScheme = state.theme.mode;
+  root.dataset.theme = state.theme.preset;
+  root.dataset.themeMode = state.theme.mode;
+  root.classList.toggle("dark", state.theme.mode === "dark");
   for (const [name, value] of Object.entries(state.theme.values)) {
     root.style.setProperty(name, value);
   }

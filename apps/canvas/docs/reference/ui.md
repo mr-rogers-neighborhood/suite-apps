@@ -16,7 +16,7 @@ Three surfaces hold the chrome: the title bar, the navigation row inside it, and
 
 | Surface | Component | What it owns |
 | --- | --- | --- |
-| Title bar | `src/chrome/TitleBar.tsx` | Workspace name and rename, the command bar, the saved status, the workspace menu, the theme toggle |
+| Title bar | `src/chrome/TitleBar.tsx` | Workspace name and rename, the command bar, the saved status and the workspace menu. The theme is the host's, not the bar's |
 | Navigation row | `BoardTabs.tsx`, `UndoRedo.tsx`, the history, outline and explain buttons in `app/WorkspaceShellView.tsx` and `canvas/PurposeControl.tsx` | Home, the open boards with their peer counts, undo, redo, version history, the outline and the purpose (explain), in one row. Explain sits outside the edit gate: a reader who may not write still gathers a selection to read it |
 | Views | `src/chrome/ViewsBar.tsx` | One icon in the nav row, after explain, opening the views layer on the projected view. **Shut** (see below) |
 | Views layer | `src/views/ViewsLayer.tsx` | The full-window mode: the rail of saved views with row actions, the presentation in read or edit mode, the context drawer and the pick |
@@ -609,13 +609,21 @@ A **shape** is the frame, not a decoration on one. `shapeClipPath` and `shapeOut
 
 Device appearance is local, and it lives in Settings. `src/styles/SettingsDialog.tsx` is a modal dialog with a focus trap and Escape through the escape stack. One section is document data and one is not: `PaletteEditor` writes the workspace palette, and `AppearanceSection` sets density, card radius, canvas background and a motion preference, written by `src/theme/appearance.ts` as attributes on `<html>` (`data-density`, `data-canvas`, `data-motion`, `data-reading`) plus `--reader-card-radius`, `--reader-size` and `--reader-measure`. Nothing about it is synced, because it changes how this screen draws and never what a peer sees. The **reading** group is separate from the canvas knobs on purpose: text size, measure and page belong to a book and sink into nothing else, so a reader at midnight gets a dim page without their boards turning sepia.
 
-The dialog opens from the theme menu (`theme-appearance`, which reads "Settings…") and from the palette's `system.settings` row. Both go through `openSettings` in `src/styles/settingsEvents.ts`, a window event, so neither surface has to own the other's state. The appearance controls keep their `appearance-*` test ids.
+The dialog opens from the palette's `system.settings` row through `openSettings` in
+`src/styles/settingsEvents.ts`, a window event, so no other surface has to own its state. The appearance controls keep their `appearance-*` test ids.
 
-Theme mode is separate again: `src/theme/theme.ts` resolves `light`, `dark` or `system` and toggles the `dark` class plus `data-theme` on the root, so both the class-based and attribute-based CSS see one decision.
+The theme is not this app's decision. Suite Shell's **View** menu (desktop) or Suite Go's **Settings**
+(mobile) owns the preset and brightness, paints the resolved token variables onto the document, and
+marks the root with `data-theme`, `data-theme-mode` and the `dark` class. `src/theme/hostTheme.ts`
+observes those attributes for the two consumers that cannot read CSS: Excalidraw's `theme` prop and the
+contrast floor, which measures live role colours. Outside a host the page follows
+`prefers-color-scheme`, and the stylesheet's fallback palette keeps it legible.
 
 ## Theme tokens
 
-`src/styles/global.css` defines the token set for both themes at the top of the file.
+`src/styles/global.css` defines the fallback token set at the top of the file. In a host, every role
+is overwritten by the preset the host resolved, so the fallback matters only before the first paint
+and outside a host.
 
 | Token | Role |
 | --- | --- |
@@ -689,7 +697,7 @@ Focus is always visible on interactive elements, and a focusable read-only contr
 | Focus trap and focus restore | `src/dialogs/useFocusTrap.test.tsx` |
 | Menu arrow keys, and focus entering the menu | `@suite/ui`'s own `menuKeys.test.tsx`, beside the implementation it covers |
 | Tab strip keyboard | `src/dialogs/tabKeys.test.tsx` |
-| Each menu takes focus on open | `ContextMenu.test.tsx`, `Dock.test.tsx`, `ViewsBar.test.tsx`, `BoardTabs.test.tsx`, `WorkspaceActions.test.tsx`, `ThemeToggle.test.tsx` and `CardTypePicker.test.tsx` beside each component |
+| Each menu takes focus on open | `ContextMenu.test.tsx`, `Dock.test.tsx`, `ViewsBar.test.tsx`, `BoardTabs.test.tsx`, `WorkspaceActions.test.tsx` and `CardTypePicker.test.tsx` beside each component |
 | A combobox keeps focus in its field | `src/cards/CardPicker.test.tsx` |
 | Each modal dialog traps Tab | `SettingsDialog.test.tsx`, `DeleteWorkspaceDialog.test.tsx` and `CardPicker.test.tsx` beside each component |
 | Card focus mode as a dialog | `src/cards/CardFocusSurface.test.tsx` |
@@ -702,7 +710,7 @@ Focus is always visible on interactive elements, and a focusable read-only contr
 | Command availability | `src/command/commandRegistry.test.ts` |
 | Tab strip keyboard | `src/cards/CardPanel.test.tsx` |
 | Library filters and selection | `src/library/*.test.ts` |
-| Theme and appearance resolution | `src/theme/*.test.ts` |
+| Host theme observation and appearance resolution | `src/theme/hostTheme.test.ts`, `src/theme/appearance.test.ts` |
 | Escape layer order | `src/shell/escapeLayers.test.ts` |
 | Hover-peek timing and dismissal | `src/canvas/peek/usePeek.test.ts` |
 | Peek resolution per entity kind | `src/canvas/peek/peekResolver.test.ts` |

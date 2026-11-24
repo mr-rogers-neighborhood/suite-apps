@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CONTRAST_TEXT, CONTRAST_UI, contrastRatio, isMeasurable, pickInk } from "./contrast.js";
-import { PRESETS } from "./presets/index.js";
+import {
+  DEFAULT_THEME_ID,
+  PRESETS,
+  presetById,
+  resolveThemeId,
+  THEME_ID_ALIASES,
+} from "./presets/index.js";
 import { PAINT_INK, PAINT_ROLES, THEME_ROLES, type ThemeValues } from "./roles.js";
 import { isSuiteTheme, type SuiteTheme, THEME_MODES } from "./theme.js";
 
@@ -158,6 +164,25 @@ describe.each(PRESETS.map((theme) => [theme.id, theme] as const))("preset %s", (
 describe("preset list", () => {
   it("ships Suite first, because the first preset is what everybody sees", () => {
     expect(PRESETS[0]?.id).toBe("suite");
+  });
+
+  it("lists Suite, Warm, Solarized in that order", () => {
+    expect(PRESETS.map((theme) => theme.id)).toEqual(["suite", "warm", "solarized"]);
+    expect(PRESETS.map((theme) => theme.name)).toEqual(["Suite", "Warm", "Solarized"]);
+  });
+
+  it("keeps a stored logseq selection on Warm rather than on a missing theme", () => {
+    expect(THEME_ID_ALIASES.logseq).toBe("warm");
+    expect(resolveThemeId("logseq")).toBe("warm");
+    expect(presetById("logseq")?.id).toBe("warm");
+    expect(presetById("logseq")?.name).toBe("Warm");
+  });
+
+  it("resolves a current id to itself and an unknown one to nothing", () => {
+    expect(resolveThemeId("solarized")).toBe("solarized");
+    expect(resolveThemeId("some-future-theme")).toBe("some-future-theme");
+    expect(presetById("some-future-theme")).toBeNull();
+    expect(presetById(DEFAULT_THEME_ID)?.id).toBe("suite");
   });
 
   it("gives every preset a distinct id", () => {

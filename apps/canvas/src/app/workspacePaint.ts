@@ -13,19 +13,19 @@ export function documentLabel(share: ShareSession, workspaceId: string): string 
 
 /**
  * The live role palette, read from the token layer on the shell root rather
- * than kept as a second copy (ADR-0046 §1). A theme change is exactly when it
- * moves.
+ * than kept as a second copy (ADR-0046 §1). The host owns the theme; `themeKey`
+ * changes when it repaints, and that is exactly when this re-reads.
  */
 export function useSurfacePalette(
   root: RefObject<HTMLElement | null>,
-  themeMode: string,
+  themeKey: string,
 ): SurfacePalette {
   const [palette, setPalette] = useState<SurfacePalette>({});
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the theme mode is the trigger, not an input; the palette is read back from the DOM once the theme's classes have moved.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the theme key is the trigger, not an input; the palette is read back from the DOM once the host's tokens have moved.
   useEffect(() => {
     const node = root.current;
     if (node) setPalette(readPalette(node));
-  }, [root, themeMode]);
+  }, [root, themeKey]);
   return palette;
 }
 

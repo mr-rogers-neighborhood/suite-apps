@@ -68,8 +68,6 @@ function args(
     setLibraryTab: noop,
     openTypeSettings: noop,
     requestShare: noop,
-    setThemeMode: noop,
-    themeMode: "light",
     ...overrides,
   };
 }

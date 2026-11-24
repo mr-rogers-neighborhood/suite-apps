@@ -11,10 +11,6 @@ vi.mock("../platform/bridge", () => ({
   getBridge: () => ({ importWorkspace }),
 }));
 
-vi.mock("../theme/ThemePicker", () => ({
-  ThemePicker: () => <div data-testid="theme-picker" />,
-}));
-
 afterEach(() => {
   // This workspace runs without globals, so Testing Library cannot register its own cleanup.
   cleanup();

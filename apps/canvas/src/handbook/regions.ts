@@ -32,7 +32,6 @@ export const HANDBOOK_REGIONS: readonly HandbookRegion[] = [
   { id: "command-bar", label: "Search and commands", group: "chrome" },
   { id: "sync-status", label: "Sync and people", group: "chrome" },
   { id: "share-action", label: "Share", group: "chrome" },
-  { id: "theme-toggle", label: "Appearance", group: "chrome" },
   { id: "board-switcher", label: "Board tabs", group: "chrome" },
   { id: "new-tab", label: "New tab", group: "chrome" },
   { id: "undo-redo", label: "Undo and redo", group: "chrome" },
