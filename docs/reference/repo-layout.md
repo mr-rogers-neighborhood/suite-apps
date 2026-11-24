@@ -41,7 +41,7 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/budget-core` | `apps/budget/packages/core` | Budget schema and document layer |
 | `@suite/help` | `apps/help` | Documentation app: explorer and handbook |
 | `@suite/sync-server` | `apps/sync` | Sync server |
-| `@suite/sync-app` | `apps/sync/app` | Sync tray app and its embedded relay |
+| `@suite/sync-app` | `apps/sync/app` | The retired relay app the last `run.suite.sync` build packaged |
 | `@suite/sync` | `apps/sync/packages/protocol` | Sync protocol |
 | `@suite/host` | `apps/sync/packages/host` | Sync host |
 | `@suite/go-app` | `apps/go` | Go container |

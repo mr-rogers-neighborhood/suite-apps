@@ -77,11 +77,10 @@ signed version. A pack update is a version update, not a channel move.
 - **Legacy apps are frozen.** Canvas, Planner, Budget and Help remain the separate Flatpaks at their
   last artifacts. Their code stays in the tree, but they get no new release and no new pre-release
   channel until they become packs.
-- **Sync is not a superapp; it is a legacy surface on the way out.** The host owns desktop channels,
-  today and retires once the host catalogue installs packs ([#314](https://github.com/mrrnbhd/suite-apps/issues/314));
-  Sync's tray app retires as the relay becomes a host capability
-  ([#315](https://github.com/mrrnbhd/suite-apps/issues/315)). Neither carries a channel, and neither
-  gets a new feature while it waits.
+- **Sync is retired as a shipped app.** `run.suite.sync` is not a superapp and carries no channel; it
+  gets no new build, and the signed remote keeps the last published ref for anyone who already has it.
+  The host is the surface that carries sync state as the relay becomes a host capability
+  ([#315](https://github.com/mrrnbhd/suite-apps/issues/315)).
 
 Freezing is about releases, not deletion: a person can still install the last stable artifact, and the
 history stays. It also means no new `slop`, `nightly` or `preview` build is published for a legacy
@@ -136,9 +135,9 @@ its accepted limit.
 A pre-release channel adds no third signature scheme. It is another branch under the same signed
 summary. A pack adds a different boundary: it signs its manifest and hashes every file when it is
 built ([Build a pack](../reference/commands.md#build-a-pack)), while the Flatpak summary still covers
-the host that verifies it. The relay is the same kind of artifact as the other Flatpaks:
-`run.suite.sync` is on the same signed remote. The retired tarball was the exception, and its
-`SHA256SUMS` was signed with the update key.
+the host that verifies it. The retired relay was the same kind of artifact as the other Flatpaks:
+`run.suite.sync` is still on the same signed remote, and it gets no new build. The retired tarball was
+the exception, and its `SHA256SUMS` was signed with the update key.
 
 ## What a channel cannot undo
 

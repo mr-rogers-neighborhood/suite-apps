@@ -10,7 +10,7 @@
  *   node scripts/flatpak.mjs --app planner   # Planner stable, same path
  *   node scripts/flatpak.mjs --app budget    # Budget stable, same path
  *   node scripts/flatpak.mjs --app help      # Help stable, same path
- *   node scripts/flatpak.mjs --app sync      # Sync (the tray relay) stable, same path
+ *   node scripts/flatpak.mjs --app sync      # the retired relay build, local only
  *   node scripts/flatpak.mjs --app shell     # Suite Shell (the host) stable, same path
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
  *   node scripts/flatpak.mjs --app shell --channel slop

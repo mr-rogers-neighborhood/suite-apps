@@ -2,14 +2,15 @@
 /**
  * The release helpers the publishing paths share, and the gate proof.
  *
- * This script publishes nothing. Desktop apps and the relay ship as Flatpaks on the signed OSTree
- * remote; `scripts/flatpak-remote.mjs` publishes that repository. Suite Go's APK is published by
+ * This script publishes nothing. Desktop apps ship as Flatpaks on the signed OSTree remote;
+ * `scripts/flatpak-remote.mjs` publishes that repository. Suite Go's APK is published by
  * `scripts/android-release.mjs`, and `scripts/release-status.mjs` writes the release bodies and
  * `RELEASES.md`. What remains here is the part all of them need: reading a version and its changelog
  * section, refusing a dirty tree, and refusing a commit `.dev/gate-status.json` has not proven.
  *
  * The relay tarball this file used to build, sign and upload is retired. `sync-v<version>` releases
- * stay on GitHub as history and are not an install path; the relay is `run.suite.sync`.
+ * stay on GitHub as history and are not an install path; the last `run.suite.sync` Flatpak ref stays
+ * published and gets no new build.
  *
  * Usage:
  *   node scripts/release.mjs --help
@@ -20,13 +21,14 @@ const USAGE = `usage: node scripts/release.mjs --help
 
 This script publishes nothing; it holds the release helpers.
 
-  Desktop apps and the relay   node scripts/flatpak-remote.mjs --target s3 --publish
+  Desktop apps                 node scripts/flatpak-remote.mjs --target s3 --publish
   Suite Go's APK               node scripts/android-release.mjs --publish
   Release drafts               node scripts/release-status.mjs --draft
   Publish, RELEASES.md         node scripts/release-status.mjs --publish
 
 The relay tarball release is retired. Older sync-v<version> assets remain
-downloadable history; the relay installs as the Flatpak run.suite.sync.
+downloadable history; the last run.suite.sync Flatpak ref stays published and
+gets no new build.
 `;
 
 /** The version a `package.json` names, or null when it names none. */

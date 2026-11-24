@@ -35,3 +35,12 @@ The rules that shape Sync.
 - Contacts are app data in each app's main process (`sync/contacts.json`, mode 0600), outside the
   document, the workspace file and the relay store. A code-only contact is completed by the first
   signed invitation whose key hashes to that code.
+- `run.suite.sync` is retired as a shipped app (#315). `apps/sync` stays as the protocol, the client
+  library and the relay implementation, and its gate row keeps running. The signed remote keeps the
+  last published ref; no new build is published, and the tray app is not the target surface. The relay
+  becomes a host capability, and whether the host imports it as a module or supervises it as a child
+  is owed by that seam, not decided here.
+- The relay never reads a document. Whatever shape the host gives it, the relay is handed no document
+  handle, no document path and no decrypted frame; it holds only its sealed-frame store and the signed
+  membership records it already needs. A module shape enforces that by code path, a supervised child
+  can also enforce it with an OS boundary.
