@@ -8,7 +8,6 @@ import {
   type PackIndexCore,
   type PackIndexEntry,
   packIndexDigest,
-  publisherKeyFingerprint,
   sha256Hex,
   signPackIndex,
 } from "@suite/pack";
@@ -19,7 +18,6 @@ import {
   DEFAULT_CATALOGUE_INDEX_URL,
   loadCatalogueIndex,
   readCatalogueIndexHead,
-  SUITE_INDEX_PUBLIC_KEY,
   writeCatalogueIndexHead,
 } from "./indexTrust.js";
 import type { PackTrustOptions } from "./installedPacks.js";
@@ -86,15 +84,6 @@ function fetcher(files: Readonly<Record<string, Uint8Array | string>>): typeof f
     return new Response(body as unknown as BodyInit, { status: 200 });
   };
 }
-
-describe("the pinned operator key", () => {
-  it("is the published key, not a value fetched with an index", async () => {
-    // spec: S12.2
-    expect(await publisherKeyFingerprint(SUITE_INDEX_PUBLIC_KEY)).toBe(
-      "77:F5:4E:74:8A:AF:47:67:45:31:E9:4F:A7:6A:CA:72:F2:85:95:F1:EF:61:40:62:61:36:AC:AC:47:CB:3B:A1",
-    );
-  });
-});
 
 describe("the catalogue index source", () => {
   it("defaults to the published index and can be turned off for the local directory", () => {

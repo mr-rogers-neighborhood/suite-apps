@@ -72,7 +72,12 @@ export {
   parsePackManifest,
   parsePackManifestJson,
 } from "./manifest.js";
-export { SUITE_PACK_PUBLIC_KEY, SUITE_PUBLISHER_ID } from "./pinnedKey.js";
+export {
+  SUITE_INDEX_PUBLIC_KEY,
+  SUITE_INDEX_PUBLIC_KEY_FINGERPRINT,
+  SUITE_PACK_PUBLIC_KEY,
+  SUITE_PUBLISHER_ID,
+} from "./pinnedKey.js";
 export {
   base64ToBytes,
   bytesToBase64,

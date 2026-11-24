@@ -103,8 +103,9 @@ Home's `shell.apps` widget shows installed packs and the catalogue together. The
 sources, and the widget names the one in use. The local directory is `.suitepack` files under
 `<dataRoot>/catalogue` (or `SUITE_SHELL_CATALOGUE`). The published index is
 `https://flatpak.suite.run/index.json` (or `SUITE_SHELL_INDEX`), fetched at launch and verified
-against the operator key pinned in `apps/shell/src/indexTrust.ts`. The pin is a compile-time
-constant, never a value the index supplies. An index entry is listed only after the index verified;
+against the operator key pinned in `packages/pack/src/pinnedKey.ts`, which both hosts import. The
+pin is a compile-time constant, never a value the index supplies. An index entry is listed only
+after the index verified;
 the archive it names is still read and verified before it is listed, and again before install.
 
 The index refusals are named, not silent: an index changed after signing, an unsigned index, an
