@@ -46,6 +46,79 @@ describe("the pack manifest", () => {
     expect(parsed.value.contributions?.fileExtensions).toEqual([".canvas"]);
   });
 
+  it("accepts every optional field family the spec names", () => {
+    const parsed = parsePackManifest(
+      manifest({
+        publisher: { key: "A".repeat(44), id: "suite" },
+        optionalCapabilities: ["notifications"],
+        documents: [
+          {
+            id: "chart",
+            format: "suite.chart",
+            version: 3,
+            mode: "single",
+            migrations: [{ from: 1, to: 2, entry: "migrate-1-2.html" }],
+            projection: "project.html",
+            criticalFields: ["title"],
+          },
+        ],
+        blobs: [{ store: "assets", class: "asset" }],
+        sync: { documents: ["chart"], blobs: ["assets"] },
+        network: { allow: ["https://api.example.com"] },
+        platforms: ["desktop", "mobile"],
+        input: ["pointer", "keyboard"],
+        defaultLocale: "en",
+        locales: ["en", "fr"],
+        widgets: [
+          {
+            id: "summary",
+            title: "Summary",
+            size: "2x1",
+            capabilities: ["capture"],
+            action: {
+              kind: "capture",
+              fields: [{ id: "note", label: "Note", type: "text" }],
+            },
+          },
+        ],
+        codeWidgets: [
+          {
+            id: "chart-card",
+            title: "Chart card",
+            size: "1x1",
+            capabilities: ["capture"],
+            action: { kind: "capture" },
+            settings: [],
+            entry: "widget.html",
+            sha256: "e".repeat(64),
+            fallback: {
+              id: "chart-card",
+              title: "Chart card",
+              size: "1x1",
+              capabilities: ["capture"],
+              action: { kind: "capture" },
+            },
+          },
+        ],
+        components: [{ kind: "map", fallback: "web" }],
+        subpackages: [{ id: "reports", entry: "reports/index.html" }],
+        addons: [{ id: "chart-export", version: "1.0.0", sha256: "b".repeat(64) }],
+        export: { entry: "export.html" },
+        license: "MIT",
+        source: "https://example.com/chart",
+        deprecated: false,
+        replacement: "chart-pro",
+        sunset: "2027-01-01",
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.publisher?.id).toBe("suite");
+    expect(parsed.value.documents?.[0]?.id).toBe("chart");
+    expect(parsed.value.codeWidgets?.[0]?.fallback.id).toBe("chart-card");
+    expect(parsed.value.addons?.[0]?.version).toBe("1.0.0");
+  });
+
   it("requires every file to be unique and the entry to be listed", () => {
     const parsed = parsePackManifest(
       manifest({
