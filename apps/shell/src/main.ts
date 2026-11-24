@@ -4,8 +4,17 @@ import { pathToFileURL } from "node:url";
 import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/desktop";
 import { isPublisherKeyTrusted, type PackDocument, SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isPackCapability, type PackCapability } from "@suite/pack/capabilities";
-import { cssVariables, defaultTheme } from "@suite/theme";
-import { app, dialog, ipcMain, Notification, nativeTheme, net, protocol } from "electron";
+import {
+  app,
+  dialog,
+  ipcMain,
+  Menu,
+  type MenuItemConstructorOptions,
+  Notification,
+  nativeTheme,
+  net,
+  protocol,
+} from "electron";
 import {
   type CataloguePack,
   catalogueEntry,
@@ -114,6 +123,15 @@ import {
   type ThemeView,
 } from "./shared.js";
 import { SpaceStore } from "./spaces.js";
+import {
+  DEFAULT_THEME_CHOICE,
+  type HostThemeChoice,
+  loadThemeChoice,
+  presetFor,
+  resolveThemeView,
+  saveThemeChoice,
+  themeOptions,
+} from "./theme.js";
 import { ShellWindow } from "./window.js";
 
 /**
@@ -125,6 +143,12 @@ import { ShellWindow } from "./window.js";
  * handlers below, and every handler scopes the request to the sender.
  */
 app.setName("Suite");
+
+/**
+ * The product name in the About panel is Suite Desk. `setName("Suite")` stays
+ * because it also decides the data directory, which is not part of the rename.
+ */
+app.setAboutPanelOptions({ applicationName: "Suite Desk" });
 
 const userDataOverride = process.env.SUITE_SHELL_USER_DATA?.trim();
 if (userDataOverride !== undefined && userDataOverride.length > 0) {
@@ -145,6 +169,11 @@ protocol.registerSchemesAsPrivileged([
 let window: ShellWindow | null = null;
 let spaceStore: SpaceStore | null = null;
 let screenStore: ScreenSet | null = null;
+/**
+ * The host's theme choice. Loaded from the profile before the first window and written back
+ * whenever the View menu changes it, so every pack opened later starts in the same theme.
+ */
+let themeChoice: HostThemeChoice = DEFAULT_THEME_CHOICE;
 /**
  * One document store per publisher. The first-party publisher keeps the
  * `documents/<container>/<pack>` layout; any other publisher has its own root,
@@ -240,6 +269,11 @@ async function bootstrap(): Promise<void> {
 
   const dataRoot = dataRootFor();
   await mkdir(dataRoot, { recursive: true });
+  // The theme is profile state, like the device key: one answer for every pack this host
+  // opens, including a pack installed after the choice was made.
+  themeChoice = await loadThemeChoice(dataRoot);
+  nativeTheme.themeSource = themeChoice.mode;
+  installApplicationMenu();
   // The device key is host data, not pack data. A missing file is a first run
   // and gets a fresh key; a malformed one is reported and leaves identity
   // calls refused rather than silently changing every pack's identity.
@@ -305,7 +339,12 @@ async function bootstrap(): Promise<void> {
 
   serveProtocols();
   registerIpc();
-  nativeTheme.on("updated", () => window?.setTheme(themeView()));
+  nativeTheme.on("updated", () => {
+    // Only "follow the system" changes without a menu click. An explicit choice paints the
+    // same answer no matter what the desktop does.
+    if (themeChoice.mode !== "system") return;
+    window?.setTheme(themeView());
+  });
   openWindow();
   startReminderScheduler();
 
@@ -662,8 +701,70 @@ function publishPackData(): void {
 }
 
 function themeView(): ThemeView {
-  const mode = nativeTheme.shouldUseDarkColors ? "dark" : "light";
-  return { mode, values: { ...cssVariables(defaultTheme(), mode) } };
+  return resolveThemeView(themeChoice, nativeTheme.shouldUseDarkColors);
+}
+
+/**
+ * The View menu: the one place a person looks for how the host draws.
+ *
+ * Brightness is `nativeTheme.themeSource`, so choosing Light, Dark or Follow the system also
+ * tells every renderer what `prefers-color-scheme` answers — the same signal a pack's own CSS
+ * already understands. The theme list is the package's list, first entry first, so the menu
+ * cannot drift from `PRESETS`.
+ */
+function installApplicationMenu(): void {
+  const modeItem = (mode: HostThemeChoice["mode"], label: string): MenuItemConstructorOptions => ({
+    label,
+    type: "radio",
+    checked: themeChoice.mode === mode,
+    click: () => void chooseTheme({ mode }),
+  });
+  const presetItems: MenuItemConstructorOptions[] = themeOptions().map((theme) => ({
+    label: theme.name,
+    type: "radio",
+    checked: themeChoice.preset === theme.id,
+    click: () => void chooseTheme({ preset: theme.id }),
+  }));
+
+  const template: MenuItemConstructorOptions[] = [
+    ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
+    { role: "fileMenu" },
+    { role: "editMenu" },
+    {
+      label: "View",
+      submenu: [
+        modeItem("light", "Light"),
+        modeItem("dark", "Dark"),
+        modeItem("system", "Follow the system"),
+        { type: "separator" },
+        { label: "Theme", submenu: presetItems },
+        { type: "separator" },
+        { role: "reload" },
+        { role: "toggleDevTools" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    { role: "windowMenu" },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+/** Apply one menu choice: repaint every open view now and remember it for the next launch. */
+async function chooseTheme(next: Partial<HostThemeChoice>): Promise<void> {
+  const choice: HostThemeChoice = {
+    preset: presetFor(next.preset ?? themeChoice.preset),
+    mode: next.mode ?? themeChoice.mode,
+  };
+  if (choice.preset === themeChoice.preset && choice.mode === themeChoice.mode) return;
+  themeChoice = choice;
+  nativeTheme.themeSource = choice.mode;
+  installApplicationMenu();
+  window?.setTheme(themeView());
+  try {
+    await saveThemeChoice(dataRootFor(), choice);
+  } catch (error) {
+    console.warn("[shell] the theme choice could not be saved", error);
+  }
 }
 
 function openWindow(): void {

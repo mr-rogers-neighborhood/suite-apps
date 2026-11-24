@@ -86,7 +86,6 @@ function actions(): CommandActions {
     placeCard: vi.fn(),
     openTypes: vi.fn(),
     openShare: vi.fn(),
-    toggleTheme: vi.fn(),
   };
 }
 

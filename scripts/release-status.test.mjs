@@ -53,7 +53,6 @@ import {
 
 const shell = APPS.find((app) => app.id === "shell");
 const go = APPS.find((app) => app.id === "go");
-const sync = APPS.find((app) => app.id === "sync");
 
 const shellEntry = {
   app: shell,
@@ -79,7 +78,6 @@ const entries = [
     date: "2026-11-20",
     section: "### Fixed\n\n- **A package.** It packaged.",
   },
-  { app: sync, version: "0.11.3", date: "2026-11-20", section: "### Added" },
   goEntry,
 ];
 
@@ -337,7 +335,7 @@ describe("the draft phase", () => {
     });
     const args = draftReleaseArgs({
       tag,
-      title: "Suite Shell + Suite Go — 2026-11-21",
+      title: "Suite Desk + Suite Go — 2026-11-21",
       notesPath: ".dev/releases/suite-2026.11.21.md",
       action: "create",
       target: "0fb48469e5de7f812a6322092396d69f669712d3",
@@ -354,7 +352,7 @@ describe("the draft phase", () => {
     });
     const args = draftReleaseArgs({
       tag,
-      title: "Suite Shell + Suite Go — 2026-11-21",
+      title: "Suite Desk + Suite Go — 2026-11-21",
       notesPath: ".dev/releases/suite-2026.11.21.md",
       action: "edit",
       target: "0fb48469e5de7f812a6322092396d69f669712d3",
@@ -598,7 +596,7 @@ describe("per-app releases are retired", () => {
       tag: "suite-2026.11.23",
     });
     assert.doesNotMatch(page, /\(pending\)/u);
-    assert.match(page, /\| \[Suite Shell\]/u);
+    assert.match(page, /\| \[Suite Desk\]/u);
     assert.match(page, /\| \[Suite Go\]/u);
   });
 });
@@ -617,16 +615,20 @@ describe("channels and maturity", () => {
     ]);
   });
 
-  it("freezes the legacy apps and names no channel for the relay", () => {
+  it("freezes the legacy apps", () => {
     for (const id of ["canvas", "planner", "budget", "help"]) {
       const app = APPS.find((row) => row.id === id);
       assert.equal(isLegacyFrozen(app), true);
       assert.equal(channelLabel(app), "frozen");
     }
-    const relay = APPS.find((row) => row.id === "sync");
-    assert.equal(isLegacyFrozen(relay), false);
-    assert.equal(channelLabel(relay), "—");
-    assert.equal(maturityLabel(relay), "—");
+  });
+
+  it("retires Suite Sync from the release table and still checks every row it keeps", () => {
+    assert.equal(APPS.find((row) => row.id === "sync"), undefined);
+    assert.ok(
+      APPS.every((row) => row.channel !== undefined || row.frozen === true),
+      "every row is a superapp or a frozen legacy app",
+    );
   });
 
   it("shows channel, maturity and install for the two superapps", () => {
@@ -634,7 +636,7 @@ describe("channels and maturity", () => {
     assert.match(body, /desktop superapp; \*\*Suite Go\*\* is the mobile superapp/u);
     assert.match(body, /\*\*Channel:\*\* stable/u);
     assert.match(body, /\*\*Maturity:\*\* alpha/u);
-    assert.match(body, /\| \[Suite Shell\]\([^)]*\) \| stable \| alpha \| 0\.2\.0 \|/u);
+    assert.match(body, /\| \[Suite Desk\]\([^)]*\) \| stable \| alpha \| 0\.2\.0 \|/u);
     assert.match(body, /\| \[Suite Go\]\([^)]*\) \| stable \| pre-alpha \| 0\.1\.0 \|/u);
     assert.doesNotMatch(body, /\| \[Suite Canvas\]/u);
     assert.doesNotMatch(body, /frozen/u);
@@ -650,7 +652,7 @@ describe("channels and maturity", () => {
     assert.ok(page.includes(AGGREGATE_TABLE_HEADER[0]));
     assert.doesNotMatch(page, /Released \| Release/u);
     assert.match(page, /a `stable`-channel\s+build can still be `alpha`/u);
-    assert.match(page, /\| \[Suite Shell\]/u);
+    assert.match(page, /\| \[Suite Desk\]/u);
     assert.match(page, /\| \[Suite Go\]/u);
     assert.doesNotMatch(page, /\| \[Suite Start\]/u);
   });
@@ -663,9 +665,9 @@ describe("release bodies", () => {
       ["shell", "go"],
     );
     const body = aggregateReleaseBody(entries, { date: "2026-11-22" });
-    assert.match(body, /Suite Shell/u);
+    assert.match(body, /Suite Desk/u);
     assert.match(body, /Suite Go/u);
-    assert.match(body, /\| \[Suite Shell\]\([^)]*\) \| stable \| alpha \| 0\.2\.0 \|/u);
+    assert.match(body, /\| \[Suite Desk\]\([^)]*\) \| stable \| alpha \| 0\.2\.0 \|/u);
     assert.match(body, /\| \[Suite Go\]\([^)]*\) \| stable \| pre-alpha \| 0\.1\.0 \|/u);
     assert.match(body, /flatpak install --user suite run\.suite\.shell/u);
     assert.match(body, new RegExp(flatpakrepoUrl().replaceAll(".", "\\."), "u"));
@@ -674,12 +676,10 @@ describe("release bodies", () => {
     assert.doesNotMatch(body, /-v\d/u);
   });
 
-  it("gives the relay the same Flatpak install block as every desktop app", () => {
-    assert.equal(installCommand(sync), "flatpak install --user suite run.suite.sync");
-    assert.equal(
-      installCell(sync),
-      "`flatpak install --user suite run.suite.sync`",
-    );
+  it("never renders the retired relay as an installable row", () => {
+    const body = aggregateReleaseBody(entries, { date: "2026-11-22" });
+    assert.doesNotMatch(body, /run\.suite\.sync/u);
+    assert.doesNotMatch(body, /Suite Sync/u);
   });
 
   it("never marks a row pending for a page that will not exist", () => {
@@ -711,7 +711,7 @@ describe("sections and the Suite Go APK", () => {
   it("keeps the desktop rows in reading order and Go alone on mobile", () => {
     assert.deepEqual(
       APPS.filter((app) => app.section === "desktop").map((app) => app.id),
-      ["shell", "canvas", "planner", "budget", "sync", "help"],
+      ["shell", "canvas", "planner", "budget", "help"],
     );
     assert.equal(APPS[0].id, "shell");
     assert.deepEqual(
@@ -723,8 +723,8 @@ describe("sections and the Suite Go APK", () => {
     assert.equal(go.kind, "apk");
   });
 
-  it("carries the host as Suite Shell, first in the desktop table", () => {
-    assert.equal(shell.name, "Suite Shell");
+  it("carries the host as Suite Desk, first in the desktop table", () => {
+    assert.equal(shell.name, "Suite Desk");
     assert.equal(shell.packageJson, "apps/shell/package.json");
     assert.equal(shell.changelog, "apps/shell/CHANGELOG.md");
     assert.equal(shell.kind, "flatpak");
@@ -736,7 +736,7 @@ describe("sections and the Suite Go APK", () => {
       tag: "suite-2026.11.22",
     });
     const rows = desktop.filter((line) => line.startsWith("| ["));
-    assert.match(rows[0], /\| \[Suite Shell\]/u);
+    assert.match(rows[0], /\| \[Suite Desk\]/u);
     assert.match(rows[0], /run\.suite\.shell/u);
   });
 
@@ -949,7 +949,7 @@ describe("channel releases", () => {
   it("marks pre-release drafts and publications", () => {
     const draft = draftReleaseArgs({
       tag: "suite-nightly-2026.11.23",
-      title: "Suite Shell + Suite Go — 2026-11-23",
+      title: "Suite Desk + Suite Go — 2026-11-23",
       notesPath: "notes.md",
       action: "create",
       target: "abc123",
@@ -1005,14 +1005,14 @@ describe("release notes name their channel", () => {
     return body.slice(start, end === -1 ? body.length : end);
   }
 
-  it("says nightly under Suite Shell and Suite Go", () => {
+  it("says nightly under Suite Desk and Suite Go", () => {
     const body = aggregateReleaseBody(entries, {
       date: "2026-11-23",
       tag: "suite-nightly-2026.11.23",
       channel: "nightly",
     });
     assert.match(
-      between(body, "## Suite Shell (desktop)", "## Suite Go (mobile)"),
+      between(body, "## Suite Desk (desktop)", "## Suite Go (mobile)"),
       /\*\*Channel:\*\* nightly/u,
     );
     assert.match(
@@ -1051,7 +1051,7 @@ describe("release notes name their channel", () => {
   it("still says stable on a stable body", () => {
     const body = aggregateReleaseBody(entries, { date: "2026-11-23" });
     assert.match(
-      between(body, "## Suite Shell (desktop)", "## Suite Go (mobile)"),
+      between(body, "## Suite Desk (desktop)", "## Suite Go (mobile)"),
       /\*\*Channel:\*\* stable/u,
     );
   });

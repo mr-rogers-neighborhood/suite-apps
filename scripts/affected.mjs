@@ -192,8 +192,9 @@ export function computeAffected({ paths, projects, rows }) {
   // hard-coded app name.
   const e2e = !global && rows.some((row) => row.e2e === true && closure.has(row.package));
   const selected = global ? rows : rows.filter((row) => closure.has(row.package));
+  const proofRows = selected.filter((row) => row.desktop === true);
 
-  return { rows: selected, docsOnly, spec, global, e2e, changed: changed.length };
+  return { rows: selected, proofRows, docsOnly, spec, global, e2e, changed: changed.length };
 }
 
 function changedPaths(root, base) {
@@ -221,10 +222,14 @@ function main() {
   });
 
   const matrix = result.rows.length > 0 ? result.rows : [{ repo: "none", package: "none" }];
+  const proofMatrix =
+    result.proofRows.length > 0 ? JSON.stringify({ include: result.proofRows }) : "";
   if (process.env.GITHUB_OUTPUT) {
     const lines = [
       `matrix=${JSON.stringify({ include: matrix })}`,
       `any=${result.rows.length > 0}`,
+      `proof_matrix=${proofMatrix}`,
+      `proof_any=${result.proofRows.length > 0}`,
       `e2e=${result.e2e}`,
       `docs_only=${result.docsOnly}`,
       `spec=${result.spec}`,

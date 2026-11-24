@@ -28,6 +28,7 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "test:pack": "pnpm index && pnpm sync && vitest run --config pack/vitest.config.mts",
+    "e2e:proof": "playwright test --grep @proof",
     "check": "biome check . && pnpm typecheck:all && vitest run && pnpm test:pack",
     "check:full": "pnpm check && pnpm build && pnpm index:check"
   },
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.4",
     "@testing-library/react": "^16.3.3",
     "@types/mdx": "^2.0.14",

@@ -9,7 +9,7 @@ share a process, a document or a trust boundary. This page describes those bound
 | Role | Apps | Owns |
 | --- | --- | --- |
 | Document owner | Canvas, Planner, Budget, Go's domain modules | One document per workspace, its schema and its writes |
-| Host | Suite Shell (desktop), Suite Go (mobile) | Installing packs, rendering their tabs, routing a link, and handing over bytes |
+| Host | Suite Desk (desktop), Suite Go (mobile) | Installing packs, rendering their tabs, routing a link, and handing over bytes |
 | Service | Suite Sync | A transport, a membership log and a persisted room |
 
 The host is not a document editor. The shell opens a signed pack in its own origin and session, hands
@@ -33,7 +33,7 @@ them.
 
 ## Host boundaries
 
-Suite Shell and Suite Go enforce the same separation in different places:
+Suite Desk and Suite Go enforce the same separation in different places:
 
 - **The host is not in the document path.** It verifies a signed pack, extracts it under its own data
   directory and opens a renderer on a pack-owned origin. The scoped document API carries opaque bytes

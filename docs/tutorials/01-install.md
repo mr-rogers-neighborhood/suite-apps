@@ -1,6 +1,6 @@
 # 1. Install the desktop apps
 
-Suite Shell is the desktop host and the way in: install it once, then install packs from its
+Suite Desk is the desktop host and the way in: install it once, then install packs from its
 catalogue. [The root README](../../README.md#the-hosts) owns the install line.
 
 This tutorial's Canvas workspace still runs as a frozen Flatpak, so step 2 installs it with the one

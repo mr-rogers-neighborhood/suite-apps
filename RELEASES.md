@@ -4,7 +4,7 @@
      in its changelog. Do not edit the table; edit those files and regenerate. -->
 
 The signed Flatpak remote is the update path. This page is the human mirror of the
-[rolling Suite Shell + Suite Go 2026-11-22 release](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-2026.11.22), which is the repository's
+[rolling Suite Desk + Suite Go 2026-11-22 release](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-2026.11.22), which is the repository's
 "Latest" release on GitHub. Only the two superapps have a release page; a pack carries
 a signed version.
 
@@ -22,7 +22,7 @@ Remote: [suite.flatpakrepo](https://flatpak.suite.run/suite.flatpakrepo)
 ## Channels and maturity
 
 A channel is a promise about a build: `slop`, `nightly`, `preview` or `stable`. Channels are on
-the superapp, Suite Shell and Suite Go, not on individual mini-apps. Packs carry signed versions,
+the superapp, Suite Desk and Suite Go, not on individual mini-apps. Packs carry signed versions,
 not channels. Maturity is separate: `pre-alpha`, `alpha`, `beta` or `1.0`, so a `stable`-channel
 build can still be `alpha`.
 
@@ -30,7 +30,7 @@ build can still be `alpha`.
 
 | App | Channel | Maturity | Version | Install |
 | --- | --- | --- | --- | --- |
-| [Suite Shell](https://github.com/mrrnbhd/suite-apps/blob/main/apps/shell/CHANGELOG.md) | stable | alpha | 0.2.0 | `flatpak install --user suite run.suite.shell` |
+| [Suite Desk](https://github.com/mrrnbhd/suite-apps/blob/main/apps/shell/CHANGELOG.md) | stable | alpha | 0.2.0 | `flatpak install --user suite run.suite.shell` |
 
 ## Mobile
 

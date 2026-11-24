@@ -92,10 +92,10 @@ the channels, the `versionCode` rule, the keystore and the device.
 
 ## Packages
 
-| Path          | Owns                                                       | Does not own                                     |
-| ------------- | ---------------------------------------------------------- | ------------------------------------------------ |
-| `packages/go` | Module declarations, routing, host interfaces, teardown    | Any domain schema, any I/O, any React at runtime |
-| `src`         | The shell: home, capture resolution, document store, theme | What any document means                          |
+| Path          | Owns                                                                             | Does not own                                     |
+| ------------- | -------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `packages/go` | Module declarations, routing, host interfaces, teardown                          | Any domain schema, any I/O, any React at runtime |
+| `src`         | The shell: home, capture resolution, document store, Settings and the host theme | What any document means                          |
 
 See [the contract](docs/reference/contract.md) for what a module may do, and
 [adding a domain](docs/how-to/add-a-domain.md) for how little the container needs to change.

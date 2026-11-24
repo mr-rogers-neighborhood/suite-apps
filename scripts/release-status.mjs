@@ -5,7 +5,7 @@
  * GitHub shows one "Latest" release per repository. This repository publishes
  * the rolling Suite release, tagged `suite-YYYY.MM.DD` and marked Latest, plus
  * the pre-release channel pages `suite-<channel>-<date>`. The body names the two
- * superapps and how each is installed: a Flatpak command for Suite Shell, or the
+ * superapps and how each is installed: a Flatpak command for Suite Desk, or the
  * release-signed Suite Go APK attached to this same release. Each names its
  * release channel and product maturity. Per-app releases are retired; a pack
  * carries a signed version and has no release page. When
@@ -106,8 +106,9 @@ export const PRODUCT_MATURITY = ["pre-alpha", "alpha", "beta", "1.0"];
  * The apps frozen as legacy until they become packs.
  *
  * The list lives in the channel library so the Flatpak builder refuses a new
- * pre-release build for the same apps this table marks frozen. Sync is not
- * frozen: it is not a superapp either, so its row names no channel.
+ * pre-release build for the same apps this table marks frozen. Sync is retired
+ * rather than frozen: it leaves this table entirely (#315) and the relay becomes
+ * a host capability, so there is no row to name a channel for.
  */
 export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
 
@@ -118,7 +119,7 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  * `kind` says where the installed bytes come from, and `installCell` is the one
  * place that turns it into a cell:
  *
- * - `flatpak` — a signed deployment on the OSTree remote, including the relay.
+ * - `flatpak` — a signed deployment on the OSTree remote.
  * - `apk` — a release-signed APK attached to the rolling suite release.
  *
  * `section` is the table a row belongs to: `desktop` or `mobile`. The table is
@@ -126,12 +127,17 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  * so a section is only a title plus its rows and the shape can be reused by a
  * page that splits the same data differently.
  *
- * `channel` names the release channel of a superapp row: Suite Shell and Suite
+ * `channel` names the release channel of a superapp row: Suite Desk and Suite
  * Go. It is absent on apps that are not superapps. `maturity` is the product
  * label and is independent of the channel, so a `stable` build may be `alpha`.
  * `frozen` marks a legacy app that keeps its code and last artifact but gets no
  * new release or channel; Status owns that inventory, so the release page does
  * not render it.
+ *
+ * Sync has no row. It stopped being a shipped artifact (#315): the signed remote
+ * keeps the last published `run.suite.sync` ref, no new build is published, and
+ * `apps/sync` stays in the tree as the protocol, client library and relay
+ * implementation.
  *
  * `flatpakId` is null outside the Flatpak rows. Per-app tags are retired, so no
  * entry carries a tag prefix: the rolling `suite-YYYY.MM.DD` tag is the only one
@@ -140,7 +146,7 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
 export const APPS = [
   {
     id: "shell",
-    name: "Suite Shell",
+    name: "Suite Desk",
     packageJson: "apps/shell/package.json",
     changelog: "apps/shell/CHANGELOG.md",
     kind: "flatpak",
@@ -192,15 +198,6 @@ export const APPS = [
     flatpakId: "run.suite.budget",
     maturity: "pre-alpha",
     frozen: true,
-  },
-  {
-    id: "sync",
-    name: "Suite Sync",
-    packageJson: "apps/sync/package.json",
-    changelog: "apps/sync/CHANGELOG.md",
-    kind: "flatpak",
-    section: "desktop",
-    flatpakId: "run.suite.sync",
   },
   {
     id: "help",
@@ -340,8 +337,8 @@ export function flatpakrepoUrl() {
  *
  * Only a superapp carries a channel. A pre-release build shares
  * `run.suite.slop.<app>` and takes the channel as its branch, so its install
- * must name both; the frozen legacy rows and the hub and relay keep their stable
- * ids on every page, because no pre-release build replaces them.
+ * must name both; the frozen legacy rows keep their stable ids on every page,
+ * because no pre-release build replaces them.
  */
 export function releaseFlatpakId(app, channel = "stable") {
   if (app.kind !== "flatpak") return null;
@@ -408,13 +405,12 @@ export function installCell(
 }
 
 /**
- * The channel a row names: the release's channel, `frozen` for legacy, or none.
+ * The channel a row names: the release's channel, or `frozen` for legacy.
  *
  * A legacy app is not on a channel any more, so saying `frozen` in the channel
  * cell is honest: its code and last artifact stay, but no new build is offered.
  * A superapp names the channel the release is published from, so a nightly page
  * says `nightly` rather than the stable channel the table was first written for.
- * A row that is not a superapp (the hub, the relay) names no channel.
  */
 export function channelLabel(app, channel = "stable") {
   if (app.frozen === true) return "frozen";
@@ -714,7 +710,7 @@ export function planTag({ tag, version, changelog, localCommit, remoteCommit, ch
  * The superapps a release page names, in reading order.
  *
  * A pack carries a signed version and has no release page, so it is not a row:
- * only Suite Shell and Suite Go appear. The other `APPS` entries stay for their
+ * only Suite Desk and Suite Go appear. The other `APPS` entries stay for their
  * version and changelog facts, which the aggregate date reads.
  */
 export const SUPERAPP_IDS = ["shell", "go"];
@@ -1057,7 +1053,7 @@ export function aggregateReleaseBody(
   // could not be collected, so it reads its id from the app table.
   const shellApp = APPS.find((app) => app.id === "shell");
   return [
-    `**Suite Shell** is the desktop superapp; **Suite Go** is the mobile superapp. ` +
+    `**Suite Desk** is the desktop superapp; **Suite Go** is the mobile superapp. ` +
       (channel === "stable"
         ? `This is the ${date} build.`
         : `This is the ${date} snapshot, published on the **${channel}** channel on ${tagDate}.`),
@@ -1072,7 +1068,7 @@ export function aggregateReleaseBody(
           ),
           "",
         ]),
-    "## Suite Shell (desktop)",
+    "## Suite Desk (desktop)",
     "",
     ...(shell === null ? [] : [...releaseLabels(shell.app, channel), ""]),
     "```sh",
@@ -1124,13 +1120,13 @@ export function releasesPage(
   const latest = aggregatePublished
     ? [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
-        `[rolling Suite Shell + Suite Go ${date} release](${releaseUrl(tag)}), which is the repository's`,
+        `[rolling Suite Desk + Suite Go ${date} release](${releaseUrl(tag)}), which is the repository's`,
         "\"Latest\" release on GitHub. Only the two superapps have a release page; a pack carries",
         "a signed version.",
       ]
     : [
         "The signed Flatpak remote is the update path. This page is the human mirror of the",
-        `rolling Suite Shell + Suite Go ${date} release, which is not published yet. \`--draft\``,
+        `rolling Suite Desk + Suite Go ${date} release, which is not published yet. \`--draft\``,
         "creates the draft, its assets are attached while it is a draft, and `--publish` publishes",
         "it and refreshes this page.",
       ];
@@ -1157,7 +1153,7 @@ export function releasesPage(
     "## Channels and maturity",
     "",
     "A channel is a promise about a build: `slop`, `nightly`, `preview` or `stable`. Channels are on",
-    "the superapp, Suite Shell and Suite Go, not on individual mini-apps. Packs carry signed versions,",
+    "the superapp, Suite Desk and Suite Go, not on individual mini-apps. Packs carry signed versions,",
     "not channels. Maturity is separate: `pre-alpha`, `alpha`, `beta` or `1.0`, so a `stable`-channel",
     "build can still be `alpha`.",
     "",
@@ -1565,7 +1561,7 @@ export function aggregateReleaseCommands({
       command: "gh",
       args: draftReleaseArgs({
         tag,
-        title: `Suite Shell + Suite Go — ${date}`,
+        title: `Suite Desk + Suite Go — ${date}`,
         notesPath,
         action: aggregate.action,
         target: aggregate.plan.commit,
@@ -1896,7 +1892,7 @@ async function main(argv) {
   }
 
   process.stdout.write(
-    `\nSuite Shell + Suite Go ${snapshotDate} build · ${tag} · aggregate\n` +
+    `\nSuite Desk + Suite Go ${snapshotDate} build · ${tag} · aggregate\n` +
       (tagDate === snapshotDate ? "" : `  tag date   ${tagDate} (snapshot ${snapshotDate})\n`) +
       `  release    ${
         releases === null

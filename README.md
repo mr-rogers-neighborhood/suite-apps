@@ -1,17 +1,17 @@
 # Suite
 
-Two hosts, one pack contract, and documents that stay files. **Suite Shell** runs signed packs on the
+Two hosts, one pack contract, and documents that stay files. **Suite Desk** runs signed packs on the
 desktop; **Suite Go** does the same on a phone. There is no account, no telemetry and no server the
 project operates.
 
-> **Alpha.** Suite Shell is alpha and Suite Go is v0. Linux x86_64 and Android arm64 are the only
+> **Alpha.** Suite Desk is alpha and Suite Go is v0. Linux x86_64 and Android arm64 are the only
 > published targets. Keep documents somewhere you back up.
 
 ## The hosts
 
 | Host | What it is | State | Install |
 | --- | --- | --- | --- |
-| **Suite Shell** | The desktop host: one window, a tab per pack, a Home Screen and a local catalogue | Alpha | `flatpak install --user suite run.suite.shell` |
+| **Suite Desk** | The desktop host: one window, a tab per pack, a Home Screen and a local catalogue | Alpha | `flatpak install --user suite run.suite.shell` |
 | **Suite Go** | The mobile host: one container, one pack at a time, the same document boundary | v0 | [suite-go.apk](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk) |
 
 Add the signed store once; every desktop install comes from it:
@@ -44,7 +44,7 @@ it up, open it offline. Nothing here has an account or a hosted copy.
 
 ## State
 
-Shell is alpha: Home, the pack catalogue, install, update, remove and `suite://` routing work; capture,
+Desk is alpha: Home, the pack catalogue, install, update, remove and `suite://` routing work; capture,
 contributions and Screen export/import do not. Go is v0: Scratch proves capture and the document
 handoff, Canvas is a placeholder, and an installed pack appears on home.
 

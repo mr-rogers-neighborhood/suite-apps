@@ -49,8 +49,6 @@ export interface ShellPaletteArgs {
   setLibraryTab: UiState["setLibraryTab"];
   openTypeSettings: UiState["openTypeSettings"];
   requestShare: UiState["requestShare"];
-  setThemeMode: (mode: "light" | "dark") => void;
-  themeMode: string;
   /**
    * The document rows, supplied by `useBoardPaletteActions`. Optional, and each
    * row appears only once its handler does: a share viewer has nothing to undo,
@@ -102,8 +100,6 @@ export function shellPaletteItems(args: ShellPaletteArgs): PaletteItem[] {
     setLibraryTab,
     openTypeSettings,
     requestShare,
-    setThemeMode,
-    themeMode,
     undo,
     redo,
     arrangeRadial,
@@ -231,7 +227,6 @@ export function shellPaletteItems(args: ShellPaletteArgs): PaletteItem[] {
       placeCard: (cardId) => placeCard(cardId),
       openTypes: () => openTypeSettings(),
       openShare: () => requestShare("workspace"),
-      toggleTheme: () => setThemeMode(themeMode === "dark" ? "light" : "dark"),
       // Undo, redo and the radial arrange act on the document, so each is
       // offered exactly while the shell hands over a handler. A read-only
       // session has nothing to step: the document is not its to undo, which is

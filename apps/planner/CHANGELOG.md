@@ -35,7 +35,7 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 ### Changed
 
 - **Planner installs as a signed desktop pack, not only a phone container.** The same renderer now
-  opens inside the Suite Shell: the host owns the document envelope, atomic write and backup, while
+  opens inside the Suite Desk: the host owns the document envelope, atomic write and backup, while
   the pack owns the schema and a task and a day page round-trip through export and import. Reminders
   say they are unavailable because the host has no notification service yet, and sync stays in the
   desktop app rather than the pack.

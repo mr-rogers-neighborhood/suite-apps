@@ -17,7 +17,6 @@ import { useState } from "react";
 import { IconButton } from "../components/IconButton";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore } from "../store/uiStore";
-import { ThemePicker } from "../theme/ThemePicker";
 import { BudgetMark } from "./BudgetMark";
 
 export function Sidebar({
@@ -58,10 +57,6 @@ export function Sidebar({
           </p>
           <p className="text-[10px] text-faint">Suite Budget</p>
         </div>
-      </div>
-
-      <div className="px-3 pb-2 lg:hidden">
-        <ThemePicker />
       </div>
 
       <nav aria-label="Primary" className="flex flex-col gap-0.5 px-2">

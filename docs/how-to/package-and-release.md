@@ -103,7 +103,7 @@ desktop-entry rule.
 
 GitHub shows one "Latest" release per repository, so this repository has one rolling Suite release
 tagged `suite-YYYY.MM.DD` and marked Latest. It names the two superapps, each with its current
-version, channel, maturity and install: a `flatpak install` command for Suite Shell, the APK asset
+version, channel, maturity and install: a `flatpak install` command for Suite Desk, the APK asset
 for Suite Go. A pack carries a signed version and has no release page, and per-app releases are
 retired.
 
@@ -179,9 +179,9 @@ tag exists.
 The signed Flatpak remote above remains the update path. GitHub Packages is not used for the
 Flatpaks.
 
-## Release Suite Shell (the host)
+## Release Suite Desk (the host)
 
-Suite Shell is the desktop host and the first row of the rolling release's Desktop table. One command runs
+Suite Desk is the desktop host and the first row of the rolling release's Desktop table. One command runs
 its publish sequence in the order that keeps every artifact on a commit the gate proved:
 
 ```sh
@@ -263,18 +263,20 @@ checked.
 
 ## The relay
 
-The relay is a Flatpak like the apps, so it has no release of its own beyond the same signed remote:
+The relay is not a shipped app any more (#315). There is no new `run.suite.sync` build and no release
+of its own: the signed remote keeps the last published ref, and the host is the surface that will run
+and show it. A contributor can still reproduce the last artifact locally:
 
 ```sh
 node scripts/flatpak.mjs --app sync                    # package, sign, install locally
-node scripts/flatpak-remote.mjs --target s3 --publish  # publish the shared repository
 ```
 
 Its manifest is `packaging/flatpak/run.suite.sync.yml` and it refuses `--channel`: a channel would be a
 second mailbox on the same data. The `sync-v<version>` tarball releases it used to ship are retired;
 [Leave a relay
-running](../../apps/sync/docs/how-to/relay.md#building-and-publishing-a-release) has the build and
-publish detail.
+running](../../apps/sync/docs/how-to/relay.md#building-the-last-artifact) has the local build detail.
+The build is not published; the host seam that takes the relay over is
+[decided in Decisions](../reference/decisions.md#retiring-the-sync-tray-app-315).
 
 ## What a publish refuses
 

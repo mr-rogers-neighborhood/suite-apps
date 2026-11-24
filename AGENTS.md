@@ -18,6 +18,9 @@ than the working tree. Use `mise exec --` so the Node and pnpm versions pinned
 in `package.json` resolve.
 The gate runs suite-start's e2e suite after the repository checks pass, under
 `xvfb-run` when there is no display; `--no-e2e` skips it for a quick loop.
+Desktop Proof of Changes (`@proof` specs, `scripts/proof-of-changes.mjs`, and
+artifact paths) is documented in
+[docs/reference/desktop-proof.md](docs/reference/desktop-proof.md).
 
 CI is the independent proof: `.github/workflows/main.yml` runs the full fresh gate on every push to
 `main`, and the merge queue runs the affected rows plus Start's e2e. The old `vm` remote, its
@@ -32,10 +35,10 @@ host.
 - `suite-apps-1` is the bootstrap snapshot from before the rename. Not canonical.
 - `suite-dev` is archived on GitHub; this repository is its successor and owns the
   build and release scripts. `suite-go` is archived too.
-- `suite-planner`, `suite-budget`, `suite-start` and `suite-sync` are still
-  active. Desktop apps now ship as Flatpaks from the signed OSTree remote,
-  including `suite-sync`: its tray app and the headless relay are one Flatpak,
-  and the relay is still the server's separate trust boundary.
+- `suite-planner`, `suite-budget` and `suite-sync` are still active repositories. Desktop apps now
+  ship as Flatpaks from the signed OSTree remote. `suite-sync` is retired as a shipped app (#315): the
+  signed remote keeps its last published ref, and the relay is still the server's separate trust
+  boundary, becoming a host capability.
 - Archiving a repository **keeps its release assets downloadable**; it only
   stops new releases. There are no per-app `latest-linux.yml` feeds to preserve:
   the Flatpak remote is the update path. The `sync-v<version>` relay tarballs are

@@ -1,16 +1,16 @@
 ---
 title: Appearance
-description: "Light, dark or system, and the reader's own density, canvas and radius."
+description: "The host owns the theme; the reader owns density, canvas and radius."
 order: 70
-targets:
-  - kind: ui
-    id: theme-toggle
+targets: []
 ---
 
-The theme control switches between light, dark and system. System follows the device and keeps
-following it, so a laptop that dims at night changes the app without anyone touching this control.
+The theme belongs to the host: **View → Theme** in Suite Desk, or **Settings** in Suite Go,
+chooses Suite, Warm or Solarized, and **View → Light / Dark / Follow the system** says how bright
+to draw it. Every open pack follows immediately, and a pack installed later opens in the same
+theme. Canvas does not offer a second control and does not remember a choice of its own.
 
-Everything past the theme lives in **Settings**, which the same menu opens:
+What remains here lives in **Settings**, which the command palette opens:
 
 - **Density** — compact reduces the padding inside a card body, so more cards fit on one screen.
 - **Canvas** — plain hides the dot grid.

@@ -14,7 +14,7 @@ import {
   storeLocalAttachment,
 } from "../editor/attachmentNode";
 import type { PasteUploader } from "../editor/pasteImages";
-import { useThemeStore } from "../theme/useThemeStore";
+import { useHostTheme } from "../theme/hostTheme";
 import {
   bytesFromDataUrl,
   dataUrlOf,
@@ -74,7 +74,7 @@ export function WhiteboardSurface({
   onCommit,
   upload = null,
 }: WhiteboardSurfaceProps) {
-  const theme = useThemeStore((state) => state.theme);
+  const theme = useHostTheme().mode;
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   // The API arrives after the first render, and restoring a sketch's pictures has
   // to wait for it: state rather than only a ref, so the effect runs again.

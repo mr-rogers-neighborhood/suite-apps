@@ -8,3 +8,7 @@ dist/
 
 # electron-builder output.
 release/
+
+# Playwright output.
+test-results/
+playwright-report/

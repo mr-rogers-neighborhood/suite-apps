@@ -88,6 +88,24 @@ owns the rationale, and [Status](status.md) owns what exists.
 - The W3C MiniApp model contributed the host, the manifest, declared capabilities and the lifecycle.
   Its packaging specification is retired, so there is no compliance target.
 
+### The desktop host is Suite Desk (#335)
+
+- The desktop host's product name is **Suite Desk**, replacing Suite Shell; Suite Go keeps its name.
+  The pair reads as two places — the desk and the go — rather than two technologies, and "shell" stays
+  an implementation word for the Electron chrome.
+- This is **Tier 1**: words, labels and the mark only. `@suite/shell`, `apps/shell`,
+  `run.suite.shell`, `run.suite.slop.shell`, the signed remote's refs and the release table's tag
+  names keep their identity, so an existing install updates in place and no data path moves.
+- **Tier 2 is deferred.** Changing the Flatpak id to `run.suite.desk`, the pre-release id to
+  `run.suite.slop.desk`, the package to `@suite/desk`, the directory to `apps/desk`, and the refs and
+  tags to match is a new application id: an existing install does not update into it, and it is a
+  second app until the old card is removed. That cost is paid once the retirements have landed and
+  there is one architecture to rename, not as part of a words change.
+- Both hosts carry the mark Start used: the shell's `apps/shell/build/icon.png` and its sized set
+  under `apps/shell/build/icons/` are Start's own artwork, recovered from the commit before Start's
+  retirement (#314), and Go's launcher icons are generated from the same bytes. The name differs
+  between the hosts; the logo does not.
+
 ## Blobs and export
 
 - A pack's blobs belong to one of three content-addressed stores: `asset` (the person's originals,
@@ -165,7 +183,7 @@ default surface. The pieces that were still Start's moved or were dropped delibe
 | Home composition and the inline widget edit | Already in `apps/shell/src/home.ts`; the Start copy was deleted. |
 | The Screens manager (list, create, rename, duplicate, delete, set Home) | Moved to the host: `apps/shell/src/screens.ts` owns the set and `screens.json`, the window exposes it, and the chrome draws the manager. The manager's rules and tests moved with it. |
 | The `start.recents` widget and the document index | Dropped. Start's cross-app list was fed by scanning `~/Documents`; the host never opens a document path and a pack owns its own recents. Shipping a host list would require the documents-folder service the shell does not have. |
-| The Sync tab's deployment states | Dropped. It showed whether the `run.suite.sync` Flatpak was installed; no host surface manages a Flatpak. The relay's delivery and tray are #315, not this change, and its install line stays until that issue lands. |
+| The Sync tab's deployment states | Dropped. It showed whether the `run.suite.sync` Flatpak was installed; no host surface manages a Flatpak. The relay's delivery and tray are #315; see [Retiring the Sync tray app](#retiring-the-sync-tray-app-315). |
 | The Suite Help card | The host catalogue and Home; Help is a pack source and a frozen Flatpak, not a card Start owns. |
 | `suite-start-cli` | Dropped. It existed to exercise Start's routing without a window; the host's `deepLink.ts` and its tests own `suite://` routing, and there is no user CLI. |
 | File associations and routing | `suite://` routing is the host's (`deepLink.ts`); the host now also claims `x-scheme-handler/suite` in its desktop entry. Extension-based file routing is dropped: a pack owns its documents and the host never receives a path for one, while a frozen Flatpak registers its own MIME type. |
@@ -184,19 +202,74 @@ after this change, and this issue explicitly rules out a migration tool. The dir
 place, untouched; a person may delete it. Documents the frozen apps wrote under
 `~/Documents/Suite` are app-owned and are not part of Start's directory, so they are unaffected.
 
+## Retiring the Sync tray app (#315)
+
+`run.suite.sync` stopped being a shipped artifact. It left the release table and the
+`RELEASES.md`/release-body surface the way a frozen app does: no row describes a build the pipeline
+will publish. `status.md` keeps a row that says it is retired rather than shipped. There is no
+`CODEOWNERS` file in this repository, so that surface had nothing to remove, and no release matrix
+named Sync; the gate row stays, and its tests keep running.
+
+The delivery split is deliberate:
+
+| What stops | What stays |
+| --- | --- |
+| New `run.suite.sync` builds on the signed remote | `apps/sync` as the protocol, the client library and the relay implementation |
+| The separate tray app as the way a person runs a relay | The headless `suite-sync` CLI and the relay's store format |
+| The tray's install line as the documented path | The Canvas and Planner clients, and the sync gate row that tests them |
+| The tray as the place sync state is shown | The host as the surface that carries that state |
+
+The last published ref is the last published ref. A person who already installed it keeps what they
+have and keeps updating from whatever `origin` it has; this change is about what the pipeline ships
+next, not about unpublishing or removing a ref from the store.
+
+### The relay becomes a host capability, and the shape is owed
+
+Sync is a capability of the host, not an app a person installs. The host's tray absorbs the states and
+controls the separate app owned: whether sync is on, the relay address, code and fingerprint, and
+starting or stopping the relay. Two shapes are still on the table, and this record does not pick one:
+
+- **A module inside the host process.** The host imports the relay and runs it in its own main process.
+  It costs the least: one process to start, one lifecycle, one place to read state, and no IPC for
+  address, code and fingerprint. It also gives the host and the relay one crash and one event loop, so
+  a relay bug can take the host down and a host restart is a relay restart.
+- **A supervised child the host starts and watches.** The host spawns the relay, watches it, restarts
+  it and reads its status. The relay keeps its own process, memory and exit code, so a crash is
+  contained and its file access can stay narrower than the host's. It costs a supervisor: spawn and
+  restart policy, a status IPC, readiness and shutdown ordering, and a second story per platform (a
+  Flatpak sandbox on desktop, background limits on mobile).
+
+**What both owe is the same guarantee: the relay never reads a document.** The relay's code path holds
+only the sealed-frame store and the signed membership records it already needs; it is never handed a
+document handle, a document path or a decrypted frame. In the module shape the boundary is an audited
+code path inside one process, enforced by review and tests rather than by an OS boundary. In the
+supervised-child shape the boundary can also be an OS one, because the child starts without a
+documents grant and with only its own store. The shape therefore decides whether the guarantee is a
+code convention, an operating-system boundary, or both. **The decision is owed by the host seam that
+implements it; this change records the two options and chooses neither.**
+
+### Android and iOS
+
+The tray is a desktop surface. On mobile the host the person is using owns the presentation, with the
+same composite quick capture and home-screen widget Go already has (#186, #227); there is no tray on
+Android. A persistent notification that carries sync state and offers capture is an **idea, not a
+requirement**: Android can pin one, and iOS cannot pin one the same way, so the two hosts would differ
+deliberately. It stays in [Ideas](ideas.md), not in this contract.
+
 ## Packaging
 
-- Flatpak is the only Linux desktop form: Suite Shell, Canvas, Planner, Budget, Help and Sync. Sync's
-  app is also the relay: its tray keeps an embedded relay serving, and the same Flatpak runs the CLI
-  headlessly with `flatpak run --command=suite-sync`. There is no AppImage, Arch package, `deb`, `rpm`
-  or `snap`.
+- Flatpak is the only Linux desktop form: Suite Desk, Canvas, Planner, Budget and Help. `run.suite.sync`
+  is retired as a shipped app (#315): no new build is published, the signed remote keeps its last
+  published ref, and the relay's code runs as a host capability rather than a separate app. The last
+  published app also runs the CLI headlessly with `flatpak run --command=suite-sync`. There is no
+  AppImage, Arch package, `deb`, `rpm` or `snap`.
 - Flatpak owns a Flatpak deployment. No Suite process writes into a deployment, replaces it or offers
   an update button; `flatpak update --user` is the path. The host is only the writer for its own
   packs.
 - A deployment updates from its own `origin` remote, so a copy from `suite-local` is not measured
   against the public `suite` store. Flatpak reads that origin; the host does not compare commits.
 - The channels are `slop`, `nightly`, `preview` and `stable`, and they belong to the superapp: Suite
-  Shell on the desktop and Suite Go on mobile. `slop` stays the session channel; `nightly` and
+  Desk on the desktop and Suite Go on mobile. `slop` stays the session channel; `nightly` and
   `preview` replace `canary` and `beta`, which are refused rather than aliased. A mini-app does not
   carry a channel; when it ships as a pack it carries a signed version.
 - Product maturity is separate from the channel: `pre-alpha`, `alpha`, `beta` and `1.0`. A
@@ -213,20 +286,22 @@ place, untouched; a person may delete it. Documents the frozen apps wrote under
   the digit so a channel move is an update on the shared pre-release id; a demotion requires an
   uninstall.
 - Canvas, Planner, Budget and Help are frozen legacy apps until they become packs: their code and last
-  artifact stay, and no new pre-release channel is published for them. Sync is neither a superapp nor
-  frozen, so its row names no channel.
+  artifact stay, and no new pre-release channel is published for them. Sync is retired rather than
+  frozen: it is not on a channel and it is not a shipped artifact at all (#315).
 - `scripts/flatpak.mjs` builds the local deployment and signs the repository summary with the store
   key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to the public
-  `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`. The relay publishes on
-  the same remote; its `sync-v<version>` tarball release is retired, and `scripts/release.mjs`
-  now holds only the shared release helpers and the gate proof.
-- The relay app's store and certificate pair live under the app's own data directory
-  (`$XDG_DATA_HOME/suite-sync`), not in a documents folder, and its one host grant outside the
-  sandbox is `xdg-config/autostart` for the login entry it writes when asked.
+  `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`. The last published
+  `run.suite.sync` ref stays on the same remote and is not rebuilt; the relay's retired
+  `sync-v<version>` tarball release stays downloadable history, and `scripts/release.mjs` now holds
+  only the shared release helpers and the gate proof.
+- The last `run.suite.sync` build kept its store and certificate pair under the app's own data
+  directory (`$XDG_DATA_HOME/suite-sync`), not in a documents folder, and its one host grant outside
+  the sandbox was `xdg-config/autostart` for the login entry it wrote when asked. A host that runs the
+  relay uses the same store shape without the app's tray.
 - The relay's reach is a stored choice, not a bind the build ships: `loopback` by default, `tailnet`
-  when Tailscale is running, and `network` only after a confirmation in the window — the app's form
-  of the CLI's `--trust-all-remote`. `SUITE_SYNC_BIND` overrides it for a test or a host unit, and
-  the window says the reach is fixed rather than pretending the selector decides.
+  when Tailscale is running, and `network` only after a confirmation — the last app's form of the
+  CLI's `--trust-all-remote`. `SUITE_SYNC_BIND` overrides it for a test or a host unit. The host seam
+  that owns the relay decides how that choice is stored and shown next; this change does not.
 - A version lives in one place and the rolling release carries it; per-app tags are retired.
   [Version ownership](../how-to/package-and-release.md#version-ownership) states which file owns it.
 - The Flatpak store key signs the OSTree summary. Flatpak verifies the summary and every object's
@@ -352,6 +427,10 @@ place, untouched; a person may delete it. Documents the frozen apps wrote under
   | Class | Example | What the pack contributes |
   | --- | --- | --- |
   | Host mechanism, host meaning | theme, window chrome, store key | nothing; it receives the result |
+
+  Theme is the worked example: the host stores the preset and brightness with its profile, offers the
+  only picker, and paints every pack's resolved tokens. A pack that carried its own theme setting
+  would be a second identity for the same product.
   | Host mechanism, pack meaning | sync, notifications, export, migration | the declaration: scope, payload, due time, entry point |
   | Pack mechanism, pack meaning | the editing surface, the schema, a projection body | everything; the host is not involved |
 

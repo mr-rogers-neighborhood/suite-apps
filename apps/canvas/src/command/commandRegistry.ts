@@ -143,7 +143,6 @@ export interface CommandActions {
   placeCard(cardId: string): void;
   openTypes(): void;
   openShare(): void;
-  toggleTheme(): void;
   /**
    * Structure undo and redo. Optional because they act on the document rather
    * than on a surface, and a share viewer has nothing to undo; the Dock supplies
@@ -348,21 +347,6 @@ export const commands: readonly CommandDefinition[] = [
     capabilities: [],
     available: (context) => context.state.libraryTab !== "trash",
     run: (context) => context.actions.openLibraryTab("trash"),
-  }),
-  define({
-    id: "theme.toggle",
-    label: "Toggle the theme",
-    group: "system",
-    owner: "palette",
-    capabilities: [],
-    available: onWorkspace,
-    palette: {
-      group: "Actions",
-      weight: 70,
-      subtitle: "Light, dark or system",
-      keywords: ["theme", "dark", "light", "appearance", "mode"],
-    },
-    run: (context) => context.actions.toggleTheme(),
   }),
   define({
     id: "board.create",
