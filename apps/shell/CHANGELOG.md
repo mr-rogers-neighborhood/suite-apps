@@ -3,40 +3,52 @@
 Written for people, not commits. This app is a spike; its version is its own until it becomes the
 shipped host.
 
-## [Unreleased]
+## [0.3.0] - 2026-11-24
 
 ### Added
 
-- **The Screens manager belongs to the host.** A person can create, rename, duplicate and delete a
-  Screen and choose which one is Home. `screens.json` remembers the role, the last Screen is kept,
-  and deleting Home asks for its replacement first. The rule and its tests moved from Start (#314).
+- **The host owns the theme.** One choice covers the host and every pack, and the per-app pickers
+  are gone. Help and Canvas keep a readable fallback when they open outside a host.
+- **One consent record and one consent surface.** Every capability asks at the tier the spec names
+  — install, first use, a thirty-day token or every use — through one dialog that says which pack,
+  capability and reason. The record is plain JSON beside the publisher trust store, keyed by
+  publisher, pack, version and capability; a refusal is a stored row, and a pack's answers never
+  reach another pack. Recents and the host-wide reminder permission migrate once instead of asking
+  again, and an unmappable answer is re-asked rather than silently granted.
+- **The host runs the reminders a pack declares.** The queue survives the pack closing and a host
+  restart, asks once for the notification tier, shows a denial instead of hiding it, and routes a
+  click back to the pack. A failed or refused delivery stays queued and retries with a backoff
+  rather than re-arming in the same tick.
+- **The host carries the file and library surface.** Reveal in folder, the recent list, the document
+  watch and folder import are host calls, so a pack presents a file without ever holding a host
+  path and the library refreshes while it is open.
+- **A publisher is trusted, not just the Suite key.** The trust store records a publisher and its
+  key, verifies signed rotation and revocation advisories, derives a per-pack identity key, and
+  keeps two publishers that reuse a pack id apart. The install confirmation names the publisher and
+  the fingerprint it recorded.
 - **The catalogue reads the published index.** The operator key is pinned in the shell, and the
   index is verified before an entry is listed: signature, `sequence`, `previous` and `expires` are
   all checked against the last verified head. A tampered, unsigned, wrong-operator, expired or
   rolled-back index is refused with a sentence naming the reason, and the catalogue says whether it
   is showing the published index or the local directory.
-- **Budget is the first real pack.** The pack's entry, prelude and assets serve over
-  `suite-pack://`, its renderer mounts over the pack bridge, and a budget round-trips through the host
-  document envelope. An export re-imports as a working document, and the bridge adds no second file
-  path. The test suite mounts the pack renderer over the same `window.suite` services the preload
-  exposes; the Electron view itself stays outside the headless gate.
-- **A pack's declared schema is what the host stamps.** A manifest document declaration now supplies
-  the envelope's schema version and the newest version the host opens. A pack that writes one format
-  under many names declares it once with `mode: "multi"`; Budget declares its snapshot at schema 1.
-
-### Changed
-
-- **Suite Desk is the only desktop host.** Install it once, then install, update, remove and
-  reinstall packs from its catalogue. Suite Start is retired (#314): the frozen Flatpaks keep their
-  `flatpak install` lines, and no second hub lists or updates them.
+- **Install, update, remove and reinstall are catalogue actions.** A person chooses the action from
+  the row, an update is additive and explicit, and removing a pack deletes its installed version and
+  clears its consent and reminder rows while its documents stay in the host's document store.
+- **Budget and Planner ship as packs, and Canvas and Help build as packs.** Budget is the first
+  pack that opens a document: its entry, prelude and assets serve over `suite-pack://`, its
+  renderer mounts over the pack bridge, and a budget round-trips through the host document envelope
+  with no second file path. A pack declares the platforms it supports, and a desktop-only pack is
+  refused by a host that cannot serve it. The test suite mounts a pack renderer over the same
+  `window.suite` services the preload exposes; the Electron view itself stays outside the headless
+  gate.
+- **The Screens manager belongs to the host.** A person can create, rename, duplicate and delete a
+  Screen and choose which one is Home. `screens.json` remembers the role, the last Screen is kept,
+  and deleting Home asks for its replacement first. The rule and its tests moved from Start (#314).
 - **Documents carry a host envelope.** Each pack document is a magic-and-version prefix, a canonical
   header (publisher, pack, document, schema, payload length, payload checksum) and the pack's payload
   bytes untouched. Saves are serialized, atomic, backed up and recovered after a crash; a file that
   does not verify is quarantined, a newer envelope or schema is refused with its path, and a
   pre-envelope file is left as it is.
-
-### Added
-
 - **Declared documents migrate through the host.** A pack's manifest entries are carried into the
   installed pack, the host proves a single migration chain before it writes, takes one backup and
   invokes each declared entry with a handle scoped to that document. The schema stamp makes a second
@@ -48,6 +60,19 @@ shipped host.
   with a host save handle, writes every asset as its original bytes with a verified SHA-256 and a
   manifest entry, and records a missing export entry as `packExport: null` while still exporting the
   assets. The entry runner is injected and the stores are not on the bridge yet.
+- **A pack's declared schema is what the host stamps.** A manifest document declaration now supplies
+  the envelope's schema version and the newest version the host opens. A pack that writes one format
+  under many names declares it once with `mode: "multi"`; Budget declares its snapshot at schema 1.
+
+### Changed
+
+- **Suite Desk is the host's name and the only desktop host.** The Flatpak id stays
+  `run.suite.shell`, so an existing install updates in place. Install it once, then install, update,
+  remove and reinstall packs from its catalogue. Suite Start is retired (#314): the frozen Flatpaks
+  keep their `flatpak install` lines, and no second hub lists or updates them.
+- **The relay stops shipping a tray app.** The Sync code stays as the protocol, the client library
+  and the relay implementation; the host is where its surface will live, and the signed remote keeps
+  the last published ref for anyone who already has it (#315).
 
 ## [0.2.0] - 2026-11-22
 

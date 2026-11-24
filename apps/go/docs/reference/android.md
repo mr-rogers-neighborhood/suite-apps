@@ -128,12 +128,15 @@ keys](../../../../docs/how-to/keys.md) owns backup and rotation.
 
 ### The four channels
 
-| Channel   | Package id          | Version name    | Launcher label     | versionCode |
-| --------- | ------------------- | --------------- | ------------------ | ----------- |
-| `stable`  | `run.suite.go`      | `0.1.0`         | Suite Go           | base × 10   |
-| `slop`    | `run.suite.slop.go` | `0.1.0-slop`    | Suite Go (slop)    | base × 10+1 |
-| `nightly` | `run.suite.slop.go` | `0.1.0-nightly` | Suite Go (nightly) | base × 10+2 |
-| `preview` | `run.suite.slop.go` | `0.1.0-preview` | Suite Go (preview) | base × 10+3 |
+| Channel   | Package id          | Version name        | Launcher label     | versionCode |
+| --------- | ------------------- | ------------------- | ------------------ | ----------- |
+| `stable`  | `run.suite.go`      | `<version>`         | Suite Go           | base × 10   |
+| `slop`    | `run.suite.slop.go` | `<version>-slop`    | Suite Go (slop)    | base × 10+1 |
+| `nightly` | `run.suite.slop.go` | `<version>-nightly` | Suite Go (nightly) | base × 10+2 |
+| `preview` | `run.suite.slop.go` | `<version>-preview` | Suite Go (preview) | base × 10+3 |
+
+`<version>` is the `version` in [`app.config.json`](../../app.config.json); this table names the
+suffix each channel adds rather than repeating the number.
 
 Stable and one pre-release install side by side, because they are two package ids with two data
 trees. Every pre-release shares `run.suite.slop.go`, so moving from slop to nightly replaces the
