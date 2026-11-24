@@ -26,9 +26,15 @@ signature, capabilities and host fit. `@suite/pack-host` owns the archive reader
 store. Go consumes the same parser and verifier; `apps/go/packages/go/src/pack.ts` retires rather
 than keeping a second manifest. This closes #202.
 
-**R2.2** A packable app keeps its pack source in `apps/<app>/pack/`: `manifest.json`, the pack entry,
-the prelude, the build config and the pack tests. The built artifact goes to a generated output
-directory, never back into `pack/`.
+**R2.2** A packable app declares itself with `"suite": { "pack": true }` in its `package.json` and
+keeps its pack source in `apps/<app>/pack/`. The directory MUST contain `manifest.json` (the source
+manifest, whose `version` equals the app version), `src/` with the pack entry and its prelude, one
+`vite.config.ts` build config, at least one `*.test.*` run by the app's `test:pack` script, and a
+`README.md` that links [the pack authoring reference](../reference/pack-authoring.md). A pack is
+source, not a workspace package: no `node_modules/`, `dist/` or other generated directory may live
+under `pack/`, and the build writes its artifact to a generated output directory outside it. Extra
+files are permitted. `node scripts/pack-shape.mjs` enforces this minimum in the gate; the authoring
+reference explains each item.
 
 **R2.3** The pack version is the app version or an explicit pack version in one file; it is not
 restated in prose. The manifest's file list and signature are generated from the build output, not
@@ -36,7 +42,8 @@ hand-edited.
 
 **R2.4** A pack declares its documents, blobs, sync scopes, capabilities, widgets, components,
 locales, export entry and add-ons in the manifest. A field a host does not implement is a refusal,
-not a silent skip.
+not a silent skip. [manifest.schema.json](manifest.schema.json) is the field list and the closed
+capability vocabulary; a checker reads it rather than repeating it.
 
 **R2.5** Legacy Canvas, Planner, Budget and Help stay frozen at their last Flatpak artifact until
 each becomes a pack. A frozen app is not deleted; its code, docs and last artifact stay.

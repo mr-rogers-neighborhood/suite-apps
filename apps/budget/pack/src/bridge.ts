@@ -107,7 +107,7 @@ interface OpenDocument {
   readonly doc: BudgetDocument;
 }
 
-function describe(error: unknown): string {
+function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
@@ -255,7 +255,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
     } catch (error) {
       if (current === target) {
         dirty = true;
-        saveError = describe(error);
+        saveError = describeError(error);
       }
       throw error;
     }
@@ -269,7 +269,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
         (error: unknown) => {
           if (current === target) {
             dirty = true;
-            saveError = describe(error);
+            saveError = describeError(error);
           }
           throw error;
         },
@@ -381,7 +381,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
       summary = await documents().save(id, doc.snapshot());
       saveError = null;
     } catch (error) {
-      saveError = describe(error);
+      saveError = describeError(error);
       fail("could not record the open budget's timestamp", error);
     }
     return openInfo(id, doc, summaryOpenedAt(summary, clock()));
@@ -438,7 +438,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
         `${safeName(open.doc.getMeta().name)}-${dateStamp(clock())}.budget`,
       );
     } catch (error) {
-      return cancelledFile(`The file picker could not open: ${describe(error)}`);
+      return cancelledFile(`The file picker could not open: ${describeError(error)}`);
     }
     if (handle === null) return { canceled: true };
 
@@ -447,7 +447,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
       await handle.write(new TextEncoder().encode(text));
       return { canceled: false, path: handle.info.name };
     } catch (error) {
-      return cancelledFile(`The budget could not be written: ${describe(error)}`);
+      return cancelledFile(`The budget could not be written: ${describeError(error)}`);
     } finally {
       await handle.close().catch(() => undefined);
     }
@@ -478,7 +478,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
         `${safeName(open.doc.getMeta().name)}-transactions.${format}`,
       );
     } catch (error) {
-      return cancelledFile(`The file picker could not open: ${describe(error)}`);
+      return cancelledFile(`The file picker could not open: ${describeError(error)}`);
     }
     if (handle === null) return { canceled: true };
 
@@ -486,7 +486,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
       await handle.write(new TextEncoder().encode(text));
       return { canceled: false, path: handle.info.name };
     } catch (error) {
-      return cancelledFile(`The records could not be written: ${describe(error)}`);
+      return cancelledFile(`The records could not be written: ${describeError(error)}`);
     } finally {
       await handle.close().catch(() => undefined);
     }
@@ -565,7 +565,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
     try {
       handle = await pickOpen.call(service, BUDGET_FILTERS);
     } catch (error) {
-      notice(`The file picker could not open: ${describe(error)}`);
+      notice(`The file picker could not open: ${describeError(error)}`);
       return { canceled: true };
     }
     if (handle === null) return { canceled: true };
@@ -599,7 +599,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
       // simply failed above stays a cancellation with a notice instead.
       throw error instanceof Error
         ? error
-        : new Error(`The budget could not be imported: ${describe(error)}`);
+        : new Error(`The budget could not be imported: ${describeError(error)}`);
     } finally {
       await handle.close().catch(() => undefined);
     }
@@ -617,7 +617,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
     try {
       handle = await pickOpen.call(service, SOURCE_FILTERS);
     } catch (error) {
-      notice(`The file picker could not open: ${describe(error)}`);
+      notice(`The file picker could not open: ${describeError(error)}`);
       return { canceled: true };
     }
     if (handle === null) return { canceled: true };
@@ -636,7 +636,7 @@ export function createBudgetPack(options: BudgetPackOptions): BudgetPack {
     } catch (error) {
       // The import wizard has no error boundary around this call, so a failed
       // read is a notice and a cancellation rather than an unhandled rejection.
-      notice(`That file could not be read: ${describe(error)}`);
+      notice(`That file could not be read: ${describeError(error)}`);
       return { canceled: true };
     } finally {
       await handle.close().catch(() => undefined);
