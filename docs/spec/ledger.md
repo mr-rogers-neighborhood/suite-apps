@@ -36,15 +36,15 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S5.5 | Suspend/resume | Absent | Go has a delayed destroy, not a suspended state |
 | S5.6 | TTI | Absent | No measurement |
 | S5.7 | Association ownership | Partial | Contributions are registered; no namespacing or second-pack refusal |
-| S6.1 | Document envelope | Partial | Host stores opaque bytes; no envelope header, schema version or checksum |
-| S6.2 | Host write/backup | Partial | Pack files have atomic write and backup; the host document service does not |
+| S6.1 | Document envelope | Implemented | `apps/shell/src/documents.ts` writes magic, envelope version, publisher, pack, document, schema, payload length and checksum; "writes each header field and reads back the payload unchanged" and "reads the header without the payload" |
+| S6.2 | Host write/backup | Implemented | Host document service: one write at a time, flushed temporary file and rename, `.bak`, crash recovery and `.corrupt-` quarantine; "quarantines a corrupt envelope…", "restores the previous copy…" and the atomic-write tests |
 | S6.3 | Pack schema/migration | Partial | Apps own schema and migrations; the host cannot invoke a declared entry |
-| S6.4 | Newer document | Partial | Apps refuse newer files; the Screen store quarantines and starts fresh |
+| S6.4 | Newer document | Implemented | Host documents refuse a newer envelope or schema with a sentence and an export path and leave the file alone; "blocks a newer envelope…", "blocks a newer schema…" and "refuses a file from before the envelope…" |
 | S6.5 | Mergeable children | Partial | Loro is used; `ensureMergeable*` is not the general rule |
 | S6.6 | Migration safety | Partial | Per-app migrations and backups exist; not uniform |
 | S6.7 | Blob classes | Absent | No asset/derived/cache store |
 | S6.8 | Export | Partial | Canvas and Budget export; Planner only `.planner`; packs, Screens and Space do not |
-| S6.9 | Unknown fields | Partial | Payloads are opaque; host-owned documents have limited preservation |
+| S6.9 | Unknown fields | Partial | The host preserves payload bytes exactly on an envelope rewrite (`rewrite` and "rewrites the envelope without changing the payload bytes"); Screen/Space unknown fields are still not shown as unknown |
 | S7.1 | Sync declaration | Partial | Canvas and Planner sync; no pack sync service |
 | S7.2 | Document keys | Partial | MLS workspace exists; per-document keys and grants are absent |
 | S7.3 | Grant rotation | Absent | No document-key rotation |
@@ -109,7 +109,7 @@ claim.
 | --- | --- | --- |
 | S3.3–S3.4 | New fields are unsigned and there is no golden vector, so a second implementation cannot verify the format | Pack |
 | S2.1–S2.5 | No publisher identity, trust store, rotation or revocation; side-loading is first-party only | Pack, shell |
-| S6.1–S6.3 | No document envelope or host-invoked migration, so the never-parse rule and pack-owned schema cannot both hold | Shell, document-runtime |
+| S6.3 | No host-invoked migration or projection entry, so the pack-owned schema is declared nowhere and the host cannot run it | Shell, document-runtime |
 | S4.2–S4.5 | No consent record or network allowlist; external links and associations bypass the boundary | Shell, Go |
 | S7.2–S7.6 | No per-document key, relay verification, header index or gap recovery | Sync |
 | S9.2–S9.4 | No code-widget sandbox, fallback or data scope | Shell |
