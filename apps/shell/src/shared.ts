@@ -248,6 +248,8 @@ export interface ShellState {
   readonly screens: readonly ScreenView[];
   readonly packs: readonly PackSummary[];
   readonly catalogue: readonly CatalogueEntry[];
+  /** Which source the catalogue is showing, in a sentence the chrome can print. */
+  readonly catalogueSource: string;
   readonly installedVersions: readonly InstalledVersionView[];
   readonly theme: ThemeView;
   readonly notice: string | null;

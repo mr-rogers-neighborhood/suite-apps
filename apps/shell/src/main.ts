@@ -17,6 +17,7 @@ import { DocumentStore, declaredDocumentSchemaVersion } from "./documents.js";
 import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
 import { HOME_SCREEN_ID, openHomeScreen } from "./home.js";
+import { catalogueIndexUrlFor, loadCatalogueIndex } from "./indexTrust.js";
 import {
   checkPackArchive,
   comparePackVersions,
@@ -123,6 +124,8 @@ let trustStore: PublisherTrustStore | null = null;
 let revocations: readonly RevocationAdvisory[] = [];
 let packs: readonly PackInfo[] = [];
 let catalogue: readonly CataloguePack[] = [];
+/** The sentence the catalogue shows about where its entries came from. */
+let catalogueSource = "The local catalogue directory is in use.";
 let installedVersions: readonly InstalledVersion[] = [];
 let pendingDeepLink: string | null = null;
 
@@ -210,6 +213,7 @@ async function bootstrap(): Promise<void> {
     },
   );
 
+  await refreshCatalogue();
   await refreshPacks();
   spaceStore = await SpaceStore.open(join(dataRoot, "spaces.loro"));
   // The host's own Screen. Home is created here and opened before any pack view
@@ -303,6 +307,46 @@ function documentsFor(sender: PackSender): DocumentStore {
 }
 
 /**
+ * Rebuild the catalogue from the published index, or from the local directory
+ * when the index is unavailable.
+ *
+ * The local directory is a first-class source (S12.1): a person may install a
+ * file with no catalogue and no network. The chrome says which source is in use
+ * instead of falling back silently, and a refused index still leaves the local
+ * directory usable.
+ */
+async function refreshCatalogue(): Promise<void> {
+  const root = catalogueRootFor(dataRootFor(), process.env);
+  const url = catalogueIndexUrlFor(process.env);
+  if (url === null) {
+    catalogue = await loadCatalogue(root, packTrustOptions(), null);
+    catalogueSource = "The local catalogue directory is in use; no catalogue index is configured.";
+    return;
+  }
+
+  const loaded = await loadCatalogueIndex({
+    url,
+    headRoot: trustRootFor(dataRootFor(), process.env),
+    fetch: (input, init) => net.fetch(input, init),
+  });
+  if (loaded.ok) {
+    catalogue = await loadCatalogue(root, packTrustOptions(), loaded.index);
+    catalogueSource = `The published catalogue index is in use (sequence ${loaded.sequence}).`;
+    console.info(
+      `[shell] catalogue index sequence ${loaded.sequence} verified; ${loaded.index.packs.length} entry(ies)`,
+    );
+    return;
+  }
+
+  catalogue = await loadCatalogue(root, packTrustOptions(), null);
+  catalogueSource =
+    loaded.reason === "refused"
+      ? `The local catalogue directory is in use; the published index was refused. ${loaded.message}`
+      : `The local catalogue directory is in use. ${loaded.message}`;
+  console.warn(`[shell] ${loaded.message}`);
+}
+
+/**
  * Rebuild the host's pack list.
  *
  * Verified installs under the data root are the load path. An unsigned directory
@@ -322,10 +366,6 @@ async function refreshPacks(): Promise<void> {
 
   packs = mergePackSources({ installed: scan.packs, development });
   installedVersions = scan.versions;
-  // #222 supplies the verified index as the third argument when it lands. Until
-  // then the local directory is the only catalogue source; a person can still
-  // install from a file through the picker.
-  catalogue = await loadCatalogue(catalogueRootFor(dataRootFor(), process.env), packTrustOptions());
   console.info(
     `[shell] ${packs.length} pack(s) available; ${catalogue.length} catalogue archive(s)`,
   );
@@ -349,7 +389,7 @@ function installedVersionViews(): readonly InstalledVersionView[] {
 
 /** Replace the window's pack data from the module's last scan. */
 function publishPackData(): void {
-  window?.setPackData(packs, catalogueView(), installedVersionViews());
+  window?.setPackData(packs, catalogueView(), installedVersionViews(), catalogueSource);
 }
 
 function themeView(): ThemeView {
@@ -365,6 +405,7 @@ function openWindow(): void {
   created = new ShellWindow({
     packs,
     catalogue: catalogueView(),
+    catalogueSource,
     installedVersions: installedVersionViews(),
     spaces: spaceStore,
     screens: screenStore,

@@ -38,6 +38,7 @@ let state = {
   screens: [],
   packs: [],
   catalogue: [],
+  catalogueSource: "",
   installedVersions: [],
   theme: { mode: "dark", values: {} },
   notice: null,
@@ -50,6 +51,7 @@ let appsView = {
   packCount: null,
   catalogue: null,
   catalogueCount: null,
+  catalogueSource: null,
   search: null,
 };
 
@@ -390,6 +392,9 @@ function renderPacks() {
 
 function renderCatalogue() {
   if (appsView.catalogue === null) return;
+  if (appsView.catalogueSource !== null) {
+    appsView.catalogueSource.textContent = state.catalogueSource;
+  }
   const matches = state.catalogue.filter((entry) =>
     matchesQuery(entry.name, entry.id, entry.description),
   );
@@ -469,6 +474,7 @@ function renderAppsWidget(body) {
     "Packs arrive from the signed catalogue or as a .suitepack file. Installing adds one to this device, updating keeps the old version until you remove it, and reinstalling replaces the install while keeping its documents. A new app opens right away; restart Suite to run a new version of an app that is already open.",
   );
   const catalogue = element("div", "grid");
+  const catalogueSource = element("p", "muted catalogue-source");
   const install = element("button", "install", "Add pack…");
   install.type = "button";
   install.addEventListener("click", () => {
@@ -488,10 +494,10 @@ function renderAppsWidget(body) {
   const revoke = trustAction(api.importRevocation, "Add revocation…");
   const actions = element("div", "trust-actions");
   actions.append(install, rotate, revoke);
-  available.append(availableHead, muted, catalogue, actions);
+  available.append(availableHead, muted, catalogueSource, catalogue, actions);
 
   body.append(installed, available);
-  appsView = { packs, packCount, catalogue, catalogueCount, search: input };
+  appsView = { packs, packCount, catalogue, catalogueCount, catalogueSource, search: input };
   refreshApps();
 }
 
@@ -681,6 +687,7 @@ function renderScreen() {
       packCount: null,
       catalogue: null,
       catalogueCount: null,
+      catalogueSource: null,
       search: null,
     };
     return;

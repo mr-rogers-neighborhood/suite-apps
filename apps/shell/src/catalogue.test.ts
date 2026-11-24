@@ -119,7 +119,7 @@ function digest(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-/** A verified-index result as #222 will hand it over; this test never parses an index. */
+/** A verified-index result as `indexTrust.ts` hands it over; this test never parses an index. */
 function indexFor(
   archive: Uint8Array,
   overrides: Partial<VerifiedIndexPack> = {},

@@ -23,12 +23,11 @@ import type { CatalogueEntry, PackCapability, PackPublisherView } from "./shared
  * `SUITE_SHELL_CATALOGUE`. A person may always install from a file without it
  * (S12.1).
  *
- * When #222's signed index has been verified, the same surface also consumes it.
- * This module never parses or checks the index; it receives only the verified
- * result through `VerifiedCatalogueIndex`. Every archive is still read and
- * verified here with the installer's rules: manifest signature against the
- * trust store, host fit, capability list and every file hash. An indexed entry
- * must also match the digest-size-identity the index displayed, or it is refused
+ * When the operator-signed index has been verified, the same surface also consumes it. This module
+ * never parses or checks the index; it receives only the verified result through
+ * `VerifiedCatalogueIndex`. Every archive is still read and verified here with the installer's
+ * rules: manifest signature against the trust store, host fit, capability list and every file hash.
+ * An indexed entry must also match the digest-size-identity the index displayed, or it is refused
  * (S12.7).
  *
  * A refused archive still appears, with the refusal sentence, because hiding it
@@ -40,19 +39,18 @@ const PACK_SUFFIX = ".suitepack";
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 /**
- * The verified-index seam #222 fills.
+ * The verified-index seam.
  *
- * #222 owns the index format, its operator signature, fetching and its own
- * refusals. It hands this module entries that already passed those checks and a
- * reader for each archive. Index parsing and verification are deliberately not
- * implemented here. Until #222 merges, `main` passes no index, so the local
- * directory stays the only source.
+ * `indexTrust.ts` owns the index format, its operator signature, fetching and its own refusals. It
+ * hands this module entries that already passed those checks and a reader for each archive. Index
+ * parsing and verification are deliberately not implemented here; `main` passes the verified
+ * result, and the local directory remains a source when no index is available.
  */
 export interface VerifiedCatalogueIndex {
   readonly packs: readonly VerifiedIndexPack[];
 }
 
-/** One index entry after #222 verified the index. The archive is not trusted yet. */
+/** One index entry after `indexTrust.ts` verified the index. The archive is not trusted yet. */
 export interface VerifiedIndexPack {
   readonly id: string;
   readonly name: string;
@@ -266,7 +264,7 @@ async function inspectFile(
 
 /**
  * Check one index entry's archive against what the index displayed, then the
- * installer's own rules. #222 already verified the index itself.
+ * installer's own rules. `indexTrust.ts` already verified the index itself.
  */
 async function inspectIndexPack(
   pack: VerifiedIndexPack,
