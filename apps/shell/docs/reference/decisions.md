@@ -81,6 +81,12 @@ The rules that shape the Suite host.
   never parses the payload. The envelope's schema version records a completed step, so a second run
   writes nothing; a failed entry restores the one backup, so the old document stays readable. The
   runner is injected, so binding it to a pack renderer is the remaining seam.
+- A pack's blobs are three content-addressed class stores under
+  `blobs/<container>/<pack>/<class>/<sha256>`; see
+  [Blobs and export](../../../docs/reference/decisions.md#blobs-and-export). `blobs.ts` re-hashes a
+  blob on read, refuses a mismatch and clears only `cache`. `exportBundle.ts` runs the declared
+  `export` entry with a save handle that cannot leave the bundle or write the host's `manifest.json`
+  or `assets/`, then writes every asset as original bytes with a verified manifest entry.
 - Writes are atomic: a temporary file in the same root, then a rename. Backups and temp files live
   under the same pack root.
 - `documents` and `files` are separate services with separate roots and capabilities. A pack cannot

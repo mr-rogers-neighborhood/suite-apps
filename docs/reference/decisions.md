@@ -88,6 +88,24 @@ owns the rationale, and [Status](status.md) owns what exists.
 - The W3C MiniApp model contributed the host, the manifest, declared capabilities and the lifecycle.
   Its packaging specification is retired, so there is no compliance target.
 
+## Blobs and export
+
+- A pack's blobs belong to one of three content-addressed stores: `asset` (the person's originals,
+  exported), `derived` (not exported by default) and `cache` (disposable). A manifest names a store
+  and declares its class; the class is the physical store, scoped to the pack and named by the
+  SHA-256 of the bytes. A read re-hashes the bytes and refuses a mismatch, and clearing `cache`
+  removes only cache. The host cannot prove a cache blob is regenerable, so "never the only copy" is
+  the pack's promise; backing up `asset` and `derived` is still open.
+- Export is a host-owned bundle. The host picks the destination and gives the pack's declared
+  `export` entry a save handle scoped to relative paths inside it; `manifest.json` and `assets/` are
+  reserved for the host. The host writes every `asset` as its original bytes at `assets/<sha256>`,
+  records each with its hash and length, verifies every hash, and writes the manifest last.
+  `derived` and `cache` are not exported.
+- A pack that declares no `export` entry is exported for its assets anyway, with `packExport: null`
+  and no document entries. S6.8 says a pack declares one; refusing the whole export over a manifest
+  omission would strand a person's assets, so the bundle records the omission instead. The choice is
+  tested in `apps/shell/src/exportBundle.test.ts`.
+
 ## Packs
 
 - `@suite/pack` is the desktop pack contract: manifest, capabilities, contributions, file hashes and
