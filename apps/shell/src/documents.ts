@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
 import { copyFile, lstat, mkdir, open, readdir, readFile, rename, rm } from "node:fs/promises";
 import { basename, dirname, join, sep } from "node:path";
+import type { PackDocument } from "@suite/pack/manifest";
 import { isSafeContainerId } from "./container.js";
 import { isSafePackId } from "./packs.js";
 import type { DocumentRecord, DocumentSummary } from "./shared.js";
@@ -57,6 +58,28 @@ export const HOST_PUBLISHER = "suite";
 
 /** The newest schema version a document may carry unless a caller says otherwise. */
 export const DOCUMENT_SCHEMA_VERSION = 1;
+
+/**
+ * The schema version a pack declares for one document.
+ *
+ * A declaration whose `id` is the document name applies exactly. A pack with one
+ * `multi` declaration writes one format under many names, and that declaration
+ * is the only schema answer it has. Anything else falls back to the host's own
+ * version, which is what a pack that declares no documents gets.
+ */
+export function declaredDocumentSchemaVersion(
+  documents: readonly PackDocument[] | undefined,
+  documentId: string,
+  fallback: number = DOCUMENT_SCHEMA_VERSION,
+): number {
+  const declarations = documents ?? [];
+  const exact = declarations.find((document) => document.id === documentId);
+  if (exact !== undefined) return exact.version;
+  if (declarations.length === 1 && declarations[0]?.mode === "multi") {
+    return declarations[0].version;
+  }
+  return fallback;
+}
 
 const MAGIC_BYTES = new TextEncoder().encode(DOCUMENT_MAGIC);
 /** magic (8) + envelope version (2) + header length (4). */
@@ -138,6 +161,11 @@ export interface DocumentSaveOptions {
    * had, not the intermediate step that happened to run last (S6.6).
    */
   readonly keepBackup?: boolean;
+}
+
+/** What a new document's envelope carries. The pack's declaration supplies the version. */
+export interface DocumentCreateOptions {
+  readonly schemaVersion?: number;
 }
 
 function fsCode(error: unknown): string | undefined {
@@ -369,7 +397,12 @@ export class DocumentStore {
     return this.#refuse(read, containerId, packId, id, file);
   }
 
-  async create(containerId: string, packId: string, name: string): Promise<DocumentSummary> {
+  async create(
+    containerId: string,
+    packId: string,
+    name: string,
+    options: DocumentCreateOptions = {},
+  ): Promise<DocumentSummary> {
     const file = this.#path(containerId, packId, name);
     try {
       await mkdir(dirname(file), { recursive: true });
@@ -382,7 +415,7 @@ export class DocumentStore {
           publisher: this.#publisher,
           packId,
           documentId: name,
-          schemaVersion: DOCUMENT_SCHEMA_VERSION,
+          schemaVersion: options.schemaVersion ?? DOCUMENT_SCHEMA_VERSION,
           payload: new Uint8Array(),
         });
         // `wx` refuses an existing file, so create cannot silently truncate a

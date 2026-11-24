@@ -8,6 +8,16 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 ## [Unreleased]
 
+### Added
+
+- **Budget runs as a pack.** Its own renderer is the pack entry: the prelude installs the bridge over
+  the host's `window.suite`, a budget is a Loro snapshot under the host's document envelope, and an
+  export re-imports as a working budget. The manifest declares the snapshot format at the core schema
+  version, the signed archive carries that declaration, and a change to the version and the manifest
+  drift apart only with a failing test. The standalone Electron app's main process is unchanged: the
+  released Flatpak still owns its library, atomic store, backups and recovery, while the pack gets
+  those from the host, and removing the app's own copy would change how that app behaves.
+
 ### Fixed
 
 - **An export re-imports as the same money.** Importing a CSV or QIF this app wrote kept neither

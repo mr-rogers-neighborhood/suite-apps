@@ -13,7 +13,7 @@ import {
   loadCatalogue,
 } from "./catalogue.js";
 import { LAUNCHER_CONTEXT, suiteLinkFromArgv } from "./deepLink.js";
-import { DocumentStore } from "./documents.js";
+import { DocumentStore, declaredDocumentSchemaVersion } from "./documents.js";
 import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
 import { HOME_SCREEN_ID, openHomeScreen } from "./home.js";
@@ -438,16 +438,22 @@ function registerIpc(): void {
   });
   onPack(PACK_IPC.createDocument, (sender, name) => {
     if (!packAllows(sender.pack, "documents") || typeof name !== "string") return undefined;
-    return documentsFor(sender).create(sender.containerId, sender.packId, name);
+    return documentsFor(sender).create(sender.containerId, sender.packId, name, {
+      schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, name),
+    });
   });
   onPack(PACK_IPC.openDocument, (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
-    return documentsFor(sender).open(sender.containerId, sender.packId, id);
+    return documentsFor(sender).open(sender.containerId, sender.packId, id, {
+      schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, id),
+    });
   });
   onPack(PACK_IPC.saveDocument, (sender, id, bytes) => {
     if (!packAllows(sender.pack, "documents")) return undefined;
     if (typeof id !== "string" || !(bytes instanceof Uint8Array)) return undefined;
-    return documentsFor(sender).save(sender.containerId, sender.packId, id, bytes);
+    return documentsFor(sender).save(sender.containerId, sender.packId, id, bytes, {
+      schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, id),
+    });
   });
   onPack(PACK_IPC.removeDocument, (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;

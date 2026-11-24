@@ -77,10 +77,13 @@ The rules that shape the Suite host.
 - A pack declares its documents, migration chain and projection in the manifest. The host finds the
   declaration by id, proves one chain to the declared version before it writes, takes one `.bak` of
   the whole document, and invokes each declared entry with a handle scoped to that document. The
-  entry is pack code and runs in the pack's renderer; the main process never imports pack code and
-  never parses the payload. The envelope's schema version records a completed step, so a second run
-  writes nothing; a failed entry restores the one backup, so the old document stays readable. The
-  runner is injected, so binding it to a pack renderer is the remaining seam.
+  declared `version` is the envelope's schema version and the newest the host will open; a pack that
+  writes one format under many names declares it once with `mode: "multi"` and the declaration
+  applies to every name. The entry is pack code and runs in the pack's renderer; the main process
+  never imports pack code and never parses the payload. The envelope's schema version records a
+  completed step, so a second run writes nothing; a failed entry restores the one backup, so the old
+  document stays readable. The runner is injected, so binding it to a pack renderer is the remaining
+  seam.
 - A pack's blobs are three content-addressed class stores under
   `blobs/<container>/<pack>/<class>/<sha256>`; see
   [Blobs and export](../../../docs/reference/decisions.md#blobs-and-export). `blobs.ts` re-hashes a
