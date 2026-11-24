@@ -7,6 +7,7 @@ import {
   type PackIndexFailureReason,
   packIndexDigest,
   parsePackIndexJson,
+  SUITE_INDEX_PUBLIC_KEY,
   verifyPackIndex,
 } from "@suite/pack";
 import {
@@ -19,7 +20,8 @@ import {
 /**
  * The published catalogue, read on the phone.
  *
- * This is the same index the desktop shell reads: the same pinned operator key, the same
+ * This is the same index the desktop shell reads: the same pinned operator key, imported from
+ * `@suite/pack` (`packages/pack/src/pinnedKey.ts`) rather than copied, the same
  * `https://flatpak.suite.run/index.json`, and the same `@suite/pack` verifier. Go does not parse
  * or check the index itself. `parsePackIndexJson` refuses an oversized file, a duplicate key and a
  * malformed entry; `verifyPackIndex` refuses an unsigned index, a changed one, one signed by a key
@@ -30,19 +32,6 @@ import {
  * in the app's own key-value store so a replay is refused on the next launch too. The head is
  * written only after every check passed.
  */
-
-/**
- * The one catalogue operator key this host trusts.
- *
- * Fingerprint: `77:F5:4E:74:8A:AF:47:67:45:31:E9:4F:A7:6A:CA:72:F2:85:95:F1:EF:61:40:62:61:36:AC:AC:47:CB:3B:A1`.
- *
- * It is the same key as `SUITE_INDEX_PUBLIC_KEY` in `apps/shell/src/indexTrust.ts`. A test
- * recomputes the fingerprint, so the comment cannot drift from the value. The two copies are a
- * deliberate limit of this change: the operator pin has no shared home yet, and `@suite/pack` is
- * outside Go's ownership. Rotating it means editing both pins in one release; the fingerprint
- * check in each gate is what makes a missed edit fail rather than silently split the catalogue.
- */
-export const SUITE_INDEX_PUBLIC_KEY = "g/0ccvgNKdfiHC+i5wPDQqvPVhAyxBX8ZjrdzTi1zF8=";
 
 /** The published index, beside the Flatpak summary on the store's own origin (same as desktop). */
 export const DEFAULT_CATALOGUE_INDEX_URL = "https://flatpak.suite.run/index.json";

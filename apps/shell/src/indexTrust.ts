@@ -9,6 +9,7 @@ import {
   type PackIndexEntry,
   type PackIndexFailureReason,
   parsePackIndexJson,
+  SUITE_INDEX_PUBLIC_KEY,
   verifyPackIndex,
 } from "@suite/pack";
 import type { VerifiedCatalogueIndex, VerifiedIndexPack } from "./catalogue.js";
@@ -17,29 +18,21 @@ import { MAX_ARCHIVE_BYTES } from "./installedPacks.js";
 /**
  * The published catalogue index (S12.2).
  *
- * The index is a second trust root, separate from a pack's publisher key. Its
- * operator key is pinned here the same way the first-party pack key is pinned:
- * a constant compiled into the host, never a value the network supplies. An
- * index that names its own trust set proves only that a signature matches
- * whatever the caller was handed, so the key this module verifies against is
- * fixed in source and a caller cannot replace it.
+ * The index is a second trust root, separate from a pack's publisher key. Its operator key is
+ * pinned once in `@suite/pack`, beside the pack pin (`packages/pack/src/pinnedKey.ts`), and
+ * imported here: a constant compiled into the host, never a value the network supplies, and never
+ * a second copy. An index that names its own trust set proves only that a signature matches
+ * whatever the caller was handed, so the key this module verifies against is fixed in source and
+ * a caller cannot replace it.
  *
- * The private half is `SUITE_INDEX_KEY` in the release environment; only the
- * public half belongs in this repository. `scripts/release-index.mjs` signs
- * with it, and `SUITE_INDEX_KEY_FINGERPRINT` is the same key's fingerprint.
+ * The private half is `SUITE_INDEX_KEY` in the release environment; only the public half belongs
+ * in this repository. `scripts/release-index.mjs` signs with it, and
+ * `SUITE_INDEX_KEY_FINGERPRINT` is the same key's fingerprint. What a host trusts and what the
+ * publisher signs with stay separate values on purpose.
  *
- * Fetching is read-only: one request for the index and one per archive, each
- * carrying only an `accept` header. Nothing about the machine, the user or the
- * install is sent.
+ * Fetching is read-only: one request for the index and one per archive, each carrying only an
+ * `accept` header. Nothing about the machine, the user or the install is sent.
  */
-
-/**
- * The one catalogue operator key this host trusts.
- *
- * Fingerprint: `77:F5:4E:74:8A:AF:47:67:45:31:E9:4F:A7:6A:CA:72:F2:85:95:F1:EF:61:40:62:61:36:AC:AC:47:CB:3B:A1`.
- * A test recomputes it, so this comment cannot drift from the key unnoticed.
- */
-export const SUITE_INDEX_PUBLIC_KEY = "g/0ccvgNKdfiHC+i5wPDQqvPVhAyxBX8ZjrdzTi1zF8=";
 
 /** The variable that points a host at a different index, or turns it off. */
 export const CATALOGUE_INDEX_URL_VARIABLE = "SUITE_SHELL_INDEX";

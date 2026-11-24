@@ -249,7 +249,8 @@ The rules that shape the Suite host.
   default and `SUITE_SHELL_CATALOGUE` when set; a person may install from a file with no index and no
   network. The published index is `https://flatpak.suite.run/index.json` by default and
   `SUITE_SHELL_INDEX` when set (or `none` for the local directory only). Its operator key is a
-  compile-time constant in `apps/shell/src/indexTrust.ts`, not a value the index supplies. The host
+  compile-time constant in `packages/pack/src/pinnedKey.ts`, imported by both hosts and never a
+  value the index supplies. The host
   fetches and verifies the index before listing an entry, refuses a lower `sequence`, a `previous`
   that does not name the last verified head, and an `expires` in the past, and records that head in
   `<dataRoot>/trust/index-head.json`. A refused or unreachable index leaves the local directory

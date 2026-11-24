@@ -123,7 +123,7 @@ Review attestations and revocation are later seams.
 - `signPackManifest`, `verifyPackSignature`, `digestPackFiles`, `verifyPackFiles`, `sha256Hex`.
 - `publisherKeyFingerprint`, `checkPublisherTrust` and `addTrustedPublisher`: the publisher fingerprint, the trust-store match and the fingerprint-confirmed addition.
 - `generatePackKeyPair` for the build script and tests.
-- `SUITE_PACK_PUBLIC_KEY` at `src/pinnedKey.ts`, exported as `@suite/pack/pinned-key`: the one pack signing key the phone and the desktop both trust. A host imports it; it does not keep a second copy.
+- `SUITE_PACK_PUBLIC_KEY` and `SUITE_INDEX_PUBLIC_KEY` at `src/pinnedKey.ts`, exported as `@suite/pack/pinned-key`: the one pack signing key and the one catalogue operator key the phone and the desktop both trust. A host imports them; it does not keep a second copy.
 
 It is pure: no Node, no Electron, no filesystem. `@noble/ed25519` and WebCrypto are the only crypto dependencies.
 
