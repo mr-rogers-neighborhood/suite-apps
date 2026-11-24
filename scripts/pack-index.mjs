@@ -65,7 +65,7 @@ function timestamp(value, label) {
 }
 
 /** The 32-byte seed `signPackIndex` signs with, from PKCS#8 or a bare seed. */
-function seedBase64(text) {
+export function seedBase64(text) {
   const trimmed = text.trim();
   let der;
   if (trimmed.includes("-----BEGIN")) {

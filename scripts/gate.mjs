@@ -203,6 +203,7 @@ const scripts =
             "scripts/shell-channel.test.mjs",
             "scripts/android-release.test.mjs",
             "scripts/release-status.test.mjs",
+            "scripts/release-index.test.mjs",
             "scripts/delivery-signals.test.mjs",
             "scripts/flatpak-remote.test.mjs",
             "scripts/spec.test.mjs",

@@ -11,6 +11,7 @@ for the two Ed25519 keys; `pnpm android:key` answers it for the Android keystore
 | --- | --- | --- | --- | --- |
 | Pack signing | a signed app pack the phone and the desktop install | Ed25519 | `pack-key` | `SUITE_PACK_PUBLIC_KEY`, `packages/pack/src/pinnedKey.ts` |
 | Update signing | nothing the suite ships any more; it signed the retired relay tarball's `SHA256SUMS` | Ed25519 | `update-key.pem` | `SUITE_UPDATE_PUBLIC_KEY`, `packages/desktop/src/updateSignature.ts` |
+| Catalogue operator | the signed pack index | Ed25519 | `SUITE_INDEX_KEY` in the `release` environment | printed in the release notes until the host pin lands (#331) |
 | Android release | every Suite Go APK, on all four channels | RSA-4096 certificate | `suite-go-release.jks` and `suite-go-release.pass` | `ANDROID_RELEASE_CERT_SHA256`, `scripts/lib/androidKey.mjs` |
 
 The Flatpak store key is a fourth secret with a different job; [Packaging
