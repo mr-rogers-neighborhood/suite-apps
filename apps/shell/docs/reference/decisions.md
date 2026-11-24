@@ -137,10 +137,12 @@ The rules that shape the Suite host.
   data, and the publisher id is part of the key, so a later install by another publisher under the
   same pack id is a different app. Uninstalling does not silently erase where the person has been;
   they remove a row with forget, or the app records a fresh open.
-- `recents` is a First use capability. The host asks once per pack, on the first list, and stores the
-  answer with the list (granted or denied, plus the ask time). A denial is a sentence, not an empty
-  list. This is the reminder queue's one-time question applied to the recent list; the general
-  consent record with a tier table (S4.3) is still absent, and the ledger says so.
+- `recents` is a First use capability. The host asks once per pack version through the one consent
+  surface and stores the answer in `consent.json`, not with the rows. A denial is a sentence, not an
+  empty list, and it is shown on the pack's card until the person asks again there.
+- The version-1 `recents.json` carried its own permission map. It is read once at startup and each
+  answer is attached to the version installed today, marked `recents-v1`; a pack with no installed
+  version is re-asked rather than guessed. The file is then rewritten as rows only.
 - The host watches a pack's own document directory only while one of its tabs is open. It keeps a
   fingerprint per document at `<dataRoot>/library.json`, so `documents.pendingChanges` compares the
   files with what the pack last saw and reports ids, including a change made while the pack was
@@ -162,16 +164,45 @@ The rules that shape the Suite host.
   (`documents[].projection`) and binds that entry in its prelude; the host calls it on save and on
   open with a read-only handle, and receives display rows: id, title, body, instant and deep link.
   The pack never schedules, polls or formats a notification.
-- The host owns the queue at `<dataRoot>/reminders.json` (permission, ask time and rows). A row
-  carries the pack id and a captured-at time. The queue survives the pack closing and a host
-  restart, and the scheduler reads only the rows, so nothing runs when the pack is closed.
-- The host asks for notification permission once and records the answer. A denial or an unsupported
-  system is a sentence on Home, not a silent drop; the rows stay queued for a later grant.
+- The host owns the queue at `<dataRoot>/reminders.json` (rows only). A row carries the pack id and a
+  captured-at time. The queue survives the pack closing and a host restart, and the scheduler reads
+  only the rows, so nothing runs when the pack is closed.
+- `notifications` is a Token capability: the scheduler asks the pack that owns the earliest row
+  through the consent surface, and the grant expires after thirty days. A denial or an unsupported
+  system is a sentence on Home and a refusal on the pack's card, not a silent drop; the rows stay
+  queued for the person's deliberate re-ask.
+- The version-1 queue carried one host-wide permission and no pack id. That answer cannot become a
+  per-pack grant without re-granting to packs the person never saw, so it is not copied: each pack
+  is asked at its next reminder and the consent record marks the migration unmappable.
 - Rows are refreshed only on save and on open. A projection that returns invalid rows removes the
   pack's rows; a transport failure keeps the last good rows. A click focuses the host and routes the
   deep link, and the pack resolves it once it is running.
 - Removing a pack's last version prunes its rows; a pack that drops `notifications` loses them too.
   Nothing outlives its pack.
+
+## Consent
+
+- There is one consent record, at `<dataRoot>/trust/consent.json` beside the publisher trust store,
+  keyed by `(publisher, pack, version, capability)` (S4.2, S4.3). It records the tier, the reason the
+  person saw, the answer and when; a denial is an entry, not an absent row. The file is the host's
+  and the person's, not a pack proxy: `ConsentRecord.answersFor` returns only one publisher and
+  pack, and there is no host method that hands a pack another pack's answers.
+- Every capability asks through the same `askConsent` surface in the main process. The dialog names
+  the pack, the capability, the tier and the reason; the record decides whether a person is asked
+  at all. A remembered denial never opens the dialog again, which is what makes a pack unable to
+  nag; the pack's card is the only deliberate re-ask.
+- Tiers are a property of the capability, not a caller's choice. `documents`, `files`, `network` and
+  `identity.pack` are install-tier: the install confirmation showed them, so they are recorded then
+  and never asked per use. `recents` is first-use. `notifications` is a token, re-asked when thirty
+  days pass. Every-use is implemented for the media capabilities the spec names, which this host
+  does not serve yet.
+- Keying by version is deliberate: an update that adds a capability has no answer for the new
+  version and pauses on a fresh consent, while a removed capability is no longer read because the
+  pack no longer declares it. Removing a pack's last version clears its rows.
+- The two ad-hoc answers are migrated once, in `migrateLegacyConsentRecords`. Recents keeps a grant
+  or refusal because its old key named the publisher and pack; notifications does not, because its
+  old answer named no pack. Re-asking is visible, and silently copying a host-wide grant would not
+  be.
 
 ## UI ownership
 

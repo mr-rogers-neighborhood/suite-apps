@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld("suiteShell", {
   installPack: () => ipcRenderer.invoke("suite:shell:install-pack"),
   installCataloguePack: (id, version) =>
     ipcRenderer.invoke("suite:shell:install-catalogue-pack", id, version),
+  reaskConsent: (packId, capability) =>
+    ipcRenderer.invoke("suite:shell:reask-consent", packId, capability),
   importRevocation: () => ipcRenderer.invoke("suite:shell:import-revocation"),
   rotatePublisher: () => ipcRenderer.invoke("suite:shell:rotate-publisher"),
   uninstallPack: (id, version) => ipcRenderer.invoke("suite:shell:uninstall-pack", id, version),

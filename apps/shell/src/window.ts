@@ -183,6 +183,7 @@ export class ShellWindow {
         capabilities: pack.capabilities,
         source: pack.source,
         publisher: pack.publisher,
+        consent: pack.consent ?? [],
       })),
       catalogue: this.#catalogue,
       catalogueSource: this.#catalogueSource,

@@ -14,7 +14,11 @@ import { dirname } from "node:path";
  * binding lives in `reminderDelivery.ts` and `main.ts`.
  */
 
-/** The permission state the host keeps with the queue. `prompt` has never been asked. */
+/**
+ * What the consent record says about the notification token, in the scheduler's
+ * vocabulary. `prompt` means unanswered or expired, so the host may ask; a
+ * remembered `denied` is never asked again until the person clears it.
+ */
 export type ReminderPermission = "prompt" | "granted" | "denied" | "unsupported";
 
 /** A display row a pack projects. The host adds the pack id and capture time. */
@@ -36,14 +40,21 @@ export interface ReminderRow extends ProjectedReminder {
 }
 
 export interface ReminderQueueData {
-  readonly version: 1;
-  readonly permission: ReminderPermission;
-  /** When the host asked, or null before it did. */
-  readonly askedAt: number | null;
+  readonly version: typeof REMINDER_QUEUE_VERSION;
   readonly rows: readonly ReminderRow[];
 }
 
-export const REMINDER_QUEUE_VERSION = 1;
+/**
+ * The one host-wide answer a version-1 file carried. It had no pack, publisher
+ * or version, so it cannot become a per-pack grant; `consent.ts` records that
+ * fact and the notification capability is asked again at a pack's next use.
+ */
+export interface LegacyNotificationPermission {
+  readonly state: "granted" | "denied";
+  readonly askedAt: number;
+}
+
+export const REMINDER_QUEUE_VERSION = 2;
 export const MAX_REMINDERS_PER_PACK = 200;
 const MAX_ID_LENGTH = 128;
 const MAX_TITLE_LENGTH = 120;
@@ -157,15 +168,24 @@ export function isReminderRow(value: unknown): value is ReminderRow {
 export class ReminderQueue {
   readonly #file: string;
   #data: ReminderQueueData;
+  #legacy: LegacyNotificationPermission | null;
+  #rewrite: boolean;
   #writing: Promise<void> = Promise.resolve();
 
-  private constructor(file: string, data: ReminderQueueData) {
+  private constructor(
+    file: string,
+    data: ReminderQueueData,
+    legacy: LegacyNotificationPermission | null,
+    rewrite: boolean,
+  ) {
     this.#file = file;
     this.#data = data;
+    this.#legacy = legacy;
+    this.#rewrite = rewrite;
   }
 
   static async open(file: string): Promise<ReminderQueue> {
-    let parsed: ReminderQueueData | null = null;
+    let parsed: ParsedQueue | null = null;
     try {
       parsed = parseQueueData(JSON.parse(await readFile(file, "utf8")));
     } catch (error) {
@@ -175,15 +195,25 @@ export class ReminderQueue {
         console.warn("[shell] the reminder queue could not be read; starting empty", error);
       }
     }
-    return new ReminderQueue(file, parsed ?? emptyQueue());
+    return new ReminderQueue(
+      file,
+      parsed?.data ?? emptyQueue(),
+      parsed?.legacy ?? null,
+      parsed?.rewrite ?? false,
+    );
   }
 
-  get permission(): ReminderPermission {
-    return this.#data.permission;
+  /** The version-1 answer this file carried, for the one-time migration. */
+  legacyPermission(): LegacyNotificationPermission | null {
+    return this.#legacy;
   }
 
-  get askedAt(): number | null {
-    return this.#data.askedAt;
+  /** Write the version-2 shape after the consent record has seen the old answer. */
+  async discardLegacyPermission(): Promise<void> {
+    if (!this.#rewrite && this.#legacy === null) return;
+    this.#legacy = null;
+    this.#rewrite = false;
+    await this.#persist();
   }
 
   rows(): readonly ReminderRow[] {
@@ -192,12 +222,6 @@ export class ReminderQueue {
 
   rowsFor(packId: string): readonly ReminderRow[] {
     return this.#data.rows.filter((row) => row.packId === packId);
-  }
-
-  async setPermission(permission: ReminderPermission, at: number): Promise<void> {
-    if (this.#data.permission === permission && this.#data.askedAt !== null) return;
-    this.#data = { ...this.#data, permission, askedAt: at };
-    await this.#persist();
   }
 
   /** Replace one pack's rows. The same projection twice leaves the queue unchanged. */
@@ -254,36 +278,39 @@ export class ReminderQueue {
 }
 
 function emptyQueue(): ReminderQueueData {
-  return { version: REMINDER_QUEUE_VERSION, permission: "prompt", askedAt: null, rows: [] };
+  return { version: REMINDER_QUEUE_VERSION, rows: [] };
 }
 
-function parseQueueData(value: unknown): ReminderQueueData {
+interface ParsedQueue {
+  readonly data: ReminderQueueData;
+  readonly legacy: LegacyNotificationPermission | null;
+  /** True for a version-1 file, so the first open rewrites it as version 2. */
+  readonly rewrite: boolean;
+}
+
+function parseQueueData(value: unknown): ParsedQueue {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("the reminder queue is not an object");
   }
   const record = value as Record<string, unknown>;
-  if (record.version !== REMINDER_QUEUE_VERSION) {
+  if (record.version !== 1 && record.version !== REMINDER_QUEUE_VERSION) {
     throw new Error(`the reminder queue is at version ${String(record.version)}`);
   }
-  const permission = record.permission;
-  if (
-    permission !== "prompt" &&
-    permission !== "granted" &&
-    permission !== "denied" &&
-    permission !== "unsupported"
-  ) {
-    throw new Error("the reminder queue has no valid permission");
-  }
-  const askedAt =
-    record.askedAt === null
-      ? null
-      : typeof record.askedAt === "number" && Number.isInteger(record.askedAt) && record.askedAt > 0
-        ? record.askedAt
-        : null;
   if (!Array.isArray(record.rows)) throw new Error("the reminder queue has no row list");
 
   const rows = record.rows.filter(isReminderRow);
-  return { version: REMINDER_QUEUE_VERSION, permission, askedAt, rows };
+  const data: ReminderQueueData = { version: REMINDER_QUEUE_VERSION, rows };
+
+  if (record.version !== 1) return { data, legacy: null, rewrite: false };
+
+  const askedAt =
+    typeof record.askedAt === "number" && Number.isInteger(record.askedAt) && record.askedAt > 0
+      ? record.askedAt
+      : null;
+  const state = record.permission;
+  const legacy: LegacyNotificationPermission | null =
+    askedAt !== null && (state === "granted" || state === "denied") ? { state, askedAt } : null;
+  return { data, legacy, rewrite: true };
 }
 
 async function quarantine(file: string): Promise<void> {
@@ -304,15 +331,26 @@ export interface ReminderClock {
 export type ReminderShowResult = "shown" | "denied" | "unsupported" | "failed";
 
 export interface ReminderDelivery {
-  /** Ask once. A host with no channel answers `unsupported`. */
-  request(): Promise<ReminderPermission>;
   show(row: ReminderRow): Promise<ReminderShowResult> | ReminderShowResult;
+}
+
+/**
+ * The host's consent surface, seen from the scheduler.
+ *
+ * `state` never opens a dialog; `ensure` asks at the token tier only when the
+ * record says unanswered or expired. A remembered denial is returned by both and
+ * is never asked again.
+ */
+export interface ReminderConsent {
+  state(packId: string): ReminderPermission;
+  ensure(packId: string): Promise<ReminderPermission>;
 }
 
 export interface ReminderSchedulerOptions {
   readonly queue: ReminderQueue;
   readonly clock: ReminderClock;
   readonly delivery: ReminderDelivery;
+  readonly consent: ReminderConsent;
   /** Called when the permission state changes; `granted` clears a visible denial. */
   readonly onPermission?: (permission: ReminderPermission) => void;
   readonly onDelivered?: (row: ReminderRow) => void;
@@ -330,6 +368,7 @@ export class ReminderScheduler {
   readonly #queue: ReminderQueue;
   readonly #clock: ReminderClock;
   readonly #delivery: ReminderDelivery;
+  readonly #consent: ReminderConsent;
   readonly #onPermission: ((permission: ReminderPermission) => void) | undefined;
   readonly #onDelivered: ((row: ReminderRow) => void) | undefined;
   readonly #onFailed: ((row: ReminderRow, error: unknown) => void) | undefined;
@@ -339,11 +378,14 @@ export class ReminderScheduler {
   #working: Promise<void> = Promise.resolve();
   /** One permission ask at a time; a second save must not open a second prompt. */
   #ensuring: Promise<void> | null = null;
+  /** The packs whose token is granted in this run. A denied pack is never retried by a timer. */
+  #granted = new Set<string>();
 
   constructor(options: ReminderSchedulerOptions) {
     this.#queue = options.queue;
     this.#clock = options.clock;
     this.#delivery = options.delivery;
+    this.#consent = options.consent;
     this.#onPermission = options.onPermission;
     this.#onDelivered = options.onDelivered;
     this.#onFailed = options.onFailed;
@@ -359,7 +401,7 @@ export class ReminderScheduler {
     this.#cancel();
   }
 
-  /** Re-read the queue after a save, open or removal. Never a background poll. */
+  /** Re-read the queue after a save, open, removal or a deliberate re-ask. Never a background poll. */
   async refresh(): Promise<void> {
     if (!this.#running) return;
     await this.#ensure();
@@ -383,32 +425,39 @@ export class ReminderScheduler {
 
   async #runEnsure(): Promise<void> {
     this.#cancel();
+    this.#granted.clear();
     if (!this.#running) return;
 
     const rows = this.#queue.rows();
     if (rows.length === 0) return;
 
-    if (this.#queue.permission === "prompt") {
-      const permission = await this.#delivery.request();
-      await this.#queue.setPermission(permission, this.#clock.now());
-      if (permission !== "granted") {
-        this.#permissionChanged(permission);
-        return;
+    // One ask per refresh at most, for the pack with the earliest row that has
+    // no answer yet. A remembered answer costs nothing; a denial stops here,
+    // and its rows stay queued for the person's deliberate re-ask.
+    let askedOne = false;
+    for (const packId of packOrder(rows)) {
+      let state = this.#consent.state(packId);
+      if (state === "prompt" && !askedOne) {
+        state = await this.#consent.ensure(packId);
+        askedOne = true;
+      }
+      if (state === "granted") {
+        this.#granted.add(packId);
+      } else {
+        this.#permissionChanged(state);
       }
     }
 
-    if (this.#queue.permission !== "granted") {
-      this.#permissionChanged(this.#queue.permission);
-      return;
-    }
-
+    if (this.#granted.size === 0) return;
     this.#permissionChanged("granted");
     this.#arm();
   }
 
   #arm(): void {
     this.#cancel();
-    const next = [...this.#queue.rows()].sort((left, right) => left.at - right.at)[0];
+    const next = [...this.#queue.rows()]
+      .filter((row) => this.#granted.has(row.packId))
+      .sort((left, right) => left.at - right.at)[0];
     if (next === undefined) return;
     const at = Math.max(this.#clock.now(), next.at);
     this.#timer = this.#clock.setTimer(at, () => {
@@ -431,7 +480,7 @@ export class ReminderScheduler {
     const now = this.#clock.now();
     const due = this.#queue
       .rows()
-      .filter((row) => row.at <= now)
+      .filter((row) => row.at <= now && this.#granted.has(row.packId))
       .sort((left, right) => left.at - right.at);
 
     for (const row of due) {
@@ -440,6 +489,7 @@ export class ReminderScheduler {
         result = await this.#delivery.show(row);
       } catch (error) {
         this.#onFailed?.(row, error);
+        await this.#ensure();
         return;
       }
 
@@ -451,15 +501,21 @@ export class ReminderScheduler {
 
       if (result === "failed") {
         this.#onFailed?.(row, new Error("the reminder could not be shown"));
+        await this.#ensure();
         return;
       }
 
-      await this.#queue.setPermission(result, now);
+      // The OS refused after the host had consent. That is not a person's answer,
+      // so it is reported but not written into the consent record.
+      this.#granted.delete(row.packId);
       this.#permissionChanged(result);
+      await this.#ensure();
       return;
     }
 
-    this.#arm();
+    // Re-evaluate so a second pack with no answer is asked after the first
+    // pack's due rows are gone, rather than only on the next save.
+    await this.#ensure();
   }
 
   #permissionChanged(permission: ReminderPermission): void {
@@ -472,4 +528,16 @@ export class ReminderScheduler {
     this.#timer?.cancel();
     this.#timer = null;
   }
+}
+
+/** Pack ids in the order of their earliest live row, so the first prompt is the most urgent. */
+function packOrder(rows: readonly ReminderRow[]): readonly string[] {
+  const earliest = new Map<string, number>();
+  for (const row of rows) {
+    const current = earliest.get(row.packId);
+    if (current === undefined || row.at < current) earliest.set(row.packId, row.at);
+  }
+  return [...earliest.entries()]
+    .sort((left, right) => left[1] - right[1])
+    .map(([packId]) => packId);
 }

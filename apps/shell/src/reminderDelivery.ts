@@ -1,9 +1,4 @@
-import type {
-  ReminderDelivery,
-  ReminderPermission,
-  ReminderRow,
-  ReminderShowResult,
-} from "./reminders.js";
+import type { ReminderDelivery, ReminderRow, ReminderShowResult } from "./reminders.js";
 
 /**
  * The OS half of reminder delivery, kept away from Electron.
@@ -22,8 +17,6 @@ export interface HostNotification {
 export interface ReminderPlatform {
   /** False when the OS has no notification channel at all. */
   isSupported(): boolean;
-  /** Ask the person once. A denial is remembered by the queue, not re-asked. */
-  ask(): Promise<ReminderPermission>;
   create(row: ReminderRow): HostNotification;
 }
 
@@ -39,15 +32,6 @@ export function createReminderDelivery(
   hooks: ReminderDeliveryHooks,
 ): ReminderDelivery {
   return {
-    async request(): Promise<ReminderPermission> {
-      if (!platform.isSupported()) return "unsupported";
-      try {
-        return await platform.ask();
-      } catch {
-        return "denied";
-      }
-    },
-
     show(row: ReminderRow): ReminderShowResult {
       if (!platform.isSupported()) return "unsupported";
       try {

@@ -1,10 +1,11 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   parseProjectedReminders,
   type ReminderClock,
+  type ReminderConsent,
   type ReminderDelivery,
   type ReminderPermission,
   ReminderProjectionError,
@@ -54,26 +55,50 @@ class ManualClock implements ReminderClock {
 
 interface FakeDelivery extends ReminderDelivery {
   readonly shown: ReminderRow[];
-  requests: number;
   result: ReminderShowResult;
 }
 
-function delivery(
-  permission: ReminderPermission = "granted",
-  result: ReminderShowResult = "shown",
-) {
+function delivery(result: ReminderShowResult = "shown") {
   const shown: ReminderRow[] = [];
   const fake: FakeDelivery = {
     shown,
-    requests: 0,
     result,
-    async request() {
-      fake.requests += 1;
-      return permission;
-    },
     show(row) {
       shown.push(row);
       return fake.result;
+    },
+  };
+  return fake;
+}
+
+/**
+ * A stand-in for the consent record. `initial` is what is remembered now
+ * (`null` for unanswered); `reply` is what the person answers when asked.
+ */
+interface FakeConsent extends ReminderConsent {
+  requests: number;
+  reply: ReminderPermission;
+  remember(state: ReminderPermission | null): void;
+}
+
+function consent(
+  reply: ReminderPermission = "granted",
+  initial: ReminderPermission | null = reply,
+): FakeConsent {
+  let remembered = initial;
+  const fake: FakeConsent = {
+    requests: 0,
+    reply,
+    state() {
+      return remembered ?? "prompt";
+    },
+    async ensure() {
+      fake.requests += 1;
+      remembered = fake.reply;
+      return remembered;
+    },
+    remember(state) {
+      remembered = state;
     },
   };
   return fake;
@@ -155,6 +180,32 @@ describe("the reminder queue", () => {
     expect(queue.rowsFor("budget")).toHaveLength(1);
   });
 
+  // spec: S4.2
+  it("reads a version-1 permission for the one-time migration and rewrites rows only", async () => {
+    const file = await queueFile();
+    await writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        permission: "granted",
+        askedAt: 1_000,
+        rows: [{ ...projected(), packId: PACK, capturedAt: NOW }],
+      }),
+      "utf8",
+    );
+
+    const queue = await ReminderQueue.open(file);
+    expect(queue.legacyPermission()).toEqual({ state: "granted", askedAt: 1_000 });
+    expect(queue.rows()).toHaveLength(1);
+
+    await queue.discardLegacyPermission();
+
+    const written = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    expect(written.version).toBe(2);
+    expect(written.permission).toBeUndefined();
+    expect((await ReminderQueue.open(file)).legacyPermission()).toBeNull();
+  });
+
   it("validates the rows a pack projects", () => {
     expect(parseProjectedReminders([projected()], PACK)).toEqual([projected()]);
 
@@ -185,7 +236,8 @@ describe("the reminder scheduler", () => {
   it("fires a due row with the pack closed, then removes it", async () => {
     const clock = new ManualClock(NOW);
     const fake = delivery();
-    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake });
+    const gate = consent();
+    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake, consent: gate });
     await queue.replacePack(PACK, [projected("a", NOW + 60_000)], NOW);
     await scheduler.start();
 
@@ -204,7 +256,8 @@ describe("the reminder scheduler", () => {
   it("delivers an overdue row as soon as the scheduler starts", async () => {
     const clock = new ManualClock(NOW);
     const fake = delivery();
-    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake });
+    const gate = consent();
+    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake, consent: gate });
     await queue.replacePack(PACK, [projected("a", NOW - 60_000)], NOW);
 
     await scheduler.start();
@@ -218,7 +271,8 @@ describe("the reminder scheduler", () => {
   it("arms for the next row after the first one fires", async () => {
     const clock = new ManualClock(NOW);
     const fake = delivery();
-    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake });
+    const gate = consent();
+    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake, consent: gate });
     await queue.replacePack(PACK, [projected("a", NOW + 1_000), projected("b", NOW + 2_000)], NOW);
     await scheduler.start();
 
@@ -232,26 +286,28 @@ describe("the reminder scheduler", () => {
     scheduler.stop();
   });
 
+  // spec: S4.2
   it("asks once, and shows a denial instead of scheduling", async () => {
     const clock = new ManualClock(NOW);
-    const fake = delivery("denied");
+    const fake = delivery();
+    const gate = consent("denied", null);
     const states: ReminderPermission[] = [];
     const scheduler = new ReminderScheduler({
       queue,
       clock,
       delivery: fake,
+      consent: gate,
       onPermission: (permission) => states.push(permission),
     });
     await queue.replacePack(PACK, [projected("a", NOW + 60_000)], NOW);
 
     await scheduler.start();
-    expect(fake.requests).toBe(1);
-    expect(queue.permission).toBe("denied");
+    expect(gate.requests).toBe(1);
     expect(states).toEqual(["denied"]);
     expect(fake.shown).toEqual([]);
 
     await scheduler.refresh();
-    expect(fake.requests).toBe(1);
+    expect(gate.requests).toBe(1);
     clock.advance(60_000);
     await scheduler.settle();
     expect(fake.shown).toEqual([]);
@@ -261,12 +317,13 @@ describe("the reminder scheduler", () => {
 
   it("keeps a denied pack's rows for a later grant", async () => {
     const clock = new ManualClock(NOW);
-    const fake = delivery("denied");
-    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake });
+    const fake = delivery();
+    const gate = consent("denied", null);
+    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake, consent: gate });
     await queue.replacePack(PACK, [projected("a", NOW + 60_000)], NOW);
     await scheduler.start();
 
-    await queue.setPermission("granted", clock.now());
+    gate.remember("granted");
     await scheduler.refresh();
     clock.advance(60_000);
     await scheduler.settle();
@@ -278,11 +335,12 @@ describe("the reminder scheduler", () => {
   it("does not ask when there is nothing to deliver", async () => {
     const clock = new ManualClock(NOW);
     const fake = delivery();
-    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake });
+    const gate = consent();
+    const scheduler = new ReminderScheduler({ queue, clock, delivery: fake, consent: gate });
 
     await scheduler.start();
 
-    expect(fake.requests).toBe(0);
+    expect(gate.requests).toBe(0);
     scheduler.stop();
   });
 });

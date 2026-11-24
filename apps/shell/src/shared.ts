@@ -25,6 +25,7 @@ export const CHROME_IPC = {
   openExternal: "suite:shell:open-external",
   installPack: "suite:shell:install-pack",
   installCataloguePack: "suite:shell:install-catalogue-pack",
+  reaskConsent: "suite:shell:reask-consent",
   importRevocation: "suite:shell:import-revocation",
   rotatePublisher: "suite:shell:rotate-publisher",
   uninstallPack: "suite:shell:uninstall-pack",
@@ -148,6 +149,21 @@ export interface PackPublisherView {
   readonly fingerprint: string;
 }
 
+/**
+ * The four strengths a capability can be asked at (S4.2). One vocabulary for
+ * the record, the dialog and the pack card.
+ */
+export type ConsentTier = "install" | "first-use" | "every-use" | "token";
+
+/** One recorded answer, as the pack's card shows it. */
+export interface PackConsentView {
+  readonly capability: PackCapability;
+  readonly tier: ConsentTier;
+  readonly answer: "granted" | "denied" | "expired";
+  readonly reason: string;
+  readonly answeredAt: number;
+}
+
 /** What the chrome needs to render a pack tile. No path and no code. */
 export interface PackSummary {
   readonly id: string;
@@ -159,6 +175,8 @@ export interface PackSummary {
   readonly source: PackSource;
   /** Null only for an unsigned development directory. */
   readonly publisher: PackPublisherView | null;
+  /** Answers for this installed version (S4.3); a denial is shown, not swallowed. */
+  readonly consent?: readonly PackConsentView[];
 }
 
 /** How this host fits a pack's `platforms` declaration, as the chrome shows it. */
