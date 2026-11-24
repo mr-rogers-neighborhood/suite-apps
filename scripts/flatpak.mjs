@@ -177,6 +177,36 @@ if (!app) {
   process.exit(2);
 }
 
+/**
+ * The metainfo's newest `<release>` is the version `flatpak info` and
+ * `flatpak list` show. It is a second copy of the app's `package.json`, which
+ * owns the version, so refuse a build whose copy has drifted: the artifact
+ * would carry the new code under the previous number.
+ */
+function metainfoVersionProblem(entry) {
+  const packagePath = join(entry.project, "package.json");
+  const version = JSON.parse(readFileSync(packagePath, "utf8")).version;
+  const versions = [...readFileSync(entry.metainfo, "utf8").matchAll(
+    /<release\s+version="([^"]+)"/gu,
+  )].map((match) => match[1]);
+  if (versions.length === 0) {
+    return `${entry.metainfo} names no release version; it must name ${version}`;
+  }
+  if (versions[0] !== version) {
+    return (
+      `${entry.metainfo} names ${versions[0]} but ${packagePath} is ${version}; ` +
+      "add the release line before building"
+    );
+  }
+  return null;
+}
+
+const metainfoMiss = metainfoVersionProblem(app);
+if (metainfoMiss !== null) {
+  process.stderr.write(`${metainfoMiss}\n`);
+  process.exit(1);
+}
+
 if (session && isPreRelease(channel)) {
   process.stdout.write(
     `${appName}: session build on ${channel}; it is local and is never published.\n`,
