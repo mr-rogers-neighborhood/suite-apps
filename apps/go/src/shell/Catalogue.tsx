@@ -130,6 +130,14 @@ export function CatalogueRow({
           ? "Asks for nothing"
           : `Uses ${entry.capabilities.join(", ")}`}
       </p>
+      {entry.platform.state === "available" ? null : (
+        <p role="status" className="mt-1 text-[13px] text-[var(--ink)]">
+          {entry.platform.reason ??
+            (entry.platform.state === "unknown"
+              ? "Platform unknown: this pack declares no platforms."
+              : "Not available on this phone.")}
+        </p>
+      )}
       <p className="mt-1 text-[13px] text-[var(--ink-muted)]">
         {entry.installedVersion === null
           ? "Not installed"
@@ -183,6 +191,18 @@ function ActionButton({
   readonly entry: CatalogueEntry;
   readonly onInstall: () => void;
 }) {
+  if (entry.platform.state === "unavailable") {
+    return (
+      <button
+        type="button"
+        className="touch rounded-xl border border-[var(--hairline)] px-4 text-[15px] font-medium text-[var(--ink)] opacity-50 focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:outline-none"
+        disabled
+      >
+        Not available on this phone
+      </button>
+    );
+  }
+
   if (entry.action === "current") {
     return (
       <button

@@ -145,6 +145,16 @@ export interface PackSummary {
   readonly publisher: PackPublisherView | null;
 }
 
+/** How this host fits a pack's `platforms` declaration, as the chrome shows it. */
+export type CataloguePlatformState = "available" | "unavailable" | "unknown";
+
+export interface CataloguePlatform {
+  /** `unknown` means the manifest predates `platforms`; it is never "supported". */
+  readonly state: CataloguePlatformState;
+  /** The refusal sentence, or the unknown explanation; null when available. */
+  readonly reason: string | null;
+}
+
 /**
  * A pack on disk that the catalogue found.
  *
@@ -163,6 +173,8 @@ export interface CatalogueEntry {
   readonly refusal: string | null;
   readonly publisher: PackPublisherView | null;
   readonly capabilities: readonly PackCapability[];
+  /** The pack's `platforms` intersected with what this host serves. */
+  readonly platform: CataloguePlatform;
   /** Archive size, so the chrome can show it before an install. */
   readonly sizeBytes: number;
   /** True when this version is newer than the highest valid installed version. */

@@ -88,7 +88,11 @@ and its signature. A second implementation MUST verify the same vector.
 **S3.5** The manifest declares `format`, `id`, `name`, `version`, `entry`, `contractVersion`,
 `publisher`, `capabilities`, `files` and `signature`. Optional fields cover documents, blobs, sync,
 network, platforms, input, locales, widgets, code widgets, components, contributions, subpackages,
-add-ons, export, license and deprecation.
+add-ons, export, license and deprecation. A `platforms` value is an opaque **host kind** (`desktop`,
+`mobile`, `tv`, `tablet`, `foldable`, `xr`, …), not a build target. An unknown kind parses and
+simply matches no host: the list is open, and rejecting the manifest would make the pack
+uninstallable everywhere. A manifest with no `platforms` is **unknown**, never universal; an
+unknown value is the deliberate exception to the closed vocabularies in S3.7.
 
 **S3.6** `id` is a stable lower-case id, 1–32 characters. `entry` is a relative HTML path listed in
 `files`; a path with `..`, a backslash or a leading slash is refused. Every file carries a lower-case

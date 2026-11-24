@@ -224,6 +224,23 @@ describe("loading a catalogue index", () => {
     expect(loaded.entries.find((row) => row.id === "probe")?.installedVersion).toBe("1.0.0");
   });
 
+  it("marks a pack needing an unserved capability unavailable and refuses it before download", async () => {
+    const text = signedText([entry({ capabilities: ["documents", "files"] })]);
+    const { catalogue, fetch } = catalogueFor(text);
+
+    const loaded = await catalogue.load();
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.entries[0]?.platform).toEqual({
+      state: "unavailable",
+      reason: "not available on Go — needs `files`",
+    });
+
+    const result = await catalogue.install("probe", "1.0.0");
+    expect(result).toMatchObject({ ok: false, reason: "platform" });
+    expect(fetch.requested).toEqual([DEFAULT_CATALOGUE_INDEX_URL]);
+  });
+
   it("refuses an unsigned index", async () => {
     const unsigned = JSON.stringify({ ...core([entry()]), signatures: [] });
 

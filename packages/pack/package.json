@@ -36,6 +36,12 @@
       "import": "./dist/pinnedKey.js",
       "default": "./dist/pinnedKey.js"
     },
+    "./platforms": {
+      "types": "./dist/platforms.d.ts",
+      "development": "./src/platforms.ts",
+      "import": "./dist/platforms.js",
+      "default": "./dist/platforms.js"
+    },
     "./signature": {
       "types": "./dist/signature.d.ts",
       "development": "./src/signature.ts",

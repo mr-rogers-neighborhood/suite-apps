@@ -5,11 +5,15 @@ import {
   type PackCapability,
   type PackIndexEntry,
   type PackIndexFailureReason,
+  type PlatformFitView,
   packIndexDigest,
   parsePackIndexJson,
+  platformFit,
+  platformFitView,
   SUITE_INDEX_PUBLIC_KEY,
   verifyPackIndex,
 } from "@suite/pack";
+import { GO_HOST } from "@suite/pack/platforms";
 import {
   type InstallFailureReason,
   type InstallOutcome,
@@ -61,6 +65,14 @@ export interface CatalogueEntry {
   readonly description: string | null;
   readonly version: string;
   readonly capabilities: readonly PackCapability[];
+  /**
+   * What this phone knows about the pack's `platforms`.
+   *
+   * The index does not carry a platform declaration, so a covered capability
+   * set is `unknown` here — never `available`. The archive's manifest is read at
+   * install and the store refuses a kind this phone is not (S4.8).
+   */
+  readonly platform: PlatformFitView;
   readonly sizeBytes: number;
   readonly sha256: string;
   readonly url: string;
@@ -264,6 +276,7 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
           description: entry.description ?? null,
           version: entry.version,
           capabilities: entry.capabilities,
+          platform: cataloguePlatform(entry.capabilities),
           sizeBytes: entry.size,
           sha256: entry.sha256,
           url: entry.url,
@@ -296,6 +309,18 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
         ok: false,
         reason: "invalid",
         message: `${entry.name} ${entry.version} is already the newest installed version. Reinstall only replaces the same version.`,
+      };
+    }
+
+    // The index carries capabilities, so a definite mismatch is refused before the
+    // archive is downloaded. A platform-only mismatch is caught by the pack store
+    // once it reads the manifest.
+    const fit = platformFit({ capabilities: entry.capabilities }, GO_HOST);
+    if (fit.state === "unavailable") {
+      return {
+        ok: false,
+        reason: "platform",
+        message: fit.reason ?? "That pack is not available on this phone.",
       };
     }
 
@@ -355,6 +380,25 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
   return { load, install, remove, head: readHead };
 }
 
+/**
+ * What the index lets this phone know about a pack's platforms.
+ *
+ * The index carries capabilities but no platform declaration, so a covered
+ * capability set is unknown here rather than available. The archive's manifest is
+ * read at install, where the pack store refuses a kind this phone is not (S4.8).
+ */
+function cataloguePlatform(capabilities: readonly PackCapability[]): PlatformFitView {
+  const fit = platformFit({ capabilities }, GO_HOST);
+  if (fit.state === "unknown") {
+    return {
+      state: "unknown",
+      reason:
+        "platform unknown — the catalogue index carries no platform declaration; the install checks the pack",
+    };
+  }
+  return platformFitView(fit);
+}
+
 /** What the row offers: nothing installed, an older version, the same version, or a newer one. */
 export function actionFor(
   installedVersion: string | null,
@@ -379,6 +423,7 @@ function entryToCatalogue(entry: PackIndexEntry): CatalogueEntry {
     description: entry.description ?? null,
     version: entry.version,
     capabilities: entry.capabilities,
+    platform: cataloguePlatform(entry.capabilities),
     sizeBytes: entry.size,
     sha256: entry.sha256,
     url: entry.url,

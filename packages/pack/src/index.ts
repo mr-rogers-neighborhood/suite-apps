@@ -79,6 +79,21 @@ export {
   SUITE_PUBLISHER_ID,
 } from "./pinnedKey.js";
 export {
+  GO_HOST,
+  HOST_DECLARATIONS,
+  type HostDeclaration,
+  type HostKind,
+  hostsOfKind,
+  isSafePackPlatform,
+  type PackPlatformClaim,
+  type PlatformFit,
+  type PlatformFitState,
+  type PlatformFitView,
+  platformFit,
+  platformFitView,
+  SHELL_HOST,
+} from "./platforms.js";
+export {
   base64ToBytes,
   bytesToBase64,
   digestPackFiles,
