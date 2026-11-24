@@ -97,8 +97,8 @@ export const PRODUCT_MATURITY = ["pre-alpha", "alpha", "beta", "1.0"];
  * The apps frozen as legacy until they become packs.
  *
  * The list lives in the channel library so the Flatpak builder refuses a new
- * pre-release build for the same apps this table marks frozen. Start and Sync
- * are not frozen: they are not superapps either, so their rows name no channel.
+ * pre-release build for the same apps this table marks frozen. Sync is not
+ * frozen: it is not a superapp either, so its row names no channel.
  */
 export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
 
@@ -139,15 +139,6 @@ export const APPS = [
     flatpakId: "run.suite.shell",
     channel: "stable",
     maturity: "alpha",
-  },
-  {
-    id: "start",
-    name: "Suite Start",
-    packageJson: "apps/start/package.json",
-    changelog: "apps/start/CHANGELOG.md",
-    kind: "flatpak",
-    section: "desktop",
-    flatpakId: "run.suite.start",
   },
   {
     id: "go",

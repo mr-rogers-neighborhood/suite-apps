@@ -9,7 +9,6 @@ and it names the gate that app expects.
 | Planner | `apps/planner/AGENTS.md` |
 | Budget | `apps/budget/AGENTS.md` |
 | Go | `apps/go/AGENTS.md` |
-| Start | `apps/start/README.md` and `docs/` |
 | Sync | `apps/sync/README.md` and `docs/` |
 | Docs only | [docs/README.md](../README.md) |
 
@@ -22,8 +21,8 @@ from the other app. Do not change another app to make yours pass.
 
 Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`. Keep a commit to one
 intent. Do not commit a lockfile from a nested app or secrets. The shared packages under `packages/*`
-commit their `dist/` output on purpose, and the Start package's `build:verify` proves it has not
-drifted; other `dist/` directories stay out of git.
+commit their `dist/` output on purpose, and a package's `build:verify` proves it has not drifted;
+other `dist/` directories stay out of git.
 
 ## Issues
 
@@ -79,9 +78,10 @@ Then the root gate when the change crosses an app or a shared package:
 mise exec -- node scripts/gate.mjs
 ```
 
-The per-app gates do not run Playwright. The root gate runs Start's e2e suite after the checks, under
-`xvfb-run` when there is no display; `--no-e2e` skips it. Other Playwright suites run on request. If
-you ran one, say which command; a claim without a command is not a verification.
+The per-app gates do not run Playwright. The root gate runs a row's e2e suite after the checks, under
+`xvfb-run` when there is no display; `--no-e2e` skips it. No row marks one after Start's retirement.
+Other Playwright suites run on request. If you ran one, say which command; a claim without a command
+is not a verification.
 
 ## Records
 

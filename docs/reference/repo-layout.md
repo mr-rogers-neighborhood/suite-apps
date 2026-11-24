@@ -1,7 +1,7 @@
 # Repository layout
 
-One pnpm workspace at the root. Seven shipped apps under `apps/`, a host spike beside them, shared
-packages under `packages/`, and one lockfile for all of them.
+One pnpm workspace at the root. The host and six apps under `apps/`, shared packages under
+`packages/`, and one lockfile for all of them.
 
 ```
 apps/
@@ -9,11 +9,10 @@ apps/
                 packages/graph, packages/import-obsidian; e2e, docs, handbook, internal
   planner/      @suite/planner desktop app; pack/; packages/core; docs
   budget/       @suite/budget desktop app; pack/; packages/core; docs
-  start/        @suite/start hub; docs, e2e
   help/         @suite/help documentation app: explorer and handbook
   sync/         @suite/sync-server; packages/protocol, packages/host; deploy, docs
   go/           @suite/go-app mobile container; packages/go contract; docs
-  shell/        @suite/shell host spike: one window, sandboxed packs, space document
+  shell/        @suite/shell host: one window, sandboxed packs, space document
 packages/       contracts, files, document-runtime, screens, desktop, theme, ui,
                 pack, pack-runtime, pack-host
 docs/           Cross-cutting documentation
@@ -40,7 +39,6 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/planner-core` | `apps/planner/packages/core` | Planner schema and document layer |
 | `@suite/budget` | `apps/budget` | Budget |
 | `@suite/budget-core` | `apps/budget/packages/core` | Budget schema and document layer |
-| `@suite/start` | `apps/start` | Hub |
 | `@suite/help` | `apps/help` | Documentation app: explorer and handbook |
 | `@suite/sync-server` | `apps/sync` | Sync server |
 | `@suite/sync-app` | `apps/sync/app` | Sync tray app and its embedded relay |
@@ -48,11 +46,11 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/host` | `apps/sync/packages/host` | Sync host |
 | `@suite/go-app` | `apps/go` | Go container |
 | `@suite/go` | `apps/go/packages/go` | Go module contract |
-| `@suite/shell` | `apps/shell` | Desktop host spike |
+| `@suite/shell` | `apps/shell` | Desktop host |
 | `@suite/contracts` | `packages/contracts` | Shared app and deployment contracts |
 | `@suite/files` | `packages/files` | Shared file envelopes |
 | `@suite/document-runtime` | `packages/document-runtime` | Shared document replica and atomic store |
-| `@suite/screens` | `packages/screens` | Shared Screens contract: `suite.screen` shape, Loro document, widget registry and Start's dashboard migration |
+| `@suite/screens` | `packages/screens` | Shared Screens contract: `suite.screen` shape, Loro document and widget registry |
 | `@suite/desktop` | `packages/desktop` | Shared Electron policy |
 | `@suite/theme` | `packages/theme` | Shared theme variables |
 | `@suite/ui` | `packages/ui` | Shared chrome |

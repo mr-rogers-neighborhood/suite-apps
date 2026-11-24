@@ -15,7 +15,7 @@ import {
   shellWidgetRegistry,
 } from "./home.js";
 import type { PackInfo } from "./packs.js";
-import { ScreenStore } from "./screens.js";
+import { SCREENS_INDEX_FILENAME, ScreenSet } from "./screens.js";
 import { SpaceStore } from "./spaces.js";
 
 function quickTask(overrides: Partial<SuiteWidget> = {}): SuiteWidget {
@@ -192,7 +192,10 @@ describe("Home in the space document", () => {
   });
 
   it("opens Home before any pack and keeps it first in the strip", async () => {
-    const screens = await ScreenStore.open(join(root, "screens", `${HOME_SCREEN_ID}.loro`));
+    const screens = await ScreenSet.open({
+      directory: join(root, "screens"),
+      indexFile: join(root, SCREENS_INDEX_FILENAME),
+    });
     const home = await openHomeScreen(screens, spaces);
 
     expect(home.opened).toBe(true);
@@ -216,7 +219,10 @@ describe("Home in the space document", () => {
   });
 
   it("reuses the Home tab instead of opening a second one", async () => {
-    const screens = await ScreenStore.open(join(root, "screens", `${HOME_SCREEN_ID}.loro`));
+    const screens = await ScreenSet.open({
+      directory: join(root, "screens"),
+      indexFile: join(root, SCREENS_INDEX_FILENAME),
+    });
     const home = await openHomeScreen(screens, spaces);
     const packTab = await spaces.openTab({
       packId: "welcome",
@@ -241,7 +247,10 @@ describe("Home in the space document", () => {
       title: "Welcome",
       entry: "index.html",
     });
-    const screens = await ScreenStore.open(join(root, "screens", `${HOME_SCREEN_ID}.loro`));
+    const screens = await ScreenSet.open({
+      directory: join(root, "screens"),
+      indexFile: join(root, SCREENS_INDEX_FILENAME),
+    });
 
     await openHomeScreen(screens, spaces);
     expect(spaces.state().tabs[0]?.kind).toBe("screen");
@@ -249,7 +258,10 @@ describe("Home in the space document", () => {
   });
 
   it("closes a screen tab and selects its neighbour", async () => {
-    const screens = await ScreenStore.open(join(root, "screens", `${HOME_SCREEN_ID}.loro`));
+    const screens = await ScreenSet.open({
+      directory: join(root, "screens"),
+      indexFile: join(root, SCREENS_INDEX_FILENAME),
+    });
     const home = await openHomeScreen(screens, spaces);
     const packTab = await spaces.openTab({
       packId: "welcome",

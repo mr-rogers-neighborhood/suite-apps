@@ -4,9 +4,8 @@ import { type ContractParse } from "./parse.js";
  * `suite.app` — the manifest a signed app ships beside itself.
  *
  * The manifest deliberately carries **no executable path**. A file that names
- * the binary to run would let a stale or tampered manifest point the launcher at
- * anything; the install location belongs to Start's own registry entry, written
- * once at install time and checked against the signing identity there.
+ * the binary to run would let a stale or tampered manifest point a launcher at
+ * anything; the host's own install record names what may run.
  */
 export declare const SUITE_APP_MANIFEST_FORMAT = "suite.app";
 /** Every deep link is under this prefix; an app's own is `suite://<id>/`. */
@@ -15,7 +14,7 @@ export declare const SUITE_PROTOCOL_PREFIX = "suite://";
 export declare const suiteAppIdSchema: z.ZodString;
 export declare const suiteSemverSchema: z.ZodString;
 /**
- * What an app can do, stated positively so Start can say "this app is older than
+ * What an app can do, stated positively so the host can say "this app is older than
  * the hub expects" instead of failing at a missing route.
  */
 export declare const suiteCapabilitySchema: z.ZodEnum<{
@@ -111,8 +110,8 @@ export declare function parseAppManifest(value: unknown): ContractParse<SuiteApp
 /**
  * Whether this app can be launched by a hub implementing `hubContract`.
  *
- * Called in both directions: Start asks "can I route to this app?", and the app
- * asks "did Start hand me a link in a shape I understand?".
+ * Called in both directions: the host asks "can I route to this app?", and the app
+ * asks "did the host hand me a link in a shape I understand?".
  */
 export declare function manifestFitsHub(manifest: Pick<SuiteAppManifest, "contractVersion">, hubContract?: string): boolean;
 /** The deep link that opens this app with nothing selected. */

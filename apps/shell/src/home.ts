@@ -8,7 +8,7 @@ import {
   type WidgetRegistry,
 } from "@suite/screens";
 import type { PackInfo } from "./packs.js";
-import type { ScreenStore } from "./screens.js";
+import type { ScreenSet } from "./screens.js";
 import type {
   ScreenChoiceView,
   ScreenView,
@@ -242,13 +242,14 @@ export interface HomeOpen {
 /**
  * Open Home before any pack.
  *
- * The Screen store already creates Home when the file is missing. This adds the tab
+ * The Screen set already creates Home when the file is missing. This adds the tab
  * that shows it: first in the strip on a fresh document, and active because a fresh
  * space document has no active tab. A restored session keeps its active tab and only
  * gains Home at the front.
  */
-export async function openHomeScreen(screens: ScreenStore, spaces: SpaceStore): Promise<HomeOpen> {
-  const screen = screens.state();
+export async function openHomeScreen(screens: ScreenSet, spaces: SpaceStore): Promise<HomeOpen> {
+  const screen = screens.screen(screens.homeId);
+  if (screen === null) throw new Error("the host has no Home Screen");
   const ensured = await spaces.ensureScreenTab({
     screenId: screen.id,
     title: screen.name,

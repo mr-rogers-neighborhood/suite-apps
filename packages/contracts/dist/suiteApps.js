@@ -9,7 +9,7 @@ export const SUITE_APPS = [
  * The root every app's documents folder sits under.
  *
  * An override exists for a test and a portable install. It is never read from a
- * document, so no file can steer where Start looks.
+ * document, so no file can steer where a host looks.
  */
 export function suiteDocumentsRoot(platform, home, rootOverride) {
     const named = rootOverride?.trim();

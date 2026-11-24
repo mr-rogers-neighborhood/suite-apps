@@ -49,7 +49,6 @@ import {
 } from "./release-status.mjs";
 
 const shell = APPS.find((app) => app.id === "shell");
-const start = APPS.find((app) => app.id === "start");
 const go = APPS.find((app) => app.id === "go");
 const sync = APPS.find((app) => app.id === "sync");
 
@@ -71,12 +70,6 @@ const goEntry = {
 /** Every app in the shape collectReleases() builds; only shell and go render. */
 const entries = [
   shellEntry,
-  {
-    app: start,
-    version: "0.5.1",
-    date: "2026-11-21",
-    section: "### Changed\n\n- **Something.** It changed.",
-  },
   {
     app: APPS.find((app) => app.id === "canvas"),
     version: "0.1.11",
@@ -513,18 +506,16 @@ describe("channels and maturity", () => {
     ]);
   });
 
-  it("freezes the legacy apps and names no channel for the hub or relay", () => {
+  it("freezes the legacy apps and names no channel for the relay", () => {
     for (const id of ["canvas", "planner", "budget", "help"]) {
       const app = APPS.find((row) => row.id === id);
       assert.equal(isLegacyFrozen(app), true);
       assert.equal(channelLabel(app), "frozen");
     }
-    for (const id of ["start", "sync"]) {
-      const app = APPS.find((row) => row.id === id);
-      assert.equal(isLegacyFrozen(app), false);
-      assert.equal(channelLabel(app), "—");
-      assert.equal(maturityLabel(app), "—");
-    }
+    const relay = APPS.find((row) => row.id === "sync");
+    assert.equal(isLegacyFrozen(relay), false);
+    assert.equal(channelLabel(relay), "—");
+    assert.equal(maturityLabel(relay), "—");
   });
 
   it("shows channel, maturity and install for the two superapps", () => {
@@ -578,7 +569,6 @@ describe("release bodies", () => {
       installCell(sync),
       "`flatpak install --user suite run.suite.sync`",
     );
-    assert.equal(installCell(start), "`flatpak install --user suite run.suite.start`");
   });
 
   it("never marks a row pending for a page that will not exist", () => {
@@ -610,7 +600,7 @@ describe("sections and the Suite Go APK", () => {
   it("keeps the desktop rows in reading order and Go alone on mobile", () => {
     assert.deepEqual(
       APPS.filter((app) => app.section === "desktop").map((app) => app.id),
-      ["shell", "start", "canvas", "planner", "budget", "sync", "help"],
+      ["shell", "canvas", "planner", "budget", "sync", "help"],
     );
     assert.equal(APPS[0].id, "shell");
     assert.deepEqual(
@@ -738,8 +728,8 @@ describe("sections and the Suite Go APK", () => {
 
   it("names the aggregate tag from the newest changelog date", () => {
     const files = {
-      "apps/start/package.json": '{"version":"0.5.1"}',
-      "apps/start/CHANGELOG.md": "## [0.5.1] - 2026-11-21\n",
+      "apps/shell/package.json": '{"version":"0.2.0"}',
+      "apps/shell/CHANGELOG.md": "## [0.2.0] - 2026-11-21\n",
       "apps/go/package.json": '{"version":"0.1.0"}',
       "apps/go/CHANGELOG.md": "## [0.1.0] - 2026-11-18\n",
     };

@@ -10,8 +10,8 @@ The rules that shape the Suite host.
   import a pack, run its main code, or learn its domain.
 - The host is not the same-process container the architecture page rejects. Every pack gets its own
   `WebContentsView`, its own custom-protocol origin and its own session partition.
-- Start is not a separate process in this model. The shell's launcher, store and update surface
-  replace Start's role. Until the migration is proven, Start remains the shipping hub.
+- The shell is the desktop host. Its catalogue, Home, Screens manager, store and update surface are
+  the one desktop install path; Start was removed (#314).
 
 ## Packs are renderer-only
 
@@ -194,8 +194,8 @@ The rules that shape the Suite host.
 - Capture delivery is not in this slice. An app widget says a capture is not available yet rather
   than offering a button that cannot work. The registry's capture build stays unused until the
   delivery path exists.
-- A Screen is local to this device. The Screens manager, a portable `.screen` file, export/import
-  and sync are later slices.
+- A Screen is local to this device. The Screens manager creates, renames, duplicates and deletes a
+  Screen and sets Home; a portable `.screen` file, export/import and sync are later slices.
 
 ## Channels
 
@@ -312,7 +312,7 @@ The rules that shape the Suite host.
 ## What this spike deliberately leaves out
 
 - app-widget capture delivery (app widgets render; captures are not sent);
-- the Screens manager and a portable `.screen` file with export/import;
+- a portable `.screen` file with export/import;
 - the host's blind relay transport for pack sync;
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;

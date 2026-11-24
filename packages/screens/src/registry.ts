@@ -19,7 +19,7 @@ import {
  * what a capture looks like. None of that needs a window, so it lives here.
  *
  * A descriptor is registered under `<app id>.<widget id>`. A host widget is the same
- * shape with the host's own app id: `start.apps` and `start.recents` are ordinary
+ * shape with the host's own app id: `shell.apps` and `canvas.recent-cards` are ordinary
  * entries, not a second table.
  */
 

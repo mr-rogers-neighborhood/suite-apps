@@ -1,10 +1,11 @@
 # CI specification
 
 Status: draft 0.1. Phases 1 and 2 are live: Actions is enabled, `.github/workflows/ci.yml` maps a
-pull request's diff to gate rows with `scripts/affected.mjs` and requires the `ci` aggregator,
-`.github/workflows/main.yml` runs the full fresh gate on every push to `main`, and Start's e2e runs on
-the merge queue and on a pull request whose affected set includes Start or Shell. `.github/workflows/nightly.yml`
-runs the full fresh gate with e2e at 02:00 UTC, then builds the host Flatpak and the Go debug APK,
+pull request's diff to gate rows with `scripts/affected.mjs` and requires the `ci` aggregator, and
+`.github/workflows/main.yml` runs the full fresh gate on every push to `main`. Start's Playwright suite
+left with Start (#314), so no app row marks an e2e suite today; the gate keeps the hook for the first
+host suite. `.github/workflows/nightly.yml` runs the full fresh gate at 02:00 UTC, then builds the host
+Flatpak and the Go debug APK,
 attests each with provenance and an SPDX SBOM, and keeps them as artifacts. Once the repository
 variable `NIGHTLY_PUBLISH` is `true` and the `release` environment holds its keys, the nightly instead
 runs `.github/workflows/release.yml` for the nightly channel: the release-signed APK and the signed
@@ -20,7 +21,8 @@ simulator test build. The delivery contract is [delivery.md](delivery.md); the p
 queue on `main`. No long-lived `slop`/`nightly`/`preview` branches; those are artifact channels.
 
 **C1.2** Fast on the change, full on the trunk. A pull request gets affected checks only. A merge queue
-gets affected checks plus affected e2e. `main` gets the full fresh gate. Nightly gets the full matrix.
+gets affected checks plus affected e2e when a row marks one. `main` gets the full fresh gate. Nightly
+gets the full matrix.
 
 **C1.3** The pipeline is the same commands a person runs. CI calls `node scripts/gate.mjs`, not a
 second build path. A workflow that cannot be reproduced locally is a bug.
@@ -73,9 +75,8 @@ trigger is required. If the plan or API cannot enable it, the pull-request rule 
 | `detect` | ubuntu-latest | Diff base…head, map files to projects, write the job matrix | none |
 | `fast` | ubuntu-latest | Lint, typecheck, unit, scripts/spec/docs checks for affected | pnpm store |
 | `build` | ubuntu-latest | Build affected apps/packages; no packaging | pnpm store, build cache |
-| `e2e` | ubuntu-latest + xvfb | Start’s suite, only when affected or on `main`/nightly | Playwright cache |
 | `main-gate` | ubuntu-latest | `node scripts/gate.mjs --fresh --no-e2e` | pnpm store |
-| `nightly-gate` | ubuntu-latest | Full `node scripts/gate.mjs --fresh` with e2e | pnpm store, Playwright |
+| `nightly-gate` | ubuntu-latest | Full `node scripts/gate.mjs --fresh` | pnpm store, Playwright |
 | `package-linux` | ubuntu-latest | Flatpak build; no publish | flatpak-builder cache |
 | `package-android` | ubuntu-latest | APK build; no publish | Gradle cache |
 | `build-windows` | windows-latest | Electron build, unsigned zip | pnpm store |
@@ -87,8 +88,9 @@ trigger is required. If the plan or API cannot enable it, the pull-request rule 
 **C3.1** `fast` and `build` are matrices over the affected projects. An empty matrix is success with
 a “nothing affected” note; it is not a skipped required check.
 
-**C3.2** `e2e` runs on a pull request only when the changed set includes Start, Shell, contracts or a
-shared package they consume. Otherwise it runs on `main` and nightly.
+**C3.2** An `e2e` job exists only while a pipeline row marks an e2e suite. It runs on a pull request
+when the affected set reaches that row, and on `main` and nightly. No row marks one after Start's
+retirement (#314); the flag is the seam for the first host suite.
 
 **C3.3** Packaging jobs build artifacts but never publish. Publication is a separate job with an
 environment and a key.
@@ -115,7 +117,7 @@ optimization, never a release proof.
 | Channel | Checks |
 | --- | --- |
 | `slop` | Fast affected checks only; no e2e; local/session artifact |
-| `nightly` | Full fresh gate + e2e + package builds + install smoke |
+| `nightly` | Full fresh gate + package builds + install smoke |
 | `preview` | Nightly gate + human review + docs + smoke + clean install |
 | `stable` | Preview gate + version/changelog/support promise + promoted artifact |
 
@@ -198,10 +200,10 @@ exposed, rotate it and delete the log.
 
 | When | What |
 | --- | --- |
-| Every pull request | Affected fast checks; affected e2e only when needed |
-| Every merge queue entry | Affected fast + affected e2e + `ci` aggregator |
+| Every pull request | Affected fast checks |
+| Every merge queue entry | Affected fast checks + `ci` aggregator |
 | Every push to `main` | `main-gate --fresh --no-e2e`, affected build, packaging build |
-| Nightly 02:00 UTC | Full fresh gate + e2e + Linux/Android/macOS/Windows/iOS builds + Revyl smoke + publish nightly |
+| Nightly 02:00 UTC | Full fresh gate + Linux/Android/macOS/Windows/iOS builds + Revyl smoke + publish nightly |
 | Weekly | Full matrix, dependency review, action pin audit, cache cleanup |
 | Manual | Preview/stable publication, platform matrix run |
 

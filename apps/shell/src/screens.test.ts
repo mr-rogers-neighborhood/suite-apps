@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { LoroDoc } from "loro-crdt";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HOME_SCREEN_ID, HOME_SCREEN_NAME, SHELL_APPS_WIDGET } from "./home.js";
-import { ScreenStore } from "./screens.js";
+import { SCREENS_INDEX_FILENAME, ScreenSet, ScreenStore } from "./screens.js";
 
 let root: string;
 let path: string;
@@ -169,5 +169,88 @@ describe("editing a Screen", () => {
       size: "2x1",
       settings: { project: "inbox" },
     });
+  });
+});
+
+describe("the Screens set", () => {
+  async function screenSet(): Promise<ScreenSet> {
+    return ScreenSet.open({
+      directory: join(root, "screens"),
+      indexFile: join(root, SCREENS_INDEX_FILENAME),
+    });
+  }
+
+  it("starts with Home and writes nothing until a Screen is created or edited", async () => {
+    const set = await screenSet();
+
+    expect(set.homeId).toBe(HOME_SCREEN_ID);
+    expect(set.summaries()).toEqual([
+      { id: HOME_SCREEN_ID, name: HOME_SCREEN_NAME, readable: true },
+    ]);
+    expect(existsSync(join(root, "screens", `${HOME_SCREEN_ID}.loro`))).toBe(false);
+    expect(existsSync(join(root, SCREENS_INDEX_FILENAME))).toBe(false);
+  });
+
+  it("creates a blank Screen, renames and duplicates it", async () => {
+    const set = await screenSet();
+    const work = await set.create("Work");
+    expect(set.screen(work)?.widgets).toEqual([]);
+
+    await expect(set.rename(work, "Deep work")).resolves.toBe(true);
+    expect(set.screen(work)?.name).toBe("Deep work");
+
+    await set.store(work)?.add({ registryId: "welcome.notes", size: "2x1" });
+    const copy = await set.duplicate(work);
+    expect(copy).not.toBeNull();
+    expect(set.screen(copy ?? "")?.name).toBe("Deep work copy");
+    expect(set.screen(copy ?? "")?.widgets).toEqual([{ registryId: "welcome.notes", size: "2x1" }]);
+    expect(set.summaries().map((screen) => screen.id).sort()).toEqual(
+      [HOME_SCREEN_ID, work, copy ?? ""].sort(),
+    );
+  });
+
+  it("persists the Home role across a reopen", async () => {
+    const set = await screenSet();
+    const work = await set.create("Work");
+    await expect(set.setHome(work)).resolves.toBe(true);
+
+    const reopened = await screenSet();
+    expect(reopened.homeId).toBe(work);
+    expect(reopened.summaries()[0]?.id).toBe(work);
+  });
+
+  it("keeps the last Screen and asks for a replacement before deleting Home", async () => {
+    const set = await screenSet();
+    const kept = await set.remove(HOME_SCREEN_ID);
+    expect(kept).toMatchObject({ ok: false, reason: "last" });
+
+    const work = await set.create("Work");
+    const refused = await set.remove(HOME_SCREEN_ID);
+    expect(refused).toMatchObject({ ok: false, reason: "replacement" });
+    if (!refused.ok) {
+      expect(refused.choices.map((screen) => screen.id)).toEqual([work]);
+    }
+
+    const removed = await set.remove(HOME_SCREEN_ID, work);
+    expect(removed).toEqual({ ok: true, homeId: work });
+    expect(set.summaries().map((screen) => screen.id)).toEqual([work]);
+    expect(existsSync(join(root, "screens", `${HOME_SCREEN_ID}.loro`))).toBe(false);
+  });
+
+  it("deletes a non-Home Screen without changing Home", async () => {
+    const set = await screenSet();
+    const work = await set.create("Work");
+    const removed = await set.remove(work, null);
+    expect(removed).toEqual({ ok: true, homeId: HOME_SCREEN_ID });
+    expect(set.screen(work)).toBeNull();
+  });
+
+  it("writers never escape the screens directory or change another Screen", async () => {
+    const set = await screenSet();
+    const work = await set.create("Work");
+    await set.store(work)?.add({ registryId: "welcome.notes", size: "2x1" });
+    expect(set.screen(HOME_SCREEN_ID)?.widgets).toEqual([
+      { registryId: SHELL_APPS_WIDGET, size: "full" },
+    ]);
   });
 });

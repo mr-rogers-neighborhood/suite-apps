@@ -13,7 +13,7 @@ import {
  *
  * Two questions in the order they are asked — a palette family, then how bright to draw it —
  * because "Solarized at night" is Solarized with dark values rather than a fifth entry in one
- * list. The same pair Canvas and Suite Start offer, in this app's own chrome.
+ * list. The same pair Canvas and Suite Shell offer, in this app's own chrome.
  *
  * A `select` rather than a custom menu: this is one control in a footer, and the platform
  * control is the one that already works with a keyboard and a screen reader.

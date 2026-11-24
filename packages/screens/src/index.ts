@@ -7,18 +7,6 @@ export {
   type ScreenPlacement,
 } from "./document.js";
 export {
-  type DashboardMigration,
-  defaultStartDashboard,
-  type MigratedDashboard,
-  migrateStartDashboard,
-  migrateStartDashboardJson,
-  type RefusedDashboard,
-  START_DASHBOARD_FORMAT,
-  START_DASHBOARD_VERSION,
-  START_HOME_SCREEN_ID,
-  START_HOME_SCREEN_NAME,
-} from "./migrate.js";
-export {
   buildWidgetCapture,
   createWidgetRegistry,
   isWidgetRegistryId,

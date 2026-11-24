@@ -1,7 +1,7 @@
 {
   "name": "@suite/screens",
   "version": "0.1.0",
-  "description": "The shared Screens contract: the suite.screen v1 shape, its Loro document, the host-side widget registry and Start's dashboard migration. No React, Electron, DOM or file IO.",
+  "description": "The shared Screens contract: the suite.screen v1 shape, its Loro document and the host-side widget registry. No React, Electron, DOM or file IO.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,12 +23,6 @@
       "development": "./src/fixture.ts",
       "import": "./dist/fixture.js",
       "default": "./dist/fixture.js"
-    },
-    "./migrate": {
-      "types": "./dist/migrate.d.ts",
-      "development": "./src/migrate.ts",
-      "import": "./dist/migrate.js",
-      "default": "./dist/migrate.js"
     },
     "./registry": {
       "types": "./dist/registry.d.ts",

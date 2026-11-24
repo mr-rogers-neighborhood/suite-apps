@@ -17,7 +17,6 @@ owns its rules and its gate; this skill routes you there.
 | `suite-budget` | `apps/budget/AGENTS.md` | `node scripts/gate.mjs --only budget` |
 | `suite-go` | `apps/go/AGENTS.md` | `node scripts/gate.mjs --only go` |
 | `suite-sync` | `apps/sync/README.md`, `docs/` | `node scripts/gate.mjs --only sync` |
-| `suite-start` | `apps/start/README.md`, `docs/` | `node scripts/gate.mjs --only start` |
 | `suite-help` | `apps/help/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only help` |
 
 If a change needs a sibling app edited, stop and coordinate.
@@ -69,8 +68,6 @@ explicit owner checkpoint.
 
 The build and release commands live at the root:
 
-- `pnpm --filter @suite/start run package:dir` builds the hub.
-- `pnpm --filter @suite/start exec electron-builder --linux AppImage` builds
   the AppImage.
 - `node scripts/flatpak.mjs` packages Canvas for Flatpak and publishes it to
   the local OSTree repo `~/suite-flatpak/repo` (remote `suite-local`). The hub
