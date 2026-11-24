@@ -198,7 +198,7 @@ describe("the S3 upload commands", () => {
 describe("restoring the refs this run built", () => {
   const commit = "a".repeat(64);
 
-  it("writes each built commit back after the merge", () => {
+  it("writes each built commit back over the ref the merge copied", () => {
     const steps = restoreRefCommands({
       repo,
       builtRefs: [
@@ -208,9 +208,13 @@ describe("restoring the refs this run built", () => {
     });
     assert.equal(steps.length, 2);
     assert.equal(steps[0].command, "ostree");
+    // The merge already copied this branch's ref into the repository, so a plain
+    // `--create` fails with "already exists"; `--force` overwrites it and has to
+    // come first, because `--create` reads the next word as the ref name.
     assert.deepEqual(steps[0].args, [
       `--repo=${repo}`,
       "refs",
+      "--force",
       "--create",
       "app/run.suite.slop.shell/x86_64/nightly",
       commit,
