@@ -370,6 +370,21 @@ export function s3MergeCommands({ repo, bucket }) {
   ];
 }
 
+/**
+ * The `ostree refs --create` commands that put back the refs this run built.
+ *
+ * The S3 merge copies the bucket's `refs/` over the local ones, so a ref this
+ * build just made would otherwise be reset to the published commit; the signed
+ * summary would then advertise yesterday's build. Restore every built ref
+ * before signing, and keep the bucket's other refs as they came in.
+ */
+export function restoreRefCommands({ repo, builtRefs }) {
+  return (builtRefs ?? []).map(({ ref, commit }) => ({
+    command: "ostree",
+    args: [`--repo=${repo}`, "refs", "--create", ref, commit],
+  }));
+}
+
 /** True when the bucket's ref listing names at least one ref. */
 export function hasPublishedRefs(listing) {
   return String(listing ?? "")

@@ -22,6 +22,7 @@ import {
   normalizeRemoteUrl,
   preservedRefs,
   refsFromSummaryView,
+  restoreRefCommands,
   s3ConfigProblems,
   s3MergeCommands,
   s3UploadCommands,
@@ -191,6 +192,29 @@ describe("the S3 upload commands", () => {
     const deltas = steps.findIndex((step) => step.args.includes(`${repo}/deltas`));
     const summary = steps.findIndex((step) => step.args.includes(`${repo}/summary`));
     assert.ok(deltas >= 0 && summary > deltas);
+  });
+});
+
+describe("restoring the refs this run built", () => {
+  const commit = "a".repeat(64);
+
+  it("writes each built commit back after the merge", () => {
+    const steps = restoreRefCommands({
+      repo,
+      builtRefs: [
+        { ref: "app/run.suite.slop.shell/x86_64/nightly", commit },
+        { ref: "runtime/run.suite.slop.shell.Debug/x86_64/nightly", commit: "b".repeat(64) },
+      ],
+    });
+    assert.equal(steps.length, 2);
+    assert.equal(steps[0].command, "ostree");
+    assert.deepEqual(steps[0].args, [
+      `--repo=${repo}`,
+      "refs",
+      "--create",
+      "app/run.suite.slop.shell/x86_64/nightly",
+      commit,
+    ]);
   });
 });
 
