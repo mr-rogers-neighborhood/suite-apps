@@ -5,7 +5,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { DetailPane } from "@/explorer/detail";
 import { Note } from "@/explorer/note";
 import { ExplorerSidebar } from "@/explorer/sidebar";
@@ -72,6 +72,7 @@ export function Explorer() {
   const [overlayDismissed, setOverlayDismissed] = useState(false);
   const requestedModules = useRef(new Set<string>());
   const [hydrated, setHydrated] = useState(false);
+  const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -89,7 +90,9 @@ export function Explorer() {
   }, []);
 
   useEffect(() => {
-    const state = readExplorerUrl(window.location.search);
+    // Router state, not `window.location`: the pack mounts this app under `HashRouter`, where the
+    // query lives in the hash and `window.location.search` is empty.
+    const state = readExplorerUrl(location.search);
     if (state.view) setView(state.view);
     if (state.node) setSelectedNode(state.node);
     if (state.module) setSelectedModule(state.module);
@@ -101,7 +104,7 @@ export function Explorer() {
     }
     if (state.level) setDetailLevel(state.level);
     setHydrated(true);
-  }, []);
+  }, [location.search]);
 
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -247,8 +250,20 @@ export function Explorer() {
     const level = view === "tours" ? stepLevel(currentStep) : detailLevel;
     if (level === "file") params.set("level", "file");
     const queryString = params.toString();
-    window.history.replaceState(null, "", `/explore${queryString ? `?${queryString}` : ""}`);
-  }, [currentStep, detailLevel, hydrated, selectedModule, selectedNode, tourId, tourIndex, view]);
+    // Route through the router, not `window.history`: `HashRouter` owns the hash and a raw
+    // replaceState would leave the route it is rendering out of step with the address bar.
+    navigate(`/explore${queryString ? `?${queryString}` : ""}`, { replace: true });
+  }, [
+    currentStep,
+    detailLevel,
+    hydrated,
+    navigate,
+    selectedModule,
+    selectedNode,
+    tourId,
+    tourIndex,
+    view,
+  ]);
 
   const expandFor = useCallback(
     (id: string) => {

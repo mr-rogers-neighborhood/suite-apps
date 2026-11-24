@@ -47,8 +47,8 @@ rather than failed. Declaring it is the step that opts into the rule.
 
 ## Build and test
 
-The app's own scripts own the commands; there is no shared pack build entry point. Budget and
-Planner are the worked examples:
+The app's own scripts own the commands; there is no shared pack build entry point. Budget, Planner
+and Help are the worked examples:
 
 ```sh
 mise exec -- pnpm --dir apps/budget run test:pack
@@ -58,10 +58,25 @@ mise exec -- pnpm budget:pack
 mise exec -- pnpm --dir apps/planner run test:pack
 mise exec -- pnpm --dir apps/planner run typecheck:all
 mise exec -- pnpm planner:pack
+
+mise exec -- pnpm --dir apps/help run test:pack
+mise exec -- pnpm --dir apps/help run typecheck:all
+mise exec -- pnpm help:pack
 ```
 
-Both build to `apps/<app>/.dev/pack` and sign the archive from there. The output path is the app's,
-under a generated directory the root `.gitignore` already covers; never point it back into `pack/`.
+All three build to `apps/<app>/.dev/pack` and sign the archive from there. The output path is the
+app's, under a generated directory the root `.gitignore` already covers; never point it back into
+`pack/`.
+
+Help also carries generated content, so its build has a second proof:
+
+```sh
+mise exec -- pnpm help:pack --check-repro
+```
+
+It builds twice into generated directories and compares every payload path and SHA-256, with no
+signing key. A pack whose bytes come from generated content must not change hash without a source
+change; a mismatch fails the command and names the paths.
 
 The app's `test:pack` script runs the pack tests from the app directory, with the pack's config and
 an explicit `root`. That is what keeps `node_modules` out of `pack/` while the tests still import

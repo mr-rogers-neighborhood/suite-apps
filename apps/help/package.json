@@ -3,6 +3,9 @@
   "productName": "Suite Help",
   "desktopName": "run.suite.help",
   "version": "0.1.2",
+  "suite": {
+    "pack": true
+  },
   "private": true,
   "description": "Suite Help: the repository's handbook and code explorer, shipped as a local-first desktop app.",
   "type": "module",
@@ -20,10 +23,12 @@
     "start": "electron .",
     "package:dir": "pnpm build && electron-builder --dir",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "typecheck:all": "pnpm typecheck && tsc --noEmit -p pack/tsconfig.json",
     "lint": "biome check .",
     "format": "biome format --write .",
     "test": "vitest run",
-    "check": "biome check . && pnpm typecheck && vitest run",
+    "test:pack": "pnpm index && pnpm sync && vitest run --config pack/vitest.config.mts",
+    "check": "biome check . && pnpm typecheck:all && vitest run && pnpm test:pack",
     "check:full": "pnpm check && pnpm build && pnpm index:check"
   },
   "dependencies": {
@@ -42,6 +47,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
     "@tailwindcss/vite": "^4.3.4",
+    "@testing-library/react": "^16.3.3",
     "@types/mdx": "^2.0.14",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",

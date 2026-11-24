@@ -1,0 +1,9 @@
+{
+  "id": "help",
+  "name": "Suite Help",
+  "description": "The repository handbook and code explorer, offline in one pack.",
+  "version": "0.1.2",
+  "entry": "index.html",
+  "contractVersion": 1,
+  "capabilities": []
+}

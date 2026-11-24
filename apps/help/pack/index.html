@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Help reads only its own bundle: the generated index and the compiled handbook pages. The
+      pack declares no host capability, so the page seals both the network and every subordinate
+      fetch directive rather than relying on the host header alone. `connect-src 'self'` is what the
+      explorer's `/data/*.json` reads cross; `wasm-unsafe-eval` is Shiki's highlighter, which the
+      code view loads lazily.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+    />
+    <title>Suite Help</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

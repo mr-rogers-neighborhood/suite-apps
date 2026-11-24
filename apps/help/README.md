@@ -24,10 +24,22 @@ mise exec -- pnpm docs:explain <node-id> # scaffold one note section in its modu
 mise exec -- pnpm docs:build        # index, sync docs/ and build the app
 mise exec -- pnpm docs:dev          # index, sync and start Vite + Electron (foreground)
 mise exec -- pnpm docs:clean        # remove out, release, .generated and public/data
+mise exec -- pnpm help:pack         # build and sign Help's pack from the same content
 ```
 
 From this directory: `pnpm index`, `pnpm sync`, `pnpm dev`, `pnpm build`, `pnpm test`,
-`pnpm typecheck`, `pnpm package:dir`.
+`pnpm test:pack`, `pnpm typecheck`, `pnpm package:dir`.
+
+## The pack
+
+`pack/` is Help's pack source: the same renderer and handbook built into a signed archive for the
+Suite host. It runs under `HashRouter` rather than the desktop app's `BrowserRouter`, because the
+host serves one entry file and answers only files that exist. The archive carries the generated
+`public/data` index and the compiled MDX pages, so the explorer and handbook work with no checkout.
+
+The pack's `capabilities` list is empty by decision, not by omission: it reads only its own bundle
+and asks the host for nothing. See [the pack source](pack/README.md) for the generated corpus and the
+two-build reproducibility check.
 
 ## What is where
 
