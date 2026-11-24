@@ -137,8 +137,9 @@ suite stays separate Flatpaks plus Start.
   migrations and file layout stay its own.
 - A one-time import of an existing document leaves the originals untouched and keeps a copy inside the
   pack's own scoped files. Import is not a move, and the host does not rewrite the source.
-- Start remains the shipping hub until the pack is proven. The pack proof does not move Start's
-  catalogue, routing or updates into the host.
+- Start is a legacy hub being retired ([#314](https://github.com/mrrnbhd/suite-apps/issues/314)). The
+  shell owns install, routing and update; a feature that belongs there does not get built into Start
+  first.
 - Go's format split is [#202](https://github.com/mrrnbhd/suite-apps/issues/202); that
   issue owns the detail. The desktop pack format does not converge here.
 

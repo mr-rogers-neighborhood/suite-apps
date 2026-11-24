@@ -12,9 +12,10 @@ the pipeline is [ci.md](ci.md); the delivery contract is [delivery.md](delivery.
 lives under `packages/` only when two or more apps consume it. An app's private packages stay under
 `apps/<app>/packages/`.
 
-**R1.3** The desktop host is `apps/shell` (`@suite/shell`). Start remains the shipping hub until the
-pack proof passes; it is not the long-term host. Go is the mobile host. The relay is `apps/sync`,
-with its app and server packages beside it.
+**R1.3** The desktop host is `apps/shell` (`@suite/shell`), and it is the way in: it lists packs from
+a verified index, installs them and opens them. Start is a legacy hub being retired
+([#314](https://github.com/mrrnbhd/suite-apps/issues/314)); it is not a host and takes no new feature.
+Go is the mobile host. The relay is `apps/sync`, with its app and server packages beside it.
 
 **R1.4** Flatpak manifests live in `packaging/flatpak/`. The spec lives in `docs/spec/`. An app's
 own docs stay in `apps/<app>/docs/`.
@@ -106,8 +107,8 @@ Do not big-bang move the tree. The order is:
    launch in a window, install/update/remove. Do not port the next app until the first passes.
 4. **Retire the old path.** When a legacy app is a pack, remove its Flatpak release lane, keep its
    last artifact, and mark it frozen.
-5. **Move the hub.** Start's catalogue/routing/update surface moves into the shell only after the
-   pack proof; Start remains the shipping hub until then.
+5. **Retire the hub.** Start's catalogue, routing and update surface move into the shell and Start is
+   deleted (#314). There is one install path once the shell catalogue carries packs, not two.
 
 ## 7. Non-goals
 
