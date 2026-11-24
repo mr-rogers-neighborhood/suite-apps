@@ -2,7 +2,7 @@
 
 Status: draft 0.1. Target matrix. Today Linux Flatpak and Android APK are the only public forms; the
 other platforms are build/test targets until signing exists. `.github/workflows/platforms.yml`
-builds unsigned Windows x64 and macOS arm64 zips of the Suite Shell at 03:30 UTC and on dispatch,
+builds unsigned Windows x64 and macOS arm64 zips of the Suite Desk at 03:30 UTC and on dispatch,
 attests an SBOM and provenance for each, and keeps them as 14-day test artifacts — never a release,
 never a download a person is asked to install. The same run builds the iOS simulator app from the
 committed `apps/go/ios` project with Swift Package Manager and no signing identity; an iOS device

@@ -91,7 +91,7 @@ and Upcoming surfaces have their own pages: [Week](week.md),
 this app has: the Planner mark as a link back to today, the workspace file's name as context, a compact
 view switcher over the same `views` registry, export and import in the actions, and the sync pill. The
 rail stays the full navigation, and the bar's switcher is the compact one. The theme is host state:
-Suite Shell's **View** menu or Suite Go's **Settings** owns it, so the app carries no picker of its own. Planner has no command palette and no presence, so the search and peers zones stay empty rather
+Suite Desk's **View** menu or Suite Go's **Settings** owns it, so the app carries no picker of its own. Planner has no command palette and no presence, so the search and peers zones stay empty rather
 than holding a control that does nothing.
 
 Below `md` the rail is not rendered: the bar's navigation button opens `SidebarDrawer`, which carries the

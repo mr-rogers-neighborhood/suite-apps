@@ -5,7 +5,7 @@ order: 70
 targets: []
 ---
 
-The theme belongs to the host: **View → Theme** in Suite Shell, or **Settings** in Suite Go,
+The theme belongs to the host: **View → Theme** in Suite Desk, or **Settings** in Suite Go,
 chooses Suite, Warm or Solarized, and **View → Light / Dark / Follow the system** says how bright
 to draw it. Every open pack follows immediately, and a pack installed later opens in the same
 theme. Canvas does not offer a second control and does not remember a choice of its own.

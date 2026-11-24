@@ -1,4 +1,4 @@
-# Suite Shell — the host — as a Flatpak.
+# Suite Desk — the host — as a Flatpak.
 #
 # Build the unpacked app first, then let this manifest package it:
 #

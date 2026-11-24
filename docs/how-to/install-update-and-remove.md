@@ -1,6 +1,6 @@
 # Install, update and remove apps
 
-Suite Shell is the desktop host and the way in. [Install the host](../../apps/shell/README.md#install-as-a-flatpak)
+Suite Desk is the desktop host and the way in. [Install the host](../../apps/shell/README.md#install-as-a-flatpak)
 once, then install, update, remove and reinstall packs from its catalogue. A `.suitepack` file still
 installs on its own. [The shell's README](../../apps/shell/README.md#installing-updating-and-removing-a-pack)
 owns that lifecycle, and neither the host nor an app edits a document.

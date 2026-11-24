@@ -131,7 +131,7 @@ the a11y addon.
 
 ## Theme
 
-The theme belongs to the host: **View** in Suite Shell or **Settings** in Suite Go chooses Suite, Warm
+The theme belongs to the host: **View** in Suite Desk or **Settings** in Suite Go chooses Suite, Warm
 or Solarized and light, dark or follow-the-system. Budget reads the resolved role variables and has no
 picker or stored choice of its own. Charts use the five chart tokens and remain legible in both
 schemes. The static values at the top of `theme/styles.css` are only the fallback for a page opened

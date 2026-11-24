@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 /**
  * The mode the host has painted, and a key that changes with the palette.
  *
- * Canvas does not choose a theme: Suite Shell (desktop) or Suite Go (mobile) owns the preset
+ * Canvas does not choose a theme: Suite Desk (desktop) or Suite Go (mobile) owns the preset
  * and brightness and paints the resolved tokens onto the document. This module only reads
  * the answer, for the two places that cannot use CSS — Excalidraw's `theme` prop and the
  * contrast floor, which measures live role colours.

@@ -5,11 +5,11 @@ belong to it; Canvas's is [here](../../apps/canvas/docs/reference/glossary.md).
 
 | Term | Means |
 | --- | --- |
-| **Suite** | The product family: Canvas, Planner, Budget, Sync, Help and Go, plus the Suite Shell host and shared packages. |
+| **Suite** | The product family: Canvas, Planner, Budget, Sync, Help and Go, plus the Suite Desk host and shared packages. |
 | **App** | A user-facing product. UI copy says "app", because the host installs apps and packs. |
 | **Domain** | The architecture word for an app's subject matter. Go hosts domains; a pack carries one. It is the same three things as Canvas, Planner and Budget. |
 | **Pack** | A built bundle a domain module is delivered as: a manifest, declared capabilities and the module's code. |
-| **Host** | The process that installs, launches and routes to a pack: Suite Shell on the desktop, Suite Go on mobile. A host never reads a document payload. |
+| **Host** | The process that installs, launches and routes to a pack: Suite Desk on the desktop, Suite Go on mobile. A host never reads a document payload. |
 | **Manifest** | Three shapes with one word: `suite.app.json` beside a desktop app, `manifest.json` inside a `.suitepack`, and the update-feed manifest. The [superapp spec](../spec/superapp.md) owns the pack manifest. |
 | **Capability** | A permission a pack declares in its manifest, which the host enforces. A declaration is not a user authorisation. |
 | **Document** | One Loro CRDT per app workspace, stored in a file the app owns: `.canvas`, `.planner` or `.budget`. |

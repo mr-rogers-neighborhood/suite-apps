@@ -4,7 +4,7 @@ A channel is a product promise. The build on a card is not only newer or older: 
 it has survived and what a person may rely on. A channel with no check at its boundary is just a name,
 so the checks are part of the definition.
 
-Channels belong to the **superapp**: Suite Shell on the desktop and Suite Go on mobile. A mini-app is
+Channels belong to the **superapp**: Suite Desk on the desktop and Suite Go on mobile. A mini-app is
 not on a channel. When it ships as a pack it carries a signed version, and the host updates it version
 by version.
 
@@ -66,11 +66,11 @@ mapping.
 
 ## The superapp is the unit
 
-Suite Shell and Suite Go each carry one channel for the whole product. Canvas, Planner, Budget and Help
+Suite Desk and Suite Go each carry one channel for the whole product. Canvas, Planner, Budget and Help
 are mini-apps: they do not get a channel of their own, because their installed form is a pack with a
 signed version. A pack update is a version update, not a channel move.
 
-- **Suite Shell** is the desktop superapp and the host that opens packs.
+- **Suite Desk** is the desktop superapp and the host that opens packs.
 - **Suite Go** is the mobile superapp and the container that opens domains as packs.
 - **Packs** carry a signed version, a contract version and a hash-pinned file set. They do not carry a
   channel.
@@ -93,8 +93,8 @@ branch and the data folder are what make a channel.
 
 | Build | Form | What carries the channel | Data |
 | --- | --- | --- | --- |
-| Suite Shell, stable | Flatpak | `run.suite.shell` on the remote's default branch | the host's own data root |
-| Suite Shell, pre-release | Flatpak | `run.suite.slop.shell` on the `slop`, `nightly` or `preview` branch | the pre-release data root |
+| Suite Desk, stable | Flatpak | `run.suite.shell` on the remote's default branch | the host's own data root |
+| Suite Desk, pre-release | Flatpak | `run.suite.slop.shell` on the `slop`, `nightly` or `preview` branch | the pre-release data root |
 | Suite Go | Release APK | the package id: `run.suite.go` for stable, `run.suite.slop.go` for every pre-release | the app's own data |
 | Legacy mini-app (frozen) | Flatpak | the last stable ref; no new channel is published | `Documents/Suite/<App>` |
 

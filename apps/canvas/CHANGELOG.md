@@ -9,7 +9,7 @@ a release is tagged `canvas-v<version>`. See
 ### Changed
 
 - **Canvas installs as a signed desktop pack, not only the frozen Electron app.** The same renderer
-  now opens inside the Suite Shell: the host owns the document envelope, atomic write and backup,
+  now opens inside the Suite Desk: the host owns the document envelope, atomic write and backup,
   while the pack owns the schema and a board opens, edits, saves, exports and re-imports through the
   host envelope, images included. The pack asks only for `documents` and `files`; the host has no
   documents folder, recents, library watch or directory import yet, so Canvas imports a copy through

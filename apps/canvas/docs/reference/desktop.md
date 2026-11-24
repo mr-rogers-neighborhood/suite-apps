@@ -192,7 +192,7 @@ rather than leaving the order to whoever remembers.
 `electron-builder.yml`. The Flatpak is the published Linux build; it registers the `.canvas` MIME
 association through the packaged desktop entry, so a document opens without a separate installer.
 
-The app claims no URL scheme of its own. `suite://` belongs to Suite Shell, the host, which routes a
+The app claims no URL scheme of its own. `suite://` belongs to Suite Desk, the host, which routes a
 link by launching this app with it, and a second scheme that nothing registers would be a promise the
 app does not keep.
 

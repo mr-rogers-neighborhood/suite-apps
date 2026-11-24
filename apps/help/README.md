@@ -73,7 +73,7 @@ gate.
 ## Theme and mark
 
 Help paints `@suite/theme`, not a palette of its own, and it no longer offers a theme control. The
-host — Suite Shell's **View** menu on desktop, Suite Go's **Settings** on mobile — owns the preset and
+host — Suite Desk's **View** menu on desktop, Suite Go's **Settings** on mobile — owns the preset and
 brightness, paints the resolved role variables onto the document, and marks the root with
 `data-theme-mode`.
 

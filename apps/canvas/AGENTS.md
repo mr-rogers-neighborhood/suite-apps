@@ -31,7 +31,7 @@ Read [docs/README.md](docs/README.md) for the four documentation sections, and
 | `scripts` | `docs-check`, `docs-symbols`, `check-shape` and the release helpers |
 
 The relay, control plane, hosted site and the account/billing services are **gone**, not moved: sync
-now runs through a relay that a device in the workspace runs itself (see `suite-sync`). Suite Shell
+now runs through a relay that a device in the workspace runs itself (see `suite-sync`). Suite Desk
 installs Canvas as a signed pack; the frozen Flatpak keeps its `flatpak install` line.
 
 ## Commands

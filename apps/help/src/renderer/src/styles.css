@@ -3,7 +3,7 @@
 /*
  * The fallback palette.
  *
- * In a host the pack receives every role as a `var(--<role>)` from Suite Shell or Suite Go,
+ * In a host the pack receives every role as a `var(--<role>)` from Suite Desk or Suite Go,
  * and those values win over this block. Outside a host there is nobody to paint them, so
  * the default Suite palette is spelled out here; without it every `@theme` alias below
  * resolves to an undefined custom property and Help renders white-on-white.

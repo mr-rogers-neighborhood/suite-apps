@@ -132,6 +132,12 @@ import { ShellWindow } from "./window.js";
  */
 app.setName("Suite");
 
+/**
+ * The product name in the About panel is Suite Desk. `setName("Suite")` stays
+ * because it also decides the data directory, which is not part of the rename.
+ */
+app.setAboutPanelOptions({ applicationName: "Suite Desk" });
+
 const userDataOverride = process.env.SUITE_SHELL_USER_DATA?.trim();
 if (userDataOverride !== undefined && userDataOverride.length > 0) {
   app.setPath("userData", userDataOverride);

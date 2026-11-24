@@ -1,7 +1,7 @@
 /**
  * The mode this pack is drawn in.
  *
- * Help has no theme setting: the host (Suite Shell on desktop, Go on mobile) owns the preset
+ * Help has no theme setting: the host (Suite Desk on desktop, Go on mobile) owns the preset
  * and the brightness, paints the resolved tokens onto the document, and marks the root with
  * `data-theme-mode`. This module only reads that answer for the one consumer that cannot use
  * CSS — Shiki, which needs to pick a syntax theme.

@@ -18,7 +18,7 @@ handbook and the search index ship inside the bundle, so a person needs no check
 ## Theme and mark
 
 Help uses `@suite/theme` rather than a palette of its own, and it has no theme control. The host owns
-the preset and brightness — Suite Shell's **View** menu on desktop, Suite Go's **Settings** on mobile —
+the preset and brightness — Suite Desk's **View** menu on desktop, Suite Go's **Settings** on mobile —
 and paints the resolved role variables onto the document. The Fumadocs `--color-fd-*` names point at
 those roles, and Shiki follows `data-theme-mode` instead of a fixed code theme.
 

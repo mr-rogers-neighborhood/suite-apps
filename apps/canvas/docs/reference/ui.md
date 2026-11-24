@@ -612,7 +612,7 @@ Device appearance is local, and it lives in Settings. `src/styles/SettingsDialog
 The dialog opens from the palette's `system.settings` row through `openSettings` in
 `src/styles/settingsEvents.ts`, a window event, so no other surface has to own its state. The appearance controls keep their `appearance-*` test ids.
 
-The theme is not this app's decision. Suite Shell's **View** menu (desktop) or Suite Go's **Settings**
+The theme is not this app's decision. Suite Desk's **View** menu (desktop) or Suite Go's **Settings**
 (mobile) owns the preset and brightness, paints the resolved token variables onto the document, and
 marks the root with `data-theme`, `data-theme-mode` and the `dark` class. `src/theme/hostTheme.ts`
 observes those attributes for the two consumers that cannot read CSS: Excalidraw's `theme` prop and the

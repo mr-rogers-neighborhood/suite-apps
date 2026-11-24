@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Publish Suite Shell and Suite Go: package the host, build the Flatpak, publish the signed
+ * Publish Suite Desk and Suite Go: package the host, build the Flatpak, publish the signed
  * remote, refresh the rolling release, attach Suite Go's APK, and relink.
  *
  * The host is the top row of the rolling release and the only desktop artifact
@@ -254,7 +254,7 @@ function goVersion() {
  */
 export function installLines(version = goVersion()) {
   const lines = [
-    "Suite Shell (desktop):",
+    "Suite Desk (desktop):",
     "  flatpak install --user suite run.suite.shell",
     "  flatpak run run.suite.shell",
   ];
@@ -306,7 +306,7 @@ async function main(argv) {
   const status = readGateStatus();
   const refusal = publishRefusal(status, head);
 
-  process.stdout.write(options.publish ? "\nSuite Shell + Suite Go release · publish\n" : "\nSuite Shell + Suite Go release · dry run\n");
+  process.stdout.write(options.publish ? "\nSuite Desk + Suite Go release · publish\n" : "\nSuite Desk + Suite Go release · dry run\n");
   process.stdout.write(`\n  head        ${head}\n`);
   process.stdout.write(
     `  gate proof  ${

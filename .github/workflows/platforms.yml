@@ -1,5 +1,5 @@
 # The platform matrix rows: unsigned Windows x64 and macOS arm64 zips of the
-# Suite Shell, a build-only Windows arm64 zip and macOS Intel zip, a Linux
+# Suite Desk, a build-only Windows arm64 zip and macOS Intel zip, a Linux
 # aarch64 Flatpak, and an unsigned iOS simulator app for Suite Go, plus an SBOM
 # and provenance for each artifact that is promised. They are test artifacts,
 # not releases (delivery.md, D8.1): no signing, no notarization, no dmg, no
@@ -99,7 +99,7 @@ jobs:
             "$((Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           }
           $readme = @'
-          Suite Shell - unsigned Windows test build
+          Suite Desk - unsigned Windows test build
 
           This is a test artifact, not a release. It is unsigned, so Windows
           SmartScreen will warn the first time it runs; choose More info then
@@ -222,7 +222,7 @@ jobs:
           cd apps/shell/release
           shasum -a 256 ./*.zip > SHA256SUMS
           cat > README.txt <<'EOF'
-          Suite Shell - unsigned macOS test build
+          Suite Desk - unsigned macOS test build
 
           This is a test artifact, not a release. It is unsigned and not
           notarized, so Gatekeeper will block it until you allow it: right-click
@@ -296,7 +296,7 @@ jobs:
           cd apps/shell/release
           shasum -a 256 ./*.zip > SHA256SUMS
           cat > README.txt <<'EOF'
-          Suite Shell - unsigned macOS Intel test build
+          Suite Desk - unsigned macOS Intel test build
 
           This is a test artifact, not a release. It is unsigned and not
           notarized, so Gatekeeper will block it until you allow it: right-click
@@ -364,7 +364,7 @@ jobs:
             "$((Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           }
           $readme = @'
-          Suite Shell - unsigned Windows on arm64 test build
+          Suite Desk - unsigned Windows on arm64 test build
 
           This is a test artifact, not a release. It is unsigned, so Windows
           SmartScreen will warn the first time it runs; choose More info then
@@ -526,7 +526,7 @@ jobs:
           set -euo pipefail
           sha256sum suite-shell-linux-aarch64.flatpak > SHA256SUMS
           cat > README.txt <<'EOF'
-          Suite Shell - unsigned Linux aarch64 test bundle
+          Suite Desk - unsigned Linux aarch64 test bundle
 
           This is a test artifact, not a release. The Flatpak bundle is not
           signed, so install it by hand into your user installation:

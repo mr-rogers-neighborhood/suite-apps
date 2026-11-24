@@ -180,7 +180,7 @@ The rules that shape the Suite host.
 - The shell renders pack-declared contributions: commands, menus, toolbar items, status items,
   keybindings and widgets. Contributions are data, not DOM. The host validates and renders them.
 - A pack owns only its content. It never renders into host chrome, and the host never imports pack UI.
-- Theme is host state, not pack state. Suite Shell owns the preset and brightness on desktop (Suite
+- Theme is host state, not pack state. Suite Desk owns the preset and brightness on desktop (Suite
   Go owns them on mobile), stores the pair at `<dataRoot>/theme.json`, and paints every pack view with
   the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A pack has no
   picker and no stored choice; a change repaints open views through `ShellWindow.setTheme` and a pack
@@ -241,7 +241,7 @@ The rules that shape the Suite host.
 
 ## Channels
 
-- Shell is a superapp, so it carries one channel for the whole product. Stable is `run.suite.shell` on
+- Suite Desk is a superapp, so it carries one channel for the whole product. Stable is `run.suite.shell` on
   `master`. One pre-release id, `run.suite.slop.shell`, carries `slop`, `nightly` and `preview` on
   branches of the same names; the display name, desktop entry, metainfo, icon and launcher follow the
   pre-release id.
