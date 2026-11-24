@@ -1,6 +1,13 @@
 # Nightly proof: the full gate with e2e, then the two artifacts that carry this
 # repository's installs.
 #
+# The first job asks GitHub whether this run's tag is already published. A
+# published release is immutable, so a second nightly on the same day has no
+# artifact it may add and no tag it may move; it prints one sentence and stops
+# before the gate, green. A manual dispatch that deliberately wants another
+# artifact for the day names the tag date (`date`, below), and the check then
+# asks about that tag instead — never the default.
+#
 # While `NIGHTLY_PUBLISH` is unset, this builds the debug APK and an unsigned
 # Flatpak bundle and attests them without touching a channel. Set the repository
 # variable to `true` once the `release` environment holds its keys, and the run
@@ -14,6 +21,13 @@ on:
   schedule:
     - cron: "0 2 * * *"
   workflow_dispatch:
+    inputs:
+      date:
+        description: >-
+          Tag date for a deliberate second publication (YYYY-MM-DD). Empty asks
+          about today's tag and stops early when it is already published.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -23,9 +37,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The question that costs no build minutes. A published release locks its tag,
+  # assets and body, so there is nothing a second run could do with them; the
+  # answer is a skip, not a failure after the gate.
+  published:
+    name: already-published
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      published: ${{ steps.check.outputs.published }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Ask whether this run's tag is already published
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # One sentence when it is published; nothing when the tag is free. The
+          # tag date is the dispatch `date` input when named, today otherwise.
+          sentence="$(node scripts/release-status.mjs --check-published --channel nightly)"
+          if [ -z "${sentence}" ]; then
+            echo "No published release for this run's tag; continuing to the gate."
+            exit 0
+          fi
+          printf '%s\n' "${sentence}"
+          printf '%s\n' "${sentence}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "published=true" >> "${GITHUB_OUTPUT}"
+
   gate:
     name: nightly-gate
-    if: vars.NIGHTLY_PUBLISH != 'true'
+    needs: published
+    if: vars.NIGHTLY_PUBLISH != 'true' && needs.published.outputs.published != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -51,8 +99,8 @@ jobs:
 
   package-linux:
     name: package-linux
-    needs: gate
-    if: vars.NIGHTLY_PUBLISH != 'true'
+    needs: [published, gate]
+    if: vars.NIGHTLY_PUBLISH != 'true' && needs.published.outputs.published != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -113,8 +161,8 @@ jobs:
 
   package-android:
     name: package-android
-    needs: gate
-    if: vars.NIGHTLY_PUBLISH != 'true'
+    needs: [published, gate]
+    if: vars.NIGHTLY_PUBLISH != 'true' && needs.published.outputs.published != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -176,7 +224,8 @@ jobs:
   # full gate, so the nightly proof and the artifact that ships are the same run.
   publish:
     name: publish-nightly
-    if: vars.NIGHTLY_PUBLISH == 'true'
+    needs: published
+    if: vars.NIGHTLY_PUBLISH == 'true' && needs.published.outputs.published != 'true'
     permissions:
       contents: write
       id-token: write
@@ -189,7 +238,7 @@ jobs:
 
   report:
     name: report
-    needs: [gate, package-linux, package-android, publish]
+    needs: [published, gate, package-linux, package-android, publish]
     # Green nights close the rolling issue; red ones open or update it. One
     # issue, not one per night (C10.1).
     if: always()
@@ -202,6 +251,8 @@ jobs:
       - name: Open, update or close the rolling nightly issue
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
+          CHECK: ${{ needs.published.result }}
+          ALREADY: ${{ needs.published.outputs.published }}
           GATE: ${{ needs.gate.result }}
           LINUX: ${{ needs.package-linux.result }}
           ANDROID: ${{ needs.package-android.result }}
@@ -210,8 +261,13 @@ jobs:
           script: |
             const label = "ci-nightly";
             const title = "Nightly gate is red";
+            // A second run that stopped before the gate proved nothing, so it
+            // must not close a red issue the first run opened. The one sentence
+            // is on the already-published job; this job stays out of the way.
+            if (process.env.ALREADY === "true") return;
             // One of the two modes runs; the other is skipped by design.
             const results = {
+              "already-published": process.env.CHECK,
               gate: process.env.GATE,
               "package-linux": process.env.LINUX,
               "package-android": process.env.ANDROID,

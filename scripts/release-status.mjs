@@ -34,11 +34,20 @@
  * A missing aggregate tag is created at HEAD, the snapshot the page describes;
  * an existing tag is never moved.
  *
+ * `--check-published` is the cheap question a nightly asks before the gate: it
+ * names this run's tag and prints one sentence when that tag is already
+ * published, so a second nightly on the same day stops instead of failing after
+ * the build. It prints nothing when the tag is free or still a draft. A
+ * deliberate second publication names another tag date — `--date`, or the
+ * workflow's `date` input, which every step that names the tag reads.
+ *
  * Usage:
  *   node scripts/release-status.mjs            # dry run: commands and bodies
  *   node scripts/release-status.mjs --draft    # create or update the draft releases
  *   node scripts/release-status.mjs --publish  # publish the drafts, then write RELEASES.md
  *   node scripts/release-status.mjs --write    # refresh RELEASES.md only
+ *   node scripts/release-status.mjs --check-published --channel nightly
+ *                                               # is this tag already out?
  *   node scripts/release-status.mjs --date 2026-11-21 --draft
  *   node scripts/release-status.mjs --help
  */
@@ -214,13 +223,15 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --date <YYYY-MM-DD>  tag date; a pre-release defaults to today in UTC, stable to
                        the newest app release (which is also stable's snapshot date)
   --channel <name>     stable (default), slop, nightly or preview; names the APK asset
+  --check-published    print one sentence and stop when this run's tag is already
+                       published; print nothing and exit 0 when it is not
   --manifest <path>    release manifest for the Artifacts section
                        (default: .dev/release/release-manifest.json when it exists)
   --prune              delete old published pre-release releases (never stable)
   --keep <n>           releases a pruned channel keeps (default 14)
   --help               print this text
 
-Pass one of --draft, --publish, --write and --dry-run.
+Pass one of --draft, --publish, --write and --dry-run, or --check-published.
 
 A release is created as a draft, its assets are attached while it is a draft, and
 --publish flips it. A published release is immutable and is never edited.
@@ -243,14 +254,16 @@ export function aggregateTag(date, channel = "stable") {
  *
  * The workflow attaches assets to the draft after `--draft`, so it has to name
  * the same tag `--draft` created: stable uses the newest changelog date, and a
- * pre-release channel uses today in UTC. `--date` names a tag date explicitly.
- * `load` and `now` are injectable so a test needs no tree and no clock.
+ * pre-release channel uses today in UTC. `--date` names a tag date explicitly,
+ * and so does the workflow's `date` input; `load`, `now` and `env` are
+ * injectable so a test needs no tree, no clock and no CI event.
  */
 export function currentAggregateTag({
   load = read,
   channel = "stable",
   date = null,
   now = new Date(),
+  env = process.env,
 } = {}) {
   const entries = [];
   for (const app of APPS) {
@@ -262,7 +275,11 @@ export function currentAggregateTag({
       // An app whose files cannot be read cannot change the newest date.
     }
   }
-  const { tagDate } = releaseDates(entries, { channel, date, now });
+  const { tagDate } = releaseDates(entries, {
+    channel,
+    date: date ?? workflowInputDate(env),
+    now,
+  });
   return aggregateTag(tagDate, channel);
 }
 
@@ -460,6 +477,38 @@ export function today(now = new Date()) {
 }
 
 /**
+ * The tag date a workflow explicitly named, or null when it named none.
+ *
+ * A deliberate second publication has to name another tag date: a published
+ * release is immutable, so its tag can never carry a second artifact (D6.3).
+ * The nightly takes that choice as its `date` dispatch input, and the release
+ * workflow it calls runs this script without `--date`. Reading the triggering
+ * event keeps one answer, so `--draft`, the asset upload and `--publish` all
+ * name the same tag. A local run has no event file and names the date with
+ * `--date`; an input that is not a calendar date refuses rather than silently
+ * falling back to today, which would reuse a published tag.
+ */
+export function workflowInputDate(env = process.env) {
+  const path = env.GITHUB_EVENT_PATH;
+  if (typeof path !== "string" || path.length === 0) return null;
+  let event;
+  try {
+    event = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
+  const value = event?.inputs?.date;
+  if (value === undefined || value === null || value === "") return null;
+  if (!isDate(value)) {
+    throw new Error(
+      `the workflow's date input is ${JSON.stringify(value)}, not a YYYY-MM-DD calendar ` +
+        "date; refusing to publish under a tag it did not name",
+    );
+  }
+  return value;
+}
+
+/**
  * Why a changelog date cannot become a tag, or null when it can.
  *
  * The heading is the only source of the aggregate date, so a typo such as
@@ -531,6 +580,36 @@ export function publishedReleaseMessage(tag) {
     `${tag} is already published, and published releases are immutable: this run refuses ` +
     "to edit its tag, assets or body, and leaves it unchanged."
   );
+}
+
+/**
+ * The one sentence a nightly prints when its tag is already published.
+ *
+ * A second run on the same day has nothing it may do: the release is
+ * immutable, so there is no tag to move and no asset to add. It stops before
+ * the gate instead of failing after the build, and it stays green because the
+ * day's artifact does exist — this run simply has no work.
+ */
+export function alreadyPublishedMessage(tag) {
+  return (
+    `${tag} is already published; its artifact already exists, so this run stops before ` +
+    "the gate and leaves it untouched."
+  );
+}
+
+/**
+ * What a check of this run's tag found: stop with one sentence, or go ahead.
+ *
+ * A draft does not stop the run: it is mutable, so a rerun updates the same
+ * draft and stays idempotent. Only a published release — which cannot be edited
+ * and whose tag cannot carry a second artifact — ends the run early.
+ */
+export function publishedCheck(releases, tag) {
+  const row = releaseFor(releases, tag);
+  if (row !== null && row.isDraft !== true) {
+    return { published: true, sentence: alreadyPublishedMessage(tag) };
+  }
+  return { published: false, sentence: null };
 }
 
 /**
@@ -1127,6 +1206,7 @@ export function parseArgs(argv) {
     channel: "stable",
     manifest: null,
     prune: false,
+    checkPublished: false,
     keep: 14,
     help: false,
   };
@@ -1159,6 +1239,8 @@ export function parseArgs(argv) {
       index += 1;
     } else if (arg === "--prune") {
       options.prune = true;
+    } else if (arg === "--check-published") {
+      options.checkPublished = true;
     } else if (arg === "--keep") {
       options.keep = Number(takeValue(index, "--keep"));
       if (!Number.isInteger(options.keep) || options.keep < 1) {
@@ -1178,6 +1260,7 @@ export function parseArgs(argv) {
     options.write ? "--write" : null,
     options.dryRun ? "--dry-run" : null,
     options.prune ? "--prune" : null,
+    options.checkPublished ? "--check-published" : null,
   ].filter((mode) => mode !== null);
   if (modes.length > 1) {
     throw new Error(`${modes.join(" and ")} pick different modes; pass at most one`);
@@ -1668,6 +1751,23 @@ async function main(argv) {
         ? "write"
         : "dry-run";
   const releases = existingReleases();
+  // The tag date has one answer per run. `--date` names it; in a dispatch, the
+  // workflow's `date` input does, so the check and the publication that follows
+  // cannot disagree about which tag they mean.
+  const namedDate = options.date ?? workflowInputDate();
+
+  if (options.checkPublished) {
+    const tag = currentAggregateTag({ channel, date: namedDate });
+    if (releases === null) {
+      throw new Error(
+        `gh release list failed; cannot tell whether ${tag} is already published, so this ` +
+          "run does not stop a build it cannot justify",
+      );
+    }
+    const check = publishedCheck(releases, tag);
+    if (check.published) process.stdout.write(`${check.sentence}\n`);
+    return;
+  }
 
   if (options.prune) {
     if (channel === "stable") {
@@ -1716,7 +1816,7 @@ async function main(argv) {
   if (problems.length > 0) throw new Error(problems.join("\n\n"));
 
   const head = currentHead();
-  const { snapshotDate, tagDate } = releaseDates(entries, { channel, date: options.date });
+  const { snapshotDate, tagDate } = releaseDates(entries, { channel, date: namedDate });
   const tag = aggregateTag(tagDate, channel);
   const preReleases = channel === "stable" ? preReleaseLinks(releases) : [];
   const aggregate = planAggregate(tag, head);
