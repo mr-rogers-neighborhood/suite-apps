@@ -1,6 +1,6 @@
 # The platform matrix rows: unsigned Windows x64 and macOS arm64 zips of the
 # Suite Desk, a build-only Windows arm64 zip and macOS Intel zip, a Linux
-# aarch64 Flatpak, and an unsigned iOS simulator app for Suite Go, plus an SBOM
+# aarch64 Flatpak, and a parked iOS simulator row for Suite Go, plus an SBOM
 # and provenance for each artifact that is promised. They are test artifacts,
 # not releases (delivery.md, D8.1): no signing, no notarization, no dmg, no
 # installer, no publication. A failure here blocks that platform's artifact,
@@ -19,10 +19,12 @@
 # deliberately no `pull_request` trigger: this is not a per-change check, and a
 # fork never gets this compute (ci.md, C2.4).
 #
-# The iOS job builds the committed Capacitor project in apps/go/ios with Swift
-# Package Manager, for the simulator only. It needs no signing identity: a
-# simulator app is unsigned by design, and an iOS device build stays out of the
-# matrix until Apple signing and notarization exist.
+# The iOS simulator job is parked (2026-11-24) while mobile runs locally on an
+# Android emulator. It runs only when the repository variable SUITE_IOS_BUILD is
+# `true`, so restoring it is one variable, not an edit. When it runs it builds
+# the committed Capacitor project in apps/go/ios with Swift Package Manager, for
+# the simulator only: no signing identity, because a simulator app is unsigned
+# by design, and no device build until Apple signing and notarization exist.
 name: platforms
 
 on:
@@ -554,6 +556,10 @@ jobs:
 
   ios-simulator:
     name: ios-simulator
+    # Parked 2026-11-24: no macOS build until the iOS row returns. Set the
+    # repository variable SUITE_IOS_BUILD=true to run it; the config note in
+    # .revyl/config.yaml records the same decision for the mobile previews.
+    if: vars.SUITE_IOS_BUILD == 'true'
     runs-on: macos-latest
     timeout-minutes: 45
     permissions:

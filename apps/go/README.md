@@ -36,7 +36,7 @@ module, hand it a document handle, and nothing else.
 | Domain modules       | Scratch proves mount, document handoff, capture and teardown; Canvas is a placeholder                                                                                                                                            |
 | Packs                | A signed pack installs from a file; **Browse apps** lists, installs, updates, reinstalls and removes from the operator-signed catalogue; [Planner's state](docs/reference/planner.md) records where the first real domain stands |
 | Android              | Debug APK installs and launches on a physical device over USB                                                                                                                                                                    |
-| iOS                  | Wired by convention, unbuilt — Xcode needs macOS                                                                                                                                                                                 |
+| iOS                  | Parked: wired by convention but built nowhere, so there is no simulator artifact until the build returns                                                                                                                         |
 | Sync                 | Seam designed, no transport. `ModuleHost` is where it will arrive                                                                                                                                                                |
 
 ## Run it

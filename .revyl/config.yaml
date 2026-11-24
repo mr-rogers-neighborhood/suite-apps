@@ -25,8 +25,12 @@ build:
           - "pnpm --filter @suite/go-app exec cap sync ios"
           - "cd apps/go/ios/App && xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO"
         output_path: "apps/go/ios/App/build/Build/Products/Debug-iphonesimulator/App.app"
+# Parked 2026-11-24: the free monthly minutes are nearly spent. Mobile runs
+# locally on an Android emulator for now, so no Revyl build or preview runs on
+# a pull request. Restore `enabled: true` when the allowance resets; the
+# profiles stay here so that is the only line that changes.
 pr_review:
-  enabled: true
+  enabled: false
   build:
     kind: revyl
     profile: preview
