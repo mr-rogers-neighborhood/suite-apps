@@ -6,18 +6,23 @@ import { defineConfig } from "vite";
 import wasm from "vite-plugin-wasm";
 
 /**
- * Builds Planner as a Suite Go pack: one HTML page, one bundle, its own everything.
+ * Builds Planner's own renderer and its bridge into `apps/planner/.dev/pack`.
  *
- * The renderer is imported, not copied. `apps/planner/src/renderer` is already a plain Vite app —
- * no Node builtins, no Electron import — and the only machine access it has is `window.suitePlanner`,
- * which the prelude in `src/main.ts` installs before importing it.
+ * The normal Electron build writes `apps/planner/out`, so this config owns a directory of its own
+ * and never repoints `electron-vite`. The entry is the pack's page: it loads `src/main.ts`, which
+ * installs the bridge over the host's `window.suite` and then imports the renderer. One entry, so
+ * no script-injection step is needed after Vite writes the page.
  *
- * `base: "./"` because a pack is served from `/_capacitor_file_/…` inside the app, not from a domain
- * root. `optimizeDeps.exclude` because Loro ships a wasm-bindgen entry whose URL pre-bundling breaks.
+ * The output and Vite's cache sit outside `pack/` on purpose: `pack/` is source, and
+ * `scripts/pack-shape.mjs` fails the gate if a generated directory appears in it.
  */
+const packRoot = fileURLToPath(new URL(".", import.meta.url));
+const outputRoot = new URL("../.dev/", import.meta.url);
+
 export default defineConfig({
-  root: fileURLToPath(new URL(".", import.meta.url)),
+  root: packRoot,
   base: "./",
+  cacheDir: fileURLToPath(new URL("vite", outputRoot)),
   plugins: [react(), tailwindcss(), wasm()],
   resolve: {
     alias: {
@@ -28,13 +33,16 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
+    // Loro ships a wasm-bindgen entry; pre-bundling it breaks the wasm URL.
     exclude: ["loro-crdt"],
   },
   build: {
-    outDir: "dist",
+    outDir: fileURLToPath(new URL("pack", outputRoot)),
     emptyOutDir: true,
     target: "es2022",
-    // A pack is a page, so the entry is the HTML and the script is a module beside it.
+    // The pack's CSP allows its own assets and no `data:` script or asset. A plain file beside the
+    // module is what the policy can fetch.
+    assetsInlineLimit: 0,
     rollupOptions: {
       output: {
         entryFileNames: "assets/[name]-[hash].js",

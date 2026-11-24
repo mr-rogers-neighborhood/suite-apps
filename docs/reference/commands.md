@@ -137,14 +137,18 @@ The gate's libraries step does the same build before anything else runs.
 
 ```sh
 mise exec -- pnpm budget:pack [--key <base64>] [--out <file.suitepack>] [--version <semver>]
+mise exec -- pnpm planner:pack [--key <base64>] [--out <file.suitepack>] [--version <semver>]
 ```
 
 `scripts/budget-pack.mjs` builds Budget's own renderer and its prelude into
 `apps/budget/.dev/pack`, puts the prelude in front of the app script, and signs the directory with
-the pinned key. The signed manifest carries the source manifest's `documents` declaration, so the
-host stamps the schema version Budget's core writes. The default output is
-`apps/budget/.dev/budget-<version>.suitepack`. The gate runs the signed round-trip with an ephemeral
-key, so a clean checkout with no owner key still proves the build and verification path.
+the pinned key. `scripts/planner-pack.mjs` builds Planner's renderer and its bridge into
+`apps/planner/.dev/pack` and signs that directory; its entry is one module, so it needs no script
+injection. Both signed manifests carry the source manifest's `documents` declaration, so the host
+stamps the schema version the app's core writes. The default outputs are
+`apps/budget/.dev/budget-<version>.suitepack` and `apps/planner/.dev/planner-<version>.suitepack`.
+The gate runs each signed round-trip with an ephemeral key, so a clean checkout with no owner key
+still proves the build and verification path.
 
 ## Releases
 

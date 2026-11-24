@@ -37,10 +37,8 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/graph` | `apps/canvas/packages/graph` | Canvas schema and document layer |
 | `@suite/import-obsidian` | `apps/canvas/packages/import-obsidian` | Canvas import |
 | `@suite/planner` | `apps/planner` | Planner |
-| `@suite/planner-pack` | `apps/planner/pack` | Planner as a Go pack |
 | `@suite/planner-core` | `apps/planner/packages/core` | Planner schema and document layer |
 | `@suite/budget` | `apps/budget` | Budget |
-| `@suite/budget-pack` | `apps/budget/pack` | Budget as a signed desktop pack |
 | `@suite/budget-core` | `apps/budget/packages/core` | Budget schema and document layer |
 | `@suite/start` | `apps/start` | Hub |
 | `@suite/help` | `apps/help` | Documentation app: explorer and handbook |

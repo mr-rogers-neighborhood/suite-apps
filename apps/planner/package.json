@@ -3,6 +3,9 @@
   "productName": "Suite Planner",
   "desktopName": "run.suite.planner",
   "version": "0.5.1",
+  "suite": {
+    "pack": true
+  },
   "private": true,
   "main": "./out/main/index.js",
   "scripts": {
@@ -13,18 +16,19 @@
     "package:dir": "electron-vite build && electron-builder --dir",
     "storybook": "storybook dev -p 6006",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "typecheck:all": "pnpm --filter @suite/planner --filter @suite/planner-core --filter @suite/planner-pack run typecheck",
+    "typecheck:all": "pnpm --filter @suite/planner --filter @suite/planner-core run typecheck && tsc --noEmit -p pack/tsconfig.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:changed": "vitest run --changed",
+    "test:pack": "vitest run --config pack/vitest.config.mts",
     "shape": "node scripts/check-shape.mjs",
     "knip": "knip",
-    "check": "biome check . && pnpm typecheck:all && vitest run --changed && pnpm shape",
-    "check:full": "pnpm lint && pnpm typecheck:all && pnpm test && pnpm shape && pnpm knip && pnpm build",
-    "verify": "biome check . && pnpm typecheck:all && vitest run && pnpm shape && pnpm knip && pnpm build && pnpm build-storybook",
+    "check": "biome check . && pnpm typecheck:all && vitest run --changed && pnpm test:pack && pnpm shape",
+    "check:full": "pnpm lint && pnpm typecheck:all && pnpm test && pnpm test:pack && pnpm shape && pnpm knip && pnpm build",
+    "verify": "biome check . && pnpm typecheck:all && vitest run && pnpm test:pack && pnpm shape && pnpm knip && pnpm build && pnpm build-storybook",
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder"
   },
@@ -74,7 +78,8 @@
     "electron-vite": "^6.0.0",
     "storybook": "^10.6.5",
     "tailwindcss": "^4.3.4",
-    "vite": "^8.3.5"
+    "vite": "^8.3.5",
+    "vite-plugin-wasm": "^3.6.0"
   },
   "author": {
     "name": "Suite contributors",

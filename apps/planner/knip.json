@@ -2,7 +2,17 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "project": ["scripts/**/*.mjs", "src/**/*.{ts,tsx}", ".storybook/**/*.ts", "e2e/**/*.ts"]
+      "entry": ["pack/vite.config.ts"],
+      "project": [
+        "scripts/**/*.mjs",
+        "src/**/*.{ts,tsx}",
+        "pack/src/**/*.ts",
+        "pack/src/**/*.tsx",
+        "pack/*.config.ts",
+        "pack/*.config.mts",
+        ".storybook/**/*.ts",
+        "e2e/**/*.ts"
+      ]
     },
     "packages/core": {
       "project": ["src/**/*.ts"]

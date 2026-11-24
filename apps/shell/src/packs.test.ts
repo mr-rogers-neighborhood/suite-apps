@@ -204,6 +204,24 @@ describe("pack request resolution", () => {
     expect(resolvePackRequest(packUrl("budget", "assets/../../prelude.js"), packs)).toBeNull();
   });
 
+  it("serves the Planner entry and its assets from the pack root", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "planner", { capabilities: ["documents", "files"] });
+    await mkdir(join(root, "planner", "assets"), { recursive: true });
+    await writeFile(join(root, "planner", "assets", "app-abc.js"), "console.log('planner');\n");
+    const packs = discoverPacks(root);
+
+    for (const path of ["index.html", "assets/app-abc.js"]) {
+      const request = resolvePackRequest(packUrl("planner", path), packs);
+      expect(request?.pack.id).toBe("planner");
+      expect(request?.file).toBe(join(root, "planner", ...path.split("/")));
+    }
+
+    // The app bundle is the pack's own script; a request that climbs out of the
+    // root never reaches it.
+    expect(resolvePackRequest(packUrl("planner", "assets/../../index.html"), packs)).toBeNull();
+  });
+
   it("refuses a climb before the URL parser can normalise it", async () => {
     const root = await temporaryRoot();
     await writePack(root, "welcome");
