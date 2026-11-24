@@ -296,6 +296,40 @@ suite stays separate Flatpaks plus Start.
   cache; a descriptor that needs the app running to render; a widget bundle as a second packaging
   format; a second descriptor for Go.
 
+## Declared, not executed
+
+- **The pack declares; the host performs.** A cross-cutting act — a notification, a sync frame, a
+  file write, a migration, an export — is a declaration the host reads and acts on, not something the
+  pack does through a privileged back door. The spec already uses this verb: a pack *declares* its
+  documents, capabilities and widgets (R2.4).
+- Two tests settle any "who owns this?" question:
+  1. **Can it happen while the pack is not running?** If yes, the host must be able to do it alone,
+     which means the declaration carries its own payload.
+  2. **Who holds the privilege?** The OS permission, the device key, the clock, the file handle and the
+     store key are the host's. A pack that asks for them is asking the host to act on its behalf.
+- Three classes, and they are not the same:
+
+  | Class | Example | What the pack contributes |
+  | --- | --- | --- |
+  | Host mechanism, host meaning | theme, window chrome, store key | nothing; it receives the result |
+  | Host mechanism, pack meaning | sync, notifications, export, migration | the declaration: scope, payload, due time, entry point |
+  | Pack mechanism, pack meaning | the editing surface, the schema, a projection body | everything; the host is not involved |
+
+- **Declarative is a different word.** It describes form — a widget descriptor, a Screen, a manifest are
+  data the host renders or validates. A declared capability usually arrives in a declarative form, but
+  the two are not synonyms and neither is the standard on its own.
+- **Consequence: a declaration must survive the pack being closed.** A reminder written at save time is
+  a row the host can schedule at 09:00 with nothing running; a pack asked to format its own
+  notification cannot answer, because it is not running. This is why notifications are projected, not
+  performed.
+- **Consequence: staleness is a real state, not an edge case.** A declaration captured yesterday may
+  describe a document that has since moved. The host refreshes a declaration on save and on open, and
+  never later — a background refresh would be the pack running again by another name.
+- **Anti-pattern.** A proxy API that lets a pack perform a privileged act but own the policy invisibly:
+  a pack-side scheduler, a pack that formats and posts its own notification through a generic channel,
+  a pack that runs its own backup beside the host's. If two copies of a policy can disagree, the
+  boundary is wrong.
+
 ## Product boundary
 
 - A document is a file the user owns. The hub returns a path or bytes; it never parses a document.
