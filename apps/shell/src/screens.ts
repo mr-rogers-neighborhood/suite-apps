@@ -436,6 +436,7 @@ export class ScreenSet {
     if (!this.#stores.has(id)) return false;
     this.#homeId = id;
     await this.#rememberHome();
+    this.#refreshSummaries();
     return true;
   }
 
