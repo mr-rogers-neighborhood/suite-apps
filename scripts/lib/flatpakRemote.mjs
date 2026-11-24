@@ -377,11 +377,16 @@ export function s3MergeCommands({ repo, bucket }) {
  * build just made would otherwise be reset to the published commit; the signed
  * summary would then advertise yesterday's build. Restore every built ref
  * before signing, and keep the bucket's other refs as they came in.
+ *
+ * The merge already copied this branch's ref into the local repository, so the
+ * restore overwrites it: `--create` alone refuses an existing ref. `--force`
+ * comes before `--create`, because `--create` takes the next word as its ref
+ * name and would otherwise read the flag as one.
  */
 export function restoreRefCommands({ repo, builtRefs }) {
   return (builtRefs ?? []).map(({ ref, commit }) => ({
     command: "ostree",
-    args: [`--repo=${repo}`, "refs", "--create", ref, commit],
+    args: [`--repo=${repo}`, "refs", "--force", "--create", ref, commit],
   }));
 }
 
