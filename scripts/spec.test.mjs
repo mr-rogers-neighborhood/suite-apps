@@ -30,6 +30,7 @@ const STATUSES = ["Implemented", "Partial", "Absent", "Future"];
  */
 const TAG_SCAN_FILES = [
   "scripts/spec.test.mjs",
+  "scripts/spec-golden.test.mjs",
   "scripts/pack.test.mjs",
   "scripts/budget-pack.test.mjs",
   "scripts/affected.test.mjs",
