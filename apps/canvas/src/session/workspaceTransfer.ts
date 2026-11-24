@@ -13,6 +13,7 @@ export { type CardAttachment, documentAttachments } from "@suite/graph";
 import { LoroDoc } from "loro-crdt";
 import { LoroIndexeddbPersistence } from "../collab/loroPersistence";
 import { storeLocalAttachment } from "../editor/attachmentNode";
+import { desktopBridge } from "../host/bridge";
 import {
   type AttachmentSource,
   defaultAttachmentSources,
@@ -316,7 +317,15 @@ export async function downloadWorkspaceBackup(
     ...(options.compact ? { compact: true } : {}),
   });
   if (prepared.warnings.length > 0) options.onWarning?.(prepared.warnings.join(" "));
-  downloadText(`${fileStem(title)}.${WORKSPACE_FILE_EXTENSION}`, prepared.json);
+  const name = `${fileStem(title)}.${WORKSPACE_FILE_EXTENSION}`;
+  // A pack has no browser download: it writes through the host's save picker. The Electron shell
+  // does not publish this method, so its long-standing download path stays the default.
+  const bridge = desktopBridge();
+  if (bridge?.saveTextFile !== undefined) {
+    await bridge.saveTextFile(name, prepared.json);
+    return prepared;
+  }
+  downloadText(name, prepared.json);
   return prepared;
 }
 

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <!--
+      A pack that declares no `network` has to prove it cannot reach one. `default-src 'self'`
+      matters as much as `connect-src`: the other fetch directives inherit from it, so without it
+      an `<img src="https://…">` would be an exfiltration channel that connect-src does not close.
+      `connect-src 'self'` rather than 'none' because wasm-bindgen fetches Loro's `.wasm`
+      same-origin. `img-src` and `media-src` keep `blob:` because a pasted image is a Blob in this
+      session; `style-src` keeps the inline allowance the theme writes before first paint.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
+    />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>Suite Canvas</title>
+    <!--
+      Excalidraw resolves `fonts/<Family>/<file>.woff2` beside this base and asks a CDN when it
+      has none. The pack policy refuses a third-party font, so the base is set by a file rather
+      than inline: `script-src 'self'` has no `unsafe-inline`.
+    -->
+    <script src="./excalidraw-assets.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!--
+      The prelude, not the app: `main.ts` installs `window.suiteDesktop` from the host's
+      `window.suite`, then imports the renderer. `main.tsx` reads that global at boot, so the
+      order is the whole entry.
+    -->
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

@@ -714,6 +714,60 @@ describe("publisher trust at install", () => {
     }
   });
 
+  // spec: S2.5, S6.3
+  it("installs the Canvas pack with its declared .canvas workspace and shows the four install facts", async () => {
+    const root = await temporaryRoot();
+    const keys = await generatePackKeyPair();
+    const pack = await fixture({
+      keys,
+      id: "canvas",
+      name: "Suite Canvas",
+      version: "0.1.12",
+      capabilities: ["documents", "files"],
+      documents: [{ id: "canvas", format: "suite.canvas", version: 6, mode: "multi" }],
+      payload: {
+        "index.html": encoder.encode(
+          '<!doctype html><div id="root"></div><script type="module" src="./assets/app.js"></script>',
+        ),
+        "assets/app.js": encoder.encode("console.log('canvas');"),
+      },
+    });
+    const installed = await install(root, pack);
+
+    expect(installed).toMatchObject({
+      id: "canvas",
+      name: "Suite Canvas",
+      version: "0.1.12",
+      capabilities: ["documents", "files"],
+      documents: [{ id: "canvas", format: "suite.canvas", version: 6, mode: "multi" }],
+    });
+    expect(await readFile(join(installed.root, "assets", "app.js"), "utf8")).toContain("canvas");
+
+    const summary = packInstallSummary(pack.manifest, {
+      id: installed.publisher.id,
+      key: keys.publicKeyBase64,
+      fingerprint: installed.publisher.fingerprint,
+    });
+    expect(summary).toEqual({
+      id: "canvas",
+      name: "Suite Canvas",
+      version: "0.1.12",
+      capabilities: ["documents", "files"],
+      publisher: { id: "suite", fingerprint: await publisherKeyFingerprint(keys.publicKeyBase64) },
+    });
+    const sentence = describePackInstall(summary, "install");
+    for (const fact of [
+      "Suite Canvas",
+      "canvas",
+      "0.1.12",
+      "suite",
+      installed.publisher.fingerprint,
+      "documents, files",
+    ]) {
+      expect(sentence).toContain(fact);
+    }
+  });
+
   // spec: S2.1
   it("loads a pre-S2.1 install without a publisher only under the first-party key", async () => {
     const root = await temporaryRoot();

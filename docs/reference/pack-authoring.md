@@ -47,8 +47,8 @@ rather than failed. Declaring it is the step that opts into the rule.
 
 ## Build and test
 
-The app's own scripts own the commands; there is no shared pack build entry point. Budget, Planner
-and Help are the worked examples:
+The app's own scripts own the commands; there is no shared pack build entry point. Budget, Planner,
+Canvas and Help are the worked examples:
 
 ```sh
 mise exec -- pnpm --dir apps/budget run test:pack
@@ -59,14 +59,22 @@ mise exec -- pnpm --dir apps/planner run test:pack
 mise exec -- pnpm --dir apps/planner run typecheck:all
 mise exec -- pnpm planner:pack
 
+mise exec -- pnpm --dir apps/canvas run test:pack
+mise exec -- pnpm --dir apps/canvas run typecheck:all
+mise exec -- pnpm canvas:pack
+
 mise exec -- pnpm --dir apps/help run test:pack
 mise exec -- pnpm --dir apps/help run typecheck:all
 mise exec -- pnpm help:pack
 ```
 
-All three build to `apps/<app>/.dev/pack` and sign the archive from there. The output path is the
+All four build to `apps/<app>/.dev/pack` and sign the archive from there. The output path is the
 app's, under a generated directory the root `.gitignore` already covers; never point it back into
 `pack/`.
+
+Canvas is the largest conversion and the first with a document format that already had an export
+envelope of its own: the pack payload is that `.canvas` envelope, so the host carries the snapshot,
+manifest and embedded images unchanged and a re-import returns the same content.
 
 Help also carries generated content, so its build has a second proof:
 

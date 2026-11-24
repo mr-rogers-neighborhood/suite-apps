@@ -7,7 +7,14 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/dist", "!**/release", "!**/storybook-static", "!**/node_modules"]
+    "includes": [
+      "**",
+      "!**/.dev",
+      "!**/dist",
+      "!**/release",
+      "!**/storybook-static",
+      "!**/node_modules"
+    ]
   },
   "formatter": {
     "enabled": true,
