@@ -110,7 +110,9 @@ mise exec -- pnpm pack:index -- --out index.json --url-base https://packs.suite.
 ```
 
 Each archive's manifest signature and every file hash are verified before its entry is written.
-Publishing the file to a store, review attestations and revocation are later seams.
+`scripts/release-index.mjs` runs the builder in the release job, chains `sequence` and `previous` from
+the published copy, and uploads it with its detached signature to the Flatpak remote's own origin.
+Review attestations and revocation are later seams.
 
 ## What this package owns
 

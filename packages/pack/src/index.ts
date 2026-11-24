@@ -103,5 +103,6 @@ export {
   publisherKeyDigest,
   publisherKeyFingerprint,
   type ResolvedPublisher,
+  type RetiredPublisherKey,
   type TrustedPublisher,
 } from "./trust.js";

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const SKIP = new Set([
   "node_modules",
+  ".dev",
   "dist",
   "out",
   "build",

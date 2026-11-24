@@ -53,6 +53,7 @@ import {
   REMOTE_NAME,
   flatpakrepoUrl as remoteFlatpakrepoUrl,
 } from "./lib/flatpakRemote.mjs";
+import { INDEX_METADATA_FILE } from "./lib/releaseIndex.mjs";
 
 /** The repository this page and these releases belong to. */
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -77,6 +78,17 @@ export const NOTES_DIR = ".dev/releases";
  */
 export const MANIFEST_FILE = "release-manifest.json";
 export const MANIFEST_PATH = join(".dev", "release", MANIFEST_FILE);
+
+/**
+ * What `release-index.mjs` wrote when it staged a catalogue publication.
+ *
+ * The index itself is on the Flatpak remote; this local report carries the
+ * sequence, expiry and the operator fingerprint the notes print, so a person
+ * can pin the catalogue trust root deliberately. A release with no pack has no
+ * report, and its notes carry no catalogue section.
+ */
+export const INDEX_RELEASE_FILE = INDEX_METADATA_FILE;
+export const INDEX_RELEASE_PATH = join(".dev", "release", INDEX_RELEASE_FILE);
 
 /** The product-maturity labels, separate from the release channels. */
 export const PRODUCT_MATURITY = ["pre-alpha", "alpha", "beta", "1.0"];
@@ -762,6 +774,49 @@ export function readManifest(path = MANIFEST_PATH, { load = read } = {}) {
   }
 }
 
+/**
+ * The catalogue report at `path`, or null when this release published no pack.
+ *
+ * A malformed report refuses, for the same reason a malformed manifest does: a
+ * note that prints the wrong operator fingerprint is worse than one that omits
+ * the catalogue section entirely.
+ */
+export function readIndexRelease(path = INDEX_RELEASE_PATH, { load = read } = {}) {
+  let text;
+  try {
+    text = load(path);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `${path} is not valid JSON; refusing to print a catalogue fingerprint it cannot read`,
+    );
+  }
+  const valid =
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Number.isInteger(value.sequence) &&
+    value.sequence > 0 &&
+    typeof value.url === "string" &&
+    value.url.length > 0 &&
+    typeof value.signatureUrl === "string" &&
+    value.signatureUrl.length > 0 &&
+    typeof value.fingerprint === "string" &&
+    value.fingerprint.length > 0;
+  if (!valid) {
+    throw new Error(
+      `${path} has no usable sequence, URLs or fingerprint; refusing to publish a note from it`,
+    );
+  }
+  return value;
+}
+
 /** One artifact from the manifest by kind, or null when the manifest omits it. */
 function manifestArtifact(manifest, kind) {
   const artifacts = Array.isArray(manifest?.artifacts) ? manifest.artifacts : [];
@@ -872,6 +927,32 @@ export function artifactsSection(manifest, { tag = null, draft = false, channel 
 }
 
 /**
+ * The catalogue paragraph: where the signed index is, and the fingerprint to pin.
+ *
+ * The index and every pack archive live on the signed Flatpak remote, so a
+ * reader adds no second origin. The fingerprint is the point of the section: a
+ * host fetches whatever it is served, and only a value copied from here lets a
+ * person decide that the catalogue operator is the one they meant.
+ */
+export function indexReleaseSection(index) {
+  const expires =
+    typeof index.expires === "string" && index.expires.length > 0
+      ? ` It expires at ${index.expires}.`
+      : "";
+  return [
+    "## Catalogue index",
+    "",
+    `Packs install from the signed catalogue at [index.json](${index.url}), sequence ` +
+      `${index.sequence}; its detached signature is [index.json.sig](${index.signatureUrl}). ` +
+      `Both are served from the signed Flatpak remote.${expires}`,
+    "",
+    `Catalogue operator fingerprint: \`${index.fingerprint}\`. Pin that value deliberately ` +
+      "before trusting the catalogue; a host verifies the index before it lists a pack.",
+    "",
+  ];
+}
+
+/**
  * The aggregate release body: the two superapps and how they install.
  *
  * The rolling release is the snapshot, so the title says which day it is and
@@ -896,6 +977,7 @@ export function aggregateReleaseBody(
     channel = "stable",
     preReleases = [],
     manifest = null,
+    index = null,
   },
 ) {
   const superapps = superappEntries(entries);
@@ -940,6 +1022,7 @@ export function aggregateReleaseBody(
     ...aggregateTable(superapps, { tag, apkLive, draft, channel }),
     "",
     ...artifactsSection(manifest, { tag, draft, channel }),
+    ...(index === null ? [] : indexReleaseSection(index)),
     "## Update",
     "",
     "Once the remote is added, the desktop apps update with:",
@@ -1625,6 +1708,7 @@ async function main(argv) {
   // missing is a mistake and refuses.
   const manifestPath = options.manifest ?? MANIFEST_PATH;
   const manifest = readManifest(manifestPath);
+  const indexRelease = readIndexRelease();
   if (manifest === null && options.manifest !== null) {
     throw new Error(
       `--manifest ${options.manifest} names no readable file; refusing to omit the Artifacts ` +
@@ -1695,6 +1779,7 @@ async function main(argv) {
     channel,
     preReleases,
     manifest,
+    index: indexRelease,
   });
   const page = releasesPage(entries, {
     date: snapshotDate,

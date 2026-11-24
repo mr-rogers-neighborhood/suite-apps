@@ -25,6 +25,8 @@ export const CHROME_IPC = {
   openExternal: "suite:shell:open-external",
   installPack: "suite:shell:install-pack",
   installCataloguePack: "suite:shell:install-catalogue-pack",
+  importRevocation: "suite:shell:import-revocation",
+  rotatePublisher: "suite:shell:rotate-publisher",
   uninstallPack: "suite:shell:uninstall-pack",
   addWidget: "suite:shell:add-widget",
   removeWidget: "suite:shell:remove-widget",

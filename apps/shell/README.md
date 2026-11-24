@@ -144,6 +144,22 @@ and extracted into a temporary sibling first; only then is the old directory mov
 one renamed into place. A refused or failed reinstall puts the previous version back, and its
 documents and files were never part of the swap.
 
+A publisher key can rotate without changing the publisher id. The publisher signs a rotation
+statement carrying the outgoing key, the new key, the same id and a sequence; **Rotate a key…** opens
+that file and the host verifies it before showing the new fingerprint. Only the confirmation that
+follows that display rewrites `<dataRoot>/trust/publishers.json`. The outgoing key is retired, not
+deleted: a version installed before the rotation still loads, and the next update must be signed by
+the new key. A replayed sequence or a signature from any key but the outgoing one is refused. The
+first-party pin is a release constant and is not changed at runtime.
+
+A revocation is a signed advisory delivered as a small JSON file. **Add revocation…** opens it; the
+pack's own publisher signs with the key that signed the pack (a retired key still counts), and the
+person may record an unsigned local advisory. A publisher cannot revoke another publisher's pack. A
+recorded advisory blocks a new install and marks the catalogue entry as refused; it never disables
+or removes an installed pack. A catalogue operator is a valid issuer in the spec, but the shell does
+not pin operator keys yet, so that form is refused until it does. Advisories live in
+`<dataRoot>/trust/revocations.json` beside the publisher store.
+
 **Uninstall** removes exactly `<dataRoot>/packs/<id>/<version>`. A symlinked install root, id
 directory or version directory is refused, and the version must resolve inside the real pack root;
 a path outside it, or a version that is not a safe segment, is refused before removal. If a tab for

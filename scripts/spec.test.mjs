@@ -40,6 +40,7 @@ const TAG_SCAN_FILES = [
   "scripts/shell-channel.test.mjs",
   "scripts/android-release.test.mjs",
   "scripts/release-status.test.mjs",
+  "scripts/release-index.test.mjs",
   "scripts/delivery-signals.test.mjs",
   "scripts/flatpak-remote.test.mjs",
   "packages/pack/src/catalogue.test.ts",
@@ -52,6 +53,8 @@ const TAG_SCAN_FILES = [
   "apps/shell/src/exportBundle.test.ts",
   "apps/shell/src/installedPacks.test.ts",
   "apps/shell/src/packIdentity.test.ts",
+  "apps/shell/src/packRevocation.test.ts",
+  "apps/shell/src/publisherRotation.test.ts",
   "apps/shell/src/publisherTrust.test.ts",
 ];
 

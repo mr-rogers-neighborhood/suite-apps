@@ -36,6 +36,11 @@ import { planUninstall } from "./lifecycle.js";
 import { documentScopeLabel, documentsRootFor } from "./packIdentity.js";
 import { devPacksEnabled, mergePackSources, shouldOpenAfterInstall } from "./packRegistry.js";
 import {
+  importRevocationAdvisory,
+  openRevocations,
+  type RevocationAdvisory,
+} from "./packRevocation.js";
+import {
   discoverPacks,
   externalLinkFor,
   HOST_CAPABILITIES,
@@ -46,8 +51,10 @@ import {
   packOrigin,
   packsRootFor,
 } from "./packs.js";
+import { checkPublisherRotation, parseRotationStatement } from "./publisherRotation.js";
 import {
   addTrustedPublisher,
+  applyPublisherRotation,
   openPublisherTrust,
   type PublisherTrustStore,
   preinstalledTrustStore,
@@ -112,6 +119,8 @@ const documentStores = new Map<string, DocumentStore>();
 let files: PackFilesService | null = null;
 let externalFiles: ExternalFilesService | null = null;
 let trustStore: PublisherTrustStore | null = null;
+/** Advisories that refuse a new install. They never disable an installed pack. */
+let revocations: readonly RevocationAdvisory[] = [];
 let packs: readonly PackInfo[] = [];
 let catalogue: readonly CataloguePack[] = [];
 let installedVersions: readonly InstalledVersion[] = [];
@@ -119,6 +128,8 @@ let pendingDeepLink: string | null = null;
 
 /** The compressed archive cap this host opens from the picker. The reader enforces its own entry limits too. */
 const MAX_INSTALL_BYTES = MAX_ARCHIVE_BYTES;
+/** A rotation statement or a revocation advisory is a small JSON file. */
+const MAX_ADVISORY_BYTES = 64 * 1024;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -183,6 +194,14 @@ async function bootstrap(): Promise<void> {
       return preinstalledTrustStore();
     },
   );
+  // A malformed advisory file is reported and treated as empty; it is host
+  // state, not a trust root, so it does not fail the launch.
+  revocations = await openRevocations(trustRootFor(dataRoot, process.env))
+    .then((store) => store.revocations)
+    .catch((error: unknown) => {
+      console.warn("[shell] the revocation advisories could not be opened", error);
+      return [];
+    });
   // The catalogue is a drop directory. Creating it is a convenience; an absent
   // or overridden path still scans as an empty catalogue.
   await mkdir(catalogueRootFor(dataRoot, process.env), { recursive: true }).catch(
@@ -258,7 +277,17 @@ function packTrustOptions(): PackTrustOptions {
     hostContractVersion: HOST_CONTRACT_VERSION,
     hostVersion: HOST_VERSION,
     hostCapabilities: HOST_CAPABILITIES,
+    revocations,
   };
+}
+
+/** Re-read the advisories after one is imported, without trusting a bad file. */
+async function reloadRevocations(): Promise<void> {
+  try {
+    revocations = (await openRevocations(trustRootFor(dataRootFor()))).revocations;
+  } catch (error) {
+    console.warn("[shell] the revocation advisories could not be read", error);
+  }
 }
 
 /** The document store for a sender's publisher, created on first use. */
@@ -397,6 +426,12 @@ function registerIpc(): void {
   onChrome(CHROME_IPC.installCataloguePack, async (id, version) => {
     if (typeof id !== "string" || typeof version !== "string") return;
     await installPackFromCatalogue(id, version);
+  });
+  onChrome(CHROME_IPC.importRevocation, async () => {
+    await importRevocationFromFile();
+  });
+  onChrome(CHROME_IPC.rotatePublisher, async () => {
+    await rotatePublisherFromFile();
   });
   onChrome(CHROME_IPC.uninstallPack, async (id, version) => {
     if (typeof id !== "string" || typeof version !== "string") return;
@@ -672,6 +707,129 @@ async function installPackFromFile(): Promise<void> {
   } catch (error) {
     current.setNotice(installRefusal(error));
   }
+}
+
+/** Open a small JSON trust file the person chose. Nothing is fetched. */
+async function readPickedJson(
+  current: ShellWindow,
+  title: string,
+  button: string,
+): Promise<Uint8Array | null> {
+  const selection = await dialog.showOpenDialog(current.window, {
+    title,
+    buttonLabel: button,
+    properties: ["openFile"],
+    filters: [{ name: "Suite trust file", extensions: ["json"] }],
+  });
+  if (selection.canceled) return null;
+  const file = selection.filePaths[0];
+  if (file === undefined) return null;
+
+  try {
+    const metadata = await stat(file);
+    if (!metadata.isFile() || metadata.size > MAX_ADVISORY_BYTES) {
+      current.setNotice("That file is too large to be a Suite trust file.");
+      return null;
+    }
+    return await readFile(file);
+  } catch {
+    current.setNotice("That file could not be read.");
+    return null;
+  }
+}
+
+/**
+ * Rotate a publisher's key from a statement the person chose (S2.3).
+ *
+ * The statement is verified first and the new fingerprint is shown before
+ * anything is written. Only the confirmation that follows that display applies
+ * it. Installed versions are verified by the retired key, so they keep running;
+ * the next update must be signed by the new key.
+ */
+async function rotatePublisherFromFile(): Promise<void> {
+  if (window === null) return;
+  const current = window;
+  const bytes = await readPickedJson(current, "Rotate a publisher key", "Open statement");
+  if (bytes === null) return;
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    current.setNotice("That file is not a rotation statement.");
+    return;
+  }
+  const statement = parseRotationStatement(raw);
+  if (statement === null || trustStore === null) {
+    current.setNotice("That file is not a rotation statement.");
+    return;
+  }
+
+  const check = await checkPublisherRotation(statement, trustStore.publishers);
+  if (!check.ok) {
+    current.setNotice(`The rotation was refused: ${check.message}`);
+    return;
+  }
+
+  const answer = await dialog.showMessageBox(current.window, {
+    type: "warning",
+    title: "Rotate this publisher key?",
+    message: `Publisher ${check.preview.publisherId} would move to a new key.`,
+    detail: `New key fingerprint: ${check.preview.newFingerprint}\nCurrent key fingerprint: ${check.preview.previousFingerprint}\nSequence: ${check.preview.sequence}\n\nOnly confirm if this is the fingerprint the publisher gave you. Installed packs keep running.`,
+    buttons: ["Cancel", "Rotate this key"],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  if (answer.response !== 1) {
+    current.setNotice("The rotation was cancelled.");
+    return;
+  }
+
+  const applied = await applyPublisherRotation(trustRootFor(dataRootFor()), {
+    statement,
+    fingerprint: check.preview.newFingerprint,
+  });
+  if (!applied.ok) {
+    current.setNotice(`The rotation was refused: ${applied.message}`);
+    return;
+  }
+
+  trustStore = await openPublisherTrust(trustRootFor(dataRootFor())).catch(() => trustStore);
+  await refreshPacks();
+  publishPackData();
+  current.setNotice(
+    `Publisher ${applied.publisher.id} now trusts key fingerprint ${applied.publisher.fingerprint}. Installed packs keep running; the next update must use the new key.`,
+  );
+}
+
+/**
+ * Record a signed revocation advisory from a file (S2.4).
+ *
+ * The file is checked against the trust store before it is written. A recorded
+ * advisory refuses a new install; it never closes a running pack.
+ */
+async function importRevocationFromFile(): Promise<void> {
+  if (window === null) return;
+  const current = window;
+  const bytes = await readPickedJson(current, "Add a revocation advisory", "Open advisory");
+  if (bytes === null) return;
+
+  const result = await importRevocationAdvisory(trustRootFor(dataRootFor()), bytes, {
+    publishers: trustStore?.publishers ?? [],
+    allowPersonIssuer: true,
+  });
+  if (!result.ok) {
+    current.setNotice(`The advisory was refused: ${result.message}`);
+    return;
+  }
+
+  await reloadRevocations();
+  await refreshPacks();
+  publishPackData();
+  current.setNotice(
+    `Recorded a revocation for ${result.advisory.publisher} ${result.advisory.pack}. New installs are blocked; an installed copy keeps running.`,
+  );
 }
 
 function isKeyTrusted(key: string): boolean {
