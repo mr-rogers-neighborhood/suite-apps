@@ -52,8 +52,8 @@ describe("the widget registry", () => {
   });
 
   it("registers a host widget with the same id shape", () => {
-    const resolved = resolveWidgets("start", [apps]);
-    expect(resolved.map((widget) => widget.registryId)).toEqual(["start.apps"]);
+    const resolved = resolveWidgets("shell", [apps]);
+    expect(resolved.map((widget) => widget.registryId)).toEqual(["shell.apps"]);
   });
 
   it("refuses an app id that is not lower kebab-case", () => {

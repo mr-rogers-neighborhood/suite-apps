@@ -111,10 +111,10 @@ describe("the registry id", () => {
   });
 
   it("splits one back into its halves", () => {
-    expect(splitWidgetRegistryId("start.apps")).toEqual({ appId: "start", widgetId: "apps" });
+    expect(splitWidgetRegistryId("shell.apps")).toEqual({ appId: "shell", widgetId: "apps" });
   });
 
-  it.each(["apps", "start.apps.extra", "Start.apps", "start.", ".apps", "start.apps/extra"])(
+  it.each(["apps", "shell.apps.extra", "Shell.apps", "start.", ".apps", "shell.apps/extra"])(
     "refuses %j",
     (value) => {
       expect(splitWidgetRegistryId(value)).toBeNull();

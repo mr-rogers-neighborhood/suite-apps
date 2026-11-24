@@ -3,19 +3,6 @@
 The apps read a small set of environment variables. Most exist to move a data root for a test or a
 portable install; they are not configuration a normal user needs.
 
-## Hub
-
-| Variable | Replaces |
-| --- | --- |
-| `SUITE_START_DOCUMENTS` | the shared documents root, `~/Documents/Suite` |
-| `SUITE_START_DATA` | the hub's Electron data directory (recents, theme) |
-| `SUITE_START_USER_DATA` | Electron's `userData` for the hub |
-| `SUITE_START_APPS_ROOT` | the managed app root, `~/Applications/Suite` |
-| `SUITE_START_FEED_BASE` | the base URL of the release feed |
-| `SUITE_START_REGISTRY` | the install registry file |
-| `SUITE_START_FLATPAK` | the Flatpak binary Start uses |
-| `SUITE_START_FLATPAK_REMOTE` | the Flatpak remote Start reads |
-
 ## Document apps
 
 | Variable | App | Replaces |
@@ -33,8 +20,8 @@ portable install; they are not configuration a normal user needs.
 
 The desktop apps take the relay address in their own Sync dialog. `SUITE_SYNC_URL`,
 `SUITE_SYNC_MEMBER`, `SUITE_SYNC_WORKSPACE`, `SUITE_SYNC_EPOCH` and `SUITE_SYNC_DEVICE` were listed
-here but no shell reads them. Start reads no relay variable: it installs and opens the Suite Sync
-Flatpak, and the tray app owns the relay's configuration.
+here but no shell reads them. The host reads no relay variable: the tray app owns the relay's
+configuration.
 
 ## Packaging
 

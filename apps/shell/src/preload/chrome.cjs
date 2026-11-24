@@ -29,6 +29,13 @@ contextBridge.exposeInMainWorld("suiteShell", {
     ipcRenderer.invoke("suite:shell:move-widget", registryId, direction),
   resizeWidget: (registryId, size) =>
     ipcRenderer.invoke("suite:shell:resize-widget", registryId, size),
+  createScreen: (name) => ipcRenderer.invoke("suite:shell:create-screen", name),
+  renameScreen: (screenId, name) => ipcRenderer.invoke("suite:shell:rename-screen", screenId, name),
+  duplicateScreen: (screenId) => ipcRenderer.invoke("suite:shell:duplicate-screen", screenId),
+  deleteScreen: (screenId, replacementId) =>
+    ipcRenderer.invoke("suite:shell:delete-screen", screenId, replacementId),
+  setHomeScreen: (screenId) => ipcRenderer.invoke("suite:shell:set-home-screen", screenId),
+  openScreen: (screenId) => ipcRenderer.invoke("suite:shell:open-screen", screenId),
   onState: (listener) => {
     ipcRenderer.on("suite:shell:state-changed", (_event, state) => listener(state));
   },

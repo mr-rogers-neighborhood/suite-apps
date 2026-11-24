@@ -27,8 +27,8 @@ person would install:
 pnpm --filter @suite/desktop package:dir
 ```
 
-The unpacked binary lands in `desktop/release/linux-unpacked`. Start it directly, or point Suite
-Start at it — the hub discovers an app by the manifest beside its executable.
+The unpacked binary lands in `desktop/release/linux-unpacked`. Start it directly; a pack install goes
+through Suite Shell's catalogue.
 
 ## Where a document goes
 
@@ -44,6 +44,6 @@ window.
 
 ## Working on the whole suite
 
-Suite Start (the hub) and Suite Sync (the service) are in this repository now, beside Canvas. The root
-gate runs every app in dependency order and owns the cross-app end-to-end suite; start with the
+Suite Shell (the host) and Suite Sync (the service) are in this repository now, beside Canvas. The
+root gate runs every app in dependency order and owns the cross-app checks; start with the
 [root docs](../../../../docs/README.md) and [Run the gate](../../../../docs/how-to/run-the-gate.md).

@@ -3,9 +3,10 @@ import { joinPath, type SuiteAppName, type SuitePathOptions, suitePaths } from "
 /**
  * The apps the suite knows how to list, and where each keeps its files.
  *
- * Start lists a planner's documents without importing a line of planner: the
- * table says which folder belongs to which app and which extension it claims.
- * That is the whole reason it exists, and the reason nothing here is a store.
+ * A host or a cataloguer lists a planner's documents without importing a line of
+ * planner: the table says which folder belongs to which app and which extension
+ * it claims. That is the whole reason it exists, and the reason nothing here is a
+ * store.
  *
  * The folder is the display name `suitePaths` already uses under
  * `~/Documents/Suite`, so the table and the path convention cannot disagree
@@ -40,7 +41,7 @@ export type SuiteDocumentAppId = Exclude<(typeof SUITE_APPS)[number]["id"], "hel
  * The root every app's documents folder sits under.
  *
  * An override exists for a test and a portable install. It is never read from a
- * document, so no file can steer where Start looks.
+ * document, so no file can steer where a host looks.
  */
 export function suiteDocumentsRoot(
   platform: string,

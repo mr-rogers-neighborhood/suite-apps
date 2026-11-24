@@ -6,8 +6,7 @@ describe("the shared Home fixture", () => {
   it("is a valid Screen", () => {
     expect(homeScreen().id).toBe("home");
     expect(homeScreen().widgets.map((widget) => widget.registryId)).toEqual([
-      "start.apps",
-      "start.recents",
+      "shell.apps",
       "planner.quick-task",
     ]);
   });

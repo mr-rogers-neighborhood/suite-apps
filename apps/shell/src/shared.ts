@@ -32,6 +32,12 @@ export const CHROME_IPC = {
   removeWidget: "suite:shell:remove-widget",
   moveWidget: "suite:shell:move-widget",
   resizeWidget: "suite:shell:resize-widget",
+  createScreen: "suite:shell:create-screen",
+  renameScreen: "suite:shell:rename-screen",
+  duplicateScreen: "suite:shell:duplicate-screen",
+  deleteScreen: "suite:shell:delete-screen",
+  setHomeScreen: "suite:shell:set-home-screen",
+  openScreen: "suite:shell:open-screen",
 } as const;
 
 /** Pushed, not invoked: the chrome redraws from the last state it received. */
@@ -276,6 +282,15 @@ export interface ScreenView {
   readonly choices: readonly ScreenChoiceView[];
 }
 
+/** One Screen in the manager's list. `open` means a tab currently shows it. */
+export interface ScreenSummaryView {
+  readonly id: string;
+  readonly name: string;
+  readonly home: boolean;
+  readonly open: boolean;
+  readonly readable: boolean;
+}
+
 export interface ThemeView {
   readonly mode: "light" | "dark";
   readonly values: Readonly<Record<string, string>>;
@@ -286,6 +301,11 @@ export interface ShellState {
   readonly activeTabId: string | null;
   readonly surface: ShellSurface;
   readonly screens: readonly ScreenView[];
+  /** Every Screen on this device, for the manager. */
+  readonly screenList: readonly ScreenSummaryView[];
+  readonly homeScreenId: string;
+  /** A manager refusal or note, such as deleting the last Screen. */
+  readonly screenManagerNote: string | null;
   readonly packs: readonly PackSummary[];
   readonly catalogue: readonly CatalogueEntry[];
   /** Which source the catalogue is showing, in a sentence the chrome can print. */

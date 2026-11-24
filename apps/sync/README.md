@@ -14,8 +14,8 @@ app owns; this repository owns the wire protocol, the membership model and the h
 - **The local transport** is the part each app runs: a cursor and a queue, no keys and no listener.
   It carries frames between the document and whatever relay the person points it at.
 
-Start is neither. It supervises a relay it can find on this machine — start, stop, address, store —
-and stays a launcher when the relay is absent or runs somewhere else.
+The tray app is neither. It owns the relay it runs on this machine — start, stop, address, store —
+and the host stays a launcher when the relay is absent or runs somewhere else.
 
 > **Status: working, two apps deep.** The protocol, the MLS group and frame types, the membership state machine,
 > the blind relay with its file store, and the relay client are here. Two Canvas clients can sync one
@@ -40,7 +40,7 @@ and stays a launcher when the relay is absent or runs somewhere else.
 > **The console and the relay code.** `serve` also opens a read-only console on `127.0.0.1` and
 > prints its URL with a token generated at startup. The console shows the relay's metadata and draws
 > a `suite://relay` code carrying the address, the certificate pin and, when one is live, an
-> invitation. Start opens that console from its Sync tab. Friend codes and contacts live in the
+> invitation. The tray app opens that console from its window. Friend codes and contacts live in the
 > apps' main processes, not in the relay: the console never sees either.
 
 ---
@@ -72,15 +72,13 @@ curl http://127.0.0.1:8787/health
 ```
 
 `--trust-all` is the CLI's development mode: it has no device-key verifier to check against, so it
-refuses to start without it. Start locates a `suite-sync` binary (`SUITE_SYNC_BIN`, a bundled copy,
-then `PATH`), runs `serve` as its own child process, and stops it when Start quits. Start does not
-embed the relay and keeps no frames of its own. The store is a directory of
-`<workspaceId>.frames.jsonl` files; there is no `workspace init`, `membership.json` or
-`snapshot.loro`.
+refuses to start without it. The CLI runs `serve` in the foreground; the tray app embeds the same
+relay and keeps no second copy of its frames. The store is a directory of `<workspaceId>.frames.jsonl`
+files; there is no `workspace init`, `membership.json` or `snapshot.loro`.
 
-When Start runs the relay, it also makes and keeps the TLS pair under the relay store's `tls/`
-directory, mode 0600, so the fingerprint survives a restart. The Sync tab shows that fingerprint and
-opens the console; a relay you run by hand uses `--tls-cert` and `--tls-key` as the guide describes.
+The tray app also makes and keeps the TLS pair under the relay store's `tls/` directory, mode 0600, so
+the fingerprint survives a restart. Its window shows that fingerprint and opens the console; a relay
+you run by hand uses `--tls-cert` and `--tls-key` as the guide describes.
 
 ## Run the relay
 
@@ -118,18 +116,17 @@ The app keeps its store under its own data directory,
 Nothing else in the home directory is touched except one autostart entry, which the tray app writes
 only when asked. In the headless form the store is whatever `--store` names.
 
-A relay the app owns is not one Suite Start supervises: Start looks for a `suite-sync` binary through
-`SUITE_SYNC_BIN` or `PATH`, and a Flatpak install is neither. Point each device at the address the
-window shows — for example `wss://192.168.1.20:8787/sync` — and paste the `certificate SHA-256
-fingerprint:` line into **Relay certificate fingerprint**.
+A relay the app owns is the one the tray app embeds; no other Suite process supervises it. Point each
+device at the address the window shows — for example `wss://192.168.1.20:8787/sync` — and paste the
+`certificate SHA-256 fingerprint:` line into **Relay certificate fingerprint**.
 
-Nothing else changes: the apps keep their documents, and Start stays a launcher that manages no relay
-when the relay runs on another machine. The address must be one the device can route to; `127.0.0.1`
+Nothing else changes: the apps keep their documents, and no Suite process manages a relay running on
+another machine. The address must be one the device can route to; `127.0.0.1`
 is always the device itself.
 
 ## Working in the monorepo
 
-The apps, the hub and the sync server share one repository and one gate. Start with the
+The host, the apps and the sync server share one repository and one gate. Start with the
 [root README](../../README.md), then [Commands](../../docs/reference/commands.md) for the gate and
 [Repository layout](../../docs/reference/repo-layout.md) for where each package lives.
 

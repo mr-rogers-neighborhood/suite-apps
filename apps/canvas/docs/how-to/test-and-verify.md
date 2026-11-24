@@ -53,9 +53,9 @@ exposing a channel, a protocol handler that refuses a path. All three look like 
 
 ## The cross-app tier
 
-The root gate runs Suite Start's cross-app Playwright suite after each app's checks, because it
-launches Start and the other apps alongside Canvas. Canvas's own e2e suite stays here. The commands
-and the memory cap are in [Run the gate](../../../../docs/how-to/run-the-gate.md).
+The root gate no longer has a cross-app Playwright suite: Start's left with Start (#314), and no app
+row marks an e2e suite. Canvas's own e2e suite stays here. The commands and the memory cap are in
+[Run the gate](../../../../docs/how-to/run-the-gate.md).
 
 ## Shape and docs
 

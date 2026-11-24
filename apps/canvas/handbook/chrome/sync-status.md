@@ -21,8 +21,8 @@ to say, and it says them in the same place every time:
 Clicking the pill opens the Sync dialog, which does one of three things depending on where the
 workspace is:
 
-**Not shared.** Two errands: *Share this workspace* asks where this machine can be reached — Start
-shows that address — and *Join one somebody shared* takes an invitation you were sent.
+**Not shared.** Two errands: *Share this workspace* asks where this machine can be reached — the
+relay app shows that address — and *Join one somebody shared* takes an invitation you were sent.
 
 **Shared.** One invitation to give away, and the devices already here with what each of them may do.
 Each row carries the device's name, the start of the id the host pins, and its role. An invitation is

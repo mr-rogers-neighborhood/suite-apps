@@ -1,47 +1,62 @@
 ---
 id: start
 title: Start here
-summary: From the shared contracts to a Canvas document that opens and saves.
+summary: From the shared contracts to a pack installed in the host and opened in a tab.
 start: true
 order: 0
 ---
 
 This is the shortest path through the suite. It follows one seam: the contracts
-that describe an app, Start launching it, the desktop shell handing over a path,
-and Canvas loading the document. Each stop opens the real file.
+that describe an app, the host's signed catalogue, the pack it installs, and the
+tab that renders it. Each stop opens the real file.
 
 ## packages/contracts/src/appManifest.ts#suiteAppManifestSchema
 
-The manifest is the contract between Start and an app. It says what the app is
-and which capabilities it declares. It deliberately cannot name a binary, so a
-tampered manifest cannot redirect a launch.
+The manifest is the contract between an app and the host. It says what the app
+is and which capabilities it declares. The schema is strict and has no field for
+a binary, so a tampered manifest cannot redirect a launch.
 
-## apps/start/src/catalogue.ts#CATALOGUE_APPS
+## apps/shell/src/catalogue.ts#loadCatalogue
 
-The catalogue is Start's opinion about the apps it can install. It maps a
-contract id to a folder, a channel and a release feed.
+The catalogue is the host's opinion about the packs it can install. It reads
+local `.suitepack` files and, when the operator-signed index verified, the
+entries that index displayed. Nothing here extracts an archive.
 
-## apps/start/src/launchCommand.ts#launchCommand
+## apps/shell/src/catalogue.ts#installCataloguePack
 
-A launch is a command and an environment, not a document read. Start writes the
-install record and starts a separate process.
+Install is the host's, not a second process. The entry is checked again, the
+publisher key and every file hash are verified, and only then does the archive
+land under the host's pack root.
+
+## apps/shell/src/installedPacks.ts#loadInstalledPacks
+
+Discovery is the other half: every installed version is verified on load, so a
+file changed after install cannot become a running pack. A refused version is
+reported with a sentence, not silently skipped.
+
+## apps/shell/src/packs.ts#discoverPacks
+
+A pack is code on a pack-owned origin. This is where the host decides which
+installed version a view runs and what URL it may load.
+
+## apps/shell/src/window.ts#ShellWindow
+
+The window owns the tab and the view. A pack tab gets its own `WebContentsView`,
+origin and session partition; a Screen tab is host chrome and creates no view.
+
+## apps/shell/src/deepLink.ts#parseSuiteLink
+
+A `suite://` link is untrusted input. This parser names an installed pack or
+refuses with one sentence; a link can never install or update anything.
 
 ## apps/canvas/desktop/src/main/index.ts
 
-The desktop shell creates the window, owns the single-instance lock and hands
-the renderer a path. It is the last place that knows both the OS and the app.
+The receiving side begins at a sandboxed window: context isolation, sandbox on,
+no Node integration, and no navigation away from the app's own origin. The
+window also flushes a pending save before it closes.
 
 ## apps/canvas/src/App.tsx#App
 
-The renderer boots without reading the document format. It asks the host for a
-workspace and renders the app surface.
-
-## apps/canvas/packages/graph/src/workspaceFile.ts#workspaceFileSchema
-
-The graph owns the file shape. Every write goes through this schema and the
-typed document, never through raw Loro in a component.
-
-## apps/canvas/packages/graph/src/workspaceTemplate.ts#STARTER_TEMPLATES
-
-A new workspace starts from a template. The template is data, validated by the
-same schema, so the first save is not a special case.
+The renderer boots without reading the file format. It asks the host for a
+workspace and renders the app surface, leaving the document layer to the graph
+package; that separation is what keeps a launch from becoming a second parser.

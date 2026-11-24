@@ -14,15 +14,16 @@ mise exec -- node scripts/gate.mjs
 mise exec -- node scripts/gate.mjs                 # this working tree
 mise exec -- node scripts/gate.mjs --only canvas
 mise exec -- node scripts/gate.mjs --fresh         # this commit, clean install
-mise exec -- node scripts/gate.mjs --no-e2e        # skip Start's e2e suite
+mise exec -- node scripts/gate.mjs --no-e2e        # skip a row marked with an e2e suite
 mise exec -- node scripts/affected.mjs --base origin/main  # rows a diff selects
 ```
 
 The gate builds the workspace libraries (`packages/*` and `apps/*/packages/*`) once, runs the root
 scripts' `node --test` checks (pack, budget pack, affected, channel, release and spec), then runs each
 app's own `check:full` in dependency order. It writes `.dev/gate-status.json`. `--fresh` exports
-`HEAD` with `git archive`, installs from the lockfile, and runs the same order in that clean tree. The
-cross-app Playwright suite runs after the checks, under `xvfb-run` when there is no display.
+`HEAD` with `git archive`, installs from the lockfile, and runs the same order in that clean tree. A
+row marked with a Playwright suite would run it after the checks, under `xvfb-run` when there is no
+display; no row marks one after Start's retirement.
 
 CI does not run a second pipeline: `detect` calls `scripts/affected.mjs`, and each selected row calls
 `node scripts/gate.mjs --only <app>`. `scripts/affected.mjs` reads the workspace graph, so a shared
@@ -46,7 +47,6 @@ short version.
 | Canvas | `pnpm check` (edit loop), `pnpm verify` (full local gate) |
 | Planner | `pnpm check`, `pnpm verify` |
 | Budget | `pnpm check`, `pnpm verify` |
-| Start | `pnpm check` |
 | Help | `pnpm check` |
 | Sync | `pnpm check` |
 | Go | `pnpm check` |
@@ -59,9 +59,9 @@ pnpm docs:symbols   # backticked paths, scripts, ADR references
 pnpm shape          # file length, observe sites, raw Loro writes
 ```
 
-The per-app gates do not run Playwright. The root gate runs Start's e2e suite after the checks, under
-`xvfb-run` when there is no display; `--no-e2e` skips it. Other Playwright suites run when the owner
-asks for a run or names a milestone.
+The per-app gates do not run Playwright. The root gate would run a row's e2e suite after the checks,
+under `xvfb-run` when there is no display; `--no-e2e` skips it. No row marks one after Start's
+retirement. Other Playwright suites run when the owner asks for a run or names a milestone.
 
 ## The factory profile
 
@@ -83,13 +83,13 @@ and the profile carries only the `slop` channel.
 
 Only Canvas, Planner, Budget and Help can be queued: they are the legacy apps with a Flatpak manifest
 and an existing `slop` identity. They are frozen for release and get no new pre-release channel until
-they become packs; the factory `slop` build is the session channel, not a shipped channel. Start ships
-no `suite.app.json` and refuses a pre-release build, Go builds for Android, and Sync ships as the
-relay's Flatpak. Their gates still run at the root.
+they become packs; the factory `slop` build is the session channel, not a shipped channel. Sync ships
+no `suite.app.json` and refuses a pre-release build, Go builds for Android, and the shell has its own
+manifest. Their gates still run at the root.
 
 The toolchain names what the factory image must provide: the pinned Node and pnpm, `git`, Docker for
-Canvas's gitleaks scan, Xvfb and the Electron GTK libraries for Start's e2e suite, the Flatpak
-builder, and Orca. `scripts/profile-check.mjs` enforces the schema and the Suite invariants and
+Canvas's gitleaks scan, Xvfb and the Electron GTK libraries for any row that marks an e2e suite, the
+Flatpak builder, and Orca. `scripts/profile-check.mjs` enforces the schema and the Suite invariants and
 rejects a host path or a secret. It validates against a local JSON Schema only when one is supplied
 (`--schema` or `SLOPMASTER_PROFILE_SCHEMA`); no schema file is committed here.
 
@@ -225,5 +225,4 @@ there is no `next start` and no loopback HTTP server.
 
 ## CI is the proof
 
-`main` runs the full fresh gate on every push, and the merge queue runs the affected rows plus Start's
-e2e. The `vm` remote and `scripts/ci/` are retired; see [Run the gate](../how-to/run-the-gate.md).
+`main` runs the full fresh gate on every push, and the merge queue runs the affected rows. The `vm` remote and `scripts/ci/` are retired; see [Run the gate](../how-to/run-the-gate.md).

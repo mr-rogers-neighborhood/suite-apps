@@ -22,7 +22,7 @@ import {
   tabViewTarget,
 } from "./packs.js";
 import { clearProjectionEntries } from "./reminderProjections.js";
-import type { ScreenStore } from "./screens.js";
+import type { ScreenSet } from "./screens.js";
 import { clearPackSender, setPackSender } from "./senders.js";
 import {
   type CatalogueEntry,
@@ -56,7 +56,8 @@ export class ShellWindow {
   #catalogueSource: string;
   #installedVersions: readonly InstalledVersionView[];
   readonly #spaces: SpaceStore;
-  readonly #screens: ScreenStore;
+  readonly #screens: ScreenSet;
+  #screenManagerNote: string | null = null;
   readonly #containerId: string;
   readonly #onViewClosed: ((tabId: string) => void) | undefined;
   readonly #views = new Map<string, WebContentsView>();
@@ -77,7 +78,7 @@ export class ShellWindow {
     readonly catalogueSource?: string;
     readonly installedVersions?: readonly InstalledVersionView[];
     readonly spaces: SpaceStore;
-    readonly screens: ScreenStore;
+    readonly screens: ScreenSet;
     readonly theme: ThemeView;
     readonly containerId?: string;
     readonly onViewClosed?: (tabId: string) => void;
@@ -164,6 +165,15 @@ export class ShellWindow {
       activeTabId: spaceState.activeTabId,
       surface: shellSurface(spaceState),
       screens: this.#screenViews(spaceState),
+      screenList: this.#screens.summaries().map((screen) => ({
+        id: screen.id,
+        name: screen.name,
+        home: screen.id === this.#screens.homeId,
+        open: spaceState.tabs.some((tab) => tab.kind === "screen" && tab.screenId === screen.id),
+        readable: screen.readable,
+      })),
+      homeScreenId: this.#screens.homeId,
+      screenManagerNote: this.#screenManagerNote,
       packs: this.#packs.map((pack) => ({
         id: pack.id,
         name: pack.name,
@@ -186,21 +196,20 @@ export class ShellWindow {
   /**
    * One view per screen tab the space document names.
    *
-   * This slice has one Screen, Home. A tab restored from a document that names a
-   * different screen stays in the strip and draws an unavailable placeholder instead
-   * of silently becoming a pack.
+   * A tab whose Screen is no longer on this device stays in the strip and draws an
+   * unavailable placeholder instead of silently becoming a pack.
    */
   #screenViews(spaceState: SpaceState): readonly ScreenView[] {
     const registry = shellWidgetRegistry(this.#packs);
-    const own = this.#screens.state();
     const views: ScreenView[] = [];
     const seen = new Set<string>();
 
     for (const tab of spaceState.tabs) {
       if (tab.kind !== "screen" || seen.has(tab.screenId)) continue;
       seen.add(tab.screenId);
-      if (tab.screenId === own.id) {
-        views.push(screenView(own, this.#packs, registry));
+      const screen = this.#screens.screen(tab.screenId);
+      if (screen !== null) {
+        views.push(screenView(screen, this.#packs, registry));
         continue;
       }
       views.push({
@@ -366,7 +375,17 @@ export class ShellWindow {
 
   /** Open the Home screen tab, or activate the one already showing it. */
   async openHome(): Promise<void> {
-    const screen = this.#screens.state();
+    await this.openScreen(this.#screens.homeId);
+  }
+
+  /** Open one Screen tab, or activate the tab already showing it. */
+  async openScreen(screenId: string): Promise<void> {
+    const screen = this.#screens.screen(screenId);
+    if (screen === null) {
+      this.#notice = "That Screen is no longer here.";
+      this.broadcast();
+      return;
+    }
     const open = this.#spaces
       .state()
       .tabs.find((tab) => tab.kind === "screen" && tab.screenId === screen.id);
@@ -383,14 +402,25 @@ export class ShellWindow {
     await this.activateTab(tab.id);
   }
 
+  /** The Screen the active tab draws, if the active tab is a Screen. */
+  #activeScreenStore() {
+    const active = this.#spaces
+      .state()
+      .tabs.find((tab) => tab.id === this.#spaces.state().activeTabId);
+    if (active === undefined || active.kind !== "screen") return null;
+    return this.#screens.store(active.screenId);
+  }
+
   /**
-   * Add one placement to the Screen. The registry decides its first size, and a
-   * duplicate id is refused by the document, which says so in the notice.
+   * Add one placement to the active Screen. The registry decides its first size, and
+   * a duplicate id is refused by the document, which says so in the notice.
    */
   async addScreenWidget(registryId: string): Promise<void> {
     if (!isWidgetRegistryId(registryId)) return;
+    const store = this.#activeScreenStore();
+    if (store === null) return;
     const registry = shellWidgetRegistry(this.#packs);
-    const added = await this.#screens.add({
+    const added = await store.add({
       registryId,
       size: preferredWidgetSize(registryId, registry),
     });
@@ -400,7 +430,7 @@ export class ShellWindow {
 
   async removeScreenWidget(registryId: string): Promise<void> {
     if (!isWidgetRegistryId(registryId)) return;
-    await this.#screens.remove(registryId);
+    await this.#activeScreenStore()?.remove(registryId);
     this.#notice = null;
     this.broadcast();
   }
@@ -408,15 +438,81 @@ export class ShellWindow {
   async moveScreenWidget(registryId: string, direction: string): Promise<void> {
     if (!isWidgetRegistryId(registryId)) return;
     if (direction !== "earlier" && direction !== "later") return;
-    await this.#screens.moveBy(registryId, direction);
+    await this.#activeScreenStore()?.moveBy(registryId, direction);
     this.broadcast();
   }
 
   async resizeScreenWidget(registryId: string, size: string): Promise<void> {
     if (!isWidgetRegistryId(registryId)) return;
     if (!isWidgetSize(size)) return;
-    await this.#screens.resize(registryId, size);
+    await this.#activeScreenStore()?.resize(registryId, size);
     this.broadcast();
+  }
+
+  /** Create a Screen, then show it in a tab. */
+  async createScreen(name: string): Promise<void> {
+    this.#screenManagerNote = null;
+    const id = await this.#screens.create(name);
+    await this.openScreen(id);
+    this.broadcast();
+  }
+
+  async renameScreen(screenId: string, name: string): Promise<void> {
+    const renamed = await this.#screens.rename(screenId, name);
+    this.#screenManagerNote = renamed ? null : "That Screen is no longer here.";
+    await this.#retitleScreenTab(screenId);
+    this.broadcast();
+  }
+
+  async duplicateScreen(screenId: string): Promise<void> {
+    this.#screenManagerNote = null;
+    const copy = await this.#screens.duplicate(screenId);
+    if (copy === null) {
+      this.#screenManagerNote = "That Screen is no longer here.";
+      this.broadcast();
+      return;
+    }
+    await this.openScreen(copy);
+    this.broadcast();
+  }
+
+  async deleteScreen(screenId: string, replacementId: string | null): Promise<void> {
+    const removal = await this.#screens.remove(screenId, replacementId);
+    if (!removal.ok) {
+      this.#screenManagerNote = removal.message;
+      this.broadcast();
+      return;
+    }
+
+    this.#screenManagerNote = null;
+    for (const tab of this.#spaces.state().tabs) {
+      if (tab.kind === "screen" && tab.screenId === screenId) {
+        await this.#spaces.closeTab(tab.id);
+      }
+    }
+    await this.openHome();
+    this.broadcast();
+  }
+
+  async setHomeScreen(screenId: string): Promise<void> {
+    const changed = await this.#screens.setHome(screenId);
+    this.#screenManagerNote = changed ? null : "That Screen is no longer here.";
+    if (changed) {
+      const screen = this.#screens.screen(screenId);
+      if (screen !== null) await this.#retitleScreenTab(screenId);
+    }
+    this.broadcast();
+  }
+
+  /** Keep a renamed Screen's tab title in step with its document. */
+  async #retitleScreenTab(screenId: string): Promise<void> {
+    const screen = this.#screens.screen(screenId);
+    if (screen === null) return;
+    for (const tab of this.#spaces.state().tabs) {
+      if (tab.kind === "screen" && tab.screenId === screenId) {
+        await this.#spaces.setTitle(tab.id, screen.name);
+      }
+    }
   }
 
   reloadTab(tabId: string): void {

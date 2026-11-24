@@ -11,8 +11,7 @@ them.
 | Planner | `~/Documents/Suite/Planner` | `.planner` |
 | Budget | `~/Documents/Suite/Budget` | `.budget` |
 
-`SUITE_START_DOCUMENTS` moves the shared root for Start. Each app also has its own library override;
-see [Environment](environment.md).
+Each app has its own library override; see [Environment](environment.md).
 
 ## Host documents
 
