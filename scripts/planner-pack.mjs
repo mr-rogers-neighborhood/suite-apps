@@ -20,7 +20,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KEYS, pinnedPublic, readKey } from "./lib/keys.mjs";
-import { bundlePack, publicKeyOfSigningKey } from "./pack.mjs";
+import { bundlePack, platformsSummary, publicKeyOfSigningKey } from "./pack.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PACK_DIR = join(ROOT, "apps", "planner", "pack");
@@ -193,6 +193,7 @@ async function main(argv) {
       `id=${result.manifest.id} v${result.manifest.version}\n`,
   );
   process.stdout.write(`${result.outPath}.sha256  ${result.sha256}\n`);
+  process.stdout.write(`packs for: ${platformsSummary(result.manifest)}\n`);
   return 0;
 }
 

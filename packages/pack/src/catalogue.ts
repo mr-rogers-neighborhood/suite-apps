@@ -2,6 +2,7 @@ import { z } from "zod";
 import { canonicalJsonValue, compareCodeUnits, findDuplicateJsonKey } from "./canonical.js";
 import { PACK_CAPABILITIES, type PackCapability } from "./capabilities.js";
 import { isSafePackId, isSafePackVersion, isSha256Hex } from "./manifest.js";
+import { isSafePackPlatform } from "./platforms.js";
 import { publicKeyFromSecret, sha256Hex, signBytes, verifyBytes } from "./signature.js";
 import { isPublisherKey, isSafePublisherId } from "./trust.js";
 
@@ -73,6 +74,12 @@ export interface PackIndexEntry {
   readonly version: string;
   readonly description?: string;
   readonly capabilities: readonly PackCapability[];
+  /**
+   * The host kinds the manifest declared, so a catalogue row can judge platform
+   * fit before downloading the archive. Absent on an index written before the
+   * field existed; the host then reports the row as unknown, never universal.
+   */
+  readonly platforms?: readonly string[];
   /** The archive's byte length. */
   readonly size: number;
   /** Lower-case hex SHA-256 of the archive bytes. */
@@ -128,6 +135,11 @@ const entrySchema = z
     version: z.string().refine(isSafePackVersion, "a semver version"),
     description: z.string().min(1).max(200).optional(),
     capabilities: z.array(z.enum(PACK_CAPABILITIES)).refine(unique, "duplicate capability"),
+    platforms: z
+      .array(z.string().refine(isSafePackPlatform, "a lower-case host kind"))
+      .min(1)
+      .refine(unique, "duplicate platform")
+      .optional(),
     size: z.number().int().nonnegative(),
     sha256: z.string().refine(isSha256Hex, "a lower-case hex SHA-256"),
     url: z.string().refine(isSafeArchiveUrl, "an absolute HTTPS archive URL"),
@@ -320,6 +332,9 @@ export function canonicalPackIndexBytes(index: PackIndexCore): Uint8Array {
 function canonicalEntry(entry: PackIndexEntry): Record<string, unknown> {
   const canonical = canonicalJsonValue(entry) as Record<string, unknown>;
   canonical.capabilities = [...new Set(entry.capabilities)].sort(compareCodeUnits);
+  if (entry.platforms !== undefined) {
+    canonical.platforms = [...new Set(entry.platforms)].sort(compareCodeUnits);
+  }
   return canonical;
 }
 

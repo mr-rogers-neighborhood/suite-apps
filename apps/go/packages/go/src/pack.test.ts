@@ -160,6 +160,22 @@ describe("parsePackManifest", () => {
   });
 });
 
+describe("platforms", () => {
+  it("parses a host kind this build has never heard of", async () => {
+    const parsed = parsePackManifest(await makeManifest({ platforms: ["mobile", "tv"] }));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.platforms).toEqual(["mobile", "tv"]);
+  });
+
+  it("refuses a malformed kind but not an unknown one", async () => {
+    const malformed = parsePackManifest(await makeManifest({ platforms: ["Mobile"] }));
+    expect(malformed.ok).toBe(false);
+    const unknown = parsePackManifest(await makeManifest({ platforms: ["watch"] }));
+    expect(unknown.ok).toBe(true);
+  });
+});
+
 describe("isolation", () => {
   it("defaults to isolated when the manifest does not say", async () => {
     const { isolation: _drop, ...without } = await makeManifest();

@@ -153,6 +153,32 @@ describe("the pack shape check", () => {
     );
   });
 
+  it("refuses a platform whose host does not serve the pack's capabilities", () => {
+    const { root } = workspace({
+      manifest: { platforms: ["desktop", "mobile"], capabilities: ["documents", "files"] },
+    });
+
+    const result = check(root);
+    assert.equal(result.ok, false);
+    assert.ok(
+      result.problems.some(
+        (problem) =>
+          problem.includes('platforms "mobile" cannot run') && problem.includes("needs `files`"),
+      ),
+      result.problems.join("\n"),
+    );
+  });
+
+  it("accepts a kind this tree has no host for, and a desktop pack that fits", () => {
+    const { root } = workspace({
+      manifest: { platforms: ["desktop", "tv"], capabilities: ["documents", "files"] },
+    });
+
+    const result = check(root);
+    assert.deepEqual(result.problems, []);
+    assert.equal(result.ok, true);
+  });
+
   it("reports an undeclared legacy pack instead of enforcing it", () => {
     const { root } = workspace({ pack: false });
 

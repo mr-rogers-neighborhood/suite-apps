@@ -10,6 +10,7 @@ function entry(overrides: Partial<CatalogueEntry> = {}): CatalogueEntry {
     description: "A small app",
     version: "2.0.0",
     capabilities: ["documents", "notifications"],
+    platform: { state: "unknown", reason: "platform unknown — this pack declares no platforms" },
     sizeBytes: 1200,
     sha256: "a".repeat(64),
     url: "https://flatpak.suite.run/packs/probe.suitepack",

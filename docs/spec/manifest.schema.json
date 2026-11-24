@@ -87,10 +87,15 @@
       }
     },
     "platforms": {
+      "description": "Host kinds this pack is meant to run on. A value is an opaque host kind, not a build target.",
+      "$comment": "Open vocabulary by deliberate exception to strict enum parsing (S3.5). A pack may name `desktop`, `mobile`, `tv`, `tablet`, `foldable`, `xr` or a kind added later. An unknown value MUST parse: the host matches only kinds it declares and reports every other value as not available on that host. Rejecting the manifest would make the pack uninstallable everywhere, which is the wrong failure. Do not replace this with an enum; adding a host kind is a schema addition plus a host declaration, not a new matching mechanism.",
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "enum": ["desktop", "mobile"] }
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+      }
     },
     "input": {
       "type": "array",

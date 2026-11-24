@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { isPublisherKey } from "@suite/pack";
+import {
+  type HostDeclaration,
+  isPublisherKey,
+  platformFit,
+  platformFitView,
+  SHELL_HOST,
+} from "@suite/pack";
 import { publisherKeyDigest, publisherKeyFingerprint } from "@suite/pack/trust";
 import {
   checkPackArchive,
@@ -13,7 +19,12 @@ import {
   MAX_ARCHIVE_BYTES,
   type PackTrustOptions,
 } from "./installedPacks.js";
-import type { CatalogueEntry, PackCapability, PackPublisherView } from "./shared.js";
+import type {
+  CatalogueEntry,
+  CataloguePlatform,
+  PackCapability,
+  PackPublisherView,
+} from "./shared.js";
 
 /**
  * The pack catalogue.
@@ -81,6 +92,14 @@ export interface CatalogueInstallOptions {
   readonly replace?: boolean;
 }
 
+/**
+ * The platform fit before a manifest could be read.
+ *
+ * An unreadable archive has no declaration to judge, so it is unknown rather than
+ * unavailable: the refusal it already carries is the reason it cannot install.
+ */
+const UNKNOWN_PLATFORM: CataloguePlatform = { state: "unknown", reason: null };
+
 /** The catalogue directory: the environment override, or `<dataRoot>/catalogue`. */
 export function catalogueRootFor(
   dataRoot: string,
@@ -104,12 +123,13 @@ export async function loadCatalogue(
   root: string,
   options: PackTrustOptions,
   index: VerifiedCatalogueIndex | null = null,
+  host: HostDeclaration = SHELL_HOST,
 ): Promise<readonly CataloguePack[]> {
-  const local = await scanDirectory(root, options);
+  const local = await scanDirectory(root, options, host);
   const indexed =
     index === null
       ? []
-      : await Promise.all(index.packs.map((pack) => inspectIndexPack(pack, options)));
+      : await Promise.all(index.packs.map((pack) => inspectIndexPack(pack, options, host)));
 
   const merged = new Map<string, CataloguePack>();
   for (const pack of local) merged.set(catalogueKey(pack), pack);
@@ -133,6 +153,7 @@ export function catalogueEntry(
     refusal: pack.refusal,
     publisher: pack.publisher,
     capabilities: pack.capabilities,
+    platform: pack.platform,
     sizeBytes: pack.sizeBytes,
     updateAvailable: isUpdate(pack.version, installedVersion),
   };
@@ -163,6 +184,19 @@ export async function installCataloguePack(
       {
         reason: entry.reason ?? "untrusted",
         message: entry.refusal ?? "The catalogue entry was not verified.",
+      },
+      entry.id.length > 0 ? entry.id : null,
+      entry.version.length > 0 ? entry.version : null,
+    );
+  }
+
+  // S4.8: refuse at the catalogue, not at launch. The fit was computed from the
+  // archive's manifest when the row was listed; an install re-checks it here.
+  if (entry.platform.state === "unavailable") {
+    throw new InstalledPackError(
+      {
+        reason: "platform",
+        message: entry.platform.reason ?? "That pack is not available on this host.",
       },
       entry.id.length > 0 ? entry.id : null,
       entry.version.length > 0 ? entry.version : null,
@@ -205,6 +239,7 @@ export async function installCataloguePack(
 async function scanDirectory(
   root: string,
   options: PackTrustOptions,
+  host: HostDeclaration,
 ): Promise<readonly CataloguePack[]> {
   const entries = await readdir(root, { withFileTypes: true }).catch(() => null);
   if (entries === null) return [];
@@ -213,7 +248,7 @@ async function scanDirectory(
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
     if (!entry.isFile()) continue;
     if (!entry.name.toLowerCase().endsWith(PACK_SUFFIX)) continue;
-    found.push(await inspectFile(join(root, entry.name), entry.name, options));
+    found.push(await inspectFile(join(root, entry.name), entry.name, options, host));
   }
 
   return found;
@@ -223,6 +258,7 @@ async function inspectFile(
   file: string,
   name: string,
   options: PackTrustOptions,
+  host: HostDeclaration,
 ): Promise<CataloguePack> {
   const stem = name.slice(0, name.length - PACK_SUFFIX.length);
   const readArchive = localReader(file);
@@ -236,6 +272,7 @@ async function inspectFile(
     refusal: "The archive could not be read.",
     publisher: null,
     capabilities: [],
+    platform: UNKNOWN_PLATFORM,
     sizeBytes: 0,
     updateAvailable: false,
     file,
@@ -256,7 +293,7 @@ async function inspectFile(
       };
     }
     bytes = await readArchive();
-    return await inspectArchive(bytes, { ...fallback, sizeBytes: metadata.size }, options);
+    return await inspectArchive(bytes, { ...fallback, sizeBytes: metadata.size }, options, host);
   } catch {
     return fallback;
   }
@@ -269,6 +306,7 @@ async function inspectFile(
 async function inspectIndexPack(
   pack: VerifiedIndexPack,
   options: PackTrustOptions,
+  host: HostDeclaration,
 ): Promise<CataloguePack> {
   const fallback: CataloguePack = {
     id: pack.id,
@@ -280,6 +318,7 @@ async function inspectIndexPack(
     refusal: "The archive could not be read.",
     publisher: null,
     capabilities: pack.capabilities,
+    platform: UNKNOWN_PLATFORM,
     sizeBytes: pack.sizeBytes,
     updateAvailable: false,
     file: null,
@@ -308,13 +347,14 @@ async function inspectIndexPack(
     };
   }
 
-  return inspectArchive(bytes, { ...fallback, expectedSha256: expected }, options);
+  return inspectArchive(bytes, { ...fallback, expectedSha256: expected }, options, host);
 }
 
 async function inspectArchive(
   bytes: Uint8Array,
   base: CataloguePack,
   options: PackTrustOptions,
+  host: HostDeclaration,
 ): Promise<CataloguePack> {
   const check = await checkPackArchive(bytes, options);
   if (check.ok) {
@@ -346,6 +386,7 @@ async function inspectArchive(
         fingerprint: check.value.publisher.fingerprint,
       },
       capabilities: manifest.capabilities,
+      platform: platformFitView(platformFit(manifest, host)),
       reason: null,
     };
   }
@@ -362,6 +403,7 @@ async function inspectArchive(
     refusal: check.error.message,
     publisher: await cataloguePublisher(manifest, check.error.fingerprint ?? null),
     capabilities: (manifest?.capabilities ?? []) as readonly PackCapability[],
+    platform: manifest === null ? UNKNOWN_PLATFORM : platformFitView(platformFit(manifest, host)),
     reason: check.error.reason,
   };
 }

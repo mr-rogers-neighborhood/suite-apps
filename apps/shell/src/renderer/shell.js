@@ -282,11 +282,13 @@ function catalogueCard(entry) {
   const updateAvailable = entry.updateAvailable === true;
   const labelled = !entry.trusted
     ? { className: "pill pill-refused", text: "refused" }
-    : installedCurrent
-      ? { className: "pill pill-installed", text: "installed" }
-      : updateAvailable
-        ? { className: "pill pill-update", text: "update" }
-        : { className: "pill pill-available", text: "available" };
+    : entry.platform.state === "unavailable"
+      ? { className: "pill pill-refused", text: "unavailable" }
+      : installedCurrent
+        ? { className: "pill pill-installed", text: "installed" }
+        : updateAvailable
+          ? { className: "pill pill-update", text: "update" }
+          : { className: "pill pill-available", text: "available" };
 
   const top = element("div", "card-top");
   const dot = element("span", "card-dot");
@@ -331,6 +333,16 @@ function catalogueCard(entry) {
     card.append(
       element("p", "card-warning", entry.refusal ?? "This archive could not be verified."),
     );
+  } else if (entry.platform.state === "unavailable") {
+    card.append(
+      element(
+        "p",
+        "card-warning",
+        entry.platform.reason ?? "This pack is not available on this host.",
+      ),
+    );
+  } else if (entry.platform.state === "unknown" && entry.platform.reason) {
+    card.append(element("p", "card-warning", entry.platform.reason));
   }
 
   tile.append(card);
@@ -339,6 +351,10 @@ function catalogueCard(entry) {
     const refused = actionButton("Cannot install", () => {});
     refused.disabled = true;
     actions.append(refused);
+  } else if (entry.platform.state === "unavailable") {
+    const unavailable = actionButton("Not available here", () => {});
+    unavailable.disabled = true;
+    actions.append(unavailable);
   } else {
     const label = installedCurrent
       ? `Reinstall v${entry.version}`
