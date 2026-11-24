@@ -47,6 +47,51 @@ missing while its `.bak` is present is restored from the backup. A file whose he
 not verify is renamed to `<name>.corrupt-<timestamp>` and refused, so the person keeps the only copy
 and no fresh document is created in its place.
 
+### Declaring a pack's documents
+
+A pack owns its schema. It declares each document in the manifest (S6.3):
+
+```json
+"documents": [
+  {
+    "id": "note",
+    "format": "suite.note",
+    "version": 3,
+    "mode": "single",
+    "migrations": [
+      { "from": 1, "to": 2, "entry": "migrate-1-2.html" },
+      { "from": 2, "to": 3, "entry": "migrate-2-3.html" }
+    ],
+    "projection": "project.html"
+  }
+]
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The document name inside `<dataRoot>/documents/<container>/<pack>/`. |
+| `format` | The payload format the pack writes; the host never interprets it. |
+| `version` | The schema version a current document carries. |
+| `mode` | `single` or `multi`; optional when the pack has one answer. |
+| `migrations` | Ordered `{from, to, entry}` steps that reach `version`. |
+| `projection` | A read-only entry that turns the current payload into a widget view. |
+
+The manifest schema validates the shape, and the host validates the chain before it writes: every
+step must advance the schema, exactly one step may leave a version, no step may pass `version`, and
+the chain must reach it. A gap or a fork refuses the migration and leaves the document alone.
+
+Before the first step the host copies the whole envelope to `<name>.bak`; it then invokes each
+declared entry with a handle scoped to that one document, no path and no sibling. The entry is pack
+code and runs in the pack's renderer; the host passes the payload bytes in and out and never parses
+them. After a step it stamps the envelope header with the step's `to` version. The envelope's schema
+version is the record that a step ran, so running the same migration again invokes no entry and
+leaves the document unchanged (S6.6).
+
+An entry that cannot finish puts the backup back: the document is readable again at its old schema,
+and the backup stays beside it. A projection runs only when the schema is current and writes nothing.
+Migrating an app's own document remains the app's job; this is the host's declared-entry path, not a
+replacement for Canvas, Planner or Budget's migration code.
+
 ## `.canvas`
 
 Canvas writes a JSON envelope whose `kind` is `suite.canvas` and whose `version` is 3 (a `.suite`

@@ -43,6 +43,7 @@ const TAG_SCAN_FILES = [
   "packages/pack/src/manifest.test.ts",
   "packages/pack/src/signature.test.ts",
   "packages/pack-host/src/archive.test.ts",
+  "apps/shell/src/documentMigrations.test.ts",
 ];
 
 function resolveRef(ref) {

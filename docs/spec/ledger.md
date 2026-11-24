@@ -38,10 +38,10 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S5.7 | Association ownership | Partial | Contributions are registered; no namespacing or second-pack refusal |
 | S6.1 | Document envelope | Implemented | `apps/shell/src/documents.ts` writes magic, envelope version, publisher, pack, document, schema, payload length and checksum; "writes each header field and reads back the payload unchanged" and "reads the header without the payload" |
 | S6.2 | Host write/backup | Implemented | Host document service: one write at a time, flushed temporary file and rename, `.bak`, crash recovery and `.corrupt-` quarantine; "quarantines a corrupt envelope…", "restores the previous copy…" and the atomic-write tests |
-| S6.3 | Pack schema/migration | Partial | Apps own schema and migrations; the host cannot invoke a declared entry |
+| S6.3 | Pack schema/migration | Partial | `apps/shell/src/documentMigrations.ts` finds a manifest's declared document, proves the chain and invokes a migration or projection entry with a one-document handle; `apps/shell/src/documentMigrations.test.ts` covers "finds the declared document and runs its two-step migration", "stamps the schema without touching the payload when the entry only validates", "invokes the declared projection with a read-only handle" and "refuses an undeclared document and a chain with a gap before writing". The runner is injected: the shell does not bind an entry to a pack renderer yet, so no app runs a declared migration |
 | S6.4 | Newer document | Implemented | Host documents refuse a newer envelope or schema with a sentence and an export path and leave the file alone; "blocks a newer envelope…", "blocks a newer schema…" and "refuses a file from before the envelope…" |
 | S6.5 | Mergeable children | Partial | Loro is used; `ensureMergeable*` is not the general rule |
-| S6.6 | Migration safety | Partial | Per-app migrations and backups exist; not uniform |
+| S6.6 | Migration safety | Partial | `apps/shell/src/documentMigrations.ts` skips a current document, backs up the whole envelope before a chain and restores it when an entry fails; `apps/shell/src/documentMigrations.test.ts` covers "running the two-step migration twice leaves the document unchanged", "keeps the pre-migration backup and puts it back when an entry fails" and "refuses a projection before the schema is current". Planner and Budget still carry their own migration bodies and backup rules |
 | S6.7 | Blob classes | Absent | No asset/derived/cache store |
 | S6.8 | Export | Partial | Canvas and Budget export; Planner only `.planner`; packs, Screens and Space do not |
 | S6.9 | Unknown fields | Partial | The host preserves payload bytes exactly on an envelope rewrite (`rewrite` and "rewrites the envelope without changing the payload bytes"); Screen/Space unknown fields are still not shown as unknown |
@@ -109,7 +109,7 @@ claim.
 | --- | --- | --- |
 | S3.3–S3.4 | Duplicate JSON keys are refused only by the library text parser, which the shell and Go host do not call, and there is no golden vector, so a second implementation cannot verify the format | Pack |
 | S2.1–S2.5 | No publisher identity, trust store, rotation or revocation; side-loading is first-party only | Pack, shell |
-| S6.3 | No host-invoked migration or projection entry, so the pack-owned schema is declared nowhere and the host cannot run it | Shell, document-runtime |
+| S6.3 | The host can invoke a declared entry, but no pack renderer is bound to the runner and no app runs a declared migration yet | Shell |
 | S4.2–S4.5 | No consent record or network allowlist; external links and associations bypass the boundary | Shell, Go |
 | S7.2–S7.6 | No per-document key, relay verification, header index or gap recovery | Sync |
 | S9.2–S9.4 | No code-widget sandbox, fallback or data scope | Shell |

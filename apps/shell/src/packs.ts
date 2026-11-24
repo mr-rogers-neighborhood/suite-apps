@@ -7,7 +7,9 @@ import {
   isSafePackPath,
   PACK_CONTRACT_VERSION,
   PACK_FORMAT,
+  type PackDocument,
   packAllows,
+  packDocumentSchema,
 } from "@suite/pack/manifest";
 import { z } from "zod";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
@@ -53,6 +55,7 @@ const manifestSchema = z
     contractVersion: z.number().int().positive(),
     minimumHostVersion: z.number().int().positive().optional(),
     capabilities: z.array(z.enum(PACK_CAPABILITIES)).default([]),
+    documents: z.array(packDocumentSchema).max(64).optional(),
     widgets: suiteWidgetsSchema.optional(),
   })
   .strict();
@@ -62,6 +65,8 @@ export interface PackInfo extends PackSummary {
   readonly root: string;
   /** Widget descriptors the manifest declares. The host draws them; it runs no code. */
   readonly widgets?: readonly SuiteWidget[];
+  /** Documents the manifest declares, with their migrations and projection. */
+  readonly documents?: readonly PackDocument[];
 }
 
 export interface PackRequest {
@@ -183,6 +188,7 @@ function readPack(directory: string): PackInfo | null {
       description: parsed.data.description ?? null,
       entry: parsed.data.entry,
       capabilities: parsed.data.capabilities as readonly PackCapability[],
+      documents: (parsed.data.documents ?? []) as readonly PackDocument[],
       widgets: parsed.data.widgets ?? [],
       root: directory,
       source: "development",

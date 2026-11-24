@@ -1,0 +1,45 @@
+{
+  "format": "suite.pack",
+  "id": "migration-sample",
+  "name": "Migration sample",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "contractVersion": 1,
+  "capabilities": ["documents"],
+  "documents": [
+    {
+      "id": "note",
+      "format": "suite.note",
+      "version": 3,
+      "mode": "single",
+      "migrations": [
+        { "from": 1, "to": 2, "entry": "migrate-1-2.html" },
+        { "from": 2, "to": 3, "entry": "migrate-2-3.html" }
+      ],
+      "projection": "project.html"
+    }
+  ],
+  "files": [
+    {
+      "path": "index.html",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 10
+    },
+    {
+      "path": "migrate-1-2.html",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "bytes": 10
+    },
+    {
+      "path": "migrate-2-3.html",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "bytes": 10
+    },
+    {
+      "path": "project.html",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "bytes": 10
+    }
+  ],
+  "signature": "Zml4dHVyZQ=="
+}
