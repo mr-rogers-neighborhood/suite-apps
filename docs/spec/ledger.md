@@ -75,8 +75,8 @@ The spec is the target. This page is the evidence. Status is `implemented`, `par
 | S11.5 | Platform APIs | Future | Deferred by contract |
 | S12.1 | Side-load | Implemented | `apps/shell/src/installedPacks.test.ts` installs a signed archive with no catalogue or network |
 | S12.2–S12.5 | Catalogue and revocation | Partial | `packages/pack/src/catalogue.test.ts` verifies an operator-signed index with sequence, previous, expiry and threshold; `scripts/pack-index.mjs` builds it and `scripts/release-index.mjs` publishes it on the Flatpak remote. Reviews, attestations, provenance and revocation are absent |
-| S12.6 | Updates | Partial | Additive installs keep the previous version; no delta or rollback pointer |
-| S12.7 | Install TOCTOU | Absent | The installed bytes are not compared with the displayed catalogue entry |
+| S12.6 | Updates | Partial | Additive installs keep the previous version, and a reinstall swaps the version directory only after the new archive verifies and extracts; `apps/shell/src/catalogue.test.ts` covers update availability, reinstall with documents and files kept, refused-reinstall rollback, and removal. No delta or rollback pointer |
+| S12.7 | Install TOCTOU | Partial | `@suite/pack` defines and verifies the signed index; when a verified index entry reaches the shell, `apps/shell/src/catalogue.ts` compares its id, version, size and SHA-256 with the displayed entry and re-checks the digest at install. `apps/shell/src/catalogue.test.ts` "refuses an index entry whose archive digest changed", "refuses an index entry whose archive names another version" and "still verifies an indexed archive against the trust store" cover it; `apps/shell/src/main.ts` does not pass an index yet |
 | S12.8 | Channels | Implemented | `docs/explanation/channels.md` and `docs/reference/packaging-channels.md` own the model; `scripts/flatpak-remote.mjs` publishes the signed remote |
 | S13.1 | Threat model | Implemented | `apps/sync/docs/threat-model.md` and `apps/shell/SECURITY.md` name the actors and mitigations |
 | S13.2 | Host boundary | Partial | Desktop has per-pack origin/session; mobile is same-origin |

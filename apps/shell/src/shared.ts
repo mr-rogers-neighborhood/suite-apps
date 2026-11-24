@@ -135,6 +135,10 @@ export interface CatalogueEntry {
   readonly refusal: string | null;
   readonly publisher: PackPublisherView | null;
   readonly capabilities: readonly PackCapability[];
+  /** Archive size, so the chrome can show it before an install. */
+  readonly sizeBytes: number;
+  /** True when this version is newer than the highest valid installed version. */
+  readonly updateAvailable: boolean;
 }
 
 /** One version directory present under the install root. */

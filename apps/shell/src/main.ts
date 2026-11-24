@@ -322,6 +322,9 @@ async function refreshPacks(): Promise<void> {
 
   packs = mergePackSources({ installed: scan.packs, development });
   installedVersions = scan.versions;
+  // #222 supplies the verified index as the third argument when it lands. Until
+  // then the local directory is the only catalogue source; a person can still
+  // install from a file through the picker.
   catalogue = await loadCatalogue(catalogueRootFor(dataRootFor(), process.env), packTrustOptions());
   console.info(
     `[shell] ${packs.length} pack(s) available; ${catalogue.length} catalogue archive(s)`,
@@ -330,7 +333,8 @@ async function refreshPacks(): Promise<void> {
 
 /** What the chrome sees: no archive paths and no refusal codes. */
 function catalogueView(): readonly CatalogueEntry[] {
-  return catalogue.map(catalogueEntry);
+  const active = new Map(packs.map((pack) => [pack.id, pack.version]));
+  return catalogue.map((pack) => catalogueEntry(pack, active.get(pack.id) ?? null));
 }
 
 /** Every valid version with the loader's current choice marked. */
@@ -676,7 +680,7 @@ async function installPackFromFile(): Promise<void> {
 
   const summary = packInstallSummary(check.value.manifest, check.value.publisher);
   const updating = packs.some((pack) => pack.id === summary.id);
-  if (!(await confirmInstall(current, summary, updating))) {
+  if (!(await confirmInstall(current, summary, updating ? "update" : "install"))) {
     current.setNotice("The install was cancelled.");
     return;
   }
@@ -697,7 +701,9 @@ async function installPackFromFile(): Promise<void> {
         console.warn(`[shell] could not open ${installed.id} after install`, error);
       });
     }
-    current.setNotice(installedNotice(installed, previous, opened));
+    current.setNotice(
+      installedNotice(installed, previous, opened, updating ? "update" : "install"),
+    );
   } catch (error) {
     current.setNotice(installRefusal(error));
   }
@@ -882,18 +888,24 @@ async function offerUnknownPublisher(
   return true;
 }
 
+/** What the chrome asked the installer to do. */
+type InstallAction = "install" | "update" | "reinstall";
+
 /** The four facts S2.5 requires, before the installer writes anything. */
 async function confirmInstall(
   current: ShellWindow,
   summary: PackInstallSummary,
-  updating: boolean,
+  action: InstallAction,
 ): Promise<boolean> {
   const answer = await dialog.showMessageBox(current.window, {
     type: "info",
-    title: updating ? "Update this pack?" : "Install this pack?",
-    message: describePackInstall(summary, updating ? "update" : "install"),
+    title: `${action === "install" ? "Install" : action === "update" ? "Update" : "Reinstall"} this pack?`,
+    message: describePackInstall(summary, action),
     detail: `Publisher id: ${summary.publisher.id}\nKey fingerprint: ${summary.publisher.fingerprint}\nPack id: ${summary.id}\nVersion: ${summary.version}\nCapabilities: ${summary.capabilities.length === 0 ? "none" : summary.capabilities.join(", ")}`,
-    buttons: ["Cancel", updating ? "Update" : "Install"],
+    buttons: [
+      "Cancel",
+      action === "install" ? "Install" : action === "update" ? "Update" : "Reinstall",
+    ],
     defaultId: 1,
     cancelId: 0,
     noLink: true,
@@ -901,11 +913,12 @@ async function confirmInstall(
   return answer.response === 1;
 }
 
-/** The sentence after an install or update, with the same four facts. */
+/** The sentence after an install, update or reinstall, with the same four facts. */
 function installedNotice(
   installed: InstalledPackInfo,
   previous: PackInfo | null,
   opened: boolean,
+  action: InstallAction,
 ): string {
   const summary: PackInstallSummary = {
     id: installed.id,
@@ -915,13 +928,16 @@ function installedNotice(
     publisher: installed.publisher,
   };
   const keptOlder =
-    previous !== null && comparePackVersions(installed.version, previous.version) > 0
+    action === "update" &&
+    previous !== null &&
+    comparePackVersions(installed.version, previous.version) > 0
       ? ` Version ${previous.version} is still on disk; remove it from the launcher when you are ready.`
       : "";
   const next = opened
     ? "The app is open now."
     : "Restart Suite to run the new version of the already-open app.";
-  return `${describePackInstall(summary, previous === null ? "install" : "update")} ${next}${keptOlder}`;
+  const kept = action === "reinstall" ? " Its documents and files were kept." : "";
+  return `${describePackInstall(summary, action)} ${next}${kept}${keptOlder}`;
 }
 
 function installRefusal(error: unknown): string {
@@ -964,7 +980,8 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
     publisher: entry.publisher,
   };
   const previous = packs.find((pack) => pack.id === id) ?? null;
-  if (!(await confirmInstall(current, summary, previous !== null))) {
+  const action = catalogueActionFor(id, version, previous);
+  if (!(await confirmInstall(current, summary, action))) {
     current.setNotice("The install was cancelled.");
     return;
   }
@@ -974,6 +991,7 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
       entry,
       join(dataRootFor(), "packs"),
       packTrustOptions(),
+      { replace: action === "reinstall" },
     );
     await refreshPacks();
     publishPackData();
@@ -984,9 +1002,28 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
         console.warn(`[shell] could not open ${installed.id} after install`, error);
       });
     }
-    current.setNotice(installedNotice(installed, previous, opened));
+    current.setNotice(installedNotice(installed, previous, opened, action));
   } catch (error) {
     current.setNotice(installRefusal(error));
+  }
+}
+
+/**
+ * Decide what a catalogue install means for the current installs.
+ *
+ * A version already on disk is a reinstall and replaces it. A newer version
+ * beside the active one is an update; an older or absent one is an install.
+ * Document and file roots are untouched by every one of them.
+ */
+function catalogueActionFor(id: string, version: string, active: PackInfo | null): InstallAction {
+  if (installedVersions.some((entry) => entry.id === id && entry.version === version)) {
+    return "reinstall";
+  }
+  if (active === null) return "install";
+  try {
+    return comparePackVersions(version, active.version) > 0 ? "update" : "install";
+  } catch {
+    return "install";
   }
 }
 
