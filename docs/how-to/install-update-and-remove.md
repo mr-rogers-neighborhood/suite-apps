@@ -7,7 +7,8 @@ owns that lifecycle, and neither the host nor an app edits a document.
 
 The frozen Canvas, Planner, Budget and Help Flatpaks keep the one `flatpak install` line the release
 page prints. Suite Start no longer exists (#314); its catalogue and Home moved into the shell. Suite
-Sync is still the `run.suite.sync` Flatpak until #315 retires that artifact.
+Sync is retired as a shipped app (#315): the signed remote keeps its last published ref, but no new
+`run.suite.sync` build is published and the tray app is not the target surface.
 
 ## Install the host
 
@@ -41,15 +42,18 @@ flatpak install --user suite run.suite.help
 The signed remote is the same one the host uses. A new build updated the deployment with
 `flatpak update --user`; the apps are frozen, so there is no new release until each becomes a pack.
 
-## Install the relay
+## The relay
 
-Suite Sync is still delivered as the `run.suite.sync` Flatpak until #315 moves the tray into the host:
+Suite Sync is no longer an app to install. The relay becomes a host capability (#315); until the host
+runs it, a person runs the headless CLI from a checkout or from the last `run.suite.sync` ref the
+signed remote keeps. There is no new build and no tray app:
 
 ```sh
-flatpak install --user suite run.suite.sync
+node apps/sync/dist/cli.js serve --host 127.0.0.1 --port 8787 --trust-all
 ```
 
 The relay remains a separate trust boundary: it stores sealed frames, never a document.
+[Leave a relay running](../../apps/sync/docs/how-to/relay.md) owns the operation guide.
 
 ## What happened to Suite Start
 

@@ -66,7 +66,7 @@ neither stands in for the other.
 The relay admits a device by what it can prove to the relay, and that is not much: it pins a device
 key on join and checks that a frame's sender holds a role. With no device registry, the signature
 check is `--trust-all` — the only mode a `serve` accepts — so **the machine that can reach the port is
-the admission control**. The app makes that an explicit choice with three scopes:
+the admission control**. The last published app made that an explicit choice with three scopes:
 
 | Scope                | Bind                           | Who can reach it                                   |
 | -------------------- | ------------------------------ | -------------------------------------------------- |
@@ -78,8 +78,9 @@ Only the network scope needs a confirmation, and the choice is stored. Selecting
 acknowledgement the CLI's `--trust-all-remote` asks for; a restart does not ask again, because the
 stored choice is the opt-in, and going back to a narrower reach never asks. If Tailscale is not
 running the tailnet scope refuses that bind and the relay stays on loopback, saying so. `SUITE_SYNC_BIND`
-overrides the bind for a test or a host unit, and the app says the reach is fixed rather than
-pretending the selector decided.
+overrides the bind for a test or a host unit. The tray app that showed this choice is retired (#315);
+the host seam that owns the relay decides how the choice is stored and shown next, and that shape is
+still owed.
 
 **What a writer on the network can do.** It can present any device key, and the relay pins it. It can
 claim an **empty** mailbox whose id it knows — the first role record may claim a workspace no owner
@@ -115,9 +116,8 @@ group's membership rules.
   local copy, but a device away longer than the retention window (30 days by default) needs a
   snapshot from a peer, because the relay cannot produce one.
 - **The CLI needs `--trust-all`.** It has no device-key verifier yet, so `serve` refuses to start
-  without it. Start runs the same CLI on loopback. A relay on a reachable address is run directly with
-  its TLS pair and `--trust-all-remote`. It records each device's key on join but does not verify with
-  it yet.
+  without it. A relay on a reachable address is run directly with its TLS pair and
+  `--trust-all-remote`. It records each device's key on join but does not verify with it yet.
 
 ## Non-goals
 

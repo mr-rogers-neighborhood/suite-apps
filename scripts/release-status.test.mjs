@@ -53,7 +53,6 @@ import {
 
 const shell = APPS.find((app) => app.id === "shell");
 const go = APPS.find((app) => app.id === "go");
-const sync = APPS.find((app) => app.id === "sync");
 
 const shellEntry = {
   app: shell,
@@ -79,7 +78,6 @@ const entries = [
     date: "2026-11-20",
     section: "### Fixed\n\n- **A package.** It packaged.",
   },
-  { app: sync, version: "0.11.3", date: "2026-11-20", section: "### Added" },
   goEntry,
 ];
 
@@ -617,16 +615,20 @@ describe("channels and maturity", () => {
     ]);
   });
 
-  it("freezes the legacy apps and names no channel for the relay", () => {
+  it("freezes the legacy apps", () => {
     for (const id of ["canvas", "planner", "budget", "help"]) {
       const app = APPS.find((row) => row.id === id);
       assert.equal(isLegacyFrozen(app), true);
       assert.equal(channelLabel(app), "frozen");
     }
-    const relay = APPS.find((row) => row.id === "sync");
-    assert.equal(isLegacyFrozen(relay), false);
-    assert.equal(channelLabel(relay), "—");
-    assert.equal(maturityLabel(relay), "—");
+  });
+
+  it("retires Suite Sync from the release table and still checks every row it keeps", () => {
+    assert.equal(APPS.find((row) => row.id === "sync"), undefined);
+    assert.ok(
+      APPS.every((row) => row.channel !== undefined || row.frozen === true),
+      "every row is a superapp or a frozen legacy app",
+    );
   });
 
   it("shows channel, maturity and install for the two superapps", () => {
@@ -674,12 +676,10 @@ describe("release bodies", () => {
     assert.doesNotMatch(body, /-v\d/u);
   });
 
-  it("gives the relay the same Flatpak install block as every desktop app", () => {
-    assert.equal(installCommand(sync), "flatpak install --user suite run.suite.sync");
-    assert.equal(
-      installCell(sync),
-      "`flatpak install --user suite run.suite.sync`",
-    );
+  it("never renders the retired relay as an installable row", () => {
+    const body = aggregateReleaseBody(entries, { date: "2026-11-22" });
+    assert.doesNotMatch(body, /run\.suite\.sync/u);
+    assert.doesNotMatch(body, /Suite Sync/u);
   });
 
   it("never marks a row pending for a page that will not exist", () => {
@@ -711,7 +711,7 @@ describe("sections and the Suite Go APK", () => {
   it("keeps the desktop rows in reading order and Go alone on mobile", () => {
     assert.deepEqual(
       APPS.filter((app) => app.section === "desktop").map((app) => app.id),
-      ["shell", "canvas", "planner", "budget", "sync", "help"],
+      ["shell", "canvas", "planner", "budget", "help"],
     );
     assert.equal(APPS[0].id, "shell");
     assert.deepEqual(

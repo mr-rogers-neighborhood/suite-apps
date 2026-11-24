@@ -21,7 +21,7 @@ inspectable without building the thing it releases.
 The gate proof is a commit, not a working tree. The publish paths share this check: a status file that
 did not pass, came from `--only`, came from a warm checkout, or names another commit is refused before
 any byte is copied. The relay tarball this module used to build is retired; `sync-v<version>` assets
-are history and the relay installs as `run.suite.sync`.
+are history and the relay's last Flatpak ref stays on the signed remote without a new build.
 
 ## scripts/lib/channel.mjs#suiteAppId
 

@@ -15,8 +15,9 @@ two Canvas clients to it. It proves the transport; it is not the shipped securit
 
 ## The shape
 
-1. Run the relay: install Suite Sync with its `flatpak install` line and open it, or run the CLI against a store
-   directory.
+1. Run the relay: build the checkout and run the headless CLI against a store directory. There is no
+   app to install any more; the relay is a host capability and its headless CLI is the operator path
+   ([Leave a relay running](../../apps/sync/docs/how-to/relay.md)).
 2. Open the document in Canvas desktop and press **Share** in the Sync dialog.
 3. Give a second device a copy of the `.canvas` file and an invitation link from the first device.
    The link carries a signed envelope naming the inviter, and the joining app resolves that name

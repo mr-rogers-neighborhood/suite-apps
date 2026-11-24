@@ -263,18 +263,20 @@ checked.
 
 ## The relay
 
-The relay is a Flatpak like the apps, so it has no release of its own beyond the same signed remote:
+The relay is not a shipped app any more (#315). There is no new `run.suite.sync` build and no release
+of its own: the signed remote keeps the last published ref, and the host is the surface that will run
+and show it. A contributor can still reproduce the last artifact locally:
 
 ```sh
 node scripts/flatpak.mjs --app sync                    # package, sign, install locally
-node scripts/flatpak-remote.mjs --target s3 --publish  # publish the shared repository
 ```
 
 Its manifest is `packaging/flatpak/run.suite.sync.yml` and it refuses `--channel`: a channel would be a
 second mailbox on the same data. The `sync-v<version>` tarball releases it used to ship are retired;
 [Leave a relay
-running](../../apps/sync/docs/how-to/relay.md#building-and-publishing-a-release) has the build and
-publish detail.
+running](../../apps/sync/docs/how-to/relay.md#building-the-last-artifact) has the local build detail.
+The build is not published; the host seam that takes the relay over is
+[decided in Decisions](../reference/decisions.md#retiring-the-sync-tray-app-315).
 
 ## What a publish refuses
 

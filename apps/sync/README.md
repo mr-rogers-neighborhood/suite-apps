@@ -14,8 +14,12 @@ app owns; this repository owns the wire protocol, the membership model and the h
 - **The local transport** is the part each app runs: a cursor and a queue, no keys and no listener.
   It carries frames between the document and whatever relay the person points it at.
 
-The tray app is neither. It owns the relay it runs on this machine — start, stop, address, store —
-and the host stays a launcher when the relay is absent or runs somewhere else.
+The separate tray app is retired. It owned the relay it ran on this machine — start, stop, address,
+store — and it was never a second role in the product. The host's tray is the target surface: it
+absorbs those states and controls, and sync is a capability of the host rather than an app a person
+installs. The shape the host uses is still owed
+([Decisions](../../docs/reference/decisions.md#retiring-the-sync-tray-app-315)); `apps/sync` stays as
+the protocol, the client library and the relay implementation.
 
 > **Status: working, two apps deep.** The protocol, the MLS group and frame types, the membership state machine,
 > the blind relay with its file store, and the relay client are here. Two Canvas clients can sync one
@@ -40,8 +44,9 @@ and the host stays a launcher when the relay is absent or runs somewhere else.
 > **The console and the relay code.** `serve` also opens a read-only console on `127.0.0.1` and
 > prints its URL with a token generated at startup. The console shows the relay's metadata and draws
 > a `suite://relay` code carrying the address, the certificate pin and, when one is live, an
-> invitation. The tray app opens that console from its window. Friend codes and contacts live in the
-> apps' main processes, not in the relay: the console never sees either.
+> invitation. The retired tray app opened that console from its window; the host will own that surface.
+> Friend codes and contacts live in the apps' main processes, not in the relay: the console never sees
+> either.
 
 ---
 
@@ -55,7 +60,7 @@ For the product story and the influences behind it, read
 | `packages/protocol` | `@suite/sync`: ids, roles, signed membership and role records, invites, sealed frames, relay messages, relay codes and QR. The root is pure and defines no document format. |
 | `packages/host`     | `@suite/host`: the relay — frame admission, the numbered frame log, the file store, the WebSocket server and the loopback console.                                          |
 | `src`               | `suite-sync`: the CLI over `@suite/host` (`serve`, `status`, `--version`).                                                                                                  |
-| `app`               | `@suite/sync-app`: the Flatpak's Electron shell. A tray keeps the embedded relay serving; the window shows its address, code and fingerprint.                               |
+| `app`               | `@suite/sync-app`: the Electron app the last `run.suite.sync` build packaged. It is not published any more; its tray and window are retired.                                |
 | `docs/`             | Protocol, threat model, and the decisions behind them.                                                                                                                      |
 
 ## Commands
@@ -72,57 +77,54 @@ curl http://127.0.0.1:8787/health
 ```
 
 `--trust-all` is the CLI's development mode: it has no device-key verifier to check against, so it
-refuses to start without it. The CLI runs `serve` in the foreground; the tray app embeds the same
-relay and keeps no second copy of its frames. The store is a directory of `<workspaceId>.frames.jsonl`
+refuses to start without it. The CLI runs `serve` in the foreground; the retired app embedded the same
+relay and kept no second copy of its frames. The store is a directory of `<workspaceId>.frames.jsonl`
 files; there is no `workspace init`, `membership.json` or `snapshot.loro`.
 
-The tray app also makes and keeps the TLS pair under the relay store's `tls/` directory, mode 0600, so
-the fingerprint survives a restart. Its window shows that fingerprint and opens the console; a relay
-you run by hand uses `--tls-cert` and `--tls-key` as the guide describes.
+The last published app made and kept the TLS pair under the relay store's `tls/` directory, mode 0600,
+so the fingerprint survived a restart. Its window showed that fingerprint and opened the console; a
+relay you run by hand uses `--tls-cert` and `--tls-key` as the guide describes.
 
 ## Run the relay
 
-The relay ships as a Flatpak, `run.suite.sync`, and installs from the suite store:
+The relay is no longer a shipped app (#315). There is no new `run.suite.sync` build and the tray app is
+retired; the signed remote keeps the last published ref for anyone who already has it, and the host is
+the surface that will run and show the relay. Until the host's shape lands
+([Decisions](../../docs/reference/decisions.md#retiring-the-sync-tray-app-315)), a person running a
+relay uses the headless CLI from a checkout or from the last published Flatpak ref.
+
+From a checkout:
 
 ```sh
-flatpak install --user suite run.suite.sync
+pnpm --filter @suite/sync-server run build
+node apps/sync/dist/cli.js serve --host 127.0.0.1 --port 8787 --trust-all
 ```
 
-A contributor builds it from a checkout instead with `node scripts/flatpak.mjs --app sync`, which
-publishes it to the local `suite-local` repository and installs it; the manifest is
-`packaging/flatpak/run.suite.sync.yml`. [Leave a relay running](docs/how-to/relay.md) is the guide.
+The last published app can still run the same CLI on a machine with no desktop:
 
-The two ways to use the same build are:
+```sh
+flatpak run --command=suite-sync run.suite.sync serve \
+  --host 127.0.0.1 --port 8787 --trust-all
+```
 
-- **A desktop app.** `flatpak run run.suite.sync` starts a tray item and a small window. The relay runs
-  in the app's own main process, so closing the window hides it to the tray and the relay keeps
-  serving; **Quit** stops it. It listens on loopback until you widen it — the tailnet, or the whole
-  network behind a confirmation — and the window remembers that choice. The window shows the address
-  another device needs, a `suite://relay` code carrying that address and the certificate pin, the
-  fingerprint to paste into an app, and the read-only console. It also starts and stops the relay and
-  can add it to login.
-- **The headless relay.** The same install runs the CLI on a machine with no desktop:
+`serve`, `status` and `--version` are the CLI in `src`, unchanged. The Flatpak carries no Node runtime
+of its own, so the `suite-sync` command runs the app's binary with `ELECTRON_RUN_AS_NODE=1`. A
+contributor can reproduce that build with `node scripts/flatpak.mjs --app sync`; it installs from the
+local `suite-local` repository, and the manifest is `packaging/flatpak/run.suite.sync.yml`.
+[Leave a relay running](docs/how-to/relay.md) is the operation guide.
 
-  ```sh
-  flatpak run --command=suite-sync run.suite.sync serve \
-    --host 127.0.0.1 --port 8787 --trust-all
-  ```
-
-  `serve`, `status` and `--version` are the CLI in `src`, unchanged. The Flatpak carries no Node
-  runtime of its own, so the `suite-sync` command runs the app's binary with `ELECTRON_RUN_AS_NODE=1`.
-
-The app keeps its store under its own data directory,
+The last app kept its store under its own data directory,
 `~/.var/app/run.suite.sync/data/suite-sync`, and the certificate pair in `tls/` beside it, mode 0600.
-Nothing else in the home directory is touched except one autostart entry, which the tray app writes
-only when asked. In the headless form the store is whatever `--store` names.
+Nothing else in the home directory is touched except one autostart entry, which its tray wrote only
+when asked. In the headless form the store is whatever `--store` names.
 
-A relay the app owns is the one the tray app embeds; no other Suite process supervises it. Point each
-device at the address the window shows — for example `wss://192.168.1.20:8787/sync` — and paste the
+Point each device at the relay's address — for example `wss://192.168.1.20:8787/sync` — and paste the
 `certificate SHA-256 fingerprint:` line into **Relay certificate fingerprint**.
 
 Nothing else changes: the apps keep their documents, and no Suite process manages a relay running on
 another machine. The address must be one the device can route to; `127.0.0.1`
-is always the device itself.
+is always the device itself. The host seam that absorbs the relay decides whether it imports the relay
+as a module or supervises it as a child process; both keep the "never reads a document" rule.
 
 ## Working in the monorepo
 

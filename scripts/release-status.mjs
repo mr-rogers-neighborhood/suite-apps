@@ -106,8 +106,9 @@ export const PRODUCT_MATURITY = ["pre-alpha", "alpha", "beta", "1.0"];
  * The apps frozen as legacy until they become packs.
  *
  * The list lives in the channel library so the Flatpak builder refuses a new
- * pre-release build for the same apps this table marks frozen. Sync is not
- * frozen: it is not a superapp either, so its row names no channel.
+ * pre-release build for the same apps this table marks frozen. Sync is retired
+ * rather than frozen: it leaves this table entirely (#315) and the relay becomes
+ * a host capability, so there is no row to name a channel for.
  */
 export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
 
@@ -118,7 +119,7 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  * `kind` says where the installed bytes come from, and `installCell` is the one
  * place that turns it into a cell:
  *
- * - `flatpak` — a signed deployment on the OSTree remote, including the relay.
+ * - `flatpak` — a signed deployment on the OSTree remote.
  * - `apk` — a release-signed APK attached to the rolling suite release.
  *
  * `section` is the table a row belongs to: `desktop` or `mobile`. The table is
@@ -132,6 +133,11 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  * `frozen` marks a legacy app that keeps its code and last artifact but gets no
  * new release or channel; Status owns that inventory, so the release page does
  * not render it.
+ *
+ * Sync has no row. It stopped being a shipped artifact (#315): the signed remote
+ * keeps the last published `run.suite.sync` ref, no new build is published, and
+ * `apps/sync` stays in the tree as the protocol, client library and relay
+ * implementation.
  *
  * `flatpakId` is null outside the Flatpak rows. Per-app tags are retired, so no
  * entry carries a tag prefix: the rolling `suite-YYYY.MM.DD` tag is the only one
@@ -192,15 +198,6 @@ export const APPS = [
     flatpakId: "run.suite.budget",
     maturity: "pre-alpha",
     frozen: true,
-  },
-  {
-    id: "sync",
-    name: "Suite Sync",
-    packageJson: "apps/sync/package.json",
-    changelog: "apps/sync/CHANGELOG.md",
-    kind: "flatpak",
-    section: "desktop",
-    flatpakId: "run.suite.sync",
   },
   {
     id: "help",
@@ -340,8 +337,8 @@ export function flatpakrepoUrl() {
  *
  * Only a superapp carries a channel. A pre-release build shares
  * `run.suite.slop.<app>` and takes the channel as its branch, so its install
- * must name both; the frozen legacy rows and the hub and relay keep their stable
- * ids on every page, because no pre-release build replaces them.
+ * must name both; the frozen legacy rows keep their stable ids on every page,
+ * because no pre-release build replaces them.
  */
 export function releaseFlatpakId(app, channel = "stable") {
   if (app.kind !== "flatpak") return null;
@@ -408,13 +405,12 @@ export function installCell(
 }
 
 /**
- * The channel a row names: the release's channel, `frozen` for legacy, or none.
+ * The channel a row names: the release's channel, or `frozen` for legacy.
  *
  * A legacy app is not on a channel any more, so saying `frozen` in the channel
  * cell is honest: its code and last artifact stay, but no new build is offered.
  * A superapp names the channel the release is published from, so a nightly page
  * says `nightly` rather than the stable channel the table was first written for.
- * A row that is not a superapp (the hub, the relay) names no channel.
  */
 export function channelLabel(app, channel = "stable") {
   if (app.frozen === true) return "frozen";

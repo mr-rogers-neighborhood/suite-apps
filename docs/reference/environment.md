@@ -20,8 +20,8 @@ portable install; they are not configuration a normal user needs.
 
 The desktop apps take the relay address in their own Sync dialog. `SUITE_SYNC_URL`,
 `SUITE_SYNC_MEMBER`, `SUITE_SYNC_WORKSPACE`, `SUITE_SYNC_EPOCH` and `SUITE_SYNC_DEVICE` were listed
-here but no shell reads them. The host reads no relay variable: the tray app owns the relay's
-configuration.
+here but no shell reads them. The host reads no relay variable: the relay's configuration belongs to
+the process that runs it, and the host seam that takes it over will decide where that lives.
 
 ## Packaging
 

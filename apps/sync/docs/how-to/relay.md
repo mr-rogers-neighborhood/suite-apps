@@ -7,29 +7,51 @@ forget about it — a spare desktop, a home server, a laptop that stays awake.
 The relay is not a service Suite operates. There is nothing to sign up for, and nothing leaves your
 network that you did not put there.
 
+> **The relay is no longer a shipped app (#315).** `run.suite.sync` stopped being published, and its
+> tray app is retired: the host the person is using owns that surface, and its shape for the relay is
+> still owed ([Decisions](../../../../docs/reference/decisions.md#retiring-the-sync-tray-app-315)).
+> `apps/sync` stays in the tree as the protocol, the client library and the relay implementation. The
+> signed remote keeps the last published ref for anyone who already has it, but no new build is
+> published. This page runs the relay headlessly; that is the part of the code that did not retire.
+
 ## What you need
 
 - A machine on the same network as the devices you want to sync (or reachable over a VPN).
-- Flatpak, and `run.suite.sync` from the suite store. A contributor can build the same app from a
-  checkout instead. The relay ships in the same app as the desktop tray, so there is no separate
-  runtime to install: the Flatpak carries its own.
-- A user session for the tray form; none for the headless form.
+- The relay itself: a built checkout, or the last `run.suite.sync` ref the signed remote keeps. Neither
+  needs a desktop session; the relay is a foreground process and a supervised unit.
 
-Both forms are one build. The **tray app** is what a person with a desktop wants: it keeps the relay
-serving while its window is closed. The **headless command** is what a server or a NAS wants: the same
-binary runs the same CLI and prints the same startup lines.
+Both forms run the same code and print the same startup lines. There is no tray, no window and no
+autostart entry to install: the relay is a process you start, and a host that owns the relay starts it
+for you when that seam lands.
 
-## 1. Install the relay
+## 1. Get the relay
 
-Add the store and install the app:
+From a checkout, build the CLI and check the version:
 
 ```sh
-flatpak remote-add --user --if-not-exists --from suite \
-  https://flatpak.suite.run/suite.flatpakrepo
-flatpak install --user suite run.suite.sync
+pnpm --filter @suite/sync-server run build:all
+node apps/sync/dist/cli.js --version
 ```
 
-A contributor builds it from a checkout instead:
+From a checkout, `suite-sync` in the commands below is `node apps/sync/dist/cli.js`; the published and
+system forms install the same binary as `suite-sync`.
+
+`suite-sync --version` prints the server and relay-protocol versions. Two devices need the same
+protocol version; the relay refuses a client that speaks a different one.
+
+If the last published ref is already installed, the same CLI is still inside it:
+
+```sh
+flatpak run --command=suite-sync run.suite.sync --version
+```
+
+That ref is the last published `run.suite.sync` build. It keeps working and keeps updating from
+whatever `origin` it has, but it will not receive a new build, and its tray is not the surface this
+project targets. The `suite-sync` command is a launcher that runs the app's own binary with
+`ELECTRON_RUN_AS_NODE=1`, because the Flatpak base carries no Node runtime. Everything after the
+command is the ordinary CLI: `serve`, `status`, `--version`.
+
+A contributor can reproduce that last artifact locally:
 
 ```sh
 node scripts/flatpak.mjs --app sync
@@ -38,134 +60,39 @@ node scripts/flatpak.mjs --app sync
 That packages the unpacked build `.artifacts/sync-app/linux-unpacked`, signs the repository summary
 with the store key, publishes it to `~/suite-flatpak/repo` and installs `run.suite.sync` from
 `suite-local`. The manifest is `packaging/flatpak/run.suite.sync.yml`; `--no-build` reuses an unpacked
-tree that already exists. Either install updates with `flatpak update --user`; the app has no updater
-of its own.
-
-Check what arrived:
-
-```sh
-flatpak run --command=suite-sync run.suite.sync --version
-```
-
-`suite-sync --version` prints the server and relay-protocol versions. Two devices need the same
-protocol version; the relay refuses a client that speaks a different one.
-
-The `suite-sync` command is a launcher inside the Flatpak. It runs the app's own binary with
-`ELECTRON_RUN_AS_NODE=1`, because the Flatpak base carries no Node runtime. Everything after the
-command is the ordinary CLI: `serve`, `status`, `--version`.
-
-### Start the tray app
-
-```sh
-flatpak run run.suite.sync
-```
-
-The relay starts with the app and **listens on `127.0.0.1:8787` until you widen it**. The window's
-**Who can reach it** selector is that choice, stored in the app's own config
-(`$XDG_CONFIG_HOME/suite-sync/relay.json`) so a restart, including a login launch with `--hidden`,
-starts the same way:
-
-| Scope                      | Bind                           | What the window says                                 |
-| -------------------------- | ------------------------------ | ---------------------------------------------------- |
-| This device only (default) | `127.0.0.1`                    | "Only this device can reach the relay."              |
-| My tailnet                 | the first IPv4 on `tailscale0` | "Only devices on your tailnet can reach it."         |
-| This network               | `0.0.0.0`                      | "Any device on this network can write to the relay." |
-
-The tailnet scope reads the interface Tailscale creates. The Flatpak shares the host's network
-namespace, so no grant and no `flatpak-spawn` is involved; if Tailscale is not running, the option is
-disabled with **Tailscale is not running on this machine.**, and a stored tailnet choice refuses that
-bind and keeps the relay on loopback rather than widening.
-
-The network scope is the acknowledgement `--trust-all-remote` asks for on the CLI, so selecting it
-shows a warning and waits for **Use this network**; the relay only rebinds after that. Nothing is
-stored until the confirmation, and the main process refuses an unacknowledged change even if a page
-asked for one. Changing scope stops and restarts the relay, so the address, the code and the link are
-the ones the new bind actually serves.
-
-The window shows the address it advertises, the certificate fingerprint, a code to scan and a link to
-the console. Closing the window hides it to the tray and leaves the relay serving; **Quit** from the
-tray or the menu stops the relay and exits. The tray offers the address, **Copy relay link**,
-**Open console** and **Quit**.
-
-`SUITE_SYNC_BIND` still wins over the stored scope for a test, a smoke run or a unit that names an
-address; the window then says the reach is fixed by the environment and disables the selector.
-
-**Start the relay when I log in** writes one XDG autostart entry,
-`~/.config/autostart/run.suite.sync.desktop`, whose command is `flatpak run run.suite.sync --hidden`.
-The Flatpak is granted exactly one host path for it, `--filesystem=xdg-config/autostart:create`; a
-directory grant keeps the host's own `~/.config/autostart` in place, so the session that reads the
-file is the host's. The same entry can be written without a desktop session:
-
-```sh
-flatpak run --command=suite-sync run.suite.sync autostart on
-flatpak run --command=suite-sync run.suite.sync autostart status
-flatpak run --command=suite-sync run.suite.sync autostart off
-```
-
-The app keeps its store at `~/.var/app/run.suite.sync/data/suite-sync`, with the certificate pair in
-`tls/` beside it, mode 0600. The pin survives restarts and updates: a new pair would unpin every
-device, so it is only replaced deliberately.
-
-### The headless command
-
-A machine with no desktop runs the same install without opening a window:
-
-```sh
-flatpak run --command=suite-sync run.suite.sync serve \
-  --store "$HOME/.var/app/run.suite.sync/data/suite-sync" \
-  --host 127.0.0.1 --port 8787 --trust-all
-```
-
-`--store` has to name a path the sandbox can write: the app's own data directory is the one that
-always is. `/var/lib` is not, so the host-install unit below is for a `suite-sync` binary on the host,
-not for the Flatpak.
-
-The reach scopes belong to the tray app. The headless command binds exactly what `--host` says, and
-the loopback/TLS rules above decide whether that bind is allowed.
-
-From a checkout, the same CLI runs through the workspace:
-
-```sh
-pnpm --filter @suite/sync-server run build:all
-node apps/sync/dist/cli.js --version
-```
-
-### How the relay runs
-
-The tray app embeds the relay; there is no separate process for a launcher to spawn. The headless
-form runs the same code through `flatpak run --command=suite-sync run.suite.sync serve …`, or through
-the built CLI from a checkout (`apps/sync/src/cli.ts`). No Suite process supervises a relay it did not
-start. Enter
-the address and pin the app shows in each app's Sync dialog.
+tree that already exists. This is a local check of the last build, not a release path.
 
 ## 2. Choose an address, honestly
 
-The tray app binds `0.0.0.0` and serves `wss://` with the pair it made. The headless command defaults
-to `127.0.0.1`, which only this machine can reach — the right default, and the wrong setting for a
-relay whose purpose is to be reached.
+The headless command defaults to `127.0.0.1`, which only this machine can reach — the right default,
+and the wrong setting for a relay whose purpose is to be reached.
 
 **Off loopback, the relay needs TLS.** A bind on any address other machines can reach refuses to start
 without `--tls-cert` and `--tls-key`. Both flags or neither. The certificate is normally self-signed:
 there is no authority to ask, and each app pins the SHA-256 fingerprint instead of trusting a chain.
-The tray app makes and keeps this pair itself; a headless relay needs one of its own, inside the app's
-data directory because that is the writable path:
+Make and keep the pair on the relay machine, in a directory only that account can read:
 
 ```sh
-mkdir -p "$HOME/.var/app/run.suite.sync/data/tls"
+mkdir -p ~/.config/suite-sync/tls
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
-  -keyout "$HOME/.var/app/run.suite.sync/data/tls/relay-key.pem" \
-  -out "$HOME/.var/app/run.suite.sync/data/tls/relay-cert.pem" -days 825 \
+  -keyout ~/.config/suite-sync/tls/relay-key.pem \
+  -out ~/.config/suite-sync/tls/relay-cert.pem -days 825 \
   -subj "/CN=suite-sync relay"
-chmod 600 "$HOME/.var/app/run.suite.sync/data/tls/relay-key.pem"
+chmod 600 ~/.config/suite-sync/tls/relay-key.pem
 ```
+
+The last app made and kept this pair under its own data directory
+(`$XDG_DATA_HOME/suite-sync`); a checkout can keep it anywhere the relay's account can read, and the
+last Flatpak must keep it inside the sandbox at `~/.var/app/run.suite.sync/data/tls`. Either location
+works as long as a person backs it up with the store.
 
 Start the relay with both files:
 
 ```sh
-flatpak run --command=suite-sync run.suite.sync serve \
+suite-sync serve \
   --host 0.0.0.0 --port 8787 --trust-all --trust-all-remote \
-  --tls-cert "$HOME/.var/app/run.suite.sync/data/tls/relay-cert.pem" \
-  --tls-key "$HOME/.var/app/run.suite.sync/data/tls/relay-key.pem"
+  --tls-cert ~/.config/suite-sync/tls/relay-cert.pem \
+  --tls-key ~/.config/suite-sync/tls/relay-key.pem
 ```
 
 The status line says `wss`, and the startup output ends with the line to copy into each app:
@@ -193,13 +120,13 @@ that is a different decision, the CLI refuses it until you say so:
 
 ```sh
 # refused: --trust-all on an address other machines can reach
-# flatpak run --command=suite-sync run.suite.sync serve --host 0.0.0.0 --trust-all
+# suite-sync serve --host 0.0.0.0 --trust-all
 
 # accepted, and the status line says what it now is
-flatpak run --command=suite-sync run.suite.sync serve \
+suite-sync serve \
   --host 0.0.0.0 --trust-all --trust-all-remote \
-  --tls-cert "$HOME/.var/app/run.suite.sync/data/tls/relay-cert.pem" \
-  --tls-key "$HOME/.var/app/run.suite.sync/data/tls/relay-key.pem"
+  --tls-cert ~/.config/suite-sync/tls/relay-cert.pem \
+  --tls-key ~/.config/suite-sync/tls/relay-key.pem
 ```
 
 Put that relay on a network you trust, or behind a VPN, and keep the port closed at the router. The
@@ -210,15 +137,17 @@ store is encrypted frame bytes with no integrity story against a hostile strange
 whether the transport is `ws` or `wss`, which is the cheapest way to check a unit file before
 restarting it.
 
-## 3. Run the headless relay under systemd
+## 3. Run the relay under systemd
 
-The Flatpak is a user install, so the unit is a user unit. Anything else would run as root against a
-Flatpak root cannot see, and the store is the app's own data directory.
+A relay belongs to one account and its store, so the usual unit is a user unit. The last published
+Flatpak is a user install too; a system unit would run as root against a Flatpak root cannot see.
+
+For the last published Flatpak ref, install the user unit:
 
 ```sh
 install -d -m 0700 ~/.config/systemd/user ~/.config/suite-sync
-install -m 0644 deploy/suite-sync-flatpak.service ~/.config/systemd/user/suite-sync.service
-install -m 0600 deploy/relay-flatpak.env.example ~/.config/suite-sync/relay.env
+install -m 0644 apps/sync/deploy/suite-sync-flatpak.service ~/.config/systemd/user/suite-sync.service
+install -m 0600 apps/sync/deploy/relay-flatpak.env.example ~/.config/suite-sync/relay.env
 ```
 
 Edit `~/.config/suite-sync/relay.env` and set `SUITE_SYNC_ARGS`. It starts empty: the unit's own line
@@ -246,10 +175,11 @@ journalctl --user -u suite-sync -f
 Keep the unit alive between logins with `loginctl enable-linger "$USER"`; without it the user manager
 stops when the last session closes, which is exactly the machine a relay is meant to outlive.
 
-The host-binary alternative is `deploy/suite-sync.service`, a system unit with `DynamicUser=yes` and
-`StateDirectory=suite-sync`. It is for a tree built from a checkout on the host (`/opt/suite-sync` and
-a `/usr/local/bin` symlink) with its own `deploy/relay.env.example`; there is no tarball to install
-any more. A Flatpak cannot write `/var/lib/suite-sync`, so do not mix the two.
+A checkout build can also run under the host-binary unit, `deploy/suite-sync.service`, which is a
+system unit with `DynamicUser=yes` and `StateDirectory=suite-sync`. It expects the binary at
+`/usr/local/bin/suite-sync` (built from a checkout at `/opt/suite-sync` and linked there) and its env
+file at `/etc/suite-sync/relay.env`; there is no tarball to install any more. Do not mix the two
+forms: a Flatpak cannot write `/var/lib/suite-sync`.
 
 ## 4. Check it is actually up
 
@@ -268,8 +198,7 @@ curl -sSk https://192.168.1.20:8787/health
 ```
 
 `workspaces` counts stores it has created; `clients` counts live connections. Neither names a
-document, an author or a change. `flatpak run --command=suite-sync run.suite.sync status` prints the
-configuration, and the tray window draws the same two numbers on its console.
+document, an author or a change. `suite-sync status` prints the configuration.
 
 ## The relay console and the relay code
 
@@ -282,15 +211,13 @@ console: http://127.0.0.1:<port>/console?token=<token>
 The token is made at startup and accepted as `?token=` or the `X-Suite-Console-Token` header; a
 request without it gets a 401. The console is loopback-only even when the relay binds `0.0.0.0`. It
 shows the relay's version, store size, workspaces, members and frame counts — metadata the relay
-already reads — and no frame payload. **Open console** in the tray app opens it with the token the app
-already holds.
+already reads — and no frame payload. The retired tray opened it with the token the app held; from a
+headless relay, open the printed URL.
 
 The page draws a `suite://relay` QR code. `u` is the relay address, `f` the certificate fingerprint,
 and a live invitation adds `w` (workspace id) and `i` (invitation id), so the code is also a bearer
-invitation. The tray window draws a code with the address and pin; the console's code adds the
-invitation when one exists. Friend codes and contacts are app data, not relay data; the relay never
-stores them. The shipped ways to reach a relay are its address plus pin, an invitation, or one of
-these codes.
+invitation. Friend codes and contacts are app data, not relay data; the relay never stores them. The
+shipped ways to reach a relay are its address plus pin, an invitation, or one of these codes.
 
 ## 5. Point devices at it
 
@@ -301,8 +228,8 @@ keeps the pin in its main process, and a different certificate is refused with n
 A loopback address may stay `ws://` and needs no fingerprint. Nothing syncs while the app is closed;
 see `suite-go`'s decisions.
 
-Scanning the code in the tray window does the same thing on a device that scans codes: it carries the
-address and pin, so nothing has to be typed.
+Scanning the console's code does the same thing on a device that scans codes: it carries the address
+and pin, so nothing has to be typed.
 
 ## Running the relay somewhere else
 
@@ -316,12 +243,12 @@ right default and the wrong setting for one that exists to be reached.
 The certificate pair belongs on the relay machine too. The pin each app stores is that certificate's
 SHA-256, so replacing the pair means entering the new fingerprint once on every device.
 
-The relay's store belongs to that machine — back up the app's data directory, not the laptop — and
-the tray app shows the store of the relay it started, not the store of one across the network.
+The relay's store belongs to that machine — back up the store directory, not the laptop.
 
-## Building and publishing a release
+## Building the last artifact
 
-The monorepo has one release path, and the Flatpak is built by the same script as the other apps:
+The monorepo has one Flatpak path, and the relay's last artifact is built by the same script as the
+other apps:
 
 ```sh
 node scripts/flatpak.mjs --app sync              # package, sign, publish and install locally
@@ -330,32 +257,35 @@ node scripts/flatpak.mjs --app sync --no-build   # reuse .artifacts/sync-app/lin
 
 The manifest packages the unpacked build `package:dir` produced, so the relay inside the app is the
 same code the gate tested. There is no pre-release identity for Sync: a tier would be a second mailbox
-on the same data, so `--channel` is refused.
-
-Publishing the signed repository is `node scripts/flatpak-remote.mjs --target s3 --publish`, the same
-path as the apps. There is no separate relay artifact: the `sync-v<version>` tarball releases are
-retired and remain downloadable history only.
+on the same data, so `--channel` is refused. This build is not published any more (#315); the signed
+remote keeps the last ref it already has. The `sync-v<version>` tarball releases are retired and
+remain downloadable history only.
 
 ## Upgrading
 
+A checkout upgrade is a rebuild and a restart:
+
 ```sh
-flatpak update --user run.suite.sync
-systemctl --user restart suite-sync   # for the headless form
+pnpm --filter @suite/sync-server run build:all
+systemctl --user restart suite-sync
 ```
 
+The last published Flatpak ref updates from its own `origin` with `flatpak update --user`, but no new
+`run.suite.sync` build is published, so it will not move past the version it already carries.
+
 The store is append-only and the format is versioned; a relay does not read what it stores, so an
-upgrade cannot migrate it and does not need to. The tray app picks the new build up the next time it
-starts.
+upgrade cannot migrate it and does not need to.
 
 Check `--version` on both sides after an upgrade. A protocol mismatch is refused at connect time, not
 discovered as a corrupt document later.
 
 ## Backing up
 
-Back up the app's data directory, `~/.var/app/run.suite.sync/data/suite-sync`. It is the only state a
-relay has, and losing it does not lose a document — devices hold the truth — it only loses frames that
-had not been delivered yet. The `tls/` pair is in there too; restoring the store with the pair keeps
-every device's pin valid.
+Back up the relay's store directory. For the last app that was
+`~/.var/app/run.suite.sync/data/suite-sync`; for a checkout it is whatever `--store` names. It is the
+only state a relay has, and losing it does not lose a document — devices hold the truth — it only
+loses frames that had not been delivered yet. The `tls/` pair lives beside the store in the last app,
+so restoring the store with the pair keeps every device's pin valid.
 
 ## What this relay still does not do
 
