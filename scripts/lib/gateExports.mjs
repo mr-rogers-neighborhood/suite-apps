@@ -1,10 +1,11 @@
 /**
  * Retention for the exports a `--fresh` gate run leaves behind.
  *
- * `scripts/gate.mjs` exports `HEAD` into `.dev/gate/<sha>` and installs a full
- * dependency tree there. Each export is about 1.6 GB, and because the directory
- * is scratch space nothing used to delete an older one, so a parallel round of
- * reviews multiplied it. This file keeps the evidence and drops the rest.
+ * `scripts/gate.mjs` exports `HEAD` into `.suite-gate/<repo>/<sha>` beside the
+ * checkout and installs a full dependency tree there. Each export is about
+ * 1.6 GB, and because the directory is scratch space nothing used to delete an
+ * older one, so a parallel round of reviews multiplied it. This file keeps the
+ * evidence and drops the rest.
  *
  * Only directories named exactly like a commit sha are exports. A tarball, a
  * lockfile, a note, or anything else a person put in the directory is left

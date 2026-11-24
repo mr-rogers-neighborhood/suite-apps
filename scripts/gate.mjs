@@ -12,9 +12,12 @@
  * through the phone.
  *
  * `--fresh` is the difference between "this tree passes" and "this commit
- * passes". It exports HEAD with `git archive` into `.dev/gate/<sha>`, installs
- * from the lockfile with no node_modules or build output present, and runs the
- * gate there. Without it, a warm cache can make a broken commit green.
+ * passes". It exports HEAD with `git archive` into a sibling
+ * `.suite-gate/<repo>/<sha>`, installs from the lockfile with no node_modules or
+ * build output present, and runs the gate there. Without it, a warm cache can
+ * make a broken commit green. The export stays outside the working tree because
+ * the apps' Biome configs exclude nested `.dev` directories, which would
+ * otherwise match the repository's own `.dev/` and ignore the whole export.
  *
  * Usage:
  *   node scripts/gate.mjs
@@ -27,7 +30,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { delimiter, dirname, join, relative } from "node:path";
+import { basename, delimiter, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pruneGateExports } from "./lib/gateExports.mjs";
 import { PIPELINE } from "./lib/pipeline.mjs";
@@ -95,10 +98,19 @@ function runE2e(repoDir, display) {
   return { status: 1, signal: null };
 }
 
+/**
+ * Where `--fresh` keeps its export: a sibling of the repository, never inside
+ * it. A path under the repository's `.dev/` makes every app whose Biome config
+ * excludes nested `.dev` directories ignore the whole export.
+ */
+function gateExportPath() {
+  return join(dirname(ROOT), ".suite-gate", basename(ROOT));
+}
+
 /** A clean export of HEAD, with no node_modules, dist or untracked files. */
 function exportHead() {
   const sha = gitSha();
-  const gateDir = join(ROOT, ".dev", "gate");
+  const gateDir = gateExportPath();
   const target = join(gateDir, sha);
   const bundle = join(gateDir, `${sha}.tar`);
   rmSync(target, { recursive: true, force: true });
@@ -118,12 +130,11 @@ function exportHead() {
   rmSync(bundle, { force: true });
   if (untar.status !== 0) throw new Error("tar failed to unpack the archive");
 
-  // The export sits inside this working tree, so git would walk up and find the
-  // real repository above it. Anything in the export that asks git for history
-  // would get "no such path" instead of "this tree has no history", and tools
-  // that stay idempotent by reading history (Canvas's doc indexes) would rewrite
-  // their output. A ceiling at the export makes the tree look like the archive
-  // it is.
+  // The export is outside this repository, but a parent directory could still
+  // be a checkout. Anything in the export that asks git for history would get
+  // "no such path" instead of "this tree has no history", and tools that stay
+  // idempotent by reading history (Canvas's doc indexes) would rewrite their
+  // output. A ceiling at the export makes the tree look like the archive it is.
   process.env.GIT_CEILING_DIRECTORIES = target;
 
   const install = run("pnpm", ["install", "--frozen-lockfile"], target);
@@ -349,7 +360,7 @@ else {
 // status file names it. A failed run keeps every export: the tree it ran in is
 // the evidence for the failure. A dry run deletes nothing.
 if (fresh && status.ok && !dry) {
-  const removed = pruneGateExports(join(ROOT, ".dev", "gate"), workdir);
+  const removed = pruneGateExports(gateExportPath(), workdir);
   if (!json && removed.length > 0) {
     process.stdout.write(`pruned ${removed.length} older gate export(s)\n`);
   }
