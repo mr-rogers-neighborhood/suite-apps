@@ -332,8 +332,6 @@ suite stays separate Flatpaks plus Start.
 
 ## Product boundary
 
-## Product boundary
-
 - A document is a file the user owns. The hub returns a path or bytes; it never parses a document.
 - No account, no telemetry, no project-operated document, sync, identity or account service. The
   signed Flatpak store is distribution only.
