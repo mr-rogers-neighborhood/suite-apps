@@ -23,6 +23,12 @@ container and pack:
 <shell data root>/documents/<container>/<pack>/<name>
 ```
 
+That is the first-party publisher's layout, kept so an existing install is not moved. A pack from
+another publisher is rooted at `documents/<publisher>/<container>/<pack>/`, because the install
+identity is `(publisher id, pack id)` (S2.2): a different publisher under the same pack id starts
+with no documents. The header's `publisher` field names the owner, and a header that names another
+publisher is refused like one that names another pack.
+
 Each file is a host-owned envelope (S6.1). The pack's bytes are the payload at the end of the file;
 the host writes and reads the rest and never parses the payload.
 

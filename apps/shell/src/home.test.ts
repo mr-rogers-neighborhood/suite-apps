@@ -50,6 +50,7 @@ function pack(
     entry: "index.html",
     capabilities: [],
     widgets,
+    publisher: { id: "suite", fingerprint: "AA:BB" },
     root: `/packs/${id}`,
     source,
   };

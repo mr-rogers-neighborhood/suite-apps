@@ -35,6 +35,12 @@
       "development": "./src/signature.ts",
       "import": "./dist/signature.js",
       "default": "./dist/signature.js"
+    },
+    "./trust": {
+      "types": "./dist/trust.d.ts",
+      "development": "./src/trust.ts",
+      "import": "./dist/trust.js",
+      "default": "./dist/trust.js"
     }
   },
   "files": [

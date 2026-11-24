@@ -64,6 +64,7 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
     version: options.version ?? "1.0.0",
     entry: "index.html",
     contractVersion: 1,
+    publisher: { id: "suite", key: keys.publicKeyBase64 },
     capabilities: [],
     files: await digestPackFiles(payload),
     ...(options.description === undefined ? {} : { description: options.description }),
@@ -82,7 +83,7 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
 
 function trust(publicKey: string): PackTrustOptions {
   return {
-    publicKey,
+    publishers: [{ id: "suite", key: publicKey, source: "preinstalled" }],
     hostContractVersion: 1,
     hostVersion: 1,
     hostCapabilities: ["documents", "files", "network"],
@@ -154,13 +155,13 @@ describe("catalogue scanning", () => {
     const entries = await loadCatalogue(root, trust(trusted.publicKeyBase64));
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ id: "demo", version: "1.0.0", trusted: false });
-    expect(entries[0]?.refusal).toContain("not signed");
+    expect(entries[0]?.refusal).toContain("trust store");
 
     const entry = entries[0];
     if (entry === undefined) throw new Error("missing entry");
     await expect(
       installCataloguePack(entry, packsRoot, trust(trusted.publicKeyBase64)),
-    ).rejects.toMatchObject({ reason: "untrusted" });
+    ).rejects.toMatchObject({ reason: "publisher" });
     expect(await readdir(packsRoot)).toEqual([]);
   });
 

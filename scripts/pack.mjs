@@ -27,8 +27,11 @@ import {
   digestPackFiles,
   PACK_FORMAT,
   parsePackManifest,
+  publisherKeyDigest,
   sha256Hex,
   signPackManifest,
+  SUITE_PACK_PUBLIC_KEY,
+  SUITE_PUBLISHER_ID,
 } from "@suite/pack";
 import { buildPackArchive } from "@suite/pack-host";
 import { KEYS, pinnedPublic, publicOf, readKey } from "./lib/keys.mjs";
@@ -181,6 +184,20 @@ export async function bundlePack({
   if (actualPublicKey.trim() !== expectedPublicKeyBase64.trim()) {
     throw new Error("The signing key does not match the expected public key.");
   }
+  // The publisher field is the key the host verifies against its trust store
+  // (S2.1). A source manifest may name its id and may repeat the key, but it
+  // cannot name a different key: the signature is made with this one.
+  if (
+    source.publisher?.key !== undefined &&
+    source.publisher.key.trim() !== actualPublicKey.trim()
+  ) {
+    throw new Error(`${SOURCE_MANIFEST} names a publisher key that is not the signing key.`);
+  }
+  const publisherId =
+    source.publisher?.id ??
+    (actualPublicKey === SUITE_PACK_PUBLIC_KEY
+      ? SUITE_PUBLISHER_ID
+      : await publisherKeyDigest(actualPublicKey));
 
   const core = {
     format: PACK_FORMAT,
@@ -191,6 +208,7 @@ export async function bundlePack({
     entry,
     contractVersion: contract,
     ...(minimumHost === undefined ? {} : { minimumHostVersion: minimumHost }),
+    publisher: { id: publisherId, key: actualPublicKey },
     capabilities: Array.isArray(source.capabilities) ? source.capabilities : [],
     ...(source.contributions === undefined ? {} : { contributions: source.contributions }),
     ...(source.widgets === undefined ? {} : { widgets: source.widgets }),

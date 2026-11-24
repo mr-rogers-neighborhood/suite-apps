@@ -12,17 +12,23 @@ import {
 } from "node:fs/promises";
 import { dirname, join, sep } from "node:path";
 import {
+  checkPublisherTrust,
+  isPublisherKey,
   isSafePackId,
   isSafePackPath,
+  isSafePublisherId,
   type PackManifest,
   packFitsHost,
   parsePackManifest,
+  type ResolvedPublisher,
+  SUITE_PUBLISHER_ID,
+  type TrustedPublisher,
   verifyPackFiles,
   verifyPackSignature,
 } from "@suite/pack";
 import { readPackArchive } from "@suite/pack-host";
 import type { PackInfo } from "./packs.js";
-import type { PackCapability } from "./shared.js";
+import type { PackCapability, PackPublisherView } from "./shared.js";
 
 /**
  * Installed packs.
@@ -40,19 +46,32 @@ const MIB = 1024 * 1024;
 /** The compressed archive size this host accepts. The reader enforces its own entry limits too. */
 export const MAX_ARCHIVE_BYTES = 64 * MIB;
 const MANIFEST_NAME = "manifest.json";
+/** The identity record in a pack's id directory: who owns this public id here. */
+const IDENTITY_NAME = "publisher.json";
 const TEMPORARY_PREFIX = ".tmp-";
 
-/** The host policy a pack is checked against. A generated key is enough for tests. */
+/**
+ * The host policy a pack is checked against (S2.1, S2.2).
+ *
+ * `publishers` is the local trust store, not a single pinned key. A generated
+ * key is enough for tests. `allowPublisherMigration` is the explicit migration
+ * S2.2 requires; the shell never passes it, so a different publisher under an
+ * existing id is refused unless the host names the migration.
+ */
 export interface PackTrustOptions {
-  readonly publicKey: string;
+  readonly publishers: readonly TrustedPublisher[];
   readonly hostContractVersion: number;
   readonly hostVersion: number;
   readonly hostCapabilities: readonly PackCapability[];
+  /** Permit replacing an id's publisher. The migration changes no stored data. */
+  readonly allowPublisherMigration?: boolean;
 }
 
 /** A pack installed under the host's pack root. `root` is its version directory. */
 export interface InstalledPackInfo extends PackInfo {
   readonly source: "installed";
+  /** Every installed pack resolved a publisher; only a development directory has none. */
+  readonly publisher: PackPublisherView;
 }
 
 /** One candidate that was refused. `id` and `version` are null when the path never yielded them. */
@@ -63,12 +82,16 @@ export interface InstalledPackIssue {
     | "unreadable"
     | "invalid"
     | "untrusted"
+    | "publisher"
+    | "identity"
     | "files"
     | "host"
     | "capability"
     | "extra-files"
     | "io";
   readonly message: string;
+  /** The publisher fingerprint when the refusal turned on a key. */
+  readonly fingerprint?: string | null;
 }
 
 /** One verified version directory, whether or not it is the selected version. */
@@ -76,6 +99,7 @@ export interface InstalledVersion {
   readonly id: string;
   readonly version: string;
   readonly root: string;
+  readonly publisher: PackPublisherView;
 }
 
 export interface InstalledPackScan {
@@ -90,6 +114,8 @@ export interface VerifiedPackArchive {
   readonly manifest: PackManifest;
   readonly manifestBytes: Uint8Array;
   readonly files: ReadonlyMap<string, Uint8Array>;
+  /** The publisher the trust store resolved, whose key verified the signature. */
+  readonly publisher: ResolvedPublisher;
 }
 
 /**
@@ -111,6 +137,7 @@ export type PackArchiveCheck =
 interface Refusal {
   readonly reason: InstalledPackIssue["reason"];
   readonly message: string;
+  readonly fingerprint?: string | null;
 }
 
 /** An installation that never reached its target directory. */
@@ -118,6 +145,8 @@ export class InstalledPackError extends Error {
   readonly reason: InstalledPackIssue["reason"];
   readonly id: string | null;
   readonly version: string | null;
+  /** The publisher fingerprint, when the refusal is about a publisher key. */
+  readonly fingerprint: string | null;
 
   constructor(refusal: Refusal, id: string | null = null, version: string | null = null) {
     super(refusal.message);
@@ -125,7 +154,43 @@ export class InstalledPackError extends Error {
     this.reason = refusal.reason;
     this.id = id;
     this.version = version;
+    this.fingerprint = refusal.fingerprint ?? null;
   }
+}
+
+/**
+ * What S2.5 requires the host to show at install and update: who signed the
+ * pack, its id, its version and the capabilities it will hold.
+ */
+export interface PackInstallSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  readonly capabilities: readonly PackCapability[];
+  readonly publisher: PackPublisherView;
+}
+
+export function packInstallSummary(
+  manifest: Pick<PackManifest, "id" | "name" | "version" | "capabilities">,
+  publisher: ResolvedPublisher,
+): PackInstallSummary {
+  return {
+    id: manifest.id,
+    name: manifest.name,
+    version: manifest.version,
+    capabilities: manifest.capabilities,
+    publisher: { id: publisher.id, fingerprint: publisher.fingerprint },
+  };
+}
+
+/** One sentence a person can read before or after an install or update. */
+export function describePackInstall(
+  summary: PackInstallSummary,
+  action: "install" | "update",
+): string {
+  const capabilities =
+    summary.capabilities.length === 0 ? "no capabilities" : summary.capabilities.join(", ");
+  return `${action === "install" ? "Install" : "Update"} ${summary.name} ${summary.version} (${summary.id}) from publisher ${summary.publisher.id}, key SHA-256 ${summary.publisher.fingerprint}; capabilities: ${capabilities}.`;
 }
 
 /**
@@ -185,6 +250,11 @@ export async function loadInstalledPacks(
       continue;
     }
 
+    // Who owns this public id here. A record written by an install is the
+    // authority; a pre-S2.1 install has none until its first install, so the
+    // versions themselves answer the question.
+    const identity = await readInstalledIdentity(idRoot);
+
     const valid: InstalledPackInfo[] = [];
     for (const versionEntry of versionEntries.sort((left, right) =>
       left.name.localeCompare(right.name, undefined, { numeric: true }),
@@ -206,13 +276,44 @@ export async function loadInstalledPacks(
       const verified = await verifyInstalledDirectory(join(idRoot, version), id, version, options);
       if (verified.ok) {
         valid.push(verified.info);
-        versions.push({ id, version, root: verified.info.root });
+        versions.push({
+          id,
+          version,
+          root: verified.info.root,
+          publisher: verified.info.publisher,
+        });
       } else {
         issues.push(verified.issue);
       }
     }
 
-    const best = highestVersion(valid);
+    const publisherIds = new Set(
+      valid
+        .map((pack) => pack.publisher?.id)
+        .filter((publisherId): publisherId is string => publisherId !== undefined),
+    );
+    const activePublisher = identity?.id ?? singlePublisher(publisherIds);
+    if (identity === null && publisherIds.size > 1) {
+      issues.push({
+        id,
+        version: null,
+        reason: "identity",
+        message: `${id} has versions from more than one publisher (${[...publisherIds].join(", ")}); only ${activePublisher ?? "none"} is loaded.`,
+      });
+    }
+
+    const owned = valid.filter((pack) => pack.publisher?.id === activePublisher);
+    for (const foreign of valid.filter((pack) => pack.publisher?.id !== activePublisher)) {
+      issues.push({
+        id,
+        version: foreign.version,
+        reason: "identity",
+        message: `${id} ${foreign.version} is signed by ${foreign.publisher?.id ?? "an unknown publisher"}, but this id is installed by ${identity?.id ?? activePublisher ?? "another publisher"}; it is not loaded.`,
+        fingerprint: foreign.publisher?.fingerprint ?? null,
+      });
+    }
+
+    const best = highestVersion(owned);
     if (best !== null) packs.push(best);
   }
 
@@ -275,23 +376,28 @@ export async function checkPackArchive(
     };
   }
 
-  const refusal = await verifyManifest(
+  const verification = await verifyManifest(
     manifest,
     () => [...archive.files.keys()],
     async (path) => archive.files.get(path) ?? null,
     options,
   );
-  if (refusal !== null) {
+  if (!verification.ok) {
     return {
       ok: false,
       manifest,
-      error: new InstalledPackError(refusal, manifest.id, manifest.version),
+      error: new InstalledPackError(verification.refusal, manifest.id, manifest.version),
     };
   }
 
   return {
     ok: true,
-    value: { manifest, manifestBytes: archive.manifestBytes, files: archive.files },
+    value: {
+      manifest,
+      manifestBytes: archive.manifestBytes,
+      files: archive.files,
+      publisher: verification.publisher,
+    },
   };
 }
 
@@ -309,7 +415,7 @@ export async function installPackArchive(
 ): Promise<InstalledPackInfo> {
   const check = await checkPackArchive(bytes, options);
   if (!check.ok) throw check.error;
-  const { manifest, manifestBytes, files: archiveFiles } = check.value;
+  const { manifest, manifestBytes, files: archiveFiles, publisher } = check.value;
 
   const idRoot = join(root, manifest.id);
   const target = join(idRoot, manifest.version);
@@ -353,6 +459,49 @@ export async function installPackArchive(
     throw refuseIo(`${manifest.id}'s install directory resolves outside the pack root.`);
   }
 
+  // One public id has one publisher in a container (S2.2). A different
+  // publisher under an existing id is refused unless the caller names the
+  // migration, and even then it inherits no document, file or session storage:
+  // every store is keyed by `(publisher id, pack id)`.
+  const existing = await existingInstalledIdentity(idRoot, options);
+  if (existing.ambiguous && options.allowPublisherMigration !== true) {
+    throw new InstalledPackError(
+      {
+        reason: "identity",
+        message: `${manifest.id} has versions from more than one publisher and no identity record. Installing ${manifest.version} needs an explicit migration.`,
+        fingerprint: publisher.fingerprint,
+      },
+      manifest.id,
+      manifest.version,
+    );
+  }
+  const identity = existing.identity;
+  const migrating = identity !== null && identity.id !== publisher.id;
+  if (migrating && options.allowPublisherMigration !== true) {
+    throw new InstalledPackError(
+      {
+        reason: "publisher",
+        message: `${manifest.id} ${manifest.version} is signed by ${publisher.id} (key fingerprint ${publisher.fingerprint}), but this container has ${manifest.id} installed by ${identity.id}. Installing a different publisher's pack under an existing id needs an explicit migration.`,
+        fingerprint: publisher.fingerprint,
+      },
+      manifest.id,
+      manifest.version,
+    );
+  }
+  if (identity !== null && identity.id === publisher.id && identity.key !== publisher.key) {
+    // Same id, different key, no signed rotation: refuse rather than trust a
+    // silently swapped key. Rotation itself belongs to S2.3.
+    throw new InstalledPackError(
+      {
+        reason: "publisher",
+        message: `${manifest.id} ${manifest.version} is signed by a new key for publisher ${publisher.id} (key fingerprint ${publisher.fingerprint}), but this id is installed with key fingerprint ${identity.fingerprint}. A key change is a signed rotation.`,
+        fingerprint: publisher.fingerprint,
+      },
+      manifest.id,
+      manifest.version,
+    );
+  }
+
   // A symlinked version directory is refused for the same reason: the rename
   // would replace the link, and a later install could write through it.
   const targetEntry = await inspect(target);
@@ -394,6 +543,7 @@ export async function installPackArchive(
       );
     }
     await rename(temporary, target);
+    if (identity === null || migrating) await writeInstalledIdentity(idRoot, publisher);
   } catch (error) {
     await rm(temporary, { recursive: true, force: true }).catch(() => undefined);
     if (error instanceof InstalledPackError) throw error;
@@ -404,7 +554,7 @@ export async function installPackArchive(
     );
   }
 
-  return installedInfo(manifest, target);
+  return installedInfo(manifest, target, publisher);
 }
 
 /**
@@ -569,6 +719,141 @@ function highestVersion(packs: readonly InstalledPackInfo[]): InstalledPackInfo 
   return best;
 }
 
+/**
+ * The publisher that owns one public id in this container.
+ *
+ * The record written by the first install is the authority. A version from a
+ * different publisher is reported and not loaded, even if its version is newer:
+ * one public id has one publisher (S2.2), and a takeover is a migration, not an
+ * update.
+ */
+interface InstalledIdentity {
+  readonly id: string;
+  readonly key: string;
+  readonly fingerprint: string;
+}
+
+function singlePublisher(publisherIds: ReadonlySet<string>): string | null {
+  // No record and more than one publisher: the id is ambiguous, so nothing
+  // loads. An install would have written a record; a hand-copied directory is
+  // not a reason to hand the id to whichever version sorts highest.
+  return publisherIds.size === 1 ? ([...publisherIds][0] ?? null) : null;
+}
+
+async function versionDirectories(idRoot: string): Promise<readonly string[]> {
+  const entries = await readdir(idRoot, { withFileTypes: true }).catch(() => null);
+  if (entries === null) return [];
+  return entries
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith(TEMPORARY_PREFIX))
+    .map((entry) => entry.name);
+}
+
+function parseIdentity(text: string): InstalledIdentity | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  if (typeof record.id !== "string" || !isSafePublisherId(record.id)) return null;
+  if (typeof record.key !== "string" || !isPublisherKey(record.key)) return null;
+  if (typeof record.fingerprint !== "string") return null;
+  return { id: record.id, key: record.key, fingerprint: record.fingerprint };
+}
+
+/**
+ * The identity record for an id directory, or null.
+ *
+ * A record with no version directory beside it is ignored: uninstalling the last
+ * version frees the id, and a stale file must not block a fresh publisher.
+ */
+async function readInstalledIdentity(idRoot: string): Promise<InstalledIdentity | null> {
+  const versions = await versionDirectories(idRoot);
+  if (versions.length === 0) return null;
+  try {
+    const text = await readFile(join(idRoot, IDENTITY_NAME), "utf8");
+    return parseIdentity(text);
+  } catch {
+    return null;
+  }
+}
+
+/** The manifest inside one version directory, without verifying its files. */
+async function readDirectoryManifest(directory: string): Promise<PackManifest | null> {
+  try {
+    const raw: unknown = JSON.parse(await readFile(join(directory, MANIFEST_NAME), "utf8"));
+    const parsed = parsePackManifest(raw);
+    return parsed.ok ? parsed.value : null;
+  } catch {
+    return null;
+  }
+}
+
+interface ExistingIdentity {
+  readonly identity: InstalledIdentity | null;
+  /** More than one publisher has a version here and no record settles it. */
+  readonly ambiguous: boolean;
+}
+
+/**
+ * Who owns an id directory before an install writes into it.
+ *
+ * The record is the authority. An install from before S2.2 has none, so the
+ * version manifests answer instead: their publisher is resolved through the same
+ * trust store, and a missing publisher resolves to the preinstalled key. If two
+ * publishers already share the id, the only safe answer is to refuse unless the
+ * caller names the migration.
+ */
+async function existingInstalledIdentity(
+  idRoot: string,
+  options: PackTrustOptions,
+): Promise<ExistingIdentity> {
+  const versions = await versionDirectories(idRoot);
+  if (versions.length === 0) return { identity: null, ambiguous: false };
+
+  const record = await readInstalledIdentity(idRoot);
+  if (record !== null) return { identity: record, ambiguous: false };
+
+  const found = new Map<string, InstalledIdentity>();
+  for (const version of versions) {
+    const manifest = await readDirectoryManifest(join(idRoot, version));
+    if (manifest === null) continue;
+    const trust = await checkPublisherTrust(manifest.publisher, options.publishers, {
+      allowMissingPublisher: true,
+      firstPartyId: SUITE_PUBLISHER_ID,
+    });
+    if (!trust.ok) continue;
+    found.set(trust.publisher.id, {
+      id: trust.publisher.id,
+      key: trust.publisher.key,
+      fingerprint: trust.publisher.fingerprint,
+    });
+  }
+  if (found.size === 1) return { identity: [...found.values()][0] ?? null, ambiguous: false };
+  return { identity: null, ambiguous: found.size > 1 };
+}
+
+async function writeInstalledIdentity(idRoot: string, publisher: ResolvedPublisher): Promise<void> {
+  const temporary = join(idRoot, `${TEMPORARY_PREFIX}${randomUUID()}-publisher`);
+  const record: InstalledIdentity = {
+    id: publisher.id,
+    key: publisher.key,
+    fingerprint: publisher.fingerprint,
+  };
+  try {
+    await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`);
+    await rename(temporary, join(idRoot, IDENTITY_NAME));
+  } catch {
+    await rm(temporary, { force: true }).catch(() => undefined);
+    throw new InstalledPackError({
+      reason: "io",
+      message: "The pack's publisher identity could not be written.",
+    });
+  }
+}
+
 function parseArchiveManifest(bytes: Uint8Array): PackManifest {
   let raw: unknown;
   try {
@@ -655,7 +940,7 @@ async function verifyInstalledDirectory(
     return refuse({ reason: "io", message: `${id} ${version} could not be listed.` });
   }
 
-  const refusal = await verifyManifest(
+  const verification = await verifyManifest(
     manifest,
     () => present,
     async (path) => {
@@ -666,28 +951,65 @@ async function verifyInstalledDirectory(
       }
     },
     options,
+    // A pre-S2.1 install has no publisher field. It is accepted only under the
+    // preinstalled first-party key; a new archive is never this lenient.
+    { allowMissingPublisher: true },
   );
-  if (refusal !== null) return refuse(refusal);
+  if (!verification.ok) return refuse(verification.refusal);
 
-  return { ok: true, info: installedInfo(manifest, directory) };
+  return {
+    ok: true,
+    info: installedInfo(manifest, directory, verification.publisher),
+  };
 }
+
+type ManifestVerification =
+  | { readonly ok: true; readonly publisher: ResolvedPublisher }
+  | { readonly ok: false; readonly refusal: Refusal };
 
 /**
  * The checks shared by an archive and an installed directory.
  *
  * Order matters only for which reason is reported first; all of them run before
  * anything is returned or written. Document bytes are never parsed here.
+ *
+ * The publisher is resolved first (S2.1): its key, from the manifest and matched
+ * against the trust store, is the key the signature must verify against. A pack
+ * cannot pick its own trust root by naming an arbitrary key.
  */
 async function verifyManifest(
   manifest: PackManifest,
   present: () => readonly string[],
   read: (path: string) => Promise<Uint8Array | null>,
   options: PackTrustOptions,
-): Promise<Refusal | null> {
-  if (!(await verifyPackSignature(manifest, options.publicKey))) {
+  trustOptions: { readonly allowMissingPublisher?: boolean } = {},
+): Promise<ManifestVerification> {
+  const trust = await checkPublisherTrust(
+    manifest.publisher,
+    options.publishers,
+    trustOptions.allowMissingPublisher === true
+      ? { allowMissingPublisher: true, firstPartyId: SUITE_PUBLISHER_ID }
+      : { firstPartyId: SUITE_PUBLISHER_ID },
+  );
+  if (!trust.ok) {
     return {
-      reason: "untrusted",
-      message: `${manifest.id} ${manifest.version} is not signed by this host's pack key.`,
+      ok: false,
+      refusal: {
+        reason: "publisher",
+        message: trust.message,
+        fingerprint: trust.fingerprint,
+      },
+    };
+  }
+
+  if (!(await verifyPackSignature(manifest, trust.publisher.key))) {
+    return {
+      ok: false,
+      refusal: {
+        reason: "untrusted",
+        message: `${manifest.id} ${manifest.version} is not signed by publisher ${trust.publisher.id} (key fingerprint ${trust.publisher.fingerprint}).`,
+        fingerprint: trust.publisher.fingerprint,
+      },
     };
   }
 
@@ -695,20 +1017,23 @@ async function verifyManifest(
     contractVersion: options.hostContractVersion,
     hostVersion: options.hostVersion,
   });
-  if (!fit.ok) return { reason: "host", message: fit.message };
+  if (!fit.ok) return { ok: false, refusal: { reason: "host", message: fit.message } };
 
   const unsupported = manifest.capabilities.filter(
     (capability) => !options.hostCapabilities.includes(capability),
   );
   if (unsupported.length > 0) {
     return {
-      reason: "capability",
-      message: `${manifest.id} asks for unimplemented ${unsupported.join(", ")}.`,
+      ok: false,
+      refusal: {
+        reason: "capability",
+        message: `${manifest.id} asks for unimplemented ${unsupported.join(", ")}.`,
+      },
     };
   }
 
   const fileSet = checkFileSet(manifest, present());
-  if (fileSet !== null) return fileSet;
+  if (fileSet !== null) return { ok: false, refusal: fileSet };
 
   const mismatches = await verifyPackFiles(manifest, read);
   if (mismatches.length > 0) {
@@ -716,10 +1041,16 @@ async function verifyManifest(
       .slice(0, 3)
       .map((mismatch) => `${mismatch.path} (${mismatch.reason})`)
       .join(", ");
-    return { reason: "files", message: `${manifest.id} ${manifest.version} failed: ${detail}.` };
+    return {
+      ok: false,
+      refusal: {
+        reason: "files",
+        message: `${manifest.id} ${manifest.version} failed: ${detail}.`,
+      },
+    };
   }
 
-  return null;
+  return { ok: true, publisher: trust.publisher };
 }
 
 function checkFileSet(manifest: PackManifest, present: readonly string[]): Refusal | null {
@@ -751,7 +1082,11 @@ function checkFileSet(manifest: PackManifest, present: readonly string[]): Refus
   return null;
 }
 
-function installedInfo(manifest: PackManifest, root: string): InstalledPackInfo {
+function installedInfo(
+  manifest: PackManifest,
+  root: string,
+  publisher: ResolvedPublisher,
+): InstalledPackInfo {
   return {
     id: manifest.id,
     name: manifest.name,
@@ -761,6 +1096,7 @@ function installedInfo(manifest: PackManifest, root: string): InstalledPackInfo 
     capabilities: manifest.capabilities,
     documents: manifest.documents ?? [],
     widgets: manifest.widgets ?? [],
+    publisher: { id: publisher.id, fingerprint: publisher.fingerprint },
     root,
     source: "installed",
   };

@@ -258,12 +258,20 @@ async function readFully(
 export class DocumentStore {
   readonly #root: string;
   readonly #publisher: string;
+  readonly #scope: string | null;
   readonly #locks = new Map<string, Promise<unknown>>();
   readonly #recovering = new Map<string, Promise<void>>();
 
-  constructor(root: string, publisher: string = HOST_PUBLISHER) {
+  /**
+   * `root` is the publisher's document root, `publisher` is the id its envelopes
+   * carry, and `scope` is the extra path segment a person's export hint shows
+   * for a non-first-party publisher. A store is per publisher, so one pack can
+   * never resolve another publisher's documents under the same id (S2.2).
+   */
+  constructor(root: string, publisher: string = HOST_PUBLISHER, scope: string | null = null) {
     this.#root = root;
     this.#publisher = publisher;
+    this.#scope = scope;
   }
 
   #packRoot(containerId: string, packId: string): string {
@@ -283,7 +291,13 @@ export class DocumentStore {
 
   /** Where a person can find the file, relative to the host data root. Never absolute. */
   #exportPath(containerId: string, packId: string, name: string): string {
-    return ["documents", containerId, packId, name].join("/");
+    return [
+      "documents",
+      ...(this.#scope === null ? [] : [this.#scope]),
+      containerId,
+      packId,
+      name,
+    ].join("/");
   }
 
   async list(containerId: string, packId: string): Promise<readonly DocumentSummary[]> {
@@ -708,9 +722,13 @@ export class DocumentStore {
   async #headerFor(file: string, packId: string, id: string): Promise<HeaderRead> {
     const read = await this.#readHeader(file);
     if (read.kind !== "ok") return read;
-    if (read.header.packId !== packId || read.header.documentId !== id) {
-      // The header names another pack or another document: a copied or renamed
-      // file is not the document it sits under.
+    if (
+      read.header.packId !== packId ||
+      read.header.documentId !== id ||
+      read.header.publisher !== this.#publisher
+    ) {
+      // The header names another pack, another publisher or another document: a
+      // copied or renamed file is not the document it sits under.
       return { kind: "corrupt", reason: "its header names another document" };
     }
     return read;

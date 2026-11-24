@@ -42,7 +42,8 @@ The app loads signed installs from `<dataRoot>/packs/<id>/<version>`. It never r
 directory is `packs/<id>/` beside the checkout and only loads when that switch is set. Data lives
 under Electron's `userData` directory (`~/.config/Suite/shell` on Linux); `SUITE_SHELL_DATA` and
 `SUITE_SHELL_USER_DATA` override the data and profile directories for a test. The local catalogue
-is `<dataRoot>/catalogue`; `SUITE_SHELL_CATALOGUE` points it at another directory.
+is `<dataRoot>/catalogue`; `SUITE_SHELL_CATALOGUE` points it at another directory. The publisher
+trust store is `<dataRoot>/trust/publishers.json`; `SUITE_SHELL_TRUST` points it elsewhere.
 
 The shared pack work lives outside this app: `packages/pack` owns the manifest and signature,
 `packages/pack-runtime` owns the pack-side service types, and `packages/pack-host` owns the scoped
@@ -95,23 +96,42 @@ the scheme in this phase, and the host routes a link that reaches it.
 
 Home's `shell.apps` widget shows installed packs and the local catalogue together. The catalogue is a directory
 of `.suitepack` files (`<dataRoot>/catalogue`, or `SUITE_SHELL_CATALOGUE`). Each archive is read with
-the shared archive reader and verified before it is listed: the manifest signature against
-`SUITE_PACK_PUBLIC_KEY`, the host contract and capability list, and every file hash. A trusted entry
-offers **Install**; a refused entry stays visible with its refusal sentence and cannot be installed.
-Listing never extracts an archive, so a refusal leaves nothing behind.
+the shared archive reader and verified before it is listed: the publisher key in the manifest against
+the local trust store, the manifest signature with that key, the host contract and capability list, and
+every file hash. A trusted entry offers **Install**; a refused entry stays visible with its refusal
+sentence and cannot be installed. Listing never extracts an archive, so a refusal leaves nothing
+behind. Each card shows the publisher id and key fingerprint, plus the declared capabilities.
+
+The trust store is `<dataRoot>/trust/publishers.json` (`SUITE_SHELL_TRUST` moves it). It is created
+with the first-party Suite key preinstalled; that pin always wins, even if the file is edited. Another
+key is added only through the install dialog: a pack signed by an unknown key is refused with the
+key's SHA-256 fingerprint in the refusal, and **Trust this publisher** adds that key only after the
+person has seen it. A malformed store is ignored rather than guessed at, so a broken file trusts the
+first-party key and nothing else.
+
+Before an install or update writes anything, the host shows the publisher id, key fingerprint, pack
+id, version and capability list and waits for confirmation; the result notice repeats them. A
+development directory has no publisher and says so.
 
 The catalogue is a local distribution path. A remote index is a later slice with the same trust
 rule; it is not built here.
 
 The **Add pack…** button is the original file picker. The host reads at most 64 MiB, verifies the
 archive with the same rules, refuses extra files and paths that leave the pack root, and only then
-writes `<dataRoot>/packs/<id>/<version>/`. Installs are additive and an existing version is never
-overwritten. A Go `.pack` is a different manifest format and is refused; it is not an import path.
+writes `<dataRoot>/packs/<id>/<version>/`, with the active publisher recorded beside the versions.
+Installs are additive and an existing version is never overwritten. A Go `.pack` is a different
+manifest format and is refused; it is not an import path.
 
-Updating is installing a newer archive for the same id. The loader selects the highest valid version,
-so the new version runs after a restart (or immediately when no tab is open). The old version stays
-on disk until the person removes it; Home lists each non-current version with an explicit
-**Remove** action. Nothing is deleted silently.
+The install identity is `(publisher id, pack id)`. A different publisher under an existing pack id is
+refused unless the host passes the explicit migration, and even then it starts with no documents,
+files or session storage: those are keyed by both ids. The first-party publisher keeps the old
+`documents/<container>/<pack>` and `persist:<container>:<pack>` paths so an existing install is not
+moved; any other publisher gets a segment containing its id.
+
+Updating is installing a newer archive for the same id and the same publisher. The loader selects the
+highest valid version for the active publisher, so the new version runs after a restart (or
+immediately when no tab is open). The old version stays on disk until the person removes it; Home
+lists each non-current version with an explicit **Remove** action. Nothing is deleted silently.
 
 **Uninstall** removes exactly `<dataRoot>/packs/<id>/<version>`. A symlinked install root, id
 directory or version directory is refused, and the version must resolve inside the real pack root;
@@ -294,14 +314,16 @@ readable (S6.6). The runner that executes an entry is injected into
 `src/documentMigrations.ts`; binding it to a pack renderer is not built yet.
 
 A pack's blobs live in three content-addressed class stores under
-`blobs/<container>/<pack>/<class>/<sha256>`: `asset`, `derived` and `cache`. A manifest store name
-declares its class, a read re-hashes the bytes and refuses a mismatch, and clearing the cache removes
-only cache. Export writes every asset as its original bytes at `assets/<sha256>` in a host-chosen
-bundle, records it with its hash and length and verifies every hash, then writes `manifest.json`
-last. The pack's declared `export` entry runs first through a save handle that cannot leave the
-bundle or write the host's manifest or assets; a pack that declares no export entry is still
-exported for its assets with `packExport: null` (S6.7, S6.8). The blob stores and export entry are
-not bound to a pack renderer yet.
+`blobs/<container>/<pack>/<class>/<sha256>`: `asset`, `derived` and `cache`. The first-party publisher
+keeps that segment; any other publisher's store is `blobs/<container>/<publisher>~<pack>/<class>/<sha256>`,
+so a migrated publisher starts with no blobs and an existing install is not moved. A manifest store
+name declares its class, a read re-hashes the bytes and refuses a mismatch, and clearing the cache
+removes only cache. Export writes every asset as its original bytes at `assets/<sha256>` in a
+host-chosen bundle, records it with its hash and length and verifies every hash, then writes
+`manifest.json` last. The pack's declared `export` entry runs first through a save handle that cannot
+leave the bundle or write the host's manifest or assets; a pack that declares no export entry is
+still exported for its assets with `packExport: null` (S6.7, S6.8). The blob stores and export entry
+are not bound to a pack renderer yet.
 
 The `files` service requires the `files` capability. It is a separate root from `documents`, created
 lazily per `(container, pack)` at `files/<container>/<pack>` and never inside the pack's code
@@ -422,7 +444,8 @@ The tests cover pack manifest discovery and traversal, document scoping, the `fi
 per-pack and per-container isolation, lock ownership, the external surface's filter validation,
 token ownership and cancellation, import into the pack root, declared-document resolution, a
 two-step migration's idempotence and failed-migration restore, projection refusal before the schema
-is current, the three blob class stores and their content addressing, cache clearing that keeps
+is current, the three blob class stores and their content addressing, two publishers' blob stores
+staying apart under one pack id, cache clearing that keeps
 assets and derived blobs, export-bundle manifests with a verified hash per asset, the no-export-entry
 asset fallback and the save handle's path refusal, catalogue trust and refusal (valid, wrong-key,
 tampered and unsigned), install from the

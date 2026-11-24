@@ -58,6 +58,27 @@ describe("blob classes", () => {
     expect(await stores.list(otherScope, declarations, "assets")).toEqual([]);
   });
 
+  // spec: S2.2
+  it("keeps two publishers' blobs apart under one pack id", async () => {
+    const alpha = { ...scope, publisherId: "alpha" };
+    const beta = { ...scope, publisherId: "beta" };
+
+    const photo = await stores.put(alpha, declarations, "assets", encode("alpha's photo"));
+    expect(await readdir(join(root, "default", "alpha~note-pack", "asset"))).toEqual([
+      photo.sha256,
+    ]);
+    expect(await stores.list(beta, declarations, "assets")).toEqual([]);
+    expect(await stores.get(beta, declarations, "assets", photo.sha256)).toBeNull();
+    expect((await stores.get(alpha, declarations, "assets", photo.sha256))?.data).toEqual(
+      encode("alpha's photo"),
+    );
+
+    // The first-party publisher keeps the pre-S2.1 directory, so an existing
+    // install's blobs are not moved by the publisher scope.
+    const firstParty = await stores.put(scope, declarations, "assets", encode("suite's photo"));
+    expect(await readdir(blobPath("asset"))).toContain(firstParty.sha256);
+  });
+
   // spec: S6.7
   it("addresses a blob by the SHA-256 of its bytes and refuses a corrupt copy", async () => {
     const bytes = encode("the original bytes");

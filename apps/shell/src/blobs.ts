@@ -4,6 +4,7 @@ import { lstat, mkdir, open, readdir, readFile, rename, rm } from "node:fs/promi
 import { join } from "node:path";
 import type { PackBlob, PackBlobClass } from "@suite/pack";
 import { isSafeContainerId } from "./container.js";
+import { FIRST_PARTY_PUBLISHER_ID, packStorageKey } from "./packIdentity.js";
 import { isSafePackId } from "./packs.js";
 
 /**
@@ -15,9 +16,13 @@ import { isSafePackId } from "./packs.js";
  * disposable. A manifest names a store and declares its class; the class is the
  * physical store, so a pack that names the same class twice still shares one
  * content-addressed directory. Every path is scoped to the sender's
- * `(container, pack)` and named by the SHA-256 of the bytes:
+ * `(container, publisher, pack)` and named by the SHA-256 of the bytes:
  *
- *   <data root>/blobs/<container>/<pack>/<class>/<sha256>
+ *   <data root>/blobs/<container>/<pack>/<class>/<sha256>          first party
+ *   <data root>/blobs/<container>/<publisher>~<pack>/<class>/<sha256>  another publisher
+ *
+ * The first-party publisher keeps the pre-S2.1 segment, so existing blobs are not
+ * moved; another publisher under the same pack id starts empty (S2.2).
  *
  * The store is not part of the pack's code root, so reinstalling a pack never
  * touches the person's blobs. A read recomputes the hash and refuses a file that
@@ -43,6 +48,8 @@ const TEMPORARY_INFIX = ".tmp-";
 export interface BlobScope {
   readonly containerId: string;
   readonly packId: string;
+  /** Defaults to the first-party publisher, which keeps the pre-S2.1 segment. */
+  readonly publisherId?: string;
 }
 
 /** A stored blob's identity. `bytes` is the length of the content, not of a file on disk. */
@@ -96,7 +103,12 @@ export class BlobStores {
       throw new BlobError("invalid", "invalid container id");
     }
     if (!isSafePackId(scope.packId)) throw new BlobError("invalid", "invalid pack id");
-    return join(this.#root, scope.containerId, scope.packId);
+    const publisherId = scope.publisherId ?? FIRST_PARTY_PUBLISHER_ID;
+    try {
+      return join(this.#root, scope.containerId, packStorageKey(publisherId, scope.packId));
+    } catch {
+      throw new BlobError("invalid", "invalid publisher id");
+    }
   }
 
   /**

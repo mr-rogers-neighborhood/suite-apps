@@ -2,7 +2,7 @@ import { mkdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/desktop";
-import { SUITE_PACK_PUBLIC_KEY } from "@suite/pack/pinned-key";
+import { isPublisherKeyTrusted, SUITE_PUBLISHER_ID } from "@suite/pack";
 import { cssVariables, defaultTheme } from "@suite/theme";
 import { app, dialog, ipcMain, nativeTheme, net, protocol } from "electron";
 import {
@@ -18,16 +18,22 @@ import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
 import { HOME_SCREEN_ID, openHomeScreen } from "./home.js";
 import {
+  checkPackArchive,
   comparePackVersions,
+  describePackInstall,
   InstalledPackError,
+  type InstalledPackInfo,
   type InstalledVersion,
   installPackArchive,
   loadInstalledPacks,
   MAX_ARCHIVE_BYTES,
+  type PackInstallSummary,
   type PackTrustOptions,
+  packInstallSummary,
   uninstallPackVersion,
 } from "./installedPacks.js";
 import { planUninstall } from "./lifecycle.js";
+import { documentScopeLabel, documentsRootFor } from "./packIdentity.js";
 import { devPacksEnabled, mergePackSources, shouldOpenAfterInstall } from "./packRegistry.js";
 import {
   discoverPacks,
@@ -40,6 +46,13 @@ import {
   packOrigin,
   packsRootFor,
 } from "./packs.js";
+import {
+  addTrustedPublisher,
+  openPublisherTrust,
+  type PublisherTrustStore,
+  preinstalledTrustStore,
+  trustRootFor,
+} from "./publisherTrust.js";
 import { ScreenStore } from "./screens.js";
 import { type PackSender, packSender } from "./senders.js";
 import {
@@ -90,9 +103,15 @@ protocol.registerSchemesAsPrivileged([
 let window: ShellWindow | null = null;
 let spaceStore: SpaceStore | null = null;
 let screenStore: ScreenStore | null = null;
-let documents: DocumentStore | null = null;
+/**
+ * One document store per publisher. The first-party publisher keeps the
+ * `documents/<container>/<pack>` layout; any other publisher has its own root,
+ * so the same pack id cannot read the previous owner's documents (S2.2).
+ */
+const documentStores = new Map<string, DocumentStore>();
 let files: PackFilesService | null = null;
 let externalFiles: ExternalFilesService | null = null;
+let trustStore: PublisherTrustStore | null = null;
 let packs: readonly PackInfo[] = [];
 let catalogue: readonly CataloguePack[] = [];
 let installedVersions: readonly InstalledVersion[] = [];
@@ -156,6 +175,14 @@ async function bootstrap(): Promise<void> {
 
   const dataRoot = dataRootFor();
   await mkdir(dataRoot, { recursive: true });
+  // The trust store is read before any pack: a pack is verified against it, so a
+  // failure here must fall back to the preinstalled key, never to "trust all".
+  trustStore = await openPublisherTrust(trustRootFor(dataRoot, process.env)).catch(
+    (error: unknown) => {
+      console.warn("[shell] the publisher trust store could not be opened", error);
+      return preinstalledTrustStore();
+    },
+  );
   // The catalogue is a drop directory. Creating it is a convenience; an absent
   // or overridden path still scans as an empty catalogue.
   await mkdir(catalogueRootFor(dataRoot, process.env), { recursive: true }).catch(
@@ -171,10 +198,8 @@ async function bootstrap(): Promise<void> {
   // than an empty launcher.
   screenStore = await ScreenStore.open(join(dataRoot, "screens", `${HOME_SCREEN_ID}.loro`));
   await openHomeScreen(screenStore, spaceStore);
-  // Documents are resolved under documents/<container>/<pack>.
-  documents = new DocumentStore(join(dataRoot, "documents"));
-  // One store per (container, pack), created on first use. This is host data,
-  // deliberately separate from the pack's code root.
+  // One store per (container, pack) under the publisher's root. This is host
+  // data, deliberately separate from the pack's code root.
   const fileService = new PackFilesService(join(dataRoot, "files"));
   files = fileService;
   // The dialogs are host chrome; the absolute path a person picks stays here.
@@ -229,11 +254,23 @@ function handleDeepLink(url: string): void {
 
 function packTrustOptions(): PackTrustOptions {
   return {
-    publicKey: SUITE_PACK_PUBLIC_KEY,
+    publishers: trustStore?.publishers ?? [],
     hostContractVersion: HOST_CONTRACT_VERSION,
     hostVersion: HOST_VERSION,
     hostCapabilities: HOST_CAPABILITIES,
   };
+}
+
+/** The document store for a sender's publisher, created on first use. */
+function documentsFor(sender: PackSender): DocumentStore {
+  const publisherId = sender.pack.publisher?.id ?? SUITE_PUBLISHER_ID;
+  let store = documentStores.get(publisherId);
+  if (store === undefined) {
+    const root = documentsRootFor(dataRootFor(), publisherId);
+    store = new DocumentStore(root, publisherId, documentScopeLabel(publisherId));
+    documentStores.set(publisherId, store);
+  }
+  return store;
 }
 
 /**
@@ -288,7 +325,7 @@ function themeView(): ThemeView {
 }
 
 function openWindow(): void {
-  if (spaceStore === null || screenStore === null || documents === null) {
+  if (spaceStore === null || screenStore === null) {
     throw new Error("the shell is not ready");
   }
   let created: ShellWindow | null = null;
@@ -397,24 +434,24 @@ function registerIpc(): void {
     // An empty list is a kinder fail-closed answer than `undefined` for the one
     // method whose contract is a list.
     if (!packAllows(sender.pack, "documents")) return [];
-    return documents?.list(sender.containerId, sender.packId);
+    return documentsFor(sender).list(sender.containerId, sender.packId);
   });
   onPack(PACK_IPC.createDocument, (sender, name) => {
     if (!packAllows(sender.pack, "documents") || typeof name !== "string") return undefined;
-    return documents?.create(sender.containerId, sender.packId, name);
+    return documentsFor(sender).create(sender.containerId, sender.packId, name);
   });
   onPack(PACK_IPC.openDocument, (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
-    return documents?.open(sender.containerId, sender.packId, id);
+    return documentsFor(sender).open(sender.containerId, sender.packId, id);
   });
   onPack(PACK_IPC.saveDocument, (sender, id, bytes) => {
     if (!packAllows(sender.pack, "documents")) return undefined;
     if (typeof id !== "string" || !(bytes instanceof Uint8Array)) return undefined;
-    return documents?.save(sender.containerId, sender.packId, id, bytes);
+    return documentsFor(sender).save(sender.containerId, sender.packId, id, bytes);
   });
   onPack(PACK_IPC.removeDocument, (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
-    return documents?.remove(sender.containerId, sender.packId, id);
+    return documentsFor(sender).remove(sender.containerId, sender.packId, id);
   });
 
   onPack(PACK_IPC.listFiles, (sender, path) => {
@@ -546,6 +583,11 @@ function externalDialog(): ExternalDialog {
  * The picker is host chrome. A pack never gets a path, and this IPC is not in the
  * pack preload or `PACK_IPC`. The dialog keeps the absolute path; only the bytes
  * cross into `installPackArchive`, and a refusal is a short notice.
+ *
+ * An archive is checked before anything is written, so an unknown publisher can
+ * be shown with its fingerprint and added by the person who chose the file
+ * (S2.1). A trusted archive is then shown with its publisher, id, version and
+ * capabilities before the installer runs (S2.5).
  */
 async function installPackFromFile(): Promise<void> {
   if (window === null) return;
@@ -578,6 +620,32 @@ async function installPackFromFile(): Promise<void> {
   }
 
   const current = window;
+  let check = await checkPackArchive(bytes, packTrustOptions());
+  if (!check.ok && check.error.reason === "publisher" && check.manifest !== null) {
+    const manifest = check.manifest;
+    const key = manifest.publisher?.key;
+    const fingerprint = check.error.fingerprint;
+    if (key !== undefined && fingerprint !== null && !isKeyTrusted(key)) {
+      const added = await offerUnknownPublisher(current, manifest, fingerprint);
+      if (!added) {
+        current.setNotice(installRefusal(check.error));
+        return;
+      }
+      check = await checkPackArchive(bytes, packTrustOptions());
+    }
+  }
+  if (!check.ok) {
+    current.setNotice(installRefusal(check.error));
+    return;
+  }
+
+  const summary = packInstallSummary(check.value.manifest, check.value.publisher);
+  const updating = packs.some((pack) => pack.id === summary.id);
+  if (!(await confirmInstall(current, summary, updating))) {
+    current.setNotice("The install was cancelled.");
+    return;
+  }
+
   const before = packs;
   try {
     const installed = await installPackArchive(
@@ -594,18 +662,108 @@ async function installPackFromFile(): Promise<void> {
         console.warn(`[shell] could not open ${installed.id} after install`, error);
       });
     }
-    const keptOlder =
-      previous !== null && comparePackVersions(installed.version, previous.version) > 0
-        ? ` Version ${previous.version} is still on disk; remove it from the launcher when you are ready.`
-        : "";
-    current.setNotice(
-      opened
-        ? `${installed.name} ${installed.version} installed. The app is open now.${keptOlder}`
-        : `${installed.name} ${installed.version} installed. Restart Suite to run the new version of the already-open app.${keptOlder}`,
-    );
+    current.setNotice(installedNotice(installed, previous, opened));
   } catch (error) {
     current.setNotice(installRefusal(error));
   }
+}
+
+function isKeyTrusted(key: string): boolean {
+  return trustStore !== null && isPublisherKeyTrusted(trustStore.publishers, key);
+}
+
+/**
+ * Show the key a pack names and offer to add it.
+ *
+ * The person sees the fingerprint before the key exists in the store; only the
+ * response that follows that display adds it. The manifest's claimed id is the
+ * id the key gets, so a pack that claims the first-party id is refused by the
+ * store rather than silently aliased to it.
+ */
+async function offerUnknownPublisher(
+  current: ShellWindow,
+  manifest: {
+    readonly name: string;
+    readonly version: string;
+    readonly publisher?: { readonly id?: string; readonly key: string } | undefined;
+  },
+  fingerprint: string,
+): Promise<boolean> {
+  const key = manifest.publisher?.key;
+  if (key === undefined || window === null) return false;
+  const answer = await dialog.showMessageBox(current.window, {
+    type: "warning",
+    title: "Unknown publisher",
+    message: `${manifest.name} ${manifest.version} is signed by a publisher this host does not trust.`,
+    detail: `Publisher id: ${manifest.publisher?.id ?? "(none named)"}\nKey fingerprint: ${fingerprint}\n\nOnly add this key if you know who owns it.`,
+    buttons: ["Cancel", "Trust this publisher"],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  if (answer.response !== 1) return false;
+
+  const requested = manifest.publisher?.id;
+  const result = await addTrustedPublisher(trustRootFor(dataRootFor()), {
+    key,
+    fingerprint,
+    ...(requested === undefined ? {} : { id: requested }),
+  }).catch((error: unknown) => {
+    console.warn("[shell] the publisher key could not be added", error);
+    return null;
+  });
+  if (result === null || !result.ok) {
+    current.setNotice(
+      result === null
+        ? "The publisher key could not be added."
+        : `The publisher was not added: ${result.message}`,
+    );
+    return false;
+  }
+  trustStore = await openPublisherTrust(trustRootFor(dataRootFor())).catch(() => trustStore);
+  return true;
+}
+
+/** The four facts S2.5 requires, before the installer writes anything. */
+async function confirmInstall(
+  current: ShellWindow,
+  summary: PackInstallSummary,
+  updating: boolean,
+): Promise<boolean> {
+  const answer = await dialog.showMessageBox(current.window, {
+    type: "info",
+    title: updating ? "Update this pack?" : "Install this pack?",
+    message: describePackInstall(summary, updating ? "update" : "install"),
+    detail: `Publisher id: ${summary.publisher.id}\nKey fingerprint: ${summary.publisher.fingerprint}\nPack id: ${summary.id}\nVersion: ${summary.version}\nCapabilities: ${summary.capabilities.length === 0 ? "none" : summary.capabilities.join(", ")}`,
+    buttons: ["Cancel", updating ? "Update" : "Install"],
+    defaultId: 1,
+    cancelId: 0,
+    noLink: true,
+  });
+  return answer.response === 1;
+}
+
+/** The sentence after an install or update, with the same four facts. */
+function installedNotice(
+  installed: InstalledPackInfo,
+  previous: PackInfo | null,
+  opened: boolean,
+): string {
+  const summary: PackInstallSummary = {
+    id: installed.id,
+    name: installed.name,
+    version: installed.version,
+    capabilities: installed.capabilities,
+    publisher: installed.publisher,
+  };
+  const keptOlder =
+    previous !== null && comparePackVersions(installed.version, previous.version) > 0
+      ? ` Version ${previous.version} is still on disk; remove it from the launcher when you are ready.`
+      : "";
+  const next = opened
+    ? "The app is open now."
+    : "Restart Suite to run the new version of the already-open app.";
+  return `${describePackInstall(summary, previous === null ? "install" : "update")} ${next}${keptOlder}`;
 }
 
 function installRefusal(error: unknown): string {
@@ -620,7 +778,9 @@ function installRefusal(error: unknown): string {
  * The entry is looked up again by id and version, and `installCataloguePack`
  * re-reads and re-verifies the bytes. A stale or swapped file is refused by the
  * same rules as the file picker. An update is just a newer version directory;
- * the older one stays until the person removes it from the launcher.
+ * the older one stays until the person removes it from the launcher. The card
+ * already showed the publisher fingerprint and capabilities; the confirmation
+ * repeats them at the moment of install (S2.5).
  */
 async function installPackFromCatalogue(id: string, version: string): Promise<void> {
   if (window === null) return;
@@ -632,8 +792,25 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
     window.setNotice(`No trusted ${id} ${version} is in the catalogue.`);
     return;
   }
+  if (entry.publisher === null) {
+    window.setNotice(`No publisher was resolved for ${id} ${version}.`);
+    return;
+  }
 
+  const current = window;
+  const summary: PackInstallSummary = {
+    id: entry.id,
+    name: entry.name,
+    version: entry.version,
+    capabilities: entry.capabilities,
+    publisher: entry.publisher,
+  };
   const previous = packs.find((pack) => pack.id === id) ?? null;
+  if (!(await confirmInstall(current, summary, previous !== null))) {
+    current.setNotice("The install was cancelled.");
+    return;
+  }
+
   try {
     const installed = await installCataloguePack(
       entry,
@@ -643,24 +820,15 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
     await refreshPacks();
     publishPackData();
 
-    const opened = shouldOpenAfterInstall(window.state().tabs, installed.id);
+    const opened = shouldOpenAfterInstall(current.state().tabs, installed.id);
     if (opened) {
-      await window.openPack(installed.id).catch((error: unknown) => {
+      await current.openPack(installed.id).catch((error: unknown) => {
         console.warn(`[shell] could not open ${installed.id} after install`, error);
       });
     }
-
-    const keptOlder =
-      previous !== null && comparePackVersions(installed.version, previous.version) > 0
-        ? ` Version ${previous.version} is still on disk; remove it from the launcher when you are ready.`
-        : "";
-    window.setNotice(
-      opened
-        ? `${installed.name} ${installed.version} installed. The app is open now.${keptOlder}`
-        : `${installed.name} ${installed.version} installed. Restart Suite to run the new version of the already-open app.${keptOlder}`,
-    );
+    current.setNotice(installedNotice(installed, previous, opened));
   } catch (error) {
-    window.setNotice(installRefusal(error));
+    current.setNotice(installRefusal(error));
   }
 }
 

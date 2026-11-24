@@ -15,6 +15,7 @@ function pack(id: string, name: string, source: PackInfo["source"]): PackInfo {
     description: null,
     entry: "index.html",
     capabilities: [],
+    publisher: { id: "suite", fingerprint: "AA:BB" },
     root: `/packs/${id}`,
     source,
   };

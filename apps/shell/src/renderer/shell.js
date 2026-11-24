@@ -197,13 +197,21 @@ function installedCard(pack) {
     pack.description ?? "A sandboxed Suite pack.",
   );
 
+  const publisher = pack.publisher
+    ? element(
+        "p",
+        "card-publisher",
+        `Publisher ${pack.publisher.id} · key ${pack.publisher.fingerprint}`,
+      )
+    : null;
+
   const meta = element("div", "card-meta");
   for (const capability of pack.capabilities) {
     meta.append(element("span", "pill", capability));
   }
   if (pack.capabilities.length === 0) meta.append(element("span", "pill", "no capabilities"));
 
-  card.append(top, description, meta);
+  card.append(top, description, ...(publisher === null ? [] : [publisher]), meta);
   card.addEventListener("click", () => run(api.openPack(pack.id)));
   tile.append(card);
 
@@ -259,6 +267,23 @@ function catalogueCard(entry) {
       (entry.trusted ? "A signed pack in the catalogue." : "This archive cannot be installed."),
   );
   card.append(top, description);
+
+  if (entry.publisher) {
+    card.append(
+      element(
+        "p",
+        "card-publisher",
+        `Publisher ${entry.publisher.id} · key ${entry.publisher.fingerprint}`,
+      ),
+    );
+  }
+  if (Array.isArray(entry.capabilities) && entry.capabilities.length > 0) {
+    const meta = element("div", "card-meta");
+    for (const capability of entry.capabilities) {
+      meta.append(element("span", "pill", capability));
+    }
+    card.append(meta);
+  }
 
   if (!entry.trusted) {
     card.append(
