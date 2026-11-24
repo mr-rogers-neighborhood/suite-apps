@@ -8,9 +8,9 @@ import { SETTINGS_EVENT } from "./settingsEvents";
 /**
  * Settings: the home appearance never had.
  *
- * Appearance used to live inside the theme menu, which is a switcher, not a
- * place a preference can grow. This is the room for the settings a reader owns
- * alone (ADR-0071). The document's own styles stay in the Styles list, because
+ * Appearance used to live inside a theme menu, which was a switcher, not a place
+ * a preference can grow. The theme itself now belongs to the host; this is the
+ * room for the settings a reader owns alone (ADR-0071). The document's own styles stay in the Styles list, because
  * those are shared with everyone in the workspace.
  *
  * `data-testid="appearance-dialog"` on the appearance section and the
@@ -69,7 +69,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Mounts Settings when the theme menu or the palette asks for it. */
+/** Mounts Settings when the palette asks for it. */
 export function SettingsHost() {
   const [open, setOpen] = useState(false);
 

@@ -4,7 +4,6 @@ import { X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { getBridge } from "../platform/bridge";
 import { useUiStore } from "../store/uiStore";
-import { ThemePicker } from "../theme/ThemePicker";
 import { PlannerMark } from "./PlannerMark";
 import { views } from "./views";
 import { WorkspaceActions } from "./WorkspaceActions";
@@ -71,10 +70,6 @@ function SidebarContent({
             <X size={16} />
           </IconButton>
         )}
-      </div>
-
-      <div className="px-3 pb-2 lg:hidden">
-        <ThemePicker />
       </div>
 
       <nav aria-label="Primary" className="flex flex-col gap-1 px-3">

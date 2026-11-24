@@ -221,9 +221,6 @@ importers:
       '@suite/document-runtime':
         specifier: workspace:*
         version: link:../../packages/document-runtime
-      '@suite/theme':
-        specifier: workspace:*
-        version: link:../../packages/theme
       '@suite/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -821,9 +818,6 @@ importers:
       '@suite/sync-desktop':
         specifier: workspace:*
         version: link:../../packages/sync-desktop
-      '@suite/theme':
-        specifier: workspace:*
-        version: link:../../packages/theme
       '@suite/ui':
         specifier: workspace:*
         version: link:../../packages/ui

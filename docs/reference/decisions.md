@@ -49,7 +49,7 @@ owns the rationale, and [Status](status.md) owns what exists.
 
 ## Desktop host
 
-- **One desktop host, named Suite Desk.** `apps/shell` (`@suite/shell`) is the desktop host. It is one Electron app
+- **One desktop host.** `apps/shell` (`@suite/shell`) is the desktop host. It is one Electron app
   that opens signed, sandboxed packs as tabs, and it owns the catalogue, Home, the Screens manager,
   routing and pack updates. Start is gone (#314); the frozen Flatpaks remain installable with their
   documented `flatpak install` lines. The host is alpha, and the pack bar below is still how a pack
@@ -427,6 +427,10 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
   | Class | Example | What the pack contributes |
   | --- | --- | --- |
   | Host mechanism, host meaning | theme, window chrome, store key | nothing; it receives the result |
+
+  Theme is the worked example: the host stores the preset and brightness with its profile, offers the
+  only picker, and paints every pack's resolved tokens. A pack that carried its own theme setting
+  would be a second identity for the same product.
   | Host mechanism, pack meaning | sync, notifications, export, migration | the declaration: scope, payload, due time, entry point |
   | Pack mechanism, pack meaning | the editing surface, the schema, a projection body | everything; the host is not involved |
 

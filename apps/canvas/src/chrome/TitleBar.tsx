@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { syncPresentation } from "../feedback/syncState";
 import { useEscapeLayer } from "../shell/escapeLayers";
 import type { SyncInfo } from "../store/useCanvasStore";
-import { ThemeToggle } from "../styles/ThemeToggle";
 import { CanvasMark } from "./CanvasMark";
 
 export type TitleBarRole = "editor" | "viewer";
@@ -322,7 +321,6 @@ export function TitleBar({
         </div>
       }
       actions={actions}
-      controls={<ThemeToggle />}
     />
   );
 }

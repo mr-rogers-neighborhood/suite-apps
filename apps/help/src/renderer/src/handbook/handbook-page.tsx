@@ -5,7 +5,6 @@ import { Link, useLocation } from "react-router";
 
 import { filterHandbookSearch, type HandbookSearchEntry } from "@/lib/handbook-search";
 import { source } from "@/lib/source";
-import { ThemeControl } from "@/theme-control";
 
 /** The shell every handbook page shares: header, page tree, article, contents. */
 export function HandbookPage() {
@@ -125,10 +124,6 @@ export function HandbookPage() {
               <TreeChildren nodes={tree.children} pathname={location.pathname} />
             </nav>
           )}
-
-          <div className="mt-3 border-t border-fd-border pt-3">
-            <ThemeControl compact />
-          </div>
         </aside>
 
         <main id="handbook-main" className="min-w-0 flex-1">

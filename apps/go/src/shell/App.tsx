@@ -10,7 +10,14 @@ import { createPackStore, type InstalledPack } from "../host/packs.js";
 import { createPins, orderModules } from "../host/pins.js";
 import { createRecents, type RecentEntry } from "../host/recents.js";
 import { createKeyValueStore } from "../host/storage.js";
-import { paintTheme, resolveTheme, watchColorScheme } from "../host/theme.js";
+import {
+  setThemeChoice as applyThemeChoice,
+  type GoThemeChoice,
+  paintTheme,
+  readThemeChoice,
+  resolveTheme,
+  watchColorScheme,
+} from "../host/theme.js";
 import { canvasModule } from "../modules/canvas/index.js";
 import { scratchModule } from "../modules/scratch/index.js";
 import { Catalogue } from "./Catalogue.js";
@@ -18,6 +25,7 @@ import { Home } from "./Home.js";
 import { IsolatedModule } from "./IsolatedModule.js";
 import { MountedModule } from "./MountedModule.js";
 import { QuickCaptureSheet } from "./QuickCaptureSheet.js";
+import { SettingsSheet } from "./SettingsSheet.js";
 
 /**
  * The container.
@@ -124,7 +132,6 @@ Object.assign(globalThis, {
 });
 // Painted before the first render, so no frame flashes the browser's default palette.
 paintTheme();
-const theme = resolveTheme();
 
 /**
  * How long a backgrounded module stays mounted before it is released and its edit flushed.
@@ -149,10 +156,20 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [pinned, setPinned] = useState<readonly string[]>([]);
   const [recent, setRecent] = useState<readonly RecentEntry[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // The theme is host profile state, so it lives here rather than in a pack.
+  const [themeChoice, setThemeChoiceState] = useState<GoThemeChoice>(() => readThemeChoice());
+  const [theme, setThemeTokens] = useState(() => resolveTheme());
   const pendingCleanup = useRef<(() => Promise<void>) | null>(null);
   const pendingFlush = useRef<(() => Promise<void>) | null>(null);
 
-  useEffect(() => watchColorScheme(() => undefined), []);
+  // A phone that dims at dusk repaints while "follow the system" is the choice.
+  useEffect(() => watchColorScheme(setThemeTokens), []);
+
+  const changeTheme = useCallback((choice: GoThemeChoice) => {
+    setThemeChoiceState(choice);
+    setThemeTokens(applyThemeChoice(choice));
+  }, []);
 
   const refreshRecents = useCallback(async () => {
     setRecent(await recents.list());
@@ -385,7 +402,7 @@ export function App() {
       },
       theme,
     };
-  }, [route, closeModule, refreshRecents]);
+  }, [route, closeModule, refreshRecents, theme]);
 
   const modules = [
     ...createModuleRegistry([scratchModule, canvasModule]).modules,
@@ -480,6 +497,7 @@ export function App() {
           onTogglePin={togglePin}
           onCatalogue={openCatalogue}
           onInstall={() => void installFromFile()}
+          onSettings={() => setSettingsOpen(true)}
           onRemove={(moduleId) => void removeDomain(moduleId)}
           removable={new Set(installed.map((pack) => pack.manifest.id))}
           notice={notice}
@@ -492,6 +510,13 @@ export function App() {
         onCapture={handleCapture}
         targets={captureTargets.map((m) => ({ id: m.id, name: m.name }))}
         defaultTargetId={route.kind === "module" ? route.moduleId : captureTarget?.id}
+      />
+
+      <SettingsSheet
+        open={settingsOpen}
+        choice={themeChoice}
+        onChange={changeTheme}
+        onClose={() => setSettingsOpen(false)}
       />
     </>
   );
