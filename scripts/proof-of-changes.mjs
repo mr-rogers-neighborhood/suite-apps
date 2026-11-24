@@ -15,7 +15,15 @@
  *   node scripts/proof-of-changes.mjs --only canvas --no-build
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { delimiter, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { computeAffected, readProjects } from "./affected.mjs";
@@ -139,6 +147,7 @@ export function formatProofMarkdown({ commit, displayMode, results, ciArtifactPr
     if (item.scenarios.length === 0) {
       lines.push("", `- **Error:** ${item.detail}`);
     } else {
+      let printedScenarioError = false;
       for (const scenario of item.scenarios) {
         lines.push("", `- **Scenario:** \`${scenario.title}\``);
         if (scenario.steps.length > 0) {
@@ -149,9 +158,13 @@ export function formatProofMarkdown({ commit, displayMode, results, ciArtifactPr
           }
         }
         if (scenario.error) {
+          printedScenarioError = true;
           const firstLine = scenario.error.split("\n")[0];
           lines.push(`- **Failure:** ${firstLine}`);
         }
+      }
+      if (!item.ok && !printedScenarioError) {
+        lines.push(`- **Failure:** ${item.detail}`);
       }
     }
 
@@ -217,23 +230,50 @@ function buildApp(repo) {
   return true;
 }
 
+/** Verify a proof run passed and produced at least one non-empty screenshot artifact. */
+export function evaluateProofOutcome({ exitStatus, scenarios, screenshots, emptyScreenshots }) {
+  const passed = exitStatus === 0 && scenarios.every((scenario) => scenario.status === "passed");
+  if (!passed) {
+    return { ok: false, detail: `playwright exited ${exitStatus ?? 1}` };
+  }
+  if (emptyScreenshots.length > 0) {
+    return {
+      ok: false,
+      detail: `empty screenshot artifact(s): ${emptyScreenshots.join(", ")}`,
+    };
+  }
+  if (screenshots.length === 0) {
+    return { ok: false, detail: "proof produced no screenshot artifacts" };
+  }
+  return { ok: true, detail: "passed" };
+}
+
 function collectArtifacts(appOutDir, outRoot) {
-  if (!existsSync(appOutDir)) return { screenshots: [], trace: null };
+  if (!existsSync(appOutDir)) return { screenshots: [], emptyScreenshots: [], trace: null };
   const entries = readdirSync(appOutDir).sort();
-  const screenshots = entries
-    .filter((name) => name.endsWith(".png"))
-    .map((name) => ({
+  const screenshots = [];
+  const emptyScreenshots = [];
+  for (const name of entries) {
+    if (!name.endsWith(".png")) continue;
+    const fullPath = join(appOutDir, name);
+    if (statSync(fullPath).size === 0) {
+      emptyScreenshots.push(name);
+      continue;
+    }
+    screenshots.push({
       name,
-      relPath: relative(outRoot, join(appOutDir, name)).replaceAll("\\", "/"),
-    }));
+      relPath: relative(outRoot, fullPath).replaceAll("\\", "/"),
+    });
+  }
   const traceName = entries.find((name) => name === "trace.zip");
-  const trace = traceName
-    ? {
-        name: traceName,
-        relPath: relative(outRoot, join(appOutDir, traceName)).replaceAll("\\", "/"),
-      }
-    : null;
-  return { screenshots, trace };
+  const trace =
+    traceName && statSync(join(appOutDir, traceName)).size > 0
+      ? {
+          name: traceName,
+          relPath: relative(outRoot, join(appOutDir, traceName)).replaceAll("\\", "/"),
+        }
+      : null;
+  return { screenshots, emptyScreenshots, trace };
 }
 
 function runAppProof(row, outRoot, useXvfb) {
@@ -279,15 +319,20 @@ function runAppProof(row, outRoot, useXvfb) {
       scenarios = [];
     }
   }
-  const { screenshots, trace } = collectArtifacts(appOutDir, outRoot);
-  const ok = run.status === 0 && scenarios.every((scenario) => scenario.status === "passed");
+  const { screenshots, emptyScreenshots, trace } = collectArtifacts(appOutDir, outRoot);
+  const { ok, detail } = evaluateProofOutcome({
+    exitStatus: run.status,
+    scenarios,
+    screenshots,
+    emptyScreenshots,
+  });
 
   return {
     repo: row.repo,
     package: row.package,
     ok,
     durationMs,
-    detail: ok ? "passed" : `playwright exited ${run.status ?? 1}`,
+    detail,
     scenarios,
     screenshots,
     trace,

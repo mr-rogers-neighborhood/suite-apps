@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { extname, join, normalize, resolve, sep } from "node:path";
-import { _electron as electron, expect, test } from "@playwright/test";
+import { _electron as electron, expect, type Page, type TestInfo, test } from "@playwright/test";
 
 const MIME_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
@@ -22,6 +22,55 @@ function isHeadless(): boolean {
     process.env.SUITE_ELECTRON_HEADLESS === "1" ||
     (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY)
   );
+}
+
+function electronArgs(desktopDir: string, userData: string): string[] {
+  return [
+    desktopDir,
+    `--user-data-dir=${join(userData, "profile")}`,
+    "--no-sandbox",
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--use-gl=angle",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader",
+    ...(isHeadless() ? ["--ozone-platform=headless"] : []),
+  ];
+}
+
+async function captureProofScreenshot(
+  page: Page,
+  proofDir: string,
+  filename: string,
+  testInfo: TestInfo,
+): Promise<void> {
+  await page.waitForLoadState("load");
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        if (document.fonts?.ready) {
+          void document.fonts.ready.then(settle, settle);
+        } else {
+          settle();
+        }
+      }),
+  );
+  const shot = join(proofDir, filename);
+  try {
+    await page.screenshot({ path: shot });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to capture proof screenshot ${filename}: ${detail}`);
+  }
+  const info = await stat(shot).catch(() => null);
+  if (info === null || info.size === 0) {
+    throw new Error(`Proof screenshot ${filename} is missing or empty (${shot})`);
+  }
+  await testInfo.attach(filename.replace(/\.png$/u, ""), {
+    path: shot,
+    contentType: "image/png",
+  });
 }
 
 /**
@@ -84,12 +133,7 @@ test("opens a .canvas document, creates a card, and renders it on the board", {
 
   const server = await startDistServer(distDir);
   const app = await electron.launch({
-    args: [
-      desktopDir,
-      `--user-data-dir=${join(userData, "profile")}`,
-      "--no-sandbox",
-      ...(isHeadless() ? ["--ozone-platform=headless"] : []),
-    ],
+    args: electronArgs(desktopDir, userData),
     env: {
       ...process.env,
       SUITE_CANVAS_LIBRARY: libraryDir,
@@ -118,9 +162,7 @@ test("opens a .canvas document, creates a card, and renders it on the board", {
       const files = await readdir(libraryDir);
       expect(files.some((file) => file.endsWith(".canvas"))).toBe(true);
 
-      const shot = join(proofDir, "01-canvas-board.png");
-      await page.screenshot({ path: shot });
-      await testInfo.attach("01-canvas-board", { path: shot, contentType: "image/png" });
+      await captureProofScreenshot(page, proofDir, "01-canvas-board.png", testInfo);
     });
 
     await test.step("Create a new card and verify it renders on the board", async () => {
@@ -133,9 +175,7 @@ test("opens a .canvas document, creates a card, and renders it on the board", {
       await expect(page.locator('[data-testid="node-card"]')).toHaveCount(initialCards + 1);
       await expect(page.getByText("Proof card").first()).toBeVisible();
 
-      const shot = join(proofDir, "02-card-created.png");
-      await page.screenshot({ path: shot });
-      await testInfo.attach("02-card-created", { path: shot, contentType: "image/png" });
+      await captureProofScreenshot(page, proofDir, "02-card-created.png", testInfo);
     });
   } finally {
     const tracePath = join(proofDir, "trace.zip");

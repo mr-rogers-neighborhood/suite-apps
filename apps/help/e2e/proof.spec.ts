@@ -1,14 +1,62 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { _electron as electron, expect, test } from "@playwright/test";
+import { _electron as electron, expect, type Page, type TestInfo, test } from "@playwright/test";
 
 function isHeadless(): boolean {
   return (
     process.env.SUITE_ELECTRON_HEADLESS === "1" ||
     (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY)
   );
+}
+
+function electronArgs(): string[] {
+  return [
+    process.cwd(),
+    "--no-sandbox",
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--use-gl=angle",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader",
+    ...(isHeadless() ? ["--ozone-platform=headless"] : []),
+  ];
+}
+
+async function captureProofScreenshot(
+  page: Page,
+  proofDir: string,
+  filename: string,
+  testInfo: TestInfo,
+): Promise<void> {
+  await page.waitForLoadState("load");
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        if (document.fonts?.ready) {
+          void document.fonts.ready.then(settle, settle);
+        } else {
+          settle();
+        }
+      }),
+  );
+  const shot = join(proofDir, filename);
+  try {
+    await page.screenshot({ path: shot });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to capture proof screenshot ${filename}: ${detail}`);
+  }
+  const info = await stat(shot).catch(() => null);
+  if (info === null || info.size === 0) {
+    throw new Error(`Proof screenshot ${filename} is missing or empty (${shot})`);
+  }
+  await testInfo.attach(filename.replace(/\.png$/u, ""), {
+    path: shot,
+    contentType: "image/png",
+  });
 }
 
 test("opens the explorer index and navigates to a handbook page", { tag: "@proof" }, async () => {
@@ -18,7 +66,7 @@ test("opens the explorer index and navigates to a handbook page", { tag: "@proof
   await mkdir(proofDir, { recursive: true });
 
   const app = await electron.launch({
-    args: [process.cwd(), "--no-sandbox", ...(isHeadless() ? ["--ozone-platform=headless"] : [])],
+    args: electronArgs(),
     env: {
       ...process.env,
       SUITE_HELP_USER_DATA: userData,
@@ -34,9 +82,7 @@ test("opens the explorer index and navigates to a handbook page", { tag: "@proof
     await test.step("Open the indexed code explorer", async () => {
       await expect(page.getByRole("link", { name: "Handbook" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Modules" })).toBeVisible();
-      const shot = join(proofDir, "01-explorer.png");
-      await page.screenshot({ path: shot });
-      await testInfo.attach("01-explorer", { path: shot, contentType: "image/png" });
+      await captureProofScreenshot(page, proofDir, "01-explorer.png", testInfo);
     });
 
     await test.step("Search the handbook and open Run the gate", async () => {
@@ -49,9 +95,7 @@ test("opens the explorer index and navigates to a handbook page", { tag: "@proof
 
       await expect(page.getByRole("heading", { name: "Run the gate", level: 1 })).toBeVisible();
 
-      const shot = join(proofDir, "02-handbook-article.png");
-      await page.screenshot({ path: shot });
-      await testInfo.attach("02-handbook-article", { path: shot, contentType: "image/png" });
+      await captureProofScreenshot(page, proofDir, "02-handbook-article.png", testInfo);
     });
   } finally {
     const tracePath = join(proofDir, "trace.zip");

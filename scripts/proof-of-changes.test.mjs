@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { PIPELINE } from "./lib/pipeline.mjs";
 import {
+  evaluateProofOutcome,
   formatProofMarkdown,
   parsePlaywrightReport,
   selectProofApps,
@@ -98,5 +99,33 @@ describe("desktop proof runner", () => {
     assert.match(markdown, /Create and open a \.budget document \(ok, 0\.9s\)/u);
     assert.match(markdown, /\[02-category-assigned\.png\]\(budget\/02-category-assigned\.png\)/u);
     assert.match(markdown, /\[trace\.zip\]\(budget\/trace\.zip\)/u);
+  });
+
+  it("fails when screenshot artifacts are missing or empty", () => {
+    const missing = evaluateProofOutcome({
+      exitStatus: 0,
+      scenarios: [{ status: "passed" }],
+      screenshots: [],
+      emptyScreenshots: [],
+    });
+    assert.equal(missing.ok, false);
+    assert.match(missing.detail, /no screenshot artifacts/);
+
+    const empty = evaluateProofOutcome({
+      exitStatus: 0,
+      scenarios: [{ status: "passed" }],
+      screenshots: [{ name: "01-open.png", relPath: "shell/01-open.png" }],
+      emptyScreenshots: ["02-focus.png"],
+    });
+    assert.equal(empty.ok, false);
+    assert.match(empty.detail, /empty screenshot artifact/);
+
+    const valid = evaluateProofOutcome({
+      exitStatus: 0,
+      scenarios: [{ status: "passed" }],
+      screenshots: [{ name: "01-open.png", relPath: "shell/01-open.png" }],
+      emptyScreenshots: [],
+    });
+    assert.equal(valid.ok, true);
   });
 });

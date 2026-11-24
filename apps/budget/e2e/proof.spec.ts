@@ -1,14 +1,62 @@
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { _electron as electron, expect, test } from "@playwright/test";
+import { _electron as electron, expect, type Page, type TestInfo, test } from "@playwright/test";
 
 function isHeadless(): boolean {
   return (
     process.env.SUITE_ELECTRON_HEADLESS === "1" ||
     (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY)
   );
+}
+
+function electronArgs(): string[] {
+  return [
+    process.cwd(),
+    "--no-sandbox",
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--use-gl=angle",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader",
+    ...(isHeadless() ? ["--ozone-platform=headless"] : []),
+  ];
+}
+
+async function captureProofScreenshot(
+  page: Page,
+  proofDir: string,
+  filename: string,
+  testInfo: TestInfo,
+): Promise<void> {
+  await page.waitForLoadState("load");
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        if (document.fonts?.ready) {
+          void document.fonts.ready.then(settle, settle);
+        } else {
+          settle();
+        }
+      }),
+  );
+  const shot = join(proofDir, filename);
+  try {
+    await page.screenshot({ path: shot });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to capture proof screenshot ${filename}: ${detail}`);
+  }
+  const info = await stat(shot).catch(() => null);
+  if (info === null || info.size === 0) {
+    throw new Error(`Proof screenshot ${filename} is missing or empty (${shot})`);
+  }
+  await testInfo.attach(filename.replace(/\.png$/u, ""), {
+    path: shot,
+    contentType: "image/png",
+  });
 }
 
 test("creates a budget document, assigns a category, and updates the visible sheet", {
@@ -21,7 +69,7 @@ test("creates a budget document, assigns a category, and updates the visible she
   await mkdir(proofDir, { recursive: true });
 
   const app = await electron.launch({
-    args: [process.cwd(), "--no-sandbox", ...(isHeadless() ? ["--ozone-platform=headless"] : [])],
+    args: electronArgs(),
     env: {
       ...process.env,
       SUITE_BUDGET_USER_DATA: userData,
@@ -47,9 +95,7 @@ test("creates a budget document, assigns a category, and updates the visible she
       const files = await readdir(libraryDir);
       expect(files.some((file) => file.endsWith(".budget"))).toBe(true);
 
-      const shot = join(proofDir, "01-budget-open.png");
-      await page.screenshot({ path: shot });
-      await testInfo.attach("01-budget-open", { path: shot, contentType: "image/png" });
+      await captureProofScreenshot(page, proofDir, "01-budget-open.png", testInfo);
     });
 
     await test.step("Assign $100 to Rent / Mortgage and verify the sheet updates", async () => {
@@ -60,9 +106,7 @@ test("creates a budget document, assigns a category, and updates the visible she
       await expect(assigned).toHaveValue("100.00");
       await expect(page.getByText("$100.00").first()).toBeVisible();
 
-      const shot = join(proofDir, "02-category-assigned.png");
-      await page.screenshot({ path: shot });
-      await testInfo.attach("02-category-assigned", { path: shot, contentType: "image/png" });
+      await captureProofScreenshot(page, proofDir, "02-category-assigned.png", testInfo);
     });
   } finally {
     const tracePath = join(proofDir, "trace.zip");
