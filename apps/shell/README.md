@@ -11,8 +11,9 @@ separate Flatpaks. The point of this tree is to prove the host boundary before a
 - a scoped document API that carries opaque bytes and never a path;
 - a scoped `files` service with relative paths, host-owned backups and locks;
 - a user-consented external file surface: a host-owned picker, opaque handles and import;
-- a local catalogue of `.suitepack` files with verified install/refusal entries;
-- uninstall and additive pack updates, version by version;
+- a catalogue that reads local `.suitepack` files, and a verified index when one is present, with
+  verified install/refusal entries;
+- install, update, reinstall and uninstall, version by version;
 - `suite://<pack-id>/<path>` routing and a launch context per tab;
 - a shell-owned Loro space document that restores tabs, models pack and screen tabs, and is
   container-ready;
@@ -94,13 +95,17 @@ the scheme in this phase, and the host routes a link that reaches it.
 
 ## Installing, updating and removing a pack
 
-Home's `shell.apps` widget shows installed packs and the local catalogue together. The catalogue is a directory
-of `.suitepack` files (`<dataRoot>/catalogue`, or `SUITE_SHELL_CATALOGUE`). Each archive is read with
+Home's `shell.apps` widget shows installed packs and the catalogue together. The local catalogue is a
+directory of `.suitepack` files (`<dataRoot>/catalogue`, or `SUITE_SHELL_CATALOGUE`). When #222's
+signed index has been verified, the same surface also consumes its entries through
+`VerifiedCatalogueIndex`; this app never parses or checks the index itself. Every archive is read with
 the shared archive reader and verified before it is listed: the publisher key in the manifest against
 the local trust store, the manifest signature with that key, the host contract and capability list, and
-every file hash. A trusted entry offers **Install**; a refused entry stays visible with its refusal
-sentence and cannot be installed. Listing never extracts an archive, so a refusal leaves nothing
-behind. Each card shows the publisher id and key fingerprint, plus the declared capabilities.
+every file hash. An indexed entry must also match the id, version, size and SHA-256 the index
+displayed. A trusted entry offers **Install**, **Update** or **Reinstall** as its state requires; a
+refused entry stays visible with its refusal sentence and cannot be installed. Listing never extracts
+an archive, so a refusal leaves nothing behind. Each card shows the version, archive size, publisher
+id and key fingerprint, plus the declared capabilities.
 
 The trust store is `<dataRoot>/trust/publishers.json` (`SUITE_SHELL_TRUST` moves it). It is created
 with the first-party Suite key preinstalled; that pin always wins, even if the file is edited. Another
@@ -113,14 +118,15 @@ Before an install or update writes anything, the host shows the publisher id, ke
 id, version and capability list and waits for confirmation; the result notice repeats them. A
 development directory has no publisher and says so.
 
-The catalogue is a local distribution path. A remote index is a later slice with the same trust
-rule; it is not built here.
+The catalogue's local directory remains a first-class distribution path: a person may install from
+a file with no index and no network (S12.1). The verified index itself is #222; until it merges, Main
+passes no index and the local directory is the only source.
 
 The **Add pack…** button is the original file picker. The host reads at most 64 MiB, verifies the
 archive with the same rules, refuses extra files and paths that leave the pack root, and only then
 writes `<dataRoot>/packs/<id>/<version>/`, with the active publisher recorded beside the versions.
-Installs are additive and an existing version is never overwritten. A Go `.pack` is a different
-manifest format and is refused; it is not an import path.
+Installs are additive and an existing version is never overwritten except by an explicit reinstall. A
+Go `.pack` is a different manifest format and is refused; it is not an import path.
 
 The install identity is `(publisher id, pack id)`. A different publisher under an existing pack id is
 refused unless the host passes the explicit migration, and even then it starts with no documents,
@@ -132,6 +138,11 @@ Updating is installing a newer archive for the same id and the same publisher. T
 highest valid version for the active publisher, so the new version runs after a restart (or
 immediately when no tab is open). The old version stays on disk until the person removes it; Home
 lists each non-current version with an explicit **Remove** action. Nothing is deleted silently.
+
+**Reinstall** replaces the version directory that is already installed. The new archive is verified
+and extracted into a temporary sibling first; only then is the old directory moved aside and the new
+one renamed into place. A refused or failed reinstall puts the previous version back, and its
+documents and files were never part of the swap.
 
 **Uninstall** removes exactly `<dataRoot>/packs/<id>/<version>`. A symlinked install root, id
 directory or version directory is refused, and the version must resolve inside the real pack root;
