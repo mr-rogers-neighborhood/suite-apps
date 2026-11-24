@@ -38,6 +38,7 @@ let state = {
   screens: [],
   packs: [],
   catalogue: [],
+  catalogueSource: "",
   installedVersions: [],
   theme: { mode: "dark", values: {} },
   notice: null,
@@ -50,6 +51,7 @@ let appsView = {
   packCount: null,
   catalogue: null,
   catalogueCount: null,
+  catalogueSource: null,
   search: null,
 };
 
@@ -255,25 +257,47 @@ function installedCard(pack) {
   return tile;
 }
 
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function catalogueCard(entry) {
   const tile = element("div", "tile");
   const card = element("div", "card card-static");
   const name = entry.name.length > 0 ? entry.name : entry.id;
+
+  const active = state.installedVersions.find(
+    (version) => version.id === entry.id && version.current,
+  );
+  const exactInstalled = state.installedVersions.some(
+    (version) => version.id === entry.id && version.version === entry.version,
+  );
+  const installedCurrent =
+    exactInstalled && active !== undefined && active.version === entry.version;
+  const updateAvailable = entry.updateAvailable === true;
+  const labelled = !entry.trusted
+    ? { className: "pill pill-refused", text: "refused" }
+    : installedCurrent
+      ? { className: "pill pill-installed", text: "installed" }
+      : updateAvailable
+        ? { className: "pill pill-update", text: "update" }
+        : { className: "pill pill-available", text: "available" };
 
   const top = element("div", "card-top");
   const dot = element("span", "card-dot");
   dot.style.background = colorFor(entry.id);
   dot.setAttribute("aria-hidden", "true");
   top.append(dot, element("span", "card-name", name));
-  top.append(
-    element(
-      "span",
-      entry.trusted ? "pill pill-available" : "pill pill-refused",
-      entry.trusted ? "available" : "refused",
-    ),
-  );
+  top.append(element("span", labelled.className, labelled.text));
   if (entry.version.length > 0) {
     top.append(element("span", "card-version", `v${entry.version}`));
+  }
+  const size = formatBytes(entry.sizeBytes);
+  if (size.length > 0) {
+    top.append(element("span", "card-version", size));
   }
 
   const description = element(
@@ -314,11 +338,16 @@ function catalogueCard(entry) {
     refused.disabled = true;
     actions.append(refused);
   } else {
-    const installed = state.installedVersions.some(
-      (version) => version.id === entry.id && version.version === entry.version,
-    );
+    const label = installedCurrent
+      ? `Reinstall v${entry.version}`
+      : updateAvailable
+        ? `Update to v${entry.version}`
+        : exactInstalled
+          ? `Installed v${entry.version}`
+          : `Install v${entry.version}`;
+    const inert = exactInstalled && !installedCurrent;
     const button = actionButton(
-      installed ? "Installed" : `Install v${entry.version}`,
+      label,
       () => {
         button.disabled = true;
         Promise.resolve(api.installCataloguePack(entry.id, entry.version))
@@ -326,12 +355,12 @@ function catalogueCard(entry) {
             showNotice(error instanceof Error ? error.message : "The host refused that action.");
           })
           .finally(() => {
-            button.disabled = installed;
+            button.disabled = inert;
           });
       },
       "action-primary",
     );
-    button.disabled = installed;
+    button.disabled = inert;
     actions.append(button);
   }
   tile.append(actions);
@@ -363,6 +392,9 @@ function renderPacks() {
 
 function renderCatalogue() {
   if (appsView.catalogue === null) return;
+  if (appsView.catalogueSource !== null) {
+    appsView.catalogueSource.textContent = state.catalogueSource;
+  }
   const matches = state.catalogue.filter((entry) =>
     matchesQuery(entry.name, entry.id, entry.description),
   );
@@ -373,7 +405,7 @@ function renderCatalogue() {
       element(
         "p",
         "empty",
-        "No archives are in the catalogue. Put signed .suitepack files in the catalogue folder, or use Add pack….",
+        "No packs are available from the catalogue. Use Add pack… to install a signed .suitepack file.",
       ),
     );
     return;
@@ -439,9 +471,10 @@ function renderAppsWidget(body) {
   const muted = element(
     "p",
     "muted",
-    "Packs arrive as signed .suitepack files in the catalogue folder. Installing adds one to this device. A new app opens right away; restart Suite to run a new version of an app that is already open. An update keeps the old version until you remove it.",
+    "Packs arrive from the signed catalogue or as a .suitepack file. Installing adds one to this device, updating keeps the old version until you remove it, and reinstalling replaces the install while keeping its documents. A new app opens right away; restart Suite to run a new version of an app that is already open.",
   );
   const catalogue = element("div", "grid");
+  const catalogueSource = element("p", "muted catalogue-source");
   const install = element("button", "install", "Add pack…");
   install.type = "button";
   install.addEventListener("click", () => {
@@ -461,10 +494,10 @@ function renderAppsWidget(body) {
   const revoke = trustAction(api.importRevocation, "Add revocation…");
   const actions = element("div", "trust-actions");
   actions.append(install, rotate, revoke);
-  available.append(availableHead, muted, catalogue, actions);
+  available.append(availableHead, muted, catalogueSource, catalogue, actions);
 
   body.append(installed, available);
-  appsView = { packs, packCount, catalogue, catalogueCount, search: input };
+  appsView = { packs, packCount, catalogue, catalogueCount, catalogueSource, search: input };
   refreshApps();
 }
 
@@ -654,6 +687,7 @@ function renderScreen() {
       packCount: null,
       catalogue: null,
       catalogueCount: null,
+      catalogueSource: null,
       search: null,
     };
     return;

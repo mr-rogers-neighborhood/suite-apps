@@ -74,6 +74,15 @@ export interface PackTrustOptions {
   readonly revocations?: readonly RevocationAdvisory[];
 }
 
+/** What an install may do to an existing version directory. */
+export interface PackInstallOptions {
+  /**
+   * Replace an existing version directory. Only a reinstall names this; an
+   * ordinary install and an update refuse to overwrite.
+   */
+  readonly replace?: boolean;
+}
+
 /** A pack installed under the host's pack root. `root` is its version directory. */
 export interface InstalledPackInfo extends PackInfo {
   readonly source: "installed";
@@ -194,11 +203,12 @@ export function packInstallSummary(
 /** One sentence a person can read before or after an install or update. */
 export function describePackInstall(
   summary: PackInstallSummary,
-  action: "install" | "update",
+  action: "install" | "update" | "reinstall",
 ): string {
   const capabilities =
     summary.capabilities.length === 0 ? "no capabilities" : summary.capabilities.join(", ");
-  return `${action === "install" ? "Install" : "Update"} ${summary.name} ${summary.version} (${summary.id}) from publisher ${summary.publisher.id}, key SHA-256 ${summary.publisher.fingerprint}; capabilities: ${capabilities}.`;
+  const verb = action === "install" ? "Install" : action === "update" ? "Update" : "Reinstall";
+  return `${verb} ${summary.name} ${summary.version} (${summary.id}) from publisher ${summary.publisher.id}, key SHA-256 ${summary.publisher.fingerprint}; capabilities: ${capabilities}.`;
 }
 
 /**
@@ -417,12 +427,16 @@ export async function checkPackArchive(
  *
  * The files are written to a temporary sibling first and renamed into place, so
  * a scan never sees a half-written version. An existing version is refused
- * rather than overwritten.
+ * rather than overwritten unless `install.replace` names a reinstall. That
+ * replacement renames the old directory aside only after the new one has
+ * extracted, and restores it if the swap fails, so a failed reinstall leaves the
+ * previous version intact.
  */
 export async function installPackArchive(
   bytes: Uint8Array,
   root: string,
   options: PackTrustOptions,
+  install: PackInstallOptions = {},
 ): Promise<InstalledPackInfo> {
   const check = await checkPackArchive(bytes, options);
   if (!check.ok) throw check.error;
@@ -525,7 +539,7 @@ export async function installPackArchive(
   if (targetEntry?.isSymbolicLink() === true) {
     throw refuseIo(`${manifest.id} ${manifest.version} is a symbolic link; it was not followed.`);
   }
-  if (targetEntry !== null) {
+  if (targetEntry !== null && install.replace !== true) {
     throw refuseIo(
       `${manifest.id} ${manifest.version} is already installed; it was not overwritten.`,
     );
@@ -554,12 +568,27 @@ export async function installPackArchive(
     if (targetNow?.isSymbolicLink() === true) {
       throw refuseIo(`${manifest.id} ${manifest.version} is a symbolic link; it was not followed.`);
     }
-    if (targetNow !== null) {
+    if (targetNow !== null && install.replace !== true) {
       throw refuseIo(
         `${manifest.id} ${manifest.version} is already installed; it was not overwritten.`,
       );
     }
-    await rename(temporary, target);
+    if (targetNow === null) {
+      await rename(temporary, target);
+    } else {
+      // A reinstall: move the old version aside, swap the verified one in, and put
+      // the old one back if the swap fails. The temporary prefix keeps a leftover
+      // backup out of the installed scan.
+      const backup = join(idRoot, `${TEMPORARY_PREFIX}${randomUUID()}-previous`);
+      await rename(target, backup);
+      try {
+        await rename(temporary, target);
+      } catch (error) {
+        await rename(backup, target).catch(() => undefined);
+        throw error;
+      }
+      await rm(backup, { recursive: true, force: true }).catch(() => undefined);
+    }
     if (identity === null || migrating || identity.key !== publisher.key) {
       await writeInstalledIdentity(idRoot, publisher);
     }

@@ -60,6 +60,8 @@ each one signs and how to rotate it; this table is only where a script looks.
 | `SUITE_KEYS_DIR` | the directory that holds both keys, instead of `~/.config/suite/keys` |
 | `SUITE_PACK_KEY` | the pack signing key's text, instead of `pack-key` in that directory |
 | `SUITE_UPDATE_KEY` | the update signing key's file, instead of `update-key.pem` in that directory |
+| `SUITE_INDEX_KEY` | the catalogue operator key, read by `scripts/release-index.mjs` |
+| `SUITE_INDEX_KEY_FINGERPRINT` | the pinned fingerprint that operator key must match |
 
 ## Development
 

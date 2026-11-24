@@ -5,6 +5,22 @@ shipped host.
 
 ## [Unreleased]
 
+### Added
+
+- **The catalogue reads the published index.** The operator key is pinned in the shell, and the
+  index is verified before an entry is listed: signature, `sequence`, `previous` and `expires` are
+  all checked against the last verified head. A tampered, unsigned, wrong-operator, expired or
+  rolled-back index is refused with a sentence naming the reason, and the catalogue says whether it
+  is showing the published index or the local directory.
+- **Budget is the first real pack.** The pack's entry, prelude and assets serve over
+  `suite-pack://`, its renderer mounts over the pack bridge, and a budget round-trips through the host
+  document envelope. An export re-imports as a working document, and the bridge adds no second file
+  path. The test suite mounts the pack renderer over the same `window.suite` services the preload
+  exposes; the Electron view itself stays outside the headless gate.
+- **A pack's declared schema is what the host stamps.** A manifest document declaration now supplies
+  the envelope's schema version and the newest version the host opens. A pack that writes one format
+  under many names declares it once with `mode: "multi"`; Budget declares its snapshot at schema 1.
+
 ### Changed
 
 - **Suite Shell is the way in.** Install the host once, then install, update, remove and reinstall

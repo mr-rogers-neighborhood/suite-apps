@@ -1,9 +1,10 @@
 # Manage signing keys
 
-Three keys sign things the Suite ships, and no private half belongs in this repository. Each one
+Four keys sign things the Suite ships, and no private half belongs in this repository. Each one
 has a public half pinned in the source that verifies it, so the question a build actually needs
 answered is narrow: **is the key on this machine the key this tree trusts?** `pnpm keys` answers it
-for the two Ed25519 keys; `pnpm android:key` answers it for the Android keystore.
+for the pack and update keys; `pnpm android:key` answers it for the Android keystore, and the
+shell's own test answers it for the catalogue operator pin.
 
 ## What exists
 
@@ -11,9 +12,10 @@ for the two Ed25519 keys; `pnpm android:key` answers it for the Android keystore
 | --- | --- | --- | --- | --- |
 | Pack signing | a signed app pack the phone and the desktop install | Ed25519 | `pack-key` | `SUITE_PACK_PUBLIC_KEY`, `packages/pack/src/pinnedKey.ts` |
 | Update signing | nothing the suite ships any more; it signed the retired relay tarball's `SHA256SUMS` | Ed25519 | `update-key.pem` | `SUITE_UPDATE_PUBLIC_KEY`, `packages/desktop/src/updateSignature.ts` |
+| Catalogue operator | the signed pack index | Ed25519 | `SUITE_INDEX_KEY` in the `release` environment | `SUITE_INDEX_PUBLIC_KEY`, `apps/shell/src/indexTrust.ts` |
 | Android release | every Suite Go APK, on all four channels | RSA-4096 certificate | `suite-go-release.jks` and `suite-go-release.pass` | `ANDROID_RELEASE_CERT_SHA256`, `scripts/lib/androidKey.mjs` |
 
-The Flatpak store key is a fourth secret with a different job; [Packaging
+The Flatpak store key is a separate secret with a different job; [Packaging
 channels](../reference/packaging-channels.md#signing) owns it and this page does not restate it.
 
 ## Where they live
@@ -33,7 +35,8 @@ mode `0600`.
 `SUITE_PACK_KEY` and `SUITE_UPDATE_KEY` still name a key file elsewhere, which is what a different
 machine or a test uses. Neither is required: the paths above are the default. The Android key has
 the same escape hatches — `SUITE_GO_KEYSTORE` and `SUITE_GO_KEYSTORE_PASSWORD` — and
-`SUITE_GO_KEY_ALIAS` overrides the `suite-go` alias.
+`SUITE_GO_KEY_ALIAS` overrides the `suite-go` alias. The catalogue operator key is a release
+secret, read from `SUITE_INDEX_KEY` in the release environment rather than from this directory.
 
 The pack key used to live in `apps/go/.dev/`, which is the scratch directory the build replaces. A
 cleanup took the only copy, and the pin was left with no key able to satisfy it. Nothing durable

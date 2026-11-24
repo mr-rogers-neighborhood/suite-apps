@@ -13,10 +13,11 @@ import {
   loadCatalogue,
 } from "./catalogue.js";
 import { LAUNCHER_CONTEXT, suiteLinkFromArgv } from "./deepLink.js";
-import { DocumentStore } from "./documents.js";
+import { DocumentStore, declaredDocumentSchemaVersion } from "./documents.js";
 import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
 import { HOME_SCREEN_ID, openHomeScreen } from "./home.js";
+import { catalogueIndexUrlFor, loadCatalogueIndex } from "./indexTrust.js";
 import {
   checkPackArchive,
   comparePackVersions,
@@ -136,6 +137,8 @@ let trustStore: PublisherTrustStore | null = null;
 let revocations: readonly RevocationAdvisory[] = [];
 let packs: readonly PackInfo[] = [];
 let catalogue: readonly CataloguePack[] = [];
+/** The sentence the catalogue shows about where its entries came from. */
+let catalogueSource = "The local catalogue directory is in use.";
 let installedVersions: readonly InstalledVersion[] = [];
 let pendingDeepLink: string | null = null;
 
@@ -232,6 +235,7 @@ async function bootstrap(): Promise<void> {
     },
   );
 
+  await refreshCatalogue();
   await refreshPacks();
   spaceStore = await SpaceStore.open(join(dataRoot, "spaces.loro"));
   // The host's own Screen. Home is created here and opened before any pack view
@@ -342,6 +346,46 @@ function documentsFor(sender: PackSender): DocumentStore {
 }
 
 /**
+ * Rebuild the catalogue from the published index, or from the local directory
+ * when the index is unavailable.
+ *
+ * The local directory is a first-class source (S12.1): a person may install a
+ * file with no catalogue and no network. The chrome says which source is in use
+ * instead of falling back silently, and a refused index still leaves the local
+ * directory usable.
+ */
+async function refreshCatalogue(): Promise<void> {
+  const root = catalogueRootFor(dataRootFor(), process.env);
+  const url = catalogueIndexUrlFor(process.env);
+  if (url === null) {
+    catalogue = await loadCatalogue(root, packTrustOptions(), null);
+    catalogueSource = "The local catalogue directory is in use; no catalogue index is configured.";
+    return;
+  }
+
+  const loaded = await loadCatalogueIndex({
+    url,
+    headRoot: trustRootFor(dataRootFor(), process.env),
+    fetch: (input, init) => net.fetch(input, init),
+  });
+  if (loaded.ok) {
+    catalogue = await loadCatalogue(root, packTrustOptions(), loaded.index);
+    catalogueSource = `The published catalogue index is in use (sequence ${loaded.sequence}).`;
+    console.info(
+      `[shell] catalogue index sequence ${loaded.sequence} verified; ${loaded.index.packs.length} entry(ies)`,
+    );
+    return;
+  }
+
+  catalogue = await loadCatalogue(root, packTrustOptions(), null);
+  catalogueSource =
+    loaded.reason === "refused"
+      ? `The local catalogue directory is in use; the published index was refused. ${loaded.message}`
+      : `The local catalogue directory is in use. ${loaded.message}`;
+  console.warn(`[shell] ${loaded.message}`);
+}
+
+/**
  * Rebuild the host's pack list.
  *
  * Verified installs under the data root are the load path. An unsigned directory
@@ -361,7 +405,6 @@ async function refreshPacks(): Promise<void> {
 
   packs = mergePackSources({ installed: scan.packs, development });
   installedVersions = scan.versions;
-  catalogue = await loadCatalogue(catalogueRootFor(dataRootFor(), process.env), packTrustOptions());
   console.info(
     `[shell] ${packs.length} pack(s) available; ${catalogue.length} catalogue archive(s)`,
   );
@@ -369,7 +412,8 @@ async function refreshPacks(): Promise<void> {
 
 /** What the chrome sees: no archive paths and no refusal codes. */
 function catalogueView(): readonly CatalogueEntry[] {
-  return catalogue.map(catalogueEntry);
+  const active = new Map(packs.map((pack) => [pack.id, pack.version]));
+  return catalogue.map((pack) => catalogueEntry(pack, active.get(pack.id) ?? null));
 }
 
 /** Every valid version with the loader's current choice marked. */
@@ -384,7 +428,7 @@ function installedVersionViews(): readonly InstalledVersionView[] {
 
 /** Replace the window's pack data from the module's last scan. */
 function publishPackData(): void {
-  window?.setPackData(packs, catalogueView(), installedVersionViews());
+  window?.setPackData(packs, catalogueView(), installedVersionViews(), catalogueSource);
 }
 
 function themeView(): ThemeView {
@@ -400,6 +444,7 @@ function openWindow(): void {
   created = new ShellWindow({
     packs,
     catalogue: catalogueView(),
+    catalogueSource,
     installedVersions: installedVersionViews(),
     spaces: spaceStore,
     screens: screenStore,
@@ -521,16 +566,22 @@ function registerIpc(): void {
   });
   onPack(PACK_IPC.createDocument, (sender, name) => {
     if (!packAllows(sender.pack, "documents") || typeof name !== "string") return undefined;
-    return documentsFor(sender).create(sender.containerId, sender.packId, name);
+    return documentsFor(sender).create(sender.containerId, sender.packId, name, {
+      schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, name),
+    });
   });
   onPack(PACK_IPC.openDocument, (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
-    return documentsFor(sender).open(sender.containerId, sender.packId, id);
+    return documentsFor(sender).open(sender.containerId, sender.packId, id, {
+      schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, id),
+    });
   });
   onPack(PACK_IPC.saveDocument, (sender, id, bytes) => {
     if (!packAllows(sender.pack, "documents")) return undefined;
     if (typeof id !== "string" || !(bytes instanceof Uint8Array)) return undefined;
-    return documentsFor(sender).save(sender.containerId, sender.packId, id, bytes);
+    return documentsFor(sender).save(sender.containerId, sender.packId, id, bytes, {
+      schemaVersion: declaredDocumentSchemaVersion(sender.pack.documents, id),
+    });
   });
   onPack(PACK_IPC.removeDocument, (sender, id) => {
     if (!packAllows(sender.pack, "documents") || typeof id !== "string") return undefined;
@@ -724,7 +775,7 @@ async function installPackFromFile(): Promise<void> {
 
   const summary = packInstallSummary(check.value.manifest, check.value.publisher);
   const updating = packs.some((pack) => pack.id === summary.id);
-  if (!(await confirmInstall(current, summary, updating))) {
+  if (!(await confirmInstall(current, summary, updating ? "update" : "install"))) {
     current.setNotice("The install was cancelled.");
     return;
   }
@@ -745,7 +796,9 @@ async function installPackFromFile(): Promise<void> {
         console.warn(`[shell] could not open ${installed.id} after install`, error);
       });
     }
-    current.setNotice(installedNotice(installed, previous, opened));
+    current.setNotice(
+      installedNotice(installed, previous, opened, updating ? "update" : "install"),
+    );
   } catch (error) {
     current.setNotice(installRefusal(error));
   }
@@ -930,18 +983,24 @@ async function offerUnknownPublisher(
   return true;
 }
 
+/** What the chrome asked the installer to do. */
+type InstallAction = "install" | "update" | "reinstall";
+
 /** The four facts S2.5 requires, before the installer writes anything. */
 async function confirmInstall(
   current: ShellWindow,
   summary: PackInstallSummary,
-  updating: boolean,
+  action: InstallAction,
 ): Promise<boolean> {
   const answer = await dialog.showMessageBox(current.window, {
     type: "info",
-    title: updating ? "Update this pack?" : "Install this pack?",
-    message: describePackInstall(summary, updating ? "update" : "install"),
+    title: `${action === "install" ? "Install" : action === "update" ? "Update" : "Reinstall"} this pack?`,
+    message: describePackInstall(summary, action),
     detail: `Publisher id: ${summary.publisher.id}\nKey fingerprint: ${summary.publisher.fingerprint}\nPack id: ${summary.id}\nVersion: ${summary.version}\nCapabilities: ${summary.capabilities.length === 0 ? "none" : summary.capabilities.join(", ")}`,
-    buttons: ["Cancel", updating ? "Update" : "Install"],
+    buttons: [
+      "Cancel",
+      action === "install" ? "Install" : action === "update" ? "Update" : "Reinstall",
+    ],
     defaultId: 1,
     cancelId: 0,
     noLink: true,
@@ -949,11 +1008,12 @@ async function confirmInstall(
   return answer.response === 1;
 }
 
-/** The sentence after an install or update, with the same four facts. */
+/** The sentence after an install, update or reinstall, with the same four facts. */
 function installedNotice(
   installed: InstalledPackInfo,
   previous: PackInfo | null,
   opened: boolean,
+  action: InstallAction,
 ): string {
   const summary: PackInstallSummary = {
     id: installed.id,
@@ -963,13 +1023,16 @@ function installedNotice(
     publisher: installed.publisher,
   };
   const keptOlder =
-    previous !== null && comparePackVersions(installed.version, previous.version) > 0
+    action === "update" &&
+    previous !== null &&
+    comparePackVersions(installed.version, previous.version) > 0
       ? ` Version ${previous.version} is still on disk; remove it from the launcher when you are ready.`
       : "";
   const next = opened
     ? "The app is open now."
     : "Restart Suite to run the new version of the already-open app.";
-  return `${describePackInstall(summary, previous === null ? "install" : "update")} ${next}${keptOlder}`;
+  const kept = action === "reinstall" ? " Its documents and files were kept." : "";
+  return `${describePackInstall(summary, action)} ${next}${kept}${keptOlder}`;
 }
 
 function installRefusal(error: unknown): string {
@@ -1012,7 +1075,8 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
     publisher: entry.publisher,
   };
   const previous = packs.find((pack) => pack.id === id) ?? null;
-  if (!(await confirmInstall(current, summary, previous !== null))) {
+  const action = catalogueActionFor(id, version, previous);
+  if (!(await confirmInstall(current, summary, action))) {
     current.setNotice("The install was cancelled.");
     return;
   }
@@ -1022,6 +1086,7 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
       entry,
       join(dataRootFor(), "packs"),
       packTrustOptions(),
+      { replace: action === "reinstall" },
     );
     await refreshPacks();
     publishPackData();
@@ -1032,9 +1097,28 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
         console.warn(`[shell] could not open ${installed.id} after install`, error);
       });
     }
-    current.setNotice(installedNotice(installed, previous, opened));
+    current.setNotice(installedNotice(installed, previous, opened, action));
   } catch (error) {
     current.setNotice(installRefusal(error));
+  }
+}
+
+/**
+ * Decide what a catalogue install means for the current installs.
+ *
+ * A version already on disk is a reinstall and replaces it. A newer version
+ * beside the active one is an update; an older or absent one is an install.
+ * Document and file roots are untouched by every one of them.
+ */
+function catalogueActionFor(id: string, version: string, active: PackInfo | null): InstallAction {
+  if (installedVersions.some((entry) => entry.id === id && entry.version === version)) {
+    return "reinstall";
+  }
+  if (active === null) return "install";
+  try {
+    return comparePackVersions(version, active.version) > 0 ? "update" : "install";
+  } catch {
+    return "install";
   }
 }
 

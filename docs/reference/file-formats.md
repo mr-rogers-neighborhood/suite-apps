@@ -82,6 +82,12 @@ A pack owns its schema. It declares each document in the manifest (S6.3):
 | `migrations` | Ordered `{from, to, entry}` steps that reach `version`. |
 | `projection` | A read-only entry that turns the current payload into a widget view. |
 
+The host stamps the declared `version` into the envelope and refuses a document above it. A pack that
+writes one format under many document names declares it once with `mode: "multi"`; Budget is the
+worked example (`budget`, `suite.budget.snapshot`, version `1`). The host uses that declaration for
+every name in the pack, so a library of budgets shares one schema answer rather than one declaration
+per file.
+
 The manifest schema validates the shape, and the host validates the chain before it writes: every
 step must advance the schema, exactly one step may leave a version, no step may pass `version`, and
 the chain must reach it. A gap or a fork refuses the migration and leaves the document alone.
@@ -171,8 +177,8 @@ schema versions since the legacy `suite.workspace` kind and migrates that kind o
 Host documents use the same rule at two levels (S6.4). The **envelope** version belongs to the host:
 a file above it is refused with a sentence naming both versions and the file's path in the data root,
 and the host does not touch it, fall back to `.bak` or create a fresh document in its place. The
-**schema** version belongs to the pack: the host compares it with the newest schema the caller says
-it understands — 1 until a manifest declares otherwise (S6.3) — and refuses a newer one the same way.
+**schema** version belongs to the pack: the host compares it with the version the pack's manifest
+declares — 1 when it declares nothing (S6.3) — and refuses a newer one the same way.
 A file with no `SUITEDOC` magic was written before the envelope; this build refuses it and leaves its
 bytes untouched until the pack schema work supplies a migration.
 

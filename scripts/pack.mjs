@@ -210,6 +210,7 @@ export async function bundlePack({
     ...(minimumHost === undefined ? {} : { minimumHostVersion: minimumHost }),
     publisher: { id: publisherId, key: actualPublicKey },
     capabilities: Array.isArray(source.capabilities) ? source.capabilities : [],
+    ...(source.documents === undefined ? {} : { documents: source.documents }),
     ...(source.contributions === undefined ? {} : { contributions: source.contributions }),
     ...(source.widgets === undefined ? {} : { widgets: source.widgets }),
     files: await digestPackFiles(files),

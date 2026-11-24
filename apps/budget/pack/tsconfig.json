@@ -9,5 +9,11 @@
       "@suite/pack-runtime": ["../../../packages/pack-runtime/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "*.config.ts", "*.config.mts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "../src/renderer/src/platform/window.d.ts",
+    "*.config.ts",
+    "*.config.mts"
+  ]
 }

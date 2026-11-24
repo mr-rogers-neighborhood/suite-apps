@@ -674,6 +674,16 @@ h2 {
   color: var(--hue-green);
 }
 
+.pill-installed {
+  border-color: var(--hue-green);
+  color: var(--hue-green);
+}
+
+.pill-update {
+  border-color: var(--hue-amber);
+  color: var(--hue-amber);
+}
+
 .pill-refused {
   border-color: var(--hue-rose);
   color: var(--hue-rose);

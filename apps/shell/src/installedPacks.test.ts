@@ -57,6 +57,8 @@ interface FixtureOptions {
   readonly contractVersion?: number;
   readonly minimumHostVersion?: number;
   readonly capabilities?: readonly PackCapability[];
+  /** Documents the manifest declares. */
+  readonly documents?: PackManifest["documents"];
   /** What the signed manifest lists. */
   readonly payload?: Record<string, Uint8Array>;
   /** What the archive actually contains. Defaults to the payload. */
@@ -97,6 +99,7 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
       : { publisher: { id: options.publisherId ?? "suite", key: keys.publicKeyBase64 } }),
     capabilities: options.capabilities ?? [],
     files: await digestPackFiles(payload),
+    ...(options.documents === undefined ? {} : { documents: options.documents }),
     ...(options.description === undefined ? {} : { description: options.description }),
     ...(options.minimumHostVersion === undefined
       ? {}
@@ -600,6 +603,61 @@ describe("publisher trust at install", () => {
     expect(describePackInstall({ ...summary, capabilities: [] }, "install")).toContain(
       "no capabilities",
     );
+  });
+
+  // spec: S2.5, S6.3
+  it("installs the Budget pack with its declared document and shows the four install facts", async () => {
+    const root = await temporaryRoot();
+    const keys = await generatePackKeyPair();
+    const pack = await fixture({
+      keys,
+      id: "budget",
+      name: "Suite Budget",
+      version: "0.4.1",
+      capabilities: ["documents", "files"],
+      documents: [{ id: "budget", format: "suite.budget.snapshot", version: 1, mode: "multi" }],
+      payload: {
+        "index.html": encoder.encode(
+          '<!doctype html><script type="module" src="./prelude.js"></script>',
+        ),
+        "prelude.js": encoder.encode("globalThis.suiteBudget = {};"),
+        "assets/app.js": encoder.encode("console.log('budget');"),
+      },
+    });
+    const installed = await install(root, pack);
+
+    expect(installed).toMatchObject({
+      id: "budget",
+      name: "Suite Budget",
+      version: "0.4.1",
+      capabilities: ["documents", "files"],
+      documents: [{ id: "budget", format: "suite.budget.snapshot", version: 1, mode: "multi" }],
+    });
+    expect(await readFile(join(installed.root, "prelude.js"), "utf8")).toContain("suiteBudget");
+
+    const summary = packInstallSummary(pack.manifest, {
+      id: installed.publisher.id,
+      key: keys.publicKeyBase64,
+      fingerprint: installed.publisher.fingerprint,
+    });
+    expect(summary).toEqual({
+      id: "budget",
+      name: "Suite Budget",
+      version: "0.4.1",
+      capabilities: ["documents", "files"],
+      publisher: { id: "suite", fingerprint: await publisherKeyFingerprint(keys.publicKeyBase64) },
+    });
+    const sentence = describePackInstall(summary, "install");
+    for (const fact of [
+      "Suite Budget",
+      "budget",
+      "0.4.1",
+      "suite",
+      installed.publisher.fingerprint,
+      "documents, files",
+    ]) {
+      expect(sentence).toContain(fact);
+    }
   });
 
   // spec: S2.1

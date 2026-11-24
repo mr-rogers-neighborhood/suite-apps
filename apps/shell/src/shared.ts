@@ -137,6 +137,10 @@ export interface CatalogueEntry {
   readonly refusal: string | null;
   readonly publisher: PackPublisherView | null;
   readonly capabilities: readonly PackCapability[];
+  /** Archive size, so the chrome can show it before an install. */
+  readonly sizeBytes: number;
+  /** True when this version is newer than the highest valid installed version. */
+  readonly updateAvailable: boolean;
 }
 
 /** One version directory present under the install root. */
@@ -246,6 +250,8 @@ export interface ShellState {
   readonly screens: readonly ScreenView[];
   readonly packs: readonly PackSummary[];
   readonly catalogue: readonly CatalogueEntry[];
+  /** Which source the catalogue is showing, in a sentence the chrome can print. */
+  readonly catalogueSource: string;
   readonly installedVersions: readonly InstalledVersionView[];
   readonly theme: ThemeView;
   readonly notice: string | null;

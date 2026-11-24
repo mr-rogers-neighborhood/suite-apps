@@ -11,8 +11,9 @@ separate Flatpaks. The point of this tree is to prove the host boundary before a
 - a scoped document API that carries opaque bytes and never a path;
 - a scoped `files` service with relative paths, host-owned backups and locks;
 - a user-consented external file surface: a host-owned picker, opaque handles and import;
-- a local catalogue of `.suitepack` files with verified install/refusal entries;
-- uninstall and additive pack updates, version by version;
+- a catalogue that reads local `.suitepack` files and the operator-signed published index, with
+  verified install/refusal entries;
+- install, update, reinstall and uninstall, version by version;
 - `suite://<pack-id>/<path>` routing and a launch context per tab;
 - a shell-owned Loro space document that restores tabs, models pack and screen tabs, and is
   container-ready;
@@ -43,7 +44,9 @@ directory is `packs/<id>/` beside the checkout and only loads when that switch i
 under Electron's `userData` directory (`~/.config/Suite/shell` on Linux); `SUITE_SHELL_DATA` and
 `SUITE_SHELL_USER_DATA` override the data and profile directories for a test. The local catalogue
 is `<dataRoot>/catalogue`; `SUITE_SHELL_CATALOGUE` points it at another directory. The publisher
-trust store is `<dataRoot>/trust/publishers.json`; `SUITE_SHELL_TRUST` points it elsewhere.
+trust store is `<dataRoot>/trust/publishers.json`; `SUITE_SHELL_TRUST` points it elsewhere. The
+catalogue index is `https://flatpak.suite.run/index.json`; `SUITE_SHELL_INDEX` points at another
+index or, with `none`, leaves only the local directory.
 
 The shared pack work lives outside this app: `packages/pack` owns the manifest and signature,
 `packages/pack-runtime` owns the pack-side service types, and `packages/pack-host` owns the scoped
@@ -94,13 +97,27 @@ the scheme in this phase, and the host routes a link that reaches it.
 
 ## Installing, updating and removing a pack
 
-Home's `shell.apps` widget shows installed packs and the local catalogue together. The catalogue is a directory
-of `.suitepack` files (`<dataRoot>/catalogue`, or `SUITE_SHELL_CATALOGUE`). Each archive is read with
-the shared archive reader and verified before it is listed: the publisher key in the manifest against
-the local trust store, the manifest signature with that key, the host contract and capability list, and
-every file hash. A trusted entry offers **Install**; a refused entry stays visible with its refusal
-sentence and cannot be installed. Listing never extracts an archive, so a refusal leaves nothing
-behind. Each card shows the publisher id and key fingerprint, plus the declared capabilities.
+Home's `shell.apps` widget shows installed packs and the catalogue together. The catalogue has two
+sources, and the widget names the one in use. The local directory is `.suitepack` files under
+`<dataRoot>/catalogue` (or `SUITE_SHELL_CATALOGUE`). The published index is
+`https://flatpak.suite.run/index.json` (or `SUITE_SHELL_INDEX`), fetched at launch and verified
+against the operator key pinned in `apps/shell/src/indexTrust.ts`. The pin is a compile-time
+constant, never a value the index supplies. An index entry is listed only after the index verified;
+the archive it names is still read and verified before it is listed, and again before install.
+
+The index refusals are named, not silent: an index changed after signing, an unsigned index, an
+index signed by an operator key this host does not pin, an expired index, a lower `sequence` than
+the last verified head (`<dataRoot>/trust/index-head.json`), and a `previous` that does not name
+that head's digest are all refused before any entry appears. When the index is refused or
+unreachable, the local directory stays usable and the widget says why the published index is not in
+use (S12.1). Every archive is read with the shared archive reader and verified: the publisher key in
+the manifest against the local trust store, the manifest signature with that key, the host contract
+and capability list, and every file hash. An indexed entry must also match the id, version, size and
+SHA-256 the index displayed. A trusted entry offers **Install**, **Update** or **Reinstall** as its
+state requires; a refused entry stays visible with its refusal sentence and cannot be installed.
+Listing never extracts
+an archive, so a refusal leaves nothing behind. Each card shows the version, archive size, publisher
+id and key fingerprint, plus the declared capabilities.
 
 The trust store is `<dataRoot>/trust/publishers.json` (`SUITE_SHELL_TRUST` moves it). It is created
 with the first-party Suite key preinstalled; that pin always wins, even if the file is edited. Another
@@ -113,14 +130,15 @@ Before an install or update writes anything, the host shows the publisher id, ke
 id, version and capability list and waits for confirmation; the result notice repeats them. A
 development directory has no publisher and says so.
 
-The catalogue is a local distribution path. A remote index is a later slice with the same trust
-rule; it is not built here.
+The local directory remains a first-class distribution path: a person may install from a file with
+no index and no network (S12.1). The published index adds the store's catalogue; it never replaces
+the local directory or the **Add pack…** picker.
 
 The **Add pack…** button is the original file picker. The host reads at most 64 MiB, verifies the
 archive with the same rules, refuses extra files and paths that leave the pack root, and only then
 writes `<dataRoot>/packs/<id>/<version>/`, with the active publisher recorded beside the versions.
-Installs are additive and an existing version is never overwritten. A Go `.pack` is a different
-manifest format and is refused; it is not an import path.
+Installs are additive and an existing version is never overwritten except by an explicit reinstall. A
+Go `.pack` is a different manifest format and is refused; it is not an import path.
 
 The install identity is `(publisher id, pack id)`. A different publisher under an existing pack id is
 refused unless the host passes the explicit migration, and even then it starts with no documents,
@@ -132,6 +150,11 @@ Updating is installing a newer archive for the same id and the same publisher. T
 highest valid version for the active publisher, so the new version runs after a restart (or
 immediately when no tab is open). The old version stays on disk until the person removes it; Home
 lists each non-current version with an explicit **Remove** action. Nothing is deleted silently.
+
+**Reinstall** replaces the version directory that is already installed. The new archive is verified
+and extracted into a temporary sibling first; only then is the old directory moved aside and the new
+one renamed into place. A refused or failed reinstall puts the previous version back, and its
+documents and files were never part of the swap.
 
 A publisher key can rotate without changing the publisher id. The publisher signs a rotation
 statement carrying the outgoing key, the new key, the same id and a sequence; **Rotate a key…** opens
@@ -145,9 +168,9 @@ A revocation is a signed advisory delivered as a small JSON file. **Add revocati
 pack's own publisher signs with the key that signed the pack (a retired key still counts), and the
 person may record an unsigned local advisory. A publisher cannot revoke another publisher's pack. A
 recorded advisory blocks a new install and marks the catalogue entry as refused; it never disables
-or removes an installed pack. A catalogue operator is a valid issuer in the spec, but the shell does
-not pin operator keys yet, so that form is refused until it does. Advisories live in
-`<dataRoot>/trust/revocations.json` beside the publisher store.
+or removes an installed pack. A catalogue operator is a valid issuer in the spec; the index key is
+pinned, but an advisory has no operator verification path yet, so that form is still refused.
+Advisories live in `<dataRoot>/trust/revocations.json` beside the publisher store.
 
 **Uninstall** removes exactly `<dataRoot>/packs/<id>/<version>`. A symlinked install root, id
 directory or version directory is refused, and the version must resolve inside the real pack root;
@@ -333,10 +356,12 @@ size, not the envelope size. A file written before the envelope is refused and l
 A pack may declare its documents and a migration chain (S6.3). The host finds the declaration by id,
 proves the chain before it writes, takes one backup and invokes each declared entry with a handle
 scoped to that single document; the entry body is pack code, and the host passes bytes without
-parsing them. The envelope's schema version records each completed step, so a second run invokes no
-entry and leaves the file unchanged; a failed entry restores the backup, so the old document stays
-readable (S6.6). The runner that executes an entry is injected into
-`src/documentMigrations.ts`; binding it to a pack renderer is not built yet.
+parsing them. The declared `version` is the schema version the host stamps into the envelope and the
+newest it will open; a pack that writes one format under many names declares it once with
+`mode: "multi"` and the host applies it to every name. The envelope's schema version records each
+completed step, so a second run invokes no entry and leaves the file unchanged; a failed entry
+restores the backup, so the old document stays readable (S6.6). The runner that executes an entry is
+injected into `src/documentMigrations.ts`; binding it to a pack renderer is not built yet.
 
 A pack's blobs live in three content-addressed class stores under
 `blobs/<container>/<pack>/<class>/<sha256>`: `asset`, `derived` and `cache`. The first-party publisher
@@ -426,7 +451,6 @@ decision record owns that trade.
 
 ## What is not built yet
 
-- a remote pack index (the catalogue is local only);
 - `identity.pack` parity in Suite Go, so a pack sees one identity across desktop and mobile;
 - app-widget capture delivery (app widgets render their declared fields, but the host does not send
   a capture to the pack yet);
@@ -470,12 +494,14 @@ mise exec -- pnpm --filter @suite/shell build
 The tests cover pack manifest discovery and traversal, document scoping, the `files` service's
 per-pack and per-container isolation, lock ownership, the external surface's filter validation,
 token ownership and cancellation, import into the pack root, declared-document resolution, a
-two-step migration's idempotence and failed-migration restore, projection refusal before the schema
-is current, the three blob class stores and their content addressing, two publishers' blob stores
+declared schema version stamped into the envelope, a two-step migration's idempotence and
+failed-migration restore, projection refusal before the schema is current, the three blob class
+stores and their content addressing, two publishers' blob stores
 staying apart under one pack id, cache clearing that keeps
 assets and derived blobs, export-bundle manifests with a verified hash per asset, the no-export-entry
 asset fallback and the save handle's path refusal, catalogue trust and refusal (valid, wrong-key,
-tampered and unsigned), install from the
+tampered and unsigned), the published index's pin and its refusals (tampered, unsigned, wrong
+operator, expired, rolled back and broken chain), install from the
 catalogue, additive updates,
 version-only uninstall and symlink refusal, uninstall planning for open tabs, `suite://` parsing and
 refusals, launch contexts, space document open/close/title and persistence, version-1 and version-2
@@ -483,6 +509,6 @@ space documents with both tab kinds, Home creation and ordering, the screen stor
 quarantine, add/remove/move/resize including the keyboard's earlier/later path, unknown widget
 placeholders, and the channel names the two preloads spell out by hand. The platform dialog itself
 is not exercised: tests use an injected picker, because a native dialog cannot run headlessly. The
-Electron window, protocol registration, `open-url`/`second-instance` delivery, the rendered
-composition and an actual pack render are not exercised headlessly; their pure model and view pieces
-are.
+Electron window, protocol registration, `open-url`/`second-instance` delivery and the rendered
+composition are not exercised headlessly; their pure model and view pieces are, and Budget's pack
+renderer is mounted in its own suite over a fake `window.suite` rather than in an Electron view.
