@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld("suiteShell", {
   installPack: () => ipcRenderer.invoke("suite:shell:install-pack"),
   installCataloguePack: (id, version) =>
     ipcRenderer.invoke("suite:shell:install-catalogue-pack", id, version),
+  importRevocation: () => ipcRenderer.invoke("suite:shell:import-revocation"),
+  rotatePublisher: () => ipcRenderer.invoke("suite:shell:rotate-publisher"),
   uninstallPack: (id, version) => ipcRenderer.invoke("suite:shell:uninstall-pack", id, version),
   addWidget: (registryId) => ipcRenderer.invoke("suite:shell:add-widget", registryId),
   removeWidget: (registryId) => ipcRenderer.invoke("suite:shell:remove-widget", registryId),

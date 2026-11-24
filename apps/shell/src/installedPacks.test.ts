@@ -28,6 +28,12 @@ import {
 } from "./installedPacks.js";
 import { documentScopeLabel, documentsRootFor } from "./packIdentity.js";
 import { packPartition } from "./packs.js";
+import { ROTATION_KIND, signRotationStatement } from "./publisherRotation.js";
+import {
+  addTrustedPublisher,
+  applyPublisherRotation,
+  openPublisherTrust,
+} from "./publisherTrust.js";
 import type { PackCapability } from "./shared.js";
 
 const encoder = new TextEncoder();
@@ -760,5 +766,63 @@ describe("publisher install identity", () => {
     expect(scan.issues).toContainEqual(
       expect.objectContaining({ id: "demo", version: "1.0.0", reason: "identity" }),
     );
+  });
+
+  // spec: S2.3
+  it("keeps an installed version running across a rotation and installs the next one with the new key", async () => {
+    const dataRoot = await temporaryRoot();
+    const packsRoot = join(dataRoot, "packs");
+    const trustRoot = join(dataRoot, "trust");
+    const outgoing = await generatePackKeyPair();
+    const incoming = await generatePackKeyPair();
+
+    const added = await addTrustedPublisher(trustRoot, {
+      id: "acme",
+      key: outgoing.publicKeyBase64,
+      fingerprint: await publisherKeyFingerprint(outgoing.publicKeyBase64),
+    });
+    expect(added.ok).toBe(true);
+
+    const first = await fixture({ version: "1.0.0", keys: outgoing, publisherId: "acme" });
+    await installPackArchive(
+      first.archive,
+      packsRoot,
+      trustFor((await openPublisherTrust(trustRoot)).publishers),
+    );
+
+    const rotation = signRotationStatement(
+      {
+        kind: ROTATION_KIND,
+        publisher: "acme",
+        sequence: 1,
+        previousKey: outgoing.publicKeyBase64,
+        newKey: incoming.publicKeyBase64,
+      },
+      outgoing.secretKeyBase64,
+    );
+    const applied = await applyPublisherRotation(trustRoot, {
+      statement: rotation,
+      fingerprint: await publisherKeyFingerprint(incoming.publicKeyBase64),
+    });
+    expect(applied.ok).toBe(true);
+
+    const rotated = await openPublisherTrust(trustRoot);
+    const kept = await loadInstalledPacks(packsRoot, trustFor(rotated.publishers));
+    expect(kept.packs).toHaveLength(1);
+    expect(kept.packs[0]).toMatchObject({ id: "demo", version: "1.0.0" });
+    expect(kept.issues).toHaveLength(0);
+
+    const second = await fixture({ version: "1.1.0", keys: incoming, publisherId: "acme" });
+    await installPackArchive(second.archive, packsRoot, trustFor(rotated.publishers));
+
+    const scan = await loadInstalledPacks(packsRoot, trustFor(rotated.publishers));
+    expect(scan.packs[0]).toMatchObject({ id: "demo", version: "1.1.0" });
+    expect(scan.versions.map((entry) => entry.version)).toEqual(["1.0.0", "1.1.0"]);
+
+    const identity = JSON.parse(
+      await readFile(join(packsRoot, "demo", "publisher.json"), "utf8"),
+    ) as { id: string; key: string };
+    expect(identity.id).toBe("acme");
+    expect(identity.key).toBe(incoming.publicKeyBase64);
   });
 });

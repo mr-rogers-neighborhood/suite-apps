@@ -59,8 +59,9 @@ export function publicKeyFromSecret(privateKeyBase64: string): string {
 }
 
 /**
- * Sign bytes. The manifest and the catalogue index carry separate documents,
- * but both are Ed25519 over canonical bytes with standard base64.
+ * Sign bytes. The manifest, the catalogue index, a key rotation statement and a
+ * revocation advisory are separate documents, but all are Ed25519 over
+ * canonical bytes with standard base64 (S2.3, S2.4).
  */
 export function signBytes(bytes: Uint8Array, privateKeyBase64: string): string {
   return bytesToBase64(nobleSign(bytes, base64ToBytes(privateKeyBase64)));

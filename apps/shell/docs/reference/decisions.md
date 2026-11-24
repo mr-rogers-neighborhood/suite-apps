@@ -185,10 +185,19 @@ The rules that shape the Suite host.
   before anything is written, and the result notice repeats them.
 - The install identity is `(publisher id, pack id)`. The active publisher is recorded beside the
   version directories. A different publisher under an existing id is refused without the explicit
-  migration, and a different key under the same id is refused as a rotation this host cannot verify
-  yet. A migration inherits no documents, files, session storage or grants: documents, files and the
-  renderer partition are keyed by both ids. The first-party publisher keeps its pre-S2.1 storage
-  paths so an existing install is not moved.
+  migration. A different key under the same id is refused unless a rotation statement retired the
+  old key: the statement is signed by the outgoing key, carries the same publisher id, the new key
+  and a strictly increasing sequence, and the store is written only after the person confirms the
+  new fingerprint. The retired key still verifies installed versions; the current key is required
+  for a new install. A migration inherits no documents, files, session storage or grants: documents,
+  files and the renderer partition are keyed by both ids. The first-party publisher keeps its
+  pre-S2.1 storage paths so an existing install is not moved.
+- A revocation is a signed advisory for one `(publisher, pack)`, delivered as a local file. The
+  publisher that owns the pack may issue it with the key that signed the pack (current or retired);
+  another publisher may not. The person may record an unsigned local advisory. A recorded advisory
+  refuses a new install and marks the catalogue entry refused, but the installed-version scan never
+  consults it: an installed pack keeps running until the person disables or removes it. A catalogue
+  operator issuer is deferred until the shell pins operator keys from the signed index.
 - The local catalogue is a directory of `.suitepack` files, `<dataRoot>/catalogue` by default and
   `SUITE_SHELL_CATALOGUE` when set. Every archive is read and verified before it is listed; a refused
   archive still lists with its refusal sentence and can never be installed. Listing extracts nothing.
