@@ -63,12 +63,24 @@ describe("upload set", () => {
   });
 
   it("names a pre-release for its channel and never writes the stable alias", () => {
-    for (const channel of ["slop", "nightly", "preview"]) {
+    for (const channel of ["nightly", "preview"]) {
       const names = uploadNames("0.1.0", channel);
       assert.deepEqual(names, [`suite-go-${channel}-0.1.0.apk`, `suite-go-${channel}-0.1.0.apk.sha256`]);
       assert.ok(!names.includes(GO_APK_ALIAS));
     }
-    assert.equal(goApkAssetName("0.1.0", "slop"), "suite-go-slop-0.1.0.apk");
+    assert.equal(goApkAssetName("0.1.0", "nightly"), "suite-go-nightly-0.1.0.apk");
+  });
+
+  it("names a slop build for its commit and never writes the stable alias", () => {
+    const names = uploadNames("0.1.0", "slop", "abc1234");
+    assert.deepEqual(names, [
+      "suite-go-slop-0.1.0-abc1234.apk",
+      "suite-go-slop-0.1.0-abc1234.apk.sha256",
+    ]);
+    assert.ok(!names.includes(GO_APK_ALIAS));
+    assert.equal(goApkAssetName("0.1.0", "slop", "abc1234"), "suite-go-slop-0.1.0-abc1234.apk");
+    assert.throws(() => goApkAssetName("0.1.0", "slop"), /needs --revision/u);
+    assert.throws(() => goApkAssetName("0.1.0", "stable", "abc1234"), /takes no --revision/u);
   });
 
   it("refuses a channel it has no identity for", () => {
@@ -91,6 +103,14 @@ describe("upload arguments", () => {
     assert.equal(options.upload, "a.apk");
     assert.equal(options.channel, "slop");
     assert.equal(options.publish, true);
+  });
+
+  it("reads the commit a slop upload names, and refuses a malformed one", () => {
+    const options = parseArgs(["--channel", "slop", "--revision", "abc1234"]);
+    assert.equal(options.revision, "abc1234");
+    assert.equal(parseArgs([]).revision, null);
+    assert.throws(() => parseArgs(["--revision", "ABC1234"]), /lower-case sha7/u);
+    assert.throws(() => parseArgs(["--revision"]), /--revision needs a value/u);
   });
 
   it("accepts --allow-published as its own switch", () => {
@@ -296,7 +316,10 @@ describe("versionCode monotonicity", () => {
       { tagName: "suite-preview-2026.11.22", isDraft: false },
       { tagName: "suite-preview-2026.11.21", isDraft: false },
       { tagName: "suite-nightly-2026.11.22", isDraft: false },
-      { tagName: "suite-slop-2026.11.20", isDraft: true },
+      { tagName: "suite-slop-2026.11.22-abc1234", isDraft: false },
+      { tagName: "suite-slop-2026.11.21-def5678", isDraft: false },
+      { tagName: "suite-slop-2026.11.23-aaaaaaa", isDraft: true },
+      { tagName: "suite-slop-2026.11.20", isDraft: false },
       { tagName: "suite-2026.11.22", isDraft: false },
     ];
     assert.deepEqual(newestManifestTags(releases, "nightly"), [
@@ -305,7 +328,9 @@ describe("versionCode monotonicity", () => {
     assert.deepEqual(newestManifestTags(releases, "preview"), [
       "suite-preview-2026.11.22",
     ]);
-    assert.deepEqual(newestManifestTags(releases, "slop"), []);
+    assert.deepEqual(newestManifestTags(releases, "slop"), [
+      "suite-slop-2026.11.22-abc1234",
+    ]);
   });
 
   it("refuses a code lower than the one published for the same package id", () => {

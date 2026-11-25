@@ -334,9 +334,10 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
   one identity for slop, nightly and preview. Each pre-release channel now has its own id and its own
   data root, so all four superapp channels install and update beside each other. The branch names and
   the channel digits do not change.
-- **Slop is the one pre-release id that did not move.** `run.suite.slop.shell` and
-  `run.suite.slop.go` were already slop's ids. Nightly and preview moved to
-  `run.suite.nightly.{shell,go}` and `run.suite.preview.{shell,go}`.
+- **Slop was the one pre-release id that did not move in #380.** Its Desk id was
+  then the shell form and its Go id was already `run.suite.slop.go`; the Desk
+  rename later took the Desk id to `run.suite.slop.desk`. Nightly and preview
+  moved to `run.suite.nightly.{desk,go}` and `run.suite.preview.{desk,go}`.
 - **The move is a reinstall, once.** A nightly or preview install made before this change does not
   update into the new id; it installs once under the new id and the old card is removed by hand. No
   pre-release data is migrated: the new id starts with an empty data root, and the old data is not
@@ -346,6 +347,31 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
 - **The Desk rename later moved all four Desk ids to `.desk`.** That is a separate identity change
   with a fresh data root; [The desktop host is Suite Desk](#the-desktop-host-is-suite-desk-335-392)
   records it.
+
+### Slop publishes every push (#386)
+
+- **Slop is published, not just built.** The `slop` workflow runs on every code push to `main` and
+  publishes the build being worked on: `run.suite.slop.desk` on branch `slop`, the Suite Go slop
+  APK, and one page per build. This replaces the older reading of D3.1 that slop was only a local
+  session artifact; the spec records the new boundary.
+- **The page is per commit.** The tag is `suite-slop-<YYYY.MM.DD>-<sha7>`, the APK is
+  `suite-go-slop-<version>-<sha7>.apk`, and the body names the commit. A second run for the same
+  commit is a no-op and never moves the tag, even on a later day. A new merge is what makes a new
+  page.
+- **The proof is the merge queue, not the full gate.** A slop push has no fresh gate, e2e, clean
+  install, SBOM or attestation. The page says **merge-queue-proven, not full-gate-proven** so nobody
+  reads it as a release. `flatpak-remote.mjs --merge-queue-proven` is accepted only with
+  `--channel slop`; every other channel still needs `.dev/gate-status.json`, and a dirty tree still
+  refuses.
+- **No index and no Latest.** A slop publication writes only its own refs and page. It never publishes
+  the pack catalogue index, never moves GitHub's Latest release, and never touches the stable refs;
+  the remote's normal ref merge keeps every other branch in the signed summary.
+- **Seven builds are kept.** `release-status.mjs --prune --channel slop --keep 7` deletes older
+  published slop pages and their tags. The tag pattern is the revision shape, so a revision-less
+  page is history rather than a candidate. Slop is a session channel, not release history.
+- **A burst builds the tip.** The workflow's `concurrency` group cancels an in-flight slop run when a
+  newer push arrives. A manual dispatch has a `publish` boolean that defaults off, so the same build
+  and key path can be rehearsed without publishing.
 
 ## Reviews and release keys
 

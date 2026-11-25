@@ -24,7 +24,7 @@ the commit that contains it; each app's `CHANGELOG.md` is the dated record of ch
 | Pack files | Working | `@suite/pack-host` enforces a scoped root with relative paths, symlink refusal, atomic writes, expected-mtime conflicts, backups and locks; the host exposes it as `files/<container>/<pack>` per pack and keeps installed packs at `<dataRoot>/packs/<id>/<version>`, with locks released when a view dies. The external picker keeps the path in the host and gives the pack an opaque handle. Suite Go serves the same capability over Capacitor's Filesystem plugin, importing the shared path rules and lock table from `@suite/pack-host/files/core` because the Node-backed store cannot enter a WebView; a pack's root is `pack-files/<pack>` for the first-party publisher and `pack-files/<publisher>~<pack>` otherwise, under the app's data directory, and the frame bridge maps each frame to the manifest it was mounted with |
 | Shared packages | Working | `@suite/contracts`, `files`, `desktop`, `theme`, `ui`, `pack`, `pack-runtime` and `pack-host` are consumed as workspace packages |
 | Linux packaging | Working | Flatpak for the host, Canvas, Planner, Budget and Help; `run.suite.sync` is retired as a shipped app and the remote keeps its last published ref; no AppImage or Arch package |
-| Release channels | Working | `slop`, `nightly`, `preview` and `stable` on the superapp (Suite Desk and Suite Go), each pre-release with its own id and data root, so all four install and update side by side; product maturity is separate, so a stable-channel build can be alpha; packs carry signed versions, and legacy Canvas, Planner, Budget and Help are frozen; [Channels](../explanation/channels.md) owns the model |
+| Release channels | Working | `slop`, `nightly`, `preview` and `stable` on the superapp (Suite Desk and Suite Go), each pre-release with its own id and data root, so all four install and update side by side; product maturity is separate, so a stable-channel build can be alpha; packs carry signed versions, and legacy Canvas, Planner, Budget and Help are frozen; slop publishes from every code push to `main` with the merge queue as its proof, never Latest and kept for seven builds; [Channels](../explanation/channels.md) owns the model |
 | Flatpak | Working | Signed local store and a published public remote at `flatpak.suite.run`, with `suite-dev` as the local test host: the host and the frozen Canvas, Planner, Budget and Help install and update through Flatpak, and the retired `run.suite.sync` ref stays published without being updated; [Packaging channels](packaging-channels.md#flatpak) owns the remote |
 | macOS and Windows | Test builds only | Unsigned test artifacts build nightly in `platforms.yml` and are not published, because there is no signing identity |
 | Accessibility | Partial | Contrast is machine-checked in the desktop apps; Canvas runs axe over its Storybook stories, Planner has no axe gate, Budget's Storybook panel does not fail the build, and the relay's loopback console has no axe; no full manual pass recorded. The statements own the detail: [Canvas](../../apps/canvas/ACCESSIBILITY.md), [Planner](../../apps/planner/ACCESSIBILITY.md), [Budget](../../apps/budget/ACCESSIBILITY.md), [Sync](../../apps/sync/ACCESSIBILITY.md) |
@@ -47,9 +47,12 @@ published. Sync is retired as an app (#315); the relay becomes a host capability
 The gate is one command, and CI runs that command rather than a second path. A pull request runs the
 rows its diff can break and `main` runs the full fresh gate. The nightly run adds the full gate,
 builds the host Flatpak and the Go debug APK, and attests both; with the release keys and `NIGHTLY_PUBLISH` configured it publishes the nightly channel as its
-own pre-release page (`suite-nightly-<date>`), keeping the newest 14. The GitHub mirror is a draft →
-attach → publish flow, safe for immutable releases. The VM gate is
-retired; the evidence is a command that can be run, and CI runs it. See [Commands](commands.md).
+own pre-release page (`suite-nightly-<date>`), keeping the newest 14. Slop publishes on every code
+push to `main` after the merge queue, with no fresh gate, e2e, clean install, SBOM, attestation or
+pack index; its page says merge-queue-proven, and the newest seven stay
+([Channels](../explanation/channels.md#slop-publication)). The GitHub mirror is a draft → attach →
+publish flow, safe for immutable releases. The VM gate is retired; the evidence is a command that can
+be run, and CI runs it. See [Commands](commands.md).
 
 ## Where to go next
 

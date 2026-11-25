@@ -164,6 +164,12 @@ Suite Go's APK and relinks it. Without `--publish` it prints every step and chan
 individual commands and the gate-proof rule are in [Package and
 release](../how-to/package-and-release.md#release-suite-desk-the-host).
 
+Slop is the exception: `.github/workflows/slop.yml` publishes on every code push to `main`, and a
+manual rehearsal is `gh workflow run slop.yml -f publish=false`. It publishes
+`run.suite.slop.desk//slop` and `suite-go-slop-<version>-<sha7>.apk` on the page
+`suite-slop-<date>-<sha7>`, with the merge queue as its proof and no pack index; the seven newest
+pages stay. [Channels](../explanation/channels.md#slop-publication) owns the promise.
+
 ## Delivery signals
 
 ```sh
