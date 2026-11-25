@@ -37,17 +37,25 @@ documents and files on disk until the person removes them.
 
 ## Install a frozen Flatpak
 
-The frozen apps are not packs yet. Each keeps its last signed deployment:
+Canvas, Planner and Help are not packs yet. Each keeps its last signed deployment:
 
 ```sh
 flatpak install --user suite run.suite.canvas
 flatpak install --user suite run.suite.planner
-flatpak install --user suite run.suite.budget
 flatpak install --user suite run.suite.help
 ```
 
 The signed remote is the same one the host uses. A new build updated the deployment with
 `flatpak update --user`; the apps are frozen, so there is no new release until each becomes a pack.
+
+Budget is separate: its pack is the install path. [Install **Suite Budget** from the Desk
+catalogue](#install-a-pack) and import the document there. Its last `run.suite.budget` Flatpak stays
+installable on the same remote for exporting an existing `Documents/Suite/Budget` document to a
+`.budget` file; no new Budget Flatpak build is published.
+
+```sh
+flatpak install --user suite run.suite.budget
+```
 
 ## The relay
 

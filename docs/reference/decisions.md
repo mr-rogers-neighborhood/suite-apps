@@ -326,11 +326,13 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
 
 ## Packaging
 
-- Flatpak is the only Linux desktop form: Suite Desk, Canvas, Planner, Budget and Help. `run.suite.sync`
-  is retired as a shipped app (#315): no new build is published, the signed remote keeps its last
-  published ref, and the relay's code runs as a host capability rather than a separate app. The last
-  published app also runs the CLI headlessly with `flatpak run --command=suite-sync`. There is no
-  AppImage, Arch package, `deb`, `rpm` or `snap`.
+- Flatpak is the only Linux desktop form for Suite Desk, Canvas, Planner and Help. Suite Budget is
+  the exception: its last `run.suite.budget` Flatpak stays published for export, and its signed pack
+  from the Desk catalogue is the install path. `run.suite.sync` is retired as a shipped app (#315):
+  since then, no new build is published, the signed remote keeps its last published ref, and the
+  relay's code runs as a host capability rather than a separate app. The last published app also runs
+  the CLI headlessly with `flatpak run --command=suite-sync`. There is no AppImage, Arch package,
+  `deb`, `rpm` or `snap`.
 - Flatpak owns a Flatpak deployment. No Suite process writes into a deployment, replaces it or offers
   an update button; `flatpak update --user` is the path. The host is only the writer for its own
   packs.
