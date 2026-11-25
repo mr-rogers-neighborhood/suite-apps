@@ -16,8 +16,10 @@ import {
   changelogDate,
   changelogDateProblem,
   channelLabel,
+  channelTagPattern,
   collectReleases,
   currentAggregateTag,
+  defaultKeepFor,
   draftAction,
   draftRefusalMessage,
   draftReleaseArgs,
@@ -27,8 +29,10 @@ import {
   INDEX_RELEASE_FILE,
   installCell,
   installCommand,
+  isChannelTag,
   isDate,
   isLegacyFrozen,
+  isRevision,
   maturityLabel,
   parseArgs,
   planTag,
@@ -44,10 +48,15 @@ import {
   releaseFor,
   releaseLabels,
   releasePhase,
+  releaseTitle,
   releasesPage,
   remoteLookupProblem,
+  revisionHeadProblem,
+  revisionProblem,
+  slopRevisionRelease,
   superappEntries,
   workflowInputDate,
+  writeModeProblem,
   writesReleasesPage,
 } from "./release-status.mjs";
 
@@ -1070,8 +1079,7 @@ describe("release notes name their channel", () => {
   });
 });
 
-describe("the Artifacts section", () => {
-  const flatpakCommit = "c".repeat(64);
+describe("the Artifacts section", () => {  const flatpakCommit = "c".repeat(64);
   const flatpakSha = "d".repeat(64);
   const apkSha = "e".repeat(64);
   const manifest = {
@@ -1202,3 +1210,217 @@ describe("the Artifacts section", () => {
   });
 });
 
+
+describe("the slop publication", () => {
+  const revision = "abc1234";
+  const otherRevision = "def5678";
+  const tagDate = "2026-11-24";
+  const tag = "suite-slop-2026.11.24-abc1234";
+  const onNov24 = new Date("2026-11-24T12:00:00Z");
+
+  /** A tree whose newest changelog date is 2026-11-22 for every app. */
+  function treeFiles() {
+    const files = {};
+    for (const app of APPS) {
+      files[app.packageJson] = JSON.stringify({ version: "1.0.0" });
+      files[app.changelog] = "## [1.0.0] - 2026-11-22\n\n### Added\n\n- **It exists.**\n";
+    }
+    return files;
+  }
+
+  it("names the tag, the title and the APK asset with the commit", () => {
+    assert.equal(aggregateTag(tagDate, "slop", revision), tag);
+    assert.equal(goApkName("0.2.0", "slop", revision), "suite-go-slop-0.2.0-abc1234.apk");
+    assert.equal(
+      goApkUrl(tag, "0.2.0", "slop", revision),
+      `https://github.com/mrrnbhd/suite-apps/releases/download/${tag}/suite-go-slop-0.2.0-abc1234.apk`,
+    );
+    assert.equal(releaseTitle(tagDate, "slop", revision), `Suite Desk + Suite Go — ${tagDate} (${revision})`);
+    assert.equal(releaseTitle(tagDate), `Suite Desk + Suite Go — ${tagDate}`);
+  });
+
+  it("never lets a revision name the stable tag, and requires one for slop", () => {
+    assert.throws(
+      () => aggregateTag("2026-11-24", "stable", revision),
+      /stable tag is the snapshot date/u,
+    );
+    assert.match(revisionProblem("slop", null), /needs --revision/u);
+    assert.match(revisionProblem("stable", revision), /takes no --revision/u);
+    assert.equal(revisionProblem("slop", revision), null);
+    assert.equal(revisionProblem("nightly", null), null);
+    assert.equal(isRevision("abc1234"), true);
+    assert.equal(isRevision("abc123"), false);
+    assert.equal(isRevision("ABC1234"), false, "a sha7 is lower-case");
+  });
+
+  it("refuses a revision that does not name the checked-out commit", () => {
+    const head = "abc1234d5e6f7890abc1234d5e6f7890abc12345";
+    assert.equal(revisionHeadProblem(revision, head), null);
+    assert.match(
+      revisionHeadProblem("def5678", head),
+      /--revision def5678 is not HEAD \(abc1234\)/u,
+    );
+    assert.equal(revisionHeadProblem(null, head), null, "a channel with no revision is fine");
+  });
+
+  it("keeps the publication day in the tag and the newest changelog date in the snapshot", () => {
+    const load = (path) => treeFiles()[path] ?? "";
+    assert.equal(
+      currentAggregateTag({ load, channel: "slop", revision, now: onNov24, env: {} }),
+      tag,
+    );
+  });
+
+  it("states the commit and the merge-queue proof boundary, without a catalogue index", () => {
+    const body = aggregateReleaseBody(entries, {
+      date: "2026-11-22",
+      tagDate,
+      tag,
+      channel: "slop",
+      revision,
+      index: {
+        sequence: 7,
+        url: "https://flatpak.suite.run/index.json",
+        signatureUrl: "https://flatpak.suite.run/index.json.sig",
+        fingerprint: "AA:BB",
+      },
+    });
+    assert.ok(body.includes(`Commit \`${revision}\``));
+    assert.match(body, /merge-queue-proven, not\s+full-gate-proven/u);
+    assert.match(body, /no fresh gate, e2e, clean install, SBOM or attestation/u);
+    assert.match(body, /never marks GitHub's Latest release/u);
+    assert.match(body, /only the seven newest slop pages are kept/u);
+    assert.doesNotMatch(body, /## Catalogue index/u);
+    assert.ok(body.includes("flatpak install --user suite run.suite.slop.desk//slop"));
+    assert.doesNotMatch(body, /install --user suite run\.suite\.desk/u);
+  });
+
+  it("names the commit in the APK cell, and never writes a stable alias", () => {
+    const live = aggregateReleaseBody(entries, {
+      date: "2026-11-22",
+      tagDate,
+      tag,
+      channel: "slop",
+      revision,
+      apkLive: true,
+    });
+    assert.ok(live.includes("suite-go-slop-0.1.0-abc1234.apk"));
+    assert.match(live, /suite-go-slop-0\.1\.0-abc1234\.apk\)/u);
+
+    const draft = installCell(go, {
+      version: "0.1.0",
+      tag,
+      draft: true,
+      channel: "slop",
+      revision,
+    });
+    assert.match(draft, /suite-go-slop-0\.1\.0-abc1234\.apk/u);
+    assert.doesNotMatch(draft, /suite-go\.apk/u);
+    assert.doesNotMatch(draft, /releases\/download/u);
+  });
+
+  it("publishes a pre-release that is never Latest", () => {
+    const args = publishReleaseArgs({
+      tag,
+      notesPath: ".dev/releases/slop.md",
+      latest: false,
+      prerelease: true,
+    });
+    assert.ok(args.includes("--latest=false"));
+    assert.ok(args.includes("--prerelease"));
+    assert.ok(!args.includes("--latest"));
+  });
+
+  it("stops a second run for the same commit, on the same day or a later one", () => {
+    const releases = [
+      { tagName: "suite-slop-2026.11.23-abc1234", isDraft: false },
+      { tagName: "suite-slop-2026.11.24-def5678", isDraft: false },
+    ];
+    const check = publishedCheck(releases, "suite-slop-2026.11.25-abc1234", {
+      channel: "slop",
+      revision,
+    });
+    assert.equal(check.published, true);
+    assert.match(check.sentence, /commit abc1234/u);
+    assert.match(check.sentence, /no-op/u);
+    assert.match(check.sentence, /leaves the tag, assets and body untouched/u);
+
+    assert.equal(
+      publishedCheck([], tag, { channel: "slop", revision }).published,
+      false,
+      "a free commit and day still publishes",
+    );
+    assert.equal(
+      slopRevisionRelease([{ tagName: tag, isDraft: true }], revision),
+      null,
+      "a draft is not an already-published build",
+    );
+    assert.equal(slopRevisionRelease(releases, revision)?.tagName, "suite-slop-2026.11.23-abc1234");
+  });
+
+  it("refuses a draft over the same commit's published page rather than move it", () => {
+    const releases = [{ tagName: "suite-slop-2026.11.23-abc1234", isDraft: false }];
+    const phase = releasePhase("draft", releases, "suite-slop-2026.11.25-abc1234", {
+      channel: "slop",
+      revision,
+    });
+    assert.equal(phase.action, "refuse");
+    assert.match(phase.problem, /second page for the same commit/u);
+    assert.match(phase.problem, /no-op/u);
+
+    const sameDay = draftAction({
+      exists: true,
+      isDraft: false,
+      tag,
+      channel: "slop",
+      revision,
+    });
+    assert.equal(sameDay.action, "refuse");
+    assert.match(sameDay.problem, /second page for the same commit/u);
+  });
+
+  it("prunes only revision-shaped slop pages, keeping the newest seven", () => {
+    const letters = ["0", "1", "2", "3", "4", "5", "6", "7", "8"];
+    const pages = letters.map((letter, index) => ({
+      tagName: `suite-slop-2026.11.${String(10 + index)}-${letter.repeat(7)}`,
+      isDraft: false,
+    }));
+    const releases = [
+      ...pages,
+      { tagName: "suite-slop-2026.11.19", isDraft: false },
+      { tagName: "suite-nightly-2026.11.19", isDraft: false },
+      { tagName: "suite-2026.11.19", isDraft: false },
+    ];
+    assert.deepEqual(pruneCandidates(releases, { channel: "slop", keep: 7 }), [
+      "suite-slop-2026.11.11-1111111",
+      "suite-slop-2026.11.10-0000000",
+    ]);
+
+    assert.equal(isChannelTag("suite-slop-2026.11.24-abc1234", "slop"), true);
+    assert.equal(isChannelTag("suite-slop-2026.11.24", "slop"), false);
+    assert.equal(channelTagPattern("nightly").test("suite-nightly-2026.11.24"), true);
+    assert.equal(channelTagPattern("nightly").test("suite-nightly-2026.11.24-abc1234"), true);
+    assert.equal(defaultKeepFor("slop"), 7);
+    assert.equal(defaultKeepFor("nightly"), 14);
+    assert.equal(parseArgs(["--prune", "--channel", "slop"]).keep, null);
+  });
+
+  it("parses --revision and refuses a malformed one", () => {
+    const options = parseArgs(["--channel", "slop", "--revision", revision]);
+    assert.equal(options.channel, "slop");
+    assert.equal(options.revision, revision);
+    assert.equal(parseArgs([]).revision, null);
+    assert.throws(
+      () => parseArgs(["--revision", "ABC1234"]),
+      /not a lower-case sha7/u,
+    );
+    assert.throws(() => parseArgs(["--revision"]), /--revision needs a value/u);
+  });
+
+  it("refuses --write for a pre-release, so it cannot overwrite the stable mirror", () => {
+    assert.equal(writeModeProblem("stable", "write"), null);
+    assert.equal(writeModeProblem("slop", "publish"), null);
+    assert.match(writeModeProblem("slop", "write"), /stable mirror/u);
+    assert.match(writeModeProblem("nightly", "write"), /overwrite the stable page/u);
+  });
+});

@@ -51,6 +51,32 @@ checks are the evidence, not an automatic promotion.
 carries, and it is allowed to be smaller and sillier than the rest. That is a promise about scope, not
 an excuse to skip a check at the next boundary.
 
+## Slop publication
+
+Slop is the one channel that publishes itself. Every code push to `main` publishes a slop build, so
+the channel is always today's work rather than a build someone remembered to promote. The pipeline is
+[`.github/workflows/slop.yml`](../../.github/workflows/slop.yml).
+
+The page is one build, tagged `suite-slop-<YYYY.MM.DD>-<sha7>` and marked *pre-release*. Its title,
+body and Suite Go asset name the commit: the APK is
+`suite-go-slop-<version>-<sha7>.apk`. A second run for the same commit is a no-op, not a moved tag.
+A burst of pushes builds only the tip.
+
+The proof boundary is written on the page, because it is narrower than the next boundary up:
+
+- **Merge-queue-proven, not full-gate-proven.** The merge queue already ran the checks the change
+  could break. Slop does not run the fresh gate, e2e, a clean install, an SBOM or attestations.
+- **No pack index.** The signed catalogue is a stable and nightly fact; a slop build publishes only
+  its own Flatpak refs and its page.
+- **Never Latest, never stable.** Slop publishes `run.suite.slop.desk` on branch `slop` and
+  `run.suite.slop.go`; it does not move the stable refs, GitHub's Latest release or another channel's
+  page.
+- **Kept for seven.** The seven newest slop pages and their tags stay; older ones are pruned. Slop is
+  a session channel, not history, and stable remains the artifact a person keeps.
+
+That is why a slop build is not a release candidate. It promises only that it is the build being
+worked on; `nightly` is where "it builds and runs from `main`" is proven.
+
 ## What "unstable" does not mean
 
 `unstable` is not a channel and not a colour between `slop` and `nightly`. `slop` already is unstable.

@@ -68,7 +68,8 @@ and what the owner tests; there is no Play Store build.
 
 ```sh
 mise exec -- node scripts/android-release.mjs                 # stable
-mise exec -- node scripts/android-release.mjs --channel slop  # slop, nightly or preview
+mise exec -- node scripts/android-release.mjs --channel slop \
+  --revision "$(git rev-parse --short=7 HEAD)"                # slop, nightly or preview
 mise exec -- node scripts/android-release.mjs --publish       # attach it to the rolling release
 adb install -r -t apps/go/.dev/release/suite-go-<version>.apk
 ```
@@ -80,7 +81,8 @@ debug-signed artifact cannot become the public one.
 
 Stable is `run.suite.go`. Each pre-release channel has its own package id — `run.suite.slop.go`,
 `run.suite.nightly.go` or `run.suite.preview.go` — so stable, slop, nightly and preview install and
-update side by side; a pre-release asset is `suite-go-<channel>-<version>.apk`. Nightly and preview
+update side by side; a pre-release asset is `suite-go-<channel>-<version>.apk`, and a slop build adds
+the commit (`suite-go-slop-<version>-<sha7>.apk`). Nightly and preview
 moved from the shared `run.suite.slop.go` id, so an older nightly or preview install reinstalls once
 under the new id; no app data is migrated. The rolling release also
 carries stable as

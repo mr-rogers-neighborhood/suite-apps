@@ -1,0 +1,270 @@
+# Slop publication: the build being worked on, published from every push to
+# `main`.
+#
+# Slop is the session channel (#386). The merge queue already proved the change,
+# so this workflow does not run the fresh gate, e2e, a clean install, an SBOM or
+# an attestation. The page says "merge-queue-proven, not full-gate-proven" and
+# keeps that honest. It publishes only the slop identities: the Desk Flatpak on
+# `run.suite.slop.desk//slop` and the Suite Go APK named for the commit. It
+# never touches the stable refs, GitHub's Latest release or the pack index.
+#
+# A burst of pushes builds only the tip. A second run for the same commit is a
+# no-op: the tag, the assets and the page carry the commit, so the cheap check
+# stops before a build instead of moving anything.
+#
+# `workflow_dispatch` with `publish` off is a rehearsal: it builds and signs both
+# artifacts and writes nothing. The keys are imported either way, because the
+# Android release APK cannot be built or verified without the keystore.
+name: slop
+
+on:
+  push:
+    branches: [main]
+    # Code only: a docs-only push has no build to publish.
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "scripts/**"
+      - "packaging/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - ".github/workflows/slop.yml"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Sign and publish; off runs the same build without touching a channel
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# A burst builds the tip: a newer push cancels the run it supersedes.
+concurrency:
+  group: slop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: publish-slop
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # The keys live here. Slop has no `approval` job: the push is the decision,
+    # and the merge queue is the proof the page names.
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      SUITE_FLATPAK_REPO: ${{ github.workspace }}/.dev/flatpak-repo
+      # A push publishes; a dispatch publishes only when asked.
+      SLOP_PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The release tag plan asks origin for a tag and `--draft` creates one
+          # at HEAD; a shallow clone cannot answer either question well.
+          fetch-depth: 0
+
+      - name: pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 12.17.0
+
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Java
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve the commit
+        run: |
+          set -euo pipefail
+          echo "REVISION=${GITHUB_SHA:0:7}" >> "${GITHUB_ENV}"
+
+      # The cheap question. A published slop page for this commit means there is
+      # nothing to build, so the run stops green before the expensive steps.
+      - name: Check this commit is not already published
+        id: check
+        if: env.SLOP_PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sentence="$(node scripts/release-status.mjs --check-published \
+            --channel slop --revision "${REVISION}")"
+          if [ -z "${sentence}" ]; then
+            echo "No published slop page for ${REVISION}; continuing."
+            exit 0
+          fi
+          printf '%s\n' "${sentence}"
+          printf '%s\n' "${sentence}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "published=true" >> "${GITHUB_OUTPUT}"
+
+      # Fail before a build when the S3 publication variables are missing. The
+      # publisher refuses too, but a named step says which variable is absent.
+      - name: Check the S3 publishing configuration
+        if: env.SLOP_PUBLISH == 'true' && steps.check.outputs.published != 'true'
+        env:
+          ROLE_ARN: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          BUCKET: ${{ vars.SUITE_FLATPAK_S3_BUCKET }}
+          DISTRIBUTION: ${{ vars.SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "${ROLE_ARN}" ] || missing+=("repository variable AWS_RELEASE_ROLE_ARN")
+          [ -n "${BUCKET}" ] || missing+=("SUITE_FLATPAK_S3_BUCKET")
+          [ -n "${DISTRIBUTION}" ] || missing+=("SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION")
+          if [ "${#missing[@]}" -ne 0 ]; then
+            printf 'The s3 target also needs:\n'
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+      - name: AWS credentials (OIDC)
+        if: >-
+          env.SLOP_PUBLISH == 'true' &&
+          steps.check.outputs.published != 'true' &&
+          vars.AWS_RELEASE_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          role-session-name: suite-slop
+          aws-region: ${{ vars.AWS_RELEASE_REGION || 'us-east-1' }}
+
+      # The release APK cannot be built or verified without the keystore, and
+      # the Flatpak summary is signed with the store key. Import both before a
+      # build so a missing secret fails early rather than after work.
+      - name: Import the store and Android keys
+        if: steps.check.outputs.published != 'true'
+        env:
+          SUITE_STORE_KEY: ${{ secrets.SUITE_STORE_KEY }}
+          SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
+          SUITE_GO_KEYSTORE_B64: ${{ secrets.SUITE_GO_KEYSTORE }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUITE_STORE_KEY}" ] || [ -z "${SUITE_STORE_KEY_ID}" ]; then
+            echo "SUITE_STORE_KEY and SUITE_STORE_KEY_ID are required; a published remote is always GPG-signed" >&2
+            exit 1
+          fi
+          if [ -z "${SUITE_GO_KEYSTORE_B64}" ]; then
+            echo "SUITE_GO_KEYSTORE is required; a debug-signed APK is never a release" >&2
+            exit 1
+          fi
+
+          gnupg="${RUNNER_TEMP}/gnupg"
+          mkdir -p "${gnupg}"
+          chmod 700 "${gnupg}"
+          export GNUPGHOME="${gnupg}"
+          printf '%s\n' "${SUITE_STORE_KEY}" | gpg --batch --import
+          gpg --batch --list-keys "${SUITE_STORE_KEY_ID}" >/dev/null
+
+          printf 'suite slop\n' | \
+            gpg --batch --yes --local-user "${SUITE_STORE_KEY_ID}" --armor --detach-sign >/dev/null
+
+          keys="${RUNNER_TEMP}/keys"
+          mkdir -p "${keys}"
+          printf '%s' "${SUITE_GO_KEYSTORE_B64}" | base64 -d > "${keys}/suite-go-release.jks"
+          chmod 600 "${keys}/suite-go-release.jks"
+
+          {
+            echo "GNUPGHOME=${gnupg}"
+            echo "SUITE_GO_KEYSTORE=${keys}/suite-go-release.jks"
+          } >> "${GITHUB_ENV}"
+
+      - name: Flatpak tooling
+        if: steps.check.outputs.published != 'true'
+        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder ostree
+
+      - name: Flatpak runtimes
+        if: steps.check.outputs.published != 'true'
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk//25.08 \
+            org.electronjs.Electron2.BaseApp//25.08
+
+      # The build being worked on, on its own id and branch. No gate runs here:
+      # the merge queue already proved the change, and the page says so.
+      - name: Build the Desk Flatpak (slop)
+        if: steps.check.outputs.published != 'true'
+        env:
+          SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
+        run: node scripts/flatpak.mjs --app desk --channel slop --no-install
+
+      - name: Publish the signed Flatpak remote (slop)
+        if: env.SLOP_PUBLISH == 'true' && steps.check.outputs.published != 'true'
+        env:
+          SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
+          SUITE_FLATPAK_S3_BUCKET: ${{ vars.SUITE_FLATPAK_S3_BUCKET }}
+          SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION: ${{ vars.SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION }}
+        run: >-
+          node scripts/flatpak-remote.mjs --target s3 --from-repo "${SUITE_FLATPAK_REPO}"
+          --channel slop --merge-queue-proven --publish
+
+      - name: Build the Suite Go slop APK
+        if: steps.check.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUITE_GO_KEYSTORE_PASSWORD: ${{ secrets.SUITE_GO_KEYSTORE_PASSWORD }}
+          SUITE_GO_KEY_ALIAS: ${{ secrets.SUITE_GO_KEY_ALIAS }}
+          SUITE_GO_KEY_PASSWORD: ${{ secrets.SUITE_GO_KEY_PASSWORD }}
+        run: node scripts/android-release.mjs --channel slop --revision "${REVISION}"
+
+      # Draft → attach → publish, so the page links the APK it actually has.
+      - name: Create the slop draft page
+        if: env.SLOP_PUBLISH == 'true' && steps.check.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          node scripts/release-status.mjs --draft --channel slop
+          --revision "${REVISION}"
+
+      - name: Attach the APK to the slop draft
+        if: env.SLOP_PUBLISH == 'true' && steps.check.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUITE_GO_KEYSTORE_PASSWORD: ${{ secrets.SUITE_GO_KEYSTORE_PASSWORD }}
+          SUITE_GO_KEY_ALIAS: ${{ secrets.SUITE_GO_KEY_ALIAS }}
+          SUITE_GO_KEY_PASSWORD: ${{ secrets.SUITE_GO_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          apk="$(find apps/go/.dev/release -maxdepth 1 \
+            -name "suite-go-slop-*-${REVISION}.apk" -print -quit)"
+          if [ -z "${apk}" ]; then
+            echo "the APK build named no suite-go-slop-*-${REVISION}.apk" >&2
+            exit 1
+          fi
+          node scripts/android-release.mjs --upload "${apk}" --channel slop \
+            --revision "${REVISION}" --publish
+
+      - name: Publish the slop page
+        if: env.SLOP_PUBLISH == 'true' && steps.check.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          node scripts/release-status.mjs --publish --channel slop
+          --revision "${REVISION}"
+
+      # Keep the Releases page readable. Slop is frequent; the seven newest
+      # pages and their tags stay, and stable is never in the candidate set.
+      - name: Prune older slop pages
+        if: env.SLOP_PUBLISH == 'true' && steps.check.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-status.mjs --prune --channel slop --keep 7

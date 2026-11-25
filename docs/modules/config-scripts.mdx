@@ -10,7 +10,10 @@ helpers the publishing paths share — the version, the changelog section, the d
 refusals; `keys.mjs` reports whether a private key matches its pin; `lib/channel.mjs` and
 `lib/keys.mjs` hold the identities and key rules the scripts use; `flatpak.mjs` and
 `flatpak-remote.mjs` build and publish the store; `android-release.mjs` publishes Suite Go's APK; and
-`release-status.mjs` writes the release bodies and `RELEASES.md`.
+`release-status.mjs` writes the release bodies and `RELEASES.md`. `release-status.mjs --channel slop
+--revision <sha7>` names one commit on the page, its tag and the APK; `flatpak-remote.mjs
+--merge-queue-proven` accepts the merge queue's proof only for that channel, so slop can publish
+without a second gate while stable and nightly still refuse without `.dev/gate-status.json`.
 
 A root script has to name its own packages: bare `pnpm -r` would recurse through
 every app. The scripts are plain Node with no build step, so the release path is

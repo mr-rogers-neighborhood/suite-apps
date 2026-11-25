@@ -129,6 +129,9 @@ const USAGE = `usage: node scripts/flatpak-remote.mjs [options]
   --no-merge-published
                       publish only the refs built here; the summary replaces the
                       published one instead of naming every channel (S3 only)
+  --merge-queue-proven
+                      accept the merge queue's proof instead of .dev/gate-status.json;
+                      accepted only with --channel slop
   --help              print this text
 
 Environment overrides: SUITE_FLATPAK_STATE, SUITE_FLATPAK_REPO,
@@ -151,6 +154,7 @@ export function parseArgs(argv) {
     fromRepo: null,
     commitFile: null,
     noMergePublished: false,
+    mergeQueueProven: false,
     help: false,
   };
 
@@ -196,6 +200,8 @@ export function parseArgs(argv) {
       index += 1;
     } else if (arg === "--no-merge-published") {
       options.noMergePublished = true;
+    } else if (arg === "--merge-queue-proven") {
+      options.mergeQueueProven = true;
     } else {
       throw new Error(`unknown option ${arg}`);
     }
@@ -431,7 +437,38 @@ function flatpakrepoText({ publicKey, branch, url }) {
   ].join("\n");
 }
 
-function checkGitProof() {
+/**
+ * Why this publication cannot use the merge-queue proof, or null.
+ *
+ * Slop is published on every push to `main` after the merge queue passed, so it
+ * has no `.dev/gate-status.json`. That exception is scoped to slop by name: any
+ * other channel still needs the fresh gate proof, so the flag cannot become a
+ * way to publish stable or nightly without one.
+ */
+export function proofModeProblem({ channel = null, mergeQueueProven = false } = {}) {
+  if (!mergeQueueProven) return null;
+  if (channel !== "slop") {
+    return (
+      "--merge-queue-proven is accepted only with --channel slop: every other channel " +
+      "publishes a commit the fresh gate proved."
+    );
+  }
+  return null;
+}
+
+/** The gate or merge-queue proof problems for one publication, and nothing when it may proceed. */
+export function proofProblems(
+  status,
+  head,
+  { channel = null, mergeQueueProven = false } = {},
+) {
+  const modeProblem = proofModeProblem({ channel, mergeQueueProven });
+  if (modeProblem !== null) return [modeProblem];
+  if (mergeQueueProven) return [];
+  return gateProblems(status, head);
+}
+
+function checkGitProof({ channel = null, mergeQueueProven = false } = {}) {
   const head = capture("git", ["rev-parse", "HEAD"]);
   const porcelain = capture("git", ["status", "--porcelain"]);
   const dirty = dirtyTreeProblem(porcelain);
@@ -445,7 +482,7 @@ function checkGitProof() {
     status = null;
   }
 
-  const problems = gateProblems(status, head);
+  const problems = proofProblems(status, head, { channel, mergeQueueProven });
   if (problems.length > 0) {
     throw new Error(
       `${problems.join("\n\n")}\n\n` +
@@ -453,7 +490,7 @@ function checkGitProof() {
     );
   }
 
-  return { head, proven: status.commit };
+  return { head, proven: mergeQueueProven ? "merge-queue-proven" : status.commit };
 }
 
 /** True when the aws CLI answers; a dry run never asks. */
@@ -549,6 +586,9 @@ async function main() {
     const channelMiss = channelProblem(channel);
     if (channelMiss !== null) throw new Error(channelMiss);
   }
+  const mergeQueueProven = options.mergeQueueProven === true;
+  const proofModeMiss = proofModeProblem({ channel, mergeQueueProven });
+  if (proofModeMiss !== null) throw new Error(proofModeMiss);
   const requestedBranch =
     channel !== null ? branchFor(channel) : (options.branch?.trim() || null);
 
@@ -578,7 +618,7 @@ async function main() {
   const publishedCommits = onBranch
     .map((ref) => ({ ref, commit: commitOf(repo, ref) }))
     .sort((left, right) => left.ref.localeCompare(right.ref));
-  const { head, proven } = checkGitProof();
+  const { head, proven } = checkGitProof({ channel, mergeQueueProven });
   const { files, bytes } = treeStats(repo);
   const deltas = staticDeltas(repo);
 
@@ -588,7 +628,7 @@ async function main() {
   process.stdout.write("\nsuite Flatpak remote\n\n");
   process.stdout.write(`  repository  ${repo}\n`);
   process.stdout.write(`  store key   ${keyId}\n`);
-  process.stdout.write(`  gate proof  ${proven}\n`);
+  process.stdout.write(`  proof       ${proven}${mergeQueueProven ? " (not full-gate)" : ""}\n`);
   process.stdout.write(`  commit      ${head}\n`);
   process.stdout.write(`  branch      ${branch} (${onBranch.length} app refs)\n`);
   process.stdout.write(`  default     ${defaultBranch}\n`);

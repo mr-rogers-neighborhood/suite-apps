@@ -85,9 +85,9 @@ A pre-release is a build of the same app on the `slop`, `nightly` or `preview` b
 different install, not just a different build: each channel has its own id —
 `run.suite.slop.<app>`, `run.suite.nightly.<app>` or `run.suite.preview.<app>` — and its own data
 root. Stable keeps `run.suite.<app>`, so stable, slop, nightly and preview can all be installed at
-once. Slop keeps the id it has always had; nightly and preview moved from the shared
-`run.suite.slop` id, so an existing nightly or preview install reinstalls once under the new id. No
-pre-release data is migrated.
+once. Slop's Go id is unchanged and its Desk id is `run.suite.slop.desk`; nightly and preview moved
+from the shared `run.suite.slop` id, so an existing nightly or preview install reinstalls once under
+the new id. No pre-release data is migrated.
 
 ```sh
 node scripts/flatpak.mjs --app desk --channel nightly
@@ -97,6 +97,14 @@ node scripts/flatpak-remote.mjs --target s3 --channel nightly --publish
 A frozen legacy mini-app (Canvas, Planner, Budget, Help) is refused here: it keeps its last stable ref
 and gets no new pre-release. `--session` builds one locally for the factory profile, and that build is
 never published.
+
+Slop is the exception that does not wait for a person: every code push to `main` publishes it. The
+`slop` workflow builds the host on `--channel slop`, publishes `run.suite.slop.desk//slop`, builds
+the Suite Go slop APK and writes the page. It runs no fresh gate, e2e, clean install, SBOM,
+attestation or pack index; the page says **merge-queue-proven, not full-gate-proven**. Its tag is
+`suite-slop-<YYYY.MM.DD>-<sha7>` and the APK is `suite-go-slop-<version>-<sha7>.apk`. The seven
+newest slop pages are kept, a second run for the same commit is a no-op, and stable refs and Latest
+are never moved. [Channels](../explanation/channels.md#slop-publication) owns the promise.
 
 The pre-release branch is published on the same signed remote; the stable refs are not rewritten. See
 [Packaging channels](../reference/packaging-channels.md#pre-release-channels) for the identity and the
@@ -110,9 +118,10 @@ version, channel, maturity and install: a `flatpak install` command for Suite De
 for Suite Go. A pack carries a signed version and has no release page, and per-app releases are
 retired.
 
-Every note names the channel the release was published from — `stable`, `nightly` or `preview` —
-separately from the product maturity, so a `stable`-channel build can still be `alpha`. A channel
-belongs to a superapp; a pack carries a signed version, not a channel.
+Every note names the channel the release was published from — `stable`, `nightly`, `preview` or
+`slop` — separately from the product maturity, so a `stable`-channel build can still be `alpha`. A
+channel belongs to a superapp; a pack carries a signed version, not a channel. A slop page also names
+its commit and says it is merge-queue-proven, not full-gate-proven.
 
 The rolling body also carries an **Artifacts** section when `.dev/release/release-manifest.json`
 exists. It names the Flatpak's OSTree commit, its id and branch, the bundle's SHA-256, the APK's
@@ -135,8 +144,13 @@ mise exec -- node scripts/release-status.mjs --publish   # publish the draft, th
 mise exec -- node scripts/release-status.mjs --write     # refresh RELEASES.md only
 mise exec -- node scripts/release-status.mjs --draft --channel preview
                                                         # suite-preview-<date>, prerelease
+mise exec -- node scripts/release-status.mjs --draft --channel slop \
+  --revision "$(git rev-parse --short=7 HEAD)"
+                                                        # suite-slop-<date>-<sha7>, prerelease
 mise exec -- node scripts/release-status.mjs --prune --channel nightly --keep 14
                                                         # delete older nightly releases
+mise exec -- node scripts/release-status.mjs --prune --channel slop --keep 7
+                                                        # keep the newest slop builds
 ```
 
 Stable publishes `suite-<date>` and is the repository's Latest release. A pre-release channel
@@ -144,7 +158,9 @@ publishes its own `suite-<channel>-<date>` release, marked *pre-release*; it nev
 the stable release body links the newest preview and nightly pages. Stable's tag is the newest
 changelog date — the snapshot the body names — while a pre-release tag is the day it is published in
 UTC (`suite-nightly-2026.11.23`), even when no app version changed. The body still says "This is the
-2026-11-22 build", because the snapshot is what the release contains.
+2026-11-22 build", because the snapshot is what the release contains. Slop adds the commit:
+`suite-slop-2026.11.23-abc1234`, and its APK is named for the same commit. A slop run without
+`--revision` refuses, because the commit is what keeps two builds of one day apart.
 
 Publication is two phases because a published GitHub release is immutable: its tag, assets and body
 lock at publication. The order is draft → attach assets → publish.
@@ -165,12 +181,14 @@ refused instead, because publishing it would attach nothing: run `--draft` first
 `RELEASES.md` from the state GitHub has after the run, so repeating it once the release is out
 refreshes the page and changes nothing on GitHub.
 
-There is one release per tag. A second publication on the same day needs `--date` with another day,
-because the earlier `suite-YYYY.MM.DD` or `suite-<channel>-YYYY.MM.DD` tag is already published and
-cannot be reused; on stable `--date` also sets the snapshot date the body names, while a pre-release
-keeps its newest-changelog snapshot. `--draft` refuses by name when the tag it would draft already
-exists and is published: a skip would send the caller's asset upload into an immutable release, so a
-same-day rerun must pass `--date`.
+There is one release per tag. A second nightly or preview publication on the same day needs `--date`
+with another day, because the earlier `suite-<channel>-YYYY.MM.DD` tag is already published and cannot
+be reused; on stable `--date` also sets the snapshot date the body names, while a pre-release keeps
+its newest-changelog snapshot. A slop rerun for the same commit is a no-op instead: the tag already
+names the commit, so the run stops before building and never moves the tag. A new merge gets a new
+`sha7`. `--draft` refuses by name when the tag it would draft already exists and is published: a skip
+would send the caller's asset upload into an immutable release, so a same-day nightly or preview
+rerun must pass `--date`.
 
 A missing tag is created at HEAD, the tree the body describes; an existing tag is never moved.
 
@@ -218,7 +236,8 @@ the APK is attached to the draft, and only then is the release published:
 ```sh
 mise exec -- node scripts/release-status.mjs --draft     # draft the rolling release
 mise exec -- node scripts/android-release.mjs --publish  # build and attach the stable APK to the draft
-mise exec -- node scripts/android-release.mjs --channel slop --publish
+mise exec -- node scripts/android-release.mjs --channel slop \
+  --revision "$(git rev-parse --short=7 HEAD)" --publish
 mise exec -- node scripts/release-status.mjs --publish   # publish the draft and write RELEASES.md
 ```
 
@@ -232,7 +251,7 @@ skips the released page with a message rather than editing it.
 the note reports. The stable asset keeps `suite-go-<version>.apk` and the `suite-go.apk` alias, so
 `https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk` always
 names the newest stable build. A pre-release is `suite-go-<channel>-<version>.apk` and has no stable
-alias.
+alias; a slop build adds the commit (`suite-go-slop-<version>-<sha7>.apk`) and requires `--revision`.
 
 A release build is signed by the key at `~/.config/suite/keys/suite-go-release.jks`, and the script
 verifies the APK's certificate against the pinned fingerprint before it uploads anything. `pnpm
@@ -246,7 +265,8 @@ A pipeline that already built and attested the APK uploads those exact bytes wit
 
 ```sh
 mise exec -- node scripts/android-release.mjs --upload .dev/release/suite-go-0.1.0.apk --publish
-mise exec -- node scripts/android-release.mjs --upload "$APK" --channel slop --publish
+mise exec -- node scripts/android-release.mjs --upload "$APK" --channel slop \
+  --revision "$(git rev-parse --short=7 HEAD)" --publish
 ```
 
 The upload path never runs Gradle and never reads the keystore. It checks the APK's certificate
@@ -291,6 +311,12 @@ they found:
    run rather than a clean export.
 
 It does not bump a version and it does not read tags to guess one.
+
+Slop is the recorded exception: `flatpak-remote.mjs --channel slop --merge-queue-proven` accepts the
+merge queue's proof instead of `.dev/gate-status.json`, because the workflow runs on every push to
+`main` and has no fresh gate to record. The flag is refused for every other channel, and a dirty tree
+still refuses. [Decisions](../reference/decisions.md#slop-publishes-every-push-386) records the
+choice.
 
 ## Before you publish
 

@@ -32,7 +32,8 @@
  *
  * Usage:
  *   node scripts/android-release.mjs                    # stable, build and name the APK
- *   node scripts/android-release.mjs --channel slop     # slop, nightly or preview
+ *   node scripts/android-release.mjs --channel slop --revision "$(git rev-parse --short=7 HEAD)"
+ *                                                       # slop, nightly or preview; slop needs the commit
  *   node scripts/android-release.mjs --publish          # also upload it to the rolling release
  *   node scripts/android-release.mjs --dry-run          # print the upload; the default
  *   node scripts/android-release.mjs --upload <apk>     # upload an APK built by an earlier step
@@ -79,7 +80,13 @@ import {
   signingEnvironment,
 } from "./lib/androidKey.mjs";
 import { CHANNELS, PRE_RELEASE_CHANNELS, channelProblem, isPreRelease } from "./lib/channel.mjs";
-import { currentAggregateTag, goApkName } from "./release-status.mjs";
+import {
+  currentAggregateTag,
+  goApkName,
+  isRevision,
+  revisionHeadProblem,
+  revisionProblem,
+} from "./release-status.mjs";
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 export const APP_DIR = join(ROOT, "apps", "go");
@@ -125,6 +132,7 @@ const RESET = "\u001b[0m";
 const USAGE = `usage: node scripts/android-release.mjs [options]
 
   --channel <name>     stable, slop, nightly or preview
+  --revision <sha7>    commit the slop asset and page carry; required for slop
   --publish            upload the APK and its checksum to the rolling release
   --dry-run            print the upload command instead; the default
   --upload <apk>       upload an APK built earlier; never builds
@@ -177,6 +185,14 @@ function capture(name, args, { cwd = ROOT, env } = {}) {
     stdout: String(result.stdout ?? ""),
     stderr: String(result.stderr ?? ""),
   };
+}
+
+/** The commit this tree is on, for the revision a slop asset names. */
+function headCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" });
+  if (result.error) throw new Error(`git: ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`git rev-parse HEAD exited ${result.status}`);
+  return result.stdout.trim();
 }
 
 /** The APK version, from the config Gradle also reads. */
@@ -251,8 +267,11 @@ function ghFailure(action, result) {
 export function manifestTagPattern(channel) {
   const problem = channelProblem(channel);
   if (problem !== null) throw new Error(problem);
+  if (channel === "slop") {
+    return new RegExp(`^suite-slop-${AGGREGATE_TAG_DATE}-[0-9a-f]{7}$`, "u");
+  }
   if (isPreRelease(channel)) {
-    return new RegExp(`^suite-${channel}-${AGGREGATE_TAG_DATE}$`, "u");
+    return new RegExp(`^suite-${channel}-${AGGREGATE_TAG_DATE}(?:-[0-9a-f]{7})?$`, "u");
   }
   return new RegExp(`^suite-${AGGREGATE_TAG_DATE}$`, "u");
 }
@@ -406,16 +425,19 @@ export function versionCodePreflight({ channel, packageId, versionCode, gh = ghR
  *
  * Stable keeps the published name and the release table's link. A pre-release names its channel,
  * because two channel builds of one version are different artifacts and only one can own
- * `suite-go-<version>.apk`.
+ * `suite-go-<version>.apk`. A slop build also names its commit after the version, so one day's
+ * merges do not overwrite each other.
  */
-export function goApkAssetName(version, channel = "stable") {
+export function goApkAssetName(version, channel = "stable", revision = null) {
   if (!CHANNELS.includes(channel)) throw new Error(channelProblem(channel) ?? "unknown channel");
-  return isPreRelease(channel) ? `suite-go-${channel}-${version}.apk` : goApkName(version);
+  const problem = revisionProblem(channel, revision);
+  if (problem !== null) throw new Error(problem);
+  return goApkName(version, channel, revision);
 }
 
 /** The assets one publish uploads: the APK, its checksum, and the stable alias. */
-export function uploadNames(version, channel = "stable") {
-  const asset = goApkAssetName(version, channel);
+export function uploadNames(version, channel = "stable", revision = null) {
+  const asset = goApkAssetName(version, channel, revision);
   const names = [asset, `${asset}.sha256`];
   if (!isPreRelease(channel)) names.push(GO_APK_ALIAS);
   return names;
@@ -798,10 +820,10 @@ function assertVersionCodeCanShip({ config, channel }) {
  * package id and versionCode are checked before it is copied under a release name. A debug-signed
  * or mislabelled artifact therefore cannot reach `RELEASE_DIR` or an upload.
  */
-function build({ config, channel, env, buildTools }) {
+function build({ config, channel, revision, env, buildTools }) {
   const version = config.version;
   const base = config.versionCode;
-  const [asset, checksum, alias] = uploadNames(version, channel);
+  const [asset, checksum, alias] = uploadNames(version, channel, revision);
   const expectedCode = versionCodeFor(base, channel);
   const expectedId = CHANNEL_PACKAGE_ID[channel];
   const gradleApk = gradleApkPath(channel);
@@ -997,6 +1019,7 @@ export function parseArgs(argv) {
     dryRun: false,
     help: false,
     channel: null,
+    revision: null,
     upload: null,
     allowPublished: false,
     keyStatus: false,
@@ -1023,6 +1046,15 @@ export function parseArgs(argv) {
     else if (arg === "--force") options.force = true;
     else if (arg === "--channel") {
       options.channel = takeValue(index, "--channel");
+      index += 1;
+    } else if (arg === "--revision") {
+      options.revision = takeValue(index, "--revision");
+      if (!isRevision(options.revision)) {
+        throw new Error(
+          `--revision ${JSON.stringify(options.revision)} is not a lower-case sha7 ` +
+            "(7 hex characters)",
+        );
+      }
       index += 1;
     } else if (arg === "--upload") {
       options.upload = takeValue(index, "--upload");
@@ -1113,8 +1145,14 @@ function uploadExisting({ options }) {
     versionName: identity.versionName,
     channel: options.channel,
   });
-  const [asset, checksum, alias] = uploadNames(version, channel);
-  const tag = currentAggregateTag({ channel });
+  const revisionMiss = revisionProblem(channel, options.revision);
+  if (revisionMiss !== null) throw new Error(revisionMiss);
+  const headMiss = isRevision(options.revision)
+    ? revisionHeadProblem(options.revision, headCommit())
+    : null;
+  if (headMiss !== null) throw new Error(headMiss);
+  const [asset, checksum, alias] = uploadNames(version, channel, options.revision);
+  const tag = currentAggregateTag({ channel, revision: options.revision });
   const release = readRelease(tag);
   const releaseProblem = releaseRefusal({ tag, release, allowPublished: options.allowPublished });
   if (options.publish && releaseProblem !== null) throw new Error(releaseProblem);
@@ -1212,6 +1250,11 @@ async function main(argv) {
   }
 
   const channel = options.channel ?? "stable";
+  const revision = options.revision;
+  const revisionMiss = revisionProblem(channel, revision);
+  if (revisionMiss !== null) throw new Error(revisionMiss);
+  const headMiss = isRevision(revision) ? revisionHeadProblem(revision, headCommit()) : null;
+  if (headMiss !== null) throw new Error(headMiss);
 
   const config = appConfig();
   const packageVersion = JSON.parse(readFileSync(join(APP_DIR, "package.json"), "utf8")).version;
@@ -1270,7 +1313,7 @@ async function main(argv) {
     throw new Error("the keystore is present but its password is not; run --key-status");
   }
 
-  const tag = currentAggregateTag({ channel });
+  const tag = currentAggregateTag({ channel, revision });
   const release = readRelease(tag);
   const releaseProblem = releaseRefusal({
     tag,
@@ -1286,7 +1329,7 @@ async function main(argv) {
   if (options.publish && releaseProblem !== null) throw new Error(releaseProblem);
 
   const env = androidEnvironment(toolchain.sdkRoot, toolchain.jdk, signing);
-  const built = build({ config, channel, env, buildTools });
+  const built = build({ config, channel, revision, env, buildTools });
   const size = statSync(built.apkPath).size;
 
   reportArtifact({ artifact: built, size });

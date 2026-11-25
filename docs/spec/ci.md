@@ -9,7 +9,9 @@ Flatpak and the Go debug APK,
 attests each with provenance and an SPDX SBOM, and keeps them as artifacts. Once the repository
 variable `NIGHTLY_PUBLISH` is `true` and the `release` environment holds its keys, the nightly instead
 runs `.github/workflows/release.yml` for the nightly channel: the release-signed APK and the signed
-Flatpak are published automatically (D3.2). The `main` ruleset requires the `ci` check and a merge
+Flatpak are published automatically (D3.2). `.github/workflows/slop.yml` publishes the slop channel
+on every code push to `main`; it is a publication, not a check, and it runs no gate, e2e, clean
+install, SBOM, attestation or pack index (delivery D3.1). The `main` ruleset requires the `ci` check and a merge
 queue (HEADGREEN grouping, merge commits), and `ci.yml` triggers on `merge_group`. The VM gate is
 retired; GitHub Actions is the full proof. The Windows/macOS/iOS matrix is live, and the iOS row is a
 simulator test build. The delivery contract is [delivery.md](delivery.md); the platform matrix is

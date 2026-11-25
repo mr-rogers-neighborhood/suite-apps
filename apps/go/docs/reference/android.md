@@ -158,11 +158,14 @@ but it cannot make a lower code legal for that id.
 Build and name:
 
 ```sh
-mise exec -- node scripts/android-release.mjs --channel slop
+mise exec -- node scripts/android-release.mjs --channel slop \
+  --revision "$(git rev-parse --short=7 HEAD)"
 ```
 
 The stable asset keeps `suite-go-<version>.apk` and the `suite-go.apk` alias; a pre-release is
-`suite-go-<channel>-<version>.apk` and has no stable alias. Nothing is uploaded without `--publish`,
+`suite-go-<channel>-<version>.apk` and has no stable alias. A slop asset adds the commit
+(`suite-go-slop-<version>-<sha7>.apk`) and the build refuses a slop run without `--revision`.
+Nothing is uploaded without `--publish`,
 and no device is needed: the APK is built, verified and checksummed on the machine. Install it with
 `adb install -r -t <path>`. A debug build is a dev-loop artifact signed by
 `~/.android/debug.keystore`, which is a different signature, so installing one over a release build

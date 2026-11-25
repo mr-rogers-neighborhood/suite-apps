@@ -266,10 +266,10 @@ script refuses a branch the repository does not carry instead of inventing one.
 Stable keeps `run.suite.<app>`; each pre-release channel has an id of its own:
 `run.suite.slop.<app>`, `run.suite.nightly.<app>` or `run.suite.preview.<app>`, on the branch of the
 same name. The id and the branch both name the channel, so stable, slop, nightly and preview are four
-installs with four data roots, and each can be installed and updated beside the others. Slop keeps
-the id it has always had; nightly and preview moved from the shared `run.suite.slop` id, so a nightly
-or preview install made before the change reinstalls once under the new id. No pre-release data is
-migrated: the new id starts with an empty data root.
+installs with four data roots, and each can be installed and updated beside the others. Slop's Go id
+is unchanged and its Desk id is `run.suite.slop.desk`; nightly and preview moved from the shared
+`run.suite.slop` id, so a nightly or preview install made before the change reinstalls once under the
+new id. No pre-release data is migrated: the new id starts with an empty data root.
 
 ```sh
 node scripts/flatpak.mjs --app desk --channel nightly
@@ -303,6 +303,17 @@ signed summary. On the local test remote the first fetch of `suite.flatpakrepo` 
 step, because it carries the public key an attacker on the path could replace. Treat it as a lab
 store, and compare its `GPGKey` with `~/suite-flatpak/suite-store.gpg` on the publisher when the
 network is not trusted.
+
+Slop publishes itself from every code push to `main`; the others are dispatched or scheduled. The
+pipeline builds `run.suite.slop.desk` on branch `slop`, publishes that branch to the signed remote,
+and creates the page `suite-slop-<YYYY.MM.DD>-<sha7>`. It is merge-queue-proven, not full-gate-proven:
+it has no fresh gate, e2e, clean install, SBOM, attestation or pack index, so the page says so.
+`flatpak-remote.mjs --channel slop --merge-queue-proven` is the only way the publisher accepts that
+boundary; every other channel still needs `.dev/gate-status.json`, and a dirty tree still refuses. A
+second run for the same commit is a no-op. The seven newest slop pages stay and older ones are
+pruned. Stable refs and every other branch are merged into the same summary as before, so a slop
+publication never moves them. [Channels](../explanation/channels.md#slop-publication) owns the
+promise.
 
 The signed local store has been exercised end to end: a second published commit is what
 `flatpak update --user` deploys. No Suite process reads or writes a deployment to decide that.
@@ -349,14 +360,15 @@ release key, not by a build machine's debug keystore. There is no Play Store lis
 | Channel | Asset | Package id |
 | --- | --- | --- |
 | `stable` | `suite-go-<version>.apk` | `run.suite.go` |
-| `slop` | `suite-go-slop-<version>.apk` | `run.suite.slop.go` |
+| `slop` | `suite-go-slop-<version>-<sha7>.apk` | `run.suite.slop.go` |
 | `nightly` | `suite-go-nightly-<version>.apk` | `run.suite.nightly.go` |
 | `preview` | `suite-go-preview-<version>.apk` | `run.suite.preview.go` |
 
 Every asset has a `.sha256` beside it. Stable also uploads the same bytes as `suite-go.apk`, the
 stable name [Suite Go's README](../../apps/go/README.md#install-the-apk) links through
 `releases/latest`; the versioned asset stays canonical. A pre-release has no stable alias, so a
-channel download cannot be mistaken for the stable one.
+channel download cannot be mistaken for the stable one. A slop asset also names the commit, because
+each slop page is one build: a second merge on the same day must not overwrite the first.
 
 Every channel is a package id with its own data tree, so stable, slop, nightly and preview install and
 update side by side. Nightly and preview moved from the shared `run.suite.slop.go` id, so an install
@@ -369,7 +381,8 @@ table live in [Android](../../apps/go/docs/reference/android.md#the-four-channel
 ```sh
 mise exec -- pnpm android:key status                     # is the release key the pinned one?
 mise exec -- node scripts/android-release.mjs             # stable, build and name the APK
-mise exec -- node scripts/android-release.mjs --channel slop
+mise exec -- node scripts/android-release.mjs --channel slop \
+  --revision "$(git rev-parse --short=7 HEAD)"            # a slop build for one commit
 mise exec -- node scripts/android-release.mjs --publish   # attach it to the rolling release
 ```
 

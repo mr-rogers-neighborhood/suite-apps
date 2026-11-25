@@ -4,7 +4,9 @@
  *
  * GitHub shows one "Latest" release per repository. This repository publishes
  * the rolling Suite release, tagged `suite-YYYY.MM.DD` and marked Latest, plus
- * the pre-release channel pages `suite-<channel>-<date>`. The body names the two
+ * the pre-release channel pages `suite-<channel>-<date>`. A slop page also names
+ * its commit (`suite-slop-<date>-<sha7>`), because every code push to `main`
+ * publishes one. The body names the two
  * superapps and how each is installed: a Flatpak command for Suite Desk, or the
  * release-signed Suite Go APK attached to this same release. Each names its
  * release channel and product maturity. Per-app releases are retired; a pack
@@ -49,6 +51,8 @@
  *   node scripts/release-status.mjs --check-published --channel nightly
  *                                               # is this tag already out?
  *   node scripts/release-status.mjs --date 2026-11-21 --draft
+ *   node scripts/release-status.mjs --channel slop --revision abc1234 --draft
+ *                                               # suite-slop-<date>-abc1234
  *   node scripts/release-status.mjs --help
  */
 import { spawnSync } from "node:child_process";
@@ -220,12 +224,13 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --date <YYYY-MM-DD>  tag date; a pre-release defaults to today in UTC, stable to
                        the newest app release (which is also stable's snapshot date)
   --channel <name>     stable (default), slop, nightly or preview; names the APK asset
+  --revision <sha7>    commit the slop page, tag and APK name carry; required for slop
   --check-published    print one sentence and stop when this run's tag is already
                        published; print nothing and exit 0 when it is not
   --manifest <path>    release manifest for the Artifacts section
                        (default: .dev/release/release-manifest.json when it exists)
   --prune              delete old published pre-release releases (never stable)
-  --keep <n>           releases a pruned channel keeps (default 14)
+  --keep <n>           releases a pruned channel keeps (default: 14, or 7 for slop)
   --help               print this text
 
 Pass one of --draft, --publish, --write and --dry-run, or --check-published.
@@ -238,12 +243,99 @@ Only the rolling release and the pre-release channel pages exist; per-app tags
 are retired. --date sets the tag date: stable uses the newest changelog date by
 default, a pre-release uses today in UTC, and a same-day rerun of one needs
 --date for another day.
+
+The slop channel is published for one commit: pass --revision <sha7>, and the
+tag, the body and the Suite Go APK name carry it. A second run for the same
+commit is a no-op, not a moved tag.
 `;
 
-/** The aggregate tag, dotted as the owner chose: `suite-2026.11.21`. */
-export function aggregateTag(date, channel = "stable") {
+/**
+ * The commit slice a slop tag and its assets carry.
+ *
+ * A slop build is published for one commit. The short revision is what keeps a
+ * second merge on the same day from reusing the first build's tag, and what
+ * makes "this commit was already published" a question with an answer.
+ */
+export const REVISION_PATTERN = /^[0-9a-f]{7}$/u;
+
+/** True when this is the lower-case `sha7` a slop tag may carry. */
+export function isRevision(value) {
+  return typeof value === "string" && REVISION_PATTERN.test(value);
+}
+
+/**
+ * Why a channel cannot use this revision, or null.
+ *
+ * `stable` is a snapshot, not a per-commit build: a revision would move the
+ * rolling tag and is refused. Slop requires one so its tag and assets name the
+ * commit; nightly and preview may take one but do not need it.
+ */
+export function revisionProblem(channel, revision) {
+  if (revision === null || revision === undefined) {
+    if (channel === "slop") {
+      return (
+        "the slop channel needs --revision <sha7>: its tag and assets name the commit, " +
+        "and without one a second build of the same day would reuse the first tag."
+      );
+    }
+    return null;
+  }
+  if (channel === "stable") {
+    return "the stable channel takes no --revision: its tag is the snapshot date, not a commit.";
+  }
+  if (!isRevision(revision)) {
+    return `--revision ${JSON.stringify(revision)} is not a lower-case sha7 (7 hex characters).`;
+  }
+  return null;
+}
+
+/**
+ * Why this revision does not name the checked-out commit, or null.
+ *
+ * The tag, the page and the APK name say which commit the bytes came from, so a
+ * revision other than HEAD would label the build with a commit it is not.
+ */
+export function revisionHeadProblem(revision, head) {
+  if (!isRevision(revision) || typeof head !== "string" || head.length < 7) return null;
+  if (head.startsWith(revision)) return null;
+  return (
+    `--revision ${revision} is not HEAD (${head.slice(0, 7)}); the tag, page and asset would ` +
+    "name a commit this tree is not."
+  );
+}
+
+/**
+ * The aggregate tag, dotted as the owner chose: `suite-2026.11.21`.
+ *
+ * A slop tag carries the commit as well: `suite-slop-2026.11.24-abc1234`. The
+ * optional revision is appended for any pre-release that names one; stable never
+ * carries one.
+ */
+export function aggregateTag(date, channel = "stable", revision = null) {
   const dotted = date.replace(/-/gu, ".");
-  return channel === "stable" ? `suite-${dotted}` : `suite-${channel}-${dotted}`;
+  if (channel === "stable") {
+    if (revision !== null && revision !== undefined) {
+      throw new Error("the stable tag is the snapshot date and never carries a revision");
+    }
+    return `suite-${dotted}`;
+  }
+  const tag = `suite-${channel}-${dotted}`;
+  return revision === null || revision === undefined ? tag : `${tag}-${revision}`;
+}
+
+/** The shape a channel's tag uses, for a page list to filter on. */
+export function channelTagPattern(channel) {
+  const dotted = String.raw`\d{4}\.\d{2}\.\d{2}`;
+  if (channel === "stable") return new RegExp(`^suite-${dotted}$`, "u");
+  if (channel === "slop") {
+    return new RegExp(`^suite-slop-${dotted}-[0-9a-f]{7}$`, "u");
+  }
+  return new RegExp(`^suite-${channel}-${dotted}(?:-[0-9a-f]{7})?$`, "u");
+}
+
+/** True when a tag belongs to this channel and carries its expected shape. */
+export function isChannelTag(tag, channel) {
+  return typeof tag === "string" && channelTagPattern(channel).test(tag);
 }
 
 /**
@@ -259,6 +351,7 @@ export function currentAggregateTag({
   load = read,
   channel = "stable",
   date = null,
+  revision = null,
   now = new Date(),
   env = process.env,
 } = {}) {
@@ -277,7 +370,7 @@ export function currentAggregateTag({
     date: date ?? workflowInputDate(env),
     now,
   });
-  return aggregateTag(tagDate, channel);
+  return aggregateTag(tagDate, channel, revision);
 }
 
 /** A release's page on GitHub. */
@@ -301,19 +394,45 @@ export function preReleaseLinks(releases) {
     .filter((row) => row.tag !== null);
 }
 
+/** How many published pages a channel keeps when `--keep` names no number. */
+export function defaultKeepFor(channel) {
+  return channel === "slop" ? 7 : 14;
+}
+
 /**
  * Published pre-release releases older than the newest `keep` for a channel.
  *
  * The tag carries its date, so lexical order is chronological for one fixed
  * tag shape. Only published releases are pruned; a draft is still being written.
+ * A slop page must match the revision shape: a build is one commit, and the
+ * older revision-less form is history rather than a page this rule prunes.
  */
-export function pruneCandidates(releases, { channel, keep }) {
+export function pruneCandidates(releases, { channel, keep = defaultKeepFor(channel) }) {
   return (releases ?? [])
     .filter((row) => row.isDraft === false)
-    .filter((row) => row.tagName.startsWith(`suite-${channel}-`))
+    .filter((row) => isChannelTag(row.tagName, channel))
     .sort((a, b) => b.tagName.localeCompare(a.tagName))
     .slice(keep)
     .map((row) => row.tagName);
+}
+
+/**
+ * The published slop page for one commit, or null.
+ *
+ * The date in a slop tag is the publication day, so the same commit re-run on a
+ * later day would otherwise get a second page. The commit is the identity that
+ * matters: if any published slop tag ends with `-<revision>`, the work is done.
+ */
+export function slopRevisionRelease(releases, revision, channel = "slop") {
+  if (!isRevision(revision)) return null;
+  return (
+    (releases ?? []).find(
+      (row) =>
+        row.isDraft === false &&
+        isChannelTag(row.tagName, channel) &&
+        row.tagName.endsWith(`-${revision}`),
+    ) ?? null
+  );
 }
 
 /** One asset's download URL on a release. */
@@ -368,14 +487,22 @@ export function installCommand(app, channel = "stable") {
   return `flatpak install --user ${REMOTE_NAME} ${releaseFlatpakRef(app, channel)}`;
 }
 
-/** The APK a Suite Go version attaches to the rolling release. */
-export function goApkName(version, channel = "stable") {
-  return channel === "stable" ? `suite-go-${version}.apk` : `suite-go-${channel}-${version}.apk`;
+/**
+ * The APK a Suite Go version attaches to the rolling release.
+ *
+ * A slop build carries the commit after the version:
+ * `suite-go-slop-0.2.0-abc1234.apk`. The revision is optional for nightly and
+ * preview so their existing asset names keep working; stable never takes one.
+ */
+export function goApkName(version, channel = "stable", revision = null) {
+  if (channel === "stable") return `suite-go-${version}.apk`;
+  const base = `suite-go-${channel}-${version}`;
+  return revision === null || revision === undefined ? `${base}.apk` : `${base}-${revision}.apk`;
 }
 
 /** The Go APK's download URL on the aggregate release. */
-export function goApkUrl(tag, version, channel = "stable") {
-  return releaseAssetUrl(tag, goApkName(version, channel));
+export function goApkUrl(tag, version, channel = "stable", revision = null) {
+  return releaseAssetUrl(tag, goApkName(version, channel, revision));
 }
 
 /**
@@ -391,13 +518,21 @@ export function goApkUrl(tag, version, channel = "stable") {
  */
 export function installCell(
   app,
-  { version = null, tag = null, apkLive = false, draft = false, channel = "stable" } = {},
+  {
+    version = null,
+    tag = null,
+    apkLive = false,
+    draft = false,
+    channel = "stable",
+    revision = null,
+  } = {},
 ) {
   if (app.kind === "flatpak") return `\`${installCommand(app, channel)}\``;
   if (app.kind === "apk") {
-    const name = version === null ? "suite-go.apk" : goApkName(version, channel);
+    const name =
+      version === null ? "suite-go.apk" : goApkName(version, channel, revision);
     if (apkLive && tag !== null && version !== null) {
-      return `[${name}](${goApkUrl(tag, version, channel)})`;
+      return `[${name}](${goApkUrl(tag, version, channel, revision)})`;
     }
     if (draft) return `\`${name}\` (attached to this draft before publication)`;
     return `\`${name}\` (not uploaded yet)`;
@@ -587,7 +722,13 @@ export function publishedReleaseMessage(tag) {
  * the gate instead of failing after the build, and it stays green because the
  * day's artifact does exist — this run simply has no work.
  */
-export function alreadyPublishedMessage(tag) {
+export function alreadyPublishedMessage(tag, { channel = "stable", revision = null } = {}) {
+  if (channel === "slop" && isRevision(revision)) {
+    return (
+      `${tag} is already published for commit ${revision}; a second run for the same commit is ` +
+      "a no-op, so this run stops before the build and leaves the tag, assets and body untouched."
+    );
+  }
   return (
     `${tag} is already published; its artifact already exists, so this run stops before ` +
     "the gate and leaves it untouched."
@@ -599,12 +740,18 @@ export function alreadyPublishedMessage(tag) {
  *
  * A draft does not stop the run: it is mutable, so a rerun updates the same
  * draft and stays idempotent. Only a published release — which cannot be edited
- * and whose tag cannot carry a second artifact — ends the run early.
+ * and whose tag cannot carry a second artifact — ends the run early. A slop
+ * build also stops when the same commit was published on another day: the slop
+ * tag names the commit, and a rerun must not move or duplicate that build.
  */
-export function publishedCheck(releases, tag) {
-  const row = releaseFor(releases, tag);
-  if (row !== null && row.isDraft !== true) {
-    return { published: true, sentence: alreadyPublishedMessage(tag) };
+export function publishedCheck(releases, tag, { channel = "stable", revision = null } = {}) {
+  const sameCommit = channel === "slop" ? slopRevisionRelease(releases, revision, channel) : null;
+  const current = sameCommit ?? releaseFor(releases, tag);
+  if (current !== null && current.isDraft !== true) {
+    return {
+      published: true,
+      sentence: alreadyPublishedMessage(current.tagName, { channel, revision }),
+    };
   }
   return { published: false, sentence: null };
 }
@@ -617,7 +764,14 @@ export function publishedCheck(releases, tag) {
  * letting the caller upload would fail inside an immutable release, so the
  * draft phase refuses before anything is written.
  */
-export function draftRefusalMessage(tag) {
+export function draftRefusalMessage(tag, { channel = "stable", revision = null } = {}) {
+  if (channel === "slop" && isRevision(revision)) {
+    return (
+      `${tag} is already published for commit ${revision}, and published releases are immutable: ` +
+      "--draft will not create a second page for the same commit. A rerun for this commit is a " +
+      "no-op; a new merge is what produces a new slop tag."
+    );
+  }
   return (
     `${tag} is already published, and published releases are immutable: --draft will not ` +
     "create or edit a draft over it, because the assets that follow would upload into a " +
@@ -631,12 +785,26 @@ export function draftRefusalMessage(tag) {
  * A draft is mutable, so rerunning `--draft` edits the same release and stays
  * idempotent. A published release cannot be turned back into a draft, so it is
  * refused by name: the version is already out, and the caller's attachment
- * step would otherwise hit an immutable release.
+ * step would otherwise hit an immutable release. A slop run additionally
+ * refuses when this commit was published under another day's tag.
  */
-export function draftAction({ exists, isDraft, tag }) {
+export function draftAction({
+  exists,
+  isDraft,
+  tag,
+  channel = "stable",
+  revision = null,
+  sameCommitTag = null,
+}) {
+  if (sameCommitTag !== null && sameCommitTag !== tag) {
+    return {
+      action: "refuse",
+      problem: draftRefusalMessage(sameCommitTag, { channel, revision }),
+    };
+  }
   if (!exists) return { action: "create", problem: null };
   if (isDraft === true) return { action: "edit", problem: null };
-  return { action: "refuse", problem: draftRefusalMessage(tag) };
+  return { action: "refuse", problem: draftRefusalMessage(tag, { channel, revision }) };
 }
 
 /**
@@ -735,11 +903,11 @@ export function superappEntries(entries) {
  */
 export function aggregateRows(
   entries,
-  { tag = null, apkLive = false, draft = false, channel = "stable" } = {},
+  { tag = null, apkLive = false, draft = false, channel = "stable", revision = null } = {},
 ) {
   return entries.map((entry) => {
     const { app, version } = entry;
-    const install = installCell(app, { version, tag, apkLive, draft, channel });
+    const install = installCell(app, { version, tag, apkLive, draft, channel, revision });
     return (
       `| [${app.name}](${blobUrl(app.changelog)}) | ${channelLabel(app, channel)} | ` +
       `${maturityLabel(app)} | ${version} | ${install} |`
@@ -789,13 +957,16 @@ export function aggregateSection(title, entries, options = {}) {
  * same promotion: it is uploaded to the draft and the link is live once
  * `--publish` flips it, so the draft must not claim the asset already exists.
  */
-function goInstallNote(entries, { tag = null, apkLive = false, draft = false, channel = "stable" }) {
+function goInstallNote(
+  entries,
+  { tag = null, apkLive = false, draft = false, channel = "stable", revision = null },
+) {
   const go = entries.find((entry) => entry.app.kind === "apk") ?? null;
   if (go === null) return [];
-  const name = goApkName(go.version, channel);
+  const name = goApkName(go.version, channel, revision);
   if (apkLive && tag !== null) {
     return [
-      `Suite Go is not a Flatpak. This release carries its release-signed APK, [${name}](${goApkUrl(tag, go.version, channel)}),`,
+      `Suite Go is not a Flatpak. This release carries its release-signed APK, [${name}](${goApkUrl(tag, go.version, channel, revision)}),`,
       "with a SHA-256 checksum beside it; sideload it with `adb install -r -t`.",
       "",
     ];
@@ -1020,6 +1191,26 @@ export function indexReleaseSection(index) {
 }
 
 /**
+ * The paragraph that states a slop build's proof boundary.
+ *
+ * Slop is published by a push to `main`, after the merge queue passed. It is
+ * deliberately not the full gate: the page must say so, or a reader would take
+ * a session build for a release. The commit is named because the tag and every
+ * asset name it, and the retention and no-index promises are part of the same
+ * boundary.
+ */
+export function slopProofLines(revision) {
+  return [
+    `Commit \`${revision}\` on \`main\`. This build is **merge-queue-proven, not`,
+    "full-gate-proven**: no fresh gate, e2e, clean install, SBOM or attestation ran for it,",
+    "and it carries no pack catalogue index. It is a slop session build: it may be broken,",
+    "incomplete, or change shape without notice, it never marks GitHub's Latest release, and",
+    "only the seven newest slop pages are kept.",
+    "",
+  ];
+}
+
+/**
  * The aggregate release body: the two superapps and how they install.
  *
  * The rolling release is the snapshot, so the title says which day it is and
@@ -1032,6 +1223,7 @@ export function indexReleaseSection(index) {
  * Stable's tag is the snapshot, so the opening sentence names one day. A
  * pre-release tag carries the publication day instead, so that sentence names
  * both: the snapshot from the changelog and the tag date a reader sees above.
+ * A slop body adds the commit and its merge-queue proof boundary.
  */
 export function aggregateReleaseBody(
   entries,
@@ -1042,6 +1234,7 @@ export function aggregateReleaseBody(
     apkLive = false,
     draft = false,
     channel = "stable",
+    revision = null,
     preReleases = [],
     manifest = null,
     index = null,
@@ -1060,6 +1253,7 @@ export function aggregateReleaseBody(
         : `This is the ${date} snapshot, published on the **${channel}** channel on ${tagDate}.`),
     "Only the two superapps have a release page; a pack carries a signed version and no page.",
     "",
+    ...(channel === "slop" && isRevision(revision) ? slopProofLines(revision) : []),
     ...(preReleases.length === 0
       ? []
       : [
@@ -1083,13 +1277,13 @@ export function aggregateReleaseBody(
     "## Suite Go (mobile)",
     "",
     ...(go === null ? [] : [...releaseLabels(go.app, channel), ""]),
-    ...goInstallNote(superapps, { tag, apkLive, draft, channel }),
+    ...goInstallNote(superapps, { tag, apkLive, draft, channel, revision }),
     "## Current versions",
     "",
-    ...aggregateTable(superapps, { tag, apkLive, draft, channel }),
+    ...aggregateTable(superapps, { tag, apkLive, draft, channel, revision }),
     "",
     ...artifactsSection(manifest, { tag, draft, channel }),
-    ...(index === null ? [] : indexReleaseSection(index)),
+    ...(index === null || channel === "slop" ? [] : indexReleaseSection(index)),
     "## Update",
     "",
     "Once the remote is added, the desktop apps update with:",
@@ -1201,10 +1395,11 @@ export function parseArgs(argv) {
     write: false,
     date: null,
     channel: "stable",
+    revision: null,
     manifest: null,
     prune: false,
     checkPublished: false,
-    keep: 14,
+    keep: null,
     help: false,
   };
 
@@ -1230,6 +1425,15 @@ export function parseArgs(argv) {
       options.channel = takeValue(index, "--channel");
       const miss = channelProblem(options.channel);
       if (miss !== null) throw new Error(miss);
+      index += 1;
+    } else if (arg === "--revision") {
+      options.revision = takeValue(index, "--revision");
+      if (!isRevision(options.revision)) {
+        throw new Error(
+          `--revision ${JSON.stringify(options.revision)} is not a lower-case sha7 ` +
+            "(7 hex characters)",
+        );
+      }
       index += 1;
     } else if (arg === "--manifest") {
       options.manifest = takeValue(index, "--manifest");
@@ -1519,6 +1723,18 @@ export function publishReleaseArgs({ tag, notesPath, latest, prerelease = false 
 }
 
 /**
+ * The title one draft or publication carries.
+ *
+ * A slop page names its commit as well, because more than one build can share a
+ * day. Other channels keep the day-only title they already have.
+ */
+export function releaseTitle(date, channel = "stable", revision = null) {
+  const base = `Suite Desk + Suite Go — ${date}`;
+  if (channel === "stable" || !isRevision(revision)) return base;
+  return `${base} (${revision})`;
+}
+
+/**
  * The git and gh steps one run would take for the rolling release.
  *
  * `--draft`, the dry run and `--publish` share this one plan, so the dry run
@@ -1532,6 +1748,7 @@ export function aggregateReleaseCommands({
   tag,
   date,
   channel = "stable",
+  revision = null,
   prerelease = false,
 }) {
   const notesPath = join(NOTES_DIR, `${tag}.md`);
@@ -1562,7 +1779,7 @@ export function aggregateReleaseCommands({
       command: "gh",
       args: draftReleaseArgs({
         tag,
-        title: `Suite Desk + Suite Go — ${date}`,
+        title: releaseTitle(date, channel, revision),
         notesPath,
         action: aggregate.action,
         target: aggregate.plan.commit,
@@ -1573,7 +1790,7 @@ export function aggregateReleaseCommands({
 }
 
 /** Create or update the rolling release as a draft; never write the page. */
-function mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel }) {
+function mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel, revision }) {
   if (releases === null) {
     throw new Error(
       "gh release list failed; refusing to draft into a repository it cannot read",
@@ -1589,6 +1806,7 @@ function mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel 
     tag,
     date,
     channel,
+    revision,
     prerelease,
   })) {
     run(step.command, step.args);
@@ -1611,6 +1829,7 @@ function mainPublish({
   notes,
   apkLive,
   channel,
+  revision,
   prerelease,
 }) {
   if (releases === null) {
@@ -1626,6 +1845,7 @@ function mainPublish({
     tag,
     date,
     channel,
+    revision,
     prerelease,
   })) {
     run(step.command, step.args);
@@ -1689,7 +1909,7 @@ function actionLabel(entry) {
  * `--write` decides nothing on GitHub: it only needs to know whether a row
  * links or is pending, which `published` already answers.
  */
-function decidePhase(mode, { exists, isDraft, tag }) {
+function decidePhase(mode, { exists, isDraft, tag, channel = "stable", revision = null, sameCommitTag = null }) {
   if (mode === "publish") return publishAction({ exists, isDraft, tag });
   if (mode === "write") {
     return {
@@ -1697,7 +1917,7 @@ function decidePhase(mode, { exists, isDraft, tag }) {
       problem: null,
     };
   }
-  return draftAction({ exists, isDraft, tag });
+  return draftAction({ exists, isDraft, tag, channel, revision, sameCommitTag });
 }
 
 /** One release row from a release list, or null when the tag is not there. */
@@ -1712,13 +1932,37 @@ export function releaseFor(releases, tag) {
  * test passes rows directly, so the decision the draft phase makes over a
  * published release is the one exercised here.
  */
-export function releasePhase(mode, releases, tag) {
+export function releasePhase(
+  mode,
+  releases,
+  tag,
+  { channel = "stable", revision = null } = {},
+) {
   const row = releaseFor(releases, tag);
+  const sameCommit = channel === "slop" ? slopRevisionRelease(releases, revision, channel) : null;
   return decidePhase(mode, {
     exists: row !== null,
     isDraft: row?.isDraft === true,
     tag,
+    channel,
+    revision,
+    sameCommitTag: sameCommit?.tagName ?? null,
   });
+}
+
+/**
+ * Why this mode must not touch `RELEASES.md`, or null.
+ *
+ * The page is the mirror of the stable Latest release. `--write` refreshes it
+ * from the tree on a workstation; letting a pre-release run that mode would
+ * overwrite the stable mirror with a channel page, so it is refused by name.
+ */
+export function writeModeProblem(channel, mode) {
+  if (mode !== "write" || channel === "stable") return null;
+  return (
+    `--write refreshes ${RELEASES_FILE}, the stable mirror; a ${channel} page is written ` +
+    "only by --publish, so this refuses to overwrite the stable page with a pre-release."
+  );
 }
 
 async function main(argv) {
@@ -1738,6 +1982,7 @@ async function main(argv) {
   const channelMiss = channelProblem(options.channel);
   if (channelMiss !== null) throw new Error(channelMiss);
   const channel = options.channel;
+  const revision = options.revision;
   const prerelease = channel !== "stable";
 
   const mode = options.draft
@@ -1747,6 +1992,15 @@ async function main(argv) {
       : options.write
         ? "write"
         : "dry-run";
+  // A slop page is per commit. Requiring the revision before anything is read
+  // makes the tag impossible to guess or reuse; a non-slop channel may omit it.
+  if (!options.prune) {
+    const revisionMiss = revisionProblem(channel, revision);
+    if (revisionMiss !== null) throw new Error(revisionMiss);
+  }
+  if (channel !== "stable" && mode === "write") {
+    throw new Error(writeModeProblem(channel, mode));
+  }
   const releases = existingReleases();
   // The tag date has one answer per run. `--date` names it; in a dispatch, the
   // workflow's `date` input does, so the check and the publication that follows
@@ -1754,14 +2008,16 @@ async function main(argv) {
   const namedDate = options.date ?? workflowInputDate();
 
   if (options.checkPublished) {
-    const tag = currentAggregateTag({ channel, date: namedDate });
+    const tag = currentAggregateTag({ channel, date: namedDate, revision });
+    const headMiss = channel === "slop" ? revisionHeadProblem(revision, currentHead()) : null;
+    if (headMiss !== null) throw new Error(headMiss);
     if (releases === null) {
       throw new Error(
         `gh release list failed; cannot tell whether ${tag} is already published, so this ` +
           "run does not stop a build it cannot justify",
       );
     }
-    const check = publishedCheck(releases, tag);
+    const check = publishedCheck(releases, tag, { channel, revision });
     if (check.published) process.stdout.write(`${check.sentence}\n`);
     return;
   }
@@ -1773,7 +2029,8 @@ async function main(argv) {
     if (releases === null) {
       throw new Error("gh release list failed; refusing to prune releases it cannot read");
     }
-    const doomed = pruneCandidates(releases, { channel, keep: options.keep });
+    const keep = options.keep ?? defaultKeepFor(channel);
+    const doomed = pruneCandidates(releases, { channel, keep: keep });
     for (const tag of doomed) {
       if (options.dryRun) {
         process.stdout.write(`would delete ${tag}\n`);
@@ -1784,8 +2041,8 @@ async function main(argv) {
     }
     process.stdout.write(
       doomed.length === 0
-        ? `Nothing to prune: ${channel} keeps the newest ${options.keep}.\n`
-        : `Pruned ${doomed.length} ${channel} release(s); kept the newest ${options.keep}.\n`,
+        ? `Nothing to prune: ${channel} keeps the newest ${keep}.\n`
+        : `Pruned ${doomed.length} ${channel} release(s); kept the newest ${keep}.\n`,
     );
     return;
   }
@@ -1796,7 +2053,9 @@ async function main(argv) {
   // missing is a mistake and refuses.
   const manifestPath = options.manifest ?? MANIFEST_PATH;
   const manifest = readManifest(manifestPath);
-  const indexRelease = readIndexRelease();
+  // The catalogue index is a stable/nightly publication fact. A slop build
+  // never writes or reads one: it publishes only its own id, refs and page.
+  const indexRelease = channel === "slop" ? null : readIndexRelease();
   if (manifest === null && options.manifest !== null) {
     throw new Error(
       `--manifest ${options.manifest} names no readable file; refusing to omit the Artifacts ` +
@@ -1813,8 +2072,10 @@ async function main(argv) {
   if (problems.length > 0) throw new Error(problems.join("\n\n"));
 
   const head = currentHead();
+  const headMiss = channel === "slop" ? revisionHeadProblem(revision, head) : null;
+  if (headMiss !== null) throw new Error(headMiss);
   const { snapshotDate, tagDate } = releaseDates(entries, { channel, date: namedDate });
-  const tag = aggregateTag(tagDate, channel);
+  const tag = aggregateTag(tagDate, channel, revision);
   const preReleases = channel === "stable" ? preReleaseLinks(releases) : [];
   const aggregate = planAggregate(tag, head);
   if (aggregate.plan.problem !== null && mode !== "write") {
@@ -1831,7 +2092,7 @@ async function main(argv) {
     aggregate.actionProblem =
       "gh release list failed; refusing to publish releases it cannot read";
   } else {
-    const phase = releasePhase(mode, knownReleases, tag);
+    const phase = releasePhase(mode, knownReleases, tag, { channel, revision });
     aggregate.action = phase.action;
     aggregate.actionProblem = phase.problem;
   }
@@ -1845,7 +2106,7 @@ async function main(argv) {
   // draft can already carry the APK: the upload happens between `--draft` and
   // `--publish`, and the publish phase re-renders the body from this read.
   const goEntry = entries.find((entry) => entry.app.kind === "apk") ?? null;
-  const goAsset = goEntry === null ? null : goApkName(goEntry.version, channel);
+  const goAsset = goEntry === null ? null : goApkName(goEntry.version, channel, revision);
   const aggregateAssets = aggregateExists ? releaseAssets(tag) : null;
   const apkLive =
     goAsset !== null &&
@@ -1865,6 +2126,7 @@ async function main(argv) {
     apkLive,
     draft: draftBodies,
     channel,
+    revision,
     preReleases,
     manifest,
     index: indexRelease,
@@ -1888,7 +2150,7 @@ async function main(argv) {
     const latest = releases.find((row) => row.isLatest);
     process.stdout.write(
       `\nLatest on GitHub now: ${latest === undefined ? "none" : latest.tagName}` +
-        (mode === "publish" ? ` → ${tag} after this run\n` : "\n"),
+        (mode === "publish" && channel === "stable" ? ` → ${tag} after this run\n` : "\n"),
     );
   }
 
@@ -1933,6 +2195,7 @@ async function main(argv) {
       notes,
       apkLive,
       channel,
+      revision,
       prerelease,
     });
     return;
@@ -1941,7 +2204,7 @@ async function main(argv) {
   if (mode === "draft") {
     if (fatalProblems.length > 0) throw new Error(fatalProblems.join("\n\n"));
     // The title names the publication day; the body names the snapshot.
-    mainDraft({ aggregate, date: tagDate, tag, releases, notes, prerelease, channel });
+    mainDraft({ aggregate, date: tagDate, tag, releases, notes, prerelease, channel, revision });
     return;
   }
 
@@ -1957,6 +2220,7 @@ async function main(argv) {
     tag,
     date: tagDate,
     channel,
+    revision,
     prerelease,
   })) {
     process.stdout.write(`\n  $ ${commandText(step.command, step.args)}\n`);

@@ -30,7 +30,7 @@ import {
   summaryPreservationProblem,
   targetProblem,
 } from "./lib/flatpakRemote.mjs";
-import { parseArgs } from "./flatpak-remote.mjs";
+import { parseArgs, proofModeProblem, proofProblems } from "./flatpak-remote.mjs";
 
 const repo = "/home/publisher/suite-flatpak/repo";
 const flatpakrepoPath = "/home/publisher/suite-flatpak/suite.flatpakrepo";
@@ -545,5 +545,39 @@ describe("the commit file", () => {
       /no OSTree commit/u,
     );
     assert.throws(() => commitFileText([{ ref: "", commit: desk }]), /needs a ref/u);
+  });
+});
+
+describe("the slop proof boundary", () => {
+  const head = "a".repeat(40);
+
+  it("accepts the merge queue's proof only on the slop channel", () => {
+    assert.equal(proofModeProblem({ channel: "slop", mergeQueueProven: true }), null);
+    assert.match(
+      proofModeProblem({ channel: "nightly", mergeQueueProven: true }),
+      /only with --channel slop/u,
+    );
+    assert.match(
+      proofModeProblem({ channel: null, mergeQueueProven: true }),
+      /only with --channel slop/u,
+    );
+    assert.deepEqual(
+      proofProblems(null, head, { channel: "slop", mergeQueueProven: true }),
+      [],
+      "slop publishes the merge queue's proof instead of writing a second gate",
+    );
+  });
+
+  it("still demands the fresh gate proof on every other channel", () => {
+    const problems = proofProblems(null, head, {
+      channel: "nightly",
+      mergeQueueProven: false,
+    });
+    assert.match(problems.join("\n"), /no \.dev\/gate-status\.json/u);
+  });
+
+  it("parses the opt-in flag", () => {
+    assert.equal(parseArgs(["--merge-queue-proven"]).mergeQueueProven, true);
+    assert.equal(parseArgs([]).mergeQueueProven, false);
   });
 });

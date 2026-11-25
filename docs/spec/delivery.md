@@ -16,7 +16,9 @@ verified without the release key. Turning it on runs in two environments: `appro
 reviewers, restricted to `main` and release tags) gates `preview` and `stable`, and `release` (also
 restricted to `main` and release tags, no reviewers) holds the keys and publishes. The nightly skips
 `approval` and runs the same workflow for the nightly channel once the `NIGHTLY_PUBLISH` variable is
-set. Only the S3 target is wired; the `lan` target stays a workstation
+set. Slop is separate: `.github/workflows/slop.yml` publishes on every code push to `main`, uses the
+`release` environment directly with no approval job, and runs no gate, e2e, clean install, SBOM,
+attestation or index (D3.1). Only the S3 target is wired; the `lan` target stays a workstation
 operation. An owner configures that environment with the secrets `SUITE_STORE_KEY`,
 `SUITE_STORE_KEY_ID`, `SUITE_GO_KEYSTORE`, `SUITE_GO_KEYSTORE_PASSWORD`, `SUITE_GO_KEY_ALIAS` and
 `SUITE_GO_KEY_PASSWORD`, and the variables `AWS_RELEASE_ROLE_ARN`, `SUITE_FLATPAK_S3_BUCKET` and
@@ -25,8 +27,10 @@ three steps in one run: `release-status.mjs --draft` creates the rolling release
 `android-release.mjs --upload` attaches the exact attested APK, and `release-status.mjs --publish`
 flips the draft and writes `RELEASES.md`. `--channel` names the APK asset, the channel in the body, and the release itself: stable is
 `suite-YYYY.MM.DD` and Latest; `nightly` and `preview` are `suite-<channel>-YYYY.MM.DD`, marked
-pre-release and never Latest, so they stay immutable and out of the stable page. Nightly keeps the
-newest 14 releases (`--prune --channel nightly --keep 14`); the stable body links the newest preview
+pre-release and never Latest, so they stay immutable and out of the stable page; slop is
+`suite-slop-YYYY.MM.DD-<sha7>` with `--revision`, and its APK names the same commit. Nightly keeps the
+newest 14 releases (`--prune --channel nightly --keep 14`) and slop keeps the newest 7
+(`--prune --channel slop --keep 7`); the stable body links the newest preview
 and nightly releases. Each
 publication also writes `release-manifest.json` with the commit, the lockfile hash, the artifact
 digests and the signer identities, and attaches it to the draft before publication (D2.1). The
@@ -77,7 +81,8 @@ removed by the owner. The old refs stay on the signed remote as history and are 
 
 **D2.1** Every artifact has a digest, a source commit, a lockfile hash and a signer identity in a
 release manifest. The manifest is the promotion input; a channel points at a manifest entry, never at
-a folder.
+a folder. A slop session build is not a promotion input: it has no manifest, and its page names the
+commit while the APK's `.sha256` sits beside the asset.
 
 **D2.2** A pack is versioned, not channelled. A pack update is a new signed version; the host keeps
 the previous version for rollback.
@@ -86,13 +91,18 @@ the previous version for rollback.
 
 | Channel | Trigger | Gate | Audience | Publication |
 | --- | --- | --- | --- | --- |
-| `slop` | A branch or session build | Fast checks only; no e2e | The person and agents working on it | Local/session artifact; never a public channel |
+| `slop` | Every code push to `main` | Merge queue only; no fresh gate, e2e, clean install, SBOM, attestation or index | The person and agents working on it | Public pre-release branch and page per commit; never Latest; seven kept |
 | `nightly` | Schedule from `main` (02:00 UTC) | Full `--fresh` gate + e2e + package build | Dogfooders | Public pre-release branch; unreviewed |
 | `preview` | Manual dispatch | Nightly gate + human review + smoke + install | Release candidates | Public pre-release branch; reviewed |
 | `stable` | Manual dispatch | Preview gate + version/docs/support promise | Everyone | Default branch; versioned |
 
-**D3.1** `slop` is not a CI publish. It is the build being worked on; it may be broken. The fast gate
-must finish without e2e, so a session does not wait at the full suite.
+**D3.1** `slop` is a CI publish, but not a release proof. Every code push to `main` publishes the
+build being worked on: `run.suite.slop.desk` on branch `slop`, the Suite Go slop APK, and the page
+`suite-slop-<YYYY.MM.DD>-<sha7>`. The merge queue already ran the checks the change could break, so
+the slop run adds no fresh gate, e2e, clean install, SBOM, attestation or pack index; the page says
+**merge-queue-proven, not full-gate-proven**. It never marks Latest, never moves the stable refs, and
+keeps the seven newest pages. A second run for the same commit is a no-op, not a moved tag. A burst
+of pushes builds only the tip.
 
 **D3.2** `nightly` is automatic and unreviewed. It is the first public proof that `main` builds,
 installs and runs.
@@ -137,8 +147,10 @@ in the tree. A debug-signed APK is never a release artifact.
 **D5.3** The pack publisher key signs the manifest and every file hash. The pack index is signed by
 the catalogue operator; a host verifies the index, the pack and the publisher pin.
 
-**D5.4** GitHub artifact attestations and an SBOM are produced for every public artifact. They are
-evidence, not a substitute for the store, APK or pack signature.
+**D5.4** GitHub artifact attestations and an SBOM are produced for every public *release* artifact.
+They are evidence, not a substitute for the store, APK or pack signature. A slop build is the
+recorded exception: it is a session build, not a release artifact, and it carries no attestation or
+SBOM because it is published on every push and promises only that it is the build being worked on.
 
 **D5.5** A release workflow has `contents: read`, `id-token: write` and `attestations: write` only
 where needed. It never runs on a pull request, never checks out untrusted code, and never prints a
@@ -146,16 +158,20 @@ key.
 
 ## 6. Releases, tags and notes
 
-**D6.1** The rolling `suite-YYYY.MM.DD` release is the only GitHub release; the two channel pages,
-`suite-preview-<date>` and `suite-nightly-<date>`, are the other two. Per-app tags are retired. A
-pre-release tag carries the UTC day it was published, so a nightly gets a new tag every day even
-when no app version changed; its body still names the newest changelog date as the snapshot. Stable's
-tag is that snapshot date, and `--date` sets the tag date (on stable, the snapshot too) for a
-same-day rerun. The signed Flatpak remote is the update path; GitHub Releases are the mirror and the
-APK download.
+**D6.1** The rolling `suite-YYYY.MM.DD` release is the only GitHub release marked Latest; the
+pre-release channel pages are `suite-preview-<date>`, `suite-nightly-<date>` and
+`suite-slop-<date>-<sha7>`. Per-app tags are retired. A nightly or preview tag carries the UTC day it
+was published, so it gets a new tag every day even when no app version changed; its body still names
+the newest changelog date as the snapshot. A slop tag also carries the commit, because each page is
+one build; a rerun for the same commit is a no-op. Stable's tag is that snapshot date, and `--date`
+sets the tag date (on stable, the snapshot too) for a same-day rerun. Slop keeps the newest seven
+pages; nightly keeps fourteen; preview and stable are not pruned. The signed Flatpak remote is the
+update path; GitHub Releases are the mirror and the APK download.
 
 **D6.2** Release notes carry the channel and product maturity separately, plus the artifact digest
-and the verification command. A note without a digest is incomplete.
+and the verification command. A note without a digest is incomplete. A slop note is the exception:
+it names the commit and links the APK it carries, and the `.sha256` is attached beside the asset
+rather than restated in a release manifest it does not have.
 
 **D6.3** Immutable releases are enabled for published releases: the tag and assets are locked after
 publication. Create the release as a draft, attach every asset, then publish.
@@ -216,6 +232,9 @@ date. Do not optimize PR or commit count; the metric is a shipped, verified arti
 6. Release notes name channel, maturity, digest and verification command.
 7. Channel promoted; clean-host install verified.
 8. Previous artifact retained; rollback path written.
+
+This checklist is for `preview` and `stable`. A slop build is not a release candidate: D3.1 is its
+boundary, and the page states that it is merge-queue-proven, not full-gate-proven.
 
 ## 11. Non-goals
 
