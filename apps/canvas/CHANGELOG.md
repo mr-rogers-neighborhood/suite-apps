@@ -6,6 +6,18 @@ a release is tagged `canvas-v<version>`. See
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.1.13] - 2026-11-24
+
+### Added
+
+- **Canvas declares the phone.** The pack manifest now lists `desktop` and `mobile`, and the build
+  writes a card sidecar beside the signed archive with Canvas's own mark, its one-line description
+  and shelf order 1. Suite Go can show the card and offer the pack once its `files` capability
+  lands (#382); until then the catalogue names that missing capability instead of installing a
+  pack that would half-work.
+
 ### Changed
 
 - **Canvas installs as a signed desktop pack, not only the frozen Electron app.** The same renderer

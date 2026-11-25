@@ -2,11 +2,11 @@
   "id": "budget",
   "name": "Suite Budget",
   "description": "A local-first envelope budget.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "entry": "index.html",
   "contractVersion": 1,
   "capabilities": ["documents", "files"],
-  "platforms": ["desktop"],
+  "platforms": ["desktop", "mobile"],
   "documents": [
     {
       "id": "budget",

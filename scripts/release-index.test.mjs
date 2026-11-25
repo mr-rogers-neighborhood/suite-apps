@@ -17,6 +17,7 @@ import {
   publishPrepared,
 } from "./release-index.mjs";
 import { bundlePack } from "./pack.mjs";
+import { CARD_FORMAT, CARD_VERSION, PACK_CARD_META } from "./lib/packCard.mjs";
 
 const roots = [];
 
@@ -30,45 +31,78 @@ function workspace() {
   return root;
 }
 
-/** One signed .suitepack fixture, plus a build command that copies it into place. */
-async function fixturePack(root) {
-  const source = join(root, "source");
+/** One signed .suitepack and card fixture, plus a build command that copies them into place. */
+async function fixturePack(
+  root,
+  {
+    id = "demo",
+    name = "Demo",
+    version = "0.1.0",
+    description = "A pack for the release-index test.",
+    capabilities = ["documents"],
+    platforms = ["desktop"],
+    shelf = 1,
+  } = {},
+) {
+  const source = join(root, `${id}-source`);
   mkdirSync(join(source, "assets"), { recursive: true });
   writeFileSync(
     join(source, "manifest.json"),
     JSON.stringify({
-      id: "demo",
-      name: "Demo",
-      version: "0.1.0",
-      description: "A pack for the release-index test.",
+      id,
+      name,
+      version,
+      description,
       entry: "index.html",
       contractVersion: 1,
-      capabilities: ["documents"],
+      capabilities,
+      platforms,
     }),
   );
-  writeFileSync(join(source, "index.html"), "<!doctype html><title>Demo</title>");
-  writeFileSync(join(source, "assets", "app.js"), "console.log('demo');");
+  writeFileSync(join(source, "index.html"), `<!doctype html><title>${name}</title>`);
+  writeFileSync(join(source, "assets", "app.js"), `console.log(${JSON.stringify(id)});`);
 
   const keys = await generatePackKeyPair();
-  const archive = join(root, "demo-0.1.0.suitepack");
+  const archive = join(root, `${id}-${version}.suitepack`);
+  const card = join(root, `${id}-${version}.card.json`);
   await bundlePack({
     directory: source,
     privateKeyBase64: keys.secretKeyBase64,
     expectedPublicKeyBase64: keys.publicKeyBase64,
     outPath: archive,
   });
+  writeFileSync(
+    card,
+    `${JSON.stringify(
+      {
+        format: CARD_FORMAT,
+        version: CARD_VERSION,
+        id,
+        packVersion: version,
+        name,
+        description,
+        shelf,
+        icon: PACK_CARD_META.canvas.icon,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 
   const packsDir = join(root, "packs");
-  const staged = join(packsDir, "demo-0.1.0.suitepack");
-  const builder = join(root, "stage-pack.mjs");
+  const staged = join(packsDir, `${id}-${version}.suitepack`);
+  const stagedCard = join(packsDir, `${id}-${version}.card.json`);
+  const builder = join(root, `stage-${id}.mjs`);
   writeFileSync(
     builder,
     `import { mkdirSync, copyFileSync } from "node:fs";\n` +
       `mkdirSync(${JSON.stringify(packsDir)}, { recursive: true });\n` +
-      `copyFileSync(${JSON.stringify(archive)}, ${JSON.stringify(staged)});\n`,
+      `copyFileSync(${JSON.stringify(archive)}, ${JSON.stringify(staged)});\n` +
+      `copyFileSync(${JSON.stringify(card)}, ${JSON.stringify(stagedCard)});\n`,
   );
   return {
     archive,
+    card,
     packsDir,
     build: `${process.execPath} ${builder}`,
     keys,
@@ -128,6 +162,8 @@ describe("release catalogue index", () => {
     assert.equal(metadata.fingerprint, await publisherKeyFingerprint(operator.publicKeyBase64));
     assert.equal(metadata.url, "https://flatpak.suite.run/index.json");
     assert.equal(metadata.signatureUrl, "https://flatpak.suite.run/index.json.sig");
+    assert.deepEqual(metadata.cards, ["demo-0.1.0.card.json"]);
+    assert.deepEqual(staged.cards, [join(fixture.packsDir, "demo-0.1.0.card.json")]);
 
     // A second publication chains from the first.
     const next = await prepareIndex({
@@ -146,7 +182,95 @@ describe("release catalogue index", () => {
   });
 
   // spec: S12.2
-  it("publishes the staged index, signature and archives to the same bucket", async () => {
+  it("stages all four mobile packs with cards and keeps the strict index parseable", async () => {
+    const root = workspace();
+    const packs = [
+      {
+        id: "canvas",
+        name: "Suite Canvas",
+        version: "0.1.13",
+        description: "A local-first canvas of boards, cards and links.",
+        capabilities: ["documents", "files", "recents"],
+        shelf: 1,
+      },
+      {
+        id: "planner",
+        name: "Suite Planner",
+        version: "0.5.2",
+        description: "A local-first day plan in one file.",
+        capabilities: ["documents", "files", "notifications"],
+        shelf: 2,
+      },
+      {
+        id: "budget",
+        name: "Suite Budget",
+        version: "0.4.2",
+        description: "A local-first envelope budget.",
+        capabilities: ["documents", "files"],
+        shelf: 3,
+      },
+      {
+        id: "help",
+        name: "Suite Help",
+        version: "0.1.3",
+        description: "The repository handbook and code explorer, offline in one pack.",
+        capabilities: [],
+        shelf: 4,
+      },
+    ];
+    const fixtures = [];
+    for (const pack of packs) {
+      fixtures.push(
+        await fixturePack(root, {
+          ...pack,
+          platforms: ["desktop", "mobile"],
+        }),
+      );
+    }
+
+    const operator = await generatePackKeyPair();
+    const outDir = join(root, "four");
+    const staged = await prepareIndex({
+      builds: fixtures.map((fixture) => fixture.build),
+      packsDir: fixtures[0].packsDir,
+      outDir,
+      privateKey: operator.secretKeyBase64,
+      expectedFingerprint: await publisherKeyFingerprint(operator.publicKeyBase64),
+      now: GENERATED_AT,
+      log: () => {},
+    });
+
+    assert.equal(staged.index.entries.length, 4);
+    assert.deepEqual(
+      staged.index.entries.map((entry) => entry.id),
+      ["budget", "canvas", "help", "planner"],
+    );
+    assert.equal(staged.cards.length, 4);
+    for (const entry of staged.index.entries) {
+      assert.deepEqual(entry.platforms, ["desktop", "mobile"]);
+      // The signed entry schema is strict: a card must never appear here.
+      assert.deepEqual(Object.keys(entry).sort(), [
+        "capabilities",
+        "description",
+        "id",
+        "name",
+        "platforms",
+        "publisher",
+        "sha256",
+        "size",
+        "url",
+        "version",
+      ]);
+    }
+
+    // The same parser a current stable host ships still reads the index.
+    const parsed = parsePackIndexJson(readFileSync(join(outDir, "index.json"), "utf8"));
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) assert.equal(parsed.value.entries.length, 4);
+  });
+
+  // spec: S12.2
+  it("publishes the staged index, signature, archives and cards to the same bucket", async () => {
     const root = workspace();
     const fixture = await fixturePack(root);
     const operator = await generatePackKeyPair();
@@ -172,13 +296,15 @@ describe("release catalogue index", () => {
 
     assert.equal(published.published, true);
 
-    // Order is a contract, not list position: archives, signature, index last.
-    // A consumer must never fetch an index that names an archive not yet stored.
+    // Order is a contract, not list position: archives, then their cards, then
+    // the signature, then the index last. A consumer must never fetch an index
+    // that names an archive or card not yet stored.
     const uploadTargets = calls
       .filter((call) => call[1] === "s3" && call[2] === "cp")
       .map((call) => call[4]);
     assert.deepEqual(uploadTargets, [
       "s3://suite-store/packs/demo-0.1.0.suitepack",
+      "s3://suite-store/packs/demo-0.1.0.card.json",
       "s3://suite-store/index.json.sig",
       "s3://suite-store/index.json",
     ]);

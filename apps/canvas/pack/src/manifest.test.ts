@@ -45,8 +45,10 @@ describe("Canvas's declared document", () => {
     expect(manifest.capabilities).toEqual(["documents", "files", "recents"]);
   });
 
-  it("declares the desktop host it needs", () => {
-    // Canvas needs a file picker and a document folder, which the mobile host does not serve.
-    expect(manifest.platforms).toEqual(["desktop"]);
+  it("declares the hosts it is built for", () => {
+    // The pack is one manifest for both hosts. The mobile host does not serve `files` yet (#382),
+    // so its catalogue refuses the install until the bridge lands; the declaration is what lets
+    // the tile and the refusal be accurate in the meantime.
+    expect(manifest.platforms).toEqual(["desktop", "mobile"]);
   });
 });

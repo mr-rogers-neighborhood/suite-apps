@@ -8,6 +8,14 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 ## [Unreleased]
 
+### Added
+
+- **Planner declares the phone.** The pack manifest now lists `desktop` and `mobile`, and the build
+  writes a card sidecar beside the signed archive with Planner's own mark, its one-line description
+  and shelf order 2. Suite Go can show the card and offer the pack once its `files` capability
+  lands (#382); until then the catalogue names that missing capability instead of installing a
+  pack that would half-work.
+
 ### Fixed
 
 - **A reminder given a new time rings again.** The app remembered that an earlier reminder had

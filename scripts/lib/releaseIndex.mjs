@@ -82,16 +82,17 @@ export function nextIndexState(
 /**
  * The upload plan for one publication.
  *
- * Order is part of the contract: every archive goes first, then the detached
- * signature, then `index.json` last. A consumer must never be able to fetch an
- * index that names an archive the store does not have yet; publishing the index
- * is the commit point. `release-index.test.mjs` asserts this order, so a later
- * edit cannot make it an accident of list position.
+ * Order is part of the contract: every archive and its card go first, then the
+ * detached signature, then `index.json` last. A consumer must never be able to
+ * fetch an index that names an archive the store does not have yet, and a card
+ * must never appear after the entry a host derives it from; publishing the
+ * index is the commit point. `release-index.test.mjs` asserts this order, so a
+ * later edit cannot make it an accident of list position.
  *
  * `index.json` and its signature change on every publication and are no-cache;
- * an archive is named for its bytes and is immutable. Only the two mutable
- * names are invalidated, because CloudFront has never seen the new archive
- * names before.
+ * an archive and a card are named for the version they describe and are
+ * immutable. Only the two mutable names are invalidated, because CloudFront has
+ * never seen the new archive or card names before.
  */
 export function indexUploadCommands({
   bucket,
@@ -99,9 +100,22 @@ export function indexUploadCommands({
   indexPath,
   signaturePath,
   packPaths = [],
+  cardPaths = [],
 }) {
   const target = (key) => `s3://${bucket}/${key}`;
   const archiveUploads = packPaths.map((path) => ({
+    command: "aws",
+    args: [
+      "s3",
+      "cp",
+      path,
+      target(`${PACKS_PREFIX}${basename(path)}`),
+      "--cache-control",
+      IMMUTABLE_CACHE_CONTROL,
+      "--no-progress",
+    ],
+  }));
+  const cardUploads = cardPaths.map((path) => ({
     command: "aws",
     args: [
       "s3",
@@ -139,6 +153,7 @@ export function indexUploadCommands({
   };
   return [
     ...archiveUploads,
+    ...cardUploads,
     signatureUpload,
     indexUpload,
     {

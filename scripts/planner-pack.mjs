@@ -20,6 +20,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KEYS, pinnedPublic, readKey } from "./lib/keys.mjs";
+import { writePackCard } from "./lib/packCard.mjs";
 import { bundlePack, platformsSummary, publicKeyOfSigningKey } from "./pack.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -187,6 +188,8 @@ async function main(argv) {
     outPath: out,
   });
 
+  const card = writePackCard({ archivePath: result.outPath, manifest: result.manifest });
+
   const totalBytes = result.manifest.files.reduce((sum, file) => sum + file.bytes, 0);
   process.stdout.write(
     `${result.outPath}  ${result.manifest.files.length} files  ${totalBytes} bytes  ` +
@@ -194,6 +197,7 @@ async function main(argv) {
   );
   process.stdout.write(`${result.outPath}.sha256  ${result.sha256}\n`);
   process.stdout.write(`packs for: ${platformsSummary(result.manifest)}\n`);
+  process.stdout.write(`${card.path}  shelf ${card.card.shelf}\n`);
   return 0;
 }
 

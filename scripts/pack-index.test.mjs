@@ -6,6 +6,7 @@ import { after, describe, it } from "node:test";
 import {
   generatePackKeyPair,
   packIndexDigest,
+  parsePackIndexJson,
   sha256Hex,
   verifyPackIndexJson,
 } from "@suite/pack";
@@ -25,7 +26,10 @@ function workspace() {
 }
 
 /** Build one signed pack and return its archive path. */
-async function buildPack(root, { id, name, version, description, capabilities }) {
+async function buildPack(
+  root,
+  { id, name, version, description, capabilities, platforms = ["desktop"] },
+) {
   const directory = join(root, `${id}-${version}`);
   mkdirSync(join(directory, "assets"), { recursive: true });
   writeFileSync(
@@ -38,6 +42,7 @@ async function buildPack(root, { id, name, version, description, capabilities })
       entry: "index.html",
       contractVersion: 1,
       capabilities,
+      platforms,
     }),
   );
   writeFileSync(join(directory, "index.html"), `<!doctype html><title>${name}</title>`);
@@ -111,6 +116,52 @@ describe("pack-index build", () => {
     });
     assert.equal(verified.ok, true);
     if (verified.ok) assert.equal(verified.digest, built.digest);
+  });
+
+  // spec: S12.2
+  it("still parses on the current host with all four mobile packs in one index", async () => {
+    const root = workspace();
+    const four = [
+      ["canvas", "Suite Canvas", "0.1.13", ["documents", "files", "recents"]],
+      ["planner", "Suite Planner", "0.5.2", ["documents", "files", "notifications"]],
+      ["budget", "Suite Budget", "0.4.2", ["documents", "files"]],
+      ["help", "Suite Help", "0.1.3", []],
+    ];
+    const archives = [];
+    for (const [id, name, version, capabilities] of four) {
+      archives.push(
+        await buildPack(root, {
+          id,
+          name,
+          version,
+          description: `${name} for the phone.`,
+          capabilities,
+          platforms: ["desktop", "mobile"],
+        }),
+      );
+    }
+    const operator = await generatePackKeyPair();
+
+    const built = await buildPackIndex({
+      archives,
+      urlBase: "https://packs.suite.run/",
+      sequence: 1,
+      generatedAt: GENERATED_AT,
+      expires: EXPIRES,
+      privateKeys: [operator.secretKeyBase64],
+    });
+
+    // The parser is the one a stable host ships; it must accept the index with
+    // no schema change, because a card is a sidecar and not an entry field.
+    const text = JSON.stringify(built.index);
+    const parsed = parsePackIndexJson(text);
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    assert.equal(parsed.value.entries.length, 4);
+    for (const entry of parsed.value.entries) {
+      assert.deepEqual(entry.platforms, ["desktop", "mobile"]);
+      assert.equal("card" in entry, false);
+    }
   });
 
   // spec: S12.2

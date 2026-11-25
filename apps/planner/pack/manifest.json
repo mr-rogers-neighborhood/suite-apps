@@ -2,11 +2,11 @@
   "id": "planner",
   "name": "Suite Planner",
   "description": "A local-first day plan in one file.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "entry": "index.html",
   "contractVersion": 1,
   "capabilities": ["documents", "files", "notifications"],
-  "platforms": ["desktop"],
+  "platforms": ["desktop", "mobile"],
   "documents": [
     {
       "id": "workspace",
