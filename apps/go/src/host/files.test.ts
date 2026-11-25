@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { acceptAttribute, createFileService, mimeFor } from "./files.js";
+import { acceptAttribute, createFileService, mimeFor, safeExportName } from "./files.js";
 
 // Mock Capacitor plugins
 vi.mock("@capacitor/filesystem", () => ({
@@ -50,6 +50,20 @@ describe("files service and helpers", () => {
     });
   });
 
+  describe("safeExportName", () => {
+    it("keeps a plain name and trims its edges", () => {
+      expect(safeExportName("export.planner")).toBe("export.planner");
+      expect(safeExportName("  export.planner  ")).toBe("export.planner");
+    });
+
+    it("refuses a name that could leave the documents directory", () => {
+      for (const attempt of ["../escape", "a/b", "a\\b", "..", ".", "", "\u0000"]) {
+        expect(() => safeExportName(attempt)).toThrow(/not usable/u);
+      }
+      expect(() => safeExportName("x".repeat(256))).toThrow(/not usable/u);
+    });
+  });
+
   describe("createFileService", () => {
     it("writes to the sandboxed Documents directory", async () => {
       const service = createFileService();
@@ -89,6 +103,24 @@ describe("files service and helpers", () => {
       if (!outcome.ok) {
         expect(outcome.reason).toBe("cancelled");
       }
+    });
+
+    it("refuses an export name containing a path separator", async () => {
+      const service = createFileService();
+      await expect(
+        service.exportFile({
+          name: "../escape.planner",
+          mimeType: "application/json",
+          bytes: new Uint8Array([1]),
+        }),
+      ).rejects.toThrow(/not usable/u);
+
+      const outcome = await service.share({
+        name: "a/b.planner",
+        mimeType: "application/json",
+        bytes: new Uint8Array([1]),
+      });
+      expect(outcome.ok).toBe(false);
     });
 
     it("reports share failure with message", async () => {

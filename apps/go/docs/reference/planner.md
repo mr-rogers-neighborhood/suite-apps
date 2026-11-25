@@ -118,12 +118,18 @@ reminders with `pendingReminders` in `@suite/planner-core` and hands them to the
 schedules from the document and can notify while the window is hidden.
 
 In the pack, the prelude asks the container's `notifications` service — the `notifications`
-capability, contract 2 — which passes each reminder to the phone's own alarm clock through
+capability — which passes each reminder to the phone's own alarm clock through
 `@capacitor/local-notifications`. Two details make it behave: cancelling a reminder that is no longer
 pending is what stops a completed or deleted task from still ringing, and a permission the person
 denied comes back to the UI as a notice instead of silence. Past-due times are never scheduled; a
 platform alarm handed a time in the past fires immediately.
 
 The renderer records the first ask in `settings.notificationsAskedAt`, so a permission the person
-revoked is reported rather than prompted for again on the next edit. A host older than contract 2
-refuses the pack rather than accepting it and silently dropping the alarm.
+revoked is reported rather than prompted for again on the next edit.
+
+Import and export go through the container's `files` service: `pickOpen` returns the bytes of a
+`.planner` file the person chose, and `share` hands the current snapshot to Android. Neither side
+learns a path. The pack declares `documents`, `files`, `recents` and `notifications` at contract 3 —
+the version that serves the file store — in `planner/pack.json`, which the build and the bridge test
+read from the same file. A host older than contract 3 refuses the pack rather than accepting it and
+silently dropping the alarm or the import.

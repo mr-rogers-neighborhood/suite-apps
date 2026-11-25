@@ -354,10 +354,13 @@ export function serveFrame(options: FrameBridgeOptions): () => void {
   const server = createFrameServer(options);
   const handle = async (event: MessageEvent): Promise<void> => {
     if (!isFrameEnvelope(event.data)) return;
+    const window = options.target();
+    // A page receives messages from anything that holds a reference to it. Only
+    // the frame this bridge was opened for may be answered, so another frame
+    // cannot borrow this pack's store by posting here.
+    if (window === null || event.source !== window) return;
     const envelope = event.data;
     const reply = await server.answer(envelope.request, envelope.payload);
-    const window = options.target();
-    if (!window) return;
     window.postMessage({ ...reply, protocol: FRAME_PROTOCOL, id: envelope.id }, "*");
   };
 

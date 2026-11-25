@@ -51,7 +51,13 @@ class MemoryBackend implements PackFileBackend {
   async mkdir(path: string): Promise<void> {
     const parts = path.split("/");
     for (let depth = 1; depth <= parts.length; depth += 1) {
-      this.directories.add(parts.slice(0, depth).join("/"));
+      const directory = parts.slice(0, depth).join("/");
+      // A path that is already a file (or a link) is not a directory, and a
+      // recursive mkdir must not turn it into one.
+      if (this.files.has(directory) || this.links.has(directory)) {
+        throw new Error("not a directory");
+      }
+      this.directories.add(directory);
     }
   }
 
@@ -263,6 +269,24 @@ describe("Suite Go pack file store", () => {
     await expect(store.backup("notes")).rejects.toSatisfy(
       (error) => errorCode(error) === "not-a-file",
     );
+  });
+
+  it("refuses a root that is not a plain host-owned path", async () => {
+    for (const root of ["", "/etc", "pack-files/\u0000", "pack-files/../escape"]) {
+      await expect(GoPackFileStore.open(root, { backend: new MemoryBackend() })).rejects.toSatisfy(
+        (error) => errorCode(error) === "invalid-path",
+      );
+    }
+  });
+
+  it("refuses mkdir over an existing file instead of calling it a directory", async () => {
+    const store = await storeFor("alpha");
+    await store.write("notes", bytes("a file"));
+
+    await expect(store.mkdir("notes")).rejects.toSatisfy(
+      (error) => errorCode(error) === "not-a-directory",
+    );
+    expect((await store.stat("notes"))?.kind).toBe("file");
   });
 
   it("creates nested directories, renames, and removes only when allowed", async () => {

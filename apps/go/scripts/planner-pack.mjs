@@ -36,6 +36,29 @@ const version = arg("version") ?? "0.1.0";
 const out = arg("out") ?? join(DEV_DIR, `${id}.pack`);
 
 /**
+ * The pack's declaration, shared with the test that proves the frame accepts it.
+ *
+ * The capabilities are not repeated here: `planner/pack.json` is the one place
+ * that says what this pack asks the container for, so the built manifest and the
+ * fixture that exercises the bridge cannot drift. The prelude calls `host.files`
+ * for import and export, so `files` has to be in this list and the contract has
+ * to be the version that serves it.
+ */
+const DECLARATION_PATH = new URL("../planner/pack.json", import.meta.url);
+const declaration = JSON.parse(readFileSync(DECLARATION_PATH, "utf8"));
+if (!Array.isArray(declaration.capabilities) || declaration.capabilities.length === 0) {
+  throw new Error("planner/pack.json must list at least one capability.");
+}
+if (!Number.isInteger(declaration.contractVersion) || declaration.contractVersion < 1) {
+  throw new Error("planner/pack.json must name a positive integer contractVersion.");
+}
+if (!declaration.capabilities.includes("files")) {
+  throw new Error(
+    "planner/pack.json must declare files: the prelude imports and exports through it.",
+  );
+}
+
+/**
  * The signing key, from the one home secrets have.
  *
  * It used to be `apps/go/.dev/suite-pack-key`, which is the scratch directory the build replaces:
@@ -142,9 +165,9 @@ await run("node", [
   "--entry",
   "index.html",
   "--capabilities",
-  "documents,recents,notifications",
+  declaration.capabilities.join(","),
   "--contract",
-  "2",
+  String(declaration.contractVersion),
   "--key",
   key,
   "--out",

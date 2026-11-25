@@ -10,7 +10,9 @@ import {
 } from "@suite/go";
 import { isSafePackId, isSafePublisherId, SUITE_PUBLISHER_ID } from "@suite/pack";
 import {
+  assertRelativePath,
   FileStoreError,
+  isSafeRelativePath,
   joinUnderRoot,
   LockTable,
   PACK_FILE_MAX_BYTES,
@@ -88,9 +90,18 @@ export function createCapacitorBackend(): PackFileBackend {
       await Filesystem.writeFile({ path, data: bytesToBase64(bytes), directory });
     },
     async mkdir(path) {
-      // Recursive creation is idempotent; some platforms still report an existing
-      // directory as an error, and the next operation is the real test.
-      await Filesystem.mkdir({ path, directory, recursive: true }).catch(() => undefined);
+      try {
+        await Filesystem.mkdir({ path, directory, recursive: true });
+      } catch (error) {
+        // Recursive creation is idempotent, but some platforms still report an
+        // existing directory as an error. Re-stat so a *file* at the path is not
+        // hidden by that tolerance.
+        const info = await Filesystem.stat({ path, directory }).catch(() => null);
+        if (info !== null && String(info.type) !== "directory") {
+          throw new FileStoreError("not-a-directory", "not a directory");
+        }
+        if (info === null) throw error;
+      }
     },
     async readdir(path) {
       const listing = await Filesystem.readdir({ path, directory });
@@ -175,6 +186,10 @@ export class GoPackFileStore {
     const store = new GoPackFileStore(root, options);
     try {
       await store.#backend.mkdir(root);
+      const info = await store.#statOrNull(root);
+      if (info === null || info.type !== "directory") {
+        throw new FileStoreError("not-a-directory", "not a directory");
+      }
     } catch (error) {
       throw fallback(error);
     }
@@ -229,6 +244,16 @@ export class GoPackFileStore {
   async mkdir(path: string): Promise<void> {
     const target = await this.#guardParent(path);
     try {
+      const existing = await this.#statOrNull(target.full);
+      if (existing !== null) {
+        this.#refuseNonRegular(existing);
+        // A directory is already what the caller asked for; a file or anything
+        // else is not, and saying "done" would turn the next read into a lie.
+        if (existing.type !== "directory") {
+          throw new FileStoreError("not-a-directory", "not a directory");
+        }
+        return;
+      }
       await this.#backend.mkdir(target.full);
       await this.#guardExisting(path, true);
     } catch (error) {
@@ -347,7 +372,7 @@ export class GoPackFileStore {
   }
 
   lock(path: string, owner = "pack"): FileLock {
-    assertPackPath(path);
+    assertRelativePath(path);
     return this.#locks.acquire(path, owner);
   }
 
@@ -367,8 +392,9 @@ export class GoPackFileStore {
     readonly full: string;
     readonly info: { type: string; size: number; mtimeMs: number };
   }> {
-    assertPackPath(path, allowRoot);
+    assertRelativePath(path, allowRoot);
     const full = joinUnderRoot(this.#root, path, allowRoot);
+    await this.#guardAncestors(path);
     const info = await this.#statOrNull(full);
     if (info === null) throw new FileStoreError("not-found", "file not found");
     this.#refuseNonRegular(info);
@@ -382,8 +408,20 @@ export class GoPackFileStore {
    * one. Missing ancestors are created by the caller after this check.
    */
   async #guardParent(path: string): Promise<{ readonly full: string }> {
-    assertPackPath(path);
+    assertRelativePath(path);
     const full = joinUnderRoot(this.#root, path);
+    await this.#guardAncestors(path);
+    return { full };
+  }
+
+  /**
+   * Refuse an ancestor that is not a real directory.
+   *
+   * The final name is checked separately by the caller; this is the walk above it,
+   * so a link or a device standing in for a parent is refused the same way whether
+   * the path exists or is about to be created.
+   */
+  async #guardAncestors(path: string): Promise<void> {
     const parts = path.split("/");
     parts.pop();
     for (let depth = parts.length; depth >= 0; depth -= 1) {
@@ -395,7 +433,6 @@ export class GoPackFileStore {
         throw new FileStoreError("not-a-directory", "not a directory");
       }
     }
-    return { full };
   }
 
   async #statOrNull(full: string): Promise<{ type: string; size: number; mtimeMs: number } | null> {
@@ -436,23 +473,10 @@ function dirname(path: string): string {
   return parts.join("/");
 }
 
-function assertPackPath(path: string, allowRoot = false): void {
-  try {
-    joinUnderRoot("", path, allowRoot);
-  } catch (error) {
-    if (error instanceof FileStoreError) throw error;
-    throw new FileStoreError("invalid-path", "invalid path");
-  }
-}
-
 function isSafeRoot(root: string): boolean {
-  if (root.length === 0 || root.length > 1024) return false;
-  if (root.startsWith("/") || root.startsWith("\\")) return false;
-  return root
-    .split("/")
-    .every(
-      (segment) => segment !== "" && segment !== "." && segment !== ".." && !segment.includes("\\"),
-    );
+  // The same rule a pack path gets, plus "not empty": the root is host-built, but
+  // a control character or a climb must not reach the filesystem either.
+  return root.length > 0 && isSafeRelativePath(root);
 }
 
 /**

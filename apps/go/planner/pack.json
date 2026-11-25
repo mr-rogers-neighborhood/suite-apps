@@ -1,0 +1,4 @@
+{
+  "capabilities": ["documents", "files", "recents", "notifications"],
+  "contractVersion": 3
+}

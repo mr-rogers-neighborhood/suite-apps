@@ -7,8 +7,10 @@ import {
   type PackManifest,
 } from "@suite/go";
 import { describe, expect, it } from "vitest";
+import declaration from "../../planner/pack.json";
 import type { PackFileBackend } from "../host/packFiles.js";
 import { createPackFilesWith } from "../host/packFiles.js";
+import { HOST_CONTRACT_VERSION } from "../host/packs.js";
 import { createFrameServer, type FrameServer } from "./frameBridge.js";
 
 /**
@@ -55,7 +57,9 @@ class MemoryBackend implements PackFileBackend {
   async mkdir(path: string): Promise<void> {
     const parts = path.split("/");
     for (let depth = 1; depth <= parts.length; depth += 1) {
-      this.directories.add(parts.slice(0, depth).join("/"));
+      const directory = parts.slice(0, depth).join("/");
+      if (this.files.has(directory)) throw new Error("not a directory");
+      this.directories.add(directory);
     }
   }
   async readdir(path: string): Promise<readonly { name: string; type: string }[]> {
@@ -260,7 +264,10 @@ describe("a pack using its own files across the frame bridge", () => {
   });
 
   it("refuses a path outside the root, and another pack's file", async () => {
-    const alpha = createPackFilesWith({ packId: "alpha" }, { backend: new MemoryBackend() });
+    // One backend, so the isolation is the store's roots doing the work rather
+    // than two fakes that could never see each other anyway.
+    const backend = new MemoryBackend();
+    const alpha = createPackFilesWith({ packId: "alpha" }, { backend });
     const first = harness({ pack: manifest("alpha", ["files"]), files: alpha });
     try {
       await first.client.files.write("notes/day.txt", bytes("alpha only"));
@@ -274,7 +281,7 @@ describe("a pack using its own files across the frame bridge", () => {
       first.close();
     }
 
-    const beta = createPackFilesWith({ packId: "beta" }, { backend: new MemoryBackend() });
+    const beta = createPackFilesWith({ packId: "beta" }, { backend });
     const second = harness({ pack: manifest("beta", ["files"]), files: beta });
     try {
       expect(await second.client.files.list()).toEqual([]);
@@ -283,6 +290,107 @@ describe("a pack using its own files across the frame bridge", () => {
       );
     } finally {
       second.close();
+    }
+  });
+
+  it("separates two publishers of the same pack id under one backend", async () => {
+    const backend = new MemoryBackend();
+    const firstParty = createPackFilesWith({ packId: "shared" }, { backend });
+    const other = createPackFilesWith({ packId: "shared", publisherId: "other" }, { backend });
+
+    await firstParty.write("notes/today.txt", bytes("first party"));
+
+    expect(await other.stat("notes/today.txt")).toBeNull();
+    await expect(other.read("notes/today.txt")).rejects.toThrow(/file not found/u);
+    // And the same relative name is its own file under the other publisher.
+    await other.write("notes/today.txt", bytes("other publisher"));
+    expect(text(await firstParty.read("notes/today.txt"))).toBe("first party");
+    expect(text(await other.read("notes/today.txt"))).toBe("other publisher");
+  });
+
+  it("exposes the person's picker, export and share", async () => {
+    const store = createPackFilesWith({ packId: "alpha" }, { backend: new MemoryBackend() });
+    const files: FileService = {
+      ...store,
+      pickOpen: async () => ({
+        name: "backup.planner",
+        mimeType: "application/json",
+        bytes: bytes("imported"),
+      }),
+      exportFile: async () => ({ ok: true, uri: "file:///documents/export.planner" }),
+      share: async (input) => ({ ok: true, name: input.name }),
+    };
+    const frame = harness({ pack: manifest("alpha", ["files"]), files });
+    try {
+      const picked = await frame.client.files.pickOpen([
+        { name: "Planner workspace", extensions: ["planner"] },
+      ]);
+      expect(picked).not.toBeNull();
+      expect(picked?.name).toBe("backup.planner");
+      expect(text(picked?.bytes ?? new Uint8Array(0))).toBe("imported");
+
+      await expect(
+        frame.client.files.exportFile({
+          name: "export.planner",
+          mimeType: "application/json",
+          bytes: bytes("exported"),
+        }),
+      ).resolves.toEqual({ ok: true, uri: "file:///documents/export.planner" });
+
+      await expect(
+        frame.client.files.share({
+          name: "snapshot.planner",
+          mimeType: "application/json",
+          bytes: bytes("shared"),
+        }),
+      ).resolves.toEqual({ ok: true, name: "snapshot.planner" });
+    } finally {
+      frame.close();
+    }
+  });
+
+  it("creates a directory, refuses a stale write, honours maxBytes and removes recursively", async () => {
+    const files = createPackFilesWith({ packId: "alpha" }, { backend: new MemoryBackend() });
+    const frame = harness({ pack: manifest("alpha", ["files"]), files });
+    try {
+      await frame.client.files.mkdir("notes/archive");
+      expect((await frame.client.files.stat("notes/archive"))?.kind).toBe("directory");
+
+      const entry = await frame.client.files.write("notes/day.txt", bytes("hello"));
+      await expect(
+        frame.client.files.write("notes/day.txt", bytes("changed"), {
+          expectedMtimeMs: entry.mtimeMs + 1_000,
+        }),
+      ).rejects.toThrow(/file changed since it was read \(conflict\)/u);
+
+      await expect(frame.client.files.read("notes/day.txt", { maxBytes: 2 })).rejects.toThrow(
+        /file is too large \(too-large\)/u,
+      );
+
+      await frame.client.files.remove("notes", { recursive: true });
+      expect(await frame.client.files.list()).toEqual([]);
+    } finally {
+      frame.close();
+    }
+  });
+
+  it("ignores an unknown unlock token and keeps the held lock", async () => {
+    const files = createPackFilesWith({ packId: "alpha" }, { backend: new MemoryBackend() });
+    const frame = harness({ pack: manifest("alpha", ["files"]), files });
+    try {
+      const lock = await frame.client.files.lock("notes/day.txt");
+
+      await expect(
+        frame.server.answer({ method: "files.unlock", token: "guessed" }),
+      ).resolves.toEqual({ ok: true, value: null });
+      await expect(frame.client.files.lock("notes/day.txt")).rejects.toThrow(
+        /file is locked \(locked\)/u,
+      );
+
+      await lock.release();
+      await expect(frame.client.files.lock("notes/day.txt")).resolves.toBeDefined();
+    } finally {
+      frame.close();
     }
   });
 
@@ -299,6 +407,46 @@ describe("a pack using its own files across the frame bridge", () => {
       await lock.release();
       const again = await frame.client.files.lock("notes/day.txt");
       await again.release();
+    } finally {
+      frame.close();
+    }
+  });
+
+  it("builds the Planner pack with files on a contract that serves it", async () => {
+    // The build script reads this same file, so the declaration the pack ships
+    // and this proof cannot drift.
+    expect(declaration.capabilities).toContain("files");
+    expect(declaration.contractVersion).toBeGreaterThanOrEqual(3);
+    expect(declaration.contractVersion).toBeLessThanOrEqual(HOST_CONTRACT_VERSION);
+
+    const store = createPackFilesWith({ packId: "planner" }, { backend: new MemoryBackend() });
+    const files: FileService = {
+      ...store,
+      pickOpen: async () => ({
+        name: "Planner.planner",
+        mimeType: "application/json",
+        bytes: bytes("snapshot"),
+      }),
+      share: async (input) => ({ ok: true, name: input.name }),
+    };
+    const planner = {
+      ...manifest("planner", declaration.capabilities as PackManifest["capabilities"]),
+      contractVersion: declaration.contractVersion,
+    };
+    const frame = harness({ pack: planner, files });
+    try {
+      const picked = await frame.client.files.pickOpen([
+        { name: "Planner workspace", extensions: ["planner"] },
+      ]);
+      expect(picked?.name).toBe("Planner.planner");
+
+      await expect(
+        frame.client.files.share({
+          name: "Planner.planner",
+          mimeType: "application/json",
+          bytes: bytes("snapshot"),
+        }),
+      ).resolves.toMatchObject({ ok: true });
     } finally {
       frame.close();
     }
