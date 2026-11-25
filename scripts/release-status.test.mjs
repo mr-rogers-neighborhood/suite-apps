@@ -1351,6 +1351,22 @@ describe("channel releases", () => {
     });
   });
 
+  it("uses publication time for several pages on one day, not the tag spelling", () => {
+    const pages = newestPages([
+      {
+        tagName: "suite-slop-2026.11.25-b1dfc56",
+        isDraft: false,
+        publishedAt: "2026-11-25T17:28:12Z",
+      },
+      {
+        tagName: "suite-slop-2026.11.25-f9bd624",
+        isDraft: false,
+        publishedAt: "2026-11-25T13:07:39Z",
+      },
+    ]);
+    assert.equal(pages.slop, "suite-slop-2026.11.25-b1dfc56");
+  });
+
   it("has no page for a channel that never published", () => {
     assert.deepEqual(newestPages([]), {
       slop: null,
