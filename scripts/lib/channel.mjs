@@ -1,12 +1,12 @@
 /**
  * The channel identities shared by the release and Flatpak paths.
  *
- * Stable keeps the id a shipped install already has. A pre-release shares one
- * id across the slop, nightly and preview channels, so a machine can hold stable
- * and one pre-release side by side, and moving channel replaces the pre-release
- * rather than adding a third install. The channel is the branch; the id stays
- * put. `canary` and `beta` were the old names and are refused rather than
- * silently aliased, so a stale command fails where it is typed.
+ * Stable keeps the id a shipped install already has. Each pre-release channel
+ * has an id of its own — `run.suite.<channel>.<app>` — on its own branch, so
+ * stable, slop, nightly and preview are four installs that sit side by side and
+ * each carries its own data root. `canary` and `beta` were the old names and are
+ * refused rather than silently aliased, so a stale command fails where it is
+ * typed.
  *
  * Pure string work lives here so both scripts describe the same identity and a
  * test can prove the desktop entry registers no MIME type or scheme handler.
@@ -67,20 +67,22 @@ export function channelProblem(channel) {
 
 /** The Flatpak application id for one app on one channel. */
 export function flatpakId(app, channel) {
-  if (!isPreRelease(channel) && channel !== STABLE_CHANNEL) {
-    throw new Error(channelProblem(channel) ?? "unknown channel");
-  }
-  return isPreRelease(channel) ? `run.suite.slop.${app}` : `run.suite.${app}`;
+  const problem = channelProblem(channel);
+  if (problem !== null) throw new Error(problem);
+  return isPreRelease(channel) ? `run.suite.${channel}.${app}` : `run.suite.${app}`;
 }
 
 /**
  * The `suite.app.json` id for one app on one channel.
  *
- * A pre-release id is `slop-<app>` with a hyphen: that is the canonical manifest
- * id, and the one every app classifies as a pre-release. The Flatpak id is a
- * different field and keeps its dots (`run.suite.slop.<app>`); the branch names
- * the channel. Do not change this to the dot form an early build wrote — that form
- * is read for compatibility, never written.
+ * A pre-release id stays `slop-<app>` with a hyphen for every pre-release
+ * channel. Only a frozen legacy mini-app ever ships one, as a local factory
+ * session build, and those apps classify exactly that marker as a pre-release;
+ * calling a nightly session build `nightly-<app>` would make it read as stable
+ * and let it write the stable documents folder. The Flatpak id carries the
+ * channel (`run.suite.<channel>.<app>`); this manifest id marks the build as a
+ * pre-release. The older `slop.<app>` dot form is still read for compatibility,
+ * never written.
  */
 export function suiteAppId(app, channel) {
   return isPreRelease(channel) ? `slop-${app}` : app;

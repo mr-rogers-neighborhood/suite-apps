@@ -60,8 +60,8 @@ Unstable does not mean unverified. A Flatpak channel verifies the signed OSTree 
 key, and the relay's checksum list is signed with the update key. Unstable means the code may change
 or break, not that the bytes are unaccounted for.
 
-Unstable does not mean shared. A pre-release runs under one pre-release id and profile, in its own
-pre-release data folder, and cannot write a stable document. [Distribution](#distribution) states the
+Unstable does not mean shared. A pre-release runs under its channel's own id and profile, in that
+channel's data root, and cannot write a stable document. [Distribution](#distribution) states the
 mapping.
 
 ## The superapp is the unit
@@ -94,18 +94,23 @@ branch and the data folder are what make a channel.
 | Build | Form | What carries the channel | Data |
 | --- | --- | --- | --- |
 | Suite Desk, stable | Flatpak | `run.suite.shell` on the remote's default branch | the host's own data root |
-| Suite Desk, pre-release | Flatpak | `run.suite.slop.shell` on the `slop`, `nightly` or `preview` branch | the pre-release data root |
-| Suite Go | Release APK | the package id: `run.suite.go` for stable, `run.suite.slop.go` for every pre-release | the app's own data |
+| Suite Desk, pre-release | Flatpak | `run.suite.<channel>.shell` on the `<channel>` branch | that channel's data root |
+| Suite Go, stable | Release APK | the package id `run.suite.go` | the app's own data |
+| Suite Go, pre-release | Release APK | the package id `run.suite.<channel>.go` | that app's own data |
 | Legacy mini-app (frozen) | Flatpak | the last stable ref; no new channel is published | `Documents/Suite/<App>` |
 
-One pre-release id serves every pre-release channel. A person has one pre-release install at a time;
-moving from `slop` to `nightly` replaces the pre-release instead of adding a third install. Stable and
-pre-release are two ids, so they are two cards and can be installed side by side. A pre-release build
-cannot resolve the stable profile.
+Each channel is its own id, branch and data root. Stable is `run.suite.shell` on Desk and
+`run.suite.go` on Go; slop, nightly and preview are `run.suite.<channel>.shell` and
+`run.suite.<channel>.go`. Four ids mean four installs, so stable, slop, nightly and preview can be
+installed and updated side by side. The ids were not always separate: slop has always been
+`run.suite.slop`, while nightly and preview moved from the shared `run.suite.slop` id, so an install
+made before the change reinstalls once under the new id. No pre-release data is migrated: the new id
+starts with an empty data root, and the old one is not copied or renamed.
 
-Data is keyed by id, so the stable id and the pre-release id have separate trees. Every pre-release
-channel writes the one `Documents/Suite Slop/<App>` folder; the channels are not separated from each
-other, only from stable. That is why one pre-release install at a time is the supported shape.
+Data is keyed by id, so every channel has a separate tree. On Desk that tree is the Flatpak sandbox
+under `~/.var/app/<id>`; Go has its own app data. A frozen mini-app's pre-release build is the
+exception: it is a local factory session build, not a shipped channel, and it still uses the one
+`Documents/Suite Slop/<App>` folder the frozen apps already know.
 
 Documents are copy-on-open. A pre-release opens a copy in its own folder rather than editing the
 stable file in place, and it does not migrate that file. Exporting back is explicit and refuses the
@@ -161,7 +166,7 @@ A channel badge is a promise, and it is persistent: a screenshot of the window s
 running, and a restart does not remove it. It commits to four things:
 
 - the build is that channel, not "newer than stable";
-- it writes the pre-release data folder, separate from stable;
+- it writes that channel's data root, separate from stable and from every other channel;
 - an update moves within the channel and never across it;
 - removing it leaves the stable documents alone.
 

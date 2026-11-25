@@ -81,14 +81,17 @@ commits nothing, so the gate proof stays on HEAD.
 
 ## Pre-release channels
 
-A pre-release is a build of the same app on the `slop`, `nightly` or `preview` branch. It is not a
-second app: it shares `run.suite.slop.<app>` across the three channels and takes the channel as its
-Flatpak branch. Stable keeps `run.suite.<app>`, so both can be installed at once. One pre-release
-install at a time is the supported shape; moving channel replaces it.
+A pre-release is a build of the same app on the `slop`, `nightly` or `preview` branch. It is a
+different install, not just a different build: each channel has its own id —
+`run.suite.slop.<app>`, `run.suite.nightly.<app>` or `run.suite.preview.<app>` — and its own data
+root. Stable keeps `run.suite.<app>`, so stable, slop, nightly and preview can all be installed at
+once. Slop keeps the id it has always had; nightly and preview moved from the shared
+`run.suite.slop` id, so an existing nightly or preview install reinstalls once under the new id. No
+pre-release data is migrated.
 
 ```sh
-node scripts/flatpak.mjs --app shell --channel slop
-node scripts/flatpak-remote.mjs --target s3 --channel slop --publish
+node scripts/flatpak.mjs --app shell --channel nightly
+node scripts/flatpak-remote.mjs --target s3 --channel nightly --publish
 ```
 
 A frozen legacy mini-app (Canvas, Planner, Budget, Help) is refused here: it keeps its last stable ref
@@ -248,11 +251,10 @@ mise exec -- node scripts/android-release.mjs --upload "$APK" --channel slop --p
 
 The upload path never runs Gradle and never reads the keystore. It checks the APK's certificate
 against the pinned release certificate, reads the package id and version name from `aapt`, and
-stages the same bytes under the asset name, writing the checksum into `apps/go/.dev/release`. A
-stable APK names its own channel; a pre-release shares `run.suite.slop.go` across slop, nightly and
-preview, so `--channel` is required and is checked against both the package id and the version name
-suffix. Without `--publish` the command verifies the APK and prints the upload only, like the build
-path.
+stages the same bytes under the asset name, writing the checksum into `apps/go/.dev/release`. The
+package id names the channel — `run.suite.nightly.go` is nightly — so `--channel` is optional and is
+checked against both the package id and the version name suffix when passed. Without `--publish` the
+command verifies the APK and prints the upload only, like the build path.
 
 An `--upload` publish needs a draft rolling release. A published release is refused because its
 assets are locked; `--allow-published` is the explicit exception, and only for a repository that has

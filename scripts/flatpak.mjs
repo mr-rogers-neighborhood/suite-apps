@@ -14,9 +14,9 @@
  *   node scripts/flatpak.mjs --app shell     # Suite Desk (the host) stable, same path
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
  *   node scripts/flatpak.mjs --app shell --channel slop
- *                                            # pre-release id on the slop branch
+ *                                            # the slop id on the slop branch
  *   node scripts/flatpak.mjs --app shell --channel nightly
- *                                            # the host pre-release id on nightly
+ *                                            # the host's nightly id on nightly
  *   node scripts/flatpak.mjs --app shell --channel nightly --dry-run
  *                                            # write the generated files and print
  *                                            # the identity; no build or install
@@ -30,12 +30,14 @@
  * remote is added with --no-gpg-verify for local testing only.
  *
  * A pre-release is generated from the stable manifest beside it: the id is
- * `run.suite.slop.<app>`, the branch is the channel, the display name names the
- * channel, and the desktop entry registers no MIME type and no scheme handler.
- * Other apps keep the `suite.app.json` pre-release manifest; the Shell has no
- * such file, so it rewrites its stable manifest to the pre-release id instead
- * and lets the pre-release Flatpak sandbox keep its data apart from stable.
- * The stable flow reads the committed manifest and is otherwise unchanged.
+ * `run.suite.<channel>.<app>`, the branch is the channel, the display name names
+ * the channel, and the desktop entry registers no MIME type and no scheme
+ * handler. Each pre-release channel is its own id and data root, so stable,
+ * slop, nightly and preview install and update side by side. Other apps keep the
+ * `suite.app.json` pre-release manifest; the Shell has no such file, so it
+ * rewrites its stable manifest to the channel's id instead and lets the Flatpak
+ * sandbox keep its data apart. The stable flow reads the committed manifest and
+ * is otherwise unchanged.
  */
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -262,7 +264,7 @@ if (dryRun) {
     process.stdout.write(`launcher · ${join(sourceDir, id)}\n`);
   }
   // The Shell has no shared Documents folder; its data is the sandbox keyed by
-  // the id, and the pre-release id is what keeps stable and pre-release apart.
+  // the id, and each channel's id is what keeps its data apart.
   if (appName === "shell") process.stdout.write(`data · ${shellDataRoot(channel)}\n`);
   process.stdout.write("dry run: no build, no repository write, no install\n");
   process.exit(0);
@@ -629,8 +631,9 @@ const installed = (spawnSync("flatpak", ["list", "--user", "--app", "--columns=a
   .includes(id);
 if (install) {
   if (preRelease) {
-    // `--or-update` installs the tier branch, and replaces an existing
-    // pre-release install when the branch moved from slop to canary to beta.
+    // `--or-update` installs the channel's branch and updates the same channel's
+    // existing install. Every channel has its own id, so moving from slop to
+    // nightly installs a second pre-release rather than replacing the first.
     run("flatpak", [
       "install",
       "--user",

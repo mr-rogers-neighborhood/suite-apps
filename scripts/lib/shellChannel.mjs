@@ -1,15 +1,15 @@
 /**
  * Suite Desk's channel-specific Flatpak pieces.
  *
- * The identities in `channel.mjs` describe every app: one stable id and one
- * pre-release id shared by `slop`, `nightly` and `preview`. Shell differs from a
- * mini-app in two ways that belong here, not in the shared identity:
+ * The identities in `channel.mjs` describe every app: stable keeps its id and
+ * each pre-release channel has its own. Shell differs from a mini-app in two
+ * ways that belong here, not in the shared identity:
  *
  * - it ships no `suite.app.json`, so there is no pre-release app manifest to
  *   generate, and
  * - its document and pack data live in its own sandbox data root rather than in
  *   `Documents/Suite`, so its pre-release keeps the stable sandbox grants and
- *   relies on the pre-release Flatpak id for a separate profile.
+ *   relies on the per-channel Flatpak id for a separate profile.
  *
  * The pure functions are exported so the shell channel test can prove the id,
  * branch, name, data root and generated manifest without running a build.
@@ -26,23 +26,23 @@ function shellSandboxHome(channel) {
  *
  * Electron puts `userData` under `XDG_CONFIG_HOME`, and the app keeps its packs,
  * Space document and Screens under `<userData>/shell`. Flatpak gives each id its
- * own home, so the stable and pre-release roots are different paths even though
- * the build and the `Suite` app name are the same. The pre-release root is the
- * shell's equivalent of the mini-app `Documents/Suite Slop` rule: every
- * pre-release channel shares it, and stable is never inside it.
+ * own home, so every channel — stable included — has a different path. The
+ * pre-release root is the shell's equivalent of the mini-app `Documents/Suite
+ * Slop` rule: the channel's id keeps its data apart from stable and from every
+ * other channel, and a preview build cannot open slop data.
  */
 export function shellDataRoot(channel) {
   return `${shellSandboxHome(channel)}/config/Suite/shell`;
 }
 
 /**
- * Rewrite the stable Shell manifest for the pre-release id.
+ * Rewrite the stable Shell manifest for one pre-release channel.
  *
  * Everything the stable manifest decides — runtime, base, cleanup commands,
  * build commands, the asar patch and the narrow grants — is kept. Only the id
  * and the paths that name this build change:
  *
- * - `app-id` and `command` become the pre-release id;
+ * - `app-id` and `command` become the channel's id;
  * - the launcher, desktop entry, metainfo and every icon name follow the id;
  * - the unpacked tree is named absolutely because the generated manifest lives
  *   under `packaging/flatpak/.build/`, not beside `run.suite.shell.yml`;
