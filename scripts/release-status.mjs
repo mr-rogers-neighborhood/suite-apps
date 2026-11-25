@@ -389,10 +389,12 @@ export function channelInstallTable({ order = CHANNEL_ORDER, pages = null } = {}
 
 
 /**
- * The apps frozen as legacy until they become packs.
+ * The apps frozen at their last Flatpak artifact.
  *
  * The list lives in the channel library so the Flatpak builder refuses a new
- * pre-release build for the same apps this table marks frozen. Sync is retired
+ * pre-release build for the same apps this table marks frozen. Budget has gone
+ * further: it ships as the signed pack in `packs/budget`, so its Flatpak lane is
+ * retired and its version now comes from the pack manifest. Sync is retired
  * rather than frozen: it leaves this table entirely (#315) and the relay becomes
  * a host capability, so there is no row to name a channel for.
  */
@@ -477,7 +479,8 @@ export const APPS = [
   {
     id: "budget",
     name: "Suite Budget",
-    packageJson: "legacy/budget/package.json",
+    // The pack owns the version now; the app is frozen at its last Flatpak.
+    packageJson: "packs/budget/pack/manifest.json",
     changelog: "legacy/budget/CHANGELOG.md",
     kind: "flatpak",
     section: "desktop",

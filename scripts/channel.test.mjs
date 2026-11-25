@@ -8,6 +8,7 @@ import {
   desktopEntry,
   displayName,
   flatpakId,
+  flatpakLaneProblem,
   launcherScript,
   preReleaseAppManifest,
   preReleaseMetainfo,
@@ -61,6 +62,14 @@ describe("pre-release identity", () => {
     }
     assert.equal(channelProblemForApp("desk", "nightly"), null);
     assert.equal(channelProblemForApp("go", "preview"), null);
+  });
+
+  it("retires Budget's Flatpak lane now that the pack is the install path", () => {
+    assert.match(flatpakLaneProblem("budget"), /signed pack/u);
+    assert.equal(flatpakLaneProblem("canvas"), null);
+    assert.equal(flatpakLaneProblem("planner"), null);
+    assert.equal(flatpakLaneProblem("help"), null);
+    assert.equal(flatpakLaneProblem("desk"), null);
   });
 
   it("writes a distinct manifest with no file association or stable update", () => {

@@ -22,14 +22,36 @@ export const PRE_RELEASE_CHANNELS = ["slop", "nightly", "preview"];
 export const CHANNELS = [STABLE_CHANNEL, ...PRE_RELEASE_CHANNELS];
 
 /**
- * The legacy mini-apps, frozen until they become packs.
+ * The legacy mini-apps, frozen at their last Flatpak artifact.
  *
  * Their code and last artifacts stay, and a person can still install the last
  * stable ref. They get no new release and no new pre-release build; the
  * superapp carries the channel. One list is read by the release table and by
  * the Flatpak builder, so a fold here closes every path at once.
+ *
+ * Budget now ships as the signed pack in `packs/budget`, so its Flatpak lane is
+ * retired rather than merely frozen. Canvas, Planner and Help stay frozen until
+ * their packs land.
  */
 export const LEGACY_FROZEN_IDS = ["canvas", "planner", "budget", "help"];
+
+/**
+ * Apps whose Flatpak lane is retired because the pack is the install path.
+ *
+ * The last published ref stays on the signed remote, so an existing install
+ * keeps working and `flatpak update --user` still reaches it. What retires is
+ * the build: no new Flatpak is produced for an app on this list.
+ */
+export const RETIRED_FLATPAK_IDS = ["budget"];
+
+/** Why this app's Flatpak lane is retired, or null when it is still buildable. */
+export function flatpakLaneProblem(app) {
+  if (!RETIRED_FLATPAK_IDS.includes(app)) return null;
+  return (
+    `${app} ships as a signed pack: its Flatpak lane is retired. ` +
+    "The last published ref stays on the signed remote; install the pack from the Desk catalogue."
+  );
+}
 
 /** True when this channel is one of the pre-release channels. */
 export function isPreRelease(channel) {

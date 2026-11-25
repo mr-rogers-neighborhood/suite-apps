@@ -5,13 +5,13 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 /**
- * Builds Budget's own renderer and the pack prelude into `packs/budget/.dev/pack`.
+ * Builds Budget's renderer and the pack prelude into `packs/budget/.dev/pack`.
  *
- * The normal Electron build writes `legacy/budget/out`, so this config owns a
- * directory of its own and never repoints `electron-vite`. Both the app and the
- * prelude are entries of one build: Rollup emits `prelude.js` beside Vite's
- * hashed assets, and `scripts/budget-pack.mjs` puts that script in front of the
- * app script in the generated page.
+ * The renderer under `pack/src/renderer/` is the pack's own source: the frozen
+ * Electron shell in `legacy/budget/` keeps its last copy and is never an input
+ * here. Both the renderer and the prelude are entries of one build: Rollup emits
+ * `prelude.js` beside Vite's hashed assets, and `scripts/budget-pack.mjs` puts
+ * that script in front of the app script in the generated page.
  *
  * The output and Vite's cache sit outside `pack/` on purpose: `pack/` is source,
  * and `scripts/pack-shape.mjs` fails the gate if a generated directory appears
@@ -19,20 +19,14 @@ import { defineConfig } from "vite";
  */
 const packRoot = fileURLToPath(new URL(".", import.meta.url));
 const outputRoot = new URL("../.dev/", import.meta.url);
-const renderer = fileURLToPath(new URL("../../../legacy/budget/src/renderer/src", import.meta.url));
-const core = fileURLToPath(new URL("../../../legacy/budget/packages/core/src/index.ts", import.meta.url));
 
 export default defineConfig({
   root: packRoot,
   base: "./",
   cacheDir: fileURLToPath(new URL("vite", outputRoot)),
   plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      "@suite/budget-core": core,
-      "@renderer": renderer,
-    },
-  },
+  // The pack has no static directory of its own; the entry is the only document.
+  publicDir: false,
   optimizeDeps: {
     // Loro ships a wasm-bindgen entry; pre-bundling it breaks the wasm URL.
     exclude: ["loro-crdt"],
