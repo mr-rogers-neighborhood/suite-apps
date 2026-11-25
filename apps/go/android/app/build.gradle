@@ -10,22 +10,27 @@ def suiteVersionName = (project.findProperty("suiteVersionName") ?: "0.2.0").toS
 // The channel identity table. `scripts/android-release.mjs` owns the same numbers and the artifact
 // names; it reads the built APK back with `aapt` and refuses a package id or versionCode that does
 // not match, so this table and the script cannot drift silently. Stable keeps the id a shipped
-// install already has. Every pre-release shares one id, `run.suite.slop.go`, so moving from slop to
-// nightly replaces the pre-release instead of adding a third install; the channel is in the display
-// and version name, not the id.
+// install already has. Each pre-release channel has its own id, so stable, slop, nightly and preview
+// install and update side by side and each has its own data tree; the channel is in the display
+// name and the id, not only the branch.
 //
 // versionCode = base x 10 + channel digit. The digit is fixed per channel, so bumping the base in
-// app.config.json always increases the code within a channel. Promotion raises the digit, so
-// slop -> nightly -> preview installs as an update on the shared pre-release id; a demotion lowers
-// it, which Android refuses. The rule is in apps/go/docs/reference/android.md.
+// app.config.json always increases the code within a channel. Each id grows on its own sequence:
+// promotion installs a second app rather than updating a shared pre-release id. The rule is in
+// apps/go/docs/reference/android.md.
 def channelDigits = [stable: 0, slop: 1, nightly: 2, preview: 3]
-def preReleaseId = "run.suite.slop.go"
+def channelIds = [
+    stable: "run.suite.go",
+    slop: "run.suite.slop.go",
+    nightly: "run.suite.nightly.go",
+    preview: "run.suite.preview.go",
+]
 
 android {
     namespace = "run.suite.go"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "run.suite.go"
+        applicationId channelIds.stable
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode suiteVersionCode * 10
@@ -55,24 +60,24 @@ android {
     productFlavors {
         stable {
             dimension "channel"
-            applicationId "run.suite.go"
+            applicationId channelIds.stable
             versionCode suiteVersionCode * 10 + channelDigits.stable
         }
         slop {
             dimension "channel"
-            applicationId preReleaseId
+            applicationId channelIds.slop
             versionCode suiteVersionCode * 10 + channelDigits.slop
             versionNameSuffix "-slop"
         }
         nightly {
             dimension "channel"
-            applicationId preReleaseId
+            applicationId channelIds.nightly
             versionCode suiteVersionCode * 10 + channelDigits.nightly
             versionNameSuffix "-nightly"
         }
         preview {
             dimension "channel"
-            applicationId preReleaseId
+            applicationId channelIds.preview
             versionCode suiteVersionCode * 10 + channelDigits.preview
             versionNameSuffix "-preview"
         }

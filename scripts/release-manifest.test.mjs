@@ -33,7 +33,7 @@ describe("release manifest", () => {
       channel: "preview",
       commit: "a".repeat(40),
       lockfileSha: "b".repeat(64),
-      artifacts: [{ kind: "apk", id: "run.suite.slop.go", sha256: "c".repeat(64) }],
+      artifacts: [{ kind: "apk", id: "run.suite.preview.go", sha256: "c".repeat(64) }],
       signers: { flatpak: "D".repeat(40), android: "e".repeat(64) },
     });
     assert.equal(manifest.format, 1);
@@ -61,7 +61,7 @@ describe("release manifest", () => {
         "--flatpak",
         flatpak,
         "--flatpak-id",
-        "run.suite.slop.shell",
+        "run.suite.preview.shell",
         "--flatpak-branch",
         "preview",
         "--flatpak-commit-file",
@@ -69,7 +69,7 @@ describe("release manifest", () => {
         "--apk",
         apk,
         "--apk-id",
-        "run.suite.slop.go",
+        "run.suite.preview.go",
         "--commit",
         SOURCE_COMMIT,
         "--out",
@@ -104,7 +104,7 @@ describe("release manifest", () => {
         "--flatpak",
         flatpak,
         "--flatpak-id",
-        "run.suite.slop.shell",
+        "run.suite.preview.shell",
         "--flatpak-branch",
         "preview",
         "--flatpak-commit-file",
@@ -112,7 +112,7 @@ describe("release manifest", () => {
         "--apk",
         apk,
         "--apk-id",
-        "run.suite.slop.go",
+        "run.suite.preview.go",
         "--commit",
         SOURCE_COMMIT,
         "--out",
@@ -149,7 +149,7 @@ describe("APK channel identity", () => {
   it("writes the code and name onto the APK artifact for stable and preview", () => {
     for (const [channel, apkId, digit] of [
       ["stable", "run.suite.go", 0],
-      ["preview", "run.suite.slop.go", 3],
+      ["preview", "run.suite.preview.go", 3],
     ]) {
       const dir = mkdtempSync(join(tmpdir(), "suite-manifest-"));
       const flatpak = join(dir, "suite-shell.flatpak");
@@ -169,7 +169,7 @@ describe("APK channel identity", () => {
           "--flatpak",
           flatpak,
           "--flatpak-id",
-          channel === "stable" ? "run.suite.shell" : "run.suite.slop.shell",
+          channel === "stable" ? "run.suite.shell" : `run.suite.${channel}.shell`,
           "--flatpak-branch",
           channel === "stable" ? "master" : channel,
           "--flatpak-commit-file",

@@ -202,8 +202,8 @@ describe("restoring the refs this run built", () => {
     const steps = restoreRefCommands({
       repo,
       builtRefs: [
-        { ref: "app/run.suite.slop.shell/x86_64/nightly", commit },
-        { ref: "runtime/run.suite.slop.shell.Debug/x86_64/nightly", commit: "b".repeat(64) },
+        { ref: "app/run.suite.nightly.shell/x86_64/nightly", commit },
+        { ref: "runtime/run.suite.nightly.shell.Debug/x86_64/nightly", commit: "b".repeat(64) },
       ],
     });
     assert.equal(steps.length, 2);
@@ -216,7 +216,7 @@ describe("restoring the refs this run built", () => {
       "refs",
       "--force",
       "--create",
-      "app/run.suite.slop.shell/x86_64/nightly",
+      "app/run.suite.nightly.shell/x86_64/nightly",
       commit,
     ]);
   });
@@ -295,10 +295,10 @@ describe("when there is nothing to merge", () => {
 
 describe("the refs a publication did not build", () => {
   const local = [
-    "app/run.suite.slop.shell/x86_64/nightly",
+    "app/run.suite.nightly.shell/x86_64/nightly",
     "appstream/x86_64",
     "appstream2/x86_64",
-    "runtime/run.suite.slop.shell.Debug/x86_64/nightly",
+    "runtime/run.suite.nightly.shell.Debug/x86_64/nightly",
   ];
   const merged = [
     ...local,
@@ -316,21 +316,21 @@ describe("the refs a publication did not build", () => {
   });
 
   it("names every merged ref this publication did not publish", () => {
-    assert.deepEqual(preservedRefs(["app/run.suite.slop.shell/x86_64/nightly"], merged), [
+    assert.deepEqual(preservedRefs(["app/run.suite.nightly.shell/x86_64/nightly"], merged), [
       "app/run.suite.planner/x86_64/master",
       "app/run.suite.shell/x86_64/master",
       "appstream/x86_64",
       "appstream2/x86_64",
+      "runtime/run.suite.nightly.shell.Debug/x86_64/nightly",
       "runtime/run.suite.shell.Debug/x86_64/master",
-      "runtime/run.suite.slop.shell.Debug/x86_64/nightly",
     ]);
   });
 
   it("names only app ids, so runtime and appstream refs add no flag", () => {
     assert.deepEqual(appIdsOf(merged), [
+      "run.suite.nightly.shell",
       "run.suite.planner",
       "run.suite.shell",
-      "run.suite.slop.shell",
     ]);
   });
 });
@@ -379,7 +379,7 @@ describe("refusing a summary that lost a ref", () => {
     `      ${commit}`,
     "    Timestamp (ostree.commit.timestamp): 2026-11-23T13:44:11-07",
     "",
-    "* app/run.suite.slop.shell/x86_64/nightly",
+    "* app/run.suite.nightly.shell/x86_64/nightly",
     "    Latest Commit (1.1 kB):",
     `      ${"b".repeat(64)}`,
     "    Timestamp (ostree.commit.timestamp): 2026-11-23T13:44:11-07",
@@ -393,8 +393,8 @@ describe("refusing a summary that lost a ref", () => {
 
   it("reads the refs a summary advertises from the view", () => {
     assert.deepEqual(refsFromSummaryView(threeRefs), [
+      "app/run.suite.nightly.shell/x86_64/nightly",
       "app/run.suite.shell/x86_64/master",
-      "app/run.suite.slop.shell/x86_64/nightly",
       "appstream/x86_64",
     ]);
     assert.deepEqual(refsFromSummaryView(""), []);
@@ -406,7 +406,7 @@ describe("refusing a summary that lost a ref", () => {
       summaryPreservationProblem({
         mergedRefs: [
           "app/run.suite.shell/x86_64/master",
-          "app/run.suite.slop.shell/x86_64/nightly",
+          "app/run.suite.nightly.shell/x86_64/nightly",
           "appstream/x86_64",
         ],
         summaryRefs,
@@ -421,7 +421,7 @@ describe("refusing a summary that lost a ref", () => {
 
   it("refuses a fixture summary that dropped the stable ref", () => {
     const nightlyOnly = [
-      "* app/run.suite.slop.shell/x86_64/nightly",
+      "* app/run.suite.nightly.shell/x86_64/nightly",
       "    Latest Commit (1.1 kB):",
       `      ${"b".repeat(64)}`,
       "",
@@ -432,7 +432,7 @@ describe("refusing a summary that lost a ref", () => {
     ].join("\n");
     const mergedRefs = [
       "app/run.suite.shell/x86_64/master",
-      "app/run.suite.slop.shell/x86_64/nightly",
+      "app/run.suite.nightly.shell/x86_64/nightly",
       "appstream/x86_64",
     ];
     const summaryRefs = refsFromSummaryView(nightlyOnly);

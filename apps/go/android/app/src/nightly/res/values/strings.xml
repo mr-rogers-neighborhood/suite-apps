@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Suite Go (nightly)</string>
     <string name="title_activity_main">Suite Go (nightly)</string>
-    <string name="package_name">run.suite.slop.go</string>
-    <string name="custom_url_scheme">run.suite.slop.go</string>
+    <string name="package_name">run.suite.nightly.go</string>
+    <string name="custom_url_scheme">run.suite.nightly.go</string>
 </resources>

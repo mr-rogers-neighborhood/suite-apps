@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Suite Go (preview)</string>
     <string name="title_activity_main">Suite Go (preview)</string>
-    <string name="package_name">run.suite.slop.go</string>
-    <string name="custom_url_scheme">run.suite.slop.go</string>
+    <string name="package_name">run.suite.preview.go</string>
+    <string name="custom_url_scheme">run.suite.preview.go</string>
 </resources>

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   assembleTask,
+  CHANNEL_PACKAGE_ID,
   classifyReleaseView,
   goApkAssetName,
   GO_APK_ALIAS,
@@ -114,18 +115,23 @@ describe("upload identity", () => {
     );
   });
 
-  it("refuses a pre-release APK while its channel is ambiguous", () => {
-    assert.throws(
-      () => resolveUploadIdentity({ applicationId: "run.suite.slop.go", versionName: "0.1.0-slop" }),
-      /--channel/u,
-    );
+  it("derives each pre-release channel from its package id", () => {
+    for (const channel of ["slop", "nightly", "preview"]) {
+      assert.deepEqual(
+        resolveUploadIdentity({
+          applicationId: `run.suite.${channel}.go`,
+          versionName: `0.1.0-${channel}`,
+        }),
+        { channel, version: "0.1.0" },
+      );
+    }
   });
 
   it("derives the version from a pre-release version name", () => {
     for (const channel of ["slop", "nightly", "preview"]) {
       assert.deepEqual(
         resolveUploadIdentity({
-          applicationId: "run.suite.slop.go",
+          applicationId: `run.suite.${channel}.go`,
           versionName: `0.1.0-${channel}`,
           channel,
         }),
@@ -142,7 +148,16 @@ describe("upload identity", () => {
     assert.throws(
       () =>
         resolveUploadIdentity({
-          applicationId: "run.suite.slop.go",
+          applicationId: "run.suite.nightly.go",
+          versionName: "0.1.0-nightly",
+          channel: "preview",
+        }),
+      /not run\.suite\.preview\.go/u,
+    );
+    assert.throws(
+      () =>
+        resolveUploadIdentity({
+          applicationId: "run.suite.nightly.go",
           versionName: "0.1.0-slop",
           channel: "nightly",
         }),
@@ -210,9 +225,18 @@ describe("versionCode", () => {
     }
   });
 
-  it("raises the digit on promotion, on the shared pre-release id", () => {
+  it("raises the digit on promotion, which is now a different package id", () => {
     assert.ok(versionCodeFor(2, "nightly") > versionCodeFor(2, "slop"));
     assert.ok(versionCodeFor(2, "preview") > versionCodeFor(2, "nightly"));
+  });
+
+  it("keeps one package id per channel", () => {
+    assert.deepEqual(CHANNEL_PACKAGE_ID, {
+      stable: "run.suite.go",
+      slop: "run.suite.slop.go",
+      nightly: "run.suite.nightly.go",
+      preview: "run.suite.preview.go",
+    });
   });
 
   it("refuses a base that is not a positive integer", () => {
@@ -222,7 +246,7 @@ describe("versionCode", () => {
 });
 
 describe("versionCode monotonicity", () => {
-  const PRE_RELEASE_ID = "run.suite.slop.go";
+  const PRE_RELEASE_ID = "run.suite.nightly.go";
 
   function fakeGh({ releases = [], manifests = {} } = {}) {
     const calls = [];
@@ -267,24 +291,48 @@ describe("versionCode monotonicity", () => {
     assert.deepEqual(tags, ["suite-2026.11.22"]);
   });
 
-  it("reads the newest published tag in each pre-release family", () => {
-    const tags = newestManifestTags(
-      [
-        { tagName: "suite-preview-2026.11.22", isDraft: false },
-        { tagName: "suite-preview-2026.11.21", isDraft: false },
-        { tagName: "suite-nightly-2026.11.22", isDraft: false },
-        { tagName: "suite-slop-2026.11.20", isDraft: true },
-        { tagName: "suite-2026.11.22", isDraft: false },
-      ],
-      "nightly",
-    );
-    assert.deepEqual(tags, [
+  it("reads only the channel's own tag family for a pre-release", () => {
+    const releases = [
+      { tagName: "suite-preview-2026.11.22", isDraft: false },
+      { tagName: "suite-preview-2026.11.21", isDraft: false },
+      { tagName: "suite-nightly-2026.11.22", isDraft: false },
+      { tagName: "suite-slop-2026.11.20", isDraft: true },
+      { tagName: "suite-2026.11.22", isDraft: false },
+    ];
+    assert.deepEqual(newestManifestTags(releases, "nightly"), [
       "suite-nightly-2026.11.22",
+    ]);
+    assert.deepEqual(newestManifestTags(releases, "preview"), [
       "suite-preview-2026.11.22",
     ]);
+    assert.deepEqual(newestManifestTags(releases, "slop"), []);
   });
 
-  it("refuses nightly 12 after preview 13 on the shared pre-release id", () => {
+  it("refuses a code lower than the one published for the same package id", () => {
+    const verdict = versionCodePreflight({
+      channel: "nightly",
+      packageId: PRE_RELEASE_ID,
+      versionCode: 12,
+      gh: fakeGh({
+        releases: [
+          { tagName: "suite-nightly-2026.11.22", isDraft: false },
+          { tagName: "suite-nightly-2026.11.21", isDraft: false },
+        ],
+        manifests: {
+          "suite-nightly-2026.11.22": apkManifest(13),
+          "suite-nightly-2026.11.21": apkManifest(12),
+        },
+      }),
+    });
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.previous, 13);
+    assert.match(verdict.message, /lower than 13/u);
+    assert.match(verdict.message, /same package id|this package id/u);
+  });
+
+  it("does not compare a channel against another channel's code", () => {
+    // Preview published a higher code, but preview is its own package id now,
+    // so a nightly build is not measured against it.
     const verdict = versionCodePreflight({
       channel: "nightly",
       packageId: PRE_RELEASE_ID,
@@ -295,15 +343,40 @@ describe("versionCode monotonicity", () => {
           { tagName: "suite-nightly-2026.11.21", isDraft: false },
         ],
         manifests: {
-          "suite-preview-2026.11.22": apkManifest(13, { channel: "preview" }),
+          "suite-preview-2026.11.22": apkManifest(13, {
+            id: "run.suite.preview.go",
+            channel: "preview",
+          }),
           "suite-nightly-2026.11.21": apkManifest(12),
         },
       }),
     });
-    assert.equal(verdict.ok, false);
-    assert.equal(verdict.previous, 13);
-    assert.match(verdict.message, /lower than 13/u);
-    assert.match(verdict.message, /base bump/u);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.previous, 12);
+  });
+
+  it("passes with a note when the channel's id has no published code yet", () => {
+    const verdict = versionCodePreflight({
+      channel: "nightly",
+      packageId: PRE_RELEASE_ID,
+      versionCode: 12,
+      gh: fakeGh({
+        releases: [
+          { tagName: "suite-preview-2026.11.22", isDraft: false },
+          { tagName: "suite-nightly-2026.11.21", isDraft: false },
+        ],
+        manifests: {
+          "suite-preview-2026.11.22": apkManifest(13, {
+            id: "run.suite.preview.go",
+            channel: "preview",
+          }),
+          "suite-nightly-2026.11.21": apkManifest(12, { id: "run.suite.slop.go", channel: "slop" }),
+        },
+      }),
+    });
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.previous, null);
+    assert.match(verdict.note, /No published release manifest records a versionCode/u);
   });
 
   it("permits an equal code as a rebuild of the same app version", () => {
@@ -327,9 +400,9 @@ describe("versionCode monotonicity", () => {
       packageId: PRE_RELEASE_ID,
       versionCode: 14,
       gh: fakeGh({
-        releases: [{ tagName: "suite-preview-2026.11.22", isDraft: false }],
+        releases: [{ tagName: "suite-nightly-2026.11.22", isDraft: false }],
         manifests: {
-          "suite-preview-2026.11.22": apkManifest(13, { channel: "preview" }),
+          "suite-nightly-2026.11.22": apkManifest(13),
         },
       }),
     });

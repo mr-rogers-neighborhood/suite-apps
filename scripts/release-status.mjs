@@ -335,10 +335,10 @@ export function flatpakrepoUrl() {
  * The Flatpak id a release installs: a superapp's pre-release id on a
  * pre-release channel, its stable id otherwise.
  *
- * Only a superapp carries a channel. A pre-release build shares
- * `run.suite.slop.<app>` and takes the channel as its branch, so its install
- * must name both; the frozen legacy rows keep their stable ids on every page,
- * because no pre-release build replaces them.
+ * Only a superapp carries a channel. Since #380 each pre-release channel has its
+ * own id (`run.suite.nightly.shell`) and branch (`nightly`), so its install must
+ * name both; the frozen legacy rows keep their stable ids on every page, because
+ * no pre-release build replaces them.
  */
 export function releaseFlatpakId(app, channel = "stable") {
   if (app.kind !== "flatpak") return null;
@@ -354,8 +354,9 @@ function refBranch(app, channel) {
 /**
  * The full Flatpak ref a release installs or runs.
  *
- * A pre-release is `run.suite.slop.shell//nightly`, because the pre-release id
- * is shared across channels and the branch is what names the channel.
+ * A pre-release is `run.suite.nightly.shell//nightly`: the id names the channel
+ * and the branch names the build line, so stable and every pre-release are
+ * separate refs.
  */
 export function releaseFlatpakRef(app, channel = "stable") {
   return `${releaseFlatpakId(app, channel)}${refBranch(app, channel)}`;
@@ -386,7 +387,7 @@ export function goApkUrl(tag, version, channel = "stable") {
  * release that is still a draft, where the APK is attached before publication,
  * so the wording does not read as a promise the run cannot keep. `channel` is
  * the release's channel, so a pre-release row names the superapp's
- * `run.suite.slop.<app>` ref on that branch rather than the stable one.
+ * `run.suite.<channel>.<app>` ref on that branch rather than the stable one.
  */
 export function installCell(
   app,
@@ -908,7 +909,7 @@ function artifactFileName(artifact) {
  * numbers come from `release-manifest.json` as it was written beside the built
  * artifacts, so a draft can state them: the bytes exist before publication and
  * `--publish` only locks them. The install and info commands name the manifest's
- * own Flatpak id and channel branch — `run.suite.slop.shell//nightly` on a
+ * own Flatpak id and channel branch — `run.suite.nightly.shell//nightly` on a
  * pre-release — and the APK's `.sha256` file is the one uploaded beside the APK.
  */
 export function artifactsSection(manifest, { tag = null, draft = false, channel = "stable" } = {}) {
@@ -959,9 +960,9 @@ export function artifactsSection(manifest, { tag = null, draft = false, channel 
   const commands = [];
   if (apkFile !== null) commands.push(`sha256sum -c ${apkFile}.sha256`);
   if (flatpak !== null && typeof flatpak.id === "string" && flatpak.id.length > 0) {
-    // A pre-release is the same id on another branch, so the ref needs both:
-    // `run.suite.slop.shell//nightly`. Stable is the default branch and keeps
-    // the plain id a shipped install already has.
+    // A pre-release carries the channel in its id and its branch, so the ref
+    // needs both: `run.suite.nightly.shell//nightly`. Stable is the default
+    // branch and keeps the plain id a shipped install already has.
     const artifactBranch =
       typeof flatpak.branch === "string" && flatpak.branch.length > 0
         ? flatpak.branch

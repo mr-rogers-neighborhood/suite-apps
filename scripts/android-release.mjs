@@ -10,9 +10,10 @@
  *
  * The channel decides three things:
  *
- * - **The package id.** Stable keeps `run.suite.go`; every pre-release shares
- *   `run.suite.slop.go`, so stable and one pre-release install side by side and moving channel
- *   replaces the pre-release instead of adding a third install.
+ * - **The package id.** Stable keeps `run.suite.go`; each pre-release channel has
+ *   its own id (`run.suite.slop.go`, `run.suite.nightly.go`,
+ *   `run.suite.preview.go`), so every channel installs and updates side by side
+ *   with its own data tree.
  * - **The version name and launcher label.** `0.1.0` for stable, `0.1.0-slop` and
  *   “Suite Go (slop)” for a pre-release.
  * - **The asset name.** Stable keeps `suite-go-<version>.apk`, the name the release table links,
@@ -23,12 +24,11 @@
  *
  *   versionCode = base × 10 + channel digit      stable 0, slop 1, nightly 2, preview 3
  *
- * Within a channel the digit is fixed, so bumping the base always increases the code. Promotion
- * raises the digit, so slop → nightly → preview installs as an update on the shared pre-release id.
- * A demotion lowers it, which Android refuses, so a release build reads the newest published
- * manifest for the package id and refuses a lower code before Gradle runs (delivery.md D4.2). An
- * equal code is a rebuild of the same app version. The full rule is in
- * `apps/go/docs/reference/android.md`.
+ * Within a channel the digit is fixed, so bumping the base always increases the code. Each id has
+ * its own sequence: a promotion is a new install rather than an update on a shared id, and a
+ * release build reads the newest published manifest **for its own package id** and refuses a lower
+ * code before Gradle runs (delivery.md D4.2). An equal code is a rebuild of the same app version.
+ * The full rule is in `apps/go/docs/reference/android.md`.
  *
  * Usage:
  *   node scripts/android-release.mjs                    # stable, build and name the APK
@@ -47,8 +47,9 @@
  *
  * `--upload <apk>` replaces the build with a verification step: the APK's certificate is checked
  * against the pin, its package id and version name decide the channel and version, and the staged
- * copy is hashed before upload. It uploads nothing without `--publish`. Pass `--channel` for a
- * pre-release APK, because `run.suite.slop.go` is shared by slop, nightly and preview. Because a
+ * copy is hashed before upload. It uploads nothing without `--publish`. The package id names the
+ * channel (`run.suite.slop.go` is slop, `run.suite.nightly.go` is nightly), so `--channel` is
+ * optional and is checked against the id when passed. Because a
  * published GitHub release is immutable, a published rolling release is refused; `--allow-published`
  * is the explicit override for a repository that has not enabled immutable releases.
  */
@@ -96,13 +97,14 @@ export const GO_APK_ALIAS = "suite-go.apk";
  * This table is the source the build verifies against: after Gradle runs, `aapt` reports the
  * package id and versionCode of the APK, and a mismatch is a refusal rather than a mislabelled
  * upload. `apps/go/android/app/build.gradle` declares the same ids and digits because Gradle needs
- * them at configuration time.
+ * them at configuration time. Each id is distinct, so the versionCode check compares a channel's
+ * code only with the codes already published for that same package id.
  */
 export const CHANNEL_PACKAGE_ID = {
   stable: "run.suite.go",
   slop: "run.suite.slop.go",
-  nightly: "run.suite.slop.go",
-  preview: "run.suite.slop.go",
+  nightly: "run.suite.nightly.go",
+  preview: "run.suite.preview.go",
 };
 
 export const CHANNEL_VERSION_CODE_DIGIT = {
@@ -136,9 +138,9 @@ The build is a release build, signed with the key at
 ${androidKeystorePath()}
 or wherever ${ANDROID_KEYSTORE_ENV} points. A debug-signed APK is never a release artifact.
 
---upload checks the APK's certificate and identity instead of signing one. Without --channel it
-accepts a stable APK; a pre-release APK shares one package id across slop, nightly and preview, so
-name its channel. --upload still uploads only with --publish.
+--upload checks the APK's certificate and identity instead of signing one. The package id names
+the channel, so --channel is optional and is checked against the id when passed. --upload still
+uploads only with --publish.
 `;
 
 function quote(value) {
@@ -242,43 +244,33 @@ function ghFailure(action, result) {
 /**
  * The tag shape whose newest manifest this channel must compare against.
  *
- * Stable publishes `suite-YYYY.MM.DD`. A pre-release shares
- * `run.suite.slop.go` across slop, nightly and preview, so one channel's newest
- * manifest cannot answer what the shared id already carries: all three families
- * do.
+ * Stable publishes `suite-YYYY.MM.DD`; a pre-release channel publishes
+ * `suite-<channel>-YYYY.MM.DD`. Each channel is its own package id since #380,
+ * so only that channel's page can carry a code for it: one tag family is enough.
  */
 export function manifestTagPattern(channel) {
   const problem = channelProblem(channel);
   if (problem !== null) throw new Error(problem);
   if (isPreRelease(channel)) {
-    return new RegExp(
-      `^suite-(?:${PRE_RELEASE_CHANNELS.join("|")})-${AGGREGATE_TAG_DATE}$`,
-      "u",
-    );
+    return new RegExp(`^suite-${channel}-${AGGREGATE_TAG_DATE}$`, "u");
   }
   return new RegExp(`^suite-${AGGREGATE_TAG_DATE}$`, "u");
 }
 
 /**
- * The newest published release tag per tag family, newest first within a family.
+ * The newest published release tag for this channel, newest first.
  *
  * A draft is still being written, so it is not evidence of what was published.
  * The tag carries its date, so lexical order is chronological for one shape.
  */
 export function newestManifestTags(releases, channel) {
   const pattern = manifestTagPattern(channel);
-  const published = (releases ?? [])
+  return (releases ?? [])
     .filter((row) => row?.isDraft === false)
     .map((row) => row.tagName)
     .filter((tag) => typeof tag === "string" && pattern.test(tag))
-    .sort((left, right) => right.localeCompare(left));
-
-  if (!isPreRelease(channel)) return published.slice(0, 1);
-
-  return PRE_RELEASE_CHANNELS.map((family) => {
-    const prefix = `suite-${family}-`;
-    return published.find((tag) => tag.startsWith(prefix)) ?? null;
-  }).filter((tag) => tag !== null);
+    .sort((left, right) => right.localeCompare(left))
+    .slice(0, 1);
 }
 
 /** The published releases `gh` can see, with just the fields the check needs. */
@@ -382,8 +374,8 @@ export function versionCodeVerdict({ channel, packageId, versionCode, manifests 
         `refusing the ${channel} build: versionCode ${versionCode} is lower than ${highest}, ` +
         `the highest code already published for ${packageId}.\n` +
         "A lower code never ships. Raise versionCode in apps/go/app.config.json until the new " +
-        "code is at least the published one; a return to a lower channel digit needs a base " +
-        "bump, and an uninstall on one phone cannot make the release sequence legal.",
+        "code is at least the published one for this package id; an uninstall on one phone " +
+        "cannot make the release sequence legal.",
     };
   }
 
@@ -432,10 +424,9 @@ export function uploadNames(version, channel = "stable") {
 /**
  * The channel and version an already-built APK carries.
  *
- * A stable APK names itself, so `--channel` is optional. The pre-release package id is shared by
- * slop, nightly and preview, so the channel is a decision the artifact cannot make; the caller has
- * to pass it. An explicit channel is checked against both the package id and the version name
- * suffix, so a mislabelled upload is refused before it reaches a release.
+ * The package id names the channel, so `--channel` is optional for stable and every pre-release;
+ * when it is passed it is checked against both the package id and the version name suffix, so a
+ * mislabelled upload is refused before it reaches a release.
  */
 export function resolveUploadIdentity({ applicationId = null, versionName = null, channel = null } = {}) {
   if (typeof applicationId !== "string" || applicationId.length === 0) {
@@ -445,37 +436,32 @@ export function resolveUploadIdentity({ applicationId = null, versionName = null
     throw new Error("the APK names no version, so its asset name cannot be derived");
   }
 
-  if (channel === null || channel === undefined) {
-    if (applicationId === CHANNEL_PACKAGE_ID.stable) {
-      return { channel: "stable", version: versionName };
-    }
-    if (applicationId === CHANNEL_PACKAGE_ID.slop) {
+  let resolved = channel;
+  if (resolved === null || resolved === undefined) {
+    resolved = CHANNELS.find((candidate) => applicationId === CHANNEL_PACKAGE_ID[candidate]) ?? null;
+    if (resolved === null) {
       throw new Error(
-        `${applicationId} is shared by slop, nightly and preview, so the asset name is ambiguous. ` +
-          "Pass --channel slop, --channel nightly or --channel preview.",
+        `${applicationId} is not a Suite Go release package ` +
+          `(${CHANNELS.map((candidate) => CHANNEL_PACKAGE_ID[candidate]).join(", ")}).`,
       );
     }
-    throw new Error(
-      `${applicationId} is not a Suite Go release package ` +
-        `(${CHANNEL_PACKAGE_ID.stable} or ${CHANNEL_PACKAGE_ID.slop}).`,
-    );
   }
 
-  const problem = channelProblem(channel);
+  const problem = channelProblem(resolved);
   if (problem !== null) throw new Error(problem);
 
-  const expectedId = CHANNEL_PACKAGE_ID[channel];
+  const expectedId = CHANNEL_PACKAGE_ID[resolved];
   if (applicationId !== expectedId) {
     throw new Error(
-      `the APK is ${applicationId}, not ${expectedId} for ${channel}: ` +
+      `the APK is ${applicationId}, not ${expectedId} for ${resolved}: ` +
         "the artifact and --channel disagree.",
     );
   }
 
-  const suffix = isPreRelease(channel) ? `-${channel}` : "";
+  const suffix = isPreRelease(resolved) ? `-${resolved}` : "";
   if (suffix.length > 0 && !versionName.endsWith(suffix)) {
     throw new Error(
-      `the ${channel} APK has version name ${JSON.stringify(versionName)}, which does not end ` +
+      `the ${resolved} APK has version name ${JSON.stringify(versionName)}, which does not end ` +
         `in ${JSON.stringify(suffix)}: the artifact and --channel disagree.`,
     );
   }
@@ -492,7 +478,7 @@ export function resolveUploadIdentity({ applicationId = null, versionName = null
   if (version.length === 0) {
     throw new Error(`the APK has no version before ${JSON.stringify(suffix)}`);
   }
-  return { channel, version };
+  return { channel: resolved, version };
 }
 
 /**
@@ -1093,10 +1079,12 @@ function reportArtifact({ artifact, size }) {
  * Upload an APK that an earlier step already built and attested.
  *
  * Nothing is built or signed here: the certificate must already be the pinned release key, and
- * the package id and version name must agree with `--channel` (or name stable on their own). The
- * staged copy is hashed again before upload, so the bytes sent are the bytes checked here.
+ * the package id and version name must agree with `--channel` when it is passed, or name their own
+ * channel on their own. The staged copy is hashed again before upload, so the bytes sent are the
+ * bytes checked here. The tag is chosen from the channel the APK names, not from a default, so a
+ * nightly APK cannot land on the stable page when `--channel` is omitted.
  */
-function uploadExisting({ options, tag, release, releaseProblem }) {
+function uploadExisting({ options }) {
   const input = options.upload;
   if (!existsSync(input) || !statSync(input).isFile()) {
     throw new Error(`--upload ${input} is not a file`);
@@ -1126,6 +1114,10 @@ function uploadExisting({ options, tag, release, releaseProblem }) {
     channel: options.channel,
   });
   const [asset, checksum, alias] = uploadNames(version, channel);
+  const tag = currentAggregateTag({ channel });
+  const release = readRelease(tag);
+  const releaseProblem = releaseRefusal({ tag, release, allowPublished: options.allowPublished });
+  if (options.publish && releaseProblem !== null) throw new Error(releaseProblem);
 
   const artifact = {
     channel,
@@ -1215,16 +1207,7 @@ async function main(argv) {
   }
 
   if (options.upload !== null) {
-    const channel = options.channel ?? "stable";
-    const tag = currentAggregateTag({ channel });
-    const release = readRelease(tag);
-    const releaseProblem = releaseRefusal({
-      tag,
-      release,
-      allowPublished: options.allowPublished,
-    });
-    if (options.publish && releaseProblem !== null) throw new Error(releaseProblem);
-    uploadExisting({ options, tag, release, releaseProblem });
+    uploadExisting({ options });
     return;
   }
 
@@ -1312,10 +1295,9 @@ async function main(argv) {
   );
   process.stdout.write(
     isPreRelease(channel)
-      ? `${DIM}This replaces the pre-release install (${CHANNEL_PACKAGE_ID[channel]}); ` +
-          "stable is a separate app and is untouched. A demotion to an earlier channel " +
-          "needs an uninstall first.${RESET}\n"
-      : `${DIM}Stable is ${CHANNEL_PACKAGE_ID[channel]}; a pre-release install sits beside it.${RESET}\n`,
+      ? `${DIM}This installs or updates ${CHANNEL_PACKAGE_ID[channel]}; stable and the other ` +
+          "pre-release channels are separate apps and are untouched.${RESET}\n"
+      : `${DIM}Stable is ${CHANNEL_PACKAGE_ID[channel]}; each pre-release install sits beside it.${RESET}\n`,
   );
 
   finishUpload({ options, tag, release, releaseProblem, artifact: built });

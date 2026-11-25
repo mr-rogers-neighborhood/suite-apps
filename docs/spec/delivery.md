@@ -59,13 +59,16 @@ packs keep the previous version. No channel may silently erase the last good art
 | Artifact | Identity | Form | Signed by | Public |
 | --- | --- | --- | --- | --- |
 | Suite Desk stable | `run.suite.shell` | Flatpak OSTree commit on `master` | Store key (summary) | Yes, own remote |
-| Suite Desk pre-release | `run.suite.slop.shell` | Flatpak commit on `slop`, `nightly` or `preview` | Store key | Yes, own remote |
+| Suite Desk pre-release | `run.suite.<channel>.shell` | Flatpak commit on the branch of the same name | Store key | Yes, own remote |
 | Suite Go stable | `run.suite.go` | APK, stable asset | Android release key | Yes, GitHub release |
-| Suite Go pre-release | `run.suite.slop.go` | APK, channel asset | Android release key | Yes, GitHub release |
+| Suite Go pre-release | `run.suite.<channel>.go` | APK, channel asset | Android release key | Yes, GitHub release |
 | Pack | `publisher/id` | `.suitepack` + manifest | Publisher key | Yes, file or catalogue |
 | Pack index | catalogue | JSON index + signature | Catalogue operator key | Yes, signed URL |
 | Windows/macOS/iOS test build | app id | zip/dmg/simulator app | None (unsigned) | Test only |
 | SBOM/provenance | any | attestation | GitHub/Sigstore | Yes, alongside release |
+
+`<channel>` is `slop`, `nightly` or `preview`; each pre-release id has its own branch of the same
+name, an id names one channel, and stable keeps `run.suite.shell` and `run.suite.go`.
 
 **D2.1** Every artifact has a digest, a source commit, a lockfile hash and a signer identity in a
 release manifest. The manifest is the promotion input; a channel points at a manifest entry, never at
@@ -102,18 +105,20 @@ the support promise are part of the promotion, not a rebuild.
 1. `detect` records the commit, lockfile hash and affected identities.
 2. `build` produces the identity artifact once and writes its digest to the manifest.
 3. `attest` signs provenance and an SBOM for the artifact.
-4. `promote` points the channel at the manifest entry. Within the pre-release identity,
-   `slop` → `nightly` → `preview` may reuse the same commit; `preview` → `stable` builds the stable
-   identity from the same commit and lockfile.
+4. `promote` points the channel at the manifest entry. Each pre-release channel is its own identity,
+   so `slop` → `nightly` → `preview` may reuse the same commit and metadata but not the same bytes;
+   `preview` → `stable` builds the stable identity from the same commit and lockfile.
 5. `verify` installs from the channel on a clean host and checks the signature, id and version.
 
-**D4.2** Android promotion is identity-specific. `run.suite.slop.go` and `run.suite.go` are different
-packages and versionCodes; stable is a separate build from the same commit, signed with the release
-key. A pre-release APK cannot be promoted to stable by renaming it. A channel move that lowers the
-versionCode is a forward fix, not an install; CI asserts monotonic growth.
+**D4.2** Android promotion is identity-specific. `run.suite.<channel>.go` and `run.suite.go` are
+different packages and versionCodes; stable is a separate build from the same commit, signed with the
+release key. A pre-release APK cannot be promoted to stable by renaming it. Each id has its own
+versionCode sequence: a lower code on one id is refused, and the fix is a base bump or a forward
+release, not an install. CI asserts monotonic growth per package id.
 
-**D4.3** Flatpak promotion within the pre-release id is a branch move on the signed OSTree repository.
-The summary is signed once per publication; clients verify it and every object's content hash.
+**D4.3** Flatpak promotion between pre-release channels is a new id and branch on the signed OSTree
+repository; a rebuild within one channel is a branch move under the same id. The summary is signed
+once per publication; clients verify it and every object's content hash.
 
 ## 5. Signing and provenance
 

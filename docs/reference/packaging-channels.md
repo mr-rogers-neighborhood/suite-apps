@@ -66,7 +66,7 @@ node scripts/flatpak.mjs --app shell           # the host, same path
 node scripts/flatpak.mjs --app help             # Help
 node scripts/flatpak.mjs --app sync             # the retired relay build, local only
 node scripts/flatpak.mjs --app planner --no-build   # reuse release/linux-unpacked
-node scripts/flatpak.mjs --app shell --channel slop    # pre-release id on branch slop
+node scripts/flatpak.mjs --app shell --channel slop    # the slop id on branch slop
 flatpak run run.suite.slop.shell
 ```
 
@@ -98,9 +98,11 @@ keeps the same "no documents grant" rule.
 
 The `.desktop` file is named for the Flatpak id, and each app's `desktopName` is that id, so Wayland
 associates the window with the entry and keeps its icon. Planner and Budget follow that rule; Canvas's
-shell still declares the older `suite-canvas.desktop` name. A pre-release reuses the stable
-manifest's runtime but replaces its documents grant: the stable folder is read-only, and the
-pre-release writes `Suite Slop`. It generates its own id, desktop entry, metainfo and icon names.
+shell still declares the older `suite-canvas.desktop` name. A frozen mini-app's pre-release session
+build reuses the stable manifest's runtime but replaces its documents grant: the stable folder is
+read-only, and it writes `Suite Slop`. The superapp has no documents grant at all, so its channel's
+id and sandbox are what keep its data apart. Either way the generated files carry the channel's own
+id, desktop entry, metainfo and icon names.
 
 ### The relay's last Flatpak
 
@@ -253,7 +255,7 @@ above needs no branch. Publishing a pre-release channel writes the same reposito
 stable install resolves to. Install a pre-release explicitly:
 
 ```sh
-flatpak install --user suite run.suite.slop.planner//slop
+flatpak install --user suite run.suite.nightly.shell//nightly
 ```
 
 `flatpak remote-ls suite` lists the stable refs and every pre-release branch the remote carries. The
@@ -261,33 +263,36 @@ script refuses a branch the repository does not carry instead of inventing one.
 
 ### Pre-release channels
 
-A pre-release shares one id, `run.suite.slop.<app>`, across `slop`, `nightly` and `preview`; stable
-keeps `run.suite.<app>`. The two ids are two cards and two profiles, so stable and one pre-release can
-be installed side by side. The channel is the branch, not part of the id, so moving from slop to
-nightly replaces the pre-release instead of adding a third install. **One pre-release install at a
-time is the supported shape.**
+Stable keeps `run.suite.<app>`; each pre-release channel has an id of its own:
+`run.suite.slop.<app>`, `run.suite.nightly.<app>` or `run.suite.preview.<app>`, on the branch of the
+same name. The id and the branch both name the channel, so stable, slop, nightly and preview are four
+installs with four data roots, and each can be installed and updated beside the others. Slop keeps
+the id it has always had; nightly and preview moved from the shared `run.suite.slop` id, so a nightly
+or preview install made before the change reinstalls once under the new id. No pre-release data is
+migrated: the new id starts with an empty data root.
 
 ```sh
-node scripts/flatpak.mjs --app shell --channel slop
-flatpak install --user suite-local run.suite.slop.shell//slop
-flatpak run run.suite.slop.shell
+node scripts/flatpak.mjs --app shell --channel nightly
+flatpak install --user suite-local run.suite.nightly.shell//nightly
+flatpak run run.suite.nightly.shell
 ```
 
 `--channel` accepts `slop`, `nightly` or `preview`; `canary`, `beta` and anything else is refused
 before the build. A pre-release branch is not published for a frozen legacy app (Canvas, Planner,
 Budget or Help), and the builder refuses to create one unless `--session` names a factory session
-build, which is local only. Suite Desk carries a channel too: `run.suite.slop.shell` on the same
-three branches, with its data in the pre-release Flatpak sandbox rather than a `Documents/Suite Slop`
+build, which is local only. Suite Desk carries a channel too: `run.suite.<channel>.shell` on the same
+three branches, with its data in the channel's Flatpak sandbox rather than a `Documents/Suite Slop`
 folder. Sync refuses `--channel`: it is not a superapp.
 
-The generated manifest uses `run.suite.slop.<app>` for the app id, command, desktop file and icon
-name, and `NoDisplay=false` keeps the card visible beside stable. Its desktop entry carries **no**
+The generated manifest uses `run.suite.<channel>.<app>` for the app id, command, desktop file and
+icon name, and `NoDisplay=false` keeps the card visible beside stable. Its desktop entry carries **no**
 `MimeType` line and **no** `x-scheme-handler/*`, so it registers neither the stable documents nor
-`suite://`; stable keeps both. The pre-release `suite.app.json` gets the id `slop-<app>` and no file
-extensions. An installed build whose manifest still carries the older `slop.<app>` id is read as a
-pre-release too; nothing writes that form any more. The packaging script also writes a
-`suite.channel.json` beside it; no app reads that file yet, so the id is what carries the pre-release
-identity.
+`suite://`; stable keeps both. A frozen mini-app's pre-release `suite.app.json` keeps the `slop-<app>`
+id and no file extensions, because those apps classify exactly that marker as a pre-release; the
+superapp ships no `suite.app.json` at all. An installed build whose manifest still carries the older
+`slop.<app>` id is read as a pre-release too; nothing writes that form any more. The packaging script
+also writes a `suite.channel.json` beside it; no app reads that file yet, so the id is what carries
+the pre-release identity.
 
 The public store is HTTPS: CloudFront serves the private bucket through an ACM certificate, so the
 first fetch of `suite.flatpakrepo` and every later object is protected in transit. The local test
@@ -345,19 +350,18 @@ release key, not by a build machine's debug keystore. There is no Play Store lis
 | --- | --- | --- |
 | `stable` | `suite-go-<version>.apk` | `run.suite.go` |
 | `slop` | `suite-go-slop-<version>.apk` | `run.suite.slop.go` |
-| `nightly` | `suite-go-nightly-<version>.apk` | `run.suite.slop.go` |
-| `preview` | `suite-go-preview-<version>.apk` | `run.suite.slop.go` |
+| `nightly` | `suite-go-nightly-<version>.apk` | `run.suite.nightly.go` |
+| `preview` | `suite-go-preview-<version>.apk` | `run.suite.preview.go` |
 
 Every asset has a `.sha256` beside it. Stable also uploads the same bytes as `suite-go.apk`, the
 stable name [Suite Go's README](../../apps/go/README.md#install-the-apk) links through
 `releases/latest`; the versioned asset stays canonical. A pre-release has no stable alias, so a
 channel download cannot be mistaken for the stable one.
 
-Stable and one pre-release install side by side: they are two package ids with two data trees. Every
-pre-release shares `run.suite.slop.go`, so moving slop → nightly → preview replaces the pre-release
-instead of adding a third install. **One pre-release install at a time is the supported shape**, the
-same rule the Flatpaks follow. The channel is in the display and version name, so a person can tell
-the installed build apart.
+Every channel is a package id with its own data tree, so stable, slop, nightly and preview install and
+update side by side. Nightly and preview moved from the shared `run.suite.slop.go` id, so an install
+made before the change reinstalls once under the new id; no app data is migrated. The channel is in
+the display and version name, so a person can tell the installed build apart.
 
 `versionCode` is derived from the one number in `apps/go/app.config.json`; the rule and the identity
 table live in [Android](../../apps/go/docs/reference/android.md#the-four-channels).
@@ -382,12 +386,17 @@ keys](../how-to/keys.md#android-release-keystore).
 
 ## Pre-release documents
 
-A pre-release install is a second identity (`run.suite.slop.<app>`), not a second window on the
-stable data. Stable keeps `Documents/Suite/<App>`. A pre-release keeps `Documents/Suite Slop/<App>`;
-a stable document handed to it by a path, a link, or a file manager is copied into that folder and the
-copy is opened, so the stable file, its backup and its temporary file are never written. Export is
-explicit, writes where the person chooses, and refuses the stable folder. The rule is in
-[Canvas's paths](../../apps/canvas/desktop/src/main/paths.ts),
+A pre-release install is its own identity, not a second window on the stable data. Stable Desk keeps
+`~/.var/app/run.suite.shell`; each pre-release channel keeps its own sandbox, so a preview build
+cannot open slop data. Stable Go keeps its app data under `run.suite.go`, and each pre-release
+package id has its own.
+
+A frozen mini-app is the exception, because its pre-release build is a local factory session rather
+than a shipped channel: it keeps `Documents/Suite Slop/<App>` while stable keeps
+`Documents/Suite/<App>`. A stable document handed to it by a path, a link, or a file manager is
+copied into that folder and the copy is opened, so the stable file, its backup and its temporary file
+are never written. Export is explicit, writes where the person chooses, and refuses the stable
+folder. The rule is in [Canvas's paths](../../apps/canvas/desktop/src/main/paths.ts),
 [Planner's workspace location](../../apps/planner/src/main/workspaceLocation.ts) and
 [Budget's library](../../apps/budget/src/main/library.ts), with tests beside each.
 

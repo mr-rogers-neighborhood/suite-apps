@@ -96,11 +96,12 @@ owns the rationale, and [Status](status.md) owns what exists.
 - This is **Tier 1**: words, labels and the mark only. `@suite/shell`, `apps/shell`,
   `run.suite.shell`, `run.suite.slop.shell`, the signed remote's refs and the release table's tag
   names keep their identity, so an existing install updates in place and no data path moves.
-- **Tier 2 is deferred.** Changing the Flatpak id to `run.suite.desk`, the pre-release id to
-  `run.suite.slop.desk`, the package to `@suite/desk`, the directory to `apps/desk`, and the refs and
-  tags to match is a new application id: an existing install does not update into it, and it is a
-  second app until the old card is removed. That cost is paid once the retirements have landed and
-  there is one architecture to rename, not as part of a words change.
+- **Tier 2 is deferred.** Changing the Flatpak id to `run.suite.desk`, the pre-release ids to
+  `run.suite.slop.desk`, `run.suite.nightly.desk` and `run.suite.preview.desk`, the package to
+  `@suite/desk`, the directory to `apps/desk`, and the refs and tags to match is a new application
+  id: an existing install does not update into it, and it is a second app until the old card is
+  removed. That cost is paid once the retirements have landed and there is one architecture to rename,
+  not as part of a words change.
 - Both hosts carry the mark Start used: the shell's `apps/shell/build/icon.png` and its sized set
   under `apps/shell/build/icons/` are Start's own artwork, recovered from the commit before Start's
   retirement (#314), and Go's launcher icons are generated from the same bytes. The name differs
@@ -274,17 +275,22 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
   carry a channel; when it ships as a pack it carries a signed version.
 - Product maturity is separate from the channel: `pre-alpha`, `alpha`, `beta` and `1.0`. A
   stable-channel build can still be labeled `alpha`.
-- Stable and pre-release are two identities: `run.suite.<app>` and `run.suite.slop.<app>`. The
-  channel (`slop`, `nightly`, `preview`) is the Flatpak branch, not part of the id, so one pre-release
-  install can move channel while stable stays installed.
-- Suite Go carries the same channel model in its package id: `run.suite.go` for stable and one shared
-  `run.suite.slop.go` for every pre-release. The APK is signed by a release keystore outside the
-  repository; its certificate digest is pinned, and a build refuses any other certificate. The debug
-  key is a dev-loop signature and never a public artifact.
+- One identity per pre-release channel. Stable keeps `run.suite.<app>`; `slop`, `nightly` and
+  `preview` are `run.suite.slop.<app>`, `run.suite.nightly.<app>` and `run.suite.preview.<app>` on the
+  branch of the same name. Every channel is its own install and its own data root, so all four can be
+  installed and updated side by side. Nightly and preview moved from the shared `run.suite.slop` id,
+  so an install made before #380 reinstalls once under the new id; no pre-release data is migrated.
+  [One identity per pre-release channel](#one-identity-per-pre-release-channel-380) records the
+  change.
+- Suite Go carries the same channel model in its package id: `run.suite.go` for stable and
+  `run.suite.slop.go`, `run.suite.nightly.go` and `run.suite.preview.go` for the pre-release channels.
+  The APK is signed by a release keystore outside the repository; its certificate digest is pinned,
+  and a build refuses any other certificate. The debug key is a dev-loop signature and never a public
+  artifact.
 - `versionCode` is the base in `app.config.json` times ten plus a fixed channel digit (stable 0,
-  slop 1, nightly 2, preview 3). It increases within a channel as the base does, and promotion raises
-  the digit so a channel move is an update on the shared pre-release id; a demotion requires an
-  uninstall.
+  slop 1, nightly 2, preview 3). It increases within a channel as the base does. Each package id grows
+  on its own sequence: promotion installs a second app rather than updating a shared pre-release id,
+  and a lower code on one id is refused rather than made legal by an uninstall.
 - Canvas, Planner, Budget and Help are frozen legacy apps until they become packs: their code and last
   artifact stay, and no new pre-release channel is published for them. Sync is retired rather than
   frozen: it is not on a channel and it is not a shipped artifact at all (#315).
@@ -317,6 +323,22 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
   pre-release channel; there is no store channel yet. The keystore lives outside the repository and
   the certificate digest is pinned, so a build refuses any other signer. The debug key is the dev
   loop only.
+
+### One identity per pre-release channel (#380)
+
+- **The shared pre-release id is replaced.** `run.suite.slop.<app>` and `run.suite.slop.go` used to be
+  one identity for slop, nightly and preview. Each pre-release channel now has its own id and its own
+  data root, so all four superapp channels install and update beside each other. The branch names and
+  the channel digits do not change.
+- **Slop is the one pre-release id that did not move.** `run.suite.slop.shell` and
+  `run.suite.slop.go` were already slop's ids. Nightly and preview move to
+  `run.suite.nightly.{shell,go}` and `run.suite.preview.{shell,go}`.
+- **The move is a reinstall, once.** A nightly or preview install made before this change does not
+  update into the new id; it installs once under the new id and the old card is removed by hand. No
+  pre-release data is migrated: the new id starts with an empty data root, and the old data is not
+  copied or renamed.
+- **The versionCode rule is per package id.** Android reads the newest manifest for the APK's own
+  package id and refuses a lower code; an equal code is a rebuild of the same app version on that id.
 
 ## Reviews and release keys
 

@@ -137,7 +137,7 @@ jobs:
       - name: Bundle
         run: |
           flatpak build-bundle "$GITHUB_WORKSPACE/.nightly/flatpak-repo" suite-shell-nightly.flatpak \
-            run.suite.slop.shell nightly
+            run.suite.nightly.shell nightly
       - name: SBOM
         run: pnpm sbom --sbom-format spdx --out suite-shell-nightly.spdx.json
       - name: Attest the bundle

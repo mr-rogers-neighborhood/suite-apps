@@ -78,9 +78,11 @@ A release build is signed by the key at `~/.config/suite/keys/suite-go-release.j
 tree pins, and the build refuses any other certificate before it names or uploads the APK, so a
 debug-signed artifact cannot become the public one.
 
-Stable is `run.suite.go`. Every pre-release is `run.suite.slop.go`, so stable and one pre-release
-install side by side; a pre-release asset is `suite-go-<channel>-<version>.apk`, and moving from slop
-to nightly replaces the pre-release rather than adding a third install. The rolling release also
+Stable is `run.suite.go`. Each pre-release channel has its own package id — `run.suite.slop.go`,
+`run.suite.nightly.go` or `run.suite.preview.go` — so stable, slop, nightly and preview install and
+update side by side; a pre-release asset is `suite-go-<channel>-<version>.apk`. Nightly and preview
+moved from the shared `run.suite.slop.go` id, so an older nightly or preview install reinstalls once
+under the new id; no app data is migrated. The rolling release also
 carries stable as
 [suite-go.apk](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk),
 so that URL always names the newest stable build; `suite-go-<version>.apk` remains canonical.

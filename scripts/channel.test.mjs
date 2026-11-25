@@ -15,11 +15,11 @@ import {
 } from "./lib/channel.mjs";
 
 describe("pre-release identity", () => {
-  it("gives a pre-release one id across channels and leaves stable alone", () => {
+  it("gives every pre-release channel its own id and leaves stable alone", () => {
     assert.equal(flatpakId("planner", "stable"), "run.suite.planner");
     assert.equal(flatpakId("planner", "slop"), "run.suite.slop.planner");
-    assert.equal(flatpakId("planner", "nightly"), "run.suite.slop.planner");
-    assert.equal(flatpakId("planner", "preview"), "run.suite.slop.planner");
+    assert.equal(flatpakId("planner", "nightly"), "run.suite.nightly.planner");
+    assert.equal(flatpakId("planner", "preview"), "run.suite.preview.planner");
     assert.equal(suiteAppId("planner", "stable"), "planner");
     assert.equal(suiteAppId("planner", "slop"), "slop-planner");
     assert.equal(branchFor("stable"), "master");
@@ -27,6 +27,19 @@ describe("pre-release identity", () => {
     assert.equal(branchFor("preview"), "preview");
     assert.equal(displayName("Suite Planner", "slop"), "Suite Planner (slop)");
     assert.equal(displayName("Suite Planner", "stable"), "Suite Planner");
+  });
+
+  it("keeps the four ids distinct, so every channel is its own install", () => {
+    const ids = ["stable", "slop", "nightly", "preview"].map((channel) =>
+      flatpakId("shell", channel),
+    );
+    assert.deepEqual(ids, [
+      "run.suite.shell",
+      "run.suite.slop.shell",
+      "run.suite.nightly.shell",
+      "run.suite.preview.shell",
+    ]);
+    assert.equal(new Set(ids).size, ids.length);
   });
 
   it("refuses a channel it does not know, including the retired names", () => {
@@ -77,7 +90,7 @@ describe("pre-release identity", () => {
       format: "suite.channel",
       app: "planner",
       channel: "preview",
-      id: "run.suite.slop.planner",
+      id: "run.suite.preview.planner",
       stableId: "run.suite.planner",
       branch: "preview",
     });

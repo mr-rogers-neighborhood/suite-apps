@@ -295,7 +295,7 @@ jobs:
             ref=run.suite.shell
             branch=master
           else
-            ref=run.suite.slop.shell
+            ref="run.suite.${CHANNEL}.shell"
             branch="${CHANNEL}"
           fi
           # Flatpak refs live at app/<id>/<arch>/<branch>, not at refs/heads/<id>.
@@ -353,9 +353,9 @@ jobs:
             branch=master
             apk_id=run.suite.go
           else
-            app_id=run.suite.slop.shell
+            app_id="run.suite.${CHANNEL}.shell"
             branch="${CHANNEL}"
-            apk_id=run.suite.slop.go
+            apk_id="run.suite.${CHANNEL}.go"
           fi
           node scripts/release-manifest.mjs \
             --channel "${CHANNEL}" \
@@ -513,7 +513,7 @@ jobs:
               app=run.suite.shell
               branch=master
             else
-              app=run.suite.slop.shell
+              app="run.suite.${CHANNEL}.shell"
               branch="${CHANNEL}"
             fi
             commit_file=".dev/release/suite-shell-${CHANNEL}.commit"

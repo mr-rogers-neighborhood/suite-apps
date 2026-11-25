@@ -128,35 +128,32 @@ keys](../../../../docs/how-to/keys.md) owns backup and rotation.
 
 ### The four channels
 
-| Channel   | Package id          | Version name        | Launcher label     | versionCode |
-| --------- | ------------------- | ------------------- | ------------------ | ----------- |
-| `stable`  | `run.suite.go`      | `<version>`         | Suite Go           | base × 10   |
-| `slop`    | `run.suite.slop.go` | `<version>-slop`    | Suite Go (slop)    | base × 10+1 |
-| `nightly` | `run.suite.slop.go` | `<version>-nightly` | Suite Go (nightly) | base × 10+2 |
-| `preview` | `run.suite.slop.go` | `<version>-preview` | Suite Go (preview) | base × 10+3 |
+| Channel   | Package id             | Version name        | Launcher label     | versionCode |
+| --------- | ---------------------- | ------------------- | ------------------ | ----------- |
+| `stable`  | `run.suite.go`         | `<version>`         | Suite Go           | base × 10   |
+| `slop`    | `run.suite.slop.go`    | `<version>-slop`    | Suite Go (slop)    | base × 10+1 |
+| `nightly` | `run.suite.nightly.go` | `<version>-nightly` | Suite Go (nightly) | base × 10+2 |
+| `preview` | `run.suite.preview.go` | `<version>-preview` | Suite Go (preview) | base × 10+3 |
 
 `<version>` is the `version` in [`app.config.json`](../../app.config.json); this table names the
 suffix each channel adds rather than repeating the number.
 
-Stable and one pre-release install side by side, because they are two package ids with two data
-trees. Every pre-release shares `run.suite.slop.go`, so moving from slop to nightly replaces the
-pre-release instead of adding a third install. **One pre-release install at a time is the supported
-shape**, the same rule the desktop Flatpaks follow ([Channels](../../../../docs/explanation/channels.md)).
+Every channel is a package id with its own data tree, so stable, slop, nightly and preview install and
+update side by side. Slop keeps `run.suite.slop.go`; nightly and preview moved from that shared id, so
+an install made before the change reinstalls once under the new id. No app data is migrated.
 
 `base` is `versionCode` in `apps/go/app.config.json`. The digit is fixed per channel, so a release
-that bumps the base always increases the code within that channel. Promotion raises the digit, so
-slop → nightly → preview installs as an update on the shared pre-release id. Stable and pre-release
-ids never collide, so their sequences are independent.
+that bumps the base always increases the code within that channel. Each id has its own sequence: a
+promotion installs a second app rather than updating a shared pre-release id. Stable and the
+pre-release ids never collide, so their sequences are independent.
 
-A lower code never ships. Before Gradle runs, `scripts/android-release.mjs` reads the newest
-published release manifest for the package id — stable from `suite-<date>`, a pre-release from the
-newest `suite-slop-*`, `suite-nightly-*` and `suite-preview-*` — and refuses when the new `versionCode`
-is lower than any code recorded there. An equal code is allowed: a nightly rebuild of the same app
-version keeps the code and changes the bytes, and sideload accepts it with `-r`. A return to a lower
-digit (preview → nightly) therefore needs a base bump in `apps/go/app.config.json`, never an
-uninstall. The first release after this rule records the first code; every release after it is
-compared against that manifest. Uninstalling `run.suite.slop.go` still makes a demotion install on
-one phone, but it cannot make a lower release legal.
+A lower code never ships. Before Gradle runs, `scripts/android-release.mjs` reads the newest published
+release manifest for **its own package id** — a pre-release from its own `suite-<channel>-*` page —
+and refuses when the new `versionCode` is lower than the code recorded there. An equal code is
+allowed: a nightly rebuild of the same app version keeps the code and changes the bytes, and sideload
+accepts it with `-r`. The first release on an id records the first code; every release after it is
+compared against that manifest. Uninstalling a package still makes a reinstall possible on one phone,
+but it cannot make a lower code legal for that id.
 
 Build and name:
 

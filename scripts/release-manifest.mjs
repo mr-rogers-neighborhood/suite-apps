@@ -21,11 +21,11 @@
  *   node scripts/release-manifest.mjs \
  *     --channel preview \
  *     --flatpak .dev/release/suite-shell-preview.flatpak \
- *     --flatpak-id run.suite.slop.shell \
+ *     --flatpak-id run.suite.preview.shell \
  *     --flatpak-branch preview \
  *     --flatpak-commit-file .dev/release/suite-shell-preview.commit \
  *     --apk apps/go/.dev/release/suite-go-preview-0.1.0.apk \
- *     --apk-id run.suite.slop.go \
+ *     --apk-id run.suite.preview.go \
  *     --commit "$GITHUB_SHA" \
  *     --out .dev/release/release-manifest.json
  *
