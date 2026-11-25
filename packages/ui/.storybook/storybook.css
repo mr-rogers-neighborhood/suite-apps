@@ -7,6 +7,9 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @source "./";
+/* Test files name class-shaped counter-examples on purpose; they are not rendered. */
+@source not "../src/**/*.test.ts";
+@source not "../src/**/*.test.tsx";
 
 /* Class-based dark mode, matching the host's `.dark` attribute. */
 @custom-variant dark (&:where(.dark, .dark *));
