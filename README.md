@@ -7,23 +7,30 @@ project operates.
 > **Alpha.** Suite Desk is alpha and Suite Go is v0. Linux x86_64 and Android arm64 are the only
 > published targets. Keep documents somewhere you back up.
 
-## The hosts
+## Install
 
-| Host | What it is | State | Install |
-| --- | --- | --- | --- |
-| **Suite Desk** | The desktop host: one window, a tab per pack, a Home Screen and a local catalogue | Alpha | `flatpak install --user suite run.suite.desk` |
-| **Suite Go** | The mobile host: one container, one pack at a time, the same document boundary | v0 | [suite-go.apk](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk) |
-
-Add the signed store once; every desktop install comes from it:
+Suite Desk is the desktop host and Suite Go is the mobile host; both install from the same signed
+remote. Add it once:
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite https://flatpak.suite.run/suite.flatpakrepo
-flatpak install --user suite run.suite.desk
 ```
 
-Suite Go is not a Flatpak. Download the APK and `adb install -r -t suite-go.apk`. Pre-release builds
-live on the `suite-nightly-<date>` and `suite-preview-<date>` pages; [Channels](docs/explanation/channels.md)
-says what each one promises. The Flatpak remote is the update path; the rolling
+<!-- BEGIN generated:channels (scripts/release-status.mjs; do not edit by hand) -->
+
+| Channel | Suite Desk | Suite Go | Page |
+| --- | --- | --- | --- |
+| `slop` | `flatpak install --user suite run.suite.slop.desk//slop` | `suite-go-slop-<version>.apk` on that page | `suite-slop-<date>` |
+| `nightly` | `flatpak install --user suite run.suite.nightly.desk//nightly` | `suite-go-nightly-<version>.apk` on that page | `suite-nightly-<date>` |
+| `preview` | `flatpak install --user suite run.suite.preview.desk//preview` | `suite-go-preview-<version>.apk` on that page | `suite-preview-<date>` |
+| `stable` | `flatpak install --user suite run.suite.desk` | [`suite-go.apk`](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk) | `suite-<date>` |
+
+<!-- END generated:channels -->
+
+Each channel installs beside the others, so a `preview` build and the `stable` one can both be
+installed. Suite Go is not a Flatpak: download the channel page's APK and `adb install -r -t`. The
+Flatpak remote is the update path (`flatpak update --user`); [Channels](docs/explanation/channels.md)
+says what each channel promises, and the rolling
 [`suite-<date>` release](https://github.com/mrrnbhd/suite-apps/releases/latest) is the GitHub mirror.
 
 ## Packs
