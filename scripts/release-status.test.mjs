@@ -1281,8 +1281,13 @@ describe("the slop publication", () => {
       goApkUrl(tag, "0.2.0", "slop", revision),
       `https://github.com/mrrnbhd/suite-apps/releases/download/${tag}/suite-go-slop-0.2.0-abc1234.apk`,
     );
-    assert.equal(releaseTitle(tagDate, "slop", revision), `Suite Desk + Suite Go — ${tagDate} (${revision})`);
-    assert.equal(releaseTitle(tagDate), `Suite Desk + Suite Go — ${tagDate}`);
+    assert.equal(
+      releaseTitle(tagDate, "slop", revision),
+      `Suite Desk + Suite Go — ${tagDate} [Slop] (${revision})`,
+    );
+    assert.equal(releaseTitle(tagDate), `Suite Desk + Suite Go — ${tagDate} [Stable]`);
+    assert.equal(releaseTitle(tagDate, "nightly"), `Suite Desk + Suite Go — ${tagDate} [Nightly]`);
+    assert.equal(releaseTitle(tagDate, "preview"), `Suite Desk + Suite Go — ${tagDate} [Preview]`);
   });
 
   it("never lets a revision name the stable tag, and requires one for slop", () => {
