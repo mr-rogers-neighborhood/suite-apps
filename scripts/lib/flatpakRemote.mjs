@@ -104,6 +104,7 @@ export const STATIC_DELTA_ARGUMENTS = [
  * client on the previous ref set or fails it outright.
  */
 export const MUTABLE_FILES = [
+  "config",
   "summary",
   "summary.sig",
   "summary.idx",
@@ -113,6 +114,7 @@ export const MUTABLE_FILES = [
 
 /** The only CloudFront paths a publication invalidates, in this order. */
 export const INVALIDATION_PATHS = [
+  `/config`,
   `/summary`,
   `/summary.sig`,
   `/summary.idx`,
@@ -307,6 +309,17 @@ export function s3UploadCommands({ repo, flatpakrepoPath, bucket }) {
       "--cache-control",
       cache("delta-indexes/"),
       "--no-progress",
+    ]),
+    // Every OSTree client fetches `config` before anything else; a bucket that
+    // never received it answers 403 and the remote cannot be installed from,
+    // however correct the summary beside it is.
+    aws([
+      "s3",
+      "cp",
+      `${repo}/config`,
+      s3Url(bucket, "config"),
+      "--cache-control",
+      cache("config"),
     ]),
     aws([
       "s3",
