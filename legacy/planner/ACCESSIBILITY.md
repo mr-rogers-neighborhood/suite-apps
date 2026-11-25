@@ -19,7 +19,7 @@ breakdown is in
 - **Focus after an inline edit.** A task title committed with Enter or cancelled with Escape returns
   focus to the row, and **Back to today** moves focus to the new day's heading instead of dropping it.
 - **One visible focus ring.** The renderer defines `*:focus-visible` once in
-  [`theme/styles.css`](src/renderer/src/theme/styles.css), and the shared primitives reuse the same
+  [`theme/styles.css`](../../packs/planner/pack/src/renderer/theme/styles.css), and the shared primitives reuse the same
   ring token.
 
 **There is no axe run in Planner's gate.** The suite's manual-testing page describes an automated

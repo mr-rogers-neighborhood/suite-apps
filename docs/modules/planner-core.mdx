@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/planner/packages/core
+module: packages/planner-core
 title: Planner core
 summary: "The record shapes, typed document, projections and .planner file Planner builds on."
 ---
@@ -24,7 +24,7 @@ The package's child modules carry their own notes: capture for the one-line
 grammar, file for the `.planner` envelope, Loro for the writer, and plan for the
 projections. This page stays with the record schema those modules share.
 
-## legacy/planner/packages/core/src/schema.ts#taskSchema
+## packages/planner-core/src/schema.ts#taskSchema
 
 A task is the record every other projection starts from, and this schema is the
 only description of it. Every read parses through it, so a malformed value fails

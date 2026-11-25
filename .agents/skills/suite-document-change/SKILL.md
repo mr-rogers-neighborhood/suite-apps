@@ -18,7 +18,7 @@ projects it. Follow the app's `AGENTS.md` and `docs/reference/decisions.md`.
 
 Anchors:
 
-- Planner core: `legacy/planner/packages/core/src/loro/`
+- Planner core: `packages/planner-core/src/loro/`
 - Budget core: `packs/budget/packages/core/src/loro/`
 - Canvas graph: `legacy/canvas/packages/graph/src/loro/`
 - Shared replica/store: `packages/document-runtime/src/replica.ts`, `src/node/store.ts`

@@ -40,6 +40,6 @@ date such as `tomorrow`.
 
 ## Registration
 
-All three are entries in `src/renderer/src/app/views.ts`. The rail renders the registry in order and
+All three are entries in `packs/planner/pack/src/renderer/app/views.ts`. The rail renders the registry in order and
 the shell resolves the component, so neither file branches on a view id. Week, Focus and Rituals are
 entries too; [Week](week.md), [Focus](focus.md) and [Rituals](rituals.md) own their pages.

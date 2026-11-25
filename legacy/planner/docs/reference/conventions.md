@@ -19,8 +19,8 @@ lives in Zustand; transient view state may live in React. Never keep a second co
 
 ## Files and folders
 
-Folder by feature, not by file type: `packages/core/src/{loro,plan,capture,file}`,
-`src/{main,preload}`, `src/renderer/src/{app,day,inbox,capture,calendar,components,store,platform,theme}`.
+Folder by feature, not by file type: `packages/planner-core/src/{loro,plan,capture,file}`,
+`src/{main,preload}`, `packs/planner/pack/src/renderer/{app,day,inbox,capture,calendar,components,store,platform,theme}`.
 
 Each feature folder exposes one `index.ts` and nothing else as public surface. No barrel files that
 re-export everything. The facade (`WorkspaceDocument`) and the folder index are the API.
@@ -71,7 +71,7 @@ No new dependency without a stated job and the correct package.
 | A log line with a task body or a file path                     | Log the error code, not the content    |
 
 `pnpm shape` enforces the mechanical half: file length, the single `observe` call site, Loro imports
-confined to `packages/core/src/loro`, `nodeIntegration: true` banned, and component file names.
+confined to `packages/planner-core/src/loro`, `nodeIntegration: true` banned, and component file names.
 
 ## TypeScript
 

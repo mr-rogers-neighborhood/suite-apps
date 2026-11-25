@@ -26,7 +26,6 @@ import { bundlePack, platformsSummary, publicKeyOfSigningKey } from "./pack.mjs"
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PACK_ROOT = join(ROOT, "packs", "planner");
 const PACK_DIR = join(PACK_ROOT, "pack");
-const APP_DIR = join(ROOT, "legacy", "planner");
 const DIST = join(PACK_ROOT, ".dev", "pack");
 const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
 

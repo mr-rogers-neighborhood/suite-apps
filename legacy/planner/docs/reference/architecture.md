@@ -13,7 +13,7 @@ This page is the map. The rules are in [conventions.md](conventions.md), the rec
    opt-in, runs through a relay a person hosts, and the file stays the document either way.
 2. **Loro owns the document.** The UI reads through `@suite/planner-core` and writes through
    `WorkspaceDocument`, never raw Loro.
-3. **Every write is validated.** Zod schemas in `packages/core/src/schema.ts` parse at the boundary
+3. **Every write is validated.** Zod schemas in `packages/planner-core/src/schema.ts` parse at the boundary
    before a value reaches the CRDT.
 
 ## Process model
@@ -77,7 +77,7 @@ clicked `suite://planner/task/<id>` once it is running.
 
 ## Navigation
 
-`src/renderer/src/app/views.ts` is the one registry of surfaces: an id, label, icon and component per
+`packs/planner/pack/src/renderer/app/views.ts` is the one registry of surfaces: an id, label, icon and component per
 entry. The rail renders the registry in order and the shell renders the resolved component, so a new
 surface is an entry and its component, not an edit to `Shell.tsx`, `Sidebar.tsx` and the store. The
 rail's "Soon" list stays for surfaces that do not exist yet. An id this build does not register — a
@@ -112,17 +112,17 @@ reconnected is handed.
 
 ## Repo map
 
-| Path                          | Responsibility                                                                  |
-| ----------------------------- | ------------------------------------------------------------------------------- |
-| `src/main`                    | Authority, file store, IPC, tray, scheduler, menu, window, sync                 |
-| `src/preload`                 | Typed `PlannerBridge` over `contextBridge`                                      |
-| `src/renderer`                | React shell, day and week views, inbox, capture, calendar, theme, sync dialog   |
-| `packages/core/src/schema.ts` | Zod records and `z.infer` types                                                 |
-| `packages/core/src/loro`      | `WorkspaceDocument` and its domain modules                                      |
-| `packages/core/src/plan`      | Pure projections: day and week plans, capacity, recurrence, inbox, search, sort |
-| `packages/core/src/capture`   | Pure one-line capture parser                                                    |
-| `packages/core/src/file`      | `.planner` envelope, encode/decode, errors                                      |
-| `scripts/check-shape.mjs`     | Mechanical rules: file length, observe sites, Loro confinement                  |
+| Path                                  | Responsibility                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------- |
+| `src/main`                            | Authority, file store, IPC, tray, scheduler, menu, window, sync                 |
+| `src/preload`                         | Typed `PlannerBridge` over `contextBridge`                                      |
+| `packs/planner/pack/src/renderer`     | React shell, day and week views, inbox, capture, calendar, theme, sync dialog   |
+| `packages/planner-core/src/schema.ts` | Zod records and `z.infer` types                                                 |
+| `packages/planner-core/src/loro`      | `WorkspaceDocument` and its domain modules                                      |
+| `packages/planner-core/src/plan`      | Pure projections: day and week plans, capacity, recurrence, inbox, search, sort |
+| `packages/planner-core/src/capture`   | Pure one-line capture parser                                                    |
+| `packages/planner-core/src/file`      | `.planner` envelope, encode/decode, errors                                      |
+| `scripts/check-shape.mjs`             | Mechanical rules: file length, observe sites, Loro confinement                  |
 
 ## Layers
 

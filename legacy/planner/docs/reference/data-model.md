@@ -1,6 +1,6 @@
 # Data model
 
-The schema is `packages/core/src/schema.ts`. Zod is the source of truth; types are `z.infer`. Every
+The schema is `packages/planner-core/src/schema.ts`. Zod is the source of truth; types are `z.infer`. Every
 write is parsed before it reaches the CRDT.
 
 ## Roots
@@ -149,7 +149,7 @@ record before replacing the authority.
 
 Schema 2 is additive: it added `settings.notificationsAskedAt`. A schema-1 file opens, the field
 reads as `null`, and the migration stamps the document at 2 before the renderer sees it. The fixture
-test in `packages/core/src/file/migration.test.ts` opens a file written at schema 1 and a file
+test in `packages/planner-core/src/file/migration.test.ts` opens a file written at schema 1 and a file
 stamped 3, so both directions are proven by the gate rather than by the version number alone.
 
 The live workspace is the same envelope at `~/Documents/Suite/Planner/workspace.planner`, with

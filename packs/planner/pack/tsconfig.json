@@ -1,20 +1,14 @@
 {
-  "extends": "../../../legacy/planner/tsconfig.base.json",
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "types": ["node", "vite/client"],
     "paths": {
-      "@suite/planner-core": ["../../../legacy/planner/packages/core/src/index.ts"],
+      "@suite/document-runtime": ["../../../packages/document-runtime/src/index.ts"],
       "@suite/pack-runtime": ["../../../packages/pack-runtime/src/index.ts"],
-      "@renderer/*": ["../../../legacy/planner/src/renderer/src/*"]
+      "@suite/ui": ["../../../packages/ui/src/index.ts"]
     }
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "../../../legacy/planner/src/renderer/src/platform/window.d.ts",
-    "*.config.ts",
-    "*.config.mts"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "*.config.ts", "*.config.mts"]
 }

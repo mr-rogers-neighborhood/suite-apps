@@ -7,9 +7,9 @@ import {
 } from "@suite/planner-core";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { App } from "../../../../legacy/planner/src/renderer/src/App";
-import { bootDocument } from "../../../../legacy/planner/src/renderer/src/store/snapshotStore";
-import { useUiStore } from "../../../../legacy/planner/src/renderer/src/store/uiStore";
+import { App } from "./renderer/App";
+import { bootDocument } from "./renderer/store/snapshotStore";
+import { useUiStore } from "./renderer/store/uiStore";
 import { memoryDocuments, memoryFiles } from "./test/fakeHost";
 
 /**

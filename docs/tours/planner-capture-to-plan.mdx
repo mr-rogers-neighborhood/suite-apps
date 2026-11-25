@@ -16,14 +16,14 @@ it, and sync is an optional transport over the same deltas. The module notes
 under the core package hold the rules behind each stop: capture, file, Loro and
 plan.
 
-## legacy/planner/src/renderer/src/capture/CaptureBar.tsx#CaptureBar
+## packs/planner/pack/src/renderer/capture/CaptureBar.tsx#CaptureBar
 
 Capture begins in the renderer because that is where the person is, not because
 the renderer owns the task. The component keeps the current input text in React
 state and the focus signal in the UI store, then hands the submitted string to
 the parser. A day target supplies an implied date; the inbox target does not.
 
-## legacy/planner/packages/core/src/capture/parse.ts#parseCapture
+## packages/planner-core/src/capture/parse.ts#parseCapture
 
 The parser is pure: one line in, a draft out. It removes the tokens it
 recognises (a day, a clock time, `#project`, `@tag`, `!1`, `~45m`) and leaves
@@ -31,7 +31,7 @@ everything it does not recognise in the title rather than dropping it. A time
 with no date borrows the implied date, which is why the same line means a
 different day in the day view and in the inbox.
 
-## legacy/planner/src/renderer/src/capture/resolve.ts#resolveProjectId
+## packs/planner/pack/src/renderer/capture/resolve.ts#resolveProjectId
 
 A draft names a project by text; the document stores an id. Resolution is a
 renderer decision made immediately before the write: an existing name matches
@@ -39,7 +39,7 @@ case-insensitively, and an unknown name creates the project through the document
 facade. Doing this in the parser would give a pure function a side effect and
 would make a parse test depend on a workspace.
 
-## legacy/planner/packages/core/src/schema.ts#taskSchema
+## packages/planner-core/src/schema.ts#taskSchema
 
 The draft only becomes a task if it satisfies this schema. Defaults do the work
 of making an old document readable: a field added later is absent from older
@@ -54,7 +54,7 @@ shape, the typed writer and the file envelope are one ownership boundary; the
 process that holds the document is another. The renderer is not allowed to write
 either one directly.
 
-## legacy/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument
+## packages/planner-core/src/loro/WorkspaceDocument.ts#WorkspaceDocument
 
 The typed facade is the only writer of a workspace. Every write that carries a
 record validates through Zod, touches only the keys that changed, and commits
@@ -62,7 +62,7 @@ once. Opening a snapshot assigns a fresh peer id and upgrades an older schema or
 refuses a newer one before any caller can read a record. A component that
 imported Loro instead would be a second writer with none of those rules.
 
-## legacy/planner/packages/core/src/file/workspaceFile.ts#decodeWorkspaceFile
+## packages/planner-core/src/file/workspaceFile.ts#decodeWorkspaceFile
 
 The file envelope is a small JSON object around an opaque base64 snapshot, and
 decoding answers with a `Result` because the person chose the file. The refusals
@@ -100,7 +100,7 @@ The path back is a snapshot and a projection. The renderer holds a replica, not
 the authority; the day view is computed from records; and UI state such as the
 selected date never becomes a second copy of the plan.
 
-## legacy/planner/src/renderer/src/store/snapshotStore.ts#DocumentReplica
+## packs/planner/pack/src/renderer/store/snapshotStore.ts#DocumentReplica
 
 This class is the renderer's single observe call site. A local edit commits on
 the replica's document, is forwarded to main as a CRDT delta, and rebuilds the
@@ -108,7 +108,7 @@ snapshot that React reads through `useSyncExternalStore`. An import or a synced
 replacement detaches the old subscription and subscribes the new document, so a
 stale observer cannot keep forwarding edits from a closed workspace.
 
-## legacy/planner/packages/core/src/plan/dayPlan.ts#dayPlan
+## packages/planner-core/src/plan/dayPlan.ts#dayPlan
 
 A day is a projection over every task, not a stored list. The function decides
 which tasks are scheduled for the date, which are overdue, which recurring
@@ -116,7 +116,7 @@ occurrences are due, and how much the planned work will take. Because it is pure
 and rebuilds on every change, moving a task to another date needs no day record
 to be edited in two places.
 
-## legacy/planner/packages/core/src/plan/capacity.ts#capacityFor
+## packages/planner-core/src/plan/capacity.ts#capacityFor
 
 Capacity compares the same estimates against the day's available minutes and
 returns a state rather than a colour. The ratio is derived, the empty day is
@@ -124,7 +124,7 @@ separate from a comfortable one, and an overfull day is a comparison rather than
 a stored flag. A view that recomputed this itself would drift from the day plan
 the moment one estimate changed.
 
-## legacy/planner/src/renderer/src/store/uiStore.ts#useUiStore
+## packs/planner/pack/src/renderer/store/uiStore.ts#useUiStore
 
 The Zustand store holds what the view is showing: the active surface, the
 selected date, the selected task, the capture focus signal and the current

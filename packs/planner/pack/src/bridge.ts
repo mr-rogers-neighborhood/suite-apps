@@ -31,7 +31,7 @@ import { projectReminders, REMINDER_PACK_ID, REMINDER_PROJECTION } from "./proje
  * backup scheme, because two can disagree.
  *
  * It goes through `WorkspaceDocument` rather than `loro-crdt` on purpose: this repository keeps
- * every touch of Loro inside `packages/core/src/loro`, and `scripts/check-shape.mjs` fails the gate
+ * every touch of Loro inside `packages/planner-core/src/loro`, and `scripts/check-shape.mjs` fails the gate
  * if something else imports it. The wrapper is not a restriction here — the schema-initialising
  * `create()`, the peer-id handling in `fromSnapshot`, and the commit-before-export in `snapshot()`
  * are all things a pack would otherwise have to re-derive and get wrong.

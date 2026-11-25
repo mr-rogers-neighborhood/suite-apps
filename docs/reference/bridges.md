@@ -13,9 +13,9 @@ to run all three has to know how. It is written from the code, not from intent.
 
 | App     | Global                | Declared in                               | Host marker       | Staleness check                     |
 | ------- | --------------------- | ----------------------------------------- | ----------------- | ----------------------------------- |
-| Canvas  | `window.suiteDesktop` | `packs/canvas/src/host/bridge.ts`          | `host: "desktop"` | **Yes** — `REQUIRED_BRIDGE_METHODS` |
-| Planner | `window.suitePlanner` | `legacy/planner/packages/core/src/ports.ts` | none              | no                                  |
-| Budget  | `window.suiteBudget`  | `packs/budget/packages/core/src/ports.ts`  | none              | no                                  |
+| Canvas  | `window.suiteDesktop` | `packs/canvas/src/host/bridge.ts` | `host: "desktop"` | **Yes** — `REQUIRED_BRIDGE_METHODS` |
+| Planner | `window.suitePlanner` | `packages/planner-core/src/ports.ts` | none              | no                                  |
+| Budget  | `window.suiteBudget`  | `packs/budget/packages/core/src/ports.ts` | none              | no                                  |
 
 ## Canvas: `window.suiteDesktop`
 

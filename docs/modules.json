@@ -1,5 +1,13 @@
 {
   "version": 1,
-  "modules": [],
-  "assign": {}
+  "modules": [
+    {
+      "id": "packs/planner/pack/src/renderer",
+      "title": "Planner renderer",
+      "parentId": "legacy/planner"
+    }
+  ],
+  "assign": {
+    "packs/planner/pack/src/renderer": "packs/planner/pack/src/renderer"
+  }
 }

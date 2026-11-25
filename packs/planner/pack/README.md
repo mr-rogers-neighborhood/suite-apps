@@ -4,9 +4,12 @@ Planner's renderer built as a signed desktop pack. The layout is the convention 
 [docs/spec/repo-structure.md R2.2](../../../docs/spec/repo-structure.md#2-packs), and the authoring
 steps live in [the pack authoring reference](../../../docs/reference/pack-authoring.md).
 
-- `manifest.json` is the source manifest; its version tracks `legacy/planner/package.json`, and its
+- `manifest.json` is the source manifest; its version tracks the app's `package.json`, and its
   `documents` entry declares the workspace at `SCHEMA_VERSION` from `@suite/planner-core` with the
-  `reminders` projection.
+  `reminders` projection. The document layer lives in `packages/planner-core`.
+- `src/renderer/` is the one renderer tree: the pack builds it, and the frozen Electron shell in
+  `legacy/planner` consumes the same files instead of keeping a second copy. Its `index.html` is the
+  shell's page; the pack page is the `index.html` beside `manifest.json`.
 - `src/prelude.ts` installs `window.suitePlanner` over the host's `window.suite`; `src/main.ts`
   imports it before the renderer.
 - `src/bridge.ts` is the adapter: the host document envelope carries a Loro snapshot unchanged, and

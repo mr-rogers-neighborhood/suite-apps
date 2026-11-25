@@ -3,10 +3,12 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-const core = fileURLToPath(new URL("../../../legacy/planner/packages/core/src/index.ts", import.meta.url));
-const renderer = fileURLToPath(new URL("../../../legacy/planner/src/renderer/src", import.meta.url));
 const runtime = fileURLToPath(
   new URL("../../../packages/pack-runtime/src/index.ts", import.meta.url),
+);
+const ui = fileURLToPath(new URL("../../../packages/ui/src/index.ts", import.meta.url));
+const documentRuntime = fileURLToPath(
+  new URL("../../../packages/document-runtime/src/index.ts", import.meta.url),
 );
 
 export default defineConfig({
@@ -18,15 +20,15 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@suite/planner-core": core,
+      "@suite/document-runtime": documentRuntime,
       "@suite/pack-runtime": runtime,
-      "@renderer": renderer,
+      "@suite/ui": ui,
     },
   },
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
-    setupFiles: ["../../../legacy/planner/src/renderer/src/test/setup.ts"],
+    setupFiles: ["./src/renderer/test/setup.ts"],
     testTimeout: 20_000,
   },
 });

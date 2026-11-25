@@ -13,7 +13,7 @@ side, where the container cannot do what the current signature asks.
 // suite-planner/packages/core/src/ports.ts
 loadSnapshot(): Promise<Uint8Array>;
 
-// legacy/planner/src/renderer/src/store/snapshotStore.ts
+// packs/planner/pack/src/renderer/store/snapshotStore.ts
 const bytes = await bridge.loadSnapshot();
 const replica = new DocumentReplica(WorkspaceDocument.fromSnapshot(bytes));
 ```

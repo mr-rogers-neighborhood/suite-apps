@@ -9,11 +9,11 @@ the `.planner` document. `pnpm planner:pack` produces the signed pack; it is not
 ## The renderer builds as a web bundle
 
 `pnpm planner:build` runs `planner.vite.config.ts`, which points Vite at
-`legacy/planner/src/renderer` and writes into `planner-dist`.
+`packs/planner/pack/src/renderer` and writes into `planner-dist`.
 
-It succeeds with **no change to the Planner repository**: 2,671 modules, ~582 kB of JavaScript and
-the 3.6 MB Loro WASM. The renderer is a plain Vite app — no Node builtins, no Electron import, and
-its only machine access is `window.suitePlanner` inside `bootDocument()`.
+It builds directly from the pack-owned renderer: 2,671 modules, ~582 kB of JavaScript and the
+3.6 MB Loro WASM. The renderer is a plain Vite app — no Node builtins, no Electron import, and its
+only machine access is `window.suitePlanner` inside `bootDocument()`.
 
 Two settings are needed and are worth remembering:
 
@@ -45,7 +45,7 @@ mobile build would only work on a machine that also had Planner's source.
 An earlier version of this page decided to **ship a seed snapshot as a fixture**, because the bridge
 had no way to say "there is no document yet". That is no longer necessary:
 
-- `legacy/planner/packages/core/src/ports.ts` declares `loadSnapshot(): Promise<Uint8Array | null>`.
+- `packages/planner-core/src/ports.ts` declares `loadSnapshot(): Promise<Uint8Array | null>`.
 - `bootDocument()` calls `WorkspaceDocument.create()` when it receives `null`.
 - [The bridge reference](../../../../docs/reference/bridges.md) documents the nullable contract,
   and [`loadsnapshot-proposal.md`](loadsnapshot-proposal.md) — the request that asked for it — is landed.
