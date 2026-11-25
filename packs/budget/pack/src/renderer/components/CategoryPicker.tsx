@@ -54,7 +54,7 @@ export function CategoryPicker({
         <Select.Content
           position="popper"
           sideOffset={4}
-          className="z-[60] max-h-80 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-line bg-panel shadow-xl"
+          className="z-[80] max-h-80 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-line bg-panel shadow-xl"
         >
           <Select.Viewport className="scroll max-h-80 overflow-y-auto p-1">
             {allowEmpty ? <Item value={NONE} label="Uncategorized" /> : null}

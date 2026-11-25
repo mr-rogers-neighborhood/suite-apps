@@ -13,9 +13,8 @@ import {
   reservedCategoryId,
   transferDirection,
 } from "@suite/budget-core";
-import { Button } from "@suite/ui";
+import { Button, Field, TextInput } from "@suite/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Field, TextInput } from "../components/Field";
 import { Modal } from "../components/Modal";
 import { getBridge } from "../platform/bridge";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";

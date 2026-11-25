@@ -6,11 +6,10 @@ import {
   type TransactionFlag,
   todayKey,
 } from "@suite/budget-core";
-import { Button } from "@suite/ui";
+import { Button, Field, TextInput } from "@suite/ui";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CategoryPicker } from "../components/CategoryPicker";
-import { Field, TextInput } from "../components/Field";
 import { IconButton } from "../components/IconButton";
 import { Modal } from "../components/Modal";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
@@ -343,12 +342,12 @@ export function TransactionDialog() {
               onChange={(event) => setPayeeName(event.target.value)}
               placeholder="Who was it?"
             />
-            <datalist id="budget-payees">
-              {snapshot.payees.map((payee) => (
-                <option key={payee.id} value={payee.name} />
-              ))}
-            </datalist>
           </Field>
+          <datalist id="budget-payees">
+            {snapshot.payees.map((payee) => (
+              <option key={payee.id} value={payee.name} />
+            ))}
+          </datalist>
           <Field label="Flag">
             <select
               value={flag}

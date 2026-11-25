@@ -1,6 +1,5 @@
-import { Button } from "@suite/ui";
+import { Button, Field, TextInput } from "@suite/ui";
 import { useEffect, useState } from "react";
-import { Field, TextInput } from "../components/Field";
 import { Modal } from "../components/Modal";
 
 export function TextPrompt({
