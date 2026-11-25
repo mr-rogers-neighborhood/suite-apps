@@ -1,5 +1,10 @@
-# The trunk proof: every push to `main` runs the whole gate with `--fresh`, the
-# same command a person runs.
+# The trunk proof: a push to `main` runs the prelude — the shared libraries
+# build and the script tests — to confirm the SHA resolves and the declared
+# project set is intact. The merge queue already proved every row for the exact
+# SHA, and the 02:00 nightly is the scheduled full-tree proof (#407).
+#
+# `workflow_dispatch` keeps the whole gate with `--fresh`, the same command a
+# person runs, so the full tree stays provable on demand.
 #
 # e2e stays on the merge queue and nightly; a trunk push must not spend its
 # budget on a desktop suite that already ran on the queue entry.
@@ -36,7 +41,24 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Trunk prelude
+        if: github.event_name == 'push'
+        run: node scripts/gate.mjs --prelude
+      - name: Resolve the Playwright version
+        if: github.event_name == 'workflow_dispatch'
+        id: playwright
+        run: |
+          version="$(node -e 'console.log(require("./legacy/canvas/e2e/node_modules/@playwright/test/package.json").version)')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Playwright browser cache
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Playwright browser (Canvas stories)
+        if: github.event_name == 'workflow_dispatch'
         run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
       - name: Fresh gate
+        if: github.event_name == 'workflow_dispatch'
         run: node scripts/gate.mjs --fresh --no-e2e

@@ -100,6 +100,11 @@ export function gateProblems(status, head) {
       `the last gate ran --only ${status.only}, so it proved one repository, not the suite`,
     );
   }
+  // The trunk's push proof is the prelude: the libraries and their script tests,
+  // with no app row. It is a healthy run, not a suite proof (#407).
+  if (status.prelude === true) {
+    problems.push("the last gate ran only the prelude, so it proved no app row");
+  }
   if (status.fresh !== true) {
     problems.push("the last gate ran on the working tree, not a clean export of this commit");
   }

@@ -95,7 +95,7 @@ jobs:
       pull-requests: read
       actions: write
     steps:
-      - name: Delete caches for closed pull requests
+      - name: Delete caches for closed pull requests and finished queue entries
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -109,19 +109,26 @@ jobs:
               JSON.parse(process.env.PRS_JSON).map((pr) => [String(pr.number), pr.state]),
             );
             const caches = JSON.parse(process.env.CACHES_JSON);
+            // A merge-queue entry keeps its own cache under
+            // `refs/heads/gh-readonly-queue/<base>/pr-<number>-<sha>`. When that
+            // pull request is closed or merged the ref is gone, so the cache can
+            // never be restored again: it is dead weight against the 10 GiB
+            // repository ceiling (4.55 GB of these were measured in #422).
+            const QUEUE_REF = /^refs\/heads\/gh-readonly-queue\/[^/]+\/pr-(\d+)-/;
+            const PULL_REF = /^refs\/pull\/(\d+)\//;
             const doomed = caches.filter((entry) => {
-              // Branch and merge-queue caches are not pull-request caches.
-              const match = /^refs\/pull\/(\d+)\//.exec(entry.ref ?? "");
+              const ref = entry.ref ?? "";
+              const match = QUEUE_REF.exec(ref) ?? PULL_REF.exec(ref);
               if (match === null) return false;
               // The default branch is never a pull request; keep its cache.
-              if (entry.ref === `refs/heads/${process.env.DEFAULT_BRANCH}`) return false;
+              if (ref === `refs/heads/${process.env.DEFAULT_BRANCH}`) return false;
               const state = states.get(match[1]);
               return state === "CLOSED" || state === "MERGED";
             });
             console.error(
               doomed.length === 0
-                ? "No cache entries for closed pull requests."
-                : `Deleting ${doomed.length} cache entry(ies) for closed pull requests.`,
+                ? "No cache entries for closed pull requests or finished queue entries."
+                : `Deleting ${doomed.length} cache entry(ies) for closed pull requests and finished queue entries.`,
             );
             process.stdout.write(doomed.map((entry) => `${entry.id}\n`).join(""));
           ' > doomed-caches.txt

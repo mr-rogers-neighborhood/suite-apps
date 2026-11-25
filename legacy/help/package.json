@@ -21,11 +21,11 @@
     "package:dir": "pnpm build && electron-builder --dir",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "typecheck:all": "pnpm typecheck",
-    "lint": "biome check .",
+    "lint": "node ../../scripts/lint.mjs",
     "format": "biome format --write .",
     "test": "vitest run",
     "e2e:proof": "playwright test --grep @proof",
-    "check": "biome check . && pnpm typecheck:all && vitest run",
+    "check": "node ../../scripts/lint.mjs && pnpm typecheck:all && vitest run",
     "check:full": "pnpm check && pnpm build && pnpm index:check"
   },
   "dependencies": {

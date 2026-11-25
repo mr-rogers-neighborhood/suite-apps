@@ -1,6 +1,6 @@
 ---
 name: suite-gate
-description: Run and interpret the Suite gate. Use when verifying a change, choosing a gate row, running typecheck/tests, or when asked about --only, --fresh, --no-e2e, gate-status.json, or what a green check proves.
+description: Run and interpret the Suite gate. Use when verifying a change, choosing a gate row, running typecheck/tests, or when asked about --only, --prelude, --fresh, --no-e2e, gate-status.json, or what a green check proves.
 argument-hint: "[row|all] [--fresh] [--no-e2e]"
 ---
 
@@ -32,6 +32,7 @@ implying they passed.
 ```sh
 mise exec -- node scripts/gate.mjs                    # working tree, all rows
 mise exec -- node scripts/gate.mjs --only canvas      # one row; not a suite proof
+mise exec -- node scripts/gate.mjs --prelude          # shared libraries + script tests, no row
 mise exec -- node scripts/gate.mjs --fresh            # HEAD in a clean export
 mise exec -- node scripts/gate.mjs --no-e2e           # skip a row marked with e2e
 mise exec -- node scripts/affected.mjs --base origin/main
@@ -42,10 +43,12 @@ mise exec -- node scripts/affected.mjs --base origin/main
   dirty tree.
 - `--only` records `only` in `.dev/gate-status.json`; release refuses to publish on it. A
   one-row loop is not evidence the suite passes.
+- `--prelude` records `prelude: true` and runs no app row. A trunk push uses it; release refuses
+  it because it proves no row.
 - `--no-e2e` only matters for a row that marks an e2e suite. No row marks one today (Start's
   suite left with Start, #314), so it currently changes nothing.
-- `.dev/gate-status.json` records `ok`, `fresh`, `commit`, `e2e`, `e2eRequested`, `only`,
-  `results`. `e2e` is what ran, not what was requested.
+- `.dev/gate-status.json` records `ok`, `fresh`, `commit`, `e2e`, `e2eRequested`, `prelude`,
+  `only`, `results`. `e2e` is what ran, not what was requested.
 
 For a large fan-out, cap it:
 

@@ -38,9 +38,9 @@
     "build": "tsc -p tsconfig.build.json && node scripts/copy-fixtures.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "biome check .",
+    "lint": "node ../../scripts/lint.mjs",
     "format": "biome format --write .",
-    "check": "biome check . && tsc --noEmit -p tsconfig.json"
+    "check": "node ../../scripts/lint.mjs && tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@suite/contracts": "workspace:*",

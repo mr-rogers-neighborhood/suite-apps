@@ -17,10 +17,10 @@
     "build:all": "pnpm --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme --filter @suite/desk --workspace-concurrency=1 run build",
     "typecheck:all": "pnpm --filter @suite/desk --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme run typecheck",
     "check:packages": "pnpm --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host run check && pnpm --filter @suite/pack --filter @suite/pack-host test",
-    "check": "pnpm build:all && pnpm check:packages && biome check . && pnpm typecheck:all && vitest run",
+    "check": "pnpm build:all && pnpm check:packages && node ../../scripts/lint.mjs && pnpm typecheck:all && vitest run",
     "check:full": "pnpm check",
     "format": "biome format --write .",
-    "lint": "biome check .",
+    "lint": "node ../../scripts/lint.mjs",
     "test": "vitest run",
     "e2e:proof": "playwright test --grep @proof",
     "verify": "pnpm check"

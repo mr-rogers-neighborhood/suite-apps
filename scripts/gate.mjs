@@ -23,6 +23,7 @@
  *   node scripts/gate.mjs
  *   node scripts/gate.mjs --fresh
  *   node scripts/gate.mjs --only canvas
+ *   node scripts/gate.mjs --prelude
  *   node scripts/gate.mjs --no-e2e
  *   node scripts/gate.mjs --e2e
  *   node scripts/gate.mjs --dry
@@ -43,11 +44,25 @@ const fresh = argv.includes("--fresh");
 const dry = argv.includes("--dry");
 const json = argv.includes("--json");
 const e2e = !argv.includes("--no-e2e") && !dry;
+// The prelude is the part of the gate that proves the tree is a Suite at all:
+// the shared libraries build, their consumers' script tests, and Budget's pack
+// bridge. `--prelude` runs exactly those and no app row, so a trunk push can
+// confirm the commit without re-proving what the merge queue already proved.
+const preludeOnly = argv.includes("--prelude");
 const onlyIndex = argv.indexOf("--only");
 const only = onlyIndex < 0 ? null : argv[onlyIndex + 1];
 
-const selected = only === null ? PIPELINE : PIPELINE.filter((entry) => entry.repo === only);
-if (selected.length === 0) {
+if (preludeOnly && only !== null) {
+  process.stderr.write("choose --prelude or --only, not both\n");
+  process.exit(2);
+}
+
+const selected = preludeOnly
+  ? []
+  : only === null
+    ? PIPELINE
+    : PIPELINE.filter((entry) => entry.repo === only);
+if (!preludeOnly && selected.length === 0) {
   process.stderr.write(`no repository named ${only}\n`);
   process.exit(2);
 }
@@ -303,6 +318,10 @@ const status = {
   // desktop run must not read as proof of the e2e step.
   e2e: e2eRan,
   e2eRequested: e2e,
+  // A prelude run proves the shared libraries and script tests, not an app row.
+  // The trunk uses it to confirm the SHA resolves; a publish must not read it as
+  // a suite proof (`release.mjs` refuses it).
+  prelude: preludeOnly,
   // A partial run proves one repository, not the suite. `release.mjs` refuses
   // to publish on it; the field is null for a full run.
   only,
