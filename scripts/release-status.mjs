@@ -33,6 +33,16 @@
  *    never edited: it is skipped with a message and the page is rewritten from
  *    the current state. A release with no draft is refused.
  *
+ * A draft keeps the target it was first created with, so every draft edit names
+ * `--target HEAD` again. Publication reads GitHub's `targetCommitish` and
+ * refuses when it differs from HEAD or no longer resolves. Publishing a stale
+ * target would lock a tag to a tree it does not describe, and an immutable tag
+ * name can never be reused (D6.3).
+ *
+ * A published page can be re-rendered without touching GitHub:
+ * `--body --channel <channel> --tag <tag>` prints the body from the current tree
+ * and the release list, ready for `gh release edit <tag> --notes-file -`.
+ *
  * A missing aggregate tag is created at HEAD, the snapshot the page describes;
  * an existing tag is never moved.
  *
@@ -493,6 +503,9 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --draft              create or update the rolling release as a draft
   --publish            publish the existing draft, then write ${RELEASES_FILE}
   --write              write ${RELEASES_FILE} and stop short of GitHub
+  --body --tag <tag>   print the body for an existing release from this tree and the
+                       release list, for \`gh release edit <tag> --notes-file -\`; needs
+                       --channel when the tag is not stable
   --date <YYYY-MM-DD>  tag date; a pre-release defaults to today in UTC, stable to
                        the newest app release (which is also stable's snapshot date)
   --channel <name>     stable (default), slop, nightly or preview; names the APK asset
@@ -507,11 +520,14 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --keep <n>           releases a pruned channel keeps (default: 14, or 7 for slop)
   --help               print this text
 
-Pass one of --draft, --publish, --write and --dry-run, or --check-published or
---check-readme. The two checks read and write nothing.
+Pass one of --draft, --publish, --write, --body and --dry-run, or
+--check-published or --check-readme. --body, the two checks and --dry-run write
+nothing to GitHub.
 
 A release is created as a draft, its assets are attached while it is a draft, and
---publish flips it. A published release is immutable and is never edited.
+--publish flips it. A published release's tag and assets are immutable; its title
+and notes stay editable, which is what --body and \`gh release edit <tag> --notes-file -\`
+are for.
 
 The versions come from each app's package.json; the dates from its changelog.
 Only the rolling release and the pre-release channel pages exist; per-app tags
@@ -611,6 +627,20 @@ export function channelTagPattern(channel) {
 /** True when a tag belongs to this channel and carries its expected shape. */
 export function isChannelTag(tag, channel) {
   return typeof tag === "string" && channelTagPattern(channel).test(tag);
+}
+
+/** The calendar day inside a channel tag, or null when the shape is wrong. */
+export function tagDateFromTag(tag, channel = "stable") {
+  if (!isChannelTag(tag, channel)) return null;
+  const match = /-(\d{4})\.(\d{2})\.(\d{2})/u.exec(tag);
+  return match === null ? null : `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+/** The commit a slop tag carries, or null on every other channel. */
+export function revisionFromTag(tag, channel = "stable") {
+  if (channel !== "slop") return null;
+  const match = /-([0-9a-f]{7})$/u.exec(tag);
+  return match?.[1] ?? null;
 }
 
 /**
@@ -1067,6 +1097,70 @@ export function draftAction({
 }
 
 /**
+ * Why a draft whose target is not HEAD must not be published, or null.
+ *
+ * GitHub stores the draft's target as `targetCommitish`, not as a local tag:
+ * `gh release create --target <sha>` leaves no `refs/tags/<tag>` on origin. A
+ * draft created in an earlier CI run therefore carries the old commit even when
+ * this checkout has no tag to inspect. Publication locks the tag (D6.3), so a
+ * mismatch would burn the tag name on bytes from another tree.
+ *
+ * `draftTarget` is the literal `targetCommitish` for the message, and
+ * `draftCommit` is its resolved commit (null when the name no longer exists).
+ * A draft at HEAD is fine; a draft behind HEAD or naming a vanished ref refuses.
+ */
+export function draftTargetProblem({
+  tag,
+  isDraft = false,
+  draftTarget = null,
+  draftCommit = null,
+  head = null,
+}) {
+  if (isDraft !== true) return null;
+  if (draftTarget === null && draftCommit === null) return null;
+  if (draftCommit !== null && draftCommit === head) return null;
+  const where =
+    draftCommit === null
+      ? `target ${JSON.stringify(draftTarget)} no longer resolves to a commit`
+      : `target ${draftCommit.slice(0, 12)} is not HEAD ${String(head).slice(0, 12)}`;
+  return (
+    `${tag} is a draft whose ${where}. A release tag cannot move once it is published, so ` +
+    "publishing this draft would ship artifacts from a different tree and burn the tag name. " +
+    `Delete the stale draft and its tag with \`gh release delete ${tag} --yes --cleanup-tag\`, ` +
+    "then run --draft again from this tree, or publish under another --date."
+  );
+}
+
+/**
+ * The publish-phase check over the state `gh release view` returned.
+ *
+ * `resolve` turns GitHub's `targetCommitish` (a branch, a tag or a SHA) into a
+ * commit. A vanished tag resolves to null and refuses rather than passing as an
+ * unknown. The resolver is injectable so this wiring is testable without a
+ * repository or a release.
+ */
+export function draftTargetStateProblem({
+  tag,
+  state,
+  head,
+  resolve = resolveTargetCommit,
+}) {
+  if (state?.isDraft !== true) return null;
+  const target =
+    typeof state.targetCommitish === "string" && state.targetCommitish.length > 0
+      ? state.targetCommitish
+      : null;
+  if (target === null) return null;
+  return draftTargetProblem({
+    tag,
+    isDraft: true,
+    draftTarget: target,
+    draftCommit: resolve(target),
+    head,
+  });
+}
+
+/**
  * What the publish phase may do with one release, or why it must not.
  *
  * `--publish` only flips drafts. A missing release is a refusal, because the
@@ -1269,6 +1363,35 @@ export function readManifest(path = MANIFEST_PATH, { load = read } = {}) {
       `${path} is not valid JSON; refusing to build a note from digests it cannot read`,
     );
   }
+}
+
+/**
+ * The manifest attached to a release, or null when it carries none.
+ *
+ * A rerender happens on a workstation, where the workflow's
+ * `.dev/release/release-manifest.json` is usually gone. The digest section is
+ * part of the page (D6.2), so `--body` reads the attached copy rather than
+ * silently dropping it. The download is injected so the JSON handling is
+ * testable without a release.
+ */
+export function readPublishedManifest(tag, { download = downloadReleaseManifest } = {}) {
+  const text = download(tag);
+  if (text === null) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function downloadReleaseManifest(tag) {
+  const result = spawnSync(
+    "gh",
+    ["release", "download", tag, "--pattern", MANIFEST_FILE, "--output", "-"],
+    { cwd: ROOT, encoding: "utf8", env: process.env },
+  );
+  if (result.error || result.status !== 0) return null;
+  return result.stdout;
 }
 
 /**
@@ -1622,6 +1745,50 @@ export function aggregateReleaseBody(
 }
 
 /**
+ * A published page re-rendered from the current tree and the release list.
+ *
+ * `--body` exists because release notes stay editable on an immutable release
+ * while its tag and assets do not (D6.3). The tag supplies the page's channel
+ * and publication day; the tree supplies the versions and snapshot date; the
+ * release list supplies the newest page of every channel. Nothing is written:
+ * the caller pipes the text to `gh release edit --notes-file -`.
+ */
+export function rerenderBody(
+  entries,
+  {
+    tag,
+    channel = "stable",
+    releases = [],
+    apkLive = false,
+    draft = false,
+    manifest = null,
+    index = null,
+  },
+) {
+  const tagDate = tagDateFromTag(tag, channel);
+  if (tagDate === null) {
+    throw new Error(
+      `--tag ${JSON.stringify(tag)} is not a ${channel} tag; expected ` +
+        (channel === "stable" ? "suite-YYYY.MM.DD" : `suite-${channel}-YYYY.MM.DD`),
+    );
+  }
+  const revision = revisionFromTag(tag, channel);
+  const { snapshotDate } = releaseDates(entries, { channel, date: tagDate });
+  return aggregateReleaseBody(entries, {
+    date: snapshotDate,
+    tagDate,
+    tag,
+    apkLive,
+    draft,
+    channel,
+    revision,
+    pages: newestPages(releases),
+    manifest,
+    index,
+  });
+}
+
+/**
  * `RELEASES.md`: the same data, as the human mirror of the Latest release.
  *
  * The generated comment is deliberate. A version belongs in `package.json`; this
@@ -1721,7 +1888,9 @@ export function parseArgs(argv) {
     publish: false,
     dryRun: false,
     write: false,
+    body: false,
     date: null,
+    tag: null,
     channel: "stable",
     revision: null,
     manifest: null,
@@ -1747,8 +1916,12 @@ export function parseArgs(argv) {
     else if (arg === "--publish") options.publish = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--write") options.write = true;
+    else if (arg === "--body") options.body = true;
     else if (arg === "--date") {
       options.date = takeValue(index, "--date");
+      index += 1;
+    } else if (arg === "--tag") {
+      options.tag = takeValue(index, "--tag");
       index += 1;
     } else if (arg === "--channel") {
       options.channel = takeValue(index, "--channel");
@@ -1790,6 +1963,7 @@ export function parseArgs(argv) {
     options.draft ? "--draft" : null,
     options.publish ? "--publish" : null,
     options.write ? "--write" : null,
+    options.body ? "--body" : null,
     options.dryRun ? "--dry-run" : null,
     options.prune ? "--prune" : null,
     options.checkPublished ? "--check-published" : null,
@@ -1797,6 +1971,12 @@ export function parseArgs(argv) {
   ].filter((mode) => mode !== null);
   if (modes.length > 1) {
     throw new Error(`${modes.join(" and ")} pick different modes; pass at most one`);
+  }
+  if (options.body && options.tag === null) {
+    throw new Error("--body needs --tag <tag>: the page to re-render is an existing release");
+  }
+  if (!options.body && options.tag !== null) {
+    throw new Error("--tag names the page --body re-renders; pass it with --body");
   }
 
   return options;
@@ -1858,6 +2038,23 @@ function read(path) {
   return readFileSync(resolve(ROOT, path), "utf8");
 }
 
+/**
+ * The commit a GitHub `targetCommitish` names, or null when it does not exist.
+ *
+ * `targetCommitish` is usually a SHA, but a deleted tag or a moved branch name
+ * is also possible. Resolving it here keeps the comparison in one place and
+ * turns a vanished name into a refusal instead of an unknown that passes.
+ */
+export function resolveTargetCommit(target) {
+  if (typeof target !== "string" || target.length === 0) return null;
+  // A full SHA needs no object to compare with HEAD; a shallow CI checkout may
+  // not have the draft's tree, and treating that as a vanished target would
+  // refuse the very run the check exists to protect.
+  if (/^[0-9a-f]{40}$/iu.test(target)) return target.toLowerCase();
+  const result = git(["rev-parse", "-q", "--verify", `${target}^{commit}`]);
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
 function localTagCommit(tag) {
   const result = git(["rev-parse", "-q", "--verify", `refs/tags/${tag}`]);
   return result.status === 0 ? result.stdout.trim() : null;
@@ -1887,6 +2084,32 @@ function existingReleases() {
   if (result.error || result.status !== 0) return null;
   try {
     return JSON.parse(result.stdout);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The draft state GitHub holds for a tag, or null when it cannot be read.
+ *
+ * `targetCommitish` is the only place a CI-created draft's target exists: the
+ * tag ref is not created until publication. The publish phase reads it here so
+ * it compares GitHub's target, not a local tag that may never have existed.
+ */
+function draftReleaseState(tag) {
+  const result = spawnSync(
+    "gh",
+    ["release", "view", tag, "--json", "targetCommitish,isDraft"],
+    { cwd: ROOT, encoding: "utf8", env: process.env },
+  );
+  if (result.error || result.status !== 0) return null;
+  try {
+    const parsed = JSON.parse(result.stdout);
+    return {
+      isDraft: parsed.isDraft === true,
+      targetCommitish:
+        typeof parsed.targetCommitish === "string" ? parsed.targetCommitish : null,
+    };
   } catch {
     return null;
   }
@@ -2026,7 +2249,21 @@ export function draftReleaseArgs({
 }) {
   const pre = prerelease ? ["--prerelease"] : [];
   if (action === "edit") {
-    return ["release", "edit", tag, "--title", title, "--notes-file", notesPath, ...pre];
+    // `--target` is deliberate on every edit: a draft keeps the target it was
+    // first created with, so a rerun must name this tree even when only the
+    // title and body changed.
+    return [
+      "release",
+      "edit",
+      tag,
+      "--title",
+      title,
+      "--notes-file",
+      notesPath,
+      "--target",
+      target,
+      ...pre,
+    ];
   }
   return [
     "release",
@@ -2094,6 +2331,7 @@ export function aggregateReleaseCommands({
   channel = "stable",
   revision = null,
   prerelease = false,
+  target = null,
 }) {
   const notesPath = join(NOTES_DIR, `${tag}.md`);
   if (mode === "publish") {
@@ -2126,7 +2364,7 @@ export function aggregateReleaseCommands({
         title: releaseTitle(date, channel, revision),
         notesPath,
         action: aggregate.action,
-        target: aggregate.plan.commit,
+        target: target ?? aggregate.plan.commit,
         prerelease,
       }),
     },
@@ -2134,7 +2372,17 @@ export function aggregateReleaseCommands({
 }
 
 /** Create or update the rolling release as a draft; never write the page. */
-function mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel, revision }) {
+function mainDraft({
+  aggregate,
+  date,
+  tag,
+  releases,
+  notes,
+  prerelease,
+  channel,
+  revision,
+  target,
+}) {
   if (releases === null) {
     throw new Error(
       "gh release list failed; refusing to draft into a repository it cannot read",
@@ -2152,6 +2400,7 @@ function mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel,
     channel,
     revision,
     prerelease,
+    target,
   })) {
     run(step.command, step.args);
   }
@@ -2339,6 +2588,66 @@ async function main(argv) {
   const revision = options.revision;
   const prerelease = channel !== "stable";
 
+  if (options.body) {
+    if (options.date !== null) {
+      throw new Error("--body reads the date from --tag; --date does not apply");
+    }
+    if (options.revision !== null) {
+      throw new Error("--body reads the commit from a slop tag; --revision does not apply");
+    }
+    if (!isChannelTag(options.tag, channel)) {
+      throw new Error(
+        `--tag ${JSON.stringify(options.tag)} is not a ${channel} tag; ` +
+          "pass the channel the page was published on with --channel",
+      );
+    }
+    const releases = existingReleases();
+    if (releases === null) {
+      throw new Error(
+        "gh release list failed; --body needs the release list to name the newest page of " +
+          "every channel",
+      );
+    }
+    const row = releaseFor(releases, options.tag);
+    if (row === null) {
+      throw new Error(
+        `no release named ${options.tag}; --body re-renders an existing page, it does not invent one`,
+      );
+    }
+    const { problems, entries } = collectReleases();
+    if (problems.length > 0) throw new Error(problems.join("\n\n"));
+
+    let manifest = readManifest(options.manifest ?? MANIFEST_PATH);
+    if (manifest === null && options.manifest !== null) {
+      throw new Error(
+        `--manifest ${options.manifest} names no readable file; refusing to drop the Artifacts section`,
+      );
+    }
+    // A page's digest section lives in the manifest attached to the release;
+    // read that copy when the workflow's local one is gone.
+    manifest ??= readPublishedManifest(options.tag);
+    const index = channel === "slop" ? null : readIndexRelease();
+    const goEntry = entries.find((entry) => entry.app.kind === "apk") ?? null;
+    const tagRevision = revisionFromTag(options.tag, channel);
+    const goAsset =
+      goEntry === null ? null : goApkName(goEntry.version, channel, tagRevision);
+    const assets = releaseAssets(options.tag);
+    const apkLive =
+      goAsset !== null && assets !== null && assets.some((asset) => asset?.name === goAsset);
+
+    const body = rerenderBody(entries, {
+      tag: options.tag,
+      channel,
+      releases,
+      apkLive,
+      draft: row.isDraft === true,
+      manifest,
+      index,
+    });
+    process.stdout.write(body.endsWith("\n") ? body : `${body}\n`);
+    return;
+  }
+
   const mode = options.draft
     ? "draft"
     : options.publish
@@ -2441,6 +2750,23 @@ async function main(argv) {
   const aggregateIsDraft = aggregateRow?.isDraft === true;
   const aggregatePublished = aggregateExists && aggregateRow.isDraft === false;
 
+  // A draft's real target lives in GitHub's targetCommitish, not in a local
+  // tag: CI creates the draft without creating the ref. --draft re-targets its
+  // own draft to HEAD; --publish and the dry run compare GitHub's value with
+  // HEAD and refuse a mismatch before the immutable tag is locked.
+  if (aggregateIsDraft && (mode === "publish" || mode === "dry-run")) {
+    const state = draftReleaseState(tag);
+    if (state === null) {
+      fatalProblems.push(
+        `${tag} is a draft, but gh release view could not read its targetCommitish; ` +
+          "refusing to publish a target this run cannot verify.",
+      );
+    } else {
+      const targetMiss = draftTargetStateProblem({ tag, state, head });
+      if (targetMiss !== null) fatalProblems.push(targetMiss);
+    }
+  }
+
   if (releases === null && mode === "publish") {
     aggregate.action = "refuse";
     aggregate.actionProblem =
@@ -2534,6 +2860,10 @@ async function main(argv) {
     throw new Error(fatalProblems.join("\n\n"));
   }
 
+  // An edit re-targets the draft to this tree; a create is already planned at
+  // the changelog commit, which is HEAD when the tag does not exist.
+  const draftCommandTarget = aggregate.action === "edit" ? head : aggregate.plan.commit;
+
   if (mode === "publish") {
     if (fatalProblems.length > 0) {
       // A version that was never drafted is a refusal, not a skip: publishing
@@ -2558,7 +2888,17 @@ async function main(argv) {
   if (mode === "draft") {
     if (fatalProblems.length > 0) throw new Error(fatalProblems.join("\n\n"));
     // The title names the publication day; the body names the snapshot.
-    mainDraft({ aggregate, date: tagDate, tag, releases, notes, prerelease, channel, revision });
+    mainDraft({
+      aggregate,
+      date: tagDate,
+      tag,
+      releases,
+      notes,
+      prerelease,
+      channel,
+      revision,
+      target: draftCommandTarget,
+    });
     return;
   }
 
@@ -2578,6 +2918,7 @@ async function main(argv) {
     channel,
     revision,
     prerelease,
+    target: draftCommandTarget,
   })) {
     process.stdout.write(`\n  $ ${commandText(step.command, step.args)}\n`);
   }

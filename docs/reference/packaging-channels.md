@@ -52,6 +52,15 @@ The block restates no version and names no live pre-release tag, so the check ne
 release list; [the site check](https://github.com/mrrnbhd/suite-apps/issues/414) owns comparing the
 release pages and their newest links at build time.
 
+A page that is already published is re-rendered from the tree and the release list without a build:
+
+```sh
+node scripts/release-status.mjs --body --channel preview --tag suite-preview-2026.11.25 \
+  | gh release edit suite-preview-2026.11.25 --notes-file -
+```
+
+The tag and assets are immutable after publication, but the title and notes stay editable (D6.3).
+
 The logo on both is `docs/assets/suite-icon.png`, the canonical brand asset. The tree had no separate
 brand mark when the release UX was built, so it is the icon Suite Desk ships
 (`hosts/desk/build/icons/512x512.png`), copied once and referenced from the README and every release
