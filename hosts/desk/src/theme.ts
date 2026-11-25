@@ -3,11 +3,13 @@ import { join } from "node:path";
 import type { ThemeMode } from "@suite/theme";
 import {
   cssVariables,
+  DEFAULT_DENSITY,
   DEFAULT_THEME_ID,
   defaultTheme,
   PRESETS,
   presetById,
   type SuiteTheme,
+  scaleVariables,
 } from "@suite/theme";
 import type { ThemeView } from "./shared.js";
 
@@ -122,15 +124,22 @@ export function resolveThemeView(choice: HostThemeChoice, shouldUseDarkColors: b
 /**
  * The stylesheet a pack view receives.
  *
- * Only the resolved tokens and `color-scheme`: the host does not import a pack's stylesheet or
- * guess at its class names. The chrome and every pack read the same variables, so a theme
- * change moves all of them together.
+ * One sheet carries both axes of the theme: the resolved colour roles and the scale (type,
+ * density, radius, elevation and motion). A pack imports neither package at runtime, so the
+ * sheet is its only source for either. The host does not read a pack's stylesheet or guess at
+ * its class names; the chrome and every pack read the same variables, so a theme change moves
+ * all of them together.
+ *
+ * The sheet is complete on the first injection. A pack reload resolves the same choice again
+ * and receives the same values, so there is no first paint that has the colours but not the
+ * scale.
  */
 export function themeCss(theme: ThemeView): string {
-  const variables = Object.entries(theme.values)
+  const variables = { ...theme.values, ...scaleVariables(DEFAULT_DENSITY) };
+  const declarations = Object.entries(variables)
     .map(([name, value]) => `${name}: ${value};`)
     .join(" ");
-  return `:root { color-scheme: ${theme.mode}; ${variables} }`;
+  return `:root { color-scheme: ${theme.mode}; ${declarations} }`;
 }
 
 /**
