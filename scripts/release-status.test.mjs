@@ -835,51 +835,79 @@ describe("release bodies", () => {
     assert.doesNotMatch(page, /releases\/tag\/suite-2026\.11\.22/u);
   });
 
-  it("opens with the logo, the callout, the own-channel table and then the others", () => {
+  it("opens every channel with the logo, links, callout, own row and the others in order", () => {
     const pages = {
       slop: "suite-slop-2026.11.24-abc1234",
       nightly: "suite-nightly-2026.11.24",
       preview: "suite-preview-2026.11.24",
       stable: "suite-2026-11-24",
     };
-    const stable = aggregateReleaseBody(entries, {
-      date: "2026-11-24",
-      tag: "suite-2026.11.24",
-      pages,
-      apkLive: true,
-    });
-    assert.ok(stable.startsWith("[<img"));
-    assert.ok(stable.includes(LOGO_URL));
-    assert.ok(stable.includes("[Site](https://suite.run)"));
-    assert.ok(stable.includes("[Documentation](https://github.com/mrrnbhd/suite-apps/blob/main/docs/README.md)"));
-    assert.match(stable, /Stable release/u);
-    assert.match(stable, /## Latest Release/u);
-    assert.match(stable, /## Other channels/u);
-    const stableOwn = stable.slice(stable.indexOf("## Latest Release"), stable.indexOf("## Other channels"));
-    assert.equal((stableOwn.match(/^\| `stable`/gmu) ?? []).length, 1);
-    assert.doesNotMatch(stableOwn, /^\| `preview`/mu);
-    const stableOthers = stable.slice(stable.indexOf("## Other channels"));
-    assert.deepEqual(
-      [...stableOthers.matchAll(/^\| `(\w+)`/gmu)].map((match) => match[1]),
-      ["preview", "nightly", "slop"],
-    );
+    const bodies = {
+      stable: aggregateReleaseBody(entries, {
+        date: "2026-11-24",
+        tag: "suite-2026.11.24",
+        pages,
+        apkLive: true,
+      }),
+      preview: aggregateReleaseBody(entries, {
+        date: "2026-11-24",
+        tag: "suite-preview-2026.11.24",
+        channel: "preview",
+        pages,
+        apkLive: true,
+      }),
+      slop: aggregateReleaseBody(entries, {
+        date: "2026-11-24",
+        tag: "suite-slop-2026.11.24-abc1234",
+        channel: "slop",
+        revision: "abc1234",
+        pages,
+        apkLive: true,
+      }),
+    };
 
-    const preview = aggregateReleaseBody(entries, {
-      date: "2026-11-24",
-      tag: "suite-preview-2026.11.24",
-      channel: "preview",
-      pages,
-      apkLive: true,
-    });
-    assert.match(preview, /## Pre-Release \(Preview\)/u);
-    assert.match(preview, /not the stable release/u);
-    assert.match(preview, /Any number of channels can be installed side by side/u);
-    const previewOthers = preview.slice(preview.indexOf("## Other channels"));
-    assert.deepEqual(
-      [...previewOthers.matchAll(/^\| `(\w+)`/gmu)].map((match) => match[1]),
-      ["slop", "nightly", "stable"],
-    );
+    for (const [channel, body] of Object.entries(bodies)) {
+      const heading = ownChannelHeading(channel);
+      assert.ok(body.startsWith("[<img"), `${channel} opens with the logo`);
+      assert.ok(body.includes(LOGO_URL), `${channel} carries the canonical logo`);
+      assert.ok(body.includes("[Site](https://suite.run)"), `${channel} links the site`);
+      assert.ok(
+        body.includes(
+          "[Documentation](https://github.com/mrrnbhd/suite-apps/blob/main/docs/README.md)",
+        ),
+        `${channel} links the docs`,
+      );
+
+      const own = body.slice(body.indexOf(heading), body.indexOf("## Other channels"));
+      assert.ok(own.startsWith(`${heading}\n`), `${channel} names its own heading`);
+      assert.equal((own.match(/^\| `\w+`/gmu) ?? []).length, 1, `${channel} names one own row`);
+      assert.match(own, new RegExp(`^\\| \`${channel}\``, "mu"));
+      for (const other of otherChannels(channel)) {
+        assert.doesNotMatch(own, new RegExp(`^\\| \`${other}\``, "mu"));
+      }
+
+      const others = body.slice(body.indexOf("## Other channels"));
+      assert.deepEqual(
+        [...others.matchAll(/^\| `(\w+)`/gmu)].map((match) => match[1]),
+        otherChannels(channel),
+        `${channel} lists the other channels in order`,
+      );
+
+      if (channel === "stable") {
+        assert.match(body, /Stable release/u);
+        assert.match(body, /Pre-release channels install beside it/u);
+      } else {
+        assert.match(body, /not the stable release/u);
+        assert.match(body, /Any number of channels can be installed side by side/u);
+      }
+
+      // A pack is installed from the Desk catalogue; a page never invents a
+      // per-app install line or table row for one.
+      assert.doesNotMatch(body, /run\.suite\.(?:canvas|planner|budget|help)/iu);
+      assert.doesNotMatch(body, /^\| \[Suite (?:Canvas|Planner|Budget|Help)\]/mu);
+    }
   });
+
 
   it("writes RELEASES.md as the mirror of the rolling release once published", () => {
     const page = releasesPage(entries, {
