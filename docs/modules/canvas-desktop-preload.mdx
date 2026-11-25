@@ -1,5 +1,5 @@
 ---
-module: apps/canvas/desktop/src/preload
+module: legacy/canvas/desktop/src/preload
 title: Canvas Desktop / Preload
 summary: "The one allowlist between a sandboxed page and Canvas main: named channels, no path the page can steer."
 ---
@@ -17,7 +17,7 @@ and the file rules live in `src/main`; the channel constants live in
 no ESM and only a small set of built-ins, so it cannot import the shared
 constants and must spell the names out.
 
-## file: apps/canvas/desktop/src/preload/index.cjs
+## file: legacy/canvas/desktop/src/preload/index.cjs
 
 This file is the entire bridge. It publishes document doors, the sync doors and
 the host values, and it exposes no filesystem primitive: there is no `saveAs`, no
@@ -25,7 +25,7 @@ the host values, and it exposes no filesystem primitive: there is no `saveAs`, n
 snapshot; main chooses where it goes and validates what it is given.
 A page compromised by a document still cannot write outside the file main opened.
 
-## apps/canvas/desktop/src/preload/index.cjs#CHANNELS
+## legacy/canvas/desktop/src/preload/index.cjs#CHANNELS
 
 One map from method name to channel string, so adding a capability means adding
 one line in one place. Because the file cannot import `shared/ipc.ts`,

@@ -22,12 +22,18 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const docs = join(root, "docs");
 const SECTIONS = ["tutorials", "how-to", "reference", "explanation"];
-const APPS = ["canvas", "planner", "budget", "sync", "go"];
+const APPS = [
+  "legacy/canvas",
+  "legacy/planner",
+  "legacy/budget",
+  "services/relay",
+  "hosts/go",
+];
 const ROOT_PAGES = [
   "README.md",
   "AGENTS.md",
   "RELEASES.md",
-  ...APPS.map((app) => `apps/${app}/README.md`),
+  ...APPS.map((app) => `${app}/README.md`),
 ];
 const BANNED = [
   {
@@ -64,7 +70,7 @@ const REPLACED_REPO =
   /https?:\/\/github\.com\/mr-rogers-neighborhood\/suite-(?:start|canvas|planner|budget|go)(?=[/\s)>"']|$)/gi;
 /** Inline code is checked only when it looks like a path from a known repository root. */
 const REPO_PATH = /^(?:[\w.@+-]+\/)+[\w.@+.-]+\.[A-Za-z0-9]{1,8}$/;
-const REPO_PATH_ROOTS = /^(apps|docs|packages|scripts|packaging|legacy)\//;
+const REPO_PATH_ROOTS = /^(docs|packages|scripts|packaging|hosts|legacy|packs|services)\//;
 
 const problems = [];
 
@@ -85,7 +91,7 @@ function walk(dir) {
 
 /** The app a page belongs to, for paths written relative to that app's root. */
 function appRoot(path) {
-  const match = /^(?:.*\/)?(apps\/[^/]+)\//.exec(rel(path));
+  const match = /^(?:.*\/)?((?:hosts|legacy|services)\/[^/]+)\//.exec(rel(path));
   return match ? join(root, match[1]) : null;
 }
 
@@ -135,7 +141,7 @@ function lineAt(text, index) {
 const pages = [
   ...ROOT_PAGES.map((name) => join(root, name)).filter((path) => existsSync(path)),
   ...walk(docs),
-  ...APPS.flatMap((app) => walk(join(root, "apps", app, "docs"))),
+  ...APPS.flatMap((app) => walk(join(root, app, "docs"))),
 ];
 
 for (const page of pages) {

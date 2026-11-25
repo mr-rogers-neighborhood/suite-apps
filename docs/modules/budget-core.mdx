@@ -1,5 +1,5 @@
 ---
-module: apps/budget/packages/core
+module: legacy/budget/packages/core
 title: Budget core
 summary: "The record shapes, integer money and the ledger projections an envelope budget reads."
 ---
@@ -20,7 +20,7 @@ assignments and targets; `buildLedger` and `monthState` turn them into the
 numbers a month shows, and the report series call the same projection. A stale
 total therefore cannot survive an edit, because no total is stored.
 
-## apps/budget/packages/core/src/money.ts#parseMoney
+## legacy/budget/packages/core/src/money.ts#parseMoney
 
 Money enters as text and leaves as a signed integer in minor units. The parser
 accepts currency symbols, grouping separators, both decimal conventions and
@@ -33,7 +33,7 @@ currency does not gain a fraction and a three-decimal one keeps it. Formatting i
 the display boundary and divides by the same scale. `parseFloat` and `toFixed`
 are banned outside this file, which is what keeps a sum of amounts exact.
 
-## apps/budget/packages/core/src/rules/evaluate.ts#applyRules
+## legacy/budget/packages/core/src/rules/evaluate.ts#applyRules
 
 A rule run is a pure function over a copy of the draft, not a write. Each
 condition reads one field; each action replaces one field; the result carries
@@ -45,7 +45,7 @@ Because the input is a draft, the same function serves an import preview, a
 manual re-run and a test. The caller decides whether to write the result, and
 the document validates the patch it finally receives.
 
-## apps/budget/packages/core/src/plan/monthState.ts#monthState
+## legacy/budget/packages/core/src/plan/monthState.ts#monthState
 
 An envelope's available balance is a running fold, and its carry rule is the
 decision in this function. Each month adds assignment and activity to the
@@ -60,7 +60,7 @@ Target status is computed from the available amount and, for a debt target, the
 linked account's balance. The result is plain data with no Loro handle, which is
 what lets the plan view and the report share one set of numbers.
 
-## apps/budget/packages/core/src/loro/schedules.ts#autoEnterSchedules
+## legacy/budget/packages/core/src/loro/schedules.ts#autoEnterSchedules
 
 A schedule is a template, so entering one is an ordinary transaction write.
 Auto-entry is the same path with a due test: for each schedule with `autoEnter`

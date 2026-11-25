@@ -5,8 +5,8 @@
  *   pnpm help:pack [--key <base64>] [--out <file.suitepack>] [--version <semver>]
  *   pnpm help:pack --check-repro
  *
- * `apps/help/pack/vite.config.ts` builds the app's renderer, the compiled handbook pages and the
- * generated `public/data` index into `apps/help/.dev/pack`, which is the pack's build output, not
+ * `packs/help/pack/vite.config.ts` builds the app's renderer, the compiled handbook pages and the
+ * generated `public/data` index into `legacy/help/.dev/pack`, which is the pack's build output, not
  * its source. This script runs the app's generators first, writes the generated manifest there and
  * hands the directory to `bundlePack`.
  *
@@ -29,8 +29,8 @@ import { writePackCard } from "./lib/packCard.mjs";
 import { bundlePack, platformsSummary, publicKeyOfSigningKey } from "./pack.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const PACK_DIR = join(ROOT, "apps", "help", "pack");
-const APP_DIR = join(ROOT, "apps", "help");
+const PACK_DIR = join(ROOT, "packs", "help", "pack");
+const APP_DIR = join(ROOT, "legacy", "help");
 const DIST = join(APP_DIR, ".dev", "pack");
 const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
 
@@ -183,7 +183,7 @@ export async function buildPayload(outDir, cacheDir) {
       "vite",
       "build",
       "--config",
-      "pack/vite.config.ts",
+      join(ROOT, "packs", "help", "pack", "vite.config.ts"),
       "--outDir",
       outDir,
       "--emptyOutDir",
@@ -225,7 +225,7 @@ function usage() {
 
   --key          Ed25519 private key, base64 PKCS#8 or a bare seed; default
                  $${KEYS.pack.env}, then the pack key in the Suite keys directory
-  --out          archive to write; default apps/help/.dev/help-<version>.suitepack
+  --out          archive to write; default legacy/help/.dev/help-<version>.suitepack
   --version      pack version to record; default the version in manifest.json
   --contract     override the manifest's contractVersion
   --min-host     minimum host version to record
@@ -233,7 +233,7 @@ function usage() {
                  payload path and SHA-256; needs no signing key
 
 Builds the explorer index, the handbook pages and the renderer into
-apps/help/.dev/pack, then signs the directory with the pinned pack key. A key
+legacy/help/.dev/pack, then signs the directory with the pinned pack key. A key
 whose public half is not ${KEYS.pack.pinName} is refused before anything is
 signed.
 `;
@@ -306,7 +306,7 @@ async function main(argv) {
       "--filter",
       "./packages/*",
       "--filter",
-      "./apps/*/packages/*",
+      "./legacy/*/packages/*",
       "--workspace-concurrency=2",
       "run",
       "build",
@@ -316,7 +316,7 @@ async function main(argv) {
   await generateContent();
   await run(
     "pnpm",
-    ["--dir", APP_DIR, "exec", "vite", "build", "--config", "pack/vite.config.ts"],
+    ["--dir", APP_DIR, "exec", "vite", "build", "--config", join(ROOT, "packs", "help", "pack", "vite.config.ts")],
     ROOT,
   );
 

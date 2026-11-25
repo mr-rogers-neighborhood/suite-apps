@@ -257,8 +257,8 @@ A release build is signed by the key at `~/.config/suite/keys/suite-go-release.j
 verifies the APK's certificate against the pinned fingerprint before it uploads anything. `pnpm
 android:key status` answers the same question by hand. The debug keystore is the dev loop only: it
 is a different signer, so it cannot update a release install.
-[Suite Go's README](../../apps/go/README.md#install-the-apk) owns the install path, and [Android
-notes](../../apps/go/docs/reference/android.md#release-signing-and-channels) own the channels, the
+[Suite Go's README](../../hosts/go/README.md#install-the-apk) owns the install path, and [Android
+notes](../../hosts/go/docs/reference/android.md#release-signing-and-channels) own the channels, the
 `versionCode` rule and the keystore.
 
 A pipeline that already built and attested the APK uploads those exact bytes with `--upload`:
@@ -271,7 +271,7 @@ mise exec -- node scripts/android-release.mjs --upload "$APK" --channel slop \
 
 The upload path never runs Gradle and never reads the keystore. It checks the APK's certificate
 against the pinned release certificate, reads the package id and version name from `aapt`, and
-stages the same bytes under the asset name, writing the checksum into `apps/go/.dev/release`. The
+stages the same bytes under the asset name, writing the checksum into `hosts/go/.dev/release`. The
 package id names the channel — `run.suite.nightly.go` is nightly — so `--channel` is optional and is
 checked against both the package id and the version name suffix when passed. Without `--publish` the
 command verifies the APK and prints the upload only, like the build path.
@@ -296,7 +296,7 @@ node scripts/flatpak.mjs --app sync                    # package, sign, install 
 Its manifest is `packaging/flatpak/run.suite.sync.yml` and it refuses `--channel`: a channel would be a
 second mailbox on the same data. The `sync-v<version>` tarball releases it used to ship are retired;
 [Leave a relay
-running](../../apps/sync/docs/how-to/relay.md#building-the-last-artifact) has the local build detail.
+running](../../services/relay/docs/how-to/relay.md#building-the-last-artifact) has the local build detail.
 The build is not published; the host seam that takes the relay over is
 [decided in Decisions](../reference/decisions.md#retiring-the-sync-tray-app-315).
 
@@ -351,11 +351,11 @@ into the artifact.
 
 | What | Where the version lives |
 | --- | --- |
-| Suite Desk | `apps/desk/package.json` |
-| Planner, Budget, Help | `apps/<app>/package.json` |
-| Canvas | `apps/canvas/desktop/package.json` |
-| The relay (`suite-sync`) | `apps/sync/package.json` |
-| Suite Go | `apps/go/app.config.json` |
+| Suite Desk | `hosts/desk/package.json` |
+| Planner, Budget, Help | `legacy/<app>/package.json` |
+| Canvas | `legacy/canvas/desktop/package.json` |
+| The relay (`suite-sync`) | `services/relay/package.json` |
+| Suite Go | `hosts/go/app.config.json` |
 | A shared package (`@suite/*`) | `packages/<name>/package.json`; consumed as `workspace:*` |
 | The Flatpak appdata | `packaging/flatpak/run.suite.<app>.metainfo.xml`; the newest `<release>` must match the owner, or `scripts/flatpak.mjs` refuses |
 

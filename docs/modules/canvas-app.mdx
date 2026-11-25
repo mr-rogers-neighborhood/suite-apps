@@ -1,5 +1,5 @@
 ---
-module: apps/canvas
+module: legacy/canvas
 title: Canvas
 summary: "The renderer entry point and app shell: resolve the host, then the document."
 ---
@@ -15,14 +15,14 @@ shell. Its seam is the host question: a browser tab names its workspace in the
 URL, while a desktop window asks the shell which file is open. Both answers
 become a session, and the store reads that session exactly once.
 
-## apps/canvas/src/main.tsx#boot
+## legacy/canvas/src/main.tsx#boot
 
 Boot order is the invariant. The store picks its room and persistence when it is
 imported, so the host and the session must be settled first; importing `App` or
 the store earlier would key the document to nothing. The dynamic imports are what
 make that ordering true rather than conventional.
 
-## apps/canvas/src/main.tsx#bootDesktop
+## legacy/canvas/src/main.tsx#bootDesktop
 
 The desktop answer comes from the shell, not the address bar: the workspace id
 lives inside the file. A window whose preload is older than the renderer is
@@ -30,7 +30,7 @@ refused by `bridgeMissing` before this point, because a missing method would
 otherwise become a control that silently does nothing. A share link in a
 desktop build gets the local-only notice instead of a fetch that can only fail.
 
-## apps/canvas/src/App.tsx#App
+## legacy/canvas/src/App.tsx#App
 
 One decision: a session with no workspace is the launcher, and a session with one
 is the canvas. On the desktop that id can only have come from the open file, so a

@@ -29,10 +29,10 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PROJECTS = [
   { name: "@suite/ui", dir: "packages/ui", dependencies: [] },
   { name: "@suite/contracts", dir: "packages/contracts", dependencies: [] },
-  { name: "@suite/canvas", dir: "apps/canvas", dependencies: ["@suite/ui", "@suite/contracts"] },
-  { name: "@suite/desk", dir: "apps/desk", dependencies: ["@suite/ui"] },
-  { name: "@suite/budget", dir: "apps/budget", dependencies: ["@suite/ui"] },
-  { name: "@suite/budget-pack", dir: "apps/budget/packages/pack", dependencies: [] },
+  { name: "@suite/canvas", dir: "legacy/canvas", dependencies: ["@suite/ui", "@suite/contracts"] },
+  { name: "@suite/desk", dir: "hosts/desk", dependencies: ["@suite/ui"] },
+  { name: "@suite/budget", dir: "legacy/budget", dependencies: ["@suite/ui"] },
+  { name: "@suite/budget-pack", dir: "legacy/budget/packages/pack", dependencies: [] },
 ];
 
 const ROWS = [
@@ -51,7 +51,7 @@ function repos(result) {
 
 describe("affected selection", () => {
   it("selects the app that owns the file and nobody else", () => {
-    const result = affected(["apps/canvas/src/board.tsx"]);
+    const result = affected(["legacy/canvas/src/board.tsx"]);
     assert.deepEqual(repos(result), ["canvas"]);
     assert.equal(result.docsOnly, false);
     assert.equal(result.global, false);
@@ -71,7 +71,7 @@ describe("affected selection", () => {
   });
 
   it("sends a docs-only change to no app row", () => {
-    const result = affected(["docs/reference/status.md", "apps/desk/docs/reference/foo.md"]);
+    const result = affected(["docs/reference/status.md", "hosts/desk/docs/reference/foo.md"]);
     assert.deepEqual(repos(result), []);
     assert.equal(result.docsOnly, true);
     assert.equal(result.spec, false);
@@ -98,21 +98,27 @@ describe("affected selection", () => {
   });
 
   it("runs nothing for a private package with no workspace dependent", () => {
-    const result = affected(["apps/budget/packages/pack/src/bridge.ts"]);
+    const result = affected(["legacy/budget/packages/pack/src/bridge.ts"]);
     assert.deepEqual(repos(result), []);
     assert.equal(result.global, false);
   });
 
   it("uses the longest matching project directory", () => {
-    assert.equal(projectFor("apps/budget/packages/pack/src/a.ts", PROJECTS).name, "@suite/budget-pack");
-    assert.equal(projectFor("apps/budget/src/a.ts", PROJECTS).name, "@suite/budget");
+    assert.equal(projectFor("legacy/budget/packages/pack/src/a.ts", PROJECTS).name, "@suite/budget-pack");
+    assert.equal(projectFor("legacy/budget/src/a.ts", PROJECTS).name, "@suite/budget");
+  });
+
+  it("maps pack source to the legacy shell that declares it", () => {
+    const result = affected(["packs/budget/pack/src/bridge.ts"]);
+    assert.deepEqual(repos(result), ["budget"]);
+    assert.equal(result.global, false);
   });
 
   it("classifies paths", () => {
     assert.equal(isDocPath("docs/modules/canvas.mdx"), true);
-    assert.equal(isDocPath("apps/help/docs/index.md"), true);
+    assert.equal(isDocPath("legacy/help/docs/index.md"), true);
     assert.equal(isDocPath("RELEASES.md"), true);
-    assert.equal(isDocPath("apps/help/src/index.ts"), false);
+    assert.equal(isDocPath("legacy/help/src/index.ts"), false);
     assert.equal(isSpecPath("docs/spec/fixtures.json"), true);
     assert.equal(isSpecPath("scripts/spec.test.mjs"), true);
     assert.equal(isSpecPath("docs/reference/status.md"), false);
@@ -122,14 +128,14 @@ describe("affected selection", () => {
 describe("workspace reading", () => {
   it("reads the real workspace patterns", () => {
     const patterns = workspacePatterns(ROOT);
-    assert.ok(patterns.includes("apps/*"), "apps/* is declared");
+    assert.ok(patterns.includes("hosts/*"), "hosts/* is declared");
     assert.ok(patterns.includes("packages/*"), "packages/* is declared");
   });
 
   it("expands a pattern to project directories", () => {
-    const dirs = expandPattern(ROOT, "apps/*");
-    assert.ok(dirs.includes("apps/desk"));
-    assert.ok(dirs.includes("apps/canvas"));
+    const dirs = expandPattern(ROOT, "hosts/*");
+    assert.ok(dirs.includes("hosts/desk"));
+    assert.ok(dirs.includes("hosts/go"));
   });
 
   it("keeps every gate row in the workspace graph", () => {
@@ -138,8 +144,8 @@ describe("workspace reading", () => {
     for (const row of PIPELINE) {
       assert.ok(names.has(row.package), `${row.package} is a workspace project`);
       assert.ok(
-        existsSync(join(ROOT, "apps", row.repo, "package.json")),
-        `apps/${row.repo} exists`,
+        existsSync(join(ROOT, row.dir, "package.json")),
+        `${row.dir} exists`,
       );
     }
   });
@@ -147,7 +153,7 @@ describe("workspace reading", () => {
   it("maps a real app file to its gate row", () => {
     const projects = readProjects(ROOT);
     const result = computeAffected({
-      paths: ["apps/desk/src/main.ts"],
+      paths: ["hosts/desk/src/main.ts"],
       projects,
       rows: PIPELINE,
     });
@@ -160,7 +166,7 @@ describe("workspace reading", () => {
 
   it("runs e2e only for a row that marks one", () => {
     const result = computeAffected({
-      paths: ["apps/desk/src/main.ts"],
+      paths: ["hosts/desk/src/main.ts"],
       projects: PROJECTS,
       rows: [{ repo: "desk", package: "@suite/desk", e2e: true }],
     });
@@ -186,7 +192,7 @@ describe("workspace reading", () => {
   it("selects only the affected desktop app for proofRows", () => {
     const projects = readProjects(ROOT);
     const budgetOnly = computeAffected({
-      paths: ["apps/budget/src/main/index.ts"],
+      paths: ["legacy/budget/src/main/index.ts"],
       projects,
       rows: PIPELINE,
     });
@@ -196,7 +202,7 @@ describe("workspace reading", () => {
     );
 
     const goOnly = computeAffected({
-      paths: ["apps/go/src/App.tsx"],
+      paths: ["hosts/go/src/App.tsx"],
       projects,
       rows: PIPELINE,
     });

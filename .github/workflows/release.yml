@@ -360,7 +360,7 @@ jobs:
 
           # The stable channel also writes the `suite-go.apk` alias; attest and
           # upload the versioned file, not a second name for the same bytes.
-          apk="$(find apps/go/.dev/release -maxdepth 1 -name 'suite-go-*.apk' ! -name 'suite-go.apk' -print -quit)"
+          apk="$(find hosts/go/.dev/release -maxdepth 1 -name 'suite-go-*.apk' ! -name 'suite-go.apk' -print -quit)"
           if [ -z "${apk}" ]; then
             echo "the APK build named no versioned suite-go-*.apk" >&2
             exit 1
@@ -411,7 +411,7 @@ jobs:
       # `release-index.mjs` publishes both or neither. A build that fails stops
       # the job here, before anything is signed or uploaded; a run with no
       # --build prints the skip sentence instead. The index reads only
-      # .dev/release/packs, so the sample packs under apps/desk/packs stay
+      # .dev/release/packs, so the sample packs under hosts/desk/packs stay
       # fixtures and are never staged for publication.
       - name: Build the catalogue index
         if: inputs.publish
@@ -421,10 +421,10 @@ jobs:
           SUITE_PACK_KEY: ${{ secrets.SUITE_PACK_KEY }}
         run: |
           set -euo pipefail
-          budget_version="$(node -p 'require("./apps/budget/pack/manifest.json").version')"
-          planner_version="$(node -p 'require("./apps/planner/pack/manifest.json").version')"
-          canvas_version="$(node -p 'require("./apps/canvas/pack/manifest.json").version')"
-          help_version="$(node -p 'require("./apps/help/pack/manifest.json").version')"
+          budget_version="$(node -p 'require("./packs/budget/pack/manifest.json").version')"
+          planner_version="$(node -p 'require("./packs/planner/pack/manifest.json").version')"
+          canvas_version="$(node -p 'require("./packs/canvas/pack/manifest.json").version')"
+          help_version="$(node -p 'require("./packs/help/pack/manifest.json").version')"
           node scripts/release-index.mjs \
             --build "pnpm budget:pack --out .dev/release/packs/budget-${budget_version}.suitepack" \
             --build "pnpm planner:pack --out .dev/release/packs/planner-${planner_version}.suitepack" \

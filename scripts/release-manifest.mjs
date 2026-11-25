@@ -24,7 +24,7 @@
  *     --flatpak-id run.suite.preview.desk \
  *     --flatpak-branch preview \
  *     --flatpak-commit-file .dev/release/suite-desk-preview.commit \
- *     --apk apps/go/.dev/release/suite-go-preview-0.1.0.apk \
+ *     --apk hosts/go/.dev/release/suite-go-preview-0.1.0.apk \
  *     --apk-id run.suite.preview.go \
  *     --commit "$GITHUB_SHA" \
  *     --out .dev/release/release-manifest.json
@@ -46,7 +46,7 @@ import { channelProblem, isPreRelease } from "./lib/channel.mjs";
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /** Where the version and the base both live. */
-const GO_CONFIG = join(ROOT, "apps", "go", "app.config.json");
+const GO_CONFIG = join(ROOT, "hosts", "go", "app.config.json");
 
 /**
  * The version name and code one channel's Suite Go APK carries.
@@ -58,7 +58,7 @@ export function apkIdentityFor(config, channel) {
   const problem = channelProblem(channel);
   if (problem !== null) throw new Error(problem);
   if (typeof config?.version !== "string" || config.version.length === 0) {
-    throw new Error("apps/go/app.config.json names no version");
+    throw new Error("hosts/go/app.config.json names no version");
   }
   return {
     versionName: isPreRelease(channel) ? `${config.version}-${channel}` : config.version,

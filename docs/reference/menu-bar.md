@@ -48,7 +48,7 @@ Every zone takes a `ReactNode`. The bar decides nothing about what an app puts t
 
 ## Adoption
 
-Canvas is the reference implementation: `apps/canvas/src/chrome/TitleBar.tsx` renders `<MenuBar>` and
+Canvas is the reference implementation: `legacy/canvas/src/chrome/TitleBar.tsx` renders `<MenuBar>` and
 `<SyncPill>` with its existing props.
 
 Planner and Budget adopt the bar too, each with only the material it has:

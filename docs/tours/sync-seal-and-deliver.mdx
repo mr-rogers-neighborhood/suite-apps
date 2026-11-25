@@ -15,17 +15,17 @@ opinions; the module notes own the reasons behind them.
 Sealing is an operation on a group, not on a file. The output is one MLS message and a group that
 has moved.
 
-## apps/sync/packages/protocol/src/group.ts#seal
+## services/relay/packages/protocol/src/group.ts#seal
 
 Where one document update becomes group traffic. The protocol module owns what the returned group
 state carries and why it must replace the old one.
 
-## apps/sync/packages/protocol/src/frame.ts#framePayload
+## services/relay/packages/protocol/src/frame.ts#framePayload
 
 The bytes a signature covers. A reader can attribute the frame without trusting the relay, and the
 sender cannot claim when it arrived.
 
-## apps/sync/packages/protocol/src/frame.ts#frameRejection
+## services/relay/packages/protocol/src/frame.ts#frameRejection
 
 The receiver's epoch check, and the one place a commit is treated differently from every other
 frame.
@@ -36,12 +36,12 @@ An application frame one epoch ahead is refused like any other mismatch. It is e
 commit is missing, not something to open; the client asks for frames after its cursor and applies
 the commit first.
 
-## apps/sync/packages/protocol/src/roleRecord.ts#applyRoleRecord
+## services/relay/packages/protocol/src/roleRecord.ts#applyRoleRecord
 
 Joining the group is not permission to write; this record is. The protocol module owns the owner
 chain, the sequence rule and the last-owner exception.
 
-## apps/sync/packages/protocol/src/removal.ts#applyRemovalRecord
+## services/relay/packages/protocol/src/removal.ts#applyRemovalRecord
 
 The readable half of a revoke, kept beside the frames. The protocol module owns what a removal does
 and what it cannot take back.
@@ -51,17 +51,17 @@ and what it cannot take back.
 The relay is a process a person runs. It stores what it is given, numbers it, and refuses the four
 things it can see without reading a payload.
 
-## apps/sync/src/cli.ts#runCli
+## services/relay/src/cli.ts#runCli
 
 The process that makes a relay. The module note owns the bind default and the two flags that widen
 it.
 
-## apps/sync/packages/protocol/src/relayClient.ts#createRelayClient
+## services/relay/packages/protocol/src/relayClient.ts#createRelayClient
 
 The client opens a socket, announces the device and turns host messages into callbacks. It does not
 decide what a frame means; decrypting, ignoring or catching up belongs to the app.
 
-## apps/sync/packages/host/src/blindRoom.ts#admitFrame
+## services/relay/packages/host/src/blindRoom.ts#admitFrame
 
 The relay's entire authority, exercised before a byte is stored. The host module owns the four
 refusals and the key-package exception.
@@ -71,22 +71,22 @@ refusals and the key-package exception.
 Workspace, device, epoch, kind, size and timing. Not a title, a card, a version vector or whether an
 update changed anything. The payload stays closed.
 
-## apps/sync/packages/host/src/blindRoom.ts#FrameLog
+## services/relay/packages/host/src/blindRoom.ts#FrameLog
 
 Numbering that survives retention, so a cursor can tell a gap from an empty catch-up. The host
 module owns the order and what a gap means for the device.
 
-## apps/sync/packages/host/src/store.ts#FileHostStore
+## services/relay/packages/host/src/store.ts#FileHostStore
 
 Durability for a mailbox: append-only files whose positions outlive compaction. The host module
 owns the torn-line and rewrite rules.
 
-## apps/sync/packages/protocol/src/group.ts#open
+## services/relay/packages/protocol/src/group.ts#open
 
 Where a member turns stored bytes back into a document update. The relay never reaches this call,
 which is why it can store the frame without knowing what it says.
 
-## apps/canvas/src/collab/peerProjection.ts#projectPeers
+## legacy/canvas/src/collab/peerProjection.ts#projectPeers
 
 Presence beside the log rather than inside it. The collab module owns the heartbeat and expiry that
 keep a closed tab from leaving a ghost.

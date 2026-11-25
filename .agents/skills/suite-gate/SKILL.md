@@ -8,7 +8,7 @@ argument-hint: "[row|all] [--fresh] [--no-e2e]"
 
 The root gate runs one prelude, then each app's own `check:full` in dependency order. It is the
 same command locally and in CI. Read `docs/reference/commands.md` for the full command page and
-`apps/<app>/AGENTS.md` for what that app's check includes; do not restate either here.
+`legacy/<app>/AGENTS.md` (or `hosts/<app>/AGENTS.md`) for what that app's check includes; do not restate either here.
 
 ## Rows
 
@@ -20,7 +20,7 @@ sync, desk, help, canvas, planner, budget, go
 
 Prelude rows, before the pipeline:
 
-- `libraries` — builds `packages/*` and `apps/*/packages/*`; consumers resolve `dist/`
+- `libraries` — builds `packages/*`, `hosts/*/packages/*`, `legacy/*/packages/*` and `services/*/packages/*`; consumers resolve `dist/`
 - `scripts` — the `node --test` checks beside `scripts/`
 - `budget pack` — Budget's signed round-trip
 

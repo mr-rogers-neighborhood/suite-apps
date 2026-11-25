@@ -16,46 +16,46 @@ The manifest is the contract between an app and the host. It says what the app
 is and which capabilities it declares. The schema is strict and has no field for
 a binary, so a tampered manifest cannot redirect a launch.
 
-## apps/desk/src/catalogue.ts#loadCatalogue
+## hosts/desk/src/catalogue.ts#loadCatalogue
 
 The catalogue is the host's opinion about the packs it can install. It reads
 local `.suitepack` files and, when the operator-signed index verified, the
 entries that index displayed. Nothing here extracts an archive.
 
-## apps/desk/src/catalogue.ts#installCataloguePack
+## hosts/desk/src/catalogue.ts#installCataloguePack
 
 Install is the host's, not a second process. The entry is checked again, the
 publisher key and every file hash are verified, and only then does the archive
 land under the host's pack root.
 
-## apps/desk/src/installedPacks.ts#loadInstalledPacks
+## hosts/desk/src/installedPacks.ts#loadInstalledPacks
 
 Discovery is the other half: every installed version is verified on load, so a
 file changed after install cannot become a running pack. A refused version is
 reported with a sentence, not silently skipped.
 
-## apps/desk/src/packs.ts#discoverPacks
+## hosts/desk/src/packs.ts#discoverPacks
 
 A pack is code on a pack-owned origin. This is where the host decides which
 installed version a view runs and what URL it may load.
 
-## apps/desk/src/window.ts#ShellWindow
+## hosts/desk/src/window.ts#ShellWindow
 
 The window owns the tab and the view. A pack tab gets its own `WebContentsView`,
 origin and session partition; a Screen tab is host chrome and creates no view.
 
-## apps/desk/src/deepLink.ts#parseSuiteLink
+## hosts/desk/src/deepLink.ts#parseSuiteLink
 
 A `suite://` link is untrusted input. This parser names an installed pack or
 refuses with one sentence; a link can never install or update anything.
 
-## apps/canvas/desktop/src/main/index.ts
+## legacy/canvas/desktop/src/main/index.ts
 
 The receiving side begins at a sandboxed window: context isolation, sandbox on,
 no Node integration, and no navigation away from the app's own origin. The
 window also flushes a pending save before it closes.
 
-## apps/canvas/src/App.tsx#App
+## legacy/canvas/src/App.tsx#App
 
 The renderer boots without reading the file format. It asks the host for a
 workspace and renders the app surface, leaving the document layer to the graph

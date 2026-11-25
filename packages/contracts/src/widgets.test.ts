@@ -114,7 +114,7 @@ describe("the registry id", () => {
     expect(splitWidgetRegistryId("desk.apps")).toEqual({ appId: "desk", widgetId: "apps" });
   });
 
-  it.each(["apps", "desk.apps.extra", "Shell.apps", "start.", ".apps", "desk.apps/extra"])(
+  it.each(["apps", "desk.apps.extra", "Shell.apps", "start.", ".apps", "desk.widget/extra"])(
     "refuses %j",
     (value) => {
       expect(splitWidgetRegistryId(value)).toBeNull();

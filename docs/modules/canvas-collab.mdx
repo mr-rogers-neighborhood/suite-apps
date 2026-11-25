@@ -1,5 +1,5 @@
 ---
-module: apps/canvas/src/collab
+module: legacy/canvas/src/collab
 title: Canvas / Collab
 summary: "The browser's local replica and the live presence around it, neither of which owns document truth."
 ---
@@ -14,7 +14,7 @@ document; Loro does. Presence is deliberately ephemeral and never enters
 the document. A closed tab, a dropped socket or a sleeping device must cost no edit and leave no
 record behind.
 
-## apps/canvas/src/collab/loroPersistence.ts#LoroIndexeddbPersistence.compact
+## legacy/canvas/src/collab/loroPersistence.ts#LoroIndexeddbPersistence.compact
 
 One tab per workspace holds the compaction lock. Followers append their updates but do not write
 snapshots, because two tabs writing snapshots is how a tab with less of the document replaces one
@@ -26,7 +26,7 @@ aborts instead of guessing. When Web Locks is missing, every tab compacts but de
 rows; replaying another tab's rows on load is idempotent, so the fallback costs space and never an
 edit. `loroPersistence.test.ts` covers the leader, the follower and the no-locks path.
 
-## apps/canvas/src/collab/peerProjection.ts#projectPeers
+## legacy/canvas/src/collab/peerProjection.ts#projectPeers
 
 Presence has no leave message, so silence is the only available signal and a heartbeat is what
 keeps silence from meaning departure. Each client publishes a beat; a peer unheard for longer than

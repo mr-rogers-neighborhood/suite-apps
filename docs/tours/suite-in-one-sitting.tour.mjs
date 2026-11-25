@@ -46,7 +46,7 @@ export default {
     },
     {
       kind: "node",
-      target: { kind: "symbol", id: "apps/canvas/src/App.tsx#App", level: "file" },
+      target: { kind: "symbol", id: "legacy/canvas/src/App.tsx#App", level: "file" },
       note: "The renderer boots without reading the document format; the bridge supplies it.",
     },
     {
@@ -56,7 +56,7 @@ export default {
     },
     {
       kind: "node",
-      target: { kind: "module", id: "apps/canvas/packages/graph" },
+      target: { kind: "module", id: "legacy/canvas/packages/graph" },
       note: "The document layer is a separate package, so a component never reaches Loro.",
     },
     {

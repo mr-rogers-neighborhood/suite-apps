@@ -175,7 +175,11 @@ const build = dry
           "--filter",
           "./packages/*",
           "--filter",
-          "./apps/*/packages/*",
+          "./hosts/*/packages/*",
+          "--filter",
+          "./legacy/*/packages/*",
+          "--filter",
+          "./services/*/packages/*",
           "--workspace-concurrency=2",
           "run",
           "build",
@@ -188,7 +192,7 @@ const build = dry
 if (!json) process.stdout.write(`${build.ok ? "ok  " : "FAIL"}  libraries  ${build.detail}\n`);
 
 if (!build.ok) {
-  results.push({ repo: "libraries", package: "apps/*/packages/*", ok: false, detail: build.detail });
+  results.push({ repo: "libraries", package: "app packages", ok: false, detail: build.detail });
 }
 
 // The pack build scripts are not inside a workspace package, so no app's
@@ -214,6 +218,7 @@ const scripts =
             "scripts/help-pack.test.mjs",
             "scripts/pack-card.test.mjs",
             "scripts/pack-shape.test.mjs",
+            "scripts/pack-links.test.mjs",
             "scripts/affected.test.mjs",
             "scripts/proof-of-changes.test.mjs",
             "scripts/release-manifest.test.mjs",
@@ -257,7 +262,7 @@ const packTests =
     ? { ok: build.ok && scripts.ok, detail: dry ? "dry run" : "not run: earlier step failed" }
     : (() => {
         if (!json) process.stdout.write("\n▶ budget pack\n");
-        const result = run("pnpm", ["--dir", "apps/budget", "run", "test:pack"], workdir);
+        const result = run("pnpm", ["--dir", "legacy/budget", "run", "test:pack"], workdir);
         return {
           ok: result.status === 0,
           detail: result.status === 0 ? "prelude tests" : `exit ${result.status}`,
@@ -271,14 +276,14 @@ if (!json) {
 if (!packTests.ok) {
   results.push({
     repo: "budget pack",
-    package: "apps/budget (test:pack)",
+    package: "legacy/budget (test:pack)",
     ok: false,
     detail: packTests.detail,
   });
 }
 
 for (const entry of build.ok && scripts.ok && packTests.ok ? selected : []) {
-  const repoDir = join(workdir, "apps", entry.repo);
+  const repoDir = join(workdir, entry.dir);
   if (!existsSync(join(repoDir, "package.json"))) {
     results.push({ ...entry, ok: false, detail: "missing repo" });
     break;
@@ -315,7 +320,7 @@ if (e2e && results.length > 0 && results.every((row) => row.ok)) {
     // notice above and `e2e: false` in the status carry the skip instead.
     if (skipDesktop) continue;
     if (!json) process.stdout.write(`\n▶ ${entry.repo} · e2e\n`);
-    const suite = runE2e(join(workdir, "apps", entry.repo), display);
+    const suite = runE2e(join(workdir, entry.dir), display);
     const ok = suite.status === 0;
     e2eRan = e2eRan || ok;
     results.push({

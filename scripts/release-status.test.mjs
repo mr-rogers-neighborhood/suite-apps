@@ -519,8 +519,8 @@ describe("the opt-in second publication", () => {
 
   it("names another tag date, never today's published one by default", () => {
     const files = {
-      "apps/start/package.json": '{"version":"0.5.1"}',
-      "apps/start/CHANGELOG.md": "## [0.5.1] - 2026-11-21\n",
+      "hosts/start/package.json": '{"version":"0.5.1"}',
+      "hosts/start/CHANGELOG.md": "## [0.5.1] - 2026-11-21\n",
     };
     const load = (path) => files[path] ?? "";
     assert.equal(
@@ -732,15 +732,15 @@ describe("sections and the Suite Go APK", () => {
       APPS.filter((app) => app.section === "mobile").map((app) => app.id),
       ["go"],
     );
-    assert.equal(go.packageJson, "apps/go/package.json");
-    assert.equal(go.changelog, "apps/go/CHANGELOG.md");
+    assert.equal(go.packageJson, "hosts/go/package.json");
+    assert.equal(go.changelog, "hosts/go/CHANGELOG.md");
     assert.equal(go.kind, "apk");
   });
 
   it("carries the host as Suite Desk, first in the desktop table", () => {
     assert.equal(desk.name, "Suite Desk");
-    assert.equal(desk.packageJson, "apps/desk/package.json");
-    assert.equal(desk.changelog, "apps/desk/CHANGELOG.md");
+    assert.equal(desk.packageJson, "hosts/desk/package.json");
+    assert.equal(desk.changelog, "hosts/desk/CHANGELOG.md");
     assert.equal(desk.kind, "flatpak");
     assert.equal(desk.section, "desktop");
     assert.equal(desk.flatpakId, "run.suite.desk");
@@ -853,10 +853,10 @@ describe("sections and the Suite Go APK", () => {
 
   it("names the aggregate tag from the newest changelog date", () => {
     const files = {
-      "apps/desk/package.json": '{"version":"0.2.0"}',
-      "apps/desk/CHANGELOG.md": "## [0.2.0] - 2026-11-21\n",
-      "apps/go/package.json": '{"version":"0.1.0"}',
-      "apps/go/CHANGELOG.md": "## [0.1.0] - 2026-11-18\n",
+      "hosts/desk/package.json": '{"version":"0.2.0"}',
+      "hosts/desk/CHANGELOG.md": "## [0.2.0] - 2026-11-21\n",
+      "hosts/go/package.json": '{"version":"0.1.0"}',
+      "hosts/go/CHANGELOG.md": "## [0.1.0] - 2026-11-18\n",
     };
     assert.equal(
       currentAggregateTag({ load: (path) => files[path] ?? "", env: {} }),
@@ -1146,7 +1146,7 @@ describe("the Artifacts section", () => {  const flatpakCommit = "c".repeat(64);
       {
         kind: "apk",
         id: "run.suite.nightly.go",
-        file: "apps/go/.dev/release/suite-go-nightly-0.1.0.apk",
+        file: "hosts/go/.dev/release/suite-go-nightly-0.1.0.apk",
         sha256: apkSha,
         size: 2048,
       },

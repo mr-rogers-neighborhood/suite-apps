@@ -1,5 +1,5 @@
 ---
-module: apps/canvas/src/editor
+module: legacy/canvas/src/editor
 title: Canvas / Editor
 summary: "The body schema, the collaboration plugins and the media nodes behind every card."
 ---
@@ -14,10 +14,10 @@ The split is deliberate. The schema can be built without a document, so a test c
 compare it with the publish allowlist; the collaboration layer contributes plugins
 and shortcuts but no nodes, so an editor's undo stack and its content shape are
 separate decisions. Media bytes live beside the document, not inside it.
-`apps/canvas/docs/reference/editing.md` owns the editing rules; these notes are the
+`legacy/canvas/docs/reference/editing.md` owns the editing rules; these notes are the
 seams the rest of the app depends on.
 
-## apps/canvas/src/editor/LoroCollaboration.ts#LoroCollaboration
+## legacy/canvas/src/editor/LoroCollaboration.ts#LoroCollaboration
 
 One extension instance binds one editor to one Loro container. The title and the
 body each get their own, which is why renaming a card does not touch its body and
@@ -30,7 +30,7 @@ schema, and the cursor plugin is added only when a cursor store exists. The
 invariant is scoped undo: what a keystroke reverses is decided by which editor the
 caret is in, and no editor reaches into another card's text.
 
-## apps/canvas/src/editor/cardEditorExtensions.ts#cardBodySchemaExtensions
+## legacy/canvas/src/editor/cardEditorExtensions.ts#cardBodySchemaExtensions
 
 The body schema, with no collaboration in it. StarterKit supplies the block nodes
 and marks with its own undo history disabled, because `LoroCollaboration` ships
@@ -46,7 +46,7 @@ registered on purpose: a document written before the `media` block existed must
 keep rendering, and `migrateLegacyMedia` converts it the first time the body is
 edited.
 
-## file: apps/canvas/src/editor/editorSchemaContract.test.ts
+## file: legacy/canvas/src/editor/editorSchemaContract.test.ts
 
 The contract is the test's whole subject: build the schema the way the editor does,
 minus collaboration, and compare its node names, mark names and per-node attributes

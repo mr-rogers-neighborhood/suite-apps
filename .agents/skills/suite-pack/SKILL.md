@@ -17,16 +17,16 @@ carries bytes and never parses a document. Read `docs/spec/superapp.md`,
 | `packages/pack` | manifest, capabilities, canonical bytes, Ed25519 verify, pinned keys, trust | import Electron or Node |
 | `packages/pack-host` | archive reader/writer, scoped files, locks, backups | import Electron |
 | `packages/pack-runtime` | pack-side service types only | carry host policy |
-| `apps/desk` | desktop host: views, sessions, consent, documents, catalogue | parse a pack document |
-| `apps/go` | mobile container: iframe realm, IndexedDB documents, flush handshake | parse a document or learn a domain name |
+| `hosts/desk` | desktop host: views, sessions, consent, documents, catalogue | parse a pack document |
+| `hosts/go` | mobile container: iframe realm, IndexedDB documents, flush handshake | parse a document or learn a domain name |
 
 ## The live split (#202)
 
 There is one `format: "suite.pack"` but two incompatible implementations:
 
-- `apps/desk` uses `@suite/pack` — multi-publisher trust, rotation, documents, contributions,
+- `hosts/desk` uses `@suite/pack` — multi-publisher trust, rotation, documents, contributions,
   `HOST_CONTRACT_VERSION = 1`.
-- `apps/go` uses `apps/go/packages/go/src/pack.ts` — one compiled pin, `independent` + `isolation`,
+- `hosts/go` uses `hosts/go/packages/go/src/pack.ts` — one compiled pin, `independent` + `isolation`,
   a different canonical byte order, `HOST_CONTRACT_VERSION = 2`.
 
 A pack built for one host is refused by the other. Do not "fix" one manifest to serve both without

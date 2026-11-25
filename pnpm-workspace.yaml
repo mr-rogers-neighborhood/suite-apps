@@ -1,7 +1,12 @@
 packages:
-  - "apps/*"
-  - "apps/*/*"
-  - "apps/*/packages/*"
+  - "hosts/*"
+  - "hosts/*/packages/*"
+  - "legacy/*"
+  - "legacy/*/*"
+  - "legacy/*/packages/*"
+  - "services/*"
+  - "services/*/*"
+  - "services/*/packages/*"
   - "packages/*"
 
 # Shared packages are workspace packages. A local edit is the one that builds.
@@ -41,5 +46,5 @@ overrides:
   "minimatch@>=7.0.0 <11.0.1": 11.0.9
 
 patchedDependencies:
-  loro-prosemirror@0.4.4: apps/canvas/patches/loro-prosemirror@0.4.4.patch
-  "@stryker-mutator/vitest-runner@10.0.0": apps/canvas/patches/@stryker-mutator__vitest-runner@10.0.0.patch
+  loro-prosemirror@0.4.4: legacy/canvas/patches/loro-prosemirror@0.4.4.patch
+  "@stryker-mutator/vitest-runner@10.0.0": legacy/canvas/patches/@stryker-mutator__vitest-runner@10.0.0.patch

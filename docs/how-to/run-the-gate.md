@@ -8,7 +8,7 @@ command that produced it.
 Start with the owning app's check while you edit:
 
 ```sh
-cd apps/canvas
+cd legacy/canvas
 pnpm check
 ```
 

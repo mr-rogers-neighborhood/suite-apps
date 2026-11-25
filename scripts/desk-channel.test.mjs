@@ -70,7 +70,7 @@ describe("Suite Desk channel identity", () => {
       "      - install -Dm644 run.suite.desk.desktop /app/share/applications/run.suite.desk.desktop",
       "    sources:",
       "      - type: dir",
-      "        path: ../../apps/desk/release/linux-unpacked",
+      "        path: ../../hosts/desk/release/linux-unpacked",
       "        dest: app",
       "      - type: file",
       "        path: run.suite.desk",
@@ -84,7 +84,7 @@ describe("Suite Desk channel identity", () => {
       id: "run.suite.nightly.desk",
       channel: "nightly",
       stableId: "run.suite.desk",
-      unpacked: "/build/apps/desk/release/linux-unpacked",
+      unpacked: "/build/hosts/desk/release/linux-unpacked",
     });
 
     assert.match(manifest, /^app-id: run\.suite\.nightly\.desk$/mu);
@@ -95,7 +95,7 @@ describe("Suite Desk channel identity", () => {
       manifest,
       /install -Dm755 run\.suite\.nightly\.desk \/app\/bin\/run\.suite\.nightly\.desk/u,
     );
-    assert.match(manifest, /path: \/build\/apps\/desk\/release\/linux-unpacked/u);
+    assert.match(manifest, /path: \/build\/hosts\/desk\/release\/linux-unpacked/u);
     assert.doesNotMatch(manifest, /run\.suite\.desk/u);
     // The host has no Documents grant to split, and the pre-release must not
     // gain one that stable does not have.

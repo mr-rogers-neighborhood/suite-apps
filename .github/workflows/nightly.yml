@@ -195,7 +195,7 @@ jobs:
           pnpm --filter "./packages/*" run build
           pnpm --filter @suite/go-app build
           pnpm --filter @suite/go-app exec cap sync android
-          cd apps/go/android
+          cd hosts/go/android
           ./gradlew assembleStableDebug
           cp app/build/outputs/apk/stable/debug/app-stable-debug.apk \
             "$GITHUB_WORKSPACE/suite-go-debug.apk"

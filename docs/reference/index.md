@@ -8,7 +8,7 @@ Facts to look up. These pages describe the repository as it is today.
 | [Commands](commands.md) | The root gate, per-app checks and the toolchain |
 | [Desktop proof](desktop-proof.md) | The `@proof` Playwright tag, runner command and where proof artifacts land |
 | [Packaging channels](packaging-channels.md) | Flatpak and the Android APK, and who may update what |
-| [Pack authoring](pack-authoring.md) | The layout, build and checks for a pack source under `apps/<app>/pack/` |
+| [Pack authoring](pack-authoring.md) | The layout, build and checks for a pack source under `packs/<app>/pack/` |
 | [File formats](file-formats.md) | `.canvas`, `.planner`, `.budget`, sync workspaces and backups |
 | [Environment](environment.md) | Variables that move data roots or configure sync |
 | [Decisions](decisions.md) | The rules that shape the repository |

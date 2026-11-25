@@ -5,7 +5,7 @@ other platforms are build/test targets until signing exists. `.github/workflows/
 builds unsigned Windows x64 and macOS arm64 zips of the Suite Desk at 03:30 UTC and on dispatch,
 attests an SBOM and provenance for each, and keeps them as 14-day test artifacts — never a release,
 never a download a person is asked to install. The same run builds the iOS simulator app from the
-committed `apps/go/ios` project with Swift Package Manager and no signing identity; an iOS device
+committed `hosts/go/ios` project with Swift Package Manager and no signing identity; an iOS device
 build needs Apple signing and stays out of the matrix. The delivery contract is
 [delivery.md](delivery.md); the pipeline is [ci.md](ci.md).
 
@@ -48,10 +48,10 @@ release. A Tier 2 failure opens an issue and blocks that platform's artifact, no
 
 | Component | Current line | Policy |
 | --- | --- | --- |
-| Electron | [The apps' `package.json`](../../apps/desk/package.json) | Latest three stable majors; 8-week cadence; upgrade within two majors of current |
+| Electron | [The apps' `package.json`](../../hosts/desk/package.json) | Latest three stable majors; 8-week cadence; upgrade within two majors of current |
 | Node.js | [`engines` in the root `package.json`](../../package.json) | Active/Maintenance LTS; plan the next LTS before the current one leaves maintenance |
 | Flatpak runtime | [The Desk manifest](../../packaging/flatpak/run.suite.desk.yml) | Two-year lifecycle; review annually and upgrade before security-only |
-| Android SDK | [`variables.gradle`](../../apps/go/android/variables.gradle) | Target the current API; revisit minSdk when device data supports a higher floor |
+| Android SDK | [`variables.gradle`](../../hosts/go/android/variables.gradle) | Target the current API; revisit minSdk when device data supports a higher floor |
 | macOS | Electron's current minimum | Unsigned builds; notarization later |
 | Windows | Electron's current minimum | Unsigned builds; Authenticode later |
 | iOS | Revyl's simulator runtime | Simulator only; device support later |

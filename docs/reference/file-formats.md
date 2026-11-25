@@ -189,6 +189,6 @@ elsewhere. The sync relay stores sealed frames and binds to loopback by default;
 serves `wss://` with a self-signed certificate the app pins, so the header and the signed records
 beside the frames are visible to the relay but not to a passive network attacker.
 
-Details per app: [Canvas desktop](../../apps/canvas/docs/reference/desktop.md),
-[Planner data model](../../apps/planner/docs/reference/data-model.md), and the
-[Budget README](../../apps/budget/README.md).
+Details per app: [Canvas desktop](../../legacy/canvas/docs/reference/desktop.md),
+[Planner data model](../../legacy/planner/docs/reference/data-model.md), and the
+[Budget README](../../legacy/budget/README.md).

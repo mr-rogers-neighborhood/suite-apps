@@ -1,5 +1,5 @@
 ---
-module: apps/canvas/src/archive
+module: legacy/canvas/src/archive
 title: Canvas / Archive
 summary: "Reading books as untrusted archives: a zip index, an EPUB package, sanitised chapters and quote anchors."
 ---
@@ -14,7 +14,7 @@ refused, no `on*` handler survives, and the report says what was lost. An anchor
 its surroundings rather than a byte offset, so a highlight survives a different column width and
 reports ambiguity instead of marking the wrong sentence.
 
-## apps/canvas/src/archive/epub/open.ts#openEpub
+## legacy/canvas/src/archive/epub/open.ts#openEpub
 
 An EPUB is a zip with `META-INF/container.xml`, a package document and a navigation document or
 NCX. The function reads the container and package first, then resolves the spine and table of

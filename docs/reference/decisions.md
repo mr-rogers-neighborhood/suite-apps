@@ -15,7 +15,7 @@ owns the rationale, and [Status](status.md) owns what exists.
   gate, and a row marked with an e2e suite runs it on the merge queue. No row marks one after Start's
   retirement (#314). The `vm` remote and its gate are retired.
 - `@suite/desktop` is shared Electron policy. Canvas's shell is `@suite/canvas-desktop`.
-- Suite Help (`apps/help`) is the documentation reader and it is a shipped app. It indexes every
+- Suite Help (`legacy/help`) is the documentation reader and it is a shipped app. It indexes every
   file and declaration, renders the handbook from `docs/`, and keeps module notes in
   `docs/modules/` and tours in `docs/tours/`. It is Vite + React Router + Fumadocs headless in an
   Electron shell, served from `suite-help://app/`; Flatpak owns updates. `docs/` and each app's
@@ -49,7 +49,7 @@ owns the rationale, and [Status](status.md) owns what exists.
 
 ## Desktop host
 
-- **One desktop host.** `apps/desk` (`@suite/desk`) is the desktop host. It is one Electron app
+- **One desktop host.** `hosts/desk` (`@suite/desk`) is the desktop host. It is one Electron app
   that opens signed, sandboxed packs as tabs, and it owns the catalogue, Home, the Screens manager,
   routing and pack updates. Start is gone (#314); the frozen Flatpaks remain installable with their
   documented `flatpak install` lines. The host is alpha, and the pack bar below is still how a pack
@@ -78,7 +78,7 @@ owns the rationale, and [Status](status.md) owns what exists.
   the alternative if a future surface needs to manage deployments, and it would be a second package
   manager until it earns its keep.
 - No service owns sync membership or keys. One service owning them would collapse the sandbox
-  isolation; [sync is a capability](../../apps/sync/docs/reference/sync-capability.md) that moves
+  isolation; [sync is a capability](../../services/relay/docs/reference/sync-capability.md) that moves
   sealed frames and readable membership.
 - `@suite/sync-desktop` is shared mechanics, not shared trust. The group, relay pin, cursor, pending
   join, frame queue and reconnect live once for Canvas and Planner; each app injects its own data
@@ -94,7 +94,7 @@ owns the rationale, and [Status](status.md) owns what exists.
   The pair reads as two places — the desk and the go — rather than two technologies.
 - **Tier 1 (#335) changed the words, labels and mark.** The identity stayed `@suite/shell`,
   `apps/shell` and `run.suite.shell`, so an existing install updated in place.
-- **Tier 2 retires the shell identity.** The package is `@suite/desk`, the directory is `apps/desk`,
+- **Tier 2 retires the shell identity.** The package is `@suite/desk`, the directory is `hosts/desk`,
   and the Flatpak ids are `run.suite.desk`, `run.suite.slop.desk`, `run.suite.nightly.desk` and
   `run.suite.preview.desk`. The environment is `SUITE_DESK_*`, the host declaration is `DESK_HOST`,
   the gate row is `desk`, and release artifacts are `suite-desk-*`.
@@ -106,8 +106,8 @@ owns the rationale, and [Status](status.md) owns what exists.
   republished.
 - The platform kind stays `desktop`. "Shell" remains an implementation word for the Electron chrome
   (`ShellWindow`, `ShellTab`), a POSIX shell or a shell command, never a product or install identity.
-- Both hosts carry the mark Start used: `apps/desk/build/icon.png` and its sized set under
-  `apps/desk/build/icons/` are Start's own artwork, recovered from the commit before Start's
+- Both hosts carry the mark Start used: `hosts/desk/build/icon.png` and its sized set under
+  `hosts/desk/build/icons/` are Start's own artwork, recovered from the commit before Start's
   retirement (#314), and Go's launcher icons are generated from the same bytes. The name differs
   between the hosts; the logo does not.
 
@@ -127,7 +127,7 @@ owns the rationale, and [Status](status.md) owns what exists.
 - A pack that declares no `export` entry is exported for its assets anyway, with `packExport: null`
   and no document entries. S6.8 says a pack declares one; refusing the whole export over a manifest
   omission would strand a person's assets, so the bundle records the omission instead. The choice is
-  tested in `apps/desk/src/exportBundle.test.ts`.
+  tested in `hosts/desk/src/exportBundle.test.ts`.
 
 ## Packs
 
@@ -138,8 +138,8 @@ owns the rationale, and [Status](status.md) owns what exists.
   another publisher starts a new identity. A host gives a pack the public half and signs only the
   pack's own data; a pack key must not sign relay frames, relay role records or membership
   changes. The host's derivation and signing guard are in
-  [apps/desk/src/packIdentityKey.ts](../../apps/desk/src/packIdentityKey.ts) and
-  [its decisions](../../apps/desk/docs/reference/decisions.md#pack-identity-and-keys). Suite Go
+  [hosts/desk/src/packIdentityKey.ts](../../hosts/desk/src/packIdentityKey.ts) and
+  [its decisions](../../hosts/desk/docs/reference/decisions.md#pack-identity-and-keys). Suite Go
   does not derive `identity.pack` yet, so one identity across both hosts is still owed.
 - `@suite/pack` is the desktop pack contract: manifest, capabilities, contributions, file hashes and
   Ed25519 verification. It shares the pinned key and the capability words with Suite Go, not the
@@ -185,8 +185,8 @@ default surface. The pieces that were still Start's moved or were dropped delibe
 | Discover, install, update and remove legacy Flatpaks; update Start itself | Dropped. Flatpak owns a deployment and a frozen app or the host has one `flatpak install` line; `flatpak update --user` is the update path. The host is not a package manager. |
 | Pack install, update, reinstall and remove in the catalogue | Already the host catalogue; unchanged by the removal. |
 | Cards, categories, icons, pre-release tiers and update states | The host's pack tiles and catalogue own the pack shape. Start's pre-release card tiers and its own update row were about Flatpak branches and a self-updating hub; both are dropped with that surface. |
-| Home composition and the inline widget edit | Already in `apps/desk/src/home.ts`; the Start copy was deleted. |
-| The Screens manager (list, create, rename, duplicate, delete, set Home) | Moved to the host: `apps/desk/src/screens.ts` owns the set and `screens.json`, the window exposes it, and the chrome draws the manager. The manager's rules and tests moved with it. |
+| Home composition and the inline widget edit | Already in `hosts/desk/src/home.ts`; the Start copy was deleted. |
+| The Screens manager (list, create, rename, duplicate, delete, set Home) | Moved to the host: `hosts/desk/src/screens.ts` owns the set and `screens.json`, the window exposes it, and the chrome draws the manager. The manager's rules and tests moved with it. |
 | The `start.recents` widget and the document index | Dropped. Start's cross-app list was fed by scanning `~/Documents`; the host never opens a document path and a pack owns its own recents. Shipping a host list would require the documents-folder service the host does not have. |
 | The Sync tab's deployment states | Dropped. It showed whether the `run.suite.sync` Flatpak was installed; no host surface manages a Flatpak. The relay's delivery and tray are #315; see [Retiring the Sync tray app](#retiring-the-sync-tray-app-315). |
 | The Suite Help card | The host catalogue and Home; Help is a pack source and a frozen Flatpak, not a card Start owns. |
@@ -197,8 +197,8 @@ default surface. The pieces that were still Start's moved or were dropped delibe
 
 Start's own suite went with it. The rules the host now owns moved to the host's tests: the Screen-set
 tests (last Screen, Home replacement, rename, duplicate, persistence) are in
-`apps/desk/src/screens.test.ts`, and `suite://` parsing already lives in
-`apps/desk/src/deepLink.test.ts`. The Flatpak card, store-channel, package-backend, folder-record,
+`hosts/desk/src/screens.test.ts`, and `suite://` parsing already lives in
+`hosts/desk/src/deepLink.test.ts`. The Flatpak card, store-channel, package-backend, folder-record,
 CLI and renderer tests for Start's removed surfaces were deleted with those surfaces.
 
 A person's Start data directory (`~/.config/suite/start`: `installs.json`, `screens/`,
@@ -219,7 +219,7 @@ The delivery split is deliberate:
 
 | What stops | What stays |
 | --- | --- |
-| New `run.suite.sync` builds on the signed remote | `apps/sync` as the protocol, the client library and the relay implementation |
+| New `run.suite.sync` builds on the signed remote | `services/relay` as the protocol, the client library and the relay implementation |
 | The separate tray app as the way a person runs a relay | The headless `suite-sync` CLI and the relay's store format |
 | The tray's install line as the documented path | The Canvas and Planner clients, and the sync gate row that tests them |
 | The tray as the place sync state is shown | The host as the surface that carries that state |

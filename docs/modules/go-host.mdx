@@ -1,5 +1,5 @@
 ---
-module: apps/go/src/host
+module: hosts/go/src/host
 title: Go Host
 summary: "The container's services: opaque documents, namespaced storage and verified packs."
 ---
@@ -14,7 +14,7 @@ The split is the point. A domain asks for a service through the contract; the
 implementation here decides how a phone supplies it. The document store never
 imports a domain, and the pack store never imports a pack to ask what it is.
 
-## apps/go/src/host/documents.ts#createDocumentStore
+## hosts/go/src/host/documents.ts#createDocumentStore
 
 The store keeps an id, a module id, a file name, a title, a timestamp and bytes.
 It has no member that returns anything else, which is the first rule in code.
@@ -26,7 +26,7 @@ IndexedDB stands in for the file a desktop app owns. When export and Android's
 document picker arrive, this file changes and `DocumentStore` stays the seam.
 The title is whatever the module saved; the store never derives one from bytes.
 
-## apps/go/src/host/packs.ts#createPackStore
+## hosts/go/src/host/packs.ts#createPackStore
 
 Install is an order, not a set of checks. It refuses a build with no pinned key,
 parses the archive, verifies the signature, verifies every file, applies the
@@ -40,7 +40,7 @@ forever. A version directory that no longer verifies is skipped, so an upgrade
 can fall back to the one that worked. `uninstall` removes every version so the
 space actually returns.
 
-## apps/go/src/host/packs.ts#PACK_PUBLIC_KEY
+## hosts/go/src/host/packs.ts#PACK_PUBLIC_KEY
 
 This constant is the trust boundary. It is compiled into the build and never
 fetched: a feed that could hand over a new key would have handed over the app. An

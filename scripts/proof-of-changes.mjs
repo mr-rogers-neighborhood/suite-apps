@@ -34,17 +34,17 @@ const DEFAULT_OUT_DIR = join(ROOT, ".dev", "proof");
 
 const DESKTOP_TARGETS = {
   desk: {
-    dir: "apps/desk",
+    dir: "hosts/desk",
     playwrightArgs: ["exec", "playwright", "test", "--grep", "@proof"],
     buildCommands: [["pnpm", ["--filter", "@suite/desk", "run", "build:all"]]],
   },
   help: {
-    dir: "apps/help",
+    dir: "legacy/help",
     playwrightArgs: ["exec", "playwright", "test", "--grep", "@proof"],
     buildCommands: [["pnpm", ["--filter", "@suite/help", "run", "build"]]],
   },
   canvas: {
-    dir: "apps/canvas/e2e",
+    dir: "legacy/canvas/e2e",
     playwrightArgs: [
       "exec",
       "playwright",
@@ -56,12 +56,12 @@ const DESKTOP_TARGETS = {
     buildCommands: [["pnpm", ["--filter", "@suite/canvas", "run", "build:all"]]],
   },
   planner: {
-    dir: "apps/planner",
+    dir: "legacy/planner",
     playwrightArgs: ["exec", "playwright", "test", "--grep", "@proof"],
     buildCommands: [["pnpm", ["--filter", "@suite/planner", "run", "build"]]],
   },
   budget: {
-    dir: "apps/budget",
+    dir: "legacy/budget",
     playwrightArgs: ["exec", "playwright", "test", "--grep", "@proof"],
     buildCommands: [["pnpm", ["--filter", "@suite/budget", "run", "build"]]],
   },
@@ -211,7 +211,11 @@ function buildLibraries() {
       "--filter",
       "./packages/*",
       "--filter",
-      "./apps/*/packages/*",
+      "./hosts/*/packages/*",
+      "--filter",
+      "./legacy/*/packages/*",
+      "--filter",
+      "./services/*/packages/*",
       "--workspace-concurrency=2",
       "run",
       "build",

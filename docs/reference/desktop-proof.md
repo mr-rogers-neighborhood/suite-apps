@@ -13,14 +13,14 @@ Each desktop row in `scripts/lib/pipeline.mjs` (`desktop: true`) has one `proof.
 
 | App | Spec | What it proves |
 | --- | --- | --- |
-| `desk` | `apps/desk/e2e/proof.spec.ts` | Opens the Home Screen, creates a `Focus` Screen document, and switches to it |
-| `help` | `apps/help/e2e/proof.spec.ts` | Opens the indexed code explorer, searches the handbook, and renders an article |
-| `canvas` | `apps/canvas/e2e/tests/desktop/proof.spec.ts` | Creates a `.canvas` workspace document, adds a card, and renders it on the board |
-| `planner` | `apps/planner/e2e/proof.spec.ts` | Opens a `.planner` document, captures a task, and shows it on the day plan |
-| `budget` | `apps/budget/e2e/proof.spec.ts` | Creates a `.budget` document, assigns `$100` to `Rent / Mortgage`, and updates the sheet |
+| `desk` | `hosts/desk/e2e/proof.spec.ts` | Opens the Home Screen, creates a `Focus` Screen document, and switches to it |
+| `help` | `legacy/help/e2e/proof.spec.ts` | Opens the indexed code explorer, searches the handbook, and renders an article |
+| `canvas` | `legacy/canvas/e2e/tests/desktop/proof.spec.ts` | Creates a `.canvas` workspace document, adds a card, and renders it on the board |
+| `planner` | `legacy/planner/e2e/proof.spec.ts` | Opens a `.planner` document, captures a task, and shows it on the day plan |
+| `budget` | `legacy/budget/e2e/proof.spec.ts` | Creates a `.budget` document, assigns `$100` to `Rent / Mortgage`, and updates the sheet |
 
-`apps/canvas/e2e/tests/desktop/proof.spec.ts` serves `apps/canvas/dist` over loopback HTTP via
-`SUITE_DESKTOP_DEV_URL` because `apps/canvas/desktop/src/main/index.ts` resolves its unpackaged
+`legacy/canvas/e2e/tests/desktop/proof.spec.ts` serves `legacy/canvas/dist` over loopback HTTP via
+`SUITE_DESKTOP_DEV_URL` because `legacy/canvas/desktop/src/main/index.ts` resolves its unpackaged
 renderer path relative to the pre-flattening `../canvas/dist` layout.
 
 ## Command

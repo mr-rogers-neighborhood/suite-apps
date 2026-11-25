@@ -6,7 +6,7 @@ pack READMEs link, not a second copy of the clause. The manifest itself is
 [S3.5–S3.7](../spec/superapp.md#3-pack-format-canonical-bytes-and-manifest) and
 [manifest.schema.json](../spec/manifest.schema.json).
 
-A pack is source under `apps/<app>/pack/`. It is not a workspace package, so nothing is installed or
+A pack is source under `packs/<app>/pack/`. It is not a workspace package, so nothing is installed or
 built into it; the build writes to a generated directory outside it.
 
 ## What the directory holds
@@ -51,24 +51,24 @@ The app's own scripts own the commands; there is no shared pack build entry poin
 Canvas and Help are the worked examples:
 
 ```sh
-mise exec -- pnpm --dir apps/budget run test:pack
-mise exec -- pnpm --dir apps/budget run typecheck:all
+mise exec -- pnpm --dir legacy/budget run test:pack
+mise exec -- pnpm --dir legacy/budget run typecheck:all
 mise exec -- pnpm budget:pack
 
-mise exec -- pnpm --dir apps/planner run test:pack
-mise exec -- pnpm --dir apps/planner run typecheck:all
+mise exec -- pnpm --dir legacy/planner run test:pack
+mise exec -- pnpm --dir legacy/planner run typecheck:all
 mise exec -- pnpm planner:pack
 
-mise exec -- pnpm --dir apps/canvas run test:pack
-mise exec -- pnpm --dir apps/canvas run typecheck:all
+mise exec -- pnpm --dir legacy/canvas run test:pack
+mise exec -- pnpm --dir legacy/canvas run typecheck:all
 mise exec -- pnpm canvas:pack
 
-mise exec -- pnpm --dir apps/help run test:pack
-mise exec -- pnpm --dir apps/help run typecheck:all
+mise exec -- pnpm --dir legacy/help run test:pack
+mise exec -- pnpm --dir legacy/help run typecheck:all
 mise exec -- pnpm help:pack
 ```
 
-All four build to `apps/<app>/.dev/pack` and sign the archive from there. The output path is the
+All four build to `legacy/<app>/.dev/pack` and sign the archive from there. The output path is the
 app's, under a generated directory the root `.gitignore` already covers; never point it back into
 `pack/`. A build also writes `<id>-<version>.card.json` beside `<id>-<version>.suitepack` for the
 catalogue's shadow tiles; [Packaging channels](packaging-channels.md#packs-and-cards) owns that

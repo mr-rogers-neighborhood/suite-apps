@@ -1,5 +1,5 @@
 ---
-module: apps/canvas/desktop
+module: legacy/canvas/desktop
 title: Canvas Desktop
 summary: "The Electron package around the Canvas renderer: its run and build scripts."
 ---
@@ -14,7 +14,7 @@ server when one is running and against the built bundle otherwise, which is the
 same choice the shell makes again in `rendererUrl.ts`. A packaged window and a
 development window therefore load the same origin by the same rule.
 
-## apps/canvas/desktop/scripts/shell.mjs
+## legacy/canvas/desktop/scripts/shell.mjs
 
 This is a developer entry point, not the app. It refuses to start when neither a
 dev-server URL nor a built bundle exists, because a window with no renderer would
@@ -22,7 +22,7 @@ fail later with a less useful message. The child's exit code is preserved: a
 signal must not look like a clean window close, or the watcher stops instead of
 restarting.
 
-## apps/canvas/desktop/scripts/watch.mjs#restart
+## legacy/canvas/desktop/scripts/watch.mjs#restart
 
 A main-process change replaces the process rather than hot-swapping state the
 main process owns: the file, the lock, the backup timer and the single-instance
@@ -30,7 +30,7 @@ lock. Waiting for the old process to exit is the invariant; starting the
 replacement first makes Electron answer its own lock and quit. The generation
 counter keeps a replaced process's exit from ending the loop.
 
-## apps/canvas/desktop/scripts/stage.mjs
+## legacy/canvas/desktop/scripts/stage.mjs
 
 The preload is CommonJS and outside `tsc`, so copying it is the only build step
 compilation does not perform. A stale copy would leave the renderer with an old

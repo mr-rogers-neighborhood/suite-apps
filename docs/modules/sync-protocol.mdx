@@ -1,5 +1,5 @@
 ---
-module: apps/sync/packages/protocol
+module: services/relay/packages/protocol
 title: Sync / Protocol
 summary: "The wire vocabulary: ids, membership metadata, sealed frames and the relay messages that carry both."
 ---
@@ -14,7 +14,7 @@ signed role and removal records decide who may write and whether the relay shoul
 mail. A frame carries both facts without carrying content the relay can read: the workspace, device
 and epoch in the header, and the MLS message inside `payload`.
 
-## apps/sync/packages/protocol/src/group.ts#seal
+## services/relay/packages/protocol/src/group.ts#seal
 
 Sealing advances the group. `seal` returns the new `DeviceGroup` beside the bytes because the MLS
 application secret ratchets on send; a caller that keeps the input state reuses a ratchet step, and
@@ -23,7 +23,7 @@ peers cannot open the next message. One document update becomes one application 
 The returned group state is the thing to persist: losing it loses the ability to read later frames.
 This function runs in an app's main process, never in a renderer, and the host never calls it.
 
-## apps/sync/packages/protocol/src/frame.ts#frameRejection
+## services/relay/packages/protocol/src/frame.ts#frameRejection
 
 A receiving client reads a frame only at its own epoch, with one exception: a commit at the
 receiver's epoch plus one, which is how the receiver moves. The rule exists because the MLS library
@@ -36,7 +36,7 @@ missing, so the client asks for everything after its last applied index and appl
 order first. A frame older than the receiver's epoch is dropped. `group.test.ts` pins the drop with
 a frame from an epoch the receiver has left.
 
-## apps/sync/packages/protocol/src/roleRecord.ts#applyRoleRecord
+## services/relay/packages/protocol/src/roleRecord.ts#applyRoleRecord
 
 Membership says who is in the group; this signed record says who may write. The first record in an
 empty workspace is a device claiming ownership of itself. After that only an owner's device may
@@ -48,7 +48,7 @@ The record is public metadata on purpose. It carries a workspace, a device, a ro
 a signature, and nothing a person wrote. `roleRecord.test.ts` covers the first claim, the owner
 gate, the sequence gap and the last-owner refusal.
 
-## apps/sync/packages/protocol/src/removal.ts#applyRemovalRecord
+## services/relay/packages/protocol/src/removal.ts#applyRemovalRecord
 
 Removing a device has two halves. The MLS commit rotates the epoch and is ciphertext; this record is
 the host's readable half, signed by an owner. It lets the host close the socket, drop the device

@@ -1,5 +1,5 @@
 ---
-module: apps/go/src/modules
+module: hosts/go/src/modules
 title: Go Modules
 summary: "The reference domains: a real Loro note and an honest Canvas placeholder."
 ---
@@ -14,7 +14,7 @@ Both modules show the same boundary from different sides. Scratch owns a
 document the container cannot read; Canvas proves the launcher can host a module
 with no surface. Neither name appears in `packages/go` or in the shell.
 
-## apps/go/src/modules/scratch/controller.ts#createScratchController
+## hosts/go/src/modules/scratch/controller.ts#createScratchController
 
 The controller keeps the document and the debounce, and the view keeps the
 caret. `start` is memoized because StrictMode mounts twice and a capture can
@@ -27,7 +27,7 @@ container cannot read a snapshot to invent one.
 leaving, then clears the timer, the subscription and the listeners. `flush` is
 the same write without the teardown, for the foreground boundary.
 
-## apps/go/src/modules/canvas/index.tsx#canvasModule
+## hosts/go/src/modules/canvas/index.tsx#canvasModule
 
 Canvas is registered so the shell can host a module with no working surface and
 so the gap is visible instead of implied. It declares `documents` and no capture

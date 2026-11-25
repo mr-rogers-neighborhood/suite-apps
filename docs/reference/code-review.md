@@ -48,7 +48,7 @@ the built-in language rules; `exclude` keeps generated and agent paths out of th
 resolution with:
 
 ```sh
-ocr rules check apps/desk/src/main.ts
+ocr rules check hosts/desk/src/main.ts
 ```
 
 ## Token budget

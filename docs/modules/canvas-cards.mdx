@@ -1,5 +1,5 @@
 ---
-module: apps/canvas/src/cards
+module: legacy/canvas/src/cards
 title: Canvas / Cards
 summary: "The card face, its two editors and the field controls that write through the graph."
 ---
@@ -14,10 +14,10 @@ The module owns no record. The card it paints arrives from the projection, the
 title and body are Loro containers it binds temporarily, and every field commit
 goes through `WorkspaceDocument`. Reader preferences — which card is folded, which
 surface owns the caret — live in `useUiStore`; the body text never does.
-`apps/canvas/docs/reference/editing.md` owns the editor contract; these notes are
+`legacy/canvas/docs/reference/editing.md` owns the editor contract; these notes are
 the stops where the card meets it.
 
-## apps/canvas/src/cards/NodeCard.tsx#NodeCard
+## legacy/canvas/src/cards/NodeCard.tsx#NodeCard
 
 One card, one editor. `CardBodyArea` answers with three faces, and each is a
 different thing rather than a mode: a view card presents a saved view, a book card
@@ -31,7 +31,7 @@ the session (`canEditContent`) and by `editingSurface`, and a read-only card pas
 component serve a board, an inspector and a share without three copies of the "may
 I type" rule.
 
-## apps/canvas/src/cards/CardBodyEditor.tsx#CardBodyEditor
+## legacy/canvas/src/cards/CardBodyEditor.tsx#CardBodyEditor
 
 The body editor binds exactly one Loro container to one Tiptap editor. It appends
 `cardBodySchemaExtensions` for the schema and `LoroCollaboration` for the plugins,
@@ -46,7 +46,7 @@ surface or a workspace call writes, tagged as a non-local update so the caret st
 is untouched. The editor's own event is skipped, because its document already
 matches Loro.
 
-## apps/canvas/src/cards/PropertyField.tsx#FieldValueInput
+## legacy/canvas/src/cards/PropertyField.tsx#FieldValueInput
 
 `FieldValueInput` is the one control set for `text`, `date`, `number`, `checkbox`,
 `select`, `multiSelect`, `card` and `board`. The inspector, the inline property

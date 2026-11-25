@@ -73,7 +73,7 @@ modules:
       - install -Dm644 icons/run.suite.desk-512.png /app/share/icons/hicolor/512x512/apps/run.suite.desk.png
     sources:
       - type: dir
-        path: ../../apps/desk/release/linux-unpacked
+        path: ../../hosts/desk/release/linux-unpacked
         dest: app
       - type: file
         path: run.suite.desk

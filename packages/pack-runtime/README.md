@@ -13,7 +13,7 @@ implementing any host policy:
 - `notifications`, `theme`, `lifecycle`, and the launch context.
 
 `PackHost` in `src/services.ts` is the target shape of `window.suite`, not what the desktop host
-implements today. The v1 host (`apps/desk`) implements `documents`, `files`, and the small
+implements today. The v1 host (`hosts/desk`) implements `documents`, `files`, and the small
 `info`/`setTitle`/`openExternal` surface; `openExternal` itself requires the `network` capability.
 The other services are refused at discovery: a manifest that declares `storage`, `relay`,
 `notifications` or `commands` is not loaded, and external file handles are not built. Treat these

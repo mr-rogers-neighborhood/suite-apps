@@ -18,7 +18,8 @@ mise exec -- node scripts/gate.mjs --no-e2e        # skip a row marked with an e
 mise exec -- node scripts/affected.mjs --base origin/main  # rows a diff selects
 ```
 
-The gate builds the workspace libraries (`packages/*` and `apps/*/packages/*`) once, runs the root
+The gate builds the workspace libraries (`packages/*`, `hosts/*/packages/*`, `legacy/*/packages/*`
+and `services/*/packages/*`) once, runs the root
 scripts' `node --test` checks (pack, budget pack, affected, channel, release and spec), then runs each
 app's own `check:full` in dependency order. It writes `.dev/gate-status.json`. `--fresh` exports
 `HEAD` with `git archive`, installs from the lockfile, and runs the same order in that clean tree. A
@@ -39,7 +40,7 @@ systemd-run --user --scope -p MemoryHigh=10G -p MemoryMax=15G \
 
 ## Per-app checks
 
-Each app owns its gate. Read `apps/<app>/AGENTS.md` before changing code; the README repeats the
+Each app owns its gate. Read `legacy/<app>/AGENTS.md` (or `hosts/<app>/AGENTS.md`) before changing code; the README repeats the
 short version.
 
 | App | Command |
@@ -77,7 +78,7 @@ mise exec -- node scripts/profile-check.mjs
 `{app}` is the only placeholder. The gate is `node scripts/gate.mjs --only {app}` with `fresh: true`;
 the slop build is `node scripts/flatpak.mjs --app {app} --channel slop --session`; the display is
 `flatpak run run.suite.slop.{app}`. `--session` is what lets the factory build a frozen legacy app;
-that build is local and is never published. Each app's `slop_build_path` is `apps/<app>/slop`. A working
+that build is local and is never published. Each app's `slop_build_path` is `legacy/<app>/slop`. A working
 change lands on `slop/<name>`; the `slop → nightly → preview → stable` ladder stays with the app set,
 and the profile carries only the `slop` channel.
 
@@ -142,14 +143,14 @@ mise exec -- pnpm canvas:pack [--key <base64>] [--out <file.suitepack>] [--versi
 ```
 
 `scripts/budget-pack.mjs` builds Budget's own renderer and its prelude into
-`apps/budget/.dev/pack`, puts the prelude in front of the app script, and signs the directory with
+`legacy/budget/.dev/pack`, puts the prelude in front of the app script, and signs the directory with
 the pinned key. `scripts/planner-pack.mjs` builds Planner's renderer and its bridge into
-`apps/planner/.dev/pack` and signs that directory; its entry is one module, so it needs no script
-injection. `scripts/canvas-pack.mjs` builds Canvas's renderer and bridge into `apps/canvas/.dev/pack`
+`legacy/planner/.dev/pack` and signs that directory; its entry is one module, so it needs no script
+injection. `scripts/canvas-pack.mjs` builds Canvas's renderer and bridge into `legacy/canvas/.dev/pack`
 and signs that directory the same way, with Excalidraw's fonts beside the assets. All three signed
 manifests carry the source manifest's `documents` declaration, so the host stamps the schema version
-the app's core writes. The default outputs are `apps/budget/.dev/budget-<version>.suitepack`,
-`apps/planner/.dev/planner-<version>.suitepack` and `apps/canvas/.dev/canvas-<version>.suitepack`.
+the app's core writes. The default outputs are `legacy/budget/.dev/budget-<version>.suitepack`,
+`legacy/planner/.dev/planner-<version>.suitepack` and `legacy/canvas/.dev/canvas-<version>.suitepack`.
 The gate runs each signed round-trip with an ephemeral key, so a clean checkout with no owner key
 still proves the build and verification path.
 
@@ -196,12 +197,12 @@ mise exec -- node scripts/docs-check.mjs
 Checks relative links, that each `docs/` section index lists its pages, and a short list of retired
 phrases. It is not part of the gate yet; run it with any documentation change.
 
-Suite Help (`apps/help`) is the shipped documentation app: one Vite + React renderer in an Electron
+Suite Help (`legacy/help`) is the shipped documentation app: one Vite + React renderer in an Electron
 shell. It shows Browser, Modules and Tours over the code index, and renders the `docs/` pages as the
 **Handbook**. It is offline; Flatpak owns updates.
 
 ```sh
-mise exec -- pnpm docs:index     # index every file and declaration into apps/help/public/data
+mise exec -- pnpm docs:index     # index every file and declaration into legacy/help/public/data
 mise exec -- pnpm docs:index:check # resolve notes, tours and generated data
 mise exec -- pnpm docs:coverage  # report authored vs generated prose; never fails on a gap
 mise exec -- pnpm docs:explain <node-id> # scaffold one note section in its module MDX
@@ -210,13 +211,13 @@ mise exec -- pnpm docs:build     # index, sync and build the app
 mise exec -- pnpm docs:clean     # remove out, release, .generated and public/data
 ```
 
-`docs:index` runs `apps/help/scripts/index-code.mjs`: every file and declaration becomes a node,
+`docs:index` runs `legacy/help/scripts/index-code.mjs`: every file and declaration becomes a node,
 modules are package roots plus `src/` children, and config files become `config:*` modules. It writes
-`apps/help/public/data/` and is not committed. `docs:index:check` resolves every note heading, tour
+`legacy/help/public/data/` and is not committed. `docs:index:check` resolves every note heading, tour
 step and composed-tour target and compares the generated files with the ones on disk; it exits
 nonzero on an unknown ID or stale data. It also checks that prose tours have an intro and that
 interludes and overlays have content. `docs:dev` and `docs:build` also run
-`apps/help/scripts/sync-docs.mjs`, which mirrors `docs/` into `apps/help/.generated/docs/` with the
+`legacy/help/scripts/sync-docs.mjs`, which mirrors `docs/` into `legacy/help/.generated/docs/` with the
 frontmatter and sidebar Fumadocs expects, and writes the offline handbook search index.
 `docs:coverage` reports how many modules and tours a person has reviewed (`reviewed: human`) against
 the generated prose, file and symbol counts, and the largest modules with no prose.

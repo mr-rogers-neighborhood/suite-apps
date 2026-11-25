@@ -8,7 +8,7 @@ Suite is a host that installs and runs local-first apps as packs, and sync you r
 - **Suite Desk** installs, updates, opens and removes packs. It never holds a document.
 - **Sync** is the protocol and the server a person runs on a device they control.
 - **Go** is the mobile container. Its home surface hosts a reference module and a Canvas placeholder,
-  and a domain arrives as an installed pack; [Planner's state](../../apps/go/docs/reference/planner.md)
+  and a domain arrives as an installed pack; [Planner's state](../../hosts/go/docs/reference/planner.md)
   records where the first one stands.
 
 Each app owns one domain and one document. The suite shares manifests, packages, a gate and a release

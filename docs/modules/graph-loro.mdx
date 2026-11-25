@@ -1,5 +1,5 @@
 ---
-module: apps/canvas/packages/graph/src/loro
+module: legacy/canvas/packages/graph/src/loro
 title: Graph / Loro
 summary: "The typed facade over one Loro document: roots, writes, commits and snapshots."
 ---
@@ -19,7 +19,7 @@ projection module. The seam is `WorkspaceDocument`: construct one over a
 snapshots through it. `DocContext` and `createDocApi` compose the domains behind
 that seam and are not a second public entry.
 
-## apps/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument
+## legacy/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument
 
 Construction is the seam. Handing in a `LoroDoc` adopts an existing document;
 handing in nothing creates one. Everything above it in Canvas works through this
@@ -27,7 +27,7 @@ object, and the only code that should hold the underlying document is a
 persistence adapter or a test. The facade composes the domain method bags on one
 prototype, so a caller does not learn which module owns a method.
 
-## apps/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument.batch
+## legacy/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument.batch
 
 A batch is how a gesture stays one change. Nested batches join the outer one
 rather than opening a second commit, which is what lets a template or a multi-card
@@ -35,21 +35,21 @@ move leave one undo step. A writer that commits inside a gesture instead of
 joining the batch turns one user action into several undo steps, and the history
 panel shows the seams.
 
-## apps/canvas/packages/graph/src/loro/api.ts#createDocApi
+## legacy/canvas/packages/graph/src/loro/api.ts#createDocApi
 
 Composition only. Each domain receives the same `DocContext` and calls another
 domain through `ctx.api`, so no module reaches into another's maps or caches. A
 new domain is added here and exposed on the facade; it is not exported from the
 package as a bag of free functions.
 
-## apps/canvas/packages/graph/src/loro/keys.ts#STRUCT_KEYS
+## legacy/canvas/packages/graph/src/loro/keys.ts#STRUCT_KEYS
 
 The root names a domain module may open. The drawings root is absent on purpose:
 it is reachable only through the facade, so a feature module cannot bypass the
 typed drawing writer. Adding a root here changes the document shape and needs the
 schema-version decision, not only a new key.
 
-## apps/canvas/packages/graph/src/loro/context.ts#DocContext.commit
+## legacy/canvas/packages/graph/src/loro/context.ts#DocContext.commit
 
 One commit per gesture. The origin is stored as the change's message, which is
 what undo and the history panel read; the context disables Loro's merge interval
@@ -57,7 +57,7 @@ so a same-message gesture cannot fold into a neighbour and hide a restorable
 point. A commit called while a batch is open is a no-op, so nested writers cannot
 split the gesture by accident.
 
-## apps/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.createCard
+## legacy/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.createCard
 
 The only constructor for a card. It applies the schema, creates the title and
 body containers, copies the chosen type's template and places the card when a
@@ -65,14 +65,14 @@ board is named. A caller that assembles a card record itself bypasses the
 containers and the template, which is the failure this single constructor exists
 to prevent.
 
-## apps/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.setCard
+## legacy/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.setCard
 
 A whole-record write, kept for import and repair. It stamps `updatedAt` and
 rewrites every leaf, so republishing a stale copy can revert a concurrent rename
 even when the sets merge cleanly. Interactive edits use the field-level methods
 beside it; Canvas's data-model page owns the full rule.
 
-## apps/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.setProperty
+## legacy/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.setProperty
 
 One property leaf, written through the shared card mutator, so two people editing
 different fields of one card both survive. A read-only field refuses unless the
@@ -80,14 +80,14 @@ caller passes `asApp`, which keeps the refusal a rule about who is asking rather
 than a second writer. Passing `null` clears the key, so a picker commits both
 gestures through one call.
 
-## apps/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument.exportSnapshot
+## legacy/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument.exportSnapshot
 
 The byte form the file envelope stores. Nothing between this call and the file's
 base64 re-encodes the document, so a save is the document rather than a rendering
 of it. The shallow export beside it is for templates and shares: it omits the
 history a restore would need, so it is not a backup.
 
-## apps/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument.importSnapshot
+## legacy/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument.importSnapshot
 
 The reload seam. An import is not an edit and must not be forwarded as one, which
 is what lets the desktop adapter hydrate without turning the open into a save.

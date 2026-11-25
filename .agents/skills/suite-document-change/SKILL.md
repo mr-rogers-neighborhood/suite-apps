@@ -18,11 +18,11 @@ projects it. Follow the app's `AGENTS.md` and `docs/reference/decisions.md`.
 
 Anchors:
 
-- Planner core: `apps/planner/packages/core/src/loro/`
-- Budget core: `apps/budget/packages/core/src/loro/`
-- Canvas graph: `apps/canvas/packages/graph/src/loro/`
+- Planner core: `legacy/planner/packages/core/src/loro/`
+- Budget core: `legacy/budget/packages/core/src/loro/`
+- Canvas graph: `legacy/canvas/packages/graph/src/loro/`
 - Shared replica/store: `packages/document-runtime/src/replica.ts`, `src/node/store.ts`
-- Shape checks: `apps/{planner,budget,canvas}/scripts/check-shape.mjs`
+- Shape checks: `legacy/{planner,budget,canvas}/scripts/check-shape.mjs`
 
 ## Invariants
 

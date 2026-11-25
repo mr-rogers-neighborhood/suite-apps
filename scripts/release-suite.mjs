@@ -48,7 +48,7 @@ import { goApkName } from "./release-status.mjs";
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /** Where `android-release.mjs` leaves the named APK, relative to the root. */
-export const APK_DIR = "apps/go/.dev/release";
+export const APK_DIR = "hosts/go/.dev/release";
 
 /** The proof file the gate writes and every publish reads. */
 export const GATE_STATUS = ".dev/gate-status.json";
@@ -238,7 +238,7 @@ function currentHead() {
 /** The Suite Go version whose APK the release attaches, or null when absent. */
 function goVersion() {
   try {
-    const config = JSON.parse(readFileSync(join(ROOT, "apps/go/app.config.json"), "utf8"));
+    const config = JSON.parse(readFileSync(join(ROOT, "hosts/go/app.config.json"), "utf8"));
     return typeof config.version === "string" && config.version.length > 0 ? config.version : null;
   } catch {
     return null;

@@ -337,7 +337,7 @@ directory, such as Orca, hides the real user installation; run with
 
 The relay is no longer a shipped app (#315). `run.suite.sync` stopped being the install path: no new
 build is published, the signed remote keeps the last published ref for a person who already has it,
-and the tray app is not the target surface. `apps/sync` stays in the tree as the protocol, the client
+and the tray app is not the target surface. `services/relay` stays in the tree as the protocol, the client
 library and the relay implementation, and its gate row still runs.
 
 The last published app had two entry points, and the headless one is what a relay operator still uses
@@ -352,7 +352,7 @@ from it:
   without a window, for a machine that has no desktop. The launcher runs the app's binary with
   `ELECTRON_RUN_AS_NODE=1`, because the Flatpak base carries no Node runtime.
 
-[Leave a relay running](../../apps/sync/docs/how-to/relay.md) is the operation guide. A relay's reach
+[Leave a relay running](../../services/relay/docs/how-to/relay.md) is the operation guide. A relay's reach
 was a stored choice in the app: loopback by default, the machine's tailnet when Tailscale is running,
 or the whole network after a confirmation. `SUITE_SYNC_BIND` overrides the bind for a test or a host
 unit. The host seam that owns the relay decides how that choice is stored and shown next.
@@ -376,7 +376,7 @@ release key, not by a build machine's debug keystore. There is no Play Store lis
 | `preview` | `suite-go-preview-<version>.apk` | `run.suite.preview.go` |
 
 Every asset has a `.sha256` beside it. Stable also uploads the same bytes as `suite-go.apk`, the
-stable name [Suite Go's README](../../apps/go/README.md#install-the-apk) links through
+stable name [Suite Go's README](../../hosts/go/README.md#install-the-apk) links through
 `releases/latest`; the versioned asset stays canonical. A pre-release has no stable alias, so a
 channel download cannot be mistaken for the stable one. A slop asset also names the commit, because
 each slop page is one build: a second merge on the same day must not overwrite the first.
@@ -386,8 +386,8 @@ update side by side. Nightly and preview moved from the shared `run.suite.slop.g
 made before the change reinstalls once under the new id; no app data is migrated. The channel is in
 the display and version name, so a person can tell the installed build apart.
 
-`versionCode` is derived from the one number in `apps/go/app.config.json`; the rule and the identity
-table live in [Android](../../apps/go/docs/reference/android.md#the-four-channels).
+`versionCode` is derived from the one number in `hosts/go/app.config.json`; the rule and the identity
+table live in [Android](../../hosts/go/docs/reference/android.md#the-four-channels).
 
 ```sh
 mise exec -- pnpm android:key status                     # is the release key the pinned one?
@@ -405,7 +405,7 @@ artifact. `--publish` attaches the asset to the rolling release while that relea
 No device or emulator is involved.
 
 The keystore, its password file, the fingerprint pin and the rotation order are in [Android
-notes](../../apps/go/docs/reference/android.md#release-signing-and-channels) and [Manage signing
+notes](../../hosts/go/docs/reference/android.md#release-signing-and-channels) and [Manage signing
 keys](../how-to/keys.md#android-release-keystore).
 
 ## Pre-release documents
@@ -420,9 +420,9 @@ than a shipped channel: it keeps `Documents/Suite Slop/<App>` while stable keeps
 `Documents/Suite/<App>`. A stable document handed to it by a path, a link, or a file manager is
 copied into that folder and the copy is opened, so the stable file, its backup and its temporary file
 are never written. Export is explicit, writes where the person chooses, and refuses the stable
-folder. The rule is in [Canvas's paths](../../apps/canvas/desktop/src/main/paths.ts),
-[Planner's workspace location](../../apps/planner/src/main/workspaceLocation.ts) and
-[Budget's library](../../apps/budget/src/main/library.ts), with tests beside each.
+folder. The rule is in [Canvas's paths](../../legacy/canvas/desktop/src/main/paths.ts),
+[Planner's workspace location](../../legacy/planner/src/main/workspaceLocation.ts) and
+[Budget's library](../../legacy/budget/src/main/library.ts), with tests beside each.
 
 ## Packs and cards
 

@@ -12,11 +12,11 @@ the pipeline is [ci.md](ci.md); the delivery contract is [delivery.md](delivery.
 lives under `packages/` only when two or more apps consume it. An app's private packages stay under
 `apps/<app>/packages/`.
 
-**R1.3** The desktop host is `apps/desk` (`@suite/desk`), and it is the way in: it reads a verified
+**R1.3** The desktop host is `hosts/desk` (`@suite/desk`), and it is the way in: it reads a verified
 index, installs packs and opens them. It is the only desktop install path. The legacy Start hub was
 retired in [#314](https://github.com/mrrnbhd/suite-apps/issues/314); its catalogue and Home moved
 here, and a frozen Flatpak keeps its documented `flatpak install` line. Go is the mobile host. The
-relay is `apps/sync`, with its app and server packages beside it.
+relay is `services/relay`, with its app and server packages beside it.
 
 **R1.4** Flatpak manifests live in `packaging/flatpak/`. The spec lives in `docs/spec/`. An app's
 own docs stay in `apps/<app>/docs/`.
@@ -25,7 +25,7 @@ own docs stay in `apps/<app>/docs/`.
 
 **R2.1** One pack format for desktop and mobile. `@suite/pack` owns the manifest, canonical bytes,
 signature, capabilities and host fit. `@suite/pack-host` owns the archive reader/writer and scoped
-store. Go consumes the same parser and verifier; `apps/go/packages/go/src/pack.ts` retires rather
+store. Go consumes the same parser and verifier; `hosts/go/packages/go/src/pack.ts` retires rather
 than keeping a second manifest. This closes #202.
 
 **R2.2** A packable app declares itself with `"suite": { "pack": true }` in its `package.json` and

@@ -1,5 +1,5 @@
 ---
-module: apps/planner/packages/core/src/plan
+module: legacy/planner/packages/core/src/plan
 title: Planner / Plan
 summary: "The pure projections that turn tasks and settings into a day, a week and a capacity."
 ---
@@ -16,7 +16,7 @@ same record. A day record holds an intention, a shutdown note and a capacity
 override; it is not a container for the tasks of that day. The views decide how
 to draw a `Capacity`; the states are computed here.
 
-## apps/planner/packages/core/src/plan/dayPlan.ts#dayPlan
+## legacy/planner/packages/core/src/plan/dayPlan.ts#dayPlan
 
 A day is a partition, not a list. The function walks every task once and sorts it
 into planned, completed, overdue or an inbox count. A recurring task is included
@@ -31,7 +31,7 @@ Planned tasks sort by `order` then `createdAt`; completed tasks sort by
 `includeCompleted` can leave the completed list out of a view without changing
 the partition. The test pins the four buckets and both recurring cases.
 
-## apps/planner/packages/core/src/plan/capacity.ts#capacityFor
+## legacy/planner/packages/core/src/plan/capacity.ts#capacityFor
 
 Capacity compares the estimates the day plan already counted with the minutes
 the day has. `plannedMinutes` uses the same default estimate, `remainingMinutes`
@@ -45,7 +45,7 @@ colour from its own ratio would disagree with the day plan as soon as one
 estimate changed. The test pins the empty, default-estimate, tight and over
 cases.
 
-## apps/planner/packages/core/src/plan/weekPlan.ts#weekPlan
+## legacy/planner/packages/core/src/plan/weekPlan.ts#weekPlan
 
 A week is seven day plans with one start. `startOfWeekKey` resolves the first
 date from `weekStartsOn`, then each day is a `dayPlan`; the day's capacity is its
@@ -58,7 +58,7 @@ to today is a separate write. A recurring task cannot be carry-over because
 `dayPlan` only reports non-recurring overdue tasks. The test pins both week
 starts, a per-day override, and carry-over that stays put.
 
-## apps/planner/packages/core/src/plan/recurrence.ts#occurrencesBetween
+## legacy/planner/packages/core/src/plan/recurrence.ts#occurrencesBetween
 
 A recurrence is projected, never materialised. The task's `scheduledFor` is the
 anchor, the rule's `until` caps the range, daily steps by `interval`, weekly
@@ -71,7 +71,7 @@ produce an unbounded list. A monthly rule anchored on the 31st simply has no
 occurrence in a shorter month, because the match is on the same day number. The
 test pins the anchor, interval, weekday and until cases.
 
-## apps/planner/packages/core/src/plan/recurrence.ts#isOccurrenceDone
+## legacy/planner/packages/core/src/plan/recurrence.ts#isOccurrenceDone
 
 Completion of a recurring task is per occurrence. This reads
 `recurrenceCompletions` rather than the task's `status`, so completing one
@@ -80,7 +80,7 @@ Tuesday does not close the series. `completeTask(id, date)` appends the date and
 done occurrence beside tomorrow's pending one, and a view must ask this rather
 than check `status`.
 
-## apps/planner/packages/core/src/plan/inbox.ts#inboxTasks
+## legacy/planner/packages/core/src/plan/inbox.ts#inboxTasks
 
 The inbox is a query, not a container. It is every task with no date and status
 `inbox`, sorted by priority and then newest first. A null priority sorts last as
@@ -88,7 +88,7 @@ The inbox is a query, not a container. It is every task with no date and status
 Scheduling a task gives it a date and changes its status, which is why it leaves
 this list without a delete.
 
-## apps/planner/packages/core/src/plan/search.ts#searchTasks
+## legacy/planner/packages/core/src/plan/search.ts#searchTasks
 
 Search is a fuzzy match over the title plus the project and tag names, so a query
 can find a task by a word that is not in its title. The names are passed in
@@ -100,7 +100,7 @@ The result is tasks, not matches. The score is not exposed, so a view cannot
 reorder by it; search is a ranked search over records and leaves the score to the
 one library that produced it.
 
-## apps/planner/packages/core/src/plan/reminders.ts#pendingReminders
+## legacy/planner/packages/core/src/plan/reminders.ts#pendingReminders
 
 A reminder is pending only when it has a time, has not fired, belongs to a task
 that is not done, and is in the future. Past times are dropped on purpose:
@@ -112,14 +112,14 @@ The returned schedule is sorted by time and carries only id, title and timestamp
 The scheduler owns delivery and the `remindedAt` write; this function never marks
 anything as sent.
 
-## apps/planner/packages/core/src/plan/sort.ts#sortByOrder
+## legacy/planner/packages/core/src/plan/sort.ts#sortByOrder
 
 `sortByOrder` is the list order for a day or a project: `order`, then
 `createdAt` as the tie-break. It returns a sorted copy, so a caller cannot reorder
 the snapshot by accident. The same rule is used by `listTasks` and `dayPlan`,
 which is why a list, a day and a project agree on what "first" means.
 
-## apps/planner/packages/core/src/plan/sort.ts#nextOrder
+## legacy/planner/packages/core/src/plan/sort.ts#nextOrder
 
 The next order is one past the highest order on that date, or 0 when the date has
 no tasks. The writer uses this so a new task lands at the end without renumbering;

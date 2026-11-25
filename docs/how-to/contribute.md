@@ -5,11 +5,11 @@ and it names the gate that app expects.
 
 | If you change | Read first |
 | --- | --- |
-| Canvas | `apps/canvas/AGENTS.md` |
-| Planner | `apps/planner/AGENTS.md` |
-| Budget | `apps/budget/AGENTS.md` |
-| Go | `apps/go/AGENTS.md` |
-| Sync | `apps/sync/README.md` and `docs/` |
+| Canvas | `legacy/canvas/AGENTS.md` |
+| Planner | `legacy/planner/AGENTS.md` |
+| Budget | `legacy/budget/AGENTS.md` |
+| Go | `hosts/go/AGENTS.md` |
+| Sync | `services/relay/README.md` and `docs/` |
 | Docs only | [docs/README.md](../README.md) |
 
 ## One app per change
@@ -68,7 +68,7 @@ that names no command is not evidence.
 ## Verify
 
 ```sh
-cd apps/<app>
+cd legacy/<app>
 pnpm check
 ```
 

@@ -4,8 +4,8 @@
  *
  *   pnpm budget:pack [--key <base64>] [--out <file.suitepack>] [--version <semver>]
  *
- * `apps/budget/pack/vite.config.ts` builds the renderer and the prelude into
- * `apps/budget/.dev/pack`, which is the pack's build output, not its source.
+ * `packs/budget/pack/vite.config.ts` builds the renderer and the prelude into
+ * `legacy/budget/.dev/pack`, which is the pack's build output, not its source.
  * This script writes the generated manifest there, puts the prelude script in
  * front of the app script, and hands the directory to `bundlePack`.
  *
@@ -23,8 +23,8 @@ import { writePackCard } from "./lib/packCard.mjs";
 import { bundlePack, platformsSummary, publicKeyOfSigningKey } from "./pack.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const PACK_DIR = join(ROOT, "apps", "budget", "pack");
-const APP_DIR = join(ROOT, "apps", "budget");
+const PACK_DIR = join(ROOT, "packs", "budget", "pack");
+const APP_DIR = join(ROOT, "legacy", "budget");
 const DIST = join(APP_DIR, ".dev", "pack");
 const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
 
@@ -115,12 +115,12 @@ function usage() {
 
   --key       Ed25519 private key, base64 PKCS#8 or a bare seed; default
               $${KEYS.pack.env}, then the pack key in the Suite keys directory
-  --out       archive to write; default apps/budget/.dev/budget-<version>.suitepack
+  --out       archive to write; default legacy/budget/.dev/budget-<version>.suitepack
   --version   pack version to record; default the version in manifest.json
   --contract  override the manifest's contractVersion
   --min-host  minimum host version to record
 
-Builds the renderer and prelude into apps/budget/.dev/pack, then signs the
+Builds the renderer and prelude into legacy/budget/.dev/pack, then signs the
 directory with the pinned pack key. A key whose public half is not
 ${KEYS.pack.pinName} is refused before anything is signed.
 `;
@@ -165,7 +165,7 @@ async function main(argv) {
       "--filter",
       "./packages/*",
       "--filter",
-      "./apps/*/packages/*",
+      "./legacy/*/packages/*",
       "--workspace-concurrency=2",
       "run",
       "build",
@@ -174,7 +174,7 @@ async function main(argv) {
   );
   await run(
     "pnpm",
-    ["--dir", APP_DIR, "exec", "vite", "build", "--config", "pack/vite.config.ts"],
+    ["--dir", APP_DIR, "exec", "vite", "build", "--config", join(ROOT, "packs", "budget", "pack", "vite.config.ts")],
     ROOT,
   );
 

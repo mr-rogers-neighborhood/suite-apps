@@ -48,18 +48,18 @@ const TAG_SCAN_FILES = [
   "packages/pack/src/signature.test.ts",
   "packages/pack/src/trust.test.ts",
   "packages/pack-host/src/archive.test.ts",
-  "apps/desk/src/documentMigrations.test.ts",
-  "apps/desk/src/consent.test.ts",
-  "apps/desk/src/recents.test.ts",
-  "apps/desk/src/reminders.test.ts",
-  "apps/desk/src/blobs.test.ts",
-  "apps/desk/src/exportBundle.test.ts",
-  "apps/desk/src/installedPacks.test.ts",
-  "apps/desk/src/packIdentity.test.ts",
-  "apps/desk/src/packIdentityKey.test.ts",
-  "apps/desk/src/packRevocation.test.ts",
-  "apps/desk/src/publisherRotation.test.ts",
-  "apps/desk/src/publisherTrust.test.ts",
+  "hosts/desk/src/documentMigrations.test.ts",
+  "hosts/desk/src/consent.test.ts",
+  "hosts/desk/src/recents.test.ts",
+  "hosts/desk/src/reminders.test.ts",
+  "hosts/desk/src/blobs.test.ts",
+  "hosts/desk/src/exportBundle.test.ts",
+  "hosts/desk/src/installedPacks.test.ts",
+  "hosts/desk/src/packIdentity.test.ts",
+  "hosts/desk/src/packIdentityKey.test.ts",
+  "hosts/desk/src/packRevocation.test.ts",
+  "hosts/desk/src/publisherRotation.test.ts",
+  "hosts/desk/src/publisherTrust.test.ts",
 ];
 
 function resolveRef(ref) {
@@ -246,7 +246,9 @@ function findFileNamed(name) {
         }
       }
     };
-    for (const base of ["scripts", "packages", "apps", "docs"]) walk(base);
+    for (const base of ["scripts", "packages", "hosts", "legacy", "packs", "services", "docs"]) {
+      walk(base);
+    }
   }
   return fileIndex.get(name) ?? null;
 }
@@ -256,7 +258,9 @@ function resolvesCitation(citation) {
   const token = citation.replace(/[.,;:]+$/u, "");
   if (token.startsWith("@suite/")) {
     const name = token.slice("@suite/".length);
-    return ["packages", "apps"].some((base) => existsSync(join(ROOT, base, name)));
+    return ["packages", "hosts", "legacy", "services"].some((base) =>
+      existsSync(join(ROOT, base, name)),
+    );
   }
   if (existsSync(join(ROOT, token))) return true;
   if (!token.includes("/")) return findFileNamed(token) !== null;

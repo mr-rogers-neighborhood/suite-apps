@@ -12,4 +12,4 @@ One task at a time. These assume you know what you want to do.
 | [Contribute a change](contribute.md) | From branch to merge, with the repo's rules |
 
 App-specific jobs live in that app's `docs/how-to/`: for example, Canvas's
-[import an Obsidian vault](../../apps/canvas/docs/how-to/import-an-obsidian-vault.md).
+[import an Obsidian vault](../../legacy/canvas/docs/how-to/import-an-obsidian-vault.md).

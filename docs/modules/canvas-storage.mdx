@@ -1,5 +1,5 @@
 ---
-module: apps/canvas/src/storage
+module: legacy/canvas/src/storage
 title: Canvas / Storage
 summary: "The renderer's persistence port: one snapshot per save, one adapter per host, and a failure a person can see."
 ---
@@ -13,7 +13,7 @@ A failed write is a visible state, never a silent one. The in-memory document is
 refused save, because persistence is a side channel and never the source of truth. A desktop build
 without its bridge is refused outright rather than allowed to keep a workspace only in memory.
 
-## apps/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence.write
+## legacy/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence.write
 
 A save is a whole snapshot, not a stream of updates. The adapter marks that something changed and
 takes the snapshot at write time, after edits settle, so a keystroke does not cross the bridge. It
@@ -26,7 +26,7 @@ changes, and a missing image is reported while the document still saves. A main-
 goes to `onFailure`; it is not thrown into a render. `desktopPersistence.test.ts` covers the local-
 only subscription, the coalesced save and the failure path.
 
-## apps/canvas/src/storage/workspacePersistence.ts#createWorkspacePersistence
+## legacy/canvas/src/storage/workspacePersistence.ts#createWorkspacePersistence
 
 The adapter is chosen from the host signal, not a build flag. A page with no room gets no
 persistence. A desktop page without a bridge throws, because the alternative is a session that

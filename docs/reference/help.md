@@ -29,7 +29,7 @@ same artwork.
 ## Commands
 
 ```sh
-mise exec -- pnpm docs:index        # build apps/help/public/data
+mise exec -- pnpm docs:index        # build legacy/help/public/data
 mise exec -- pnpm docs:index:check  # validate notes, tours and generated data
 mise exec -- pnpm docs:coverage     # authored vs generated prose
 mise exec -- pnpm docs:explain <node-id>
@@ -38,8 +38,8 @@ mise exec -- pnpm docs:build        # generate and build the static renderer
 mise exec -- pnpm docs:clean
 ```
 
-The owning instructions are in [apps/help/AGENTS.md](../../apps/help/AGENTS.md) and
-[apps/help/README.md](../../apps/help/README.md).
+The owning instructions are in [legacy/help/AGENTS.md](../../legacy/help/AGENTS.md) and
+[legacy/help/README.md](../../legacy/help/README.md).
 
 ## Packaging
 

@@ -36,7 +36,7 @@ standard; the white paper documents the capability tiers in its security and pri
 | --- | --- |
 | Host plus downloaded packs | Suite Desk on the desktop and Suite Go on mobile |
 | A manifest beside the executable | `suite.app.json` for desktop discovery; `manifest.json` inside a `.suitepack` for both hosts |
-| Declared capabilities | Pack `capabilities`, enforced by the host; see [Go decisions](../../apps/go/docs/reference/decisions.md) |
+| Declared capabilities | Pack `capabilities`, enforced by the host; see [Go decisions](../../hosts/go/docs/reference/decisions.md) |
 | One instance per app | The host keeps one running instance per container and opens tabs into it |
 | Addressable app entry | `suite://<app>/<path>`; the old `/workspace/` form went with Start (#314) |
 | A widget in a host surface | A descriptor a host renders on its dashboard; no app code runs in the host |
@@ -67,11 +67,11 @@ standard; the white paper documents the capability tiers in its security and pri
 
 ## The desktop host spike
 
-`apps/desk` tests the same model on the desktop with one Electron host: a tab per pack, a custom
+`hosts/desk` tests the same model on the desktop with one Electron host: a tab per pack, a custom
 protocol origin per pack, a session partition per pack, and a scoped document API. It is a spike, not
 the shipping path; the frozen desktop apps remain separate Flatpaks.
 [Decisions](../reference/decisions.md#desktop-host) owns the direction, and
-[the host's README](../../apps/desk/README.md) states what works.
+[the host's README](../../hosts/desk/README.md) states what works.
 
 ## Reading
 

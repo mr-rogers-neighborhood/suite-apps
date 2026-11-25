@@ -30,13 +30,13 @@ build can still be `alpha`.
 
 | App | Channel | Maturity | Version | Install |
 | --- | --- | --- | --- | --- |
-| [Suite Desk](https://github.com/mrrnbhd/suite-apps/blob/main/apps/desk/CHANGELOG.md) | stable | alpha | 0.3.0 | `flatpak install --user suite run.suite.desk` |
+| [Suite Desk](https://github.com/mrrnbhd/suite-apps/blob/main/hosts/desk/CHANGELOG.md) | stable | alpha | 0.3.0 | `flatpak install --user suite run.suite.desk` |
 
 ## Mobile
 
 | App | Channel | Maturity | Version | Install |
 | --- | --- | --- | --- | --- |
-| [Suite Go](https://github.com/mrrnbhd/suite-apps/blob/main/apps/go/CHANGELOG.md) | stable | pre-alpha | 0.2.0 | [suite-go-0.2.0.apk](https://github.com/mrrnbhd/suite-apps/releases/download/suite-2026.11.24/suite-go-0.2.0.apk) |
+| [Suite Go](https://github.com/mrrnbhd/suite-apps/blob/main/hosts/go/CHANGELOG.md) | stable | pre-alpha | 0.2.0 | [suite-go-0.2.0.apk](https://github.com/mrrnbhd/suite-apps/releases/download/suite-2026.11.24/suite-go-0.2.0.apk) |
 
 Suite Go is not a Flatpak. This release carries its release-signed APK, [suite-go-0.2.0.apk](https://github.com/mrrnbhd/suite-apps/releases/download/suite-2026.11.24/suite-go-0.2.0.apk),
 with a SHA-256 checksum beside it; sideload it with `adb install -r -t`.

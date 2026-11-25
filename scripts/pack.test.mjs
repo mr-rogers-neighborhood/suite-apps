@@ -222,13 +222,13 @@ describe("the pack pin", () => {
     assert.ok(match, `${pinFile} does not declare SUITE_PACK_PUBLIC_KEY`);
     const pinned = match[1];
 
-    const goSource = readFileSync(join(root, "apps/go/src/host/packs.ts"), "utf8");
+    const goSource = readFileSync(join(root, "hosts/go/src/host/packs.ts"), "utf8");
     assert.match(goSource, /from "@suite\/pack\/pinned-key"/u);
     assert.match(goSource, /SUITE_PACK_PUBLIC_KEY/u);
     assert.equal(
       goSource.includes(pinned),
       false,
-      "apps/go/src/host/packs.ts repeats the pinned key instead of importing it",
+      "hosts/go/src/host/packs.ts repeats the pinned key instead of importing it",
     );
 
     // The key tooling must read that same constant, or `pnpm keys status` would check another pin.

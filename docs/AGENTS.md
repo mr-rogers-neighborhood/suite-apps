@@ -1,6 +1,6 @@
 # Docs
 
-This lane owns the cross-app pages in `docs/` and the Help reader in `apps/help`. An app's own
+This lane owns the cross-app pages in `docs/` and the Help reader in `legacy/help`. An app's own
 `docs/` stays with that app's lane until its pull request merges.
 
 - A docs change lands with the code that changes the fact, in the same change.

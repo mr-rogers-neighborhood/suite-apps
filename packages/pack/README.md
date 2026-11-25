@@ -1,7 +1,7 @@
 # `@suite/pack`
 
 The Suite pack contract for the desktop host: the manifest, signature and capability contract that
-`apps/desk` installs and verifies.
+`hosts/desk` installs and verifies.
 
 The pinned key and the capability vocabulary are shared with Suite Go, but the manifest format is
 not. Go's manifest requires `independent` and `isolation`, has its own capability list and different

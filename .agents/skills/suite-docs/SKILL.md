@@ -9,7 +9,7 @@ Suite Help is the reader: **Browser / Modules / Tours** over one generated index
 declaration. The index derives reference facts. `docs/modules/` and `docs/tours/` are the authored
 layer. `docs/` is the handbook and notes archive.
 
-Read `apps/help/AGENTS.md` and `apps/help/README.md` before editing.
+Read `legacy/help/AGENTS.md` and `legacy/help/README.md` before editing.
 
 ## Commands
 
@@ -36,7 +36,7 @@ Do not run `pnpm docs:dev`, Electron, or Playwright in a headless session.
 - Keep tour notes short and deictic; the durable explanation belongs in the module note.
 - Never mirror a signature or narrate line by line. Explain why, invariants, failure modes, and test
   intent.
-- Get node IDs from `apps/help/public/data/search.json`; never invent one.
+- Get node IDs from `legacy/help/public/data/search.json`; never invent one.
 - **Never add `reviewed: human`.** That is a person's claim after reading or rewriting the prose.
 
 ## Choosing what to write
@@ -52,6 +52,6 @@ Priority is the tour, then the module:
 ## Review gate
 
 - `pnpm docs:index:check` passes.
-- `mise exec -- pnpm --dir apps/help lint` passes.
+- `mise exec -- pnpm --dir legacy/help lint` passes.
 - A person reads the prose, fixes claims against the code, and only then adds `reviewed: human`.
 - Work in a branch or worktree; open a pull request. Do not merge your own review.
