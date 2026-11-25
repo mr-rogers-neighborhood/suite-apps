@@ -3,6 +3,10 @@
 The documentation reader, shipped as a local-first desktop app. It is one Vite + React renderer
 inside an Electron shell, and it works with no checkout, no network and no account.
 
+**Mobile-ready.** The signed pack declares `desktop` and `mobile`, so Suite Go can offer it: the
+reader asks the host for no capability and reads only its own archive. The phone layout pass is
+tracked separately; the declaration is what makes the pack installable there.
+
 **Explorer.** Browser, Modules and Tours over one generated index of every file and declaration.
 Reference facts are derived; module MDX and tours are the prose layer. Prose is **authored** only
 after a person reviews or rewrites it and adds `reviewed: human` to the module or tour frontmatter.
@@ -81,7 +85,7 @@ brightness, paints the resolved role variables onto the document, and marks the 
 share one palette, and Shiki asks for `github-light` or `github-dark` from the host's resolved mode
 rather than a fixed theme.
 
-The window icon, the `electron-builder` icon, the Flatpak icons and the Help card in Start all use the
+The window icon, the `electron-builder` icon, the Flatpak icons and the catalogue card all use the
 same headset on the ink tile. The card mark is white on the hub's ink and a light theme inverts the
 tile and glyph together; the packaged icon is the same artwork.
 

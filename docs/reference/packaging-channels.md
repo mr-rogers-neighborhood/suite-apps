@@ -400,11 +400,51 @@ folder. The rule is in [Canvas's paths](../../apps/canvas/desktop/src/main/paths
 [Planner's workspace location](../../apps/planner/src/main/workspaceLocation.ts) and
 [Budget's library](../../apps/budget/src/main/library.ts), with tests beside each.
 
+## Packs and cards
+
+Canvas, Planner, Budget and Help build as signed `.suitepack` archives, and the release index job
+stages all four. Each manifest declares `"platforms": ["desktop", "mobile"]`: the desktop build is
+unchanged, and Suite Go serves `documents`, `files`, `storage`, `recents`, `notifications` and
+`network`, so all four packs are available there. Help asks for no capability and is available
+immediately. The host's catalogue is what refuses an uninstallable pack, and its sentence names the
+missing capability.
+
+A pack build also writes a **card sidecar** beside the archive:
+
+```
+packs/canvas-0.1.13.suitepack
+packs/canvas-0.1.13.card.json
+```
+
+The card URL is the archive URL with `.suitepack` replaced by `.card.json`, in the same `/packs/`
+directory. The signed `index.json` entry does **not** gain a field for it: a stable host with the
+strict entry parser keeps reading the index, and a host that has verified an entry can derive the
+card URL and fetch it for an uninstalled shadow tile without downloading the archive.
+
+The card is one JSON object, format `suite.pack.card`, version `1`:
+
+| Field | What it is |
+| --- | --- |
+| `format`, `version` | `"suite.pack.card"` and the card format version, `1`. |
+| `id`, `packVersion` | The pack id and the archive version the card describes. |
+| `name`, `description` | The catalogue name and the manifest's one-line description. |
+| `shelf` | The suite Home order: Canvas 1, Planner 2, Budget 3, Help 4. |
+| `icon` | A base64 `data:image/svg+xml` or `data:image/png` URI. |
+
+Canvas, Planner and Budget use the glyph their `AppMark` already draws; Help uses the headset in its
+own `resources/icon.svg`. `@suite/pack` owns the card shape, parser and URL helper, so the phone
+reads the same contract as the release build. A card is presentation only and is not signed. The
+archive's publisher signature and file hashes remain the proof, and the catalogue entry is what a
+host verifies before it offers an install. `scripts/release-index.mjs` uploads every archive, then
+its card, then the detached index signature, and writes `index.json` last; a build whose archive has
+no card fails before anything is published.
+
 ## Platforms
 
 Linux is the only desktop platform with published builds. Android has release-signed APKs on the
 rolling release. macOS and Windows are configured but have no signing identity, so there is nothing
-to download.
+to download. A pack's `platforms` declaration is what a host compares with its own kind and served
+capabilities; it does not create a build that does not exist.
 
 ## Signing
 

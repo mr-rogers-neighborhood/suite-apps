@@ -18,6 +18,12 @@
       "import": "./dist/capabilities.js",
       "default": "./dist/capabilities.js"
     },
+    "./card": {
+      "types": "./dist/card.d.ts",
+      "development": "./src/card.ts",
+      "import": "./dist/card.js",
+      "default": "./dist/card.js"
+    },
     "./catalogue": {
       "types": "./dist/catalogue.d.ts",
       "development": "./src/catalogue.ts",

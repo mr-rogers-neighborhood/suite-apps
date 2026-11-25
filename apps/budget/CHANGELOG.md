@@ -10,6 +10,11 @@ Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 
 ### Added
 
+- **Budget declares the phone.** The pack manifest now lists `desktop` and `mobile`, and the build
+  writes a card sidecar beside the signed archive with Budget's own mark, its one-line description
+  and shelf order 3. Suite Go serves the scoped `files` root the pack asks for, so the phone's
+  catalogue shows the card and offers the install.
+
 - **Budget runs as a pack.** Its own renderer is the pack entry: the prelude installs the bridge over
   the host's `window.suite`, a budget is a Loro snapshot under the host's document envelope, and an
   export re-imports as a working budget. The manifest declares the snapshot format at the core schema

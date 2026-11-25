@@ -114,11 +114,22 @@ Each archive's manifest signature and every file hash are verified before its en
 the published copy, and uploads it with its detached signature to the Flatpak remote's own origin.
 Review attestations and revocation are later seams.
 
+## Card sidecars
+
+A published pack has a card beside its archive for a catalogue's shadow tiles. The card is not in
+the signed index: a host derives its URL from the verified entry's archive URL
+(`<id>-<version>.suitepack` → `<id>-<version>.card.json`), fetches the small JSON document and draws
+the tile without the archive. `parsePackCard`, `cardUrlForArchiveUrl`, `cardFileNameFor` and the
+`PACK_CARD_FORMAT` / `PACK_CARD_VERSION` constants are the pure contract this package exports for
+the phone and the release build. The format itself is owned by
+[Packaging channels](../../docs/reference/packaging-channels.md#packs-and-cards).
+
 ## What this package owns
 
 - `parsePackManifest` and the Zod schema, with actionable issues.
 - `canonicalManifestBytes`, the exact bytes a signature covers. Capabilities and files are sorted (paths by UTF-16 code unit, never by locale); command and menu order is preserved.
 - `canonicalPackIndexBytes`, `parsePackIndexJson`, `verifyPackIndex`, `signPackIndex` and `packIndexDigest`: the catalogue index, signed by operator keys.
+- `parsePackCard`, `cardUrlForArchiveUrl`, `cardFileNameFor` and the card constants: the presentation sidecar that keeps the strict index entry free of card fields.
 - `packFitsHost` and `packAllows`.
 - `signPackManifest`, `verifyPackSignature`, `digestPackFiles`, `verifyPackFiles`, `sha256Hex`.
 - `publisherKeyFingerprint`, `checkPublisherTrust` and `addTrustedPublisher`: the publisher fingerprint, the trust-store match and the fingerprint-confirmed addition.

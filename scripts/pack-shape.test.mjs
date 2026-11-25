@@ -169,6 +169,19 @@ describe("the pack shape check", () => {
     );
   });
 
+  it("accepts all four pack capabilities on the phone now that files is served", () => {
+    const { root } = workspace({
+      manifest: {
+        platforms: ["desktop", "mobile"],
+        capabilities: ["documents", "files", "recents", "notifications"],
+      },
+    });
+
+    const result = check(root);
+    assert.deepEqual(result.problems, []);
+    assert.equal(result.ok, true);
+  });
+
   it("accepts a kind this tree has no host for, and a desktop pack that fits", () => {
     const { root } = workspace({
       manifest: { platforms: ["desktop", "tv"], capabilities: ["documents", "files"] },

@@ -69,6 +69,7 @@ import {
 } from "./lib/releaseIndex.mjs";
 import { buildPackIndex, seedBase64 } from "./pack-index.mjs";
 import { ROOT } from "./lib/keys.mjs";
+import { cardPathForArchive } from "./lib/packCard.mjs";
 
 export { INDEX_FILE, INDEX_SIGNATURE_FILE, INDEX_METADATA_FILE };
 
@@ -132,6 +133,26 @@ function archivesIn(directory) {
     .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".suitepack"))
     .map((entry) => join(directory, entry.name))
     .sort();
+}
+
+/**
+ * The card beside every staged archive.
+ *
+ * A card is part of the pack build's output, not an optional extra: an index
+ * whose entry has no card gives a Home a tile it cannot draw, so a missing card
+ * fails the publication instead of shipping the archive alone.
+ */
+function cardsForArchives(archives) {
+  return archives.map((archive) => {
+    const card = cardPathForArchive(archive);
+    if (!existsSync(card)) {
+      throw new Error(
+        `${archive} has no card at ${card}; the pack build writes it beside the archive, ` +
+          "and the catalogue publishes both or neither.",
+      );
+    }
+    return card;
+  });
 }
 
 function clearOutputs(outDir) {
@@ -235,6 +256,7 @@ export async function prepareIndex({
         "refusing to publish an index that describes nothing.",
     );
   }
+  const cards = cardsForArchives(archives);
 
   const prior =
     priorIndex === null || priorIndex === undefined
@@ -282,6 +304,8 @@ export async function prepareIndex({
         digest: built.digest,
         packs: archives.map((path) => basename(path)),
         packPaths: archives.map((path) => relative(ROOT, path)),
+        cards: cards.map((path) => basename(path)),
+        cardPaths: cards.map((path) => relative(ROOT, path)),
       },
       null,
       2,
@@ -306,6 +330,7 @@ export async function prepareIndex({
     signaturePath,
     metadataPath,
     archives,
+    cards,
   };
 }
 
@@ -340,7 +365,12 @@ export function publishPrepared({
     : (Array.isArray(metadata.packs) ? metadata.packs : []).map((name) =>
         join(ROOT, PACKS_DIR, name),
       );
-  for (const path of packPaths) {
+  const cardPaths = Array.isArray(metadata.cardPaths)
+    ? metadata.cardPaths.map((path) => join(ROOT, path))
+    : (Array.isArray(metadata.cards) ? metadata.cards : []).map((name) =>
+        join(ROOT, PACKS_DIR, name),
+      );
+  for (const path of [...packPaths, ...cardPaths]) {
     if (!existsSync(path)) {
       throw new Error(
         `${path} was staged but is gone; refusing to publish an index with a dead entry.`,
@@ -354,6 +384,7 @@ export function publishPrepared({
     indexPath,
     signaturePath,
     packPaths,
+    cardPaths,
   });
   for (const step of commands) {
     log(`${commandText(step)}\n`);
@@ -396,7 +427,7 @@ function usage() {
   node scripts/release-index.mjs --publish
 
   --build <command>       build one pack and write its .suitepack into
-                          ${PACKS_DIR}; repeatable, Budget and Planner today
+                          ${PACKS_DIR}; repeatable, all four packs today
   --publish               upload the staged index and archives
   --packs-dir <dir>       where the build commands write archives
   --out-dir <dir>         where index.json, index.json.sig and metadata go

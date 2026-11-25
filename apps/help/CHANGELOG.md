@@ -10,6 +10,10 @@ this file and there is no AppImage release tag.
 
 ### Added
 
+- **Help is mobile-ready.** The pack now declares `desktop` and `mobile`, so Suite Go can install it:
+  it asks for no host capability and reads only its own archive. The build also writes a card
+  sidecar with Help's own headset mark, its one-line description and shelf order 4.
+
 - **Help is a pack.** The same explorer and handbook now build as a signed `.suitepack` for the
   Suite host, with the generated index and compiled documentation pages inside the archive. The
   pack asks the host for no capability: it reads only its own bundle, and hash routes keep Browser,

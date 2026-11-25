@@ -2,7 +2,7 @@
   "name": "@suite/budget",
   "productName": "Suite Budget",
   "desktopName": "run.suite.budget",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "suite": {
     "pack": true
   },
