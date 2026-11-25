@@ -65,7 +65,6 @@ const PATH_PREFIXES = [
   "packs/",
   "services/",
   "packages/",
-  "services/",
   "scripts/",
   "e2e/",
   "docs/",

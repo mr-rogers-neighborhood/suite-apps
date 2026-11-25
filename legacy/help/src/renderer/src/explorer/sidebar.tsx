@@ -293,8 +293,7 @@ function ModuleList({
         ? "Config"
         : module.id.startsWith("hosts/") ||
             module.id.startsWith("legacy/") ||
-            module.id.startsWith("services/") ||
-            module.id.startsWith("packs/")
+            module.id.startsWith("services/")
           ? "Apps"
           : module.id.startsWith("packages/")
             ? "Packages"

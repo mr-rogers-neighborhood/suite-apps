@@ -582,7 +582,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       # Go imports @suite/pack, which resolves through its built dist.
       - name: Build the workspace libraries
-        run: pnpm --filter "./packages/*" --filter "./legacy/*/packages/*" run build
+        run: pnpm --filter "./packages/*" --filter "./hosts/*/packages/*" --filter "./legacy/*/packages/*" run build
       - name: Build the web bundle
         run: pnpm --filter @suite/go-app build
       - name: Sync the iOS project

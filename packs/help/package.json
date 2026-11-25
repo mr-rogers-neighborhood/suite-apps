@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "suite": {
+    "pack": true
+  },
   "description": "Help's pack source and its build. The Electron shell stays in legacy/help.",
   "scripts": {
     "build": "pnpm --dir ../../legacy/help index && pnpm --dir ../../legacy/help sync && vite build --config pack/vite.config.ts",

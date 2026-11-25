@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "suite": {
+    "pack": true
+  },
   "description": "Budget's pack source and its build. The Electron shell stays in legacy/budget.",
   "scripts": {
     "build": "vite build --config pack/vite.config.ts",

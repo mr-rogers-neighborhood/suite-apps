@@ -1,9 +1,6 @@
 {
   "name": "@suite/canvas",
   "version": "0.1.13",
-  "suite": {
-    "pack": true
-  },
   "private": true,
   "type": "module",
   "scripts": {

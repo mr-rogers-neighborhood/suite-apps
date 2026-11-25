@@ -270,17 +270,14 @@ export function checkPackShape({
     if (!entry.isDirectory()) continue;
     const app = entry.name;
     const packDir = join(packsDir, app, "pack");
-    // The app that declares the pack keeps its package.json and its other
-    // source under `legacy/<app>`; only the pack source moved to `packs/`.
-    const appManifest = join(root, "legacy", app, "package.json");
-    if (!isFile(appManifest)) {
-      problems.push(
-        `${relative(root, appManifest)}: pack source has no legacy app package.json`,
-      );
+    // The pack package declares itself. The legacy shell still owns the app
+    // version the source manifest must match; the pack package owns the build.
+    const packManifest = join(packsDir, app, "package.json");
+    if (!isFile(packManifest)) {
+      problems.push(`${relative(root, packManifest)}: pack source has no pack package.json`);
       continue;
     }
-
-    const pkg = readJson(appManifest);
+    const pkg = readJson(packManifest);
     const declared = pkg?.suite?.pack === true;
 
     if (!declared) {
@@ -291,6 +288,13 @@ export function checkPackShape({
       });
       continue;
     }
+
+    const appManifest = join(root, "legacy", app, "package.json");
+    if (!isFile(appManifest)) {
+      problems.push(`${relative(root, appManifest)}: pack has no legacy app package.json`);
+      continue;
+    }
+    const appVersion = readJson(appManifest).version;
 
     if (!isDirectory(packDir)) {
       problems.push(`${relative(root, packDir)}: declared packable but has no pack directory`);
@@ -319,9 +323,9 @@ export function checkPackShape({
     if (!isFile(manifestPath)) continue;
     const manifest = readJson(manifestPath);
 
-    if (manifest.version !== pkg.version) {
+    if (manifest.version !== appVersion) {
       problems.push(
-        `${relative(root, manifestPath)}: version ${JSON.stringify(manifest.version)} does not match the app version ${JSON.stringify(pkg.version)}`,
+        `${relative(root, manifestPath)}: version ${JSON.stringify(manifest.version)} does not match the app version ${JSON.stringify(appVersion)}`,
       );
     }
 

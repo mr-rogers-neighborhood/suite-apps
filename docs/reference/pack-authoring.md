@@ -6,8 +6,8 @@ pack READMEs link, not a second copy of the clause. The manifest itself is
 [S3.5–S3.7](../spec/superapp.md#3-pack-format-canonical-bytes-and-manifest) and
 [manifest.schema.json](../spec/manifest.schema.json).
 
-A pack is its own workspace package at `packs/<app>` (`@suite/<app>-pack`); its source lives in
-`pack/`. The package owns the build toolchain, so nothing is installed or built inside `pack/`; the
+A pack is its own workspace package at `packs/<app>` (`@suite/<app>-pack`); its `package.json`
+declares `"suite": { "pack": true }` and its source lives in `pack/`. The package owns the build toolchain, so nothing is installed or built inside `pack/`; the
 build writes to a generated directory outside it.
 
 ## What the directory holds

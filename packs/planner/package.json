@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "suite": {
+    "pack": true
+  },
   "description": "Planner's pack source and its build. The Electron shell stays in legacy/planner.",
   "scripts": {
     "build": "vite build --config pack/vite.config.ts",

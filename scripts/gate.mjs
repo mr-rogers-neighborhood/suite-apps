@@ -33,6 +33,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, delimiter, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pruneGateExports } from "./lib/gateExports.mjs";
+import { discoverScriptTests } from "./lib/gateTests.mjs";
 import { PIPELINE } from "./lib/pipeline.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -201,43 +202,19 @@ if (!build.ok) {
 // round-trip uses an ephemeral key and verifies against its own public half, so
 // a clean checkout with no owner signing key still proves the signed path. The
 // pack shape check runs in the same row, so a pack that drifts fails CI here.
+// The test set is discovered, not listed: the directory is the owner.
 const scripts =
   dry || !build.ok
     ? { ok: build.ok, detail: build.ok ? "dry run" : "not run: libraries failed" }
     : (() => {
         if (!json) process.stdout.write("\n▶ scripts\n");
-        const tests = run(
-          "node",
-          [
-            "--test",
-            "scripts/pack.test.mjs",
-            "scripts/pack-index.test.mjs",
-            "scripts/budget-pack.test.mjs",
-            "scripts/planner-pack.test.mjs",
-            "scripts/canvas-pack.test.mjs",
-            "scripts/help-pack.test.mjs",
-            "scripts/pack-card.test.mjs",
-            "scripts/pack-shape.test.mjs",
-            "scripts/affected.test.mjs",
-            "scripts/proof-of-changes.test.mjs",
-            "scripts/release-manifest.test.mjs",
-            "scripts/channel.test.mjs",
-            "scripts/desk-channel.test.mjs",
-            "scripts/android-release.test.mjs",
-            "scripts/release-status.test.mjs",
-            "scripts/release-index.test.mjs",
-            "scripts/delivery-signals.test.mjs",
-            "scripts/flatpak-remote.test.mjs",
-            "scripts/spec.test.mjs",
-          ],
-          workdir,
-        );
+        const tests = run("node", ["--test", ...discoverScriptTests(workdir)], workdir);
         const shape = run("node", ["scripts/pack-shape.mjs"], workdir);
         const ok = tests.status === 0 && shape.status === 0;
         return {
           ok,
           detail: ok
-            ? "pack shape, pack, channel, affected, release and spec tests"
+            ? "pack shape, pack, channel, affected, release, spec and gate tests"
             : `tests exit ${tests.status}, pack shape exit ${shape.status}`,
         };
       })();

@@ -25,7 +25,16 @@ function workspace({ pack = true, manifest = {}, packageJson = {} } = {}) {
 
   write(
     join(root, "legacy", "budget", "package.json"),
-    json({ name: "@suite/budget", version: "0.4.1", ...(pack ? { suite: { pack: true } } : {}), ...packageJson }),
+    json({ name: "@suite/budget", version: "0.4.1" }),
+  );
+  write(
+    join(root, "packs", "budget", "package.json"),
+    json({
+      name: "@suite/budget-pack",
+      version: "0.0.0",
+      ...(pack ? { suite: { pack: true } } : {}),
+      ...packageJson,
+    }),
   );
   const packDir = join(root, "packs", "budget", "pack");
   write(
