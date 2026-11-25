@@ -2,19 +2,20 @@
 
 Status: draft 0.1. Phases 1 and 2 are live: Actions is enabled, `.github/workflows/ci.yml` maps a
 pull request's diff to gate rows with `scripts/affected.mjs` and requires the `ci` aggregator, and
-`.github/workflows/main.yml` runs the full fresh gate on every push to `main`. Start's Playwright suite
-left with Start (#314), so no app row marks an e2e suite today; the gate keeps the hook for the first
-host suite. `.github/workflows/nightly.yml` runs the full fresh gate at 02:00 UTC, then builds the host
-Flatpak and the Go debug APK,
-attests each with provenance and an SPDX SBOM, and keeps them as artifacts. Once the repository
-variable `NIGHTLY_PUBLISH` is `true` and the `release` environment holds its keys, the nightly instead
-runs `.github/workflows/release.yml` for the nightly channel: the release-signed APK and the signed
-Flatpak are published automatically (D3.2). `.github/workflows/slop.yml` publishes the slop channel
-on every code push to `main`; it is a publication, not a check, and it runs no gate, e2e, clean
-install, SBOM, attestation or pack index (delivery D3.1). The `main` ruleset requires the `ci` check and a merge
-queue (HEADGREEN grouping, merge commits), and `ci.yml` triggers on `merge_group`. The VM gate is
-retired; GitHub Actions is the full proof. The Windows/macOS/iOS matrix is live, and the iOS row is a
-simulator test build. The delivery contract is [delivery.md](delivery.md); the platform matrix is
+the merge queue proves the exact SHA. `.github/workflows/main.yml` runs the gate's prelude on every
+push to `main`; a dispatch runs the full tree. Start's Playwright suite left with Start (#314), so no
+app row marks an e2e suite today; the gate keeps the hook for the first host suite.
+`.github/workflows/nightly.yml` runs the full fresh gate at 02:00 UTC, then builds the host Flatpak
+and the Go debug APK, attests each with provenance and an SPDX SBOM, and keeps them as artifacts.
+Once the repository variable `NIGHTLY_PUBLISH` is `true` and the `release` environment holds its
+keys, the nightly instead runs `.github/workflows/release.yml` for the nightly channel: the
+release-signed APK and the signed Flatpak are published automatically (D3.2).
+`.github/workflows/slop.yml` publishes the slop channel on every code push to `main`; it is a
+publication, not a check, and it runs no gate, e2e, clean install, SBOM, attestation or pack index
+(delivery D3.1). The `main` ruleset requires the `ci` check and a merge queue (HEADGREEN grouping,
+merge commits), and `ci.yml` triggers on `merge_group`. The VM gate is retired; GitHub Actions is
+the full proof. The Windows/macOS/iOS matrix is live, and the iOS row is a simulator test build. The
+delivery contract is [delivery.md](delivery.md); the platform matrix is
 [platforms.md](platforms.md); the product contract is [superapp.md](superapp.md).
 
 ## 1. Principles
@@ -22,9 +23,16 @@ simulator test build. The delivery contract is [delivery.md](delivery.md); the p
 **C1.1** Trunk-based development: short-lived branches, one reviewable change per branch, and a merge
 queue on `main`. No long-lived `slop`/`nightly`/`preview` branches; those are artifact channels.
 
-**C1.2** Fast on the change, full on the trunk. A pull request gets affected checks only. A merge queue
-gets affected checks plus affected e2e when a row marks one. `main` gets the full fresh gate. Nightly
-gets the full matrix.
+**C1.2** Fast on the change, proven by the queue. A pull request gets affected checks only; a merge
+queue entry gets affected checks plus affected e2e when a row marks one, and proves that exact SHA.
+`main` on push runs the prelude only — the `libraries` build, the `scripts` checks and the Budget
+pack round-trip, about 0.4 minutes — to confirm the merged SHA resolves and the declared project set
+is intact. The nightly keeps the full gate and matrix, and a full `--fresh` run stays available by
+dispatch. The cut is measured ([#407](https://github.com/mrrnbhd/suite-apps/issues/407),
+[#422](https://github.com/mrrnbhd/suite-apps/issues/422)): 88 of 94 trunk pushes were already
+queue-proven SHAs, the trunk's full-tree export had 0 true catches in 56 hours, and 15 of its reds
+were false — `biome check .` seeing zero files. About 1,540 job-minutes a week went to re-proving the
+tree, and the expected trunk cost is about 15 minutes a day instead of about 220.
 
 **C1.3** The pipeline is the same commands a person runs. CI calls `node scripts/gate.mjs`, not a
 second build path. A workflow that cannot be reproduced locally is a bug.
@@ -40,10 +48,11 @@ self-hosted runner. `pull_request_target` is not used to check out a fork.
 | Event | Workflow | Required |
 | --- | --- | --- |
 | `pull_request` (opened, synchronize, reopened) | `ci` | Yes: the `ci` aggregator |
-| `merge_group` | `ci` | Yes: the `ci` aggregator |
-| `push` to `main` | `main` | Yes: `main-gate` |
+| `merge_group` | `ci` | Yes: the `ci` aggregator; the whole-row proof for the SHA |
+| `push` to `main` | `main` | No: confirms the trunk SHA with the prelude |
 | `schedule` 02:00 UTC | `nightly` | No; publishes nightly |
 | `workflow_dispatch` | `preview`, `stable`, `matrix` | Environment approval |
+| `workflow_dispatch` | `main` | No; a full `--fresh` tree on demand |
 
 `release` has no tag trigger: a publication creates the tag and a dispatch follows, rather than a
 tag starting a build ([delivery.md](delivery.md) §0).
@@ -76,8 +85,8 @@ trigger is required. If the plan or API cannot enable it, the pull-request rule 
 | --- | --- | --- | --- |
 | `detect` | ubuntu-latest | Diff base…head, map files to projects, write the job matrix | none |
 | `fast` | ubuntu-latest | Lint, typecheck, unit, scripts/spec/docs checks for affected | pnpm store |
-| `build` | ubuntu-latest | Build affected apps/packages; no packaging | pnpm store, build cache |
-| `main-gate` | ubuntu-latest | `node scripts/gate.mjs --fresh --no-e2e` | pnpm store |
+| `build` | ubuntu-latest | Build affected projects and packages; no packaging | pnpm store, build cache |
+| `main-gate` | ubuntu-latest | Prelude only: `libraries`, `scripts`, Budget pack; a dispatch runs the full `--fresh` tree | pnpm store |
 | `nightly-gate` | ubuntu-latest | Full `node scripts/gate.mjs --fresh` | pnpm store, Playwright |
 | `package-linux` | ubuntu-latest | Flatpak build; no publish | flatpak-builder cache |
 | `package-android` | ubuntu-latest | APK build; no publish | Gradle cache |
@@ -91,8 +100,8 @@ trigger is required. If the plan or API cannot enable it, the pull-request rule 
 a “nothing affected” note; it is not a skipped required check.
 
 **C3.2** An `e2e` job exists only while a pipeline row marks an e2e suite. It runs on a pull request
-when the affected set reaches that row, and on `main` and nightly. No row marks one after Start's
-retirement (#314); the flag is the seam for the first host suite.
+when the affected set reaches that row, and on the merge queue and nightly. No row marks one after
+Start's retirement (#314); the flag is the seam for the first host suite.
 
 **C3.3** Packaging jobs build artifacts but never publish. Publication is a separate job with an
 environment and a key.
@@ -111,8 +120,9 @@ hand-maintained app list. A missing edge is a test failure, not a silent skip.
 **C4.3** A docs-only change runs `docs-check` and `docs:index:check`; a spec change runs `spec:check`;
 a workflow change runs the workflow linter. It does not build every app.
 
-**C4.4** `main` and nightly always run the full gate. Affected selection is a pull-request
-optimization, never a release proof.
+**C4.4** The merge queue, the nightly and a manual dispatch run the whole row set; `main` on push
+runs the prelude only, to confirm the trunk SHA rather than re-prove the tree the queue already
+proved. Affected selection is a pull-request optimization, never a release proof.
 
 ## 5. Gates by channel
 
@@ -203,11 +213,11 @@ exposed, rotate it and delete the log.
 | When | What |
 | --- | --- |
 | Every pull request | Affected fast checks |
-| Every merge queue entry | Affected fast checks + `ci` aggregator |
-| Every push to `main` | `main-gate --fresh --no-e2e`, affected build, packaging build |
+| Every merge queue entry | Affected fast checks + `ci` aggregator; the proof for the SHA |
+| Every push to `main` | Prelude only: `libraries`, `scripts`, Budget pack |
 | Nightly 02:00 UTC | Full fresh gate + Linux/Android/macOS/Windows/iOS builds + Revyl smoke + publish nightly |
 | Weekly | Full matrix, dependency review, action pin audit, cache cleanup |
-| Manual | Preview/stable publication, platform matrix run |
+| Manual | Preview/stable publication, platform matrix run, a full `--fresh` tree |
 
 **C10.1** A nightly failure opens or updates one issue; it does not spam a new issue per night.
 

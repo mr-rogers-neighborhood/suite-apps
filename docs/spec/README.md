@@ -77,7 +77,7 @@ without a test or a named gap.
 | What exists | [ledger.md](ledger.md) and [status](../reference/status.md) |
 | Why a rule exists | [decisions](../reference/decisions.md) and app decisions |
 | Release channels and Flatpak | [channels](../explanation/channels.md), [packaging](../reference/packaging-channels.md) |
-| App schema, UX and migration | `apps/<app>/docs/` |
+| App schema, UX and migration | the app's own `docs/` beside its code |
 | Accessibility evidence | [WCAG map](../reference/accessibility/wcag-22-map.md) |
 | Engineering style and gate | [standards.md](standards.md), app `AGENTS.md` |
 | Governance, licensing, disclosure | [governance.md](governance.md) |
