@@ -29,6 +29,10 @@ import {
   draftAction,
   draftRefusalMessage,
   draftReleaseArgs,
+  draftTargetProblem,
+  rerenderBody,
+  revisionFromTag,
+  tagDateFromTag,
   flatpakrepoUrl,
   goApkName,
   goApkUrl,
@@ -56,6 +60,7 @@ import {
   publishReleaseArgs,
   readIndexRelease,
   readManifest,
+  readPublishedManifest,
   releaseAssetUrl,
   releaseDates,
   releaseFor,
@@ -382,7 +387,35 @@ describe("the draft phase", () => {
     assert.deepEqual(args.slice(0, 3), ["release", "edit", tag]);
     assert.ok(!args.includes("--draft"));
     assert.ok(!args.includes("--draft=false"), "editing a draft must not publish it");
-    assert.ok(!args.includes("--target"));
+    assert.ok(args.includes("--target"));
+    assert.equal(
+      args[args.indexOf("--target") + 1],
+      "0fb48469e5de7f812a6322092396d69f669712d3",
+      "every draft edit names this tree's target again",
+    );
+  });
+
+  it("refuses a draft whose tag points at another commit, before publishing it", () => {
+    const head = "a".repeat(40);
+    const old = "b".repeat(40);
+    assert.equal(draftTargetProblem({ tag, isDraft: true, draftCommit: head, head }), null);
+    assert.equal(
+      draftTargetProblem({ tag, isDraft: true, draftCommit: null, head }),
+      null,
+      "an unknown target is not a mismatch this guard can prove",
+    );
+    assert.equal(
+      draftTargetProblem({ tag, isDraft: false, draftCommit: old, head }),
+      null,
+      "a published release is skipped, not treated as a stale draft",
+    );
+    const problem = draftTargetProblem({ tag, isDraft: true, draftCommit: old, head });
+    assert.match(problem, /suite-2026\.11\.21 is a draft/u);
+    assert.match(problem, /bbbbbbbbbbbb/u);
+    assert.match(problem, /not HEAD aaaaaaaaaaaa/u);
+    assert.match(problem, /cannot move once it is published/u);
+    assert.match(problem, /--cleanup-tag/u);
+    assert.match(problem, /--date/u);
   });
 
   it("refuses a draft over an already published release and names --date", () => {
@@ -775,6 +808,75 @@ describe("release bodies", () => {
   });
 });
 
+describe("rerendering a published page", () => {
+  const releases = [
+    { tagName: "suite-2026.11.24", isDraft: false },
+    { tagName: "suite-preview-2026.11.24", isDraft: false },
+    { tagName: "suite-nightly-2026.11.23", isDraft: false },
+    { tagName: "suite-slop-2026.11.25-abc1234", isDraft: false },
+  ];
+
+  it("reads the publication day and the slop commit from the tag", () => {
+    assert.equal(tagDateFromTag("suite-2026.11.24", "stable"), "2026-11-24");
+    assert.equal(tagDateFromTag("suite-preview-2026.11.24", "preview"), "2026-11-24");
+    assert.equal(tagDateFromTag("suite-preview-2026.11.24", "nightly"), null);
+    assert.equal(tagDateFromTag("not-a-tag", "stable"), null);
+    assert.equal(revisionFromTag("suite-slop-2026.11.25-abc1234", "slop"), "abc1234");
+    assert.equal(revisionFromTag("suite-nightly-2026.11.25", "nightly"), null);
+  });
+
+  it("renders a stable page from the current tree and the release list", () => {
+    const body = rerenderBody(entries, {
+      tag: "suite-2026.11.24",
+      channel: "stable",
+      releases,
+      apkLive: true,
+    });
+    assert.match(body, /This is the 2026-11-24 build/u);
+    assert.match(body, /## Latest Release/u);
+    assert.ok(body.includes("this page (`suite-2026.11.24`)"));
+    assert.ok(body.includes("[`suite-preview-2026.11.24`]"));
+    assert.ok(body.includes("| [Suite Desk](https://github.com/mrrnbhd/suite-apps/blob/main/hosts/desk/CHANGELOG.md) | stable | alpha | 0.2.0 |"));
+    assert.ok(body.includes("suite-go-0.1.0.apk"));
+  });
+
+  it("renders a pre-release page with its tag day and the tree's snapshot day", () => {
+    const body = rerenderBody(entries, {
+      tag: "suite-preview-2026.11.24",
+      channel: "preview",
+      releases,
+      apkLive: true,
+    });
+    assert.match(
+      body,
+      /This is the 2026-11-22 snapshot, published on the \*\*preview\*\* channel on 2026-11-24/u,
+    );
+    assert.match(body, /## Pre-Release \(Preview\)/u);
+    assert.ok(body.includes("this page (`suite-preview-2026.11.24`)"));
+    assert.ok(body.includes("[`suite-nightly-2026.11.23`]"));
+    assert.ok(body.includes("[`suite-2026.11.24`]"));
+    assert.ok(body.includes("run.suite.preview.desk//preview"));
+  });
+
+  it("adds the slop commit proof when the tag names one", () => {
+    const body = rerenderBody(entries, {
+      tag: "suite-slop-2026.11.25-abc1234",
+      channel: "slop",
+      releases,
+    });
+    assert.match(body, /Commit `abc1234`/u);
+    assert.match(body, /merge-queue-proven, not\s+full-gate-proven/u);
+    assert.match(body, /## Pre-Release \(Slop\)/u);
+  });
+
+  it("refuses a tag that belongs to another channel", () => {
+    assert.throws(
+      () => rerenderBody(entries, { tag: "suite-preview-2026.11.24", channel: "stable", releases }),
+      /not a stable tag/u,
+    );
+  });
+});
+
 describe("sections and the Suite Go APK", () => {
   it("keeps the desktop rows in reading order and Go alone on mobile", () => {
     assert.deepEqual(
@@ -943,6 +1045,19 @@ describe("arguments", () => {
     assert.equal(options.channel, "nightly");
     assert.throws(
       () => parseArgs(["--check-published", "--draft"]),
+      /pick different modes/u,
+    );
+  });
+
+  it("reads --body with the tag it re-renders and refuses a half pair", () => {
+    const options = parseArgs(["--body", "--tag", "suite-preview-2026.11.25", "--channel", "preview"]);
+    assert.equal(options.body, true);
+    assert.equal(options.tag, "suite-preview-2026.11.25");
+    assert.equal(options.channel, "preview");
+    assert.throws(() => parseArgs(["--body"]), /--body needs --tag/u);
+    assert.throws(() => parseArgs(["--tag", "suite-2026.11.25"]), /pass it with --body/u);
+    assert.throws(
+      () => parseArgs(["--body", "--tag", "suite-2026.11.25", "--draft"]),
       /pick different modes/u,
     );
   });
@@ -1372,6 +1487,12 @@ describe("the Artifacts section", () => {  const flatpakCommit = "c".repeat(64);
       readManifest(join(tmpdir(), "suite-no-such-manifest", MANIFEST_FILE)),
       null,
     );
+    assert.equal(readPublishedManifest("suite-2026.11.23", { download: () => null }), null);
+    assert.deepEqual(
+      readPublishedManifest("suite-2026.11.23", { download: () => JSON.stringify(manifest) }),
+      manifest,
+    );
+    assert.equal(readPublishedManifest("suite-2026.11.23", { download: () => "not json" }), null);
   });
 });
 

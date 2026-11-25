@@ -36,8 +36,9 @@ publication also writes `release-manifest.json` with the commit, the lockfile ha
 digests and the signer identities, and attaches it to the draft before publication (D2.1). The
 workflow header records the known limits: the Flatpak summary is re-signed while the OSTree commit
 stays fixed (the commit is what is attested); a pre-release channel publishes its own page and never
-the stable Latest one, whose body links the newest preview and nightly; a published release is
-immutable; and `RELEASES.md` is regenerated in the runner rather than committed.
+the stable Latest one, whose body links the newest preview and nightly; a published release's tag
+and assets are immutable while its title and notes stay editable (D6.3); and `RELEASES.md` is
+regenerated in the runner rather than committed.
 
 ## 1. Principles
 
@@ -174,8 +175,15 @@ and the verification command. A note without a digest is incomplete. A slop note
 it names the commit and links the APK it carries, and the `.sha256` is attached beside the asset
 rather than restated in a release manifest it does not have.
 
-**D6.3** Immutable releases are enabled for published releases: the tag and assets are locked after
-publication. Create the release as a draft, attach every asset, then publish.
+**D6.3** Immutable releases are enabled for published releases. Publication locks the **tag** (it
+cannot move, be deleted, or have its name reused, even after the release is deleted) and the
+**assets** (they cannot be replaced or removed). The **title, notes, Latest flag and pre-release
+flag** stay editable. Create the release as a draft, attach every asset, then publish. A draft keeps
+the target it was first created with, so every draft run names its target again and a run refuses
+when the draft's tag points at a commit other than `HEAD`; publishing a stale target would lock a
+tag to bytes from another tree. `scripts/release-status.mjs --body --channel <channel> --tag <tag>`
+re-renders a published page from the current tree and the release list, and
+`gh release edit <tag> --notes-file -` applies it without touching the tag or assets.
 
 **D6.4** A version has one home: the app's `package.json` (or the Android Gradle version). No page
 restates it; link the file.

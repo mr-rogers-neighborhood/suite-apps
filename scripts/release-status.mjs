@@ -33,6 +33,15 @@
  *    never edited: it is skipped with a message and the page is rewritten from
  *    the current state. A release with no draft is refused.
  *
+ * A draft keeps the target it was first created with, so every draft edit names
+ * `--target` again and a run refuses when the draft's tag points at a commit
+ * other than HEAD. Publishing a stale target would lock a tag to a tree it does
+ * not describe, and an immutable tag name can never be reused (D6.3).
+ *
+ * A published page can be re-rendered without touching GitHub:
+ * `--body --channel <channel> --tag <tag>` prints the body from the current tree
+ * and the release list, ready for `gh release edit <tag> --notes-file -`.
+ *
  * A missing aggregate tag is created at HEAD, the snapshot the page describes;
  * an existing tag is never moved.
  *
@@ -493,6 +502,9 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --draft              create or update the rolling release as a draft
   --publish            publish the existing draft, then write ${RELEASES_FILE}
   --write              write ${RELEASES_FILE} and stop short of GitHub
+  --body --tag <tag>   print the body for an existing release from this tree and the
+                       release list, for \`gh release edit <tag> --notes-file -\`; needs
+                       --channel when the tag is not stable
   --date <YYYY-MM-DD>  tag date; a pre-release defaults to today in UTC, stable to
                        the newest app release (which is also stable's snapshot date)
   --channel <name>     stable (default), slop, nightly or preview; names the APK asset
@@ -507,11 +519,14 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --keep <n>           releases a pruned channel keeps (default: 14, or 7 for slop)
   --help               print this text
 
-Pass one of --draft, --publish, --write and --dry-run, or --check-published or
---check-readme. The two checks read and write nothing.
+Pass one of --draft, --publish, --write, --body and --dry-run, or
+--check-published or --check-readme. --body, the two checks and --dry-run write
+nothing to GitHub.
 
 A release is created as a draft, its assets are attached while it is a draft, and
---publish flips it. A published release is immutable and is never edited.
+--publish flips it. A published release's tag and assets are immutable; its title
+and notes stay editable, which is what --body and \`gh release edit <tag> --notes-file -\`
+are for.
 
 The versions come from each app's package.json; the dates from its changelog.
 Only the rolling release and the pre-release channel pages exist; per-app tags
@@ -611,6 +626,20 @@ export function channelTagPattern(channel) {
 /** True when a tag belongs to this channel and carries its expected shape. */
 export function isChannelTag(tag, channel) {
   return typeof tag === "string" && channelTagPattern(channel).test(tag);
+}
+
+/** The calendar day inside a channel tag, or null when the shape is wrong. */
+export function tagDateFromTag(tag, channel = "stable") {
+  if (!isChannelTag(tag, channel)) return null;
+  const match = /-(\d{4})\.(\d{2})\.(\d{2})/u.exec(tag);
+  return match === null ? null : `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+/** The commit a slop tag carries, or null on every other channel. */
+export function revisionFromTag(tag, channel = "stable") {
+  if (channel !== "slop") return null;
+  const match = /-([0-9a-f]{7})$/u.exec(tag);
+  return match?.[1] ?? null;
 }
 
 /**
@@ -1067,6 +1096,29 @@ export function draftAction({
 }
 
 /**
+ * Why a draft whose tag points at another commit must not be published, or null.
+ *
+ * A draft's tag is created at the draft's first target. A rerun that only edits
+ * the title and body leaves that target behind, so the later artifacts and the
+ * tag name different trees. Immutable releases lock the tag at publication
+ * (D6.3), which makes the mismatch permanent: the tag name could never be
+ * reused. Retargeting every draft edit is the happy path; this guard refuses
+ * when the known tag commit is not HEAD, before anything is uploaded or locked.
+ */
+export function draftTargetProblem({ tag, isDraft = false, draftCommit = null, head = null }) {
+  if (isDraft !== true) return null;
+  if (draftCommit === null || draftCommit === undefined || head === null) return null;
+  if (draftCommit === head) return null;
+  return (
+    `${tag} is a draft whose tag points at ${draftCommit.slice(0, 12)}, not HEAD ` +
+    `${head.slice(0, 12)}. A release tag cannot move once it is published, so publishing this ` +
+    "draft would ship artifacts from a different tree and burn the tag name. Delete the stale " +
+    `draft and its tag with \`gh release delete ${tag} --yes --cleanup-tag\`, then run --draft ` +
+    "again from this tree, or publish under another --date."
+  );
+}
+
+/**
  * What the publish phase may do with one release, or why it must not.
  *
  * `--publish` only flips drafts. A missing release is a refusal, because the
@@ -1269,6 +1321,35 @@ export function readManifest(path = MANIFEST_PATH, { load = read } = {}) {
       `${path} is not valid JSON; refusing to build a note from digests it cannot read`,
     );
   }
+}
+
+/**
+ * The manifest attached to a release, or null when it carries none.
+ *
+ * A rerender happens on a workstation, where the workflow's
+ * `.dev/release/release-manifest.json` is usually gone. The digest section is
+ * part of the page (D6.2), so `--body` reads the attached copy rather than
+ * silently dropping it. The download is injected so the JSON handling is
+ * testable without a release.
+ */
+export function readPublishedManifest(tag, { download = downloadReleaseManifest } = {}) {
+  const text = download(tag);
+  if (text === null) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function downloadReleaseManifest(tag) {
+  const result = spawnSync(
+    "gh",
+    ["release", "download", tag, "--pattern", MANIFEST_FILE, "--output", "-"],
+    { cwd: ROOT, encoding: "utf8", env: process.env },
+  );
+  if (result.error || result.status !== 0) return null;
+  return result.stdout;
 }
 
 /**
@@ -1622,6 +1703,50 @@ export function aggregateReleaseBody(
 }
 
 /**
+ * A published page re-rendered from the current tree and the release list.
+ *
+ * `--body` exists because release notes stay editable on an immutable release
+ * while its tag and assets do not (D6.3). The tag supplies the page's channel
+ * and publication day; the tree supplies the versions and snapshot date; the
+ * release list supplies the newest page of every channel. Nothing is written:
+ * the caller pipes the text to `gh release edit --notes-file -`.
+ */
+export function rerenderBody(
+  entries,
+  {
+    tag,
+    channel = "stable",
+    releases = [],
+    apkLive = false,
+    draft = false,
+    manifest = null,
+    index = null,
+  },
+) {
+  const tagDate = tagDateFromTag(tag, channel);
+  if (tagDate === null) {
+    throw new Error(
+      `--tag ${JSON.stringify(tag)} is not a ${channel} tag; expected ` +
+        (channel === "stable" ? "suite-YYYY.MM.DD" : `suite-${channel}-YYYY.MM.DD`),
+    );
+  }
+  const revision = revisionFromTag(tag, channel);
+  const { snapshotDate } = releaseDates(entries, { channel, date: tagDate });
+  return aggregateReleaseBody(entries, {
+    date: snapshotDate,
+    tagDate,
+    tag,
+    apkLive,
+    draft,
+    channel,
+    revision,
+    pages: newestPages(releases),
+    manifest,
+    index,
+  });
+}
+
+/**
  * `RELEASES.md`: the same data, as the human mirror of the Latest release.
  *
  * The generated comment is deliberate. A version belongs in `package.json`; this
@@ -1721,7 +1846,9 @@ export function parseArgs(argv) {
     publish: false,
     dryRun: false,
     write: false,
+    body: false,
     date: null,
+    tag: null,
     channel: "stable",
     revision: null,
     manifest: null,
@@ -1747,8 +1874,12 @@ export function parseArgs(argv) {
     else if (arg === "--publish") options.publish = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--write") options.write = true;
+    else if (arg === "--body") options.body = true;
     else if (arg === "--date") {
       options.date = takeValue(index, "--date");
+      index += 1;
+    } else if (arg === "--tag") {
+      options.tag = takeValue(index, "--tag");
       index += 1;
     } else if (arg === "--channel") {
       options.channel = takeValue(index, "--channel");
@@ -1790,6 +1921,7 @@ export function parseArgs(argv) {
     options.draft ? "--draft" : null,
     options.publish ? "--publish" : null,
     options.write ? "--write" : null,
+    options.body ? "--body" : null,
     options.dryRun ? "--dry-run" : null,
     options.prune ? "--prune" : null,
     options.checkPublished ? "--check-published" : null,
@@ -1797,6 +1929,12 @@ export function parseArgs(argv) {
   ].filter((mode) => mode !== null);
   if (modes.length > 1) {
     throw new Error(`${modes.join(" and ")} pick different modes; pass at most one`);
+  }
+  if (options.body && options.tag === null) {
+    throw new Error("--body needs --tag <tag>: the page to re-render is an existing release");
+  }
+  if (!options.body && options.tag !== null) {
+    throw new Error("--tag names the page --body re-renders; pass it with --body");
   }
 
   return options;
@@ -2026,7 +2164,21 @@ export function draftReleaseArgs({
 }) {
   const pre = prerelease ? ["--prerelease"] : [];
   if (action === "edit") {
-    return ["release", "edit", tag, "--title", title, "--notes-file", notesPath, ...pre];
+    // `--target` is deliberate on every edit: a draft keeps the target it was
+    // first created with, so a rerun must name this tree even when only the
+    // title and body changed.
+    return [
+      "release",
+      "edit",
+      tag,
+      "--title",
+      title,
+      "--notes-file",
+      notesPath,
+      "--target",
+      target,
+      ...pre,
+    ];
   }
   return [
     "release",
@@ -2339,6 +2491,66 @@ async function main(argv) {
   const revision = options.revision;
   const prerelease = channel !== "stable";
 
+  if (options.body) {
+    if (options.date !== null) {
+      throw new Error("--body reads the date from --tag; --date does not apply");
+    }
+    if (options.revision !== null) {
+      throw new Error("--body reads the commit from a slop tag; --revision does not apply");
+    }
+    if (!isChannelTag(options.tag, channel)) {
+      throw new Error(
+        `--tag ${JSON.stringify(options.tag)} is not a ${channel} tag; ` +
+          "pass the channel the page was published on with --channel",
+      );
+    }
+    const releases = existingReleases();
+    if (releases === null) {
+      throw new Error(
+        "gh release list failed; --body needs the release list to name the newest page of " +
+          "every channel",
+      );
+    }
+    const row = releaseFor(releases, options.tag);
+    if (row === null) {
+      throw new Error(
+        `no release named ${options.tag}; --body re-renders an existing page, it does not invent one`,
+      );
+    }
+    const { problems, entries } = collectReleases();
+    if (problems.length > 0) throw new Error(problems.join("\n\n"));
+
+    let manifest = readManifest(options.manifest ?? MANIFEST_PATH);
+    if (manifest === null && options.manifest !== null) {
+      throw new Error(
+        `--manifest ${options.manifest} names no readable file; refusing to drop the Artifacts section`,
+      );
+    }
+    // A page's digest section lives in the manifest attached to the release;
+    // read that copy when the workflow's local one is gone.
+    manifest ??= readPublishedManifest(options.tag);
+    const index = channel === "slop" ? null : readIndexRelease();
+    const goEntry = entries.find((entry) => entry.app.kind === "apk") ?? null;
+    const tagRevision = revisionFromTag(options.tag, channel);
+    const goAsset =
+      goEntry === null ? null : goApkName(goEntry.version, channel, tagRevision);
+    const assets = releaseAssets(options.tag);
+    const apkLive =
+      goAsset !== null && assets !== null && assets.some((asset) => asset?.name === goAsset);
+
+    const body = rerenderBody(entries, {
+      tag: options.tag,
+      channel,
+      releases,
+      apkLive,
+      draft: row.isDraft === true,
+      manifest,
+      index,
+    });
+    process.stdout.write(body.endsWith("\n") ? body : `${body}\n`);
+    return;
+  }
+
   const mode = options.draft
     ? "draft"
     : options.publish
@@ -2440,6 +2652,19 @@ async function main(argv) {
   const aggregateExists = aggregateRow !== null;
   const aggregateIsDraft = aggregateRow?.isDraft === true;
   const aggregatePublished = aggregateExists && aggregateRow.isDraft === false;
+
+  // A draft keeps the target it was first created with. Publishing one whose
+  // tag points at another tree would lock that tag to bytes it never described,
+  // so the known mismatch is a refusal, not an edit that GitHub may ignore.
+  if (aggregateIsDraft && (mode === "draft" || mode === "publish" || mode === "dry-run")) {
+    const targetMiss = draftTargetProblem({
+      tag,
+      isDraft: true,
+      draftCommit: aggregate.plan.commit,
+      head,
+    });
+    if (targetMiss !== null) fatalProblems.push(targetMiss);
+  }
 
   if (releases === null && mode === "publish") {
     aggregate.action = "refuse";
