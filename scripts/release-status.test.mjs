@@ -30,6 +30,7 @@ import {
   draftRefusalMessage,
   draftReleaseArgs,
   draftTargetProblem,
+  draftTargetStateProblem,
   rerenderBody,
   revisionFromTag,
   tagDateFromTag,
@@ -65,6 +66,7 @@ import {
   releaseDates,
   releaseFor,
   releaseLabels,
+  resolveTargetCommit,
   releasePhase,
   releaseTitle,
   releasesPage,
@@ -416,6 +418,68 @@ describe("the draft phase", () => {
     assert.match(problem, /cannot move once it is published/u);
     assert.match(problem, /--cleanup-tag/u);
     assert.match(problem, /--date/u);
+  });
+
+  it("compares GitHub's targetCommitish, so a CI draft with no local tag is caught", () => {
+    const head = "a".repeat(40);
+    const old = "b".repeat(40);
+    assert.equal(
+      draftTargetStateProblem({
+        tag,
+        state: { isDraft: true, targetCommitish: head },
+        head,
+        resolve: () => head,
+      }),
+      null,
+      "a draft at HEAD is fine",
+    );
+
+    const behind = draftTargetStateProblem({
+      tag,
+      state: { isDraft: true, targetCommitish: old },
+      head,
+      resolve: () => old,
+    });
+    assert.match(behind, /target bbbbbbbbbbbb is not HEAD aaaaaaaaaaaa/u);
+    assert.match(behind, /burn the tag name/u);
+
+    const vanished = draftTargetStateProblem({
+      tag,
+      state: { isDraft: true, targetCommitish: "suite-nightly-2026.11.24" },
+      head,
+      resolve: () => null,
+    });
+    assert.match(vanished, /suite-nightly-2026\.11\.24/u);
+    assert.match(vanished, /no longer resolves to a commit/u);
+    assert.match(vanished, /cleanup-tag/u);
+
+    assert.equal(
+      draftTargetStateProblem({ tag, state: { isDraft: false }, head }),
+      null,
+      "a published release is skipped, not treated as a stale draft",
+    );
+  });
+
+  it("resolves a targetCommitish, and a vanished tag becomes a null commit", () => {
+    assert.match(resolveTargetCommit("HEAD"), /^[0-9a-f]{40}$/u);
+    const absent = "1".repeat(40);
+    assert.equal(resolveTargetCommit(absent), absent, "a full SHA needs no local object");
+    assert.equal(resolveTargetCommit("suite-no-such-tag-532f3461"), null);
+    assert.equal(resolveTargetCommit(""), null);
+  });
+
+  it("re-targets an existing draft to HEAD instead of refusing the draft run", () => {
+    const head = "a".repeat(40);
+    const commands = aggregateReleaseCommands({
+      mode: "draft",
+      aggregate: { action: "edit", plan: { createLocal: false, commit: "b".repeat(40) } },
+      tag,
+      date: "2026-11-21",
+      target: head,
+    });
+    assert.equal(commands.length, 1);
+    const args = commands[0].args;
+    assert.equal(args[args.indexOf("--target") + 1], head);
   });
 
   it("refuses a draft over an already published release and names --date", () => {

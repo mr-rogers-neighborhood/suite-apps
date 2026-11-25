@@ -179,9 +179,9 @@ rather than restated in a release manifest it does not have.
 cannot move, be deleted, or have its name reused, even after the release is deleted) and the
 **assets** (they cannot be replaced or removed). The **title, notes, Latest flag and pre-release
 flag** stay editable. Create the release as a draft, attach every asset, then publish. A draft keeps
-the target it was first created with, so every draft run names its target again and a run refuses
-when the draft's tag points at a commit other than `HEAD`; publishing a stale target would lock a
-tag to bytes from another tree. `scripts/release-status.mjs --body --channel <channel> --tag <tag>`
+the target it was first created with, so every draft run re-targets it to `HEAD`. Publication reads
+GitHub's `targetCommitish` and refuses when it differs from `HEAD` or no longer resolves; publishing
+a stale target would lock a tag to bytes from another tree. `scripts/release-status.mjs --body --channel <channel> --tag <tag>`
 re-renders a published page from the current tree and the release list, and
 `gh release edit <tag> --notes-file -` applies it without touching the tag or assets.
 

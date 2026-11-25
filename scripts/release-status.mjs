@@ -34,9 +34,10 @@
  *    the current state. A release with no draft is refused.
  *
  * A draft keeps the target it was first created with, so every draft edit names
- * `--target` again and a run refuses when the draft's tag points at a commit
- * other than HEAD. Publishing a stale target would lock a tag to a tree it does
- * not describe, and an immutable tag name can never be reused (D6.3).
+ * `--target HEAD` again. Publication reads GitHub's `targetCommitish` and
+ * refuses when it differs from HEAD or no longer resolves. Publishing a stale
+ * target would lock a tag to a tree it does not describe, and an immutable tag
+ * name can never be reused (D6.3).
  *
  * A published page can be re-rendered without touching GitHub:
  * `--body --channel <channel> --tag <tag>` prints the body from the current tree
@@ -1096,26 +1097,67 @@ export function draftAction({
 }
 
 /**
- * Why a draft whose tag points at another commit must not be published, or null.
+ * Why a draft whose target is not HEAD must not be published, or null.
  *
- * A draft's tag is created at the draft's first target. A rerun that only edits
- * the title and body leaves that target behind, so the later artifacts and the
- * tag name different trees. Immutable releases lock the tag at publication
- * (D6.3), which makes the mismatch permanent: the tag name could never be
- * reused. Retargeting every draft edit is the happy path; this guard refuses
- * when the known tag commit is not HEAD, before anything is uploaded or locked.
+ * GitHub stores the draft's target as `targetCommitish`, not as a local tag:
+ * `gh release create --target <sha>` leaves no `refs/tags/<tag>` on origin. A
+ * draft created in an earlier CI run therefore carries the old commit even when
+ * this checkout has no tag to inspect. Publication locks the tag (D6.3), so a
+ * mismatch would burn the tag name on bytes from another tree.
+ *
+ * `draftTarget` is the literal `targetCommitish` for the message, and
+ * `draftCommit` is its resolved commit (null when the name no longer exists).
+ * A draft at HEAD is fine; a draft behind HEAD or naming a vanished ref refuses.
  */
-export function draftTargetProblem({ tag, isDraft = false, draftCommit = null, head = null }) {
+export function draftTargetProblem({
+  tag,
+  isDraft = false,
+  draftTarget = null,
+  draftCommit = null,
+  head = null,
+}) {
   if (isDraft !== true) return null;
-  if (draftCommit === null || draftCommit === undefined || head === null) return null;
-  if (draftCommit === head) return null;
+  if (draftTarget === null && draftCommit === null) return null;
+  if (draftCommit !== null && draftCommit === head) return null;
+  const where =
+    draftCommit === null
+      ? `target ${JSON.stringify(draftTarget)} no longer resolves to a commit`
+      : `target ${draftCommit.slice(0, 12)} is not HEAD ${String(head).slice(0, 12)}`;
   return (
-    `${tag} is a draft whose tag points at ${draftCommit.slice(0, 12)}, not HEAD ` +
-    `${head.slice(0, 12)}. A release tag cannot move once it is published, so publishing this ` +
-    "draft would ship artifacts from a different tree and burn the tag name. Delete the stale " +
-    `draft and its tag with \`gh release delete ${tag} --yes --cleanup-tag\`, then run --draft ` +
-    "again from this tree, or publish under another --date."
+    `${tag} is a draft whose ${where}. A release tag cannot move once it is published, so ` +
+    "publishing this draft would ship artifacts from a different tree and burn the tag name. " +
+    `Delete the stale draft and its tag with \`gh release delete ${tag} --yes --cleanup-tag\`, ` +
+    "then run --draft again from this tree, or publish under another --date."
   );
+}
+
+/**
+ * The publish-phase check over the state `gh release view` returned.
+ *
+ * `resolve` turns GitHub's `targetCommitish` (a branch, a tag or a SHA) into a
+ * commit. A vanished tag resolves to null and refuses rather than passing as an
+ * unknown. The resolver is injectable so this wiring is testable without a
+ * repository or a release.
+ */
+export function draftTargetStateProblem({
+  tag,
+  state,
+  head,
+  resolve = resolveTargetCommit,
+}) {
+  if (state?.isDraft !== true) return null;
+  const target =
+    typeof state.targetCommitish === "string" && state.targetCommitish.length > 0
+      ? state.targetCommitish
+      : null;
+  if (target === null) return null;
+  return draftTargetProblem({
+    tag,
+    isDraft: true,
+    draftTarget: target,
+    draftCommit: resolve(target),
+    head,
+  });
 }
 
 /**
@@ -1996,6 +2038,23 @@ function read(path) {
   return readFileSync(resolve(ROOT, path), "utf8");
 }
 
+/**
+ * The commit a GitHub `targetCommitish` names, or null when it does not exist.
+ *
+ * `targetCommitish` is usually a SHA, but a deleted tag or a moved branch name
+ * is also possible. Resolving it here keeps the comparison in one place and
+ * turns a vanished name into a refusal instead of an unknown that passes.
+ */
+export function resolveTargetCommit(target) {
+  if (typeof target !== "string" || target.length === 0) return null;
+  // A full SHA needs no object to compare with HEAD; a shallow CI checkout may
+  // not have the draft's tree, and treating that as a vanished target would
+  // refuse the very run the check exists to protect.
+  if (/^[0-9a-f]{40}$/iu.test(target)) return target.toLowerCase();
+  const result = git(["rev-parse", "-q", "--verify", `${target}^{commit}`]);
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
 function localTagCommit(tag) {
   const result = git(["rev-parse", "-q", "--verify", `refs/tags/${tag}`]);
   return result.status === 0 ? result.stdout.trim() : null;
@@ -2025,6 +2084,32 @@ function existingReleases() {
   if (result.error || result.status !== 0) return null;
   try {
     return JSON.parse(result.stdout);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The draft state GitHub holds for a tag, or null when it cannot be read.
+ *
+ * `targetCommitish` is the only place a CI-created draft's target exists: the
+ * tag ref is not created until publication. The publish phase reads it here so
+ * it compares GitHub's target, not a local tag that may never have existed.
+ */
+function draftReleaseState(tag) {
+  const result = spawnSync(
+    "gh",
+    ["release", "view", tag, "--json", "targetCommitish,isDraft"],
+    { cwd: ROOT, encoding: "utf8", env: process.env },
+  );
+  if (result.error || result.status !== 0) return null;
+  try {
+    const parsed = JSON.parse(result.stdout);
+    return {
+      isDraft: parsed.isDraft === true,
+      targetCommitish:
+        typeof parsed.targetCommitish === "string" ? parsed.targetCommitish : null,
+    };
   } catch {
     return null;
   }
@@ -2246,6 +2331,7 @@ export function aggregateReleaseCommands({
   channel = "stable",
   revision = null,
   prerelease = false,
+  target = null,
 }) {
   const notesPath = join(NOTES_DIR, `${tag}.md`);
   if (mode === "publish") {
@@ -2278,7 +2364,7 @@ export function aggregateReleaseCommands({
         title: releaseTitle(date, channel, revision),
         notesPath,
         action: aggregate.action,
-        target: aggregate.plan.commit,
+        target: target ?? aggregate.plan.commit,
         prerelease,
       }),
     },
@@ -2286,7 +2372,17 @@ export function aggregateReleaseCommands({
 }
 
 /** Create or update the rolling release as a draft; never write the page. */
-function mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel, revision }) {
+function mainDraft({
+  aggregate,
+  date,
+  tag,
+  releases,
+  notes,
+  prerelease,
+  channel,
+  revision,
+  target,
+}) {
   if (releases === null) {
     throw new Error(
       "gh release list failed; refusing to draft into a repository it cannot read",
@@ -2304,6 +2400,7 @@ function mainDraft({ aggregate, date, tag, releases, notes, prerelease, channel,
     channel,
     revision,
     prerelease,
+    target,
   })) {
     run(step.command, step.args);
   }
@@ -2653,17 +2750,21 @@ async function main(argv) {
   const aggregateIsDraft = aggregateRow?.isDraft === true;
   const aggregatePublished = aggregateExists && aggregateRow.isDraft === false;
 
-  // A draft keeps the target it was first created with. Publishing one whose
-  // tag points at another tree would lock that tag to bytes it never described,
-  // so the known mismatch is a refusal, not an edit that GitHub may ignore.
-  if (aggregateIsDraft && (mode === "draft" || mode === "publish" || mode === "dry-run")) {
-    const targetMiss = draftTargetProblem({
-      tag,
-      isDraft: true,
-      draftCommit: aggregate.plan.commit,
-      head,
-    });
-    if (targetMiss !== null) fatalProblems.push(targetMiss);
+  // A draft's real target lives in GitHub's targetCommitish, not in a local
+  // tag: CI creates the draft without creating the ref. --draft re-targets its
+  // own draft to HEAD; --publish and the dry run compare GitHub's value with
+  // HEAD and refuse a mismatch before the immutable tag is locked.
+  if (aggregateIsDraft && (mode === "publish" || mode === "dry-run")) {
+    const state = draftReleaseState(tag);
+    if (state === null) {
+      fatalProblems.push(
+        `${tag} is a draft, but gh release view could not read its targetCommitish; ` +
+          "refusing to publish a target this run cannot verify.",
+      );
+    } else {
+      const targetMiss = draftTargetStateProblem({ tag, state, head });
+      if (targetMiss !== null) fatalProblems.push(targetMiss);
+    }
   }
 
   if (releases === null && mode === "publish") {
@@ -2759,6 +2860,10 @@ async function main(argv) {
     throw new Error(fatalProblems.join("\n\n"));
   }
 
+  // An edit re-targets the draft to this tree; a create is already planned at
+  // the changelog commit, which is HEAD when the tag does not exist.
+  const draftCommandTarget = aggregate.action === "edit" ? head : aggregate.plan.commit;
+
   if (mode === "publish") {
     if (fatalProblems.length > 0) {
       // A version that was never drafted is a refusal, not a skip: publishing
@@ -2783,7 +2888,17 @@ async function main(argv) {
   if (mode === "draft") {
     if (fatalProblems.length > 0) throw new Error(fatalProblems.join("\n\n"));
     // The title names the publication day; the body names the snapshot.
-    mainDraft({ aggregate, date: tagDate, tag, releases, notes, prerelease, channel, revision });
+    mainDraft({
+      aggregate,
+      date: tagDate,
+      tag,
+      releases,
+      notes,
+      prerelease,
+      channel,
+      revision,
+      target: draftCommandTarget,
+    });
     return;
   }
 
@@ -2803,6 +2918,7 @@ async function main(argv) {
     channel,
     revision,
     prerelease,
+    target: draftCommandTarget,
   })) {
     process.stdout.write(`\n  $ ${commandText(step.command, step.args)}\n`);
   }
