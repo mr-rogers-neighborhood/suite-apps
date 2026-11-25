@@ -235,7 +235,7 @@ jobs:
     with:
       channel: nightly
       effort: high
-      budget: "3000000"
+      budget: "5000000"
       max_tokens: "200000"
     secrets:
       DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}

@@ -94,9 +94,10 @@ cost control, not the token cap. The shared workflow is `.github/workflows/ocr-b
 - `nightly.yml` calls it after a green gate when `NIGHTLY_PUBLISH` is not `true`.
 - `release.yml` calls it before `approval` when `publish` is true, for `preview`, `stable`, and a
   publishing `nightly`.
-- `continue-on-error` at the caller makes it advisory: a DeepRelay outage never blocks a release.
-  The gate, approval and merge queue remain the decisions.
-- Effort `high` (three review rounds), 3,000,000 total token cap, 200,000 prompt ceiling. The cap is
+- The boundary workflow is advisory by default (`advisory: true` for callers): a DeepRelay outage
+  never blocks a release. A manual dispatch sets `advisory: false` so a test fails visibly. The gate,
+  approval and merge queue remain the decisions.
+- Effort `high` (three review rounds), 5,000,000 total token cap, 200,000 prompt ceiling. The cap is
   a ceiling, not a target; OCR's file selection, bundling, plan-skip and prompt caching keep a run
   proportional to the diff.
 - Range: the channel's last version tag. A non-publishing nightly creates no tag, so it uses the
