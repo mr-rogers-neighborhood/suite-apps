@@ -59,6 +59,28 @@ Recorded 2026-11-25.
 - **The docs moved with the decision.** This rewrites "`main` runs the full fresh gate" in
   [ci.md](../spec/ci.md) (C1.2, C4.4) and the root `AGENTS.md`; the workflow edit lands separately.
 
+### Slop builds only the hosts the push changed (#407, #422)
+
+Recorded 2026-11-25.
+
+- **The push diff decides.** `slop.yml` gains a `slop-targets` job that reads the push diff and the
+  workspace graph: a Desk source change builds only the Desk Flatpak, a Go change only the slop APK,
+  and a shared package reaches a host only through its declared dependencies. A scripts, packaging,
+  lockfile or unrecognised path rebuilds both. The fallback is deliberate: a stale slop artifact is
+  worse than a saved minute.
+- **A docs or workflow-only push publishes nothing.** Its run is the `slop-targets` job alone, green,
+  with one sentence in the step summary.
+- **Measured before, expected after.** Scoping the 8 slop pushes in the #422 window
+  (2026-11-24T17:39Z → 2026-11-25T14:26Z) skips 2 of 8 (`f9bd6244`, `9b04236d`) at about 4.3 minutes
+  each: about 1.1 of 4.9 minutes per push. A push that touches one host saves its ~1.9-minute APK or
+  ~2.5-minute Flatpak path instead.
+- **actionlint moves into `fast`.** The separate always-on `workflows` job is gone. `fast` runs Go
+  setup and actionlint only when the diff touches `.github/workflows/`, from the `workflows` output
+  `scripts/affected.mjs` already computes. In the window's 33 merge-queue runs, 19 (58%) touched no
+  workflow file, so they no longer pay its ~0.35 minutes.
+- **The proof is untouched.** Neither cut changes the merge-queue row set, the nightly full gate, or
+  the `ci` aggregator's assertions.
+
 ## Layout
 
 - The tree has four roots. `hosts/<host>` is a host (`desk`, `go`), `packs/<app>` is a pack

@@ -97,6 +97,12 @@ describe("affected selection", () => {
     );
   });
 
+  it("flags a workflow change for the actionlint step", () => {
+    assert.equal(affected([".github/workflows/ci.yml"]).workflows, true);
+    assert.equal(affected(["hosts/desk/src/main.ts"]).workflows, false);
+    assert.equal(affected(["docs/reference/status.md"]).workflows, false);
+  });
+
   it("runs nothing for a private package with no workspace dependent", () => {
     const result = affected(["legacy/budget/packages/pack/src/bridge.ts"]);
     assert.deepEqual(repos(result), []);
