@@ -29,18 +29,18 @@ Each editor binds one container and owns its undo stack. Origins belonging to
 another surface, and the structural `struct:` prefix, are excluded, which is why a
 text keystroke and a layout change do not share one history.
 
-## legacy/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.setProperty
+## packs/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.setProperty
 
 The field write reaches the document here. It validates the value, refuses a
 read-only session and touches one property rather than replacing the card, so two
 people editing different fields keep both writes.
 
-## legacy/canvas/packages/graph/src/loro/context.ts#DocContext.commit
+## packs/canvas/packages/graph/src/loro/context.ts#DocContext.commit
 
 One change leaves the facade. The commit's origin is also the change message, so
 the edit arrives as one history point and the undo panel can name it.
 
-## legacy/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument.batch
+## packs/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument.batch
 
 A gesture that needs several facade calls is one batch. Structural edits use it so
 that a create, a title, a property and a link land together; a promotion or a
@@ -92,7 +92,7 @@ The file authority assembles the envelope, takes the lock and writes atomically.
 The renderer never touches the path: it hands over a snapshot, and main decides
 where it lands and keeps the previous byte as a backup.
 
-## legacy/canvas/packages/graph/src/workspaceFile.test.ts
+## packs/canvas/packages/graph/src/workspaceFile.test.ts
 
 The reload contract closes the loop: write an envelope, read it into a fresh
 document and assert that the board, card and tag survived. The other cases pin the

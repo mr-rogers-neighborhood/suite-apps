@@ -24,7 +24,7 @@ import ts from "typescript";
  * generator works on a clean checkout.
  */
 const WORKSPACE_SOURCES = {
-  "@suite/graph": "../packages/graph/src/index.ts",
+  "@suite/graph": "../../../packs/canvas/packages/graph/src/index.ts",
 };
 
 export function resolve(specifier, context, next) {

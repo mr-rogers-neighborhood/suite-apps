@@ -61,8 +61,8 @@ the CRDT and nowhere else.
 | `packs/canvas/src` | The renderer: launcher, boards, cards, editor, panels |
 | `src/main.tsx` | The shell's entry, which loads the pack-owned renderer |
 | `desktop` | The Electron shell: the file, the lock, the window, packaging |
-| `packages/graph` | `@suite/graph`: the schema and the document layer |
-| `packages/import-obsidian` | Reads an Obsidian vault into a document |
+| `packs/canvas/packages/graph` | `@suite/graph`: the schema and the document layer |
+| `packs/canvas/packages/import-obsidian` | Reads an Obsidian vault into a document |
 | `e2e` | The Playwright suites, including the desktop one |
 | `docs/reference/decisions.md` | The rules that shape Canvas |
 

@@ -59,10 +59,10 @@ export default defineConfig({
       // The schema, document layer and importer are the pack's own; build them from source so
       // a stale `dist` can never describe a document the pack does not write.
       "@suite/graph": fileURLToPath(
-        new URL("../../../legacy/canvas/packages/graph/src/index.ts", import.meta.url),
+        new URL("../packages/graph/src/index.ts", import.meta.url),
       ),
       "@suite/import-obsidian": fileURLToPath(
-        new URL("../../../legacy/canvas/packages/import-obsidian/src/index.ts", import.meta.url),
+        new URL("../packages/import-obsidian/src/index.ts", import.meta.url),
       ),
       "@suite/sync": fileURLToPath(
         new URL("../../../services/relay/packages/protocol/src/index.ts", import.meta.url),

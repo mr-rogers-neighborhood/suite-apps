@@ -163,6 +163,8 @@ async function main(argv) {
       "./packages/*",
       "--filter",
       "./legacy/*/packages/*",
+      "--filter",
+      "./packs/*/packages/*",
       "--workspace-concurrency=2",
       "run",
       "build",

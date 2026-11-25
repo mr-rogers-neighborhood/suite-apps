@@ -97,14 +97,14 @@ before the window leaves the workspace. It holds the document instance, not a
 copy of its records, and a refused write never becomes document state. The Canvas
 / Store note owns what may live in the store.
 
-## legacy/canvas/packages/graph/src/workspaceFile.ts#tryParseWorkspaceFile
+## packs/canvas/packages/graph/src/workspaceFile.ts#tryParseWorkspaceFile
 
 Parsing answers with a `Result` because the person chose the file and needs a
 sentence they can act on. It never merges into an open document; the caller gives
 it a new workspace id. A missing image is reported as damaged while the rest of
 the document imports. The Graph note owns the envelope and the version refusals.
 
-## legacy/canvas/packages/graph/src/workspaceFile.test.ts
+## packs/canvas/packages/graph/src/workspaceFile.test.ts
 
 The reload contract is the end of the path: the first case writes an envelope,
 reads it into a fresh document and asserts that the board, card and tag survived.

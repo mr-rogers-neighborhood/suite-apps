@@ -57,7 +57,7 @@ export default {
     },
     {
       kind: "node",
-      target: { kind: "module", id: "legacy/canvas/packages/graph" },
+      target: { kind: "module", id: "packs/canvas/packages/graph" },
       note: "The document layer is a separate package, so a component never reaches Loro.",
     },
     {

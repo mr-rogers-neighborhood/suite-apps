@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
  */
 const WHY =
   "packages/graph is the pure, DOM-free core: that is why its suite runs in a couple of seconds " +
-  "and can be mutation-tested. Move React, editor or browser code into legacy/canvas and pass " +
+  "and can be mutation-tested. Move React, editor or browser code into the pack renderer and pass " +
   "plain data into the graph.";
 
 /**
@@ -22,7 +22,7 @@ const WHY =
  */
 const ROOT = ts.sys.getCurrentDirectory();
 const SRC =
-  ["packages/graph/src", "src"]
+  ["packs/canvas/packages/graph/src", "packages/graph/src", "src"]
     .map((candidate) => `${ROOT}/${candidate}`)
     .find((candidate) => ts.sys.fileExists(`${candidate}/index.ts`)) ?? `${ROOT}/src`;
 

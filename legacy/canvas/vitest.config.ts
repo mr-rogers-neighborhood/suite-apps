@@ -21,50 +21,7 @@ export default defineConfig({
     // parallel with the canvas project; the 5 s default produced a load-induced
     // timeout (9.7 s, passed on rerun). 15 s still fails a genuine hang.
     testTimeout: 15_000,
-    coverage: {
-      provider: "v8",
-      reporter: ["text-summary", "lcov"],
-      reportsDirectory: "coverage",
-      include: ["packages/graph/src/**", "../packs/canvas/pack/src/renderer/**"],
-      exclude: [
-        "**/*.test.*",
-        "**/*.spec.*",
-        "**/*.stories.*",
-        "**/dist/**",
-        "**/*.d.ts",
-        "**/*.css",
-      ],
-      // Only `@suite/graph` is gated: it has a real suite of behavioural tests.
-      // `server` and `canvas` are measured and printed but not gated, so nobody
-      // is tempted to add assertion-free tests just to clear a number.
-      // A glob key (not a per-project block) is what vitest 5 actually honours —
-      // per-project `test.coverage` is accepted by the types but ignored at runtime.
-      thresholds: {
-        "packages/graph/src/**": {
-          statements: 85,
-          branches: 74,
-          functions: 93,
-          lines: 90,
-        },
-      },
-    },
     projects: [
-      {
-        test: {
-          name: "graph",
-          environment: "node",
-          include: ["packages/graph/src/**/*.test.ts"],
-        },
-      },
-      {
-        // The Obsidian importer reads a vault into a document, so its suite
-        // needs the graph's real CRDT and nothing else.
-        test: {
-          name: "importer",
-          environment: "node",
-          include: ["packages/import-obsidian/src/**/*.test.ts"],
-        },
-      },
       {
         // The desktop shell's main process: the lock, the file store, recovery
         // and the page policy. Node, and no Electron, because none of it needs a

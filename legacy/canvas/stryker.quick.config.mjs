@@ -9,7 +9,7 @@ import graph from "./stryker.graph.config.mjs";
 
 export default {
   ...graph,
-  mutate: ["packages/graph/src/search.ts"],
+  mutate: ["packs/canvas/packages/graph/src/search.ts"],
   incrementalFile: "reports/stryker-incremental-quick.json",
   htmlReporter: { fileName: "reports/mutation/quick.html" },
   jsonReporter: { fileName: "reports/mutation/quick.json" },

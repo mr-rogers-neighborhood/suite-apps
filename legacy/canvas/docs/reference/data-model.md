@@ -25,19 +25,19 @@ each root is a `LoroMap` keyed by record id.
 | `views` | one map per saved view | `VIEWS_KEY` |
 | `drawings` | one scene per card | `WorkspaceDocument.drawingRoot(doc)` |
 
-`STRUCT_KEYS` in `packages/graph/src/loro/keys.ts` names the first twelve. The drawings root is not in that
+`STRUCT_KEYS` in `packs/canvas/packages/graph/src/loro/keys.ts` names the first twelve. The drawings root is not in that
 object: it is opened only through the facade, so no domain module can reach it without going past the typed
 writer. `WorkspaceDocument.ROOT_KEYS` lists all thirteen in the order a projection replaces them.
 
-The facade is `packages/graph/src/loro/WorkspaceDocument.ts`. Its card half is the `CardsFacade` class in
-`packages/graph/src/loro/facade/cards.ts`, which the facade extends, so `doc.listCards()` and
+The facade is `packs/canvas/packages/graph/src/loro/WorkspaceDocument.ts`. Its card half is the `CardsFacade` class in
+`packs/canvas/packages/graph/src/loro/facade/cards.ts`, which the facade extends, so `doc.listCards()` and
 `doc.titleId()` resolve on the same prototype as `doc.createBoard()`. Domain modules are plain functions
-over a shared `DocContext` (`packages/graph/src/loro/context.ts`), composed by `createDocApi` in
-`packages/graph/src/loro/api.ts`, and they call each other through `ctx.api`.
+over a shared `DocContext` (`packs/canvas/packages/graph/src/loro/context.ts`), composed by `createDocApi` in
+`packs/canvas/packages/graph/src/loro/api.ts`, and they call each other through `ctx.api`.
 
 ## Record shapes
 
-`packages/graph/src/schema.ts` is the only description of a record. Every read parses through it, so a
+`packs/canvas/packages/graph/src/schema.ts` is the only description of a record. Every read parses through it, so a
 malformed value throws at the boundary that read it rather than reaching the canvas.
 
 | Record | Stored on the record map | Nested containers |
@@ -51,7 +51,7 @@ malformed value throws at the boundary that read it rather than reaching the can
 | Tag | `name`, `color`, `createdAt` | none |
 | Saved view | `name`, `position`, optional `kind`, optional `context` pins | `query`, a map holding the query facets; `lens`, `collection` and `render` payloads |
 
-A placement is keyed by `placementKey(boardId, cardId)` from `packages/graph/src/loro/constants.ts`, which
+A placement is keyed by `placementKey(boardId, cardId)` from `packs/canvas/packages/graph/src/loro/constants.ts`, which
 is `${boardId}/${cardId}`. One card can therefore sit on many boards without a second record kind.
 
 Two calls use that. `moveCardToBoard` rewrites the placement and removes the others, dropping the edges that
@@ -66,7 +66,7 @@ and `MIN_RANK_GAP` is the distance below which the board renumbers.
 `deletedAt` is a number on a card and a drawing element, null or absent everywhere else. It is the soft
 delete, not a second record.
 
-Readers live in `packages/graph/src/records/`. `cardFromMap` is the one card reader, `normalizeCard`
+Readers live in `packs/canvas/packages/graph/src/records/`. `cardFromMap` is the one card reader, `normalizeCard`
 backfills a field added after a document was created, and `readIdSet` turns an id-keyed map into the array a
 caller expects.
 
@@ -109,7 +109,7 @@ content and an undo would make it disagree with the text it describes.
 ## The reference index
 
 `references` is derived: for each card, a map of the card ids its title, body and property values name.
-`packages/graph/src/loro/cards/references.ts` owns it.
+`packs/canvas/packages/graph/src/loro/cards/references.ts` owns it.
 
 `ensureReferences` compares the stored set with the set the text currently names and rewrites only the
 entries that differ, so running it on every client after the first sync converges without coordination.
@@ -130,7 +130,7 @@ container and reference caches. The subscription in `context.ts` invalidates the
 and notifies the listeners that asked about them, which is why a cache is never the authority for what a
 document contains. A cache cannot be written to make a read faster in a way that changes an answer.
 
-Saved views store a query, never a result. `viewQuerySchema` in `packages/graph/src/views.ts` holds text
+Saved views store a query, never a result. `viewQuerySchema` in `packs/canvas/packages/graph/src/views.ts` holds text
 facets, type and tag facets, scope, grouping and predicates, and `viewPredicates.ts` evaluates them against
 the document at read time. `viewsRevision` moves when a view record changes, so a renderer can subscribe to
 the view list without subscribing to every card.
@@ -264,12 +264,12 @@ Publishing is a plan and an apply. The plan compares a draft with the source and
 every change; the apply writes those values onto the source in one commit. No shipped surface opens a
 draft, because sync edits the same document on both devices.
 
-`packages/graph/src/publish/` owns both halves. `planPublish` is pure: it compares the draft, the baseline
+`packs/canvas/packages/graph/src/publish/` owns both halves. `planPublish` is pure: it compares the draft, the baseline
 and the source, records `changes`, `conflicts` and `unsupported` keys, and captures the exact value of each
 change. `applyPublish` refuses a plan with a conflict or an unsupported key, then replays the captured
 values inside `source.batch(PUBLISH_ORIGIN, ...)`.
 
-Apply does not validate. `packages/graph/src/publishValidation.ts` is the validator, and planning is the only
+Apply does not validate. `packs/canvas/packages/graph/src/publishValidation.ts` is the validator, and planning is the only
 place that calls it. Apply's guards are replay guards, so a plan applied twice writes nothing the second
 time, and each step compares before writing for that reason. `publish/apply.ts` keeps one named function per
 change kind, so the replay rule for each kind can be read on its own.
@@ -279,12 +279,12 @@ rich-text nesting and a fixed allowlist of node and mark names.
 
 ## Projection: a document for a subset
 
-`projectWorkspace` in `packages/graph/src/projection/workspace.ts` builds a fresh `LoroDoc` from a board,
+`projectWorkspace` in `packs/canvas/packages/graph/src/projection/workspace.ts` builds a fresh `LoroDoc` from a board,
 a card or a selection: the board, the selected cards, their placements, their sections and the edges
 whose ends both travel, committed once under `sys:projection`. Nothing outside that scope is copied, and
 a reference to a card that stayed behind is reported with `private: true` rather than copied; a board
 projection redacts those titles to `PRIVATE_REFERENCE_TITLE`. `applyProjection` in
-`packages/graph/src/projection/apply.ts` replays such a document into a live one.
+`packs/canvas/packages/graph/src/projection/apply.ts` replays such a document into a live one.
 
 The builder has tests and no caller in the app. The share room that served it is retired, and a share
 is an invite into a workspace or a file ([Decisions](decisions.md#sharing)).
@@ -293,7 +293,7 @@ is an invite into a workspace or a file ([Decisions](decisions.md#sharing)).
 
 A saved point is a Loro change, not a record of our own. `WorkspaceDocument.listHistoryPoints` reads
 `doc.getAllChanges()` and reports each change as a point with its origin, its timestamp and the frontier that
-ends it (`packages/graph/src/history.ts`). Nothing new is persisted, so a workspace that never opens the panel
+ends it (`packs/canvas/packages/graph/src/history.ts`). Nothing new is persisted, so a workspace that never opens the panel
 pays nothing for it.
 
 Every commit carries its origin as the change's message, which is what the panel shows. `DocContext` also sets
@@ -308,7 +308,7 @@ the reader's.
 
 ## Templates are data
 
-`packages/graph/src/workspaceTemplate.ts` holds the shapes a workspace can start from as validated data:
+`packs/canvas/packages/graph/src/workspaceTemplate.ts` holds the shapes a workspace can start from as validated data:
 boards, regions and cards with authored geometry, plus tags, colours and card types by name.
 `applyWorkspaceTemplate` copies one into a document through the same typed methods a person would use, in one
 batch, so the whole template is one undo step and nothing is written at boot. A starter is a copy of authored
@@ -316,10 +316,10 @@ records, not a code path that builds cards by hand.
 
 ## Files, backups and merge
 
-`packages/graph/src/workspaceFile.ts` wraps a document in the `.canvas` envelope (`suite.canvas`, version
+`packs/canvas/packages/graph/src/workspaceFile.ts` wraps a document in the `.canvas` envelope (`suite.canvas`, version
 3). Version 2 added attachments; version 3 renamed the kind from `suite.workspace` and moved the file to
 `.canvas`, because `.suite` now means a bundle. The decoder accepts all three, and
-`migrateWorkspaceFile` rewrites an older envelope without touching the snapshot bytes. `packages/graph/src/portable.ts` exports a document as plain JSON
+`migrateWorkspaceFile` rewrites an older envelope without touching the snapshot bytes. `packs/canvas/packages/graph/src/portable.ts` exports a document as plain JSON
 (`suite.portable`, version 1) for interchange, and `merge.ts` merges a portable export into a document.
 
 `SCHEMA_VERSION` is 6. It is the version of the document shape the code expects, not the version of the
@@ -330,12 +330,12 @@ records, not a code path that builds cards by hand.
 The chain for any record change is the same, and [../how-to/change-the-data-model.md](../how-to/change-the-data-model.md)
 walks it with the tests each step needs.
 
-1. `packages/graph/src/schema.ts` describes the record.
-2. `packages/graph/src/records/` reads it back, including a backfill for a field older documents lack.
-3. `packages/graph/src/loro/` writes it, one leaf at a time.
-4. `packages/graph/src/loro/api.ts` composes the domain module, and `WorkspaceDocument.ts` or
+1. `packs/canvas/packages/graph/src/schema.ts` describes the record.
+2. `packs/canvas/packages/graph/src/records/` reads it back, including a backfill for a field older documents lack.
+3. `packs/canvas/packages/graph/src/loro/` writes it, one leaf at a time.
+4. `packs/canvas/packages/graph/src/loro/api.ts` composes the domain module, and `WorkspaceDocument.ts` or
    `facade/cards.ts` exposes the method.
-5. `packages/graph/src/index.ts` re-exports the type a consumer outside the package needs.
+5. `packs/canvas/packages/graph/src/index.ts` re-exports the type a consumer outside the package needs.
 
 A schema bump is a decision, not a side effect of adding a field: older clients keep editing the same
 document, so a field that changes meaning needs a backfill that reads both shapes.

@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/canvas/packages/graph
+module: packs/canvas/packages/graph
 title: Graph
 summary: "The schema, file envelope and authored seeds Canvas reads and writes through."
 ---
@@ -19,7 +19,7 @@ a browser profile and a file, and the Electron main process owns the file, the
 lock and the backup. Templates are data, so nothing here builds a starter by hand
 at boot.
 
-## file: legacy/canvas/packages/graph/src/index.ts
+## file: packs/canvas/packages/graph/src/index.ts
 
 This file is the package boundary. A consumer outside the package sees schemas,
 types, pure functions and the `WorkspaceDocument` facade here, and does not reach
@@ -27,7 +27,7 @@ into `src/loro/`. The composition pieces (`DocContext`, `createDocApi`, the
 per-domain method bags) are deliberately absent: exporting them would make the
 internal write protocol a second way in.
 
-## legacy/canvas/packages/graph/src/schema.ts#cardSchema
+## packs/canvas/packages/graph/src/schema.ts#cardSchema
 
 A card is the record most writes end on, and this schema is the only description
 of it. Every read parses through it, so a malformed value fails at the boundary
@@ -35,7 +35,7 @@ that read it instead of reaching React. A field added later is additive first:
 older documents still parse, and the record readers backfill the field rather
 than a migration script rewriting every card.
 
-## legacy/canvas/packages/graph/src/workspaceFile.ts#workspaceFileSchema
+## packs/canvas/packages/graph/src/workspaceFile.ts#workspaceFileSchema
 
 This is the shape on disk. It carries a base64 Loro snapshot, a small manifest
 and the document's images inline; the payload is opaque to the envelope, which is
@@ -43,14 +43,14 @@ why a future version can be refused by name before anything is imported. Both th
 current `suite.canvas` kind and the legacy `suite.workspace` kind are accepted,
 and that union is what made the rename a rename rather than a break.
 
-## legacy/canvas/packages/graph/src/workspaceFile.ts#WORKSPACE_FILE_VERSION
+## packs/canvas/packages/graph/src/workspaceFile.ts#WORKSPACE_FILE_VERSION
 
 The version is the contract for readers, and it is not the schema version: the
 envelope and the document shape move independently, and both are checked before a
 snapshot is opened. Bump this only with a reader that still accepts the previous
 shape, and a test that opens a file written before the bump.
 
-## legacy/canvas/packages/graph/src/workspaceFile.ts#createWorkspaceFile
+## packs/canvas/packages/graph/src/workspaceFile.ts#createWorkspaceFile
 
 The export and backup path. It takes a live document, exports the snapshot and
 counts the manifest from that same document, so the header cannot claim a
@@ -58,7 +58,7 @@ different workspace than the payload holds. Compact export omits history for a
 template or a share; it is the same format and a smaller file, never a second
 reader.
 
-## legacy/canvas/packages/graph/src/workspaceFile.ts#buildWorkspaceFile
+## packs/canvas/packages/graph/src/workspaceFile.ts#buildWorkspaceFile
 
 The desktop main process has the snapshot and the counts but no
 `WorkspaceDocument`, and this assembler is how it writes the envelope without
@@ -66,7 +66,7 @@ holding a second copy of the document or re-encoding images that did not change.
 One function owns the base64 and versioning decisions, so the export path and the
 autosave path cannot drift into two formats.
 
-## legacy/canvas/packages/graph/src/workspaceFile.ts#tryParseWorkspaceFile
+## packs/canvas/packages/graph/src/workspaceFile.ts#tryParseWorkspaceFile
 
 Import answers with a `Result`, because a person chose the file and needs a
 sentence they can act on. It never merges into an open document; the caller gives
@@ -74,7 +74,7 @@ it a new workspace id. A referenced image whose bytes are absent or unreadable i
 reported as damaged while the rest of the document imports, because losing one
 picture must not cost the text beside it.
 
-## file: legacy/canvas/packages/graph/src/workspaceFile.test.ts
+## file: packs/canvas/packages/graph/src/workspaceFile.test.ts
 
 The first case is the reload contract: create an envelope, read it back into a
 fresh document, and assert that the board name, the card and the tag survived.
@@ -82,7 +82,7 @@ The remaining cases pin the refusals (newer file, newer schema, corrupt payload)
 and the attachment path byte-for-byte. A change that makes this file pass by
 weakening one of those checks has changed the format's promise, not its tests.
 
-## legacy/canvas/packages/graph/src/workspaceTemplate.ts#STARTER_TEMPLATES
+## packs/canvas/packages/graph/src/workspaceTemplate.ts#STARTER_TEMPLATES
 
 A new workspace is a template, not a special constructor. The list is parsed
 through `workspaceTemplateSchema` at module load, so a broken authored key fails
@@ -90,7 +90,7 @@ in the test suite rather than on someone's first board. The notebook is
 deliberately almost empty; the guide is labelled unfinished rather than dressed
 up as a finished reading path.
 
-## legacy/canvas/packages/graph/src/workspaceTemplate.ts#applyWorkspaceTemplate
+## packs/canvas/packages/graph/src/workspaceTemplate.ts#applyWorkspaceTemplate
 
 A template is copied through the same facade a person uses: boards, sections,
 cards, portals, edges and pictures are written with the typed methods inside one

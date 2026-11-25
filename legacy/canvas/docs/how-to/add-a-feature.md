@@ -9,7 +9,7 @@ attribute or a board setting.
 
 ## 1. Model it in `@suite/graph`
 
-Schema first. Everything persisted is a Zod schema in `packages/graph/src/schema.ts`, and the
+Schema first. Everything persisted is a Zod schema in `packs/canvas/packages/graph/src/schema.ts`, and the
 TypeScript type is derived from it rather than written twice.
 
 - Add or extend the schema (`cardSchema`, `edgeSchema`, `boardSchema`, …) and export the inferred
@@ -17,12 +17,12 @@ TypeScript type is derived from it rather than written twice.
 - A new constrained value is a `z.enum` built from an `as const` tuple, so the UI can iterate it.
 - Shape changes are additive and optional, so an old document still parses. Bumping a stored format is
   an explicit decision, not a side effect of adding a field.
-- Update `packages/graph/src/schema.test.ts` with the parse and reject cases. The loop is
-  `pnpm exec vitest run packages/graph/src/schema.test.ts`.
+- Update `packs/canvas/packages/graph/src/schema.test.ts` with the parse and reject cases. The loop is
+  `pnpm exec vitest run packs/canvas/packages/graph/src/schema.test.ts`.
 
 ## 2. Put the write on `WorkspaceDocument`
 
-Graph writes go through the typed wrapper in `packages/graph/src/loro/`. The method lives in the module
+Graph writes go through the typed wrapper in `packs/canvas/packages/graph/src/loro/`. The method lives in the module
 that owns the record (`cards/`, `placements.ts`, `edges.ts`, `sections.ts`, `boards.ts`) and is
 re-exported from `WorkspaceDocument.ts`.
 
@@ -31,7 +31,7 @@ re-exported from `WorkspaceDocument.ts`.
 - Validate with the Zod schema at the boundary. Every `set*` method does, and a new one must too.
 - Keep reads side-effect free: `peekContent`/`peekTitle` for fragments, and only creation inserts.
 - Commit once per gesture, so `Cmd-Z` undoes the whole drop rather than N single-record steps.
-- Add the method's test beside the module (`packages/graph/src/loro/cards/*.test.ts`). If the write can
+- Add the method's test beside the module (`packs/canvas/packages/graph/src/loro/cards/*.test.ts`). If the write can
   conflict with another client, add a seeded case to `merge.property.test.ts`.
 
 ## 3. Expose it to the UI
@@ -83,7 +83,7 @@ gets `menuKeyDown` from `@suite/ui`, and Escape is registered with
 
 Tests sit beside the thing they test: `src/cards/NodeCard.test.tsx` covers the card face,
 `src/field/compositeKinds.test.tsx` covers the composing field kinds, and
-`packages/graph/src/schema.test.ts` covers the schema.
+`packs/canvas/packages/graph/src/schema.test.ts` covers the schema.
 
 - A story (`*.stories.tsx`) when the surface is visual, with the states a reviewer would ask about:
   default, empty, long content, error. Stories are what the visual baselines render.

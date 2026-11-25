@@ -25,7 +25,7 @@ Read [docs/README.md](docs/README.md) for the four documentation sections, and
 | `packs/canvas/src` | The canvas itself: launcher, boards, cards, editor, library, panels, collab provider, Zustand store |
 | `src/main.tsx` | The shell's entry, which loads the pack-owned renderer |
 | `desktop` | The Electron shell — the window, the `suite.app.json` a hub discovers, and the updater |
-| `packages/graph` | `@suite/graph`: schema, types, typed Loro layer, workspace file and portable export |
+| `packs/canvas/packages/graph` | `@suite/graph`: schema, types, typed Loro layer, workspace file and portable export |
 | `e2e` | Playwright specs, tagged `@smoke` for the smoke tier |
 | `docs` | Developer documentation: tutorials, how-to, reference and explanation |
 | `handbook` | The user handbook: one Markdown article per interface element and system, shown in the app |
@@ -81,7 +81,7 @@ All verification gates are local, so every gate claim in this repo names a local
 
 1. Graph data goes through `@suite/graph`. Never write raw Loro for document data.
 2. Document truth never lives in Zustand, React state or localStorage. Zustand holds UI state only.
-3. Schema changes are additive first. `packages/graph/src/schema.ts` changes with its tests, and
+3. Schema changes are additive first. `packs/canvas/packages/graph/src/schema.ts` changes with its tests, and
    bumping the schema version needs a recorded decision.
 4. TypeScript stays strict. No `any` without a justified `biome-ignore`; prefer `unknown` and
    narrowing.
@@ -116,7 +116,7 @@ a todo or a plan phase, then strike it through.
 
 ## Feature path
 
-1. Model it in `packages/graph/src/schema.ts` with tests.
+1. Model it in `packs/canvas/packages/graph/src/schema.ts` with tests.
 2. Expose typed accessors and mutations on `WorkspaceDocument`.
 3. Consume it in `src` through `useWorkspaceSnapshot` and the Zustand store.
 4. Add a Storybook story and component tests.

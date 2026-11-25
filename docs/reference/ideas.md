@@ -64,7 +64,7 @@ command reports and never fails on a gap; re-run it rather than trusting a stale
 | Written tours reviewed by a person | 0/13 |
 | Generated tour steps with a note | 147/147 |
 
-The largest modules with no prose are `legacy/canvas/packages/import-obsidian` (143 symbols), the Canvas
+The largest modules with no prose are `packs/canvas/packages/import-obsidian` (143 symbols), the Canvas
 graph publish package (125), `legacy/help` (121), `legacy/help/src/renderer` (120) and
 `packs/canvas/src/library` (114). The help and Canvas rows are the densest, but they are app-owned
 prose: this pass records them and does not write app module notes.

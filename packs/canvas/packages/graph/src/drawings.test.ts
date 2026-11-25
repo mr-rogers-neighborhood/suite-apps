@@ -464,7 +464,7 @@ describe("drawing share projections", () => {
 describe("drawings boundary", () => {
   const ROOT = ts.sys.getCurrentDirectory();
   const SRC =
-    ["packages/graph/src", "src"]
+    ["packs/canvas/packages/graph/src", "packages/graph/src", "src"]
       .map((candidate) => `${ROOT}/${candidate}`)
       .find((candidate) => ts.sys.fileExists(`${candidate}/index.ts`)) ?? `${ROOT}/src`;
   const ALLOWED = ["loro/WorkspaceDocument.ts", "projection.ts"];

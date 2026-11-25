@@ -48,7 +48,7 @@ Tests:
 A node surface is a card face with its own chrome. It is still a card, still placed by a placement, and
 still edited by Tiptap for its text.
 
-1. Model the marker in `packages/graph`. The existing surfaces use a card type or a property, which is
+1. Model the marker in `packs/canvas/packages/graph`. The existing surfaces use a card type or a property, which is
    how `whiteboard` and `board` portals are recognised; a new record class needs a schema change and a
    decision record first.
 2. Add the predicate beside the others in `src/cards/`. `cards/whiteboard.ts` exports

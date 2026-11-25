@@ -9,8 +9,8 @@ only for the opt-in sync one workspace asks for: it holds the group keys and the
 | --- | --- | --- |
 | Renderer | `src` | The document's UI: launcher, boards, cards, editor, panels |
 | Shell | `desktop` | The file on disk, its lock and backups, the window, the package |
-| Document | `packages/graph` (`@suite/graph`) | The schema and the only writer |
-| Importer | `packages/import-obsidian` | Reads a vault into a document |
+| Document | `packs/canvas/packages/graph` (`@suite/graph`) | The schema and the only writer |
+| Importer | `packs/canvas/packages/import-obsidian` | Reads a vault into a document |
 
 ## The document
 

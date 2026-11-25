@@ -16,8 +16,8 @@ the pipeline is [ci.md](ci.md); the delivery contract is [delivery.md](delivery.
 `packs/<app>` is a pack workspace package (`@suite/<app>-pack`) whose `pack/` holds the source.
 `legacy/<app>` is a frozen app: its Electron shell, renderer, private packages, tests and docs.
 `services/relay` is the relay. A shared package lives under root `packages/` only when two or more
-apps consume it; an app's private packages stay under `hosts/<host>/packages/` or
-`legacy/<app>/packages/`. Cross-app documentation is `docs/` and the Flatpak manifests are
+apps consume it; an app's private packages stay under `hosts/<host>/packages/`,
+`packs/<app>/packages/` or `legacy/<app>/packages/`. Cross-app documentation is `docs/` and the Flatpak manifests are
 `packaging/`.
 
 **R1.3** The desktop host is `hosts/desk` (`@suite/desk`), and it is the way in: it reads a verified

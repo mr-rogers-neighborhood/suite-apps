@@ -52,7 +52,7 @@ A section is a labelled region on one board, stored in `sections`:
 | `shrinkToFit` | whether the frame is elastic to what it holds; absent means yes |
 
 Sections never own cards. Membership is computed from geometry on every read: `sectionMembership` in
-`packages/graph/src/sections.ts` takes each placement's anchor (its top-left corner plus
+`packs/canvas/packages/graph/src/sections.ts` takes each placement's anchor (its top-left corner plus
 `CARD_ANCHOR_INSET`, 8 flow units) and returns the smallest section whose rect contains it, with the
 higher `z` and then the id breaking ties. Two clients therefore agree about a card that straddles a
 border without exchanging anything.
@@ -61,7 +61,7 @@ border without exchanging anything.
 members: the cards whose anchor resolves to it, and any section geometrically inside it. Nesting is
 therefore a layout relationship, not a separate record: the inner frame is laid out first and the parent
 then grows around the child's *new* box, exactly as it would around a card. `planSectionFit` in
-`packages/graph/src/propagator/sectionFitPlan.ts` is the rule for a section gesture, and
+`packs/canvas/packages/graph/src/propagator/sectionFitPlan.ts` is the rule for a section gesture, and
 `computeSectionResizes` in `reflowPlan.ts` applies the same membership while a card drag is being
 resolved, smallest frame first. `shrinkToFit: false` keeps a frame fixed: it still grows to hold what
 moved, and never shrinks back.
