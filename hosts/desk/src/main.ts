@@ -14,6 +14,7 @@ import {
   nativeTheme,
   net,
   protocol,
+  webContents,
 } from "electron";
 import {
   type CataloguePack,
@@ -92,6 +93,9 @@ import {
   trustRootFor,
 } from "./publisherTrust.js";
 import { type RecentsScope, RecentsStore } from "./recents.js";
+import { RelayBroker, type RelayScope as RelayBrokerScope } from "./relayAdapter.js";
+import { openPinnedRelaySocket } from "./relaySocket.js";
+import { RelaySupervisor, type RelaySupervisorStatus } from "./relaySupervisor.js";
 import { createReminderDelivery, type ReminderPlatform } from "./reminderDelivery.js";
 import { RendererProjectionRunner, registerProjectionChannels } from "./reminderProjections.js";
 import {
@@ -121,6 +125,8 @@ import {
   type PackConsentView,
   type PackInfoView,
   type PackLaunchContext,
+  type RelayLifecycle,
+  type RelayView,
   type ThemeView,
 } from "./shared.js";
 import { SpaceStore } from "./spaces.js";
@@ -207,6 +213,11 @@ let reminderScheduler: ReminderScheduler | null = null;
 /** The host's recent list and the seen fingerprints its document watch compares. */
 let recentsStore: RecentsStore | null = null;
 let libraryWatch: LibraryWatch | null = null;
+/** The supervised relay child and the pack-facing broker over its socket. */
+let relaySupervisor: RelaySupervisor | null = null;
+let relayBroker: RelayBroker | null = null;
+/** The quit hook prevents the first `before-quit`, stops the relay, then quits again. */
+let shuttingDown = false;
 
 /** The compressed archive cap this host opens from the picker. The reader enforces its own entry limits too. */
 const MAX_INSTALL_BYTES = MAX_ARCHIVE_BYTES;
@@ -255,14 +266,27 @@ if (!gotLock) {
       window.focus();
     }
   });
-  app.on("before-quit", () => {
+  app.on("before-quit", (event) => {
+    // The relay is a child, not a thread: stop accepting sync work and wait for
+    // it to close its store before this process exits. The first quit is held,
+    // the second one (after the await below) is the real one.
+    if (shuttingDown) return;
+    shuttingDown = true;
+    event.preventDefault();
     reminderScheduler?.stop();
-    void spaceStore?.flush().catch((error: unknown) => {
-      console.warn("[desk] space document flush failed", error);
-    });
-    void screenStore?.flush().catch((error: unknown) => {
-      console.warn("[desk] screen document flush failed", error);
-    });
+    relayBroker?.closeAll();
+    void (async () => {
+      await relaySupervisor?.stop().catch((error: unknown) => {
+        console.warn("[desk] the relay child could not be stopped", error);
+      });
+      await spaceStore?.flush().catch((error: unknown) => {
+        console.warn("[desk] space document flush failed", error);
+      });
+      await screenStore?.flush().catch((error: unknown) => {
+        console.warn("[desk] screen document flush failed", error);
+      });
+      app.quit();
+    })();
   });
 }
 
@@ -339,6 +363,40 @@ async function bootstrap(): Promise<void> {
   // `external.ts` turns it into an opaque, tab-scoped token for the pack.
   externalFiles = new ExternalFilesService(externalDialog(), fileService);
 
+  // The relay is a supervised child, not a module in this process. It gets its
+  // own store and nothing else: no document root, no pack root, no device key.
+  relaySupervisor = new RelaySupervisor({
+    entry: relayChildEntry(),
+    store: join(dataRoot, "relay"),
+    baseEnv: process.env,
+    logger: (line) => console.info(`[desk] ${line}`),
+    onStatus: (status) => window?.setRelayStatus(relayView(status)),
+  });
+  // The pack-facing side opens the socket and forwards bytes. It refuses any
+  // address or pin other than the relay this host supervises.
+  relayBroker = new RelayBroker({
+    runtime: () => ({
+      ready: relaySupervisor?.ready ?? false,
+      address: relaySupervisor?.status.address ?? null,
+      fingerprint: relaySupervisor?.status.fingerprint ?? null,
+    }),
+    openSocket: openPinnedRelaySocket,
+    sink: {
+      frame: (webContentsId, token, frame) => {
+        const contents = webContents.fromId(webContentsId);
+        if (contents !== undefined && !contents.isDestroyed()) {
+          contents.send(PACK_EVENT.relayFrame, token, frame);
+        }
+      },
+      close: (webContentsId, token, reason) => {
+        const contents = webContents.fromId(webContentsId);
+        if (contents !== undefined && !contents.isDestroyed()) {
+          contents.send(PACK_EVENT.relayClosed, token, reason);
+        }
+      },
+    },
+  });
+
   serveProtocols();
   registerIpc();
   nativeTheme.on("updated", () => {
@@ -359,6 +417,63 @@ function dataRootFor(): string {
   const override = process.env.SUITE_DESK_DATA?.trim();
   if (override !== undefined && override.length > 0) return override;
   return join(app.getPath("userData"), "desk");
+}
+
+/**
+ * Where the built relay child lives.
+ *
+ * A checkout runs the host from `hosts/desk`, so the relay's compiled entry is
+ * two levels up and beside it. `SUITE_DESK_RELAY_ENTRY` names a different file
+ * for a test or a packaging experiment. A packaged host that does not carry the
+ * child fails visibly at start rather than pretending sync is available.
+ */
+function relayChildEntry(): string {
+  const override = process.env.SUITE_DESK_RELAY_ENTRY?.trim();
+  if (override !== undefined && override.length > 0) return override;
+  return join(app.getAppPath(), "..", "..", "services", "relay", "dist", "child.js");
+}
+
+function relayLifecycle(state: RelaySupervisorStatus["state"]): RelayLifecycle {
+  if (state === "stopped") return "off";
+  if (state === "ready") return "on";
+  return state;
+}
+
+/** The relay state the chrome draws. No frame, no document and no pack data. */
+function relayView(status: RelaySupervisorStatus): RelayView {
+  return {
+    state: relayLifecycle(status.state),
+    on: status.state === "ready",
+    address: status.address,
+    fingerprint: status.fingerprint,
+    code: status.code,
+    consoleUrl: status.consoleUrl,
+    restartCount: status.restartCount,
+    lastError: status.lastError,
+  };
+}
+
+function currentRelayView(): RelayView {
+  if (relaySupervisor !== null) return relayView(relaySupervisor.status);
+  return {
+    state: "off",
+    on: false,
+    address: null,
+    fingerprint: null,
+    code: null,
+    consoleUrl: null,
+    restartCount: 0,
+    lastError: null,
+  };
+}
+
+function relayScopeFor(sender: PackSender): RelayBrokerScope {
+  return {
+    webContentsId: sender.webContentsId,
+    tabId: sender.tabId,
+    packId: sender.packId,
+    allowed: packAllows(sender.pack, "relay"),
+  };
 }
 
 /**
@@ -785,10 +900,12 @@ function openWindow(): void {
     spaces: spaceStore,
     screens: screenStore,
     theme: themeView(),
+    relay: currentRelayView(),
     onViewClosed: (tabId) => {
       files?.releaseOwner(tabId);
       externalFiles?.releaseOwner(tabId);
       libraryWatch?.unsubscribe(tabId);
+      relayBroker?.releaseOwner(tabId);
     },
     onClosed: () => {
       if (window === created) window = null;
@@ -917,6 +1034,15 @@ function registerIpc(): void {
     if (typeof screenId !== "string") return;
     await window?.openScreen(screenId);
   });
+  onChrome(CHROME_IPC.relayStart, () => {
+    if (relaySupervisor === null) return undefined;
+    relaySupervisor.start();
+    return relayView(relaySupervisor.status);
+  });
+  onChrome(CHROME_IPC.relayStop, async () => {
+    if (relaySupervisor === null) return undefined;
+    return relayView(await relaySupervisor.stop());
+  });
 
   onPack(PACK_IPC.launch, (sender): PackLaunchContext => {
     return window?.launchFor(sender.tabId) ?? LAUNCHER_CONTEXT;
@@ -937,6 +1063,29 @@ function registerIpc(): void {
     // Only the pack's own data reaches this call. A relay frame, a role record
     // or a membership change would be refused by `signPackRecord` itself.
     return signPackRecord("pack-data", bytes, identityFor(sender).secretKey);
+  });
+
+  // The narrow sync transport. The host opens the pinned socket to the relay it
+  // supervises; the pack sends and receives opaque frames. No frame is parsed
+  // here and no document id, handle or path is in the request.
+  onPack(PACK_IPC.relayConnect, async (sender, options) => {
+    if (!packAllows(sender.pack, "relay")) {
+      throw new Error("the relay capability is not enabled for this pack");
+    }
+    if (relayBroker === null) throw new Error("the relay service is not ready");
+    await ensurePackConsent(sender.pack, "relay");
+    return relayBroker.connect(relayScopeFor(sender), options);
+  });
+  onPack(PACK_IPC.relaySend, (sender, token, frame) => {
+    if (!packAllows(sender.pack, "relay")) {
+      throw new Error("the relay capability is not enabled for this pack");
+    }
+    if (relayBroker === null) throw new Error("the relay service is not ready");
+    relayBroker.send(relayScopeFor(sender), token, frame);
+  });
+  onPack(PACK_IPC.relayClose, (sender, token) => {
+    if (!packAllows(sender.pack, "relay")) return;
+    relayBroker?.close(relayScopeFor(sender), token);
   });
   onPack(PACK_IPC.listDocuments, (sender) => {
     // An empty list is a kinder fail-closed answer than `undefined` for the one

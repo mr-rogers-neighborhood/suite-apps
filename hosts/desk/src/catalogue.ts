@@ -1,13 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  DESK_HOST,
-  type HostDeclaration,
-  isPublisherKey,
-  platformFit,
-  platformFitView,
-} from "@suite/pack";
+import { type HostDeclaration, isPublisherKey, platformFit, platformFitView } from "@suite/pack";
 import { publisherKeyDigest, publisherKeyFingerprint } from "@suite/pack/trust";
 import {
   checkPackArchive,
@@ -19,6 +13,7 @@ import {
   MAX_ARCHIVE_BYTES,
   type PackTrustOptions,
 } from "./installedPacks.js";
+import { HOST_DECLARATION } from "./packs.js";
 import type {
   CatalogueEntry,
   CataloguePlatform,
@@ -123,7 +118,7 @@ export async function loadCatalogue(
   root: string,
   options: PackTrustOptions,
   index: VerifiedCatalogueIndex | null = null,
-  host: HostDeclaration = DESK_HOST,
+  host: HostDeclaration = HOST_DECLARATION,
 ): Promise<readonly CataloguePack[]> {
   const local = await scanDirectory(root, options, host);
   const indexed =

@@ -19,7 +19,7 @@ import {
   packMinimumHost,
   packRing,
 } from "@suite/pack/manifest";
-import { DESK_HOST, platformFit } from "@suite/pack/platforms";
+import { DESK_HOST, type HostDeclaration, platformFit } from "@suite/pack/platforms";
 import { z } from "zod";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { FIRST_PARTY_PUBLISHER_ID, packStorageKey } from "./packIdentity.js";
@@ -66,11 +66,18 @@ export function hostRingsFor(value: string | undefined): readonly PackRing[] {
  * The capabilities this host actually serves.
  *
  * The declaration lives in `@suite/pack/platforms` beside the Go host's, so the
- * catalogue compares one shared fact rather than a copy. The shared vocabulary is
- * wider; a pack that declares a service this host does not implement is refused
- * rather than loaded into a broken bridge.
+ * catalogue compares one shared fact rather than a copy. The desk host extends
+ * that base with `relay`: the supervisor spawns the relay child and the pack
+ * broker forwards opaque frames, so a pack that declares it is no longer refused
+ * at discovery. The shared declaration catches up when the catalogue rows need
+ * to name the relay too; until then this is the host's own addition.
  */
-export const HOST_CAPABILITIES = DESK_HOST.capabilities;
+export const HOST_DECLARATION: HostDeclaration = {
+  ...DESK_HOST,
+  capabilities: [...DESK_HOST.capabilities, "relay"],
+};
+
+export const HOST_CAPABILITIES = HOST_DECLARATION.capabilities;
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 
@@ -259,7 +266,7 @@ function readPack(directory: string, host: HostContract): PackInfo | null {
         ...(parsed.data.platforms === undefined ? {} : { platforms: parsed.data.platforms }),
         capabilities: parsed.data.capabilities,
       },
-      DESK_HOST,
+      HOST_DECLARATION,
     );
     if (platform.state === "unavailable") {
       console.warn(`[desk] ${parsed.data.id} is ${platform.reason}; refusing it`);

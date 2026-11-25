@@ -17,10 +17,49 @@
         <span>Suite</span>
       </button>
       <div id="tabs" class="tabs" role="tablist" aria-label="Open tabs"></div>
+      <button
+        id="sync-toggle"
+        class="sync-toggle"
+        type="button"
+        aria-expanded="false"
+        title="Sync relay"
+      >
+        Sync
+      </button>
       <button id="new-tab" class="new-tab" type="button" title="Home" aria-label="Open Home">
         +
       </button>
     </header>
+
+    <section id="sync-panel" class="sync-panel" aria-label="Sync relay" hidden>
+      <div class="sync-heading">
+        <p class="eyebrow">Sync and collaboration</p>
+        <span id="sync-state" class="pill">Off</span>
+      </div>
+      <p class="sync-lede">
+        Suite Desk runs the relay on this machine. A pack asks the host for one pinned connection;
+        the host never reads its frames.
+      </p>
+      <div class="sync-grid">
+        <p class="sync-row">
+          <span class="sync-label">Address</span>
+          <code id="sync-address">Not running</code>
+        </p>
+        <p class="sync-row">
+          <span class="sync-label">Fingerprint</span>
+          <code id="sync-fingerprint">Not running</code>
+        </p>
+        <p class="sync-row">
+          <span class="sync-label">Code</span>
+          <code id="sync-code">Not running</code>
+        </p>
+      </div>
+      <p id="sync-error" class="notice" role="status" aria-live="polite" hidden></p>
+      <div class="sync-actions">
+        <button id="sync-start" class="action action-primary" type="button">Start relay</button>
+        <button id="sync-stop" class="action" type="button">Stop relay</button>
+      </div>
+    </section>
 
     <main class="content">
       <section id="screen" class="screen" aria-label="Screen">

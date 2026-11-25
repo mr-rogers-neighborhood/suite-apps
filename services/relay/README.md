@@ -59,7 +59,7 @@ For the product story and the influences behind it, read
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol` | `@suite/sync`: ids, roles, signed membership and role records, invites, sealed frames, relay messages, relay codes and QR. The root is pure and defines no document format. |
 | `packages/host`     | `@suite/host`: the relay — frame admission, the numbered frame log, the file store, the WebSocket server and the loopback console.                                          |
-| `src`               | `suite-sync`: the CLI over `@suite/host` (`serve`, `status`, `--version`).                                                                                                  |
+| `src`               | `suite-sync`: the CLI over `@suite/host` (`serve`, `status`, `--version`) and the host-supervised `child` entry.                                                            |
 | `app`               | `@suite/sync-app`: the Electron app the last `run.suite.sync` build packaged. It is not published any more; its tray and window are retired.                                |
 | `docs/`             | Protocol, threat model, and the decisions behind them.                                                                                                                      |
 
@@ -123,8 +123,12 @@ Point each device at the relay's address — for example `wss://192.168.1.20:878
 
 Nothing else changes: the apps keep their documents, and no Suite process manages a relay running on
 another machine. The address must be one the device can route to; `127.0.0.1`
-is always the device itself. The host seam that absorbs the relay decides whether it imports the relay
-as a module or supervises it as a child process; both keep the "never reads a document" rule.
+is always the device itself. The host seam that absorbs the relay is a **supervised child**: Suite
+Desk spawns `src/child.ts` with its own store, waits for a JSON readiness line, restarts it under a
+bounded policy and stops it before exit. A module inside the host was rejected because it shares the
+host's crash domain. Both shapes keep the "never reads a document" rule, and the child starts without
+a documents grant. Per-document keys, frame verification, the header index and gap recovery are still
+#304; this seam is the lifecycle and transport.
 
 ## Working in the monorepo
 

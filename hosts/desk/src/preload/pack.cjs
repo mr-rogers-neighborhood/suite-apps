@@ -17,6 +17,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 const MAX_FILE_BYTES = 256 * 1024 * 1024;
 // The same kind of guard for the pack's own signing call; the host enforces it.
 const MAX_IDENTITY_BYTES = 16 * 1024 * 1024;
+// Keep in sync with MAX_FRAME_BYTES in relayAdapter.ts. The host checks again.
+const MAX_RELAY_FRAME_BYTES = 16 * 1024 * 1024;
 
 // The host is `<container>.<pack>`. The host still derives both from the sender
 // for every call; these values are for display, not identity.
@@ -38,6 +40,34 @@ let changeListeners = 0;
 // host calls it with a read-only handle for one document. The map is local, so
 // another renderer cannot borrow a handler by naming this pack's entry.
 const projections = new Map();
+
+// Relay connections in this renderer, keyed by the host's token. Frames can
+// arrive before `connect()` resolves and before the pack binds a listener, so an
+// unknown token is buffered briefly rather than dropped.
+const relayConnections = new Map();
+const pendingRelayFrames = new Map();
+const pendingRelayCloses = new Map();
+const MAX_PENDING_RELAY_FRAMES = 64;
+
+ipcRenderer.on("suite:relay:frame", (_event, token, frame) => {
+  const connection = relayConnections.get(token);
+  if (connection === undefined) {
+    const buffered = pendingRelayFrames.get(token) ?? [];
+    if (buffered.length < MAX_PENDING_RELAY_FRAMES) buffered.push(frame);
+    pendingRelayFrames.set(token, buffered);
+    return;
+  }
+  connection.deliver(frame);
+});
+
+ipcRenderer.on("suite:relay:closed", (_event, token, reason) => {
+  const connection = relayConnections.get(token);
+  if (connection === undefined) {
+    pendingRelayCloses.set(token, reason);
+    return;
+  }
+  connection.close(reason);
+});
 
 function projectionHandle(request) {
   return {
@@ -201,6 +231,76 @@ contextBridge.exposeInMainWorld("suite", {
   },
   setTitle: (title) => ipcRenderer.send("suite:pack:set-title", title),
   openExternal: (url) => ipcRenderer.invoke("suite:pack:open-external", url),
+  // The narrow relay capability: the host opens a pinned socket to the relay it
+  // supervises and forwards opaque frames. The token is a closure here, never a
+  // property of the connection the pack receives, so another tab cannot replay it.
+  relay: {
+    connect: async (options) => {
+      const issued = await ipcRenderer.invoke("suite:relay:connect", options);
+      if (!issued || typeof issued.token !== "string") {
+        throw new Error("the host refused the relay connection");
+      }
+      const token = issued.token;
+      const frameListeners = new Set();
+      const closeListeners = new Set();
+      const buffered = pendingRelayFrames.get(token) ?? [];
+      pendingRelayFrames.delete(token);
+      const connection = {
+        buffered,
+        closed: null,
+        deliver(frame) {
+          if (frameListeners.size === 0) {
+            if (this.buffered.length < MAX_PENDING_RELAY_FRAMES) this.buffered.push(frame);
+            return;
+          }
+          for (const listener of frameListeners) listener(frame);
+        },
+        close(reason) {
+          if (this.closed !== null) return;
+          this.closed = reason;
+          relayConnections.delete(token);
+          for (const listener of closeListeners) listener(reason);
+        },
+      };
+      relayConnections.set(token, connection);
+      const pendingClose = pendingRelayCloses.get(token);
+      pendingRelayCloses.delete(token);
+      if (pendingClose !== undefined) connection.close(pendingClose);
+
+      return {
+        // The host never inspects the frame; this guard only avoids cloning an
+        // obviously oversized buffer across IPC.
+        send: (frame) => {
+          if (!frame || typeof frame.byteLength !== "number") {
+            return Promise.reject(new Error("a relay frame is bytes"));
+          }
+          if (frame.byteLength > MAX_RELAY_FRAME_BYTES) {
+            return Promise.reject(new Error("relay frame is too large"));
+          }
+          return ipcRenderer.invoke("suite:relay:send", token, frame);
+        },
+        onFrame: (listener) => {
+          if (typeof listener !== "function") throw new Error("a frame listener is a function");
+          frameListeners.add(listener);
+          while (connection.buffered.length > 0) {
+            const frame = connection.buffered.shift();
+            if (frame !== undefined) listener(frame);
+          }
+          return () => frameListeners.delete(listener);
+        },
+        onClose: (listener) => {
+          if (typeof listener !== "function") throw new Error("a close listener is a function");
+          closeListeners.add(listener);
+          if (connection.closed !== null) listener(connection.closed);
+          return () => closeListeners.delete(listener);
+        },
+        close: () =>
+          ipcRenderer
+            .invoke("suite:relay:close", token)
+            .finally(() => connection.close("the pack closed the connection")),
+      };
+    },
+  },
   // A deep link that arrives while this tab is already open. The first launch is
   // read through `launch()`; this is the same context pushed to a live page.
   onDeepLink: (listener) => {

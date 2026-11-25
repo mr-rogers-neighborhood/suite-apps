@@ -14,7 +14,7 @@
     "start": "electron .",
     "dev": "SUITE_DESK_DEV_PACKS=1 pnpm build:all && SUITE_DESK_DEV_PACKS=1 pnpm start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build:all": "pnpm --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme --filter @suite/desk --workspace-concurrency=1 run build",
+    "build:all": "pnpm --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme --filter @suite/desk --workspace-concurrency=1 run build && pnpm --filter @suite/sync run build && pnpm --filter @suite/host run build && pnpm --filter @suite/sync-server run build",
     "typecheck:all": "pnpm --filter @suite/desk --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme run typecheck",
     "check:packages": "pnpm --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host run check && pnpm --filter @suite/pack --filter @suite/pack-host test",
     "check": "pnpm build:all && pnpm check:packages && node ../../scripts/lint.mjs && pnpm typecheck:all && vitest run",
@@ -34,12 +34,14 @@
     "@suite/desktop": "workspace:*",
     "@suite/theme": "workspace:*",
     "loro-crdt": "^1.18.0",
+    "ws": "^8.22.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
     "@playwright/test": "^1.64.1",
     "@types/node": "^26.6.5",
+    "@types/ws": "^8.18.2",
     "electron": "^45.2.2",
     "electron-builder": "^26.0.12",
     "typescript": "~5.9.3",

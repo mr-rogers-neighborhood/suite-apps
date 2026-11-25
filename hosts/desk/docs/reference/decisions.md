@@ -18,9 +18,10 @@ The rules that shape the Suite host.
 - No pack-supplied Node, no raw `fs`, no raw network. A pack runs in a sandboxed renderer with
   context isolation and no Node integration.
 - The host exposes a narrow capability API. The spike implements `documents`, `files`,
-  `identity.pack` and the `network` policy; `storage`, `recents`, `notifications`, `relay` and
+  `identity.pack`, the `network` policy, `relay`, `recents` and `notifications`; `storage` and
   `commands` are in the shared vocabulary but are refused at discovery until their service exists.
-  A manifest never widens the bridge by asking.
+  A manifest never widens the bridge by asking. `relay` is not a general socket: the host supervises
+  the relay child and gives a pack one pinned connection to it, and only while that relay is ready.
 - Browser storage is not the `storage` capability. Every pack has its own persistent session
   partition, so `localStorage` and IndexedDB are pack-local; `storage` names a host key-value service
   that this spike does not implement.
@@ -371,6 +372,17 @@ The rules that shape the Suite host.
 ## Sync and collaboration
 
 - Sync stays a separate relay and service. The host does not become the relay.
+- The host supervises the relay as a child (`relaySupervisor.ts`). It spawns the relay's child entry
+  with its own store and a whitelisted environment, waits for one JSON readiness line before it
+  reports sync as available, applies a bounded restart policy, and sends `stop` before it exits. The
+  child closes its listener, console and store before it exits. A crash is shown on the Sync
+  surface, not swallowed, and a successful restart keeps the crash sentence visible.
+- The relay child starts without a `documents` grant. The only path it receives is its own store;
+  the child's argument parser refuses a document, file, workspace or data-root argument by name, and
+  the supervisor's environment is a whitelist rather than the host's whole environment.
+- The pack-facing service is `relayAdapter.ts`: `connect({ url, certificateSha256 })` opens a
+  pinned socket only to this host's relay, returns a tab-scoped connection and forwards opaque bytes.
+  The host never parses a frame, and a token from one tab cannot be spent by another.
 - The host's space-document key is the host's own. It never holds an app document key.
 - The order is: local space document first, then personal multi-device sync of structure, then
   shared spaces with presence and follow. Shared control is not planned.
@@ -386,7 +398,8 @@ The rules that shape the Suite host.
 
 - app-widget capture delivery (app widgets render; captures are not sent);
 - a portable `.screen` file with export/import;
-- the host's blind relay transport for pack sync;
+- per-document keys, relay frame verification, the header index and gap recovery (S7.2–S7.6, #304);
+- packaging the relay child inside the Flatpak;
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;
 - tab tear-off and split view;

@@ -396,6 +396,21 @@ watches, not a module inside the host process.
   relay reads the choice it is started with and reports status back. The relay keeps its existing
   store shape.
 
+Implemented on 2026-11-25 in `hosts/desk` and `services/relay`:
+
+- `services/relay/src/child.ts` is the child entry. It takes `--store` (and optionally `--host` and
+  `--port`), starts the same relay `serve` starts, and writes one JSON readiness line. `stop` closes
+  the listener, console and store before it reports `stopped`; the child refuses a document, file,
+  workspace or data-root argument by name.
+- `hosts/desk/src/relaySupervisor.ts` spawns that entry with only its store and a whitelisted
+  environment, waits for readiness, applies a bounded restart policy, and stops it before the host
+  exits. `hosts/desk/src/relayAdapter.ts` is the pack-facing service: one pinned socket to this
+  host's relay, opaque frames and a tab-scoped token. The host never parses a frame.
+- The relay child is built by the host's `build:all` but is not packaged inside the Flatpak yet;
+  a checkout runs it from `services/relay/dist/child.js`.
+- Per-document keys, relay frame verification, the header index and gap recovery remain S7.2–S7.6
+  (#304). This slice is the lifecycle and transport seam, not the document protocol.
+
 ### Android and iOS
 
 The tray is a desktop surface. On mobile the host the person is using owns the presentation, with the

@@ -34,9 +34,38 @@ const elements = {
   newTab: document.querySelector("#new-tab"),
   home: document.querySelector("#home"),
   openHome: document.querySelector("#open-home"),
+  syncToggle: document.querySelector("#sync-toggle"),
+  syncPanel: document.querySelector("#sync-panel"),
+  syncState: document.querySelector("#sync-state"),
+  syncAddress: document.querySelector("#sync-address"),
+  syncFingerprint: document.querySelector("#sync-fingerprint"),
+  syncCode: document.querySelector("#sync-code"),
+  syncError: document.querySelector("#sync-error"),
+  syncStart: document.querySelector("#sync-start"),
+  syncStop: document.querySelector("#sync-stop"),
 };
 
 const SIZES = ["1x1", "2x1", "full"];
+
+const RELAY_LABELS = {
+  off: "Off",
+  starting: "Starting…",
+  on: "On",
+  stopping: "Stopping…",
+  crashed: "Restarting after a crash",
+  failed: "Stopped after repeated crashes",
+};
+
+const EMPTY_RELAY = {
+  state: "off",
+  on: false,
+  address: null,
+  fingerprint: null,
+  code: null,
+  consoleUrl: null,
+  restartCount: 0,
+  lastError: null,
+};
 
 let state = {
   tabs: [],
@@ -53,10 +82,12 @@ let state = {
   theme: { preset: "suite", mode: "dark", values: {} },
   notice: null,
   reminderStatus: null,
+  relay: { ...EMPTY_RELAY },
 };
 let query = "";
 let editing = false;
 let managingScreens = false;
+let syncOpen = false;
 let shouldFocusSearch = true;
 let appsView = {
   packs: null,
@@ -84,6 +115,20 @@ function runAction(promise) {
     .then((next) => {
       if (next && Array.isArray(next.tabs)) {
         state = next;
+        paint();
+      }
+    })
+    .catch((error) => {
+      showNotice(error instanceof Error ? error.message : "The host refused that action.");
+    });
+}
+
+/** A relay action answers with the relay view only; the rest of the state is unchanged. */
+function runRelayAction(promise) {
+  Promise.resolve(promise)
+    .then((next) => {
+      if (next && typeof next.state === "string") {
+        state.relay = next;
         paint();
       }
     })
@@ -831,6 +876,43 @@ function renderScreensPanel() {
   elements.createScreen.disabled = false;
 }
 
+/**
+ * The relay state the tray app used to own.
+ *
+ * This is host chrome and a read-only view: the page asks main to start or
+ * stop and draws the answer. The address, pin and code are the values a person
+ * copies; a crash is a sentence here rather than a silent exit.
+ */
+function renderSync() {
+  const relay = { ...EMPTY_RELAY, ...(state.relay ?? {}) };
+  elements.syncPanel.hidden = !syncOpen;
+  elements.syncToggle.setAttribute("aria-expanded", String(syncOpen));
+  elements.syncToggle.dataset.state = relay.state;
+  elements.syncToggle.textContent =
+    relay.state === "on"
+      ? "Sync · on"
+      : relay.state === "crashed" || relay.state === "failed"
+        ? "Sync · !"
+        : "Sync";
+  elements.syncState.textContent = RELAY_LABELS[relay.state] ?? relay.state;
+  elements.syncState.dataset.state = relay.state;
+  elements.syncAddress.textContent = relay.address ?? "Not running";
+  elements.syncFingerprint.textContent = relay.fingerprint ?? "Not running";
+  elements.syncCode.textContent = relay.code ?? "Not running";
+
+  const restarts =
+    relay.restartCount > 0
+      ? ` Restarted ${relay.restartCount} time${relay.restartCount === 1 ? "" : "s"}.`
+      : "";
+  const error = relay.lastError === null ? "" : `${relay.lastError}${restarts}`;
+  elements.syncError.hidden = error.length === 0;
+  elements.syncError.textContent = error;
+
+  const busy = relay.state === "starting" || relay.state === "stopping";
+  elements.syncStart.disabled = busy || relay.state === "on" || relay.state === "crashed";
+  elements.syncStop.disabled = relay.state === "off" || relay.state === "failed" || busy;
+}
+
 function updateFocus() {
   if (!shouldFocusSearch) return;
   if (state.surface !== "screen" || appsView.search === null) return;
@@ -901,6 +983,7 @@ function renderScreen() {
 function paint() {
   applyTheme();
   renderTabs();
+  renderSync();
   renderScreen();
 
   const active = state.tabs.find((tab) => tab.id === state.activeTabId);
@@ -917,6 +1000,13 @@ function bindChrome() {
   elements.newTab.addEventListener("click", openHome);
   elements.home.addEventListener("click", openHome);
   elements.openHome.addEventListener("click", openHome);
+
+  elements.syncToggle.addEventListener("click", () => {
+    syncOpen = !syncOpen;
+    paint();
+  });
+  elements.syncStart.addEventListener("click", () => runRelayAction(api.relayStart()));
+  elements.syncStop.addEventListener("click", () => runRelayAction(api.relayStop()));
 
   elements.editToggle.addEventListener("click", () => {
     editing = !editing;
