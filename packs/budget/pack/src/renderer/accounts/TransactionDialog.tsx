@@ -343,12 +343,12 @@ export function TransactionDialog() {
               onChange={(event) => setPayeeName(event.target.value)}
               placeholder="Who was it?"
             />
-            <datalist id="budget-payees">
-              {snapshot.payees.map((payee) => (
-                <option key={payee.id} value={payee.name} />
-              ))}
-            </datalist>
           </Field>
+          <datalist id="budget-payees">
+            {snapshot.payees.map((payee) => (
+              <option key={payee.id} value={payee.name} />
+            ))}
+          </datalist>
           <Field label="Flag">
             <select
               value={flag}

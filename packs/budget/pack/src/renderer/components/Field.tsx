@@ -1,29 +1,32 @@
-import type { InputHTMLAttributes, ReactNode } from "react";
+import { Field as SharedField, TextInput as SharedTextInput } from "@suite/ui";
+import type { InputHTMLAttributes, ReactElement } from "react";
 
 export type FieldProps = {
   label: string;
   hint?: string;
-  children: ReactNode;
+  children: ReactElement<Record<string, unknown>>;
   htmlFor?: string;
 };
 
+/**
+ * Budget's field, on the shared one.
+ *
+ * The call sites keep their props; the label, hint, control and error wiring come from
+ * `@suite/ui`. A child control (`<select>`, a date input, `CategoryPicker`) is labelled and
+ * described by the shared component, and the shared `TextInput` is passed straight through.
+ */
 export function Field({ label, hint, children, htmlFor }: FieldProps) {
   return (
-    <label className="block" htmlFor={htmlFor}>
-      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-faint">
-        {label}
-      </span>
+    <SharedField
+      label={label}
+      {...(hint === undefined ? {} : { hint })}
+      {...(htmlFor === undefined ? {} : { id: htmlFor })}
+    >
       {children}
-      {hint ? <span className="mt-1 block text-[11px] text-faint">{hint}</span> : null}
-    </label>
+    </SharedField>
   );
 }
 
 export function TextInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={`h-8 w-full rounded-md border border-line bg-raised px-2.5 text-[13px] text-ink placeholder:text-faint focus:border-accent focus:outline-none ${className}`}
-      {...props}
-    />
-  );
+  return <SharedTextInput className={className} {...props} />;
 }
