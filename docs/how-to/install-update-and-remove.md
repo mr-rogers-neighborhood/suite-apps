@@ -9,10 +9,13 @@ once, then install, update, remove and reinstall packs from its catalogue. A `.s
 installs on its own. [The host's README](../../hosts/desk/README.md#installing-updating-and-removing-a-pack)
 owns that lifecycle, and neither the host nor an app edits a document.
 
-The frozen Canvas, Planner, Budget and Help Flatpaks keep the one `flatpak install` line the release
-page prints. Suite Start no longer exists (#314); its catalogue and Home moved into the host. Suite
-Sync is retired as a shipped app (#315): the signed remote keeps its last published ref, but no new
-`run.suite.sync` build is published and the tray app is not the target surface.
+The frozen Canvas, Planner and Help Flatpaks keep the one `flatpak install` line the release page
+prints. Budget is frozen and its pack is the install path: install **Suite Budget** from the Desk
+catalogue, and export from the last `run.suite.budget` Flatpak to import there; that last ref stays
+published, but no new Budget app build is made. Suite Start no longer exists (#314); its catalogue and
+Home moved into the host. Suite Sync is retired as a shipped app (#315): the signed remote keeps its
+last published ref, but no new `run.suite.sync` build is published and the tray app is not the target
+surface.
 
 ## Install the host
 

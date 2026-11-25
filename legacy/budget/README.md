@@ -1,8 +1,14 @@
 # Suite Budget
 
+> **Frozen.** Suite Budget now runs as a signed pack: install **Suite Budget** from the Desk
+> catalogue. This Electron app keeps its code and its last `run.suite.budget` Flatpak artifact, and
+> gets no new release or pre-release lane. To move a budget: open it here, export a `.budget` file,
+> install the pack, and import that file there. The last Flatpak stays published, so an existing
+> install still updates to its final ref; `flatpak update --user` is the only path for it.
+
 **A local-first envelope budget.** Give every dollar a job, import transactions from your bank's CSV,
-and keep the ledger in one file you own — in an Electron app that opens without a network and has no
-account, no server, and no telemetry.
+and keep the ledger in one file you own. The Electron app is frozen; the signed pack is the app now.
+Both open without a network and have no account, no server, and no telemetry.
 
 Suite Budget is the money app in the Suite family, alongside
 [Suite Canvas](../canvas/README.md) and
@@ -10,7 +16,7 @@ Suite Budget is the money app in the Suite family, alongside
 
 > Suite Budget is pre-alpha. The core loop works: a launcher, accounts, transactions, the month grid,
 > rollover, reconcile, undo, and a `.budget` file with rolling backups. Targets, rules, schedules,
-> CSV/QIF import, and reports are in place as well; the app still changes shape between releases.
+> CSV/QIF import, and reports are in place as well; the frozen app no longer changes shape.
 
 ---
 
@@ -29,14 +35,16 @@ For the product story and the influences behind it, read
 - **Nothing is trapped.** Export a `.budget` file, plain JSON records, transactions as CSV, or QIF.
   Import CSV, QIF, native JSON, or another `.budget`.
 - **Offline by design.** No network client, no updater, no analytics. Bank sync is deliberately
-  absent. Updates arrive through the Flatpak remote; Flatpak owns the deployment, and no Suite
-  process replaces it.
-- **One shipped form.** Budget ships as the Flatpak `run.suite.budget`. A pre-release is a separate
-  branch with its own id and data folder.
+  absent. The pack updates from the Desk catalogue; a frozen Flatpak, if it is still installed,
+  updates through the Flatpak remote, and no Suite process replaces it.
+- **One live form, one frozen one.** Budget ships as the signed pack from the Desk catalogue. The
+  last shipped artifact is the Flatpak `run.suite.budget`; it stays published and gets no new build.
+  There is no Budget pre-release lane.
 
-## Run it
+## Run the frozen app
 
 Node and pnpm (pinned in the root `package.json`) and a display (Electron). pnpm is the only package manager.
+This starts the frozen app for reference or for exporting a budget; it is not the release path.
 
 ```sh
 pnpm install
@@ -74,8 +82,8 @@ The host, the apps and the sync server share one repository and one gate. Start 
   backups beside them under `.backups/`. The library index (`library.json`) and `recovered/` stay in
   the application directory, because they describe this machine rather than the documents.
   `SUITE_BUDGET_LIBRARY` and `SUITE_BUDGET_DATA` move the two roots for a test or a portable install.
-- A pre-release build keeps budgets in `~/Documents/Suite Slop/Budget`. A stable budget handed to it
-  is copied there first and never opened in place; export refuses the stable folder.
+- The pack keeps budgets in the host's document store. To move one, export a `.budget` here and
+  import it there; the frozen app's `~/Documents/Suite/Budget` files stay where they are.
 - A `.budget` file is JSON containing a base64 Loro snapshot and its format/schema versions. It is
   readable by anyone who has the file. **Use OS disk encryption**; the app does not add a passphrase.
 - Every save is atomic (temp file → rename), keeps the previous copy, and keeps seven daily backups.
@@ -98,7 +106,7 @@ projections compute the month, targets, rules, reports, and imports.
 | ----------------------------- | ----------------------------------------------------------------------------------- |
 | `src`                         | Electron main, preload bridge, React renderer, Storybook, Playwright                |
 | `packages/core`               | Schema, `BudgetDocument`, month math, rules, importers, exports, reports, templates |
-| `pack`                        | The signed desktop pack: renderer build, `window.suiteBudget` prelude, manifest     |
+| `../../packs/budget`          | The signed pack: its own renderer copy, prelude, manifest and build                 |
 | `docs/reference`              | Architecture, conventions, data model, interface                                    |
 | `docs/reference/decisions.md` | The rules that shape Budget                                                         |
 
@@ -107,8 +115,9 @@ Read [AGENTS.md](AGENTS.md) before contributing (human or agent), and
 
 ## As a desktop pack
 
-`pack/` builds the same renderer with a bridge prelude, for a host that carries the app as a signed
-`.suitepack` instead of shipping Budget as its own Electron window.
+`packs/budget` builds Budget as a signed `.suitepack`. The pack owns its renderer copy under
+`packs/budget/pack/src/renderer`; this frozen app keeps the last copy and is not an input to the
+build. Install **Suite Budget** from the Desk catalogue, or build the archive yourself:
 
 ```sh
 pnpm budget:pack                 # renderer + prelude + signature
@@ -126,8 +135,9 @@ on `pagehide`, and on the host's flush. Documents are identified by their pack d
 `path` on a library entry is a display value, never a filesystem path. External `.budget`, JSON, CSV
 and QIF files go through the host's `pickOpen`/`pickSave` handles.
 
-What is not built yet: the host has no "show in folder", so reveal is a notice; the pack has no sync;
-and the host integration is not claimed until the host half lands and installs this pack.
+The host integration is proven headlessly: the pack test opens, edits, saves, exports and re-imports
+a budget, and a signed archive installs and verifies in the host catalogue. A person's window pass
+remains. The host has no "show in folder", so reveal is a notice, and the pack has no sync.
 
 ## Security
 

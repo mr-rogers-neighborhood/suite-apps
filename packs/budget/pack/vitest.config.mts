@@ -7,7 +7,6 @@ const runtime = fileURLToPath(
   new URL("../../../packages/pack-runtime/src/index.ts", import.meta.url),
 );
 const ui = fileURLToPath(new URL("../../../packages/ui/src/index.ts", import.meta.url));
-const theme = fileURLToPath(new URL("../../../packages/theme/src/index.ts", import.meta.url));
 const documentRuntime = fileURLToPath(
   new URL("../../../packages/document-runtime/src/index.ts", import.meta.url),
 );
@@ -26,7 +25,6 @@ export default defineConfig({
     alias: {
       "@suite/pack-runtime": runtime,
       "@suite/ui": ui,
-      "@suite/theme": theme,
       "@suite/document-runtime": documentRuntime,
     },
   },

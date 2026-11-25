@@ -96,8 +96,12 @@ const LADDER = ["slop", "nightly", "preview", "stable"];
 const BRANCH_PREFIX = "slop/";
 const TIER = "slop";
 
-/** The apps that can be queued: a Flatpak manifest and a `slop` identity. */
-const APPS = ["canvas", "planner", "budget", "help"];
+/**
+ * The apps that can be queued: a live Flatpak manifest and a `slop` identity.
+ * Budget's Flatpak lane is retired because it ships as a signed pack, so it is
+ * not queueable.
+ */
+const APPS = ["canvas", "planner", "help"];
 
 const APP_ID = /^[a-z0-9][a-z0-9-]*$/u;
 const GUEST_PATH = /^\/[A-Za-z0-9._/-]+$/u;

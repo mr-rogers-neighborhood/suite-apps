@@ -7,10 +7,8 @@
     "paths": {
       "@suite/pack-runtime": ["../../../packages/pack-runtime/src/index.ts"],
       "@suite/ui": ["../../../packages/ui/src/index.ts"],
-      "@suite/theme": ["../../../packages/theme/src/index.ts"],
       "@suite/document-runtime": ["../../../packages/document-runtime/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "*.config.ts", "*.config.mts"],
-  "exclude": ["src/**/*.stories.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "*.config.ts", "*.config.mts"]
 }

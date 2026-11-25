@@ -408,6 +408,7 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  * place that turns it into a cell:
  *
  * - `flatpak` — a signed deployment on the OSTree remote.
+ * - `pack` — a signed catalogue pack; the host owns the install.
  * - `apk` — a release-signed APK attached to the rolling suite release.
  *
  * `section` is the table a row belongs to: `desktop` or `mobile`. The table is
@@ -479,12 +480,14 @@ export const APPS = [
   {
     id: "budget",
     name: "Suite Budget",
-    // The pack owns the version now; the app is frozen at its last Flatpak.
-    packageJson: "packs/budget/pack/manifest.json",
+    // The frozen app's package.json owns the version and its changelog owns the date. The pack
+    // manifest restates the version; `scripts/pack-shape.mjs` fails when the two disagree.
+    packageJson: "legacy/budget/package.json",
     changelog: "legacy/budget/CHANGELOG.md",
-    kind: "flatpak",
+    // The installed bytes are the signed pack; the last Flatpak stays published on the remote.
+    kind: "pack",
     section: "desktop",
-    flatpakId: "run.suite.budget",
+    flatpakId: null,
     maturity: "pre-alpha",
     frozen: true,
   },
@@ -820,6 +823,7 @@ export function installCell(
   } = {},
 ) {
   if (app.kind === "flatpak") return `\`${installCommand(app, channel)}\``;
+  if (app.kind === "pack") return `\`${app.name}\` from the Desk catalogue`;
   if (app.kind === "apk") {
     const name =
       version === null ? "suite-go.apk" : goApkName(version, channel, revision);

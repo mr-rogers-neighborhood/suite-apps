@@ -20,12 +20,6 @@
       "slop_build_path": "legacy/planner/slop"
     },
     {
-      "id": "budget",
-      "path": "legacy/budget",
-      "manifest": "legacy/budget/package.json",
-      "slop_build_path": "legacy/budget/slop"
-    },
-    {
       "id": "help",
       "path": "legacy/help",
       "manifest": "legacy/help/package.json",
