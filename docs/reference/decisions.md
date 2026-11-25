@@ -102,7 +102,8 @@ owns the rationale, and [Status](status.md) owns what exists.
   `run.suite.shell` install does not update into `run.suite.desk`; it is a second app until the old
   card is removed. The owner chose no data migration: the new id opens an empty data root, the old
   `~/.var/app/run.suite.shell` install and data are ignored, and the owner may remove them. The old
-  refs on the signed remote stay as history and are not rebuilt or republished.
+  refs are retired by a one-time fresh-start wipe of the signed remote and are not rebuilt or
+  republished.
 - The platform kind stays `desktop`. "Shell" remains an implementation word for the Electron chrome
   (`ShellWindow`, `ShellTab`), a POSIX shell or a shell command, never a product or install identity.
 - Both hosts carry the mark Start used: `apps/desk/build/icon.png` and its sized set under

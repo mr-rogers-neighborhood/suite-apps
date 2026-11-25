@@ -6,7 +6,7 @@ underneath enough to matter.
 Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 [Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
 
-## [Unreleased]
+## [0.5.2] - 2026-11-24
 
 ### Added
 

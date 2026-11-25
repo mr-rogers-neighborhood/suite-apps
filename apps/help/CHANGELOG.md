@@ -6,7 +6,7 @@ underneath enough to matter.
 Versions here are Suite Help's own. It ships through Flatpak, so the deployment version follows
 this file and there is no AppImage release tag.
 
-## [Unreleased]
+## [0.1.3] - 2026-11-24
 
 ### Added
 

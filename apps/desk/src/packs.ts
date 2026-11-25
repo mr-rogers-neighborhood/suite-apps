@@ -159,13 +159,13 @@ function readPack(directory: string): PackInfo | null {
     const raw: unknown = JSON.parse(readFileSync(manifestPath, "utf8"));
     const parsed = manifestSchema.safeParse(raw);
     if (!parsed.success) {
-      console.warn(`[shell] ${manifestPath} is not a pack manifest`, parsed.error.issues);
+      console.warn(`[desk] ${manifestPath} is not a pack manifest`, parsed.error.issues);
       return null;
     }
 
     if (parsed.data.contractVersion > HOST_CONTRACT_VERSION) {
       console.warn(
-        `[shell] ${parsed.data.id} needs contract ${parsed.data.contractVersion}; this host implements ${HOST_CONTRACT_VERSION}`,
+        `[desk] ${parsed.data.id} needs contract ${parsed.data.contractVersion}; this host implements ${HOST_CONTRACT_VERSION}`,
       );
       return null;
     }
@@ -174,7 +174,7 @@ function readPack(directory: string): PackInfo | null {
       parsed.data.minimumHostVersion > HOST_VERSION
     ) {
       console.warn(
-        `[shell] ${parsed.data.id} needs host ${parsed.data.minimumHostVersion}; this host is ${HOST_VERSION}`,
+        `[desk] ${parsed.data.id} needs host ${parsed.data.minimumHostVersion}; this host is ${HOST_VERSION}`,
       );
       return null;
     }
@@ -184,7 +184,7 @@ function readPack(directory: string): PackInfo | null {
     );
     if (unsupported.length > 0) {
       console.warn(
-        `[shell] ${parsed.data.id} asks for unimplemented ${unsupported.join(", ")}; refusing it`,
+        `[desk] ${parsed.data.id} asks for unimplemented ${unsupported.join(", ")}; refusing it`,
       );
       return null;
     }
@@ -197,13 +197,13 @@ function readPack(directory: string): PackInfo | null {
       DESK_HOST,
     );
     if (platform.state === "unavailable") {
-      console.warn(`[shell] ${parsed.data.id} is ${platform.reason}; refusing it`);
+      console.warn(`[desk] ${parsed.data.id} is ${platform.reason}; refusing it`);
       return null;
     }
 
     const entryPath = join(directory, parsed.data.entry);
     if (!existsSync(entryPath) || !statSync(entryPath).isFile()) {
-      console.warn(`[shell] ${parsed.data.id} names an entry that does not exist: ${entryPath}`);
+      console.warn(`[desk] ${parsed.data.id} names an entry that does not exist: ${entryPath}`);
       return null;
     }
 
@@ -221,7 +221,7 @@ function readPack(directory: string): PackInfo | null {
       source: "development",
     };
   } catch (error) {
-    console.warn(`[shell] could not read ${manifestPath}`, error);
+    console.warn(`[desk] could not read ${manifestPath}`, error);
     return null;
   }
 }
@@ -239,7 +239,7 @@ export function discoverPacks(root: string): readonly PackInfo[] {
     const pack = readPack(join(root, entry.name));
     if (pack === null) continue;
     if (seen.has(pack.id)) {
-      console.warn(`[shell] duplicate pack id ${pack.id}; ignoring ${pack.root}`);
+      console.warn(`[desk] duplicate pack id ${pack.id}; ignoring ${pack.root}`);
       continue;
     }
     seen.add(pack.id);
