@@ -31,6 +31,10 @@ const PAIRS: readonly { readonly name: string; readonly on: string; readonly ink
   { name: "Field", on: SURFACE.base, ink: INK.base },
   { name: "Modal", on: SURFACE.base, ink: INK.base },
   { name: "Launch heading on the page", on: "bg-[var(--canvas)]", ink: INK.base },
+  { name: "AppShell header", on: SURFACE.base, ink: INK.base },
+  { name: "AppShell content", on: SURFACE.canvas, ink: INK.base },
+  { name: "ListView selected row", on: SURFACE.sunk, ink: INK.base },
+  { name: "DetailView pane", on: SURFACE.base, ink: INK.base },
 ];
 
 /** Edges that are a component boundary rather than a divider: SC 1.4.11 asks 3:1. */

@@ -1,0 +1,7 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { cx } from "./cx.js";
+import { EDGE, INK, SURFACE } from "./tokens.js";
+export function AppShell({ title, leading, actions, navigation, navigationLabel = "Navigation", className, children, ...props }) {
+    return (_jsxs("div", { "data-has-navigation": navigation === undefined ? undefined : "true", className: cx("flex h-full min-h-0 flex-col", SURFACE.canvas, INK.base, className), ...props, children: [_jsxs("header", { className: cx("flex shrink-0 items-center gap-[var(--control-gap,0.5rem)] border-b px-5 py-3", SURFACE.base, EDGE.hairline), children: [leading === undefined ? null : (_jsx("div", { className: "flex shrink-0 items-center", children: leading })), _jsx("h1", { className: "min-w-0 flex-1 truncate text-[length:var(--text-title,15px)] font-semibold", children: title }), actions === undefined ? null : (_jsx("div", { className: "flex shrink-0 items-center gap-2", children: actions }))] }), _jsxs("div", { className: "flex min-h-0 flex-1 flex-col md:flex-row", children: [navigation === undefined ? null : (_jsx("nav", { "aria-label": navigationLabel, className: cx("shrink-0 overflow-y-auto border-b px-[var(--control-padding-x,0.75rem)] py-2 md:w-56 md:border-b-0 md:border-r", EDGE.hairline), children: navigation })), _jsx("main", { className: "min-h-0 flex-1 overflow-y-auto", children: children })] })] }));
+}
+//# sourceMappingURL=AppShell.js.map
