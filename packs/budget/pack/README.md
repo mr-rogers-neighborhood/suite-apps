@@ -11,8 +11,10 @@ steps live in [the pack authoring reference](../../../docs/reference/pack-author
   frozen Electron shell under `legacy/budget/` keeps its last copy and is not an input to this
   build. `../packages/core` is `@suite/budget-core`, the schema and document layer both this pack
   and the frozen shell consume.
-- `src/` also holds the prelude and the bridge, with their tests. `src/PackRender.test.tsx` mounts
-  the pack renderer over the prelude and opens, edits, saves, exports and re-imports a budget.
+- `src/` also holds the prelude and the bridge, with their tests. The bridge is the adapter over
+  `@suite/pack-runtime`'s shared save, boundary, picker and notice runtime: it keeps Budget's
+  library entries, snapshot policy and file codec. `src/PackRender.test.tsx` mounts the pack renderer
+  over the prelude and opens, edits, saves, exports and re-imports a budget.
 - `vite.config.ts` builds into `packs/budget/.dev/pack`, outside this source tree.
 - `pnpm --dir ../.. run budget:pack` builds and signs the archive.
 
