@@ -417,11 +417,28 @@ export function restoreRefCommands({ repo, builtRefs }) {
   }));
 }
 
-/** True when the bucket's ref listing names at least one ref. */
-export function hasPublishedRefs(listing) {
-  return String(listing ?? "")
-    .split(/\r?\n/u)
-    .some((line) => line.trim().length > 0);
+/**
+ * True when `aws s3api list-objects-v2` reports at least one object.
+ *
+ * `aws s3 ls` is not the question to ask: with a prefix that holds no objects
+ * it exits 1 and prints nothing, which is exactly the state a wiped bucket has,
+ * so a first publication would read as a failed command. The S3 API answers
+ * with 200 and `KeyCount: 0`. Unreadable output is an error rather than an
+ * empty bucket, because silently skipping the merge would drop every other
+ * channel from the summary.
+ */
+export function listingHasObjects(json) {
+  const text = String(json ?? "").trim();
+  if (text.length === 0) return false;
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`the S3 listing is not JSON: ${text.slice(0, 200)}`);
+  }
+  if (typeof parsed.KeyCount === "number") return parsed.KeyCount > 0;
+  if (Array.isArray(parsed.Contents)) return parsed.Contents.length > 0;
+  throw new Error("the S3 listing names neither KeyCount nor Contents");
 }
 
 /**
