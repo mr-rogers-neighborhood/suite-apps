@@ -56,7 +56,14 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { changelogSection, versionFromPackage } from "./release.mjs";
-import { CHANNELS, branchFor, channelProblem, flatpakId as flatpakIdFor } from "./lib/channel.mjs";
+import {
+  CHANNELS,
+  PRE_RELEASE_CHANNELS,
+  STABLE_CHANNEL,
+  branchFor,
+  channelProblem,
+  flatpakId as flatpakIdFor,
+} from "./lib/channel.mjs";
 import {
   DEFAULT_PUBLIC_URL,
   REMOTE_NAME,
@@ -74,6 +81,12 @@ export const REMOTE_URL = DEFAULT_PUBLIC_URL;
 
 /** The generated human mirror of the Latest release, committed at the root. */
 export const RELEASES_FILE = "RELEASES.md";
+
+/** The README carries the same channel table; `--check-readme` keeps it honest. */
+export const README_FILE = "README.md";
+export const CHANNELS_BLOCK_START =
+  "<!-- BEGIN generated:channels (scripts/release-status.mjs; do not edit by hand) -->";
+export const CHANNELS_BLOCK_END = "<!-- END generated:channels -->";
 
 /** Where a publish writes each release body before handing it to `gh`. */
 export const NOTES_DIR = ".dev/releases";
@@ -101,6 +114,132 @@ export const INDEX_RELEASE_PATH = join(".dev", "release", INDEX_RELEASE_FILE);
 
 /** The product-maturity labels, separate from the release channels. */
 export const PRODUCT_MATURITY = ["pre-alpha", "alpha", "beta", "1.0"];
+
+/**
+ * The four release channels in promotion order, the order
+ * `docs/explanation/channels.md` lists them. One list feeds every table below,
+ * so a page cannot name a channel the model does not have.
+ */
+export const CHANNEL_ORDER = [...PRE_RELEASE_CHANNELS, STABLE_CHANNEL];
+
+/** The tag shape each channel publishes, which is also its page. */
+export function channelTagPattern(channel) {
+  return channel === "stable"
+    ? /^suite-\d{4}\.\d{2}\.\d{2}$/u
+    : new RegExp(`^suite-${channel}-\\d{4}\\.\\d{2}\\.\\d{2}$`, "u");
+}
+
+/**
+ * The newest **published** page per channel, or null for one that has none.
+ *
+ * A draft is excluded: its page is not readable yet, and linking it would send a
+ * person to a 404 that is still being written.
+ */
+export function newestPages(releases) {
+  const published = (releases ?? []).filter((row) => row?.isDraft === false);
+  const pages = {};
+  for (const channel of CHANNEL_ORDER) {
+    const pattern = channelTagPattern(channel);
+    pages[channel] =
+      published
+        .map((row) => row.tagName ?? "")
+        .filter((tagName) => pattern.test(tagName))
+        .sort((left, right) => right.localeCompare(left))[0] ?? null;
+  }
+  return pages;
+}
+
+/**
+ * The channel table every release page and `RELEASES.md` carries.
+ *
+ * `mode` decides the third column: a release page names the Flatpak id a reader
+ * types after adding the remote, and the README spends the extra width on the
+ * whole command, because that is the page a person starts from. Both render the
+ * same rows from the same list, so the two cannot disagree about a channel or a
+ * branch.
+ */
+export function channelTable({
+  mode = "page",
+  channel = null,
+  tag = null,
+  pages = {},
+  shellApp = null,
+} = {}) {
+  const header =
+    mode === "install"
+      ? ["| Channel | Suite Desk | Suite Go | Page |", "| --- | --- | --- | --- |"]
+      : ["| Channel | Newest page | Suite Desk |", "| --- | --- | --- |"];
+  const rows = CHANNEL_ORDER.map((name) => {
+    const shape = name === "stable" ? "`suite-<date>`" : `\`suite-${name}-<date>\``;
+    const page = name === channel && tag !== null ? tag : (pages?.[name] ?? null);
+    const where =
+      pages === null
+        ? shape
+        : name === channel && tag !== null
+          ? `this page (\`${tag}\`)`
+          : page === null
+            ? "not published yet"
+            : `[\`${page}\`](${releaseUrl(page)})`;
+    if (mode === "install") {
+      const command = shellApp === null ? "—" : `\`${installCommand(shellApp, name)}\``;
+      const apk =
+        name === "stable"
+          ? `[\`suite-go.apk\`](https://github.com/${RELEASE_REPO}/releases/latest/download/suite-go.apk)`
+          : `\`suite-go-${name}-<version>.apk\` on that page`;
+      return `| \`${name}\` | ${command} | ${apk} | ${where} |`;
+    }
+    const id = shellApp === null ? "—" : `\`${releaseFlatpakRef(shellApp, name)}\``;
+    return `| \`${name}\` | ${where} | ${id} |`;
+  });
+  return [...header, ...rows];
+}
+
+/** The README block: the version-free channel table, between its markers. */
+export function channelsBlock() {
+  return [CHANNELS_BLOCK_START, "", ...channelInstallTable(), "", CHANNELS_BLOCK_END].join("\n");
+}
+
+/** `text` with the generated channels block replaced. */
+export function withChannelsBlock(text, block = channelsBlock()) {
+  const start = text.indexOf(CHANNELS_BLOCK_START);
+  const end = text.indexOf(CHANNELS_BLOCK_END);
+  if (start < 0 || end < start) {
+    throw new Error(`${README_FILE} has no ${CHANNELS_BLOCK_START} … ${CHANNELS_BLOCK_END} block`);
+  }
+  return text.slice(0, start) + block + text.slice(end + CHANNELS_BLOCK_END.length);
+}
+
+/**
+ * Why `text`'s channels block is out of date, or null when it is current.
+ *
+ * A hand-edited table and the generator drift silently otherwise, and the README
+ * is the page a person installs from. The gate runs this, so a channel rename or
+ * a new channel cannot leave the README telling someone to run a command that
+ * installs nothing.
+ */
+export function readmeChannelsDrift(text) {
+  const start = text.indexOf(CHANNELS_BLOCK_START);
+  const end = text.indexOf(CHANNELS_BLOCK_END);
+  if (start < 0 || end < start) {
+    return `${README_FILE} has no generated channels block; restore ${CHANNELS_BLOCK_START}`;
+  }
+  const current = text.slice(start, end + CHANNELS_BLOCK_END.length);
+  if (current === channelsBlock()) return null;
+  return (
+    `${README_FILE}'s channels table is out of date; run ` +
+    "`node scripts/release-status.mjs --write` and commit the result"
+  );
+}
+
+/** The version-free table the README and `RELEASES.md` share. */
+export function channelInstallTable() {
+  return channelTable({
+    mode: "install",
+    pages: null,
+    shellApp: APPS.find((app) => app.id === "desk") ?? null,
+  });
+}
+
 
 /**
  * The apps frozen as legacy until they become packs.
@@ -222,13 +361,16 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --channel <name>     stable (default), slop, nightly or preview; names the APK asset
   --check-published    print one sentence and stop when this run's tag is already
                        published; print nothing and exit 0 when it is not
+  --check-readme       fail when the README's channel table is not what --write
+                       would generate
   --manifest <path>    release manifest for the Artifacts section
                        (default: .dev/release/release-manifest.json when it exists)
   --prune              delete old published pre-release releases (never stable)
   --keep <n>           releases a pruned channel keeps (default 14)
   --help               print this text
 
-Pass one of --draft, --publish, --write and --dry-run, or --check-published.
+Pass one of --draft, --publish, --write and --dry-run, or --check-published or
+--check-readme. The two checks read and write nothing.
 
 A release is created as a draft, its assets are attached while it is a draft, and
 --publish flips it. A published release is immutable and is never edited.
@@ -283,22 +425,6 @@ export function currentAggregateTag({
 /** A release's page on GitHub. */
 export function releaseUrl(tag) {
   return `https://github.com/${RELEASE_REPO}/releases/tag/${tag}`;
-}
-
-/** The newest published preview and nightly releases, for the stable body. */
-export function preReleaseLinks(releases) {
-  const rows = (releases ?? []).filter(
-    (row) =>
-      row.isDraft === false &&
-      /^suite-(?:nightly|preview)-\d{4}\.\d{2}\.\d{2}$/u.test(row.tagName ?? ""),
-  );
-  const newest = (channel) =>
-    rows
-      .filter((row) => row.tagName.startsWith(`suite-${channel}-`))
-      .sort((a, b) => b.tagName.localeCompare(a.tagName))[0]?.tagName ?? null;
-  return ["preview", "nightly"]
-    .map((channel) => ({ channel, tag: newest(channel) }))
-    .filter((row) => row.tag !== null);
 }
 
 /**
@@ -1042,7 +1168,7 @@ export function aggregateReleaseBody(
     apkLive = false,
     draft = false,
     channel = "stable",
-    preReleases = [],
+    pages = {},
     manifest = null,
     index = null,
   },
@@ -1060,15 +1186,15 @@ export function aggregateReleaseBody(
         : `This is the ${date} snapshot, published on the **${channel}** channel on ${tagDate}.`),
     "Only the two superapps have a release page; a pack carries a signed version and no page.",
     "",
-    ...(preReleases.length === 0
-      ? []
-      : [
-          "Pre-release channels are separate releases:",
-          ...preReleases.map(
-            (row) => `- Latest ${row.channel}: [${row.tag}](${releaseUrl(row.tag)})`,
-          ),
-          "",
-        ]),
+    "## Channels",
+    "",
+    `Every channel is a promise; [Channels](${blobUrl("docs/explanation/channels.md")}) owns what each`,
+    "one carries. This page is the " + `\`${channel}\` build, and the other three install beside it.`,
+    "",
+    ...channelTable({ channel, tag, pages, shellApp: deskApp }),
+    "",
+    `Install one after the remote below is added: \`flatpak install --user ${REMOTE_NAME} <id>\`.`,
+    "",
     "## Suite Desk (desktop)",
     "",
     ...(desk === null ? [] : [...releaseLabels(desk.app, channel), ""]),
@@ -1158,6 +1284,8 @@ export function releasesPage(
     "not channels. Maturity is separate: `pre-alpha`, `alpha`, `beta` or `1.0`, so a `stable`-channel",
     "build can still be `alpha`.",
     "",
+    ...channelInstallTable(),
+    "",
     ...aggregateSection("Desktop", entriesForSection(superapps, "desktop"), {
       tag,
       apkLive,
@@ -1204,6 +1332,7 @@ export function parseArgs(argv) {
     manifest: null,
     prune: false,
     checkPublished: false,
+    checkReadme: false,
     keep: 14,
     help: false,
   };
@@ -1238,6 +1367,8 @@ export function parseArgs(argv) {
       options.prune = true;
     } else if (arg === "--check-published") {
       options.checkPublished = true;
+    } else if (arg === "--check-readme") {
+      options.checkReadme = true;
     } else if (arg === "--keep") {
       options.keep = Number(takeValue(index, "--keep"));
       if (!Number.isInteger(options.keep) || options.keep < 1) {
@@ -1258,6 +1389,7 @@ export function parseArgs(argv) {
     options.dryRun ? "--dry-run" : null,
     options.prune ? "--prune" : null,
     options.checkPublished ? "--check-published" : null,
+    options.checkReadme ? "--check-readme" : null,
   ].filter((mode) => mode !== null);
   if (modes.length > 1) {
     throw new Error(`${modes.join(" and ")} pick different modes; pass at most one`);
@@ -1283,6 +1415,15 @@ export function writesReleasesPage(mode) {
  * The guard is the invariant, not a comment: `--draft` and `--dry-run` can
  * never reach the file, whatever a future branch does.
  */
+function writeReadmeChannels(mode) {
+  if (!writesReleasesPage(mode)) {
+    throw new Error(`${mode} must not write ${README_FILE}`);
+  }
+  const path = join(ROOT, README_FILE);
+  const text = readFileSync(path, "utf8");
+  writeFileSync(path, withChannelsBlock(text));
+}
+
 function writeReleasesPage(mode, content) {
   if (!writesReleasesPage(mode)) {
     throw new Error(`${mode} must not write ${RELEASES_FILE}`);
@@ -1735,6 +1876,16 @@ async function main(argv) {
     return;
   }
 
+  if (options.checkReadme) {
+    const drift = readmeChannelsDrift(readFileSync(join(ROOT, README_FILE), "utf8"));
+    if (drift !== null) {
+      process.stderr.write(`${drift}\n`);
+      process.exit(1);
+    }
+    process.stdout.write(`${README_FILE}: the channels table is current\n`);
+    return;
+  }
+
   const channelMiss = channelProblem(options.channel);
   if (channelMiss !== null) throw new Error(channelMiss);
   const channel = options.channel;
@@ -1815,7 +1966,7 @@ async function main(argv) {
   const head = currentHead();
   const { snapshotDate, tagDate } = releaseDates(entries, { channel, date: namedDate });
   const tag = aggregateTag(tagDate, channel);
-  const preReleases = channel === "stable" ? preReleaseLinks(releases) : [];
+  const pages = newestPages(releases);
   const aggregate = planAggregate(tag, head);
   if (aggregate.plan.problem !== null && mode !== "write") {
     throw new Error(aggregate.plan.problem);
@@ -1865,7 +2016,7 @@ async function main(argv) {
     apkLive,
     draft: draftBodies,
     channel,
-    preReleases,
+    pages,
     manifest,
     index: indexRelease,
   });
@@ -1948,6 +2099,8 @@ async function main(argv) {
   if (mode === "write") {
     writeReleasesPage("write", page);
     process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
+    writeReadmeChannels("write");
+    process.stdout.write(`wrote the ${README_FILE} channels table\n`);
     return;
   }
 

@@ -1,7 +1,7 @@
 # 1. Install the desktop apps
 
 Suite Desk is the desktop host and the way in: install it once, then install packs from its
-catalogue. [The root README](../../README.md#the-hosts) owns the install line.
+catalogue. [The root README](../../README.md#install) owns the install line.
 
 This tutorial's Canvas workspace still runs as a frozen Flatpak, so step 2 installs it with the one
 `flatpak install` line the release page prints. Start no longer exists (#314); the host is the only
