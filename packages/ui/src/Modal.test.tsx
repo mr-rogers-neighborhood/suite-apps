@@ -42,6 +42,46 @@ describe("Modal", () => {
     expect(screen.getByRole("button", { name: "First" })).toHaveFocus();
   });
 
+  it("renders a caller-composed header, description and footer", () => {
+    render(
+      <Modal
+        open
+        onClose={() => {}}
+        label="Import"
+        header={<h2>Import transactions</h2>}
+        description="Nothing is written until the review."
+        footer={<button type="button">Import</button>}
+      >
+        <p>Step one</p>
+      </Modal>,
+    );
+    const dialog = screen.getByRole("dialog", { name: "Import" });
+    expect(dialog).toHaveAccessibleDescription("Nothing is written until the review.");
+    expect(screen.getByRole("heading", { name: "Import transactions" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Import" })).toBeInTheDocument();
+    expect(screen.getByText("Step one")).toBeInTheDocument();
+  });
+
+  it("does not add a close control of its own", () => {
+    render(
+      <Modal open onClose={() => {}} label="Settings" footer={<p>actions</p>}>
+        <p>body</p>
+      </Modal>,
+    );
+    expect(screen.queryByRole("button", { name: /close/u })).toBeNull();
+  });
+
+  it("closes on Escape while framed", () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open onClose={onClose} label="Settings" header={<h2>Settings</h2>}>
+        <p>body</p>
+      </Modal>,
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("returns focus to whatever had it, on close", async () => {
     const trigger = document.createElement("button");
     document.body.append(trigger);

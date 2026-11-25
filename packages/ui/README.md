@@ -68,8 +68,9 @@ duration is a `var(--token)`, never a hex, `bg-black`, `rounded-2xl`, `shadow-lg
 | --- | --- |
 | `Button` | `primary · secondary · ghost · danger`, `sm · md`. One background class per variant, never two. |
 | `IconButton` | A glyph with a **required** accessible name. |
-| `Field` | Label, hint and error wired to the input, so `aria-describedby` and `aria-invalid` cannot be left out. |
-| `Modal` | Radix Dialog: focus in, focus back on close, Tab wraps, Escape and outside press close. |
+| `Field` | Label, hint and error wired to the control, so `aria-describedby` and `aria-invalid` cannot be left out. Renders the shared input, or labels a child `<select>`/picker. |
+| `TextInput` | The shared input on its own, for a table cell or an inline rename with no label column. |
+| `Modal` | Radix Dialog: focus in, focus back on close, Tab wraps, Escape and outside press close. Optional `header`, `description` and `footer` slots keep a caller's title, close control and fixed actions while the body scrolls. |
 | `Toast` | `role` follows the tone: `alert` for a failure, `status` otherwise. |
 | `EmptyState` | The "nothing here yet" panel. |
 | `Launch` | The no-document-open screen. Everything app-specific is a child. |

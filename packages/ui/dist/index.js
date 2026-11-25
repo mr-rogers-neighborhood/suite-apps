@@ -35,6 +35,7 @@ export { MenuBar } from "./menu/MenuBar.js";
 export { focusFirstMenuItem, handleMenuBarKeyDown, menuBarKeyDown, menuItemsIn, menuKeyDown, } from "./menu/menuKeys.js";
 export { SyncPill } from "./menu/SyncPill.js";
 export { PrivacyLine } from "./PrivacyLine.js";
+export { TextInput } from "./TextInput.js";
 export { Toast } from "./Toast.js";
 export { FOCUS_RING, MOTION } from "./tokens.js";
 //# sourceMappingURL=index.js.map
