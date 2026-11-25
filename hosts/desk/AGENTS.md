@@ -27,7 +27,9 @@ The desktop host spike. Read the repository `AGENTS.md` first, then [`README.md`
   development convenience, not a release path. The switch is ignored in a packaged app, and a plain
   `start` loads only installed packs. Do not widen that into a release path by deleting the
   distinction.
-- **Sync stays separate.** Do not put a document key or the relay inside this app. The space-document key
+- **The host supervises the relay; no pack owns it.** The host spawns, watches and restarts the relay
+  child and reads its status over IPC; the relay keeps its own process and starts without a documents
+  grant. Do not put a document key or a pack's sync transport inside this app. The space-document key
   is the host's own and is not an app document key.
 
 ## Checks
