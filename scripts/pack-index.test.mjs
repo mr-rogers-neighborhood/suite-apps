@@ -204,10 +204,18 @@ describe("pack-index build", () => {
     });
     assert.equal(advanced.ok, true);
 
-    const rolledBack = await verifyPackIndexJson(firstIndex.json, {
+    // The same index, fetched again: this is a refetch, not a replay.
+    const refetched = await verifyPackIndexJson(firstIndex.json, {
       operatorKeys: [first.publicKeyBase64, second.publicKeyBase64],
       now: NOW,
       head: { sequence: 1, digest: firstIndex.digest },
+    });
+    assert.equal(refetched.ok, true);
+
+    const rolledBack = await verifyPackIndexJson(firstIndex.json, {
+      operatorKeys: [first.publicKeyBase64, second.publicKeyBase64],
+      now: NOW,
+      head: { sequence: 2, digest: firstIndex.digest },
     });
     assert.equal(rolledBack.ok, false);
     assert.equal(rolledBack.reason, "rollback");

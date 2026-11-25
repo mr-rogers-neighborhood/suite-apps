@@ -21,9 +21,11 @@ import { isPublisherKey, isSafePublisherId } from "./trust.js";
  * rather than a second encoding. `signatures` is excluded, exactly as a
  * manifest's `signature` is.
  *
- * Rollback is refused by construction: `sequence` must increase, `previous`
- * names the digest of the canonical bytes of the index being replaced, and an
- * index whose `expires` has passed is refused. `threshold` is inside the signed
+ * Rollback is refused by construction: `sequence` must not decrease (an equal
+ * sequence is the index this host already trusts, accepted only when its digest
+ * matches; the same sequence with different bytes is an equivocation and is
+ * refused), `previous` names the digest of the canonical bytes of the index
+ * being replaced, and an index whose `expires` has passed is refused. `threshold` is inside the signed
  * bytes, so an attacker cannot lower the number of operator signatures a host
  * needs.
  */
