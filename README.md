@@ -1,37 +1,59 @@
+<p align="center"><a href="https://suite.run"><img src="docs/assets/suite-icon.png" alt="Suite" width="96" height="96"></a></p>
+
 # Suite
 
-Two hosts, one pack contract, and documents that stay files. **Suite Desk** runs signed packs on the
-desktop; **Suite Go** does the same on a phone. There is no account, no telemetry and no server the
-project operates.
+Suite is a desktop app and a phone app for work you keep in your own files. **Suite Desk** runs
+*packs* on your computer; **Suite Go** runs the same packs on your phone. A pack is a small signed
+app for one job — Canvas for boards, Planner for days, Budget for money — and every document it
+opens is a file you own. There is no account, no telemetry and no server this project operates:
+copy a document, back it up, open it offline.
+
+<!-- The canonical brand asset is the Suite Desk app icon, promoted in #411. -->
 
 > **Alpha.** Suite Desk is alpha and Suite Go is v0. Linux x86_64 and Android arm64 are the only
 > published targets. Keep documents somewhere you back up.
 
 ## Install
 
-Suite Desk is the desktop host and Suite Go is the mobile host; both install from the same signed
-remote. Add it once:
+Suite Desk is the desktop host and Suite Go is the mobile host. Add the signed Flatpak remote once,
+then install the stable release:
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite https://flatpak.suite.run/suite.flatpakrepo
+flatpak install --user suite run.suite.desk
 ```
+
+Suite Go is not a Flatpak: download `suite-go.apk` from the stable release page and
+`adb install -r -t suite-go.apk`. The Flatpak remote is the update path (`flatpak update --user`);
+[Channels](docs/explanation/channels.md) says what each channel promises.
+
+The tables below are generated from the versions in the tree and the newest published page of each
+channel. Run `node scripts/release-status.mjs --write` after a release; `--check-readme` fails when
+they drift.
 
 <!-- BEGIN generated:channels (scripts/release-status.mjs; do not edit by hand) -->
 
+### Release
+
+| Host | Version | Install |
+| --- | --- | --- |
+| **Suite Desk** | 0.4.0 | `flatpak install --user suite run.suite.desk` |
+| **Suite Go** | 0.2.0 | [`suite-go.apk`](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk) |
+
+### Pre-Release
+
 | Channel | Suite Desk | Suite Go | Page |
 | --- | --- | --- | --- |
-| `slop` | `flatpak install --user suite run.suite.slop.desk//slop` | `suite-go-slop-<version>.apk` on that page | `suite-slop-<date>-<revision>` |
-| `nightly` | `flatpak install --user suite run.suite.nightly.desk//nightly` | `suite-go-nightly-<version>.apk` on that page | `suite-nightly-<date>` |
-| `preview` | `flatpak install --user suite run.suite.preview.desk//preview` | `suite-go-preview-<version>.apk` on that page | `suite-preview-<date>` |
-| `stable` | `flatpak install --user suite run.suite.desk` | [`suite-go.apk`](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk) | `suite-<date>` |
+| `preview` | `flatpak install --user suite run.suite.preview.desk//preview` | `suite-go-preview-<version>.apk` on that page | [`suite-preview-2026.11.25`](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-preview-2026.11.25) |
+| `nightly` | `flatpak install --user suite run.suite.nightly.desk//nightly` | `suite-go-nightly-<version>.apk` on that page | [`suite-nightly-2026.11.25`](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-nightly-2026.11.25) |
+| `slop` | `flatpak install --user suite run.suite.slop.desk//slop` | `suite-go-slop-<version>.apk` on that page | [`suite-slop-2026.11.25-f9bd624`](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-slop-2026.11.25-f9bd624) |
 
 <!-- END generated:channels -->
 
 Each channel installs beside the others, so a `preview` build and the `stable` one can both be
 installed. Suite Go is not a Flatpak: download the channel page's APK and `adb install -r -t`. The
-Flatpak remote is the update path (`flatpak update --user`); [Channels](docs/explanation/channels.md)
-says what each channel promises, and the rolling
-[`suite-<date>` release](https://github.com/mrrnbhd/suite-apps/releases/latest) is the GitHub mirror.
+rolling [`suite-<date>` release](https://github.com/mrrnbhd/suite-apps/releases/latest) is the
+GitHub mirror; the signed remote is the update path.
 
 ## Packs
 

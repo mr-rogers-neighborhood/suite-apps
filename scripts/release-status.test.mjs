@@ -9,9 +9,13 @@ import {
   MANIFEST_FILE,
   aggregateDate,
   aggregateReleaseBody,
+  channelCallout,
+  channelRow,
   channelTable,
   channelsBlock,
   readmeChannelsDrift,
+  readmeTables,
+  stableReleaseTable,
   aggregateReleaseCommands,
   aggregateSection,
   aggregateTag,
@@ -36,10 +40,15 @@ import {
   isDate,
   isLegacyFrozen,
   isRevision,
+  LOGO_PATH,
+  LOGO_URL,
   maturityLabel,
+  otherChannels,
+  ownChannelHeading,
   parseArgs,
   planTag,
   README_FILE,
+  README_PRE_RELEASE_ORDER,
   ROOT,
   newestPages,
   pruneCandidates,
@@ -704,6 +713,52 @@ describe("release bodies", () => {
     assert.doesNotMatch(page, /releases\/tag\/suite-2026\.11\.22/u);
   });
 
+  it("opens with the logo, the callout, the own-channel table and then the others", () => {
+    const pages = {
+      slop: "suite-slop-2026.11.24-abc1234",
+      nightly: "suite-nightly-2026.11.24",
+      preview: "suite-preview-2026.11.24",
+      stable: "suite-2026-11-24",
+    };
+    const stable = aggregateReleaseBody(entries, {
+      date: "2026-11-24",
+      tag: "suite-2026.11.24",
+      pages,
+      apkLive: true,
+    });
+    assert.ok(stable.startsWith("[<img"));
+    assert.ok(stable.includes(LOGO_URL));
+    assert.ok(stable.includes("[Site](https://suite.run)"));
+    assert.ok(stable.includes("[Documentation](https://github.com/mrrnbhd/suite-apps/blob/main/docs/README.md)"));
+    assert.match(stable, /Stable release/u);
+    assert.match(stable, /## Latest Release/u);
+    assert.match(stable, /## Other channels/u);
+    const stableOwn = stable.slice(stable.indexOf("## Latest Release"), stable.indexOf("## Other channels"));
+    assert.equal((stableOwn.match(/^\| `stable`/gmu) ?? []).length, 1);
+    assert.doesNotMatch(stableOwn, /^\| `preview`/mu);
+    const stableOthers = stable.slice(stable.indexOf("## Other channels"));
+    assert.deepEqual(
+      [...stableOthers.matchAll(/^\| `(\w+)`/gmu)].map((match) => match[1]),
+      ["preview", "nightly", "slop"],
+    );
+
+    const preview = aggregateReleaseBody(entries, {
+      date: "2026-11-24",
+      tag: "suite-preview-2026.11.24",
+      channel: "preview",
+      pages,
+      apkLive: true,
+    });
+    assert.match(preview, /## Pre-Release \(Preview\)/u);
+    assert.match(preview, /not the stable release/u);
+    assert.match(preview, /Any number of channels can be installed side by side/u);
+    const previewOthers = preview.slice(preview.indexOf("## Other channels"));
+    assert.deepEqual(
+      [...previewOthers.matchAll(/^\| `(\w+)`/gmu)].map((match) => match[1]),
+      ["slop", "nightly", "stable"],
+    );
+  });
+
   it("writes RELEASES.md as the mirror of the rolling release once published", () => {
     const page = releasesPage(entries, {
       date: "2026-11-22",
@@ -1013,23 +1068,97 @@ describe("channel releases", () => {
       tag: "suite-nightly-2026.11.25",
       pages: { nightly: "suite-nightly-2026.11.24", stable: "suite-2026.11.24" },
       shellApp: APPS.find((app) => app.id === "desk"),
+      goApp: APPS.find((app) => app.id === "go"),
+      goVersion: "0.2.0",
+      apkLive: true,
     });
-    assert.deepEqual(rows[0], "| Channel | Newest page | Suite Desk |");
+    assert.deepEqual(rows[0], "| Channel | Suite Desk | Suite Go | Page |");
     const slop = rows.find((row) => row.startsWith("| `slop`"));
     assert.ok(slop.includes("not published yet"));
     assert.ok(slop.includes("run.suite.slop.desk//slop"));
-    assert.ok(rows.find((row) => row.startsWith("| `nightly`")).includes("this page"));
+    assert.ok(slop.includes("on that page"));
+    const nightly = rows.find((row) => row.startsWith("| `nightly`"));
+    assert.ok(nightly.includes("this page"));
+    assert.ok(nightly.includes("suite-go-nightly-0.2.0.apk"));
     assert.ok(rows.find((row) => row.startsWith("| `stable`")).includes("suite-2026.11.24"));
     assert.equal(rows.filter((row) => row.includes("this page")).length, 1);
+    assert.ok(channelRow("preview", { pages: null }).includes("`suite-preview-<date>`"));
   });
 
-  it("keeps the README's channel table in step with the generator", () => {
+  it("orders the other channels ascending on a pre-release page, descending on Latest", () => {
+    assert.deepEqual(otherChannels("nightly"), ["slop", "preview", "stable"]);
+    assert.deepEqual(otherChannels("preview"), ["slop", "nightly", "stable"]);
+    assert.deepEqual(otherChannels("stable"), ["preview", "nightly", "slop"]);
+  });
+
+  it("names the own-channel heading and both sides of the callout", () => {
+    assert.equal(ownChannelHeading("stable"), "## Latest Release");
+    assert.equal(ownChannelHeading("preview"), "## Pre-Release (Preview)");
+    assert.equal(ownChannelHeading("nightly"), "## Pre-Release (Nightly)");
+    assert.equal(ownChannelHeading("slop"), "## Pre-Release (Slop)");
+    const stable = channelCallout("stable").join(" ");
+    assert.match(stable, /Stable release/u);
+    assert.match(stable, /Pre-release channels install beside it/u);
+    const preview = channelCallout("preview").join(" ");
+    assert.match(preview, /not the stable release/u);
+    assert.match(preview, /Install stable/u);
+    assert.match(preview, /Any number of channels can be installed side by side/u);
+  });
+
+  it("renders the README's Release and Pre-Release tables", () => {
+    const release = stableReleaseTable(entries);
+    assert.deepEqual(release[0], "| Host | Version | Install |");
+    assert.ok(release.some((row) => row.includes("**Suite Desk**") && row.includes("0.2.0")));
+    assert.ok(release.some((row) => row.includes("**Suite Go**") && row.includes("0.1.0")));
+
+    const tables = readmeTables({ entries, pages: null });
+    assert.ok(tables.includes("### Release"));
+    assert.ok(tables.includes("### Pre-Release"));
+    const rows = tables.filter((row) => row.startsWith("| `"));
+    assert.deepEqual(
+      rows.map((row) => row.split("|")[1].trim()),
+      README_PRE_RELEASE_ORDER.map((name) => `\`${name}\``),
+    );
+    assert.deepEqual(README_PRE_RELEASE_ORDER, ["preview", "nightly", "slop"]);
+  });
+
+  it("keeps the README's generated tables in step with the generator", () => {
+    const readme = [
+      "# Suite",
+      "",
+      "<!-- BEGIN generated:channels (scripts/release-status.mjs; do not edit by hand) -->",
+      "",
+      "### Release",
+      "",
+      "<!-- END generated:channels -->",
+      "",
+    ].join("\n");
+    assert.equal(
+      readmeChannelsDrift(readme, { entries }),
+      "README.md's Release and Pre-Release tables are out of date; run " +
+        "`node scripts/release-status.mjs --write` and commit the result",
+    );
+    const current = readme.replace(
+      "### Release",
+      readmeTables({ entries }).join("\n"),
+    );
+    assert.equal(readmeChannelsDrift(current, { entries }), null);
+    const edited = current.replace(
+      "run.suite.nightly.desk//nightly",
+      "run.suite.nightly.shell//nightly",
+    );
+    assert.match(readmeChannelsDrift(edited, { entries }), /out of date/u);
+    assert.match(readmeChannelsDrift("# no block here", { entries }), /no generated channels block/u);
+  });
+
+  it("keeps the committed README's logo and generated tables parseable", () => {
     const readme = readFileSync(join(ROOT, README_FILE), "utf8");
-    assert.equal(readmeChannelsDrift(readme), null);
-    assert.ok(readme.includes(channelsBlock().split("\n")[2]));
-    const edited = readme.replace("run.suite.nightly.desk//nightly", "run.suite.nightly.shell//nightly");
-    assert.match(readmeChannelsDrift(edited), /out of date/u);
-    assert.match(readmeChannelsDrift("# no block here"), /no generated channels block/u);
+    assert.ok(readme.includes(`src="${LOGO_PATH}"`));
+    assert.ok(readme.includes("### Release"));
+    assert.ok(readme.includes("### Pre-Release"));
+    assert.match(readme, /BEGIN generated:channels/u);
+    assert.match(readme, /END generated:channels/u);
+    assert.equal(channelsBlock({ entries }).includes(LOGO_PATH), false);
   });
 
   it("prunes only the older published releases of one channel", () => {
@@ -1342,8 +1471,10 @@ describe("the slop publication", () => {
     assert.match(body, /never marks GitHub's Latest release/u);
     assert.match(body, /only the seven newest slop pages are kept/u);
     assert.doesNotMatch(body, /## Catalogue index/u);
-    assert.ok(body.includes("flatpak install --user suite run.suite.slop.desk//slop"));
-    assert.doesNotMatch(body, /install --user suite run\.suite\.desk/u);
+    // The callout points a reader at stable; the install block below it is slop.
+    const install = body.slice(body.indexOf("```sh"), body.indexOf("```", body.indexOf("```sh") + 3));
+    assert.ok(install.includes("flatpak install --user suite run.suite.slop.desk//slop"));
+    assert.doesNotMatch(install, /install --user suite run\.suite\.desk/u);
   });
 
   it("names the commit in the APK cell, and never writes a stable alias", () => {
