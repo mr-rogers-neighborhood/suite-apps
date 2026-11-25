@@ -70,6 +70,10 @@ const RULES: readonly { readonly name: string; readonly pattern: RegExp }[] = [
     ),
   },
   { name: "an unpublished radius step", pattern: /\brounded-(?:2xl|3xl|4xl)|rounded-\[\d/giu },
+  // Tailwind compiles bare `rounded` to a static `0.25rem` and bare `shadow` to a literal rgb
+  // pair; neither follows the published `--radius-*`/`--shadow-*` steps.
+  { name: "a bare radius utility", pattern: /(?<![\w-])rounded(?![\w-])/gu },
+  { name: "a bare shadow utility", pattern: /(?<![\w-])shadow(?![\w-])/gu },
   {
     name: "an unpublished shadow step",
     pattern: /\bshadow-(?:2xs|xs|sm|md|lg|inner)\b/giu,
@@ -81,9 +85,11 @@ const RULES: readonly { readonly name: string; readonly pattern: RegExp }[] = [
     name: "an arbitrary shadow without a token",
     pattern: /\bshadow-\[(?![^\]]*var\()[^\]]*\]/giu,
   },
+  // `transition-colors` alone bakes in Tailwind's static 150ms. Every transition utility must
+  // carry the published duration in its class list; `transition-none` animates nothing.
   {
     name: "a transition without a token duration",
-    pattern: /\btransition-colors\b(?![^"'`\n]*duration-\[var\()/gu,
+    pattern: /(?<![\w-])transition(?!-none\b)(?:-[a-z]+)?(?![^"'`\n]*duration-\[var\()/gu,
   },
   { name: "a literal duration", pattern: /\bduration-(?:\d+|\[\d)/giu },
 ] as const;
@@ -150,6 +156,19 @@ const FORMS = [
     source: 'className="transition-colors"',
     value: "transition-colors",
   },
+  { name: "bare rounded", source: 'className="rounded"', value: "rounded" },
+  { name: "bare shadow", source: 'className="shadow"', value: "shadow" },
+  { name: "bare transition", source: 'className="transition"', value: "transition" },
+  {
+    name: "transition-opacity without a token duration",
+    source: 'className="transition-opacity"',
+    value: "transition-opacity",
+  },
+  {
+    name: "transition-transform without a token duration",
+    source: 'className="transition-transform"',
+    value: "transition-transform",
+  },
 ] as const;
 
 describe("the matcher", () => {
@@ -163,6 +182,9 @@ describe("the matcher", () => {
       'className="shadow-[var(--shadow-2xl)]"',
       'className="shadow-[inset_0_-1px_0_var(--hairline)]"',
       'className="transition-colors duration-[var(--duration-base)] ease-[var(--ease-standard)]"',
+      'className="transition-opacity duration-[var(--duration-base)]"',
+      'className="transition-transform duration-[var(--duration-base)]"',
+      'className="rounded-full rounded-sm shadow-none transition-none"',
     ].join("\n");
 
     expect(violationsIn(source)).toEqual([]);

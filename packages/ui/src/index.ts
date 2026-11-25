@@ -15,10 +15,11 @@
  *    @source "../../node_modules/@suite/ui/dist";
  *    ```
  *
- * 3. Publish the token layers on the view that hosts the component. A pack receives the colour
- *    roles from its host today; the type, density, radius, shadow and motion layers are
- *    `scaleVariables(density)` from `@suite/theme`. `@suite/ui` falls back to the values that
- *    shipped when a host has not published them yet.
+ * 3. Publish the token layers on the view that hosts the component. One `:root` sheet carries
+ *    both: the colour roles from `cssVariables(preset, mode)` and the type, density, radius,
+ *    shadow and motion layers from `scaleVariables(density)`. `themeCss()` in `hosts/desk`
+ *    writes both before first paint, so a pack reads `var(--token)` and imports nothing.
+ *    `@suite/ui` falls back to the values that shipped when a document has no host sheet.
  *
  * 4. React 19 is a peer, not a dependency.
  */

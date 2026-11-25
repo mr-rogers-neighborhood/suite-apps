@@ -48,10 +48,15 @@ React 19 is a peer dependency. `@radix-ui/react-dialog` is the package's only ru
 | Colour roles | `--canvas`, `--ink`, `--accent`, … | `cssVariables(preset, mode)` |
 | Type, density, radius, shadow, motion | `--text-*`, `--control-*`, `--radius-*`, `--shadow-*`, `--duration-*` | `scaleVariables(density)` |
 
-`@suite/theme` publishes both records. The host's `themeCss()` currently injects the colour record
-only; **publishing `scaleVariables(DEFAULT_DENSITY)` from `hosts/desk` is still the host lane's
-first step**, so a pack today reaches the scale through the fallbacks in the components. Both
-fallbacks are the values that already shipped, which is why adopting the scale moves no pixel.
+`@suite/theme` publishes both records, and the host publishes them together. `themeCss()` in
+`hosts/desk` writes the colour roles and `scaleVariables(DEFAULT_DENSITY)` into one `:root` sheet,
+inserted before the first paint (the host lane that closed this gap is #445). A pack reads
+`var(--token)` from that document and imports neither `@suite/theme` nor a stylesheet; a theme
+change moves both layers together.
+
+The components keep fallbacks for a document with no host sheet — a story, a unit test, or a pack
+opened outside Suite. They are the values that already shipped, so the fallbacks change no pixel
+when the published layer arrives.
 
 The rule inside this package is the same one a pack must follow: every colour, radius, shadow and
 duration is a `var(--token)`, never a hex, `bg-black`, `rounded-2xl`, `shadow-lg` or
@@ -101,9 +106,9 @@ pnpm --filter @suite/ui check          # build, typecheck, both test runs, story
 The first consumer is Budget (#420). A pack migrates one screen at a time; nothing below changes
 the pack contract.
 
-1. **Make the tokens reachable.** Add the `@source` line above. Confirm the host's sheet carries the
-   colour record; when the host lane lands the scale record, no pack edit is needed. Until then the
-   fallbacks keep the current pixels.
+1. **Make the tokens reachable.** Add the `@source` line above. The host's sheet already carries
+   both the colour and scale records, so the pack reads `var(--token)` and imports nothing; a token
+   layer arrives with no pack edit.
 2. **Replace the local duplicates.** Import `Button`, `IconButton`, `EmptyState`, `Field`, `Modal`,
    `Toast`, `Launch`, `AppMark` and `MenuBar` from `@suite/ui`. A local wrapper is fine when it only
    adds layout, as Budget's `IconButton` and `EmptyState` wrappers already do.
