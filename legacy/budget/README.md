@@ -115,10 +115,10 @@ pnpm budget:pack                 # renderer + prelude + signature
 pnpm budget:pack --out /tmp/budget.suitepack
 ```
 
-The build writes `packs/budget/pack/dist`, puts the prelude before the app script, and signs the
+The build writes `packs/budget/.dev/pack`, puts the prelude before the app script, and signs the
 directory with the pack key pinned in `packages/pack/src/pinnedKey.ts`. A key that does not match the
 pin is refused before anything is signed; `pnpm keys status` compares them. The archive lands in
-`legacy/budget/.dev/` by default.
+`packs/budget/.dev/` by default.
 
 Inside the pack the renderer still talks only through `BudgetBridge`. The prelude owns the
 `BudgetDocument`, applies the renderer's CRDT updates, and writes a snapshot when the page is hidden,

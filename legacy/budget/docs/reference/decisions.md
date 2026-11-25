@@ -32,7 +32,7 @@ The rules that shape Budget.
 - Charts are SVG. The interface shows age of money.
 - The gate is local: `pnpm check` to edit, `pnpm verify` for the full gate. There is no Turborepo.
 - Budget also ships as a signed desktop pack. `scripts/budget-pack.mjs` builds the renderer and the
-  `window.suiteBudget` prelude into `packs/budget/pack/dist`; the prelude owns the `BudgetDocument`
+  `window.suiteBudget` prelude into `packs/budget/.dev/pack`; the prelude owns the `BudgetDocument`
   and writes a snapshot at the visibility-hidden, `pagehide` and host-flush boundaries. The container
   never parses or writes a budget.
 - A pack document id is its document-store file name. `LibraryEntry.path` is a display value with
