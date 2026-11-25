@@ -716,8 +716,8 @@ async function buildSite() {
 
   await cp(styleSource, join(outDir, "style.css"));
   await cp(landingSource, join(outDir, "index.html"));
-  // GitHub Pages serves this for a missing path on the shared artifact, which is
-  // where a docs.suite.run deep link arrives before the /docs/ prefix.
+  // The static host serves this for a missing path on the shared artifact, which
+  // is where a docs.suite.run deep link arrives before the /docs/ prefix.
   await cp(notFoundSource, join(outDir, "404.html"));
 
   const docs = await buildDocs();
