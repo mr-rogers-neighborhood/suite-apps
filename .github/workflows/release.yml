@@ -113,93 +113,25 @@ jobs:
     name: ocr-review-${{ inputs.channel }}
     # Advisory evidence for the channel boundary: nightly -> preview asks "is it
     # shaped right?" and preview -> stable asks "is it a release?". A person
-    # still decides; OCR only supplies a code review of the range since the
+    # still decides; OCR supplies a high-effort review of the range since the
     # channel's last tag. It runs before approval so the approver can read it.
     #
     # Keep this out of `publish`: that job holds the signing keys and the
-    # release upload. This job has `contents: read` and the model secret only.
-    # `continue-on-error` means a DeepRelay outage never blocks a signed
-    # release; the evidence is best-effort and the gate remains the proof.
+    # release upload. The boundary workflow has `contents: read` and the model
+    # secret only. `continue-on-error` means a DeepRelay outage never blocks a
+    # signed release.
     #
-    # This is not a second PR pipeline: the range is tag..HEAD at a channel
-    # boundary, not the PR's merge-base..head. It reuses the same wrapper and
-    # provider configuration as the local skill.
-    #
-    # Nightly is excluded: it has no human approval to inform, and its boundary
-    # question ("does it work?") is answered by the gate, install and launch.
-    if: inputs.publish && inputs.channel != 'nightly'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    continue-on-error: true
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-
-      - name: Install OCR
-        run: npm install -g @alibaba-group/open-code-review@1.14.3
-
-      - name: Configure DeepRelay
-        id: configure
-        env:
-          DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -z "${DEEPRELAY_API_KEY}" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "DEEPRELAY_API_KEY is not set; the advisory review is skipped." | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          ocr config set provider deeprelay
-          ocr config set custom_providers.deeprelay.url https://api.deeprelay.ai/v1
-          ocr config set custom_providers.deeprelay.protocol openai
-          ocr config set custom_providers.deeprelay.model deeprelay/deepseek-v4.1-flash
-          ocr config set custom_providers.deeprelay.api_key_cmd 'printf "%s" "$DEEPRELAY_API_KEY"'
-          ocr llm test
-          echo "configured=true" >> "$GITHUB_OUTPUT"
-
-      - name: Review the channel range
-        if: steps.configure.outputs.configured == 'true'
-        env:
-          DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
-          CHANNEL: ${{ inputs.channel }}
-        run: |
-          set -euo pipefail
-          if [ "${CHANNEL}" = "stable" ]; then
-            base="$(git tag --list 'suite-*' --sort=-v:refname \
-              | grep -vE -- '-(nightly|preview|slop)-' | head -1 || true)"
-          else
-            base="$(git tag --list "suite-${CHANNEL}-*" --sort=-v:refname | head -1 || true)"
-          fi
-          if [ -z "${base}" ]; then
-            echo "No previous ${CHANNEL} tag; nothing to compare. Skipping the advisory review." | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          if [ "$(git rev-parse "${base}^{commit}")" = "$(git rev-parse HEAD)" ]; then
-            echo "The last ${CHANNEL} tag is HEAD; there is no range to review." | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          echo "Reviewing ${base}..HEAD for the ${CHANNEL} boundary." | tee -a "$GITHUB_STEP_SUMMARY"
-          node .agents/skills/suite-review/scripts/review.mjs \
-            --from "${base}" --effort medium --budget 400000 \
-            --output .dev/ocr/release.json
-
-      - name: Upload the review evidence
-        if: always() && hashFiles('.dev/ocr/release.json') != ''
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ocr-release-${{ inputs.channel }}-${{ github.run_id }}
-          path: .dev/ocr/release.json
-          retention-days: 30
+    # Nightly publishes through this workflow call; a non-publishing nightly
+    # calls the same workflow from nightly.yml.
+    if: inputs.publish
+    uses: ./.github/workflows/ocr-boundary.yml
+    with:
+      channel: ${{ inputs.channel }}
+      effort: high
+      budget: "3000000"
+      max_tokens: "200000"
+    secrets:
+      DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
 
   approval:
     name: approve-${{ inputs.channel }}

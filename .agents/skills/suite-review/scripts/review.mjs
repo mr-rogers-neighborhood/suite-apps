@@ -37,6 +37,7 @@ function usage() {
   --workspace         Review the working tree instead of a range
   --effort <level>    low | medium | high (default: ${DEFAULTS.effort})
   --budget <n>        Total input+output token cap (default: ${DEFAULTS.budget})
+  --max-tokens <n>    Prompt ceiling per subtask (default: ${DEFAULTS.maxTokens})
   --provider <name>   Override the configured provider
   --model <name>      Override the configured model
   --output <path>     Write the JSON here instead of .dev/ocr/<timestamp>.json
@@ -62,6 +63,7 @@ function parseArgs(argv) {
       case "--workspace": out.workspace = true; break;
       case "--effort": out.effort = next(); break;
       case "--budget": out.budget = Number(next()); break;
+      case "--max-tokens": out.maxTokens = Number(next()); break;
       case "--provider": out.provider = next(); break;
       case "--model": out.model = next(); break;
       case "--output": out.output = next(); break;
@@ -83,6 +85,9 @@ function parseArgs(argv) {
   }
   if (!Number.isFinite(out.budget) || out.budget <= 0) {
     throw new Error("--budget must be a positive number");
+  }
+  if (out.maxTokens !== undefined && (!Number.isFinite(out.maxTokens) || out.maxTokens <= 0)) {
+    throw new Error("--max-tokens must be a positive number");
   }
   return out;
 }
@@ -243,7 +248,7 @@ function main() {
     "--output", outFile,
     "--effort", args.effort,
     "--max-tokens-budget", String(args.budget),
-    "--max-tokens", String(DEFAULTS.maxTokens),
+    "--max-tokens", String(args.maxTokens ?? DEFAULTS.maxTokens),
     "--concurrency", String(DEFAULTS.concurrency),
     "--max-git-procs", String(DEFAULTS.gitProcs),
     "--timeout", String(DEFAULTS.timeout),

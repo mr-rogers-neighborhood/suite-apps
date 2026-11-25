@@ -87,33 +87,23 @@ outside Orca's encrypted store.
 
 ## CI
 
-`.github/workflows/ocr-review.yml` runs the official OCR Action on same-repo pull requests. It is
-**advisory**: it is not in the `ci` aggregator and does not run on the merge queue, `main`, nightly,
-`platforms` or the release workflow. The approval, the fresh gate and the merge queue remain the
-gates.
+OCR runs at the three channel boundaries, **not on pull requests**. The review-only agent and the
+gate own PR review. Fewer runs are what make a high-effort review affordable: frequency is the main
+cost control, not the token cap. The shared workflow is `.github/workflows/ocr-boundary.yml`.
 
-- Trigger: `pull_request` to `main`, excluding drafts, docs-only changes, Dependabot, and fork PRs
-  (a fork or Dependabot run has no secret).
-- Secret: `DEEPRELAY_API_KEY` (repository secret, Settings → Secrets and variables → Actions).
-- Budget: `effort: low`, 600000 total tokens, concurrency 4, 10-minute subtask timeout. The cap is
-  a ceiling, not a target; most PRs spend far less.
-- Trust boundary: a `pull_request` run uses the workflow from the head branch and receives the
-  secret. This repository has one owner and branch protection; a shared setup should use a dedicated
-  low-limit key or an environment with required reviewers.
-- `checkpoint_range` reviews only the commits since the previous run; `sticky_summary` and
-  `incremental` keep the comments in place.
-- Pinned twice: the Action by full SHA and `ocr_version` in the workflow. The Action installs the CLI
-  at run time, so the SHA alone does not freeze behavior.
-
-`release.yml` adds an `ocr-review-<channel>` job before `approval`:
-
-- It runs only when `publish` is true, reviews `last channel tag..HEAD`, and uses `effort: medium`
-  with a 400000 token budget.
-- It has `contents: read` and the model secret only, never the `release` environment or the signing
-  keys. It uploads `release.json` as the `ocr-release-<channel>-<run_id>` workflow artifact.
-- `continue-on-error` makes it advisory: a DeepRelay outage never blocks a signed release. The
-  approver reads the artifact; the gate and the approval remain the decision.
-- `preview` and `stable` are the boundaries that use it. `nightly` is deliberately excluded: it has
-  no human approval to inform, and its boundary question is answered by the gate, install and launch.
-- The range comes from the channel's last tag, sorted by version. If that tag is `HEAD`, or no tag
-  exists, the job skips instead of reporting an empty range as evidence.
+- `nightly.yml` calls it after a green gate when `NIGHTLY_PUBLISH` is not `true`.
+- `release.yml` calls it before `approval` when `publish` is true, for `preview`, `stable`, and a
+  publishing `nightly`.
+- `continue-on-error` at the caller makes it advisory: a DeepRelay outage never blocks a release.
+  The gate, approval and merge queue remain the decisions.
+- Effort `high` (three review rounds), 3,000,000 total token cap, 200,000 prompt ceiling. The cap is
+  a ceiling, not a target; OCR's file selection, bundling, plan-skip and prompt caching keep a run
+  proportional to the diff.
+- Range: the channel's last version tag. A non-publishing nightly creates no tag, so it uses the
+  commit 24 hours before `HEAD`. If that tag is `HEAD`, or there is no base, the job skips.
+- Secret: `DEEPRELAY_API_KEY` (repository secret). No PR-triggered workflow uses it, so the secret is
+  never exposed to a head-branch workflow.
+- Output: `review.json` as the `ocr-<channel>-<run_id>` workflow artifact.
+- Manual test or spot check: dispatch `ocr-boundary.yml` with `channel`, `effort`, `budget`, and an
+  optional `from` ref.
+- Local pre-PR review stays available: `node .agents/skills/suite-review/scripts/review.mjs --from main`.
