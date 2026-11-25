@@ -1401,27 +1401,30 @@ function downloadReleaseManifest(tag) {
   return result.stdout;
 }
 
+function downloadReleaseIndex(tag) {
+  const result = spawnSync(
+    "gh",
+    ["release", "download", tag, "--pattern", INDEX_RELEASE_FILE, "--output", "-"],
+    { cwd: ROOT, encoding: "utf8", env: process.env },
+  );
+  if (result.error || result.status !== 0) return null;
+  return result.stdout;
+}
+
 /**
- * The catalogue report at `path`, or null when this release published no pack.
+ * A catalogue report parsed and checked, or a refusal naming where it came from.
  *
  * A malformed report refuses, for the same reason a malformed manifest does: a
  * note that prints the wrong operator fingerprint is worse than one that omits
  * the catalogue section entirely.
  */
-export function readIndexRelease(path = INDEX_RELEASE_PATH, { load = read } = {}) {
-  let text;
-  try {
-    text = load(path);
-  } catch (error) {
-    if (error.code === "ENOENT") return null;
-    throw error;
-  }
+function parseIndexReleaseText(text, label) {
   let value;
   try {
     value = JSON.parse(text);
   } catch {
     throw new Error(
-      `${path} is not valid JSON; refusing to print a catalogue fingerprint it cannot read`,
+      `${label} is not valid JSON; refusing to print a catalogue fingerprint it cannot read`,
     );
   }
   const valid =
@@ -1438,10 +1441,60 @@ export function readIndexRelease(path = INDEX_RELEASE_PATH, { load = read } = {}
     value.fingerprint.length > 0;
   if (!valid) {
     throw new Error(
-      `${path} has no usable sequence, URLs or fingerprint; refusing to publish a note from it`,
+      `${label} has no usable sequence, URLs or fingerprint; refusing to publish a note from it`,
     );
   }
   return value;
+}
+
+/**
+ * The catalogue report at `path`, or null when this release published no pack.
+ */
+export function readIndexRelease(path = INDEX_RELEASE_PATH, { load = read } = {}) {
+  let text;
+  try {
+    text = load(path);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+  return parseIndexReleaseText(text, path);
+}
+
+/**
+ * The catalogue report attached to a release, or null when it carries none.
+ *
+ * This mirrors `readPublishedManifest`: a rerender happens on a workstation,
+ * where the workflow's `.dev/release/index-release.json` is usually gone, so
+ * `--body` reads the attached copy rather than silently dropping the section.
+ * It differs in one place, because the section names a trust root: when the
+ * release lists the asset and the copy still cannot be read, the rerender
+ * refuses. Omitting it would publish a page that says less than the one it
+ * replaces, which is the bug this fallback exists to fix.
+ *
+ * `listed` is the release's asset list, injectable so the JSON handling is
+ * testable without a release. A failed listing refuses for the same reason: the
+ * run cannot prove the release carries no report.
+ */
+export function readPublishedIndex(
+  tag,
+  { download = downloadReleaseIndex, listed = releaseAssets(tag) } = {},
+) {
+  if (listed === null) {
+    throw new Error(
+      `could not list the assets of ${tag}; refusing to rerender without the catalogue ` +
+        "report it may carry",
+    );
+  }
+  if (!listed.some((asset) => asset?.name === INDEX_RELEASE_FILE)) return null;
+  const text = download(tag);
+  if (text === null) {
+    throw new Error(
+      `${tag} carries ${INDEX_RELEASE_FILE}, but it could not be downloaded; refusing to ` +
+        "drop the catalogue section",
+    );
+  }
+  return parseIndexReleaseText(text, `${INDEX_RELEASE_FILE} on ${tag}`);
 }
 
 /** One artifact from the manifest by kind, or null when the manifest omits it. */
@@ -2630,15 +2683,18 @@ async function main(argv) {
         `--manifest ${options.manifest} names no readable file; refusing to drop the Artifacts section`,
       );
     }
-    // A page's digest section lives in the manifest attached to the release;
-    // read that copy when the workflow's local one is gone.
+    // A page's digest and catalogue sections live in the assets attached to the
+    // release; read those copies when the workflow's local ones are gone.
     manifest ??= readPublishedManifest(options.tag);
-    const index = channel === "slop" ? null : readIndexRelease();
+    const assets = releaseAssets(options.tag);
+    const index =
+      channel === "slop"
+        ? null
+        : (readIndexRelease() ?? readPublishedIndex(options.tag, { listed: assets }));
     const goEntry = entries.find((entry) => entry.app.kind === "apk") ?? null;
     const tagRevision = revisionFromTag(options.tag, channel);
     const goAsset =
       goEntry === null ? null : goApkName(goEntry.version, channel, tagRevision);
-    const assets = releaseAssets(options.tag);
     const apkLive =
       goAsset !== null && assets !== null && assets.some((asset) => asset?.name === goAsset);
 

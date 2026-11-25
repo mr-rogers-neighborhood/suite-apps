@@ -486,9 +486,11 @@ jobs:
           CHANNEL: ${{ inputs.channel }}
         run: node scripts/release-status.mjs --draft --channel "${CHANNEL}"
 
-      # The manifest (D2.1) and the SBOM (D10 item 5) are assets of the draft, so
-      # they become immutable with the release.
-      - name: Attach the manifest and SBOM to the draft
+      # The manifest (D2.1), the SBOM (D10 item 5) and the catalogue report are
+      # assets of the draft, so they become immutable with the release. The
+      # report is what a clean-checkout `--body` rerender reads; a release with
+      # no pack wrote none, so its absence is normal.
+      - name: Attach the manifest, SBOM and catalogue report to the draft
         if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -500,6 +502,9 @@ jobs:
           test -n "${tag}"
           gh release upload "${tag}" .dev/release/release-manifest.json --clobber
           gh release upload "${tag}" .dev/release/suite-apps.spdx.json --clobber
+          if [ -f .dev/release/index-release.json ]; then
+            gh release upload "${tag}" .dev/release/index-release.json --clobber
+          fi
 
       - name: Upload the exact APK into the draft
         if: inputs.publish
