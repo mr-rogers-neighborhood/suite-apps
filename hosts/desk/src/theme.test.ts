@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PRESETS } from "@suite/theme";
+import { cssVariables, DEFAULT_DENSITY, defaultTheme, PRESETS, scaleVariables } from "@suite/theme";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_THEME_CHOICE,
@@ -112,6 +112,26 @@ describe("resolving the choice", () => {
     expect(css).toContain("--ink:");
   });
 
+  it("publishes every variable in the composed record, colour and scale", () => {
+    const view = resolveThemeView({ preset: "suite", mode: "light" }, false);
+    const css = themeCss(view);
+    const composed = {
+      ...cssVariables(defaultTheme(), "light"),
+      ...scaleVariables(DEFAULT_DENSITY),
+    };
+
+    for (const [name, value] of Object.entries(composed)) {
+      expect(css, `${name} should reach the pack sheet`).toContain(`${name}: ${value};`);
+    }
+
+    // The values are the ones that shipped before the scale was published: this moves no
+    // pixel for a host or pack that only knew the fallbacks.
+    expect(css).toContain("--control-height: 36px;");
+    expect(css).toContain("--text-body: 13px;");
+    expect(css).toContain("--radius-lg: 8px;");
+    expect(css).toContain("--duration-base: 150ms;");
+  });
+
   it("marks the pack document dark so class-based styles follow the host", () => {
     const script = themeAttributesScript(
       resolveThemeView({ preset: "solarized", mode: "dark" }, true),
@@ -166,6 +186,33 @@ describe("painting a pack view", () => {
     expect(scripts[1]).toContain('root.dataset.themeMode = "light";');
     expect(scripts[1]).toContain('root.classList.toggle("dark", false);');
     expect(removed).toEqual(["sheet-1"]);
+  });
+
+  it("gives a reload the same complete sheet as a host restart", async () => {
+    const choice = { preset: "warm", mode: "dark" } as const;
+    const first = resolveThemeView(choice, true);
+    const restart = resolveThemeView(choice, true);
+
+    const recordingSurface = (sink: string[]) => ({
+      insertCSS: vi.fn(async (css: string) => {
+        sink.push(css);
+        return "sheet";
+      }),
+      executeJavaScript: vi.fn(async () => undefined),
+      removeInsertedCSS: vi.fn(async () => undefined),
+    });
+
+    const firstPaint: string[] = [];
+    const reload: string[] = [];
+    await paintThemeSurface(recordingSurface(firstPaint), first);
+    await paintThemeSurface(recordingSurface(reload), restart);
+
+    // The first sheet already carries the scale; a reload cannot be the first place a pack
+    // sees it. A host restart resolves the same choice to the same sheet.
+    expect(firstPaint).toEqual(reload);
+    expect(firstPaint[0]).toBe(themeCss(first));
+    expect(firstPaint[0]).toContain("--control-height: 36px;");
+    expect(firstPaint[0]).toContain("--duration-base: 150ms;");
   });
 
   it("keeps the new sheet when Electron reuses a key", async () => {

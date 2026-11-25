@@ -218,6 +218,34 @@ another tab. A plain open is `{ kind: "launcher" }`; a deep link is
 `{ kind: "deep-link", url }`. The chrome's own link opening is unchanged, and a pack still cannot
 hand a link to the OS browser without `network`.
 
+## Theme tokens a pack can rely on
+
+A pack has no theme setting and no copy of `@suite/theme`. The host resolves the preset and mode
+once, then injects one `:root` sheet into every pack view: **57 custom properties**, all of them
+complete in the first sheet injected and replaced as a set when the person changes the theme. A
+pack reads `var(--token)` and imports nothing at runtime.
+
+| Layer         | Variables                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Colour (30)   | `--canvas`, `--surface`, `--surface-sunk`, `--surface-strong`, `--accent`, `--accent-strong`, `--danger`, `--success`, `--warning`, `--ink`, `--ink-muted`, `--ink-faint`, `--hairline`, `--border-strong`, `--focus`, `--on-accent`, `--on-danger`, `--on-success`, `--on-warning`, `--hue-slate`, `--hue-blue`, `--hue-green`, `--hue-amber`, `--hue-rose`, `--hue-violet`, `--chart-1` … `--chart-5` |
+| Type (10)     | `--text-caption`, `--text-label`, `--text-body`, `--text-title`, `--text-display`, and `--leading-caption`, `--leading-label`, `--leading-body`, `--leading-title`, `--leading-display`                                                                                                                                                                                                                 |
+| Density (7)   | `--control-height`, `--control-height-sm`, `--control-padding-x`, `--control-padding-x-sm`, `--control-gap`, `--control-gap-sm`, `--row-padding-y`                                                                                                                                                                                                                                                      |
+| Radius (4)    | `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-xl`                                                                                                                                                                                                                                                                                                                                              |
+| Elevation (2) | `--shadow-xl`, `--shadow-2xl`                                                                                                                                                                                                                                                                                                                                                                           |
+| Motion (4)    | `--duration-fast`, `--duration-base`, `--duration-slow`, `--ease-standard`                                                                                                                                                                                                                                                                                                                              |
+
+The sheet also carries `color-scheme`, and the host sets `data-theme`, `data-theme-mode`, the
+`.dark` class and `style.color-scheme` on the document element, because a stylesheet sometimes
+needs the answer as a rule rather than as a value.
+
+The values are the ones that already shipped: the same type steps, the `cozy` density, Tailwind's
+four radius steps and two shadows, and the base transition duration a `transition-colors` already
+ran at. Publishing them moves no pixel. The type, density, radius, shadow and motion record is
+`scaleVariables(density)` in
+[`packages/theme/src/scale.ts`](../../packages/theme/src/scale.ts); the colour record is
+`cssVariables(preset, mode)`. The host injects `scaleVariables(DEFAULT_DENSITY)` with the resolved
+colour values in `themeCss()`, so a pack does not need a separate scale handshake.
+
 ## The shape
 
 ```text
