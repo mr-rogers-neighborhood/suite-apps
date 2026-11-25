@@ -66,6 +66,9 @@ duration is a `var(--token)`, never a hex, `bg-black`, `rounded-2xl`, `shadow-lg
 
 | Export | What it is |
 | --- | --- |
+| `AppShell` | The pack's frame: a titled header with optional leading and trailing slots, an optional navigation region, and the content slot. Navigation stacks above content below 768px (`md`). |
+| `ListView` | A single-select listbox: click or arrow/Home/End to select, Enter to open, optional sections, `EmptyState` when empty. |
+| `DetailView` | A detail pane: title, subtitle, header actions, scrolling body, optional sticky footer. |
 | `Button` | `primary · secondary · ghost · danger`, `sm · md`. One background class per variant, never two. |
 | `IconButton` | A glyph with a **required** accessible name. |
 | `Field` | Label, hint and error wired to the control, so `aria-describedby` and `aria-invalid` cannot be left out. Renders the shared input, or labels a child `<select>`/picker. |
@@ -84,6 +87,37 @@ duration is a `var(--token)`, never a hex, `bg-black`, `rounded-2xl`, `shadow-lg
 `ImportMenu` is internal to `Launch`; its `ImportOption` type is exported because `LaunchProps`
 uses it. The former `Dialog` wrapper and the unused `defaultWorkspace` helpers were deleted: no
 pack imported them, and `Modal` plus an app's heading covers the same job.
+
+## Layout shells
+
+`AppShell`, `ListView` and `DetailView` are layout primitives, not a router or a store. They take
+nodes, and the caller keeps the selected id, the open record and the navigation choice. `AppShell`
+is the pack's content frame: **the host owns the window chrome and the cross-app `MenuBar`, and a
+pack draws its content inside `AppShell`.** A pack with a genuinely different chrome keeps its own
+frame rather than bending this one.
+
+```tsx
+<AppShell
+  title="Household"
+  leading={<IconButton label="Back">←</IconButton>}
+  actions={<Button variant="primary">New account</Button>}
+  navigation={<div className="flex flex-col gap-1">…</div>}
+>
+  <ListView
+    label="Accounts"
+    items={accounts.map((account) => ({ id: account.id, content: account.name }))}
+    selectedId={selectedId}
+    onSelect={setSelectedId}
+    onActivate={openAccount}
+  />
+</AppShell>
+```
+
+`DetailView` takes the content region instead of `ListView` once a row is open. Its body is the
+scroll container; the footer stays visible while the body moves. The listbox owns only the keyboard
+pattern: one roving tab stop, arrows move selection and focus (wrapping), Home/End jump to the ends,
+and Enter calls `onActivate`. Every colour, radius, shadow and duration is a `var(--token)` from
+`@suite/theme`; no shell names an app, a route or a domain type.
 
 ## Storybook and axe
 

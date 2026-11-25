@@ -24,13 +24,21 @@
  * 4. React 19 is a peer, not a dependency.
  */
 export { AppMark, type AppMarkProps, type AppMarkSize } from "./AppMark.js";
+export { AppShell, type AppShellProps } from "./AppShell.js";
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button.js";
 export { type ClassValue, cx } from "./cx.js";
+export { DetailView, type DetailViewProps } from "./DetailView.js";
 export { EmptyState, type EmptyStateProps } from "./EmptyState.js";
 export { Field, type FieldProps } from "./Field.js";
 export { IconButton, type IconButtonProps, type IconButtonSize } from "./IconButton.js";
 export type { ImportOption } from "./ImportMenu.js";
 export { Launch, type LaunchProps, type LaunchRecent } from "./Launch.js";
+export {
+  ListView,
+  type ListViewItem,
+  type ListViewProps,
+  type ListViewSection,
+} from "./ListView.js";
 export { Modal, type ModalProps } from "./Modal.js";
 export { MenuBar, type MenuBarProps } from "./menu/MenuBar.js";
 export {
