@@ -15,7 +15,9 @@
 #   the job skips them rather than running without a provider.
 #
 # Cost:
-# - effort low, 200k token budget, concurrency 4, 10-minute subtask timeout.
+# - effort low, 600k token budget, concurrency 4, 10-minute subtask timeout.
+#   The cap is a ceiling; a normal PR spends far less. Large workflow files are
+#   why it is above the local 200k default.
 # - checkpoint_range reviews only the commits since the previous run, so a
 #   long-lived PR does not pay for the same diff on every push. sticky_summary
 #   and incremental keep comments in place instead of piling up.
@@ -47,9 +49,16 @@ jobs:
     # rather than failing after paying for a checkout.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]' &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Trust boundary: a `pull_request` run uses this workflow from the head
+    # branch and receives repository secrets, so anyone who can push a branch
+    # here can change this step. This repository has one owner and branch
+    # protection; a shared or multi-collaborator setup should use a dedicated
+    # low-limit DeepRelay key, or an environment with required reviewers.
+    #
     # No checkout step: the Action performs its own fetch-depth: 0 checkout of
     # the base and fetches the PR head, so checkpoint ranges resolve.
     steps:
@@ -71,7 +80,7 @@ jobs:
           llm_reasoning_effort: low
           llm_timeout: "300"
           effort: low
-          max_tokens_budget: "400000"
+          max_tokens_budget: "600000"
           review_concurrency: 4
           review_task_timeout: "10"
           language: English

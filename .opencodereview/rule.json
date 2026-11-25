@@ -4,9 +4,15 @@
     ".dev/**",
     ".artifacts/**",
     ".flatpak-builder/**",
+    "node_modules/**",
+    "dist/**",
     ".commandcode/**",
     ".agents/**",
-    ".opencode/**"
+    ".opencode/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
   ],
   "rules": [
     {

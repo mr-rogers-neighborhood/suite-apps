@@ -92,11 +92,14 @@ outside Orca's encrypted store.
 `platforms` or the release workflow. The approval, the fresh gate and the merge queue remain the
 gates.
 
-- Trigger: `pull_request` to `main`, excluding drafts and docs-only changes. A fork PR has no secret
-  and is skipped.
+- Trigger: `pull_request` to `main`, excluding drafts, docs-only changes, Dependabot, and fork PRs
+  (a fork or Dependabot run has no secret).
 - Secret: `DEEPRELAY_API_KEY` (repository secret, Settings → Secrets and variables → Actions).
-- Budget: `effort: low`, 400000 total tokens, concurrency 4, 10-minute subtask timeout. The cap is
+- Budget: `effort: low`, 600000 total tokens, concurrency 4, 10-minute subtask timeout. The cap is
   a ceiling, not a target; most PRs spend far less.
+- Trust boundary: a `pull_request` run uses the workflow from the head branch and receives the
+  secret. This repository has one owner and branch protection; a shared setup should use a dedicated
+  low-limit key or an environment with required reviewers.
 - `checkpoint_range` reviews only the commits since the previous run; `sticky_summary` and
   `incremental` keep the comments in place.
 - Pinned twice: the Action by full SHA and `ocr_version` in the workflow. The Action installs the CLI
@@ -110,6 +113,7 @@ gates.
   keys. It uploads `release.json` as the `ocr-release-<channel>-<run_id>` workflow artifact.
 - `continue-on-error` makes it advisory: a DeepRelay outage never blocks a signed release. The
   approver reads the artifact; the gate and the approval remain the decision.
-- `preview` and `stable` are the boundaries that use it. `nightly` may run it through
-  `workflow_call`, but its boundary question is answered by the gate, install and launch, not by a
-  code review.
+- `preview` and `stable` are the boundaries that use it. `nightly` is deliberately excluded: it has
+  no human approval to inform, and its boundary question is answered by the gate, install and launch.
+- The range comes from the channel's last tag, sorted by version. If that tag is `HEAD`, or no tag
+  exists, the job skips instead of reporting an empty range as evidence.

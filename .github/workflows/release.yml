@@ -124,7 +124,10 @@ jobs:
     # This is not a second PR pipeline: the range is tag..HEAD at a channel
     # boundary, not the PR's merge-base..head. It reuses the same wrapper and
     # provider configuration as the local skill.
-    if: inputs.publish
+    #
+    # Nightly is excluded: it has no human approval to inform, and its boundary
+    # question ("does it work?") is answered by the gate, install and launch.
+    if: inputs.publish && inputs.channel != 'nightly'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
@@ -172,13 +175,17 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${CHANNEL}" = "stable" ]; then
-            base="$(git tag --list 'suite-*' --sort=-creatordate \
+            base="$(git tag --list 'suite-*' --sort=-v:refname \
               | grep -vE -- '-(nightly|preview|slop)-' | head -1 || true)"
           else
-            base="$(git tag --list "suite-${CHANNEL}-*" --sort=-creatordate | head -1 || true)"
+            base="$(git tag --list "suite-${CHANNEL}-*" --sort=-v:refname | head -1 || true)"
           fi
           if [ -z "${base}" ]; then
             echo "No previous ${CHANNEL} tag; nothing to compare. Skipping the advisory review." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$(git rev-parse "${base}^{commit}")" = "$(git rev-parse HEAD)" ]; then
+            echo "The last ${CHANNEL} tag is HEAD; there is no range to review." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           echo "Reviewing ${base}..HEAD for the ${CHANNEL} boundary." | tee -a "$GITHUB_STEP_SUMMARY"
