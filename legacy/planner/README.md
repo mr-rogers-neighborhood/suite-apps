@@ -72,13 +72,14 @@ React 19 on Electron, one Loro CRDT document per workspace, Zod-validated record
 Radix primitives. The main process holds the authoritative document and the reminder scheduler; the
 renderer keeps a replica and streams CRDT deltas over a narrow, validated IPC bridge.
 
-| Path                          | What lives there                                                           |
-| ----------------------------- | -------------------------------------------------------------------------- |
-| `src`                         | Electron main, preload bridge, React renderer, Storybook, Playwright       |
-| `packages/core`               | Schema, `WorkspaceDocument`, pure projections, capture parser, file format |
-| `docs/reference`              | Architecture, conventions, data model                                      |
-| `docs/reference/decisions.md` | The rules that shape Planner                                               |
-| `docs/reference/alpha.md`     | The closing checklist for the pre-alpha promise                            |
+| Path                              | What lives there                                                           |
+| --------------------------------- | -------------------------------------------------------------------------- |
+| `src`                             | Electron main and preload bridge; Storybook and Playwright                 |
+| `packs/planner/pack/src/renderer` | React renderer, owned by the pack and built by the shell too               |
+| `packages/planner-core`           | Schema, `WorkspaceDocument`, pure projections, capture parser, file format |
+| `docs/reference`                  | Architecture, conventions, data model                                      |
+| `docs/reference/decisions.md`     | The rules that shape Planner                                               |
+| `docs/reference/alpha.md`         | The closing checklist for the pre-alpha promise                            |
 
 Read [AGENTS.md](AGENTS.md) before contributing (human or agent), and
 [docs/reference/architecture.md](docs/reference/architecture.md) for the longer version.

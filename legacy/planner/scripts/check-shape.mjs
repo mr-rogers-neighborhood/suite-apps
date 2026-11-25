@@ -20,7 +20,8 @@ const SKIP = new Set([
 const SOURCE = /\.(ts|tsx|mjs)$/;
 const MAX_LINES = 900;
 const OBSERVE_OWNER = "packages/document-runtime/src/replica.ts";
-const LORO_ALLOWED = "packages/core/src/loro/";
+const CORE = join(root, "../../packages/planner-core");
+const LORO_ALLOWED = "../../packages/planner-core/src/loro/";
 
 /** @param {string} dir @returns {Promise<string[]>} */
 async function walk(dir) {
@@ -37,7 +38,11 @@ async function walk(dir) {
 
 const problems = [];
 const observeSites = [];
-const files = [...(await walk(root)), ...(await walk(join(root, "../../packs/planner/pack")))];
+const files = [
+  ...(await walk(root)),
+  ...(await walk(CORE)),
+  ...(await walk(join(root, "../../packs/planner/pack"))),
+];
 
 for (const file of files) {
   const rel = relative(root, file);
@@ -55,7 +60,7 @@ for (const file of files) {
   }
 
   if (/from\s+["']loro-crdt["']/.test(text) && !rel.startsWith(LORO_ALLOWED)) {
-    problems.push(`${rel}: imports loro-crdt; only packages/core/src/loro may touch Loro`);
+    problems.push(`${rel}: imports loro-crdt; only packages/planner-core/src/loro may touch Loro`);
   }
 
   if (/nodeIntegration\s*:\s*true/.test(text)) {

@@ -6,7 +6,7 @@ projected into columns.
 
 ## The projection
 
-`weekPlan` in `packages/core/src/plan/weekPlan.ts` starts the week on `settings.weekStartsOn` with
+`weekPlan` in `packages/planner-core/src/plan/weekPlan.ts` starts the week on `settings.weekStartsOn` with
 `startOfWeekKey`, then walks seven days with `addDaysToKey`. Each day is an ordinary `dayPlan`: the
 tasks whose `scheduledFor` is that date, plus the recurring occurrences projected into it. The day's
 available time is its `capacityMinutesOverride` when it has one, otherwise

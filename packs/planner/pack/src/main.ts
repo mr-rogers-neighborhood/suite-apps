@@ -6,4 +6,4 @@ import "./prelude";
  * The static import above runs first and installs `window.suitePlanner`; only then may the
  * renderer be imported, because `bootDocument()` reads that global at import time.
  */
-await import("../../../../legacy/planner/src/renderer/src/main");
+await import("./renderer/main");

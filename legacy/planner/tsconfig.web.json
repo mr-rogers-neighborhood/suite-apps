@@ -5,9 +5,13 @@
     "jsx": "react-jsx",
     "types": ["vite/client"],
     "paths": {
-      "@suite/planner-core": ["./packages/core/src/index.ts"],
-      "@renderer/*": ["./src/renderer/src/*"]
+      "@suite/planner-core": ["../../packages/planner-core/src/index.ts"],
+      "@renderer/*": ["../../packs/planner/pack/src/renderer/*"]
     }
   },
-  "include": ["src/renderer/src/**/*.ts", "src/renderer/src/**/*.tsx", ".storybook/**/*.ts"]
+  "include": [
+    "../../packs/planner/pack/src/renderer/**/*.ts",
+    "../../packs/planner/pack/src/renderer/**/*.tsx",
+    ".storybook/**/*.ts"
+  ]
 }

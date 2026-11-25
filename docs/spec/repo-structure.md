@@ -60,8 +60,10 @@ capability vocabulary; a checker reads it rather than repeating it.
 **R2.5** Legacy Canvas, Planner and Help stay frozen at their last Flatpak artifact until each
 becomes a pack. Budget is frozen and ships as `packs/budget`: its last Flatpak artifact stays
 published, its Flatpak lane is retired, and its app source, docs and last artifact stay under
-`legacy/budget/`. A frozen app is not deleted; its code, docs and last artifact stay under
-`legacy/<app>/`.
+`legacy/budget/`. Planner's renderer and document layer are already pack-owned:
+`packs/planner/pack/src/renderer` is the one renderer tree and `packages/planner-core` is the shared
+package, while `legacy/planner` keeps the frozen Electron shell. A frozen app is not deleted; its
+code, docs and last artifact stay under `legacy/<app>/` unless a clause moves a piece.
 
 ## 3. Ownership
 

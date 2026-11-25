@@ -3,10 +3,13 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-const core = fileURLToPath(new URL("./packages/core/src/index.ts", import.meta.url));
-const renderer = fileURLToPath(new URL("./src/renderer/src", import.meta.url));
+const core = fileURLToPath(new URL("../../packages/planner-core/src/index.ts", import.meta.url));
+const renderer = fileURLToPath(new URL("../../packs/planner/pack/src/renderer", import.meta.url));
+const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 export default defineConfig({
+  // The renderer lives in the pack now; the test server must be allowed to read it.
+  server: { fs: { allow: [repoRoot] } },
   test: {
     testTimeout: 15_000,
     projects: [
@@ -15,7 +18,7 @@ export default defineConfig({
         test: {
           name: "core",
           environment: "node",
-          include: ["packages/core/src/**/*.test.ts"],
+          include: ["../../packages/planner-core/src/**/*.test.ts"],
         },
       },
       {
@@ -50,8 +53,8 @@ export default defineConfig({
         test: {
           name: "renderer",
           environment: "jsdom",
-          include: ["src/renderer/src/**/*.test.{ts,tsx}"],
-          setupFiles: ["src/renderer/src/test/setup.ts"],
+          include: ["../../packs/planner/pack/src/renderer/**/*.test.{ts,tsx}"],
+          setupFiles: ["../../packs/planner/pack/src/renderer/test/setup.ts"],
         },
       },
     ],

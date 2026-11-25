@@ -13,9 +13,8 @@ import wasm from "vite-plugin-wasm";
  * cache to `.vite-planner`, so building the mobile app never dirties the Planner
  * checkout.
  */
-const planner = fileURLToPath(new URL("../planner/src/renderer", import.meta.url));
-const rendererSrc = fileURLToPath(new URL("../planner/src/renderer/src", import.meta.url));
-const core = fileURLToPath(new URL("../planner/packages/core/src/index.ts", import.meta.url));
+const planner = fileURLToPath(new URL("../../packs/planner/pack/src/renderer", import.meta.url));
+const core = fileURLToPath(new URL("../../packages/planner-core/src/index.ts", import.meta.url));
 
 export default defineConfig({
   root: planner,
@@ -25,7 +24,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@suite/planner-core": core,
-      "@renderer": rendererSrc,
     },
   },
   optimizeDeps: {

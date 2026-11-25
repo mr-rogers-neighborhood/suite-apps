@@ -15,8 +15,8 @@ hosts/
 legacy/
   canvas/       @suite/canvas renderer; desktop/ shell;
                 packages/graph, packages/import-obsidian; e2e, docs, handbook, internal
-  planner/      @suite/planner desktop app; packages/core; docs
-  budget/       @suite/budget desktop app; docs
+  planner/      @suite/planner desktop app; docs (renderer and core live outside)
+  budget/       @suite/budget desktop app; docs (core lives in the pack)
   help/         @suite/help Electron shell for the documentation app
 packs/
   canvas/pack/  Canvas pack source
@@ -27,7 +27,7 @@ packs/
 services/
   relay/        @suite/sync-server; packages/protocol, packages/host; app, deploy, docs
 packages/       contracts, files, document-runtime, screens, desktop, theme, ui,
-                pack, pack-runtime, pack-host
+                pack, pack-runtime, pack-host, planner-core
 docs/           Cross-cutting documentation
 packaging/      Flatpak manifests
 scripts/        gate.mjs, flatpak.mjs, ci/, docs-check.mjs
@@ -54,7 +54,7 @@ also owns the overrides, patches and build permissions the apps need.
 | `@suite/import-obsidian` | `legacy/canvas/packages/import-obsidian` | Canvas import |
 | `@suite/planner` | `legacy/planner` | Planner |
 | `@suite/planner-pack` | `packs/planner` | Planner pack build |
-| `@suite/planner-core` | `legacy/planner/packages/core` | Planner schema and document layer |
+| `@suite/planner-core` | `packages/planner-core` | Planner schema and document layer |
 | `@suite/budget` | `legacy/budget` | Budget |
 | `@suite/budget-pack` | `packs/budget` | Budget pack build |
 | `@suite/budget-core` | `packs/budget/packages/core` | Budget schema and document layer |

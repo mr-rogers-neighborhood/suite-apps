@@ -5,7 +5,7 @@
       "entry": ["../../packs/planner/pack/vite.config.ts"],
       "project": ["scripts/**/*.mjs", "src/**/*.{ts,tsx}", ".storybook/**/*.ts", "e2e/**/*.ts"]
     },
-    "packages/core": {
+    "../../packages/planner-core": {
       "project": ["src/**/*.ts"]
     }
   },

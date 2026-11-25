@@ -19,14 +19,14 @@ Read [docs/reference/conventions.md](docs/reference/conventions.md) before writi
 
 ## Repo map
 
-| Path                          | Purpose                                                                   |
-| ----------------------------- | ------------------------------------------------------------------------- |
-| `src/main`                    | Document authority, atomic file store, IPC, tray, reminder scheduler      |
-| `src/preload`                 | The allowlisted `contextBridge` surface                                   |
-| `src/renderer/src`            | React app: shell, day and week views, inbox, capture, calendar            |
-| `packages/core`               | Schema, document layer, pure projections, capture parser, `.planner` file |
-| `docs/reference`              | Architecture, conventions, data model                                     |
-| `docs/reference/decisions.md` | The rules that shape Planner                                              |
+| Path                              | Purpose                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------- |
+| `src/main`                        | Document authority, atomic file store, IPC, tray, reminder scheduler      |
+| `src/preload`                     | The allowlisted `contextBridge` surface                                   |
+| `packs/planner/pack/src/renderer` | React app: shell, day and week views, inbox, capture, calendar            |
+| `packages/planner-core`           | Schema, document layer, pure projections, capture parser, `.planner` file |
+| `docs/reference`                  | Architecture, conventions, data model                                     |
+| `docs/reference/decisions.md`     | The rules that shape Planner                                              |
 
 ## Commands
 
@@ -60,7 +60,7 @@ All verification gates are local. Every gate claim names a local command.
 ## Rules
 
 1. Document data goes through `@suite/planner-core` (`WorkspaceDocument`). Never touch Loro from a
-   component, and never import `loro-crdt` outside `packages/core/src/loro`.
+   component, and never import `loro-crdt` outside `packages/planner-core/src/loro`.
 2. Document truth never lives in Zustand, React state or localStorage. Zustand holds UI state only.
 3. Validate every write with the Zod schema. A write sets the leaf keys that changed, never the whole
    record.
@@ -90,7 +90,7 @@ Zustand, transient view state in React.
 
 ## Feature path
 
-1. Model it in `packages/core/src/schema.ts` with tests.
+1. Model it in `packages/planner-core/src/schema.ts` with tests.
 2. Add a typed accessor or mutation on `WorkspaceDocument`.
 3. Consume it through `useWorkspaceSnapshot` and the Zustand store.
 4. Add a story where it is visual, a test where behaviour is non-trivial.

@@ -8,10 +8,11 @@ import wasm from "vite-plugin-wasm";
 /**
  * Builds Planner's own renderer and its bridge into `packs/planner/.dev/pack`.
  *
- * The normal Electron build writes `legacy/planner/out`, so this config owns a directory of its own
- * and never repoints `electron-vite`. The entry is the pack's page: it loads `src/main.ts`, which
- * installs the bridge over the host's `window.suite` and then imports the renderer. One entry, so
- * no script-injection step is needed after Vite writes the page.
+ * The renderer under `src/renderer/` is the pack's source; the frozen Electron shell builds that
+ * same tree and keeps no copy of its own. The shell writes its own `out/`, so this config owns a
+ * directory of its own and never repoints `electron-vite`. The entry is the pack's page: it loads
+ * `src/main.ts`, which installs the bridge over the host's `window.suite` and then imports the
+ * renderer. One entry, so no script-injection step is needed after Vite writes the page.
  *
  * The output and Vite's cache sit outside `pack/` on purpose: `pack/` is source, and
  * `scripts/pack-shape.mjs` fails the gate if a generated directory appears in it.
@@ -24,14 +25,6 @@ export default defineConfig({
   base: "./",
   cacheDir: fileURLToPath(new URL("vite", outputRoot)),
   plugins: [react(), tailwindcss(), wasm()],
-  resolve: {
-    alias: {
-      "@suite/planner-core": fileURLToPath(
-        new URL("../../../legacy/planner/packages/core/src/index.ts", import.meta.url),
-      ),
-      "@renderer": fileURLToPath(new URL("../../../legacy/planner/src/renderer/src", import.meta.url)),
-    },
-  },
   optimizeDeps: {
     // Loro ships a wasm-bindgen entry; pre-bundling it breaks the wasm URL.
     exclude: ["loro-crdt"],
