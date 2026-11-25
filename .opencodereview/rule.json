@@ -15,7 +15,7 @@
   ],
   "rules": [
     {
-      "path": "apps/*/packages/*/src/loro/**",
+      "path": "legacy/*/packages/*/src/loro/**",
       "rule": "This is an app's document layer. Enforce all of the following:\n\n- One writer: only the owning facade (WorkspaceDocument/BudgetDocument/graph facade) mutates the document.\n- Schema changes are additive first; a destructive change needs a migration and a decision record.\n- Parse with Zod on read and write. Write only changed keys on a mergeable map so concurrent edits merge rather than clobber a record.\n- A fresh replica sets its own peer id before its first edit.\n- Raw Loro imports stay inside this package; no component imports loro-crdt.\n- Only the declared observe site calls observe(). Flag a second one.\n- Document truth never moves into Zustand, React state, or localStorage.",
       "merge_system_rule": true
     },
@@ -25,17 +25,17 @@
       "merge_system_rule": true
     },
     {
-      "path": "apps/*/src/renderer/**",
+      "path": "legacy/*/src/renderer/**",
       "rule": "Renderer code is sandboxed. Enforce:\n\n- No Node built-ins, no fs, no child_process, no direct IPC beyond the typed preload bridge.\n- contextIsolation and sandbox stay on; nodeIntegration stays off.\n- Document truth never lives in React state, Zustand, or localStorage; those hold UI state only.\n- No raw Loro import; read through the snapshot store.\n- Any innerHTML use needs a documented reason; eval/new Function are refused.",
       "merge_system_rule": true
     },
     {
-      "path": "apps/desk/src/**",
+      "path": "hosts/desk/src/**",
       "rule": "The desktop host. Enforce:\n\n- Resolve the sender to a pack before acting; check the capability per call and by the resolved sender, not once at open. A missing capability is a refusal, not an empty success.\n- The host carries bytes and never parses a pack document.\n- Document and external-file handles are opaque tokens; absolute paths stay in main.\n- Pack views keep per-pack origin, session partition, denied navigation/window.open/downloads, and all permissions denied.\n- A new privileged act should be a declaration the host performs, not a pack-side back door.",
       "merge_system_rule": true
     },
     {
-      "path": "apps/go/src/host/**",
+      "path": "hosts/go/src/host/**",
       "rule": "The Go container. Enforce:\n\n- The container never reads or parses a document and never learns a domain name.\n- Module code receives bytes and opaque ids only.\n- Pack identity is the compiled pin; no runtime trust additions.\n- The isolation boundary is an iframe realm plus a per-request capability check; do not claim process isolation.\n- Capability checks happen in the frame bridge, not in the module.",
       "merge_system_rule": true
     },

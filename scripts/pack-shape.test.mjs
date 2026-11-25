@@ -24,10 +24,19 @@ function workspace({ pack = true, manifest = {}, packageJson = {} } = {}) {
   roots.push(root);
 
   write(
-    join(root, "apps", "budget", "package.json"),
-    json({ name: "@suite/budget", version: "0.4.1", ...(pack ? { suite: { pack: true } } : {}), ...packageJson }),
+    join(root, "legacy", "budget", "package.json"),
+    json({ name: "@suite/budget", version: "0.4.1" }),
   );
-  const packDir = join(root, "apps", "budget", "pack");
+  write(
+    join(root, "packs", "budget", "package.json"),
+    json({
+      name: "@suite/budget-pack",
+      version: "0.0.0",
+      ...(pack ? { suite: { pack: true } } : {}),
+      ...packageJson,
+    }),
+  );
+  const packDir = join(root, "packs", "budget", "pack");
   write(
     join(packDir, "manifest.json"),
     json({
@@ -64,13 +73,13 @@ describe("the pack shape check", () => {
     const result = check(root);
     assert.deepEqual(result.problems, []);
     assert.equal(result.ok, true);
-    assert.deepEqual(result.packs, [{ app: "budget", dir: join("apps", "budget", "pack") }]);
+    assert.deepEqual(result.packs, [{ app: "budget", dir: join("packs", "budget", "pack") }]);
   });
 
   it("refuses a missing required file or directory", () => {
     const { root } = workspace();
-    rmSync(join(root, "apps", "budget", "pack", "README.md"));
-    rmSync(join(root, "apps", "budget", "pack", "src"), { recursive: true, force: true });
+    rmSync(join(root, "packs", "budget", "pack", "README.md"));
+    rmSync(join(root, "packs", "budget", "pack", "src"), { recursive: true, force: true });
 
     const result = check(root);
     assert.equal(result.ok, false);

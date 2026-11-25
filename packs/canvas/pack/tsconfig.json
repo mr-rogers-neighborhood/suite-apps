@@ -1,0 +1,13 @@
+{
+  "extends": "../../../legacy/canvas/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@suite/graph": ["../../../legacy/canvas/packages/graph/src/index.ts"],
+      "@suite/pack-runtime": ["../../../packages/pack-runtime/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "*.config.ts", "*.config.mts"]
+}

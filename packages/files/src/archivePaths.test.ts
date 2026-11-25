@@ -4,8 +4,8 @@ import { archivePathProblem, isSafeArchivePath } from "./archivePaths.js";
 describe("archivePathProblem", () => {
   it.each([
     "manifest.json",
-    "apps/canvas/workspace.canvas",
-    "apps/budget/household.budget",
+    "legacy/canvas/workspace.canvas",
+    "legacy/budget/household.budget",
     "README.txt",
     "a-1/b_2/c.3",
   ])("accepts %s", (entry) => {
@@ -20,20 +20,20 @@ describe("archivePathProblem", () => {
     ["c:relative", "drive-letter"],
     ["apps\\canvas\\x", "backslash"],
     ["../secret", "traversal"],
-    ["apps/../../secret", "traversal"],
-    ["apps/./x", "traversal"],
-    ["apps//x", "traversal"],
-    ["apps/%2e%2e/secret", "traversal"],
-    ["apps/%2E%2E/secret", "traversal"],
-    ["apps/a%2Fb", "traversal"],
-    ["apps/a%00b", "control-character"],
-    ["apps/a\u0007b", "control-character"],
-    ["apps/trailing.", "trailing-dot-or-space"],
-    ["apps/trailing ", "trailing-dot-or-space"],
-    ["apps/CON", "reserved-name"],
-    ["apps/con.txt", "reserved-name"],
-    ["apps/LPT1/data.bin", "reserved-name"],
-    ["apps/%zz", "malformed-escape"],
+    ["documents/../../secret", "traversal"],
+    ["documents/./x", "traversal"],
+    ["documents//x", "traversal"],
+    ["documents/%2e%2e/secret", "traversal"],
+    ["documents/%2E%2E/secret", "traversal"],
+    ["documents/a%2Fb", "traversal"],
+    ["documents/a%00b", "control-character"],
+    ["documents/a\u0007b", "control-character"],
+    ["documents/trailing.", "trailing-dot-or-space"],
+    ["documents/trailing ", "trailing-dot-or-space"],
+    ["documents/CON", "reserved-name"],
+    ["documents/con.txt", "reserved-name"],
+    ["documents/LPT1/data.bin", "reserved-name"],
+    ["documents/%zz", "malformed-escape"],
   ])("refuses %s as %s", (entry, reason) => {
     expect(archivePathProblem(entry)).toBe(reason);
   });
@@ -43,14 +43,14 @@ describe("archivePathProblem", () => {
   });
 
   it("accepts a name that merely contains a reserved word", () => {
-    expect(archivePathProblem("apps/console.txt")).toBeNull();
-    expect(archivePathProblem("apps/com10.txt")).toBeNull();
+    expect(archivePathProblem("documents/console.txt")).toBeNull();
+    expect(archivePathProblem("documents/com10.txt")).toBeNull();
   });
 });
 
 describe("isSafeArchivePath", () => {
   it("is the predicate form", () => {
-    expect(isSafeArchivePath("apps/canvas/workspace.canvas")).toBe(true);
+    expect(isSafeArchivePath("legacy/canvas/workspace.canvas")).toBe(true);
     expect(isSafeArchivePath("../workspace.canvas")).toBe(false);
   });
 });

@@ -42,7 +42,7 @@ export function isDocPath(path) {
   const normalized = normalizePath(path);
   return (
     normalized.startsWith("docs/") ||
-    /^apps\/[^/]+\/docs\//.test(normalized) ||
+    /^(?:hosts|legacy|services)\/[^/]+\/docs\//.test(normalized) ||
     DOC_SUFFIXES.some((suffix) => normalized.endsWith(suffix))
   );
 }
@@ -63,6 +63,23 @@ export function projectFor(path, projects) {
     }
   }
   return match;
+}
+
+/**
+ * The project owning a path, including pack source.
+ *
+ * A pack is its own workspace project, but its gate row is still the legacy
+ * shell that runs it. Mapping `packs/<app>` to the shell keeps one row: a pack
+ * edit selects that row, and the row runs the shell and then the pack.
+ */
+export function projectForPath(path, projects) {
+  const normalized = normalizePath(path);
+  const pack = /^packs\/([^/]+)\//.exec(normalized);
+  if (pack !== null) {
+    const owner = projects.find((project) => project.dir === `legacy/${pack[1]}`);
+    if (owner !== undefined) return owner;
+  }
+  return projectFor(normalized, projects);
 }
 
 /**
@@ -181,7 +198,7 @@ export function computeAffected({ paths, projects, rows }) {
   let global = false;
   for (const path of changed) {
     if (isDocPath(path)) continue;
-    const project = projectFor(path, projects);
+    const project = projectForPath(path, projects);
     if (project) direct.add(project.name);
     else global = true;
   }

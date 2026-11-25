@@ -1,5 +1,5 @@
 ---
-module: apps/planner/src/main
+module: legacy/planner/src/main
 title: Planner main
 summary: "The authoritative workspace, its file, the IPC boundary and reminder delivery."
 ---
@@ -20,7 +20,7 @@ scheduler that delivers a reminder. Sync adds a transport beside them: the same
 delta a local edit produced is what a relay carries, so the document layer did
 not change when sync arrived.
 
-## apps/planner/src/main/ipc.ts#registerIpc
+## legacy/planner/src/main/ipc.ts#registerIpc
 
 This function is the renderer's whole capability set. It answers a snapshot
 request, accepts a binary CRDT update on commit, and owns the native import and
@@ -35,7 +35,7 @@ registration for the same channel. Import publishes `workspace:replaced` to ever
 window after the store has been replaced and validated, so no window keeps a
 replica of the closed document.
 
-## apps/planner/src/main/workspaceStore.ts#WorkspaceStore
+## legacy/planner/src/main/workspaceStore.ts#WorkspaceStore
 
 The store owns the authoritative document and the save schedule. An edit is
 applied immediately, then a 400 ms debounce coalesces a burst into one write:

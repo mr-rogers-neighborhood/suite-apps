@@ -1,5 +1,5 @@
 ---
-module: apps/go
+module: hosts/go
 title: Go App
 summary: "The Android hub: a container, a pack store and one narrow module contract."
 ---
@@ -21,7 +21,7 @@ committed, because regenerating it loses the hand-edited share intent.
 checked by asking the running WebView through `pnpm android:eval`, not by
 reading a screenshot.
 
-## file: apps/go/scripts/pack.mjs
+## file: hosts/go/scripts/pack.mjs
 
 The builder and the device share one definition of the format. This script walks
 the directory that will be installed, hashes each file, and imports

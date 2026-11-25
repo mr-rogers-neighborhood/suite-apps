@@ -13,18 +13,18 @@ build:
           - "pnpm --filter \"./packages/*\" run build"
           - "pnpm --filter @suite/go-app build"
           - "pnpm --filter @suite/go-app exec cap sync android"
-          - "export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64 && cd apps/go/android && ./gradlew assembleStableDebug"
-        output_path: "apps/go/android/app/build/outputs/apk/stable/debug/app-stable-debug.apk"
+          - "export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64 && cd hosts/go/android && ./gradlew assembleStableDebug"
+        output_path: "hosts/go/android/app/build/outputs/apk/stable/debug/app-stable-debug.apk"
       ios:
         app_id: "350ee9a2-01d8-4024-b3a7-c5ac9c400bc3"
         setup_commands:
           - "pnpm install"
         build_commands:
-          - "pnpm --filter \"./packages/*\" --filter \"./apps/*/packages/*\" run build"
+          - "pnpm --filter \"./packages/*\" --filter \"./hosts/*/packages/*\" --filter \"./legacy/*/packages/*\" --filter \"./services/*/packages/*\" run build"
           - "pnpm --filter @suite/go-app build"
           - "pnpm --filter @suite/go-app exec cap sync ios"
-          - "cd apps/go/ios/App && xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO"
-        output_path: "apps/go/ios/App/build/Build/Products/Debug-iphonesimulator/App.app"
+          - "cd hosts/go/ios/App && xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO"
+        output_path: "hosts/go/ios/App/build/Build/Products/Debug-iphonesimulator/App.app"
 # Parked 2026-11-24: the free monthly minutes are nearly spent. Mobile runs
 # locally on an Android emulator for now, so no Revyl build or preview runs on
 # a pull request. Restore `enabled: true` when the allowance resets; the

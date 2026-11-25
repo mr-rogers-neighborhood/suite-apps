@@ -1,5 +1,5 @@
 ---
-module: apps/budget/packages/core/src/plan
+module: legacy/budget/packages/core/src/plan
 title: Budget plan projections
 summary: "The ledger, month fold and target arithmetic behind a budget's plan."
 ---
@@ -14,7 +14,7 @@ The notes below cover the rules worth stating. The ledger and month fold are tes
 against a hand-computed month and a generated invariant; debt payoff adds a
 fixed-rate projection over the target's payment.
 
-## apps/budget/packages/core/src/plan/amortization.ts#projectDebtPayoff
+## legacy/budget/packages/core/src/plan/amortization.ts#projectDebtPayoff
 
 The target editor can say what a fixed payment does to a debt without moving money.
 `projectDebtPayoff` runs the month loop in integers: add interest, take the

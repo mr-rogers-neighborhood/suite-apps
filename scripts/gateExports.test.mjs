@@ -3,14 +3,19 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   rmSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { KEEP_EXPORTS, pruneGateExports } from "./lib/gateExports.mjs";
+import { discoverScriptTests } from "./lib/gateTests.mjs";
+
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function scratch() {
   return mkdtempSync(join(tmpdir(), "gate-exports-"));
@@ -98,5 +103,19 @@ describe("gate export retention", () => {
     } finally {
       rmSync(parent, { recursive: true, force: true });
     }
+  });
+});
+
+describe("gate test discovery", () => {
+  it("runs exactly the scripts/*.test.mjs files in the gated tree", () => {
+    // The listing is the independent oracle; discovery is what gate.mjs calls.
+    const listing = readdirSync(join(ROOT, "scripts"), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".test.mjs"))
+      .map((entry) => `scripts/${entry.name}`)
+      .sort();
+
+    assert.deepEqual(discoverScriptTests(ROOT), listing);
+    assert.deepEqual(discoverScriptTests(ROOT), [...discoverScriptTests(ROOT)].sort());
+    assert.ok(listing.length > 0, "the gate discovers at least one script test");
   });
 });

@@ -210,7 +210,7 @@ jobs:
       - name: Electron system libraries and Xvfb
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb
-          pnpm --dir apps/budget exec playwright install-deps chromium
+          pnpm --dir legacy/budget exec playwright install-deps chromium
       - name: Proof of Changes (${{ matrix.repo }})
         run: node scripts/proof-of-changes.mjs --only "${{ matrix.repo }}"
       - name: Write Proof of Changes summary

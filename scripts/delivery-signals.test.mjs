@@ -64,14 +64,14 @@ const fixture = {
     ["d".repeat(40)]: "2026-11-22T22:00:00Z",
   },
   commits: [
-    { sha: "1".repeat(40), subject: "feat(canvas): add a board", parents: 1, committedAt: "2026-10-25T10:00:00Z", paths: ["apps/canvas/src/board.tsx"] },
-    { sha: "2".repeat(40), subject: "fix(canvas): correct the board layout", parents: 1, committedAt: "2026-10-26T10:00:00Z", paths: ["apps/canvas/src/board.tsx"] },
+    { sha: "1".repeat(40), subject: "feat(canvas): add a board", parents: 1, committedAt: "2026-10-25T10:00:00Z", paths: ["legacy/canvas/src/board.tsx"] },
+    { sha: "2".repeat(40), subject: "fix(canvas): correct the board layout", parents: 1, committedAt: "2026-10-26T10:00:00Z", paths: ["legacy/canvas/src/board.tsx"] },
     { sha: "3".repeat(40), subject: "Merge pull request #1 from mrrnbhd/feat/board", parents: 2, committedAt: "2026-10-27T10:00:00Z", paths: [] },
-    { sha: "4".repeat(40), subject: 'Revert "feat(canvas): add a board"', parents: 1, committedAt: "2026-10-28T10:00:00Z", paths: ["apps/canvas/src/board.tsx"] },
-    { sha: "5".repeat(40), subject: "fix(planner): tidy a new file", parents: 1, committedAt: "2026-10-29T10:00:00Z", paths: ["apps/planner/src/new.ts"] },
+    { sha: "4".repeat(40), subject: 'Revert "feat(canvas): add a board"', parents: 1, committedAt: "2026-10-28T10:00:00Z", paths: ["legacy/canvas/src/board.tsx"] },
+    { sha: "5".repeat(40), subject: "fix(planner): tidy a new file", parents: 1, committedAt: "2026-10-29T10:00:00Z", paths: ["legacy/planner/src/new.ts"] },
     { sha: "6".repeat(40), subject: "chore: bump dependencies", parents: 1, committedAt: "2026-11-01T10:00:00Z", paths: ["package.json"] },
     { sha: "7".repeat(40), subject: "fix: repair package.json", parents: 1, committedAt: "2026-11-02T10:00:00Z", paths: ["package.json"] },
-    { sha: "8".repeat(40), subject: 'Revert "old work"', parents: 1, committedAt: "2026-09-01T10:00:00Z", paths: ["apps/canvas/src/old.ts"] },
+    { sha: "8".repeat(40), subject: 'Revert "old work"', parents: 1, committedAt: "2026-09-01T10:00:00Z", paths: ["legacy/canvas/src/old.ts"] },
   ],
 };
 
@@ -189,8 +189,8 @@ describe("rework rate", () => {
 
   it("does not count a fix whose path only it changed", () => {
     const commits = [
-      { sha: "a".repeat(40), subject: "fw: something", parents: 1, committedAt: "2026-11-01T00:00:00Z", paths: ["apps/x/one.ts"] },
-      { sha: "b".repeat(40), subject: "fix(x): add a file", parents: 1, committedAt: "2026-11-02T00:00:00Z", paths: ["apps/x/two.ts"] },
+      { sha: "a".repeat(40), subject: "fw: something", parents: 1, committedAt: "2026-11-01T00:00:00Z", paths: ["legacy/x/one.ts"] },
+      { sha: "b".repeat(40), subject: "fix(x): add a file", parents: 1, committedAt: "2026-11-02T00:00:00Z", paths: ["legacy/x/two.ts"] },
     ];
     const rework = reworkSummary(commits, window);
     assert.equal(rework.commits, 2);

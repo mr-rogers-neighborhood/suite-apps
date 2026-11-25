@@ -21,7 +21,7 @@ belongs in a tour.
 Current rules are in [reference/decisions.md](reference/decisions.md), and the
 [idea tracker](reference/ideas.md) records what is being considered next. The tracker is a planning
 page, not a reference fact: each entry links to the page that owns the detail. App-specific notes stay
-in `apps/<app>/docs/`; the app README is the way in. The Canvas handbook remains the user-facing
+in `legacy/<app>/docs/` (or the host's own `hosts/<app>/docs/`); the app README is the way in. The Canvas handbook remains the user-facing
 interface guide.
 
 ## Suite Help
@@ -39,12 +39,12 @@ derived.
 
 | App | Start here |
 | --- | --- |
-| Canvas | [README](../apps/canvas/README.md) · [docs](../apps/canvas/docs/README.md) · [handbook](../apps/canvas/handbook/) |
-| Planner | [README](../apps/planner/README.md) · [docs](../apps/planner/docs/reference/architecture.md) |
-| Budget | [README](../apps/budget/README.md) · [docs](../apps/budget/docs/reference/architecture.md) |
-| Help | [README](../apps/help/README.md) · [AGENTS](../apps/help/AGENTS.md) |
-| Sync | [README](../apps/sync/README.md) · [protocol](../apps/sync/docs/protocol.md) · [threat model](../apps/sync/docs/threat-model.md) |
-| Go | [README](../apps/go/README.md) · [contract](../apps/go/docs/reference/contract.md) |
+| Canvas | [README](../legacy/canvas/README.md) · [docs](../legacy/canvas/docs/README.md) · [handbook](../legacy/canvas/handbook/) |
+| Planner | [README](../legacy/planner/README.md) · [docs](../legacy/planner/docs/reference/architecture.md) |
+| Budget | [README](../legacy/budget/README.md) · [docs](../legacy/budget/docs/reference/architecture.md) |
+| Help | [README](../legacy/help/README.md) · [AGENTS](../legacy/help/AGENTS.md) |
+| Sync | [README](../services/relay/README.md) · [protocol](../services/relay/docs/protocol.md) · [threat model](../services/relay/docs/threat-model.md) |
+| Go | [README](../hosts/go/README.md) · [contract](../hosts/go/docs/reference/contract.md) |
 
 ## One fact, one home
 
@@ -74,7 +74,7 @@ one copy is already wrong.
 | What works, per subsystem | [Status](reference/status.md) |
 | Shared vocabulary | [Glossary](reference/glossary.md) |
 | Version numbers | `package.json` and each `CHANGELOG.md` |
-| An app's own design | `apps/<app>/docs/` |
+| An app's own design | `legacy/<app>/docs/` or `hosts/<app>/docs/` |
 
 Never restate a version in prose here. Link to the file that holds it.
 
@@ -102,7 +102,7 @@ Never restate a version in prose here. Link to the file that holds it.
   duplicates a source file.
 - **One module MDX, not one file MDX.** A module's narrative and its `## <node-id>` notes live in one
   `docs/modules/*.mdx`. The explorer splits it by file and declaration at render time.
-- **The reader is local.** Suite Help (`apps/help`) is the shipped documentation app. It is
+- **The reader is local.** Suite Help (`legacy/help`) is the shipped documentation app. It is
   offline, keeps no canonical copy of a page, and reads the generated index plus `docs/`; Flatpak
   owns updates.
 - **Neutral voice.** State the fact. No first person, no marketing cadence, no section summary that

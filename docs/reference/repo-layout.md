@@ -1,18 +1,26 @@
 # Repository layout
 
-One pnpm workspace at the root. The host and six apps under `apps/`, shared packages under
+One pnpm workspace at the root. Hosts under `hosts/`, the frozen apps and their shells under
+`legacy/`, pack source under `packs/`, the relay under `services/`, shared packages under
 `packages/`, and one lockfile for all of them.
 
 ```
-apps/
+hosts/
+  desk/         @suite/desk host: one window, sandboxed packs, space document
+  go/           @suite/go-app mobile container; packages/go contract; docs
+legacy/
   canvas/       @suite/canvas renderer; desktop/ shell;
                 packages/graph, packages/import-obsidian; e2e, docs, handbook, internal
-  planner/      @suite/planner desktop app; pack/; packages/core; docs
-  budget/       @suite/budget desktop app; pack/; packages/core; docs
+  planner/      @suite/planner desktop app; packages/core; docs
+  budget/       @suite/budget desktop app; packages/core; docs
   help/         @suite/help documentation app: explorer and handbook
-  sync/         @suite/sync-server; packages/protocol, packages/host; deploy, docs
-  go/           @suite/go-app mobile container; packages/go contract; docs
-  desk/         @suite/desk host: one window, sandboxed packs, space document
+packs/
+  canvas/pack/  Canvas pack source
+  planner/pack/ Planner pack source
+  budget/pack/  Budget pack source
+  help/pack/    Help pack source
+services/
+  relay/        @suite/sync-server; packages/protocol, packages/host; app, deploy, docs
 packages/       contracts, files, document-runtime, screens, desktop, theme, ui,
                 pack, pack-runtime, pack-host
 docs/           Cross-cutting documentation
@@ -20,33 +28,39 @@ packaging/      Flatpak manifests
 scripts/        gate.mjs, flatpak.mjs, ci/, docs-check.mjs
 ```
 
-`apps/help` renders the explorer over `docs/modules/`, `docs/tours/` and the generated index, and
+`legacy/help` renders the explorer over `docs/modules/`, `docs/tours/` and the generated index, and
 renders `docs/` as the handbook. It is offline, ships through Flatpak, and never owns a documentation
 fact: the code and `docs/` are the source of truth.
 
-`pnpm-workspace.yaml` includes `apps/*`, `apps/*/*`, `apps/*/packages/*` and `packages/*`. It also
-owns the overrides, patches and build permissions the apps need.
+`pnpm-workspace.yaml` includes `hosts/*`, `hosts/*/packages/*`, `legacy/*`, `legacy/*/*`,
+`legacy/*/packages/*`, `packs/*`, `services/*`, `services/*/*`, `services/*/packages/*` and
+`packages/*`. It
+also owns the overrides, patches and build permissions the apps need.
 
 ## Packages
 
 | Package | Directory | Owner |
 | --- | --- | --- |
-| `@suite/canvas` | `apps/canvas` | Canvas renderer |
-| `@suite/canvas-desktop` | `apps/canvas/desktop` | Canvas Electron shell |
-| `@suite/graph` | `apps/canvas/packages/graph` | Canvas schema and document layer |
-| `@suite/import-obsidian` | `apps/canvas/packages/import-obsidian` | Canvas import |
-| `@suite/planner` | `apps/planner` | Planner |
-| `@suite/planner-core` | `apps/planner/packages/core` | Planner schema and document layer |
-| `@suite/budget` | `apps/budget` | Budget |
-| `@suite/budget-core` | `apps/budget/packages/core` | Budget schema and document layer |
-| `@suite/help` | `apps/help` | Documentation app: explorer and handbook |
-| `@suite/sync-server` | `apps/sync` | Sync server |
-| `@suite/sync-app` | `apps/sync/app` | The retired relay app the last `run.suite.sync` build packaged |
-| `@suite/sync` | `apps/sync/packages/protocol` | Sync protocol |
-| `@suite/host` | `apps/sync/packages/host` | Sync host |
-| `@suite/go-app` | `apps/go` | Go container |
-| `@suite/go` | `apps/go/packages/go` | Go module contract |
-| `@suite/desk` | `apps/desk` | Desktop host |
+| `@suite/canvas` | `legacy/canvas` | Canvas renderer |
+| `@suite/canvas-pack` | `packs/canvas` | Canvas pack build |
+| `@suite/canvas-desktop` | `legacy/canvas/desktop` | Canvas Electron shell |
+| `@suite/graph` | `legacy/canvas/packages/graph` | Canvas schema and document layer |
+| `@suite/import-obsidian` | `legacy/canvas/packages/import-obsidian` | Canvas import |
+| `@suite/planner` | `legacy/planner` | Planner |
+| `@suite/planner-pack` | `packs/planner` | Planner pack build |
+| `@suite/planner-core` | `legacy/planner/packages/core` | Planner schema and document layer |
+| `@suite/budget` | `legacy/budget` | Budget |
+| `@suite/budget-pack` | `packs/budget` | Budget pack build |
+| `@suite/budget-core` | `legacy/budget/packages/core` | Budget schema and document layer |
+| `@suite/help` | `legacy/help` | Documentation app: explorer and handbook |
+| `@suite/help-pack` | `packs/help` | Help pack build |
+| `@suite/sync-server` | `services/relay` | Sync server |
+| `@suite/sync-app` | `services/relay/app` | The retired relay app the last `run.suite.sync` build packaged |
+| `@suite/sync` | `services/relay/packages/protocol` | Sync protocol |
+| `@suite/host` | `services/relay/packages/host` | Sync host |
+| `@suite/go-app` | `hosts/go` | Go container |
+| `@suite/go` | `hosts/go/packages/go` | Go module contract |
+| `@suite/desk` | `hosts/desk` | Desktop host |
 | `@suite/contracts` | `packages/contracts` | Shared app and deployment contracts |
 | `@suite/files` | `packages/files` | Shared file envelopes |
 | `@suite/document-runtime` | `packages/document-runtime` | Shared document replica and atomic store |
@@ -60,7 +74,7 @@ owns the overrides, patches and build permissions the apps need.
 
 ## App-private and shared
 
-An app's private packages stay with it: `apps/canvas/packages/graph` is Canvas's, even though it is a
+An app's private packages stay with it: `legacy/canvas/packages/graph` is Canvas's, even though it is a
 workspace package. Only `@suite/contracts`, `@suite/files`, `@suite/document-runtime`,
 `@suite/screens`, `@suite/desktop`, `@suite/theme`, `@suite/ui`, `@suite/pack`,
 `@suite/pack-runtime` and `@suite/pack-host` are shared; they live at the root.

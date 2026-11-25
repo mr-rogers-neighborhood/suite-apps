@@ -63,7 +63,7 @@ and a server a person runs on a device they control. It never defines an app sch
 ## The desktop superapp boundary
 
 Desktop Suite is the host plus signed packs, with the frozen Flatpaks still shipped beside them. It is
-not one application that mounts domain code. [`apps/desk`](../../apps/desk/README.md) is one
+not one application that mounts domain code. [`hosts/desk`](../../hosts/desk/README.md) is one
 Electron app with a `WebContentsView` per pack, each in its own custom-protocol origin and session
 partition, rendering a signed pack instead of launching a separate process. It owns the catalogue,
 Home and the Screens manager; Flatpak owns the host's own deployment and the frozen apps' deployments.
@@ -113,8 +113,8 @@ target: the MiniApp Packaging specification is
 it. The [Suite superapp specification](../spec/superapp.md) is the target for the host and pack
 contract; [The mini-app model](mini-app-model.md) owns the comparison.
 
-The two host seams are named rather than implied: [the host's decisions](../../apps/desk/docs/reference/decisions.md)
-state the pack boundary, and [the sync capability](../../apps/sync/docs/reference/sync-capability.md)
+The two host seams are named rather than implied: [the host's decisions](../../hosts/desk/docs/reference/decisions.md)
+state the pack boundary, and [the sync capability](../../services/relay/docs/reference/sync-capability.md)
 states the sealed-frame contract.
 
 ## Shared packages

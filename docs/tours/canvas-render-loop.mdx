@@ -12,38 +12,38 @@ editor bound to one container. The question at every stop is who owns the value
 being looked at: document truth, a derived snapshot, React Flow's transient state,
 or UI state that a reload may forget.
 
-## apps/canvas/src/App.tsx#App
+## legacy/canvas/src/App.tsx#App
 
 A session with a workspace renders the canvas and a session without one renders the
 launcher. The stop is where "which document" is settled, before any board exists;
 nothing below it chooses a document or reads a file.
 
-## apps/canvas/src/store/useCanvasStore.ts#useCanvasStore
+## legacy/canvas/src/store/useCanvasStore.ts#useCanvasStore
 
 The store holds the live document and the adapter that persists it, not a copy of
 its records. Everything the board paints is read through this document, which is why
 the stop comes before any projection.
 
-## apps/canvas/src/store/workspaceSnapshotStore.ts#WorkspaceSnapshotStore
+## legacy/canvas/src/store/workspaceSnapshotStore.ts#WorkspaceSnapshotStore
 
 The first derived layer. One observer applies a document change to the previous
 snapshot and keeps array identity for the sections that did not move, so a card can
 re-render without rebuilding the whole board.
 
-## apps/canvas/src/canvas/board/BoardView.tsx#BoardView
+## legacy/canvas/src/canvas/board/BoardView.tsx#BoardView
 
 The board wires its hooks in the one order that works: projection, refs, links,
 camera, sections, nodes, selection, commands, keyboard, menu. Each hook reads what
 the one before it produced, so this is the place to see the board as a pipeline
 rather than a component tree.
 
-## apps/canvas/src/canvas/board/useBoardProjection.ts#useBoardProjection
+## legacy/canvas/src/canvas/board/useBoardProjection.ts#useBoardProjection
 
 Here the workspace becomes this board: placements keyed by card, paint order,
 sections, portals and the scene a link endpoint resolves against. It is a pure
 derivation, and the empty board is a real answer rather than an error.
 
-## apps/canvas/src/canvas/board/useBoardNodes.ts#useBoardNodes
+## legacy/canvas/src/canvas/board/useBoardNodes.ts#useBoardNodes
 
 A placement becomes a React Flow node, typed `whiteboard`, `portal` or `note`. This
 is the seam where a document position and a dragged position are both true at once;
@@ -56,19 +56,19 @@ still holds the old one. The pointer sample moves an easing target, and the drop
 writes once. A peer's position is eased toward the broadcast value instead, so a
 remote gesture never turns into a local save.
 
-## apps/canvas/src/canvas/board/BoardSurface.tsx#BoardSurface
+## legacy/canvas/src/canvas/board/BoardSurface.tsx#BoardSurface
 
 React Flow paints the nodes and owns the gesture. It unmounts cards outside the
 viewport but keeps their measured bounds, and it cannot delete a card itself: every
 key is read above it, so the surface never writes behind the document.
 
-## apps/canvas/src/canvas/board/useBoardCamera.ts#useBoardCamera
+## legacy/canvas/src/canvas/board/useBoardCamera.ts#useBoardCamera
 
 The viewport is UI state, one per board, written when a move ends and once when a
 board opens. A return to a board lands where the reader left, and two readers on one
 board can look at different corners without disagreeing about the document.
 
-## apps/canvas/src/store/useUiStore.ts#useUiStore
+## legacy/canvas/src/store/useUiStore.ts#useUiStore
 
 Selection, panels, folding, the camera and the marquee flags live here because a
 reload may forget them. A field a second device should see belongs in the graph
@@ -79,25 +79,25 @@ instead; this store is the boundary where that choice is made.
 Everything so far is a reading. The next four stops are where a press becomes a
 write, and each one narrows the caret to a single container.
 
-## apps/canvas/src/cards/NodeCard.tsx#NodeCard
+## legacy/canvas/src/cards/NodeCard.tsx#NodeCard
 
 The card chooses a face: a view, a book, the static face, or the body editor on the
 one surface that owns the edit. A card mounted twice still has one editor, which is
 the rule this stop exists to show.
 
-## apps/canvas/src/cards/CardBodyEditor.tsx#CardBodyEditor
+## legacy/canvas/src/cards/CardBodyEditor.tsx#CardBodyEditor
 
 The body editor binds one Tiptap editor to one Loro container. A read-only mount
 still draws mentions and media; it just never focuses or advertises a placeholder,
 so the same component serves a canvas, an inspector and a share.
 
-## apps/canvas/src/editor/LoroCollaboration.ts#LoroCollaboration
+## legacy/canvas/src/editor/LoroCollaboration.ts#LoroCollaboration
 
 Three plugins and no schema: sync, undo and cursors. Each editor binds one
 container, so the title and the body have separate undo stacks and a keystroke never
 reaches into another card's text.
 
-## apps/canvas/src/cards/PropertyField.tsx#FieldValueInput
+## legacy/canvas/src/cards/PropertyField.tsx#FieldValueInput
 
 The other half of the loop. A field control keeps a local draft and commits one
 value on blur; it never writes per keystroke, and a value it cannot parse is

@@ -1,5 +1,5 @@
 ---
-module: apps/sync
+module: services/relay
 title: Sync Server
 summary: "The suite-sync CLI: a thin command surface over the host, with a loopback default and pinned TLS when it faces a network."
 ---
@@ -17,7 +17,7 @@ SHA-256 fingerprint. `serve` also refuses to start without `--trust-all`, becaus
 device registry to check a frame signature against; the flag is the explicit acknowledgement of that
 gap, not a production setting.
 
-## apps/sync/src/cli.ts#runCli
+## services/relay/src/cli.ts#runCli
 
 The command parser reads the store path, the bind address, the port, the certificate pair and the two
 development flags. `serve` fails when `--trust-all` is absent, so a mailbox that would admit anything

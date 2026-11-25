@@ -25,16 +25,16 @@ The limits are deliberate and recorded, not marketing gaps:
 
 - **Sync is per app.** The protocol and server exist, and Canvas and Planner clients can converge
   through them; a second device joins with a single-use invitation the owner mints in the Sync dialog.
-  Budget still opens one file on one machine. [Planner's Sync](../../apps/planner/docs/reference/sync.md)
+  Budget still opens one file on one machine. [Planner's Sync](../../legacy/planner/docs/reference/sync.md)
   owns the Planner detail; [Status](../reference/status.md) has the per-subsystem picture.
 - **No silent data wake.** A push may signal a notification or a wake hint, and an opt-in background
   refresh may pull frames; correctness never depends on it. See
   [the superapp spec](../spec/superapp.md#7-sync-sharing-and-cloud-peers) and
-  `apps/go/docs/reference/decisions.md`.
+  `hosts/go/docs/reference/decisions.md`.
 - **The sync relay is not the shipped security model.** It stores sealed frames it cannot read and,
   off loopback, serves TLS with a self-signed certificate the app pins; it still binds to loopback by
   default and sees the metadata the threat model accepts.
-  See `apps/sync/docs/reference/decisions.md`.
+  See `services/relay/docs/reference/decisions.md`.
 - **Files rely on disk encryption.** A `.canvas`, `.planner` or `.budget` file is readable by anyone
   who has it. The apps do not add a passphrase.
 - **Longevity is a property of the format, not a promise about future versions.** Each file carries a

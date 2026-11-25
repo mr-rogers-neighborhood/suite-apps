@@ -23,8 +23,8 @@ export const SUITE_PUBLISHER_ID = "suite";
  * An index carries its own signatures, so the key that verifies them cannot come from the index:
  * a signature checked against a key the response supplied proves only that the response is
  * self-consistent. This key is compiled into both hosts, which import it from here instead of
- * keeping a copy, and a caller cannot replace it. `apps/desk/src/indexTrust.ts` and
- * `apps/go/src/host/catalogue.ts` each pass it to `verifyPackIndex`; neither holds a second value.
+ * keeping a copy, and a caller cannot replace it. `hosts/desk/src/indexTrust.ts` and
+ * `hosts/go/src/host/catalogue.ts` each pass it to `verifyPackIndex`; neither holds a second value.
  *
  * It is a *host* trust root, not the publisher's signing key. The release tooling signs with
  * `SUITE_INDEX_KEY` from the release environment; `SUITE_INDEX_KEY_FINGERPRINT` is the separate

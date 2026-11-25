@@ -1,7 +1,7 @@
 # Glossary
 
 The words this repository uses in more than one app. Each app's own glossary has the terms that
-belong to it; Canvas's is [here](../../apps/canvas/docs/reference/glossary.md).
+belong to it; Canvas's is [here](../../legacy/canvas/docs/reference/glossary.md).
 
 | Term | Means |
 | --- | --- |

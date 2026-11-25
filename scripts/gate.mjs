@@ -33,6 +33,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, delimiter, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pruneGateExports } from "./lib/gateExports.mjs";
+import { discoverScriptTests } from "./lib/gateTests.mjs";
 import { PIPELINE } from "./lib/pipeline.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -175,7 +176,11 @@ const build = dry
           "--filter",
           "./packages/*",
           "--filter",
-          "./apps/*/packages/*",
+          "./hosts/*/packages/*",
+          "--filter",
+          "./legacy/*/packages/*",
+          "--filter",
+          "./services/*/packages/*",
           "--workspace-concurrency=2",
           "run",
           "build",
@@ -188,7 +193,7 @@ const build = dry
 if (!json) process.stdout.write(`${build.ok ? "ok  " : "FAIL"}  libraries  ${build.detail}\n`);
 
 if (!build.ok) {
-  results.push({ repo: "libraries", package: "apps/*/packages/*", ok: false, detail: build.detail });
+  results.push({ repo: "libraries", package: "app packages", ok: false, detail: build.detail });
 }
 
 // The pack build scripts are not inside a workspace package, so no app's
@@ -197,43 +202,19 @@ if (!build.ok) {
 // round-trip uses an ephemeral key and verifies against its own public half, so
 // a clean checkout with no owner signing key still proves the signed path. The
 // pack shape check runs in the same row, so a pack that drifts fails CI here.
+// The test set is discovered, not listed: the directory is the owner.
 const scripts =
   dry || !build.ok
     ? { ok: build.ok, detail: build.ok ? "dry run" : "not run: libraries failed" }
     : (() => {
         if (!json) process.stdout.write("\n▶ scripts\n");
-        const tests = run(
-          "node",
-          [
-            "--test",
-            "scripts/pack.test.mjs",
-            "scripts/pack-index.test.mjs",
-            "scripts/budget-pack.test.mjs",
-            "scripts/planner-pack.test.mjs",
-            "scripts/canvas-pack.test.mjs",
-            "scripts/help-pack.test.mjs",
-            "scripts/pack-card.test.mjs",
-            "scripts/pack-shape.test.mjs",
-            "scripts/affected.test.mjs",
-            "scripts/proof-of-changes.test.mjs",
-            "scripts/release-manifest.test.mjs",
-            "scripts/channel.test.mjs",
-            "scripts/desk-channel.test.mjs",
-            "scripts/android-release.test.mjs",
-            "scripts/release-status.test.mjs",
-            "scripts/release-index.test.mjs",
-            "scripts/delivery-signals.test.mjs",
-            "scripts/flatpak-remote.test.mjs",
-            "scripts/spec.test.mjs",
-          ],
-          workdir,
-        );
+        const tests = run("node", ["--test", ...discoverScriptTests(workdir)], workdir);
         const shape = run("node", ["scripts/pack-shape.mjs"], workdir);
         const ok = tests.status === 0 && shape.status === 0;
         return {
           ok,
           detail: ok
-            ? "pack shape, pack, channel, affected, release and spec tests"
+            ? "pack shape, pack, channel, affected, release, spec and gate tests"
             : `tests exit ${tests.status}, pack shape exit ${shape.status}`,
         };
       })();
@@ -249,36 +230,8 @@ if (!scripts.ok) {
   });
 }
 
-// The prelude's tests live with Budget's app, which owns the Vitest version. They
-// need no signing key; the signed round-trip above is the key-bearing path, and
-// this is the bridge's list/create/commit/export/import behaviour.
-const packTests =
-  dry || !build.ok || !scripts.ok
-    ? { ok: build.ok && scripts.ok, detail: dry ? "dry run" : "not run: earlier step failed" }
-    : (() => {
-        if (!json) process.stdout.write("\n▶ budget pack\n");
-        const result = run("pnpm", ["--dir", "apps/budget", "run", "test:pack"], workdir);
-        return {
-          ok: result.status === 0,
-          detail: result.status === 0 ? "prelude tests" : `exit ${result.status}`,
-        };
-      })();
-
-if (!json) {
-  process.stdout.write(`${packTests.ok ? "ok  " : "FAIL"}  budget pack  ${packTests.detail}\n`);
-}
-
-if (!packTests.ok) {
-  results.push({
-    repo: "budget pack",
-    package: "apps/budget (test:pack)",
-    ok: false,
-    detail: packTests.detail,
-  });
-}
-
-for (const entry of build.ok && scripts.ok && packTests.ok ? selected : []) {
-  const repoDir = join(workdir, "apps", entry.repo);
+for (const entry of build.ok && scripts.ok ? selected : []) {
+  const repoDir = join(workdir, entry.dir);
   if (!existsSync(join(repoDir, "package.json"))) {
     results.push({ ...entry, ok: false, detail: "missing repo" });
     break;
@@ -290,9 +243,19 @@ for (const entry of build.ok && scripts.ok && packTests.ok ? selected : []) {
     continue;
   }
 
-  const result = run("pnpm", ["--filter", entry.package, "run", "check:full"], workdir);
-  const ok = result.status === 0;
-  results.push({ ...entry, ok, detail: ok ? "passed" : `exit ${result.status}` });
+  // A frozen app's pack is its own workspace package, but it is the same gate
+  // row: run the shell first, then its pack, rather than adding a second row.
+  // They are sequential because Help's pack reads the generated handbook the
+  // shell writes, and pnpm would otherwise run both at once.
+  const packages = [entry.package, ...(entry.pack === undefined ? [] : [entry.pack])];
+  let status = 0;
+  for (const name of packages) {
+    const result = run("pnpm", ["--filter", name, "run", "check:full"], workdir);
+    status = result.status ?? 1;
+    if (status !== 0) break;
+  }
+  const ok = status === 0;
+  results.push({ ...entry, ok, detail: ok ? "passed" : `exit ${status}` });
   if (!ok) break;
 }
 
@@ -315,7 +278,7 @@ if (e2e && results.length > 0 && results.every((row) => row.ok)) {
     // notice above and `e2e: false` in the status carry the skip instead.
     if (skipDesktop) continue;
     if (!json) process.stdout.write(`\n▶ ${entry.repo} · e2e\n`);
-    const suite = runE2e(join(workdir, "apps", entry.repo), display);
+    const suite = runE2e(join(workdir, entry.dir), display);
     const ok = suite.status === 0;
     e2eRan = e2eRan || ok;
     results.push({

@@ -12,7 +12,7 @@
  *   ~/.config/suite/keys/pack-key       Ed25519, base64 PKCS#8, one line
  *   ~/.config/suite/keys/update-key.pem Ed25519, PKCS#8 PEM
  *
- * `SUITE_KEYS_DIR` moves the directory. The earlier home for the pack key was `apps/go/.dev/`,
+ * `SUITE_KEYS_DIR` moves the directory. The earlier home for the pack key was `hosts/go/.dev/`,
  * which is a scratch directory the build replaces, so a cleanup took the only copy with it. Nothing
  * durable belongs there, and `inspectKey` never looks there.
  *

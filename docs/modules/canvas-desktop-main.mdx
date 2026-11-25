@@ -1,5 +1,5 @@
 ---
-module: apps/canvas/desktop/src/main
+module: legacy/canvas/desktop/src/main
 title: Canvas Desktop / Main
 summary: "The Electron main process: one window, one document and the file authority behind both."
 ---
@@ -15,28 +15,28 @@ Every handler checks its sender, and no channel accepts a destination path from
 the page: the page says what to save, main decides where. Sync is wired in the
 same process, but it is opt-in per workspace and separate from the file path.
 
-## apps/canvas/desktop/src/main/index.ts#openDocument
+## legacy/canvas/desktop/src/main/index.ts#openDocument
 
 Every way to open a file ends here: the command line, the dialog, a recent, a
 link the hub routed. A refusal is shown over whatever the window already had, so
 losing the open cannot look like the file is gone. A success adopts the store and
 reloads the renderer before the new document is announced.
 
-## apps/canvas/desktop/src/main/index.ts#attachFile
+## legacy/canvas/desktop/src/main/index.ts#attachFile
 
 A file handed to a cold start is queued only when its extension is one this app
 opens. The gate is cheaper and narrower than the parser, which runs after the app
 is ready. A link is resolved against the library by `documentFromArgv` first, so a
 `suite://` argument is never treated as a path.
 
-## apps/canvas/desktop/src/main/index.ts#createWindow
+## legacy/canvas/desktop/src/main/index.ts#createWindow
 
 The window policy is part of the file guarantee: sandbox, `contextIsolation`, no
 Node in the renderer, and no navigation away from the bundle. The close handler
 flushes before destroying the window, so the debounce window is not lost on quit.
 Rendering starts hidden so a white frame never covers the document being opened.
 
-## apps/canvas/desktop/src/main/index.ts#registerIpc
+## legacy/canvas/desktop/src/main/index.ts#registerIpc
 
 This is the renderer's whole capability set. `loadDocument` hands over the open
 snapshot; `saveDocument` creates a file when none exists, so the first save is not
@@ -44,14 +44,14 @@ a separate renderer path; `openDocument` accepts only a path this process alread
 reported. Every handler is wrapped by `onIpc`, which refuses a sender that is not
 the page this shell loaded.
 
-## apps/canvas/desktop/src/main/store.ts#DocumentStore
+## legacy/canvas/desktop/src/main/store.ts#DocumentStore
 
 One open file and one writer. The class holds the lock, the last written size and
 mtime, the debounce timer and the pending attachment set together, so those
 cannot drift apart between open and save. It is constructed only through `open`
 and `create`, both of which refuse rather than return a half-open store.
 
-## apps/canvas/desktop/src/main/store.ts#DocumentStore.open
+## legacy/canvas/desktop/src/main/store.ts#DocumentStore.open
 
 The order is the guarantee: take the lock, parse the envelope, convert a legacy
 file, then try backups. A damaged file is never replaced by an empty one; when
@@ -59,7 +59,7 @@ neither it nor a backup parses, the open fails and the bytes are left exactly as
 they were. The tests name the failures: a second open, a converted file, a
 damaged file and recovery from a backup.
 
-## apps/canvas/desktop/src/main/store.ts#DocumentStore.save
+## legacy/canvas/desktop/src/main/store.ts#DocumentStore.save
 
 A save is queued, not performed. The newest snapshot replaces an earlier pending
 one because the snapshot is the whole state, so writing the intermediate ones
@@ -67,7 +67,7 @@ would be wasted work. A malformed request stops the store instead of writing a
 partial document, and that sticky failure is what the user is shown. The debounce
 lives here, so a menu Save and an autosave share one rule.
 
-## apps/canvas/desktop/src/main/store.ts#DocumentStore.write
+## legacy/canvas/desktop/src/main/store.ts#DocumentStore.write
 
 The mtime guard runs before the write. If the file changed since this session
 last wrote it, saving stops with `changed-on-disk` rather than overwriting an
@@ -75,7 +75,7 @@ outside edit from a sync client, an editor or a restore. The envelope is
 assembled through the graph's builder and written atomically, so a crash leaves
 the previous version instead of a truncated file.
 
-## apps/canvas/desktop/src/main/lock.ts#acquireLock
+## legacy/canvas/desktop/src/main/lock.ts#acquireLock
 
 Two processes writing one file lose the loser's work with no error anywhere, so
 the second is refused rather than warned. A lock from this machine goes stale

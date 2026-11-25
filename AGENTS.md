@@ -5,13 +5,13 @@ each app:
 
 | Before editing | Read | Gate |
 | --- | --- | --- |
-| `apps/canvas` | `apps/canvas/AGENTS.md` | `node scripts/gate.mjs --only canvas` |
-| `apps/planner` | `apps/planner/AGENTS.md` | `node scripts/gate.mjs --only planner` |
-| `apps/budget` | `apps/budget/AGENTS.md` | `node scripts/gate.mjs --only budget` |
-| `apps/go` | `apps/go/AGENTS.md` | `node scripts/gate.mjs --only go` |
-| `apps/sync` | `apps/sync/README.md` and `docs/` | `node scripts/gate.mjs --only sync` |
-| `apps/help` | `apps/help/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only help` |
-| `apps/desk` | `apps/desk/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only desk` |
+| `legacy/canvas` | `legacy/canvas/AGENTS.md` | `node scripts/gate.mjs --only canvas` |
+| `legacy/planner` | `legacy/planner/AGENTS.md` | `node scripts/gate.mjs --only planner` |
+| `legacy/budget` | `legacy/budget/AGENTS.md` | `node scripts/gate.mjs --only budget` |
+| `hosts/go` | `hosts/go/AGENTS.md` | `node scripts/gate.mjs --only go` |
+| `services/relay` | `services/relay/README.md` and `docs/` | `node scripts/gate.mjs --only sync` |
+| `legacy/help` | `legacy/help/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only help` |
+| `hosts/desk` | `hosts/desk/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only desk` |
 
 The full gate is `node scripts/gate.mjs`; `--fresh` proves the commit rather
 than the working tree. Use `mise exec --` so the Node and pnpm versions pinned
@@ -90,7 +90,8 @@ These still hold, from the old workspace skill:
 ## Documentation
 
 - Cross-app docs live in `docs/`: module narratives in `docs/modules/`, tours in `docs/tours/`, and
-  the older pages as a notes archive. Each app keeps `apps/<app>/docs/` beside its code.
+  the older pages as a notes archive. Each app keeps its `docs/` beside its code
+  under `hosts/`, `legacy/` or `services/`.
 - One fact has one home. Fix the owning page and link from the rest. Never restate a version; link
   to `package.json` or the changelog.
 - Docs describe the tree as it is. The flattened layout is a proposal in

@@ -1,5 +1,5 @@
 ---
-module: apps/budget/src/main
+module: legacy/budget/src/main
 title: Budget main
 summary: "The library, the open budget, its backups and the no-overwrite recovery path."
 ---
@@ -20,7 +20,7 @@ display name; the document inside the file supplies its own id and schema
 version. That separation is what lets an import choose a fresh id without
 rewriting the record it copied.
 
-## apps/budget/src/main/library.ts#openBudget
+## legacy/budget/src/main/library.ts#openBudget
 
 Opening is library lookup, then path safety, then load. The id must be one safe
 path component; an entry that names a file outside this channel's folder is
@@ -34,7 +34,7 @@ backup restore and then an older schema written over the newer document. When
 every candidate fails, the damaged file is copied aside and the open is refused
 rather than replaced with an empty budget.
 
-## apps/budget/src/main/recovery.ts#recoverFile
+## legacy/budget/src/main/recovery.ts#recoverFile
 
 Recovery copies, it does not repair. The damaged file is copied into
 `recovered/<timestamp>-<id>/` and this function returns that folder; the caller

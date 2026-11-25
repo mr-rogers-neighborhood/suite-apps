@@ -213,7 +213,7 @@ card has no badge: stable is the default and the baseline the others are compare
 - [Status](../reference/status.md) for what the tree ships today and which apps are frozen.
 - [Mini-app model](mini-app-model.md) for packs and the signed version a mini-app carries instead of
   a channel.
-- [Budget's beta bar](../../apps/budget/docs/reference/beta-bar.md) for a boundary written as checks,
+- [Budget's beta bar](../../legacy/budget/docs/reference/beta-bar.md) for a boundary written as checks,
   with the evidence and the boxes a person still has to tick. It stays with the frozen app as the bar
   a future pack has to clear.
 - [Architecture](architecture.md) for why the desktop superapp is separate from the legacy apps.

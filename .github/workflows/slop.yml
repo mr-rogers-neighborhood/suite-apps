@@ -22,7 +22,10 @@ on:
     branches: [main]
     # Code only: a docs-only push has no build to publish.
     paths:
-      - "apps/**"
+      - "hosts/**"
+      - "legacy/**"
+      - "packs/**"
+      - "services/**"
       - "packages/**"
       - "scripts/**"
       - "packaging/**"
@@ -244,7 +247,7 @@ jobs:
           SUITE_GO_KEY_PASSWORD: ${{ secrets.SUITE_GO_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          apk="$(find apps/go/.dev/release -maxdepth 1 \
+          apk="$(find hosts/go/.dev/release -maxdepth 1 \
             -name "suite-go-slop-*-${REVISION}.apk" -print -quit)"
           if [ -z "${apk}" ]; then
             echo "the APK build named no suite-go-slop-*-${REVISION}.apk" >&2

@@ -1,5 +1,5 @@
 ---
-module: apps/go/src/shell
+module: hosts/go/src/shell
 title: Go Shell
 summary: "The container: routes, mounts, frames and the one teardown path."
 ---
@@ -15,7 +15,7 @@ There is no branch on a domain id in this module. A pack becomes a module
 through `packAsModule`, which uses only its id, name and entry URL. A change
 that needs a domain name belongs in that domain's pack.
 
-## apps/go/src/shell/mount.ts#mountModule
+## hosts/go/src/shell/mount.ts#mountModule
 
 Mounting has three failure stages and one cleanup. `register` can throw before a
 view exists; `install` can throw after the registration exists, in which case
@@ -25,7 +25,7 @@ unmounts and remounts in development. The returned cleanup is idempotent and
 runs the install cleanup before `dispose`, so leaving by any route settles to
 one teardown.
 
-## apps/go/src/shell/frameBridge.ts#serveFrame
+## hosts/go/src/shell/frameBridge.ts#serveFrame
 
 One listener, one switch, one reply per envelope. The capability for a request
 is checked when the request arrives, not when the pack was installed, because
@@ -37,7 +37,7 @@ A method this shell does not know answers an honest failure instead of
 `undefined`. The switch is exhaustive over `FrameRequest`, so a new request
 method is a compile error here rather than a domain failure on a device.
 
-## apps/go/src/shell/IsolatedModule.tsx#IsolatedModule
+## hosts/go/src/shell/IsolatedModule.tsx#IsolatedModule
 
 An isolated pack gets its own document, its own JavaScript realm and its own
 heap. That is what keeps a pack's Tailwind preflight out of the launcher, keeps

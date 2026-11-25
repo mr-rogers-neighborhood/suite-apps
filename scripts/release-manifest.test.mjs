@@ -126,7 +126,7 @@ describe("release manifest", () => {
 });
 
 describe("APK channel identity", () => {
-  const config = JSON.parse(readFileSync(join(ROOT, "apps/go/app.config.json"), "utf8"));
+  const config = JSON.parse(readFileSync(join(ROOT, "hosts/go/app.config.json"), "utf8"));
 
   it("records the stable version name and the base with digit 0", () => {
     const identity = apkIdentityFor(config, "stable");

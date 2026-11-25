@@ -1,8 +1,8 @@
 # Install, update and remove apps
 
-Suite Desk is the desktop host and the way in. [Install the host](../../apps/desk/README.md#install-as-a-flatpak)
+Suite Desk is the desktop host and the way in. [Install the host](../../hosts/desk/README.md#install-as-a-flatpak)
 once, then install, update, remove and reinstall packs from its catalogue. A `.suitepack` file still
-installs on its own. [The host's README](../../apps/desk/README.md#installing-updating-and-removing-a-pack)
+installs on its own. [The host's README](../../hosts/desk/README.md#installing-updating-and-removing-a-pack)
 owns that lifecycle, and neither the host nor an app edits a document.
 
 The frozen Canvas, Planner, Budget and Help Flatpaks keep the one `flatpak install` line the release
@@ -49,11 +49,11 @@ runs it, a person runs the headless CLI from a checkout or from the last `run.su
 signed remote keeps. There is no new build and no tray app:
 
 ```sh
-node apps/sync/dist/cli.js serve --host 127.0.0.1 --port 8787 --trust-all
+node services/relay/dist/cli.js serve --host 127.0.0.1 --port 8787 --trust-all
 ```
 
 The relay remains a separate trust boundary: it stores sealed frames, never a document.
-[Leave a relay running](../../apps/sync/docs/how-to/relay.md) owns the operation guide.
+[Leave a relay running](../../services/relay/docs/how-to/relay.md) owns the operation guide.
 
 ## What happened to Suite Start
 

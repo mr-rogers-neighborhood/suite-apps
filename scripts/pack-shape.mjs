@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Enforce the packed-app shape in `apps/<app>/pack/`.
+ * Enforce the packed-app shape in `packs/<app>/pack/`.
  *
  * The convention lives in docs/spec/repo-structure.md R2.2 and the authoring
  * reference it links. This script is the enforcement: it runs in the gate's
@@ -46,7 +46,7 @@ export const REQUIRED = [
 ];
 
 /**
- * A pack test. The gate runs the app's `test:pack` script, and CI is where a
+ * A pack test. The gate runs the pack package's `test` script, and CI is where a
  * pack's tests become proof, so a pack with none fails here.
  */
 export const PACK_TEST = /\.test\.[cm]?[jt]sx?$/u;
@@ -260,39 +260,48 @@ export function checkPackShape({
   root = ROOT,
   schemaPath = join(root, "docs", "spec", "manifest.schema.json"),
 } = {}) {
-  const appsDir = join(root, "apps");
+  const packsDir = join(root, "packs");
   const schema = readJson(schemaPath);
   const packs = [];
   const skipped = [];
   const problems = [];
 
-  for (const entry of readdirSync(appsDir, { withFileTypes: true })) {
+  for (const entry of readdirSync(packsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const appDir = join(appsDir, entry.name);
-    const appManifest = join(appDir, "package.json");
-    if (!isFile(appManifest)) continue;
-
-    const app = readJson(appManifest);
-    const declared = app?.suite?.pack === true;
-    const packDir = join(appDir, "pack");
-
-    if (!declared) {
-      if (isDirectory(packDir)) {
-        skipped.push({
-          app: entry.name,
-          dir: relative(root, packDir),
-          reason: `not declared packable; add "suite": { "pack": true } to its package.json when it becomes a pack`,
-        });
-      }
+    const app = entry.name;
+    const packDir = join(packsDir, app, "pack");
+    // The pack package declares itself. The legacy shell still owns the app
+    // version the source manifest must match; the pack package owns the build.
+    const packManifest = join(packsDir, app, "package.json");
+    if (!isFile(packManifest)) {
+      problems.push(`${relative(root, packManifest)}: pack source has no pack package.json`);
       continue;
     }
+    const pkg = readJson(packManifest);
+    const declared = pkg?.suite?.pack === true;
+
+    if (!declared) {
+      skipped.push({
+        app,
+        dir: relative(root, packDir),
+        reason: `not declared packable; add "suite": { "pack": true } to its package.json when it becomes a pack`,
+      });
+      continue;
+    }
+
+    const appManifest = join(root, "legacy", app, "package.json");
+    if (!isFile(appManifest)) {
+      problems.push(`${relative(root, appManifest)}: pack has no legacy app package.json`);
+      continue;
+    }
+    const appVersion = readJson(appManifest).version;
 
     if (!isDirectory(packDir)) {
       problems.push(`${relative(root, packDir)}: declared packable but has no pack directory`);
       continue;
     }
 
-    packs.push({ app: entry.name, dir: relative(root, packDir) });
+    packs.push({ app, dir: relative(root, packDir) });
 
     for (const required of REQUIRED) {
       const path = join(packDir, required.path);
@@ -306,7 +315,7 @@ export function checkPackShape({
 
     if (walkPack(packDir, problems) === 0) {
       problems.push(
-        `${relative(root, packDir)}: no pack test; add at least one *.test.* and wire it into the app's test:pack script`,
+        `${relative(root, packDir)}: no pack test; add at least one *.test.* and wire it into the pack package's test script`,
       );
     }
 
@@ -314,9 +323,9 @@ export function checkPackShape({
     if (!isFile(manifestPath)) continue;
     const manifest = readJson(manifestPath);
 
-    if (manifest.version !== app.version) {
+    if (manifest.version !== appVersion) {
       problems.push(
-        `${relative(root, manifestPath)}: version ${JSON.stringify(manifest.version)} does not match the app version ${JSON.stringify(app.version)}`,
+        `${relative(root, manifestPath)}: version ${JSON.stringify(manifest.version)} does not match the app version ${JSON.stringify(appVersion)}`,
       );
     }
 

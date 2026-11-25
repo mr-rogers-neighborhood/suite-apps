@@ -22,7 +22,7 @@
 # The iOS simulator job is parked (2026-11-24) while mobile runs locally on an
 # Android emulator. It runs only when the repository variable SUITE_IOS_BUILD is
 # `true`, so restoring it is one variable, not an edit. When it runs it builds
-# the committed Capacitor project in apps/go/ios with Swift Package Manager, for
+# the committed Capacitor project in hosts/go/ios with Swift Package Manager, for
 # the simulator only: no signing identity, because a simulator app is unsigned
 # by design, and no device build until Apple signing and notarization exist.
 name: platforms
@@ -66,7 +66,7 @@ jobs:
         run: pnpm --filter @suite/desk build:all
       # Unsigned zip, per platforms.md section 4: no NSIS installer, no
       # Authenticode, no auto-update. `directories.output` is `release`, so the
-      # artifact lands in apps/desk/release.
+      # artifact lands in hosts/desk/release.
       - name: Package the unsigned Windows zip
         run: pnpm --filter @suite/desk exec electron-builder --win zip --publish never
       # P5.1: start the packaged .exe, prove it is still running after ten
@@ -76,7 +76,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $zip = Get-ChildItem "apps/desk/release" -Filter *.zip | Select-Object -First 1
+          $zip = Get-ChildItem "hosts/desk/release" -Filter *.zip | Select-Object -First 1
           if (-not $zip) { throw "no zip was packaged" }
           $dest = Join-Path $env:RUNNER_TEMP "smoke"
           if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
@@ -96,7 +96,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $dir = "apps/desk/release"
+          $dir = "hosts/desk/release"
           $lines = Get-ChildItem $dir -Filter *.zip | Sort-Object Name | ForEach-Object {
             "$((Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           }
@@ -127,20 +127,20 @@ jobs:
       - name: Attest provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: apps/desk/release/*.zip
+          subject-path: hosts/desk/release/*.zip
       - name: Attest the SBOM
         uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           sbom-path: suite-desk-windows-x64.spdx.json
-          subject-path: apps/desk/release/*.zip
+          subject-path: hosts/desk/release/*.zip
       - name: Upload the test artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: suite-desk-windows-x64-unsigned
           path: |
-            apps/desk/release/*.zip
-            apps/desk/release/SHA256SUMS
-            apps/desk/release/README.txt
+            hosts/desk/release/*.zip
+            hosts/desk/release/SHA256SUMS
+            hosts/desk/release/README.txt
             suite-desk-windows-x64.spdx.json
           retention-days: 14
           if-no-files-found: error
@@ -184,7 +184,7 @@ jobs:
       - name: Launch smoke
         run: |
           set -euo pipefail
-          zip="$(find apps/desk/release -maxdepth 1 -name '*.zip' -print -quit)"
+          zip="$(find hosts/desk/release -maxdepth 1 -name '*.zip' -print -quit)"
           test -n "${zip}"
           dest="${RUNNER_TEMP}/smoke"
           rm -rf "${dest}"
@@ -221,7 +221,7 @@ jobs:
       - name: Checksums and README
         run: |
           set -euo pipefail
-          cd apps/desk/release
+          cd hosts/desk/release
           shasum -a 256 ./*.zip > SHA256SUMS
           cat > README.txt <<'EOF'
           Suite Desk - unsigned macOS test build
@@ -243,20 +243,20 @@ jobs:
       - name: Attest provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: apps/desk/release/*.zip
+          subject-path: hosts/desk/release/*.zip
       - name: Attest the SBOM
         uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           sbom-path: suite-desk-macos-arm64.spdx.json
-          subject-path: apps/desk/release/*.zip
+          subject-path: hosts/desk/release/*.zip
       - name: Upload the test artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: suite-desk-macos-arm64-unsigned
           path: |
-            apps/desk/release/*.zip
-            apps/desk/release/SHA256SUMS
-            apps/desk/release/README.txt
+            hosts/desk/release/*.zip
+            hosts/desk/release/SHA256SUMS
+            hosts/desk/release/README.txt
             suite-desk-macos-arm64.spdx.json
           retention-days: 14
           if-no-files-found: error
@@ -295,7 +295,7 @@ jobs:
       - name: Checksums and README
         run: |
           set -euo pipefail
-          cd apps/desk/release
+          cd hosts/desk/release
           shasum -a 256 ./*.zip > SHA256SUMS
           cat > README.txt <<'EOF'
           Suite Desk - unsigned macOS Intel test build
@@ -317,9 +317,9 @@ jobs:
         with:
           name: suite-desk-macos-intel-unsigned
           path: |
-            apps/desk/release/*.zip
-            apps/desk/release/SHA256SUMS
-            apps/desk/release/README.txt
+            hosts/desk/release/*.zip
+            hosts/desk/release/SHA256SUMS
+            hosts/desk/release/README.txt
           retention-days: 14
           if-no-files-found: error
       - name: Report the tier
@@ -361,7 +361,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $dir = "apps/desk/release"
+          $dir = "hosts/desk/release"
           $lines = Get-ChildItem $dir -Filter *.zip | Sort-Object Name | ForEach-Object {
             "$((Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           }
@@ -392,9 +392,9 @@ jobs:
         with:
           name: suite-desk-windows-arm64-unsigned
           path: |
-            apps/desk/release/*.zip
-            apps/desk/release/SHA256SUMS
-            apps/desk/release/README.txt
+            hosts/desk/release/*.zip
+            hosts/desk/release/SHA256SUMS
+            hosts/desk/release/README.txt
           retention-days: 14
           if-no-files-found: error
       - name: Report the tier
@@ -468,7 +468,7 @@ jobs:
       - name: Name the unpacked directory the manifest expects
         run: |
           set -euo pipefail
-          release="apps/desk/release"
+          release="hosts/desk/release"
           unpacked="${release}/linux-unpacked"
           if [ ! -d "${unpacked}" ]; then
             arch_dir="$(find "${release}" -maxdepth 1 -type d -name 'linux-*-unpacked' -print -quit)"
@@ -582,7 +582,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       # Go imports @suite/pack, which resolves through its built dist.
       - name: Build the workspace libraries
-        run: pnpm --filter "./packages/*" --filter "./apps/*/packages/*" run build
+        run: pnpm --filter "./packages/*" --filter "./hosts/*/packages/*" --filter "./legacy/*/packages/*" run build
       - name: Build the web bundle
         run: pnpm --filter @suite/go-app build
       - name: Sync the iOS project
@@ -590,13 +590,13 @@ jobs:
       # Simulator only: no identity, no provisioning profile, no notarization.
       # The generated project uses Swift Package Manager, so there is no Podfile.
       - name: Build the simulator app
-        working-directory: apps/go/ios/App
+        working-directory: hosts/go/ios/App
         run: |
           xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
             -sdk iphonesimulator -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
       - name: Zip the simulator app
-        working-directory: apps/go/ios/App
+        working-directory: hosts/go/ios/App
         run: |
           set -euo pipefail
           app="build/Build/Products/Debug-iphonesimulator/App.app"

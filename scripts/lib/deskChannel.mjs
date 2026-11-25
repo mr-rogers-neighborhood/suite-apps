@@ -65,7 +65,7 @@ export function deskPreReleaseManifest(
     .replace(/^command:.*$/mu, `command: ${id}`)
     .replace(/^(\s*)- name: suite-desk$/mu, `$1- name: suite-desk-${channel}`)
     .replace(
-      /^(\s*)path: \.\.\/\.\.\/apps\/desk\/release\/linux-unpacked$/mu,
+      /^(\s*)path: \.\.\/\.\.\/hosts\/desk\/release\/linux-unpacked$/mu,
       `$1path: ${unpacked}`,
     )
     .replaceAll(stableId, id);

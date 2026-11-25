@@ -20,7 +20,7 @@
  *   plus the `suite-go.apk` alias. A pre-release is `suite-go-<channel>-<version>.apk` with no
  *   stable alias, so a pre-release download can never be mistaken for the stable one.
  *
- * `versionCode` is derived from the one number in `apps/go/app.config.json`:
+ * `versionCode` is derived from the one number in `hosts/go/app.config.json`:
  *
  *   versionCode = base × 10 + channel digit      stable 0, slop 1, nightly 2, preview 3
  *
@@ -28,7 +28,7 @@
  * its own sequence: a promotion is a new install rather than an update on a shared id, and a
  * release build reads the newest published manifest **for its own package id** and refuses a lower
  * code before Gradle runs (delivery.md D4.2). An equal code is a rebuild of the same app version.
- * The full rule is in `apps/go/docs/reference/android.md`.
+ * The full rule is in `hosts/go/docs/reference/android.md`.
  *
  * Usage:
  *   node scripts/android-release.mjs                    # stable, build and name the APK
@@ -67,7 +67,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { resolveJdk, resolveSdkRoot } from "../apps/go/scripts/preflight.mjs";
+import { resolveJdk, resolveSdkRoot } from "../hosts/go/scripts/preflight.mjs";
 import {
   ANDROID_KEYSTORE_ENV,
   ANDROID_RELEASE_CERT_SHA256,
@@ -89,7 +89,7 @@ import {
 } from "./release-status.mjs";
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-export const APP_DIR = join(ROOT, "apps", "go");
+export const APP_DIR = join(ROOT, "hosts", "go");
 export const ANDROID_DIR = join(APP_DIR, "android");
 
 /** Where the named, checksummed artifact waits. Ignored by git. */
@@ -103,7 +103,7 @@ export const GO_APK_ALIAS = "suite-go.apk";
  *
  * This table is the source the build verifies against: after Gradle runs, `aapt` reports the
  * package id and versionCode of the APK, and a mismatch is a refusal rather than a mislabelled
- * upload. `apps/go/android/app/build.gradle` declares the same ids and digits because Gradle needs
+ * upload. `hosts/go/android/app/build.gradle` declares the same ids and digits because Gradle needs
  * them at configuration time. Each id is distinct, so the versionCode check compares a channel's
  * code only with the codes already published for that same package id.
  */
@@ -392,7 +392,7 @@ export function versionCodeVerdict({ channel, packageId, versionCode, manifests 
       message:
         `refusing the ${channel} build: versionCode ${versionCode} is lower than ${highest}, ` +
         `the highest code already published for ${packageId}.\n` +
-        "A lower code never ships. Raise versionCode in apps/go/app.config.json until the new " +
+        "A lower code never ships. Raise versionCode in hosts/go/app.config.json until the new " +
         "code is at least the published one for this package id; an uninstall on one phone " +
         "cannot make the release sequence legal.",
     };
@@ -560,7 +560,7 @@ export function gradleApkPath(channel) {
 /**
  * The SDK and JDK Gradle needs, or the reasons they are missing.
  *
- * `apps/go/scripts/preflight.mjs` already owns these lookups, including the
+ * `hosts/go/scripts/preflight.mjs` already owns these lookups, including the
  * `SUITE_GO_JAVA_HOME` escape hatch and the unpacked JDK under `~/Android`.
  * Asking it here keeps a hand-run release and `pnpm android:install` on the
  * same toolchain, and a missing one becomes a sentence rather than a Gradle
@@ -595,7 +595,7 @@ export function resolveToolchain() {
 
   if (!existsSync(join(ANDROID_DIR, "gradlew"))) {
     problems.push(
-      "apps/go/android is missing: generate it once with " +
+      "hosts/go/android is missing: generate it once with " +
         "`pnpm --filter @suite/go-app exec cap add android`",
     );
   }
@@ -1260,7 +1260,7 @@ async function main(argv) {
   const packageVersion = JSON.parse(readFileSync(join(APP_DIR, "package.json"), "utf8")).version;
   if (packageVersion !== config.version) {
     throw new Error(
-      `apps/go/package.json says ${packageVersion} but app.config.json says ${config.version}. ` +
+      `hosts/go/package.json says ${packageVersion} but app.config.json says ${config.version}. ` +
         "The APK name follows app.config.json, so the two have to agree before a release.",
     );
   }

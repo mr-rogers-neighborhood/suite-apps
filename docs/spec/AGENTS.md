@@ -32,7 +32,7 @@ match the code, and do not mark a clause implemented without a test or a named g
 
 ## Do not load for a spec task
 
-`.generated/`, `apps/help/public/data`, changelogs, every app's full docs, or the whole help index.
+`.generated/`, `legacy/help/public/data`, changelogs, every app's full docs, or the whole help index.
 Load the clause and the owning file.
 
 ## Checks

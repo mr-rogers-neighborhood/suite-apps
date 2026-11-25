@@ -9,27 +9,27 @@
   "apps": [
     {
       "id": "canvas",
-      "path": "apps/canvas",
-      "manifest": "apps/canvas/package.json",
-      "slop_build_path": "apps/canvas/slop"
+      "path": "legacy/canvas",
+      "manifest": "legacy/canvas/package.json",
+      "slop_build_path": "legacy/canvas/slop"
     },
     {
       "id": "planner",
-      "path": "apps/planner",
-      "manifest": "apps/planner/package.json",
-      "slop_build_path": "apps/planner/slop"
+      "path": "legacy/planner",
+      "manifest": "legacy/planner/package.json",
+      "slop_build_path": "legacy/planner/slop"
     },
     {
       "id": "budget",
-      "path": "apps/budget",
-      "manifest": "apps/budget/package.json",
-      "slop_build_path": "apps/budget/slop"
+      "path": "legacy/budget",
+      "manifest": "legacy/budget/package.json",
+      "slop_build_path": "legacy/budget/slop"
     },
     {
       "id": "help",
-      "path": "apps/help",
-      "manifest": "apps/help/package.json",
-      "slop_build_path": "apps/help/slop"
+      "path": "legacy/help",
+      "manifest": "legacy/help/package.json",
+      "slop_build_path": "legacy/help/slop"
     }
   ],
   "toolchain": [

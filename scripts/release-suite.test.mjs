@@ -150,7 +150,7 @@ describe("the install commands", () => {
     assert.ok(lines.some((line) => line.includes("flatpak install --user suite run.suite.desk")));
     assert.ok(lines.includes("Suite Go (mobile):"));
     assert.ok(lines.some((line) => line.includes("flatpak run run.suite.desk")));
-    assert.ok(lines.some((line) => line.includes("adb install -r -t apps/go/.dev/release/suite-go-0.1.0.apk")));
-    assert.match(lines.at(-1), /apps\/go\/\.dev\/release\/suite-go\.apk/u);
+    assert.ok(lines.some((line) => line.includes("adb install -r -t hosts/go/.dev/release/suite-go-0.1.0.apk")));
+    assert.match(lines.at(-1), /hosts\/go\/\.dev\/release\/suite-go\.apk/u);
   });
 });

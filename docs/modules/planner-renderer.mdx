@@ -1,5 +1,5 @@
 ---
-module: apps/planner/src/renderer
+module: legacy/planner/src/renderer
 title: Planner renderer
 summary: "The replica, the UI store and the views that read a workspace snapshot."
 ---
@@ -20,7 +20,7 @@ snapshot store, so no component subscribes to the document directly. And the
 views registry is the one list of surfaces, so the shell and the compact view
 menu render the same entries.
 
-## apps/planner/src/renderer/src/store/snapshotStore.ts#DocumentReplica
+## legacy/planner/src/renderer/src/store/snapshotStore.ts#DocumentReplica
 
 This class is the renderer's replica and its only `observe` call site. A local
 update is forwarded to main, then the cached snapshot is rebuilt and listeners
@@ -33,7 +33,7 @@ before opening the new document, so an observer of the closed workspace cannot
 keep committing edits. `dispose` clears both the subscription and the listeners,
 which is the path a closed window takes.
 
-## apps/planner/src/renderer/src/task/TaskNotesEditor.tsx#TaskNotesEditor
+## legacy/planner/src/renderer/src/task/TaskNotesEditor.tsx#TaskNotesEditor
 
 The note editor is a Tiptap 3 view over the task's Loro map, not a controlled
 input. `LoroNoteSync` returns `LoroSyncPlugin` from `loro-prosemirror`, and each
@@ -49,7 +49,7 @@ that says changes save as you type, and Escape closes the dialog while it has
 focus. `plainTextToContent` seeds an old note as hard-broken lines; once the map
 exists, the plugin loads it and the seed is ignored.
 
-## apps/planner/src/renderer/src/app/Shell.tsx#Shell
+## legacy/planner/src/renderer/src/app/Shell.tsx#Shell
 
 The shell composes the shared menu bar with the active view. It reads the view
 id from the UI store, resolves the component from the views registry, and asks
@@ -61,7 +61,7 @@ entry in the registry and its component, not an edit here. The native menu is
 auto-hidden on Linux and Windows, so this in-app bar stays the visible menu
 rather than drawing a second copy beside it.
 
-## apps/planner/src/renderer/src/week/WeekView.tsx#WeekView
+## legacy/planner/src/renderer/src/week/WeekView.tsx#WeekView
 
 The week surface renders `weekPlan` as seven columns. Each column is a labelled
 region with its own capacity meter and task list; the header marks today and the

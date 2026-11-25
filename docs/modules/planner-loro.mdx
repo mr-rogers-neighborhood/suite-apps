@@ -1,5 +1,5 @@
 ---
-module: apps/planner/packages/core/src/loro
+module: legacy/planner/packages/core/src/loro
 title: Planner / Loro
 summary: "The typed, validated writer over one Loro document: roots, field-level writes and snapshots."
 ---
@@ -21,7 +21,7 @@ The root names are the storage contract: `tasks`, `projects`, `tags`, `events`,
 `days`, `focusSessions`, `settings`, `meta`, and `note:<taskId>` for a note. A new
 collection is a root and a domain file, not a field on an existing record.
 
-## apps/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument
+## legacy/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument
 
 The facade is the only writer. Its methods validate through Zod, write leaf keys
 rather than a whole record, and commit once per call; the class exposes no raw
@@ -34,7 +34,7 @@ initialises meta and settings before the first read. `workspace.test.ts` pins th
 field-level update, the snapshot round trip, both note containers and a
 two-replica merge.
 
-## apps/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.fromSnapshot
+## legacy/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.fromSnapshot
 
 Opening is where identity and schema are decided. A fresh peer id is assigned
 because reusing the id baked into the snapshot makes the first local edit collide
@@ -46,7 +46,7 @@ read a record through this build's schema.
 before it subscribed. Without it, an update stream would never carry the upgrade;
 the renderer uses it to adopt the snapshot.
 
-## apps/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.observe
+## legacy/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.observe
 
 The subscription reports local updates only. A local commit produces bytes, which
 the replica forwards to main; an update applied with `applyUpdate` does not echo
@@ -58,7 +58,7 @@ changed; the replica rebuilds a snapshot instead of applying a patch.
 Unsubscribing detaches the listener, which is what `DocumentReplica.replace` does
 before opening a new document.
 
-## apps/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.applyUpdate
+## legacy/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.applyUpdate
 
 `applyUpdate` imports a delta from outside this process: main's commit path, or a
 synced update. It does not validate or transform the bytes; Loro imports them, and
@@ -66,7 +66,7 @@ the next read parses each record through Zod. The trust boundary is therefore th
 caller. IPC parses the payload as a binary update, and sync carries the same delta
 a local edit produced.
 
-## apps/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.snapshot
+## legacy/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.snapshot
 
 A snapshot is a full document, not a delta. `snapshot()` commits pending
 operations first, then exports, which makes it the flush point for a file write
@@ -77,7 +77,7 @@ Confusing the two is the easy mistake. File encoding and adoption need bytes; th
 renderer and the projections need records. The names are close on purpose, but
 the return types are not interchangeable.
 
-## apps/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.validate
+## legacy/planner/packages/core/src/loro/WorkspaceDocument.ts#WorkspaceDocument.validate
 
 `validate` parses the whole read model and answers with a `Result` instead of
 throwing. It exists for the open path: a candidate file that decodes but contains
@@ -85,7 +85,7 @@ a malformed record is skipped in favour of the backup, and an explicit import is
 refused instead of replacing a working document. The error is the schema failure,
 not a new message, so the log says which record broke.
 
-## apps/planner/packages/core/src/loro/snapshot.ts#readWorkspaceSnapshot
+## legacy/planner/packages/core/src/loro/snapshot.ts#readWorkspaceSnapshot
 
 The read model is assembled by parsing every root: tasks, projects, tags, events,
 days, focus sessions, settings and meta. A missing record is not a special case; a
@@ -96,7 +96,7 @@ stale.
 The shape is plain data. Nothing in it holds a Loro container, which is why a
 component can receive it without the ability to write.
 
-## apps/planner/packages/core/src/loro/tasks.ts#createTask
+## legacy/planner/packages/core/src/loro/tasks.ts#createTask
 
 Creation supplies what a draft does not: an id, timestamps, a status and an
 order. A task with a date starts `planned` and one without starts `inbox`; the
@@ -108,7 +108,7 @@ The record is parsed before it is written, so an invalid estimate or date fails
 here rather than becoming a map with a bad key. The write sets every field of the
 new record in one commit.
 
-## apps/planner/packages/core/src/loro/tasks.ts#updateTask
+## legacy/planner/packages/core/src/loro/tasks.ts#updateTask
 
 An update merges the patch over the current record, parses the result, and writes
 only the keys that were present in the patch plus `updatedAt`. That is why two
@@ -120,7 +120,7 @@ A missing task throws `TaskNotFoundError`; an invalid merged record fails the
 schema before anything is written. `workspace.test.ts` pins the one-update commit
 and the two-replica merge.
 
-## apps/planner/packages/core/src/loro/notes.ts#getNote
+## legacy/planner/packages/core/src/loro/notes.ts#getNote
 
 A note is not a task field. It is a root keyed `note:<taskId>`, and the key can
 hold two container types at once: the rich note is a `LoroMap` tree written by the
@@ -132,7 +132,7 @@ words, one line per block; without a map it reads the text. The compatibility is
 one-way: an older build reads the text and never sees the rich note. The test
 keeps both roots in one snapshot and proves the map wins.
 
-## apps/planner/packages/core/src/loro/meta.ts#ensureCurrentSchema
+## legacy/planner/packages/core/src/loro/meta.ts#ensureCurrentSchema
 
 Migration happens on open and is additive by rule. For a document that already
 has settings, this build's upgrade adds the field schema 2 introduced; a document

@@ -66,9 +66,9 @@ describe("the Suite app-set profile", () => {
   it("points every app at its package and its own slop build", () => {
     for (const app of profile().apps) {
       assert.deepEqual(Object.keys(app).sort(), ["id", "manifest", "path", "slop_build_path"]);
-      assert.equal(app.path, `apps/${app.id}`);
-      assert.equal(app.manifest, `apps/${app.id}/package.json`);
-      assert.equal(app.slop_build_path, `apps/${app.id}/slop`);
+      assert.equal(app.path, `legacy/${app.id}`);
+      assert.equal(app.manifest, `legacy/${app.id}/package.json`);
+      assert.equal(app.slop_build_path, `legacy/${app.id}/slop`);
     }
   });
 
@@ -199,17 +199,17 @@ describe("the profile check mirrors FactoryProfileSchema", () => {
   it("refuses a duplicate app id and an app outside the set", () => {
     const duplicate = copy();
     duplicate.apps[1].id = "canvas";
-    duplicate.apps[1].path = "apps/canvas";
-    duplicate.apps[1].manifest = "apps/canvas/package.json";
-    duplicate.apps[1].slop_build_path = "apps/canvas/slop";
+    duplicate.apps[1].path = "legacy/canvas";
+    duplicate.apps[1].manifest = "legacy/canvas/package.json";
+    duplicate.apps[1].slop_build_path = "legacy/canvas/slop";
     assert.match(failures(duplicate).join("\n"), /duplicates canvas/u);
 
     const extra = copy();
     extra.apps.push({
       id: "sync",
-      path: "apps/sync",
-      manifest: "apps/sync/package.json",
-      slop_build_path: "apps/sync/slop",
+      path: "services/relay",
+      manifest: "services/relay/package.json",
+      slop_build_path: "services/relay/slop",
     });
     assert.match(failures(extra).join("\n"), /must list canvas, planner, budget, help/u);
   });
@@ -217,7 +217,10 @@ describe("the profile check mirrors FactoryProfileSchema", () => {
   it("refuses a slop build path outside the app", () => {
     const value = copy();
     value.apps[0].slop_build_path = "packaging/flatpak/.build/run.suite.slop.canvas";
-    assert.match(failures(value).join("\n"), /apps\[0\]\.slop_build_path: must be apps\/canvas\/slop/u);
+    assert.match(
+      failures(value).join("\n"),
+      /apps\[0\]\.slop_build_path: must be legacy\/canvas\/slop/u,
+    );
   });
 
   it("refuses a lowercase environment name", () => {

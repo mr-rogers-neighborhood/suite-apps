@@ -277,7 +277,7 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  *
  * Sync has no row. It stopped being a shipped artifact (#315): the signed remote
  * keeps the last published `run.suite.sync` ref, no new build is published, and
- * `apps/sync` stays in the tree as the protocol, client library and relay
+ * `services/relay` stays in the tree as the protocol, client library and relay
  * implementation.
  *
  * `flatpakId` is null outside the Flatpak rows. Per-app tags are retired, so no
@@ -288,8 +288,8 @@ export const APPS = [
   {
     id: "desk",
     name: "Suite Desk",
-    packageJson: "apps/desk/package.json",
-    changelog: "apps/desk/CHANGELOG.md",
+    packageJson: "hosts/desk/package.json",
+    changelog: "hosts/desk/CHANGELOG.md",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.desk",
@@ -299,8 +299,8 @@ export const APPS = [
   {
     id: "go",
     name: "Suite Go",
-    packageJson: "apps/go/package.json",
-    changelog: "apps/go/CHANGELOG.md",
+    packageJson: "hosts/go/package.json",
+    changelog: "hosts/go/CHANGELOG.md",
     kind: "apk",
     section: "mobile",
     flatpakId: null,
@@ -310,8 +310,8 @@ export const APPS = [
   {
     id: "canvas",
     name: "Suite Canvas",
-    packageJson: "apps/canvas/desktop/package.json",
-    changelog: "apps/canvas/CHANGELOG.md",
+    packageJson: "legacy/canvas/desktop/package.json",
+    changelog: "legacy/canvas/CHANGELOG.md",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.canvas",
@@ -321,8 +321,8 @@ export const APPS = [
   {
     id: "planner",
     name: "Suite Planner",
-    packageJson: "apps/planner/package.json",
-    changelog: "apps/planner/CHANGELOG.md",
+    packageJson: "legacy/planner/package.json",
+    changelog: "legacy/planner/CHANGELOG.md",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.planner",
@@ -332,8 +332,8 @@ export const APPS = [
   {
     id: "budget",
     name: "Suite Budget",
-    packageJson: "apps/budget/package.json",
-    changelog: "apps/budget/CHANGELOG.md",
+    packageJson: "legacy/budget/package.json",
+    changelog: "legacy/budget/CHANGELOG.md",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.budget",
@@ -343,8 +343,8 @@ export const APPS = [
   {
     id: "help",
     name: "Suite Help",
-    packageJson: "apps/help/package.json",
-    changelog: "apps/help/CHANGELOG.md",
+    packageJson: "legacy/help/package.json",
+    changelog: "legacy/help/CHANGELOG.md",
     kind: "flatpak",
     section: "desktop",
     flatpakId: "run.suite.help",

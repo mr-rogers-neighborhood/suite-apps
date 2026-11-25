@@ -1,5 +1,5 @@
 ---
-module: apps/budget/packages/core/src/file
+module: legacy/budget/packages/core/src/file
 title: Budget file
 summary: "The `.budget` envelope, the records export and the checks that keep a file openable."
 ---
@@ -23,7 +23,7 @@ instead of throwing, and a version refusal is terminal: an older build must not
 fall through to a backup or to the records parser and then write its own schema
 over a document it does not understand.
 
-## apps/budget/packages/core/src/file/budgetFile.ts#BudgetFileEnvelope
+## legacy/budget/packages/core/src/file/budgetFile.ts#BudgetFileEnvelope
 
 A `.budget` file is JSON, not a zip and not a bare snapshot. The envelope names
 the format (`suite.budget`), a file version, the schema version that wrote it,
@@ -32,7 +32,7 @@ build refuse a file it cannot understand before a CRDT parser touches it, and
 the timestamp is evidence for a person rather than a merge input. There is no
 path or library id in the envelope; those belong to main.
 
-## apps/budget/packages/core/src/file/budgetFile.ts#encodeBudgetFile
+## legacy/budget/packages/core/src/file/budgetFile.ts#encodeBudgetFile
 
 Encoding is pure: it commits the document, exports a snapshot, base64s it and
 pretty-prints the JSON with a trailing newline. The schema version comes from
@@ -40,7 +40,7 @@ the document's meta, falling back to the current constant, so an older document
 is labelled with the schema it actually carries. It does not write; main decides
 where and how to replace the file.
 
-## apps/budget/packages/core/src/file/budgetFile.ts#decodeBudgetFile
+## legacy/budget/packages/core/src/file/budgetFile.ts#decodeBudgetFile
 
 Decoding is the trust boundary for a file a person chose. It parses JSON, checks
 the envelope shape, refuses a newer format version, refuses a newer schema, and
@@ -49,7 +49,7 @@ returns raw bytes rather than a document, so version policy and CRDT opening
 stay separate. It does not validate the records inside the snapshot; the caller
 must open and validate them.
 
-## apps/budget/packages/core/src/file/budgetFile.ts#BudgetFileError
+## legacy/budget/packages/core/src/file/budgetFile.ts#BudgetFileError
 
 `BudgetFileError` carries a small code beside the message: `not-json`,
 `wrong-format`, `unsupported-version`, `unsupported-schema` and `bad-snapshot`.
@@ -58,7 +58,7 @@ person which version to use, instead of falling through to a backup or to the
 records parser as if the file were damaged. The message is for display; callers
 branch on the code.
 
-## apps/budget/packages/core/src/file/recordsFile.ts#recordsEnvelopeSchema
+## legacy/budget/packages/core/src/file/recordsFile.ts#recordsEnvelopeSchema
 
 The records envelope is the readable counterpart: one JSON object with every
 root array, validated by Zod as a whole. Parsing the whole object is deliberate,
@@ -67,7 +67,7 @@ record shape should fail before any record reaches a document.
 `scheduleBatches` defaults to empty so older exports still load; the other roots
 are required.
 
-## apps/budget/packages/core/src/file/recordsFile.ts#decodeRecords
+## legacy/budget/packages/core/src/file/recordsFile.ts#decodeRecords
 
 Decoding a records file is a rebuild, not a merge. After JSON and format-version
 checks, the whole envelope is schema-parsed, then `validateReferences` runs; the
@@ -76,7 +76,7 @@ every problem it found, which is why the error type carries a `problems` list.
 The caller turns that snapshot into a new document with
 `BudgetDocument.fromRecords`.
 
-## apps/budget/packages/core/src/file/recordsFile.ts#encodeRecords
+## legacy/budget/packages/core/src/file/recordsFile.ts#encodeRecords
 
 Encoding flattens a snapshot back into the records envelope: meta, settings,
 every root, and the schema version the snapshot names. It is for interchange and
@@ -84,7 +84,7 @@ inspection, not for the live file; a records file loses concurrent-edit history
 even though it preserves ids. It is also the fallback import shape when a file
 is not a `.budget` envelope.
 
-## apps/budget/packages/core/src/file/recordsFile.ts#validateReferences
+## legacy/budget/packages/core/src/file/recordsFile.ts#validateReferences
 
 A CRDT map has no foreign keys, so a records file can parse and still point at a
 missing account, category, payee, parent, dashboard or transfer account. This
@@ -92,7 +92,7 @@ function checks both directions: ids unique within each id-keyed root it checks,
 and every reference resolvable, with Ready to Assign allowed as a category. It returns
 messages rather than throwing, so a caller can show all the broken rows at once.
 
-## apps/budget/packages/core/src/file/export.ts#transactionsToCsv
+## legacy/budget/packages/core/src/file/export.ts#transactionsToCsv
 
 CSV is a flat presentation of transactions, so a split parent is replaced by one
 row per child and the parent itself is omitted; the child's category becomes the
@@ -100,7 +100,7 @@ category column. Amounts go through the display formatter, which keeps the
 integer minor units until the last division, and cells are quoted only when
 needed. The function returns text; it never writes a file.
 
-## apps/budget/packages/core/src/file/export.ts#transactionsToQif
+## legacy/budget/packages/core/src/file/export.ts#transactionsToQif
 
 QIF carries the same ledger into a format other finance tools read: a transfer
 becomes an account link, a categorized row becomes a category link, and a split

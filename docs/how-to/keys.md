@@ -44,7 +44,7 @@ the same escape hatches — `SUITE_GO_KEYSTORE` and `SUITE_GO_KEYSTORE_PASSWORD`
 `SUITE_GO_KEY_ALIAS` overrides the `suite-go` alias. The catalogue operator key is a release
 secret, read from `SUITE_INDEX_KEY` in the release environment rather than from this directory.
 
-The pack key used to live in `apps/go/.dev/`, which is the scratch directory the build replaces. A
+The pack key used to live in `hosts/go/.dev/`, which is the scratch directory the build replaces. A
 cleanup took the only copy, and the pin was left with no key able to satisfy it. Nothing durable
 belongs in a generated directory, and no script here looks for one there.
 
@@ -103,7 +103,7 @@ machine holding another key, or the debug keystore, produces an APK the phone re
 to the installed app.
 
 The channel ids, the fingerprint check in the build and the `versionCode` rule belong to [Android
-notes](../../apps/go/docs/reference/android.md#release-signing-and-channels); this page owns where the
+notes](../../hosts/go/docs/reference/android.md#release-signing-and-channels); this page owns where the
 key lives, how to make one, and what losing it costs.
 
 ## Rotate
@@ -137,7 +137,7 @@ and rebuild every channel. Android compares the certificate of an update with th
 so every installed build signed with the old key is refused; a person has to uninstall it before the
 new one installs. There is no side-by-side migration for the same package id, and each pre-release id
 is separate from stable and from every other channel. Plan a rotation as a release, not as a machine
-setup step. The build steps are in [Android](../../apps/go/docs/reference/android.md#release-signing-and-channels).
+setup step. The build steps are in [Android](../../hosts/go/docs/reference/android.md#release-signing-and-channels).
 
 ## Back up
 
