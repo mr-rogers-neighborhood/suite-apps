@@ -68,9 +68,9 @@ export function projectFor(path, projects) {
 /**
  * The project owning a path, including pack source.
  *
- * A pack is not a workspace project (repo-structure R2.2), so `packs/<app>/pack`
- * has no package of its own. Its owner is the legacy shell that declares it;
- * without this, every pack edit would look like a workspace-wide change.
+ * A pack is its own workspace project, but its gate row is still the legacy
+ * shell that runs it. Mapping `packs/<app>` to the shell keeps one row: a pack
+ * edit selects that row, and the row runs the shell and then the pack.
  */
 export function projectForPath(path, projects) {
   const normalized = normalizePath(path);

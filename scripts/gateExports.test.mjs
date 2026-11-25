@@ -108,6 +108,7 @@ describe("gate export retention", () => {
 
 describe("gate test discovery", () => {
   it("runs exactly the scripts/*.test.mjs files in the gated tree", () => {
+    // The listing is the independent oracle; discovery is what gate.mjs calls.
     const listing = readdirSync(join(ROOT, "scripts"), { withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.endsWith(".test.mjs"))
       .map((entry) => `scripts/${entry.name}`)

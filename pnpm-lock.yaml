@@ -1251,9 +1251,15 @@ importers:
 
   packs/canvas:
     dependencies:
+      '@excalidraw/excalidraw':
+        specifier: 0.18.1
+        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@suite/graph':
         specifier: workspace:*
         version: link:../../legacy/canvas/packages/graph
+      '@suite/import-obsidian':
+        specifier: workspace:*
+        version: link:../../legacy/canvas/packages/import-obsidian
       '@suite/pack-runtime':
         specifier: workspace:*
         version: link:../../packages/pack-runtime

@@ -14,7 +14,9 @@
     "check:full": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
     "@suite/graph": "workspace:*",
+    "@suite/import-obsidian": "workspace:*",
     "@suite/pack-runtime": "workspace:*"
   },
   "devDependencies": {
