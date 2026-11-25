@@ -1,6 +1,12 @@
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
-import type { FileFilter, FileOutcome, FileService, PickedFile, WriteFileInput } from "@suite/go";
+import type {
+  FileFilter,
+  FileOutcome,
+  PersonFileService,
+  PickedFile,
+  WriteFileInput,
+} from "@suite/go";
 
 /**
  * Files a person can actually reach, with no third-party plugin.
@@ -50,9 +56,34 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+/**
+ * A file name the Documents directory may hold.
+ *
+ * A pack supplies this name, so it is checked rather than trusted: a separator or
+ * a `..` segment would let the write leave the app's own documents directory.
+ * Both export and the share sheet go through here.
+ */
+export function safeExportName(name: string): string {
+  const trimmed = name.trim();
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what this rejects.
+  const unusable = /[\u0000-\u001f\u007f]/u.test(trimmed);
+  if (
+    trimmed.length === 0 ||
+    trimmed.length > 255 ||
+    trimmed === "." ||
+    trimmed === ".." ||
+    unusable ||
+    trimmed.includes("/") ||
+    trimmed.includes("\\")
+  ) {
+    throw new Error("that file name is not usable");
+  }
+  return trimmed;
+}
+
 async function writeToDocuments(input: WriteFileInput): Promise<{ ok: true; uri: string }> {
   const result = await Filesystem.writeFile({
-    path: input.name,
+    path: safeExportName(input.name),
     data: toBase64(input.bytes),
     directory: Directory.Documents,
     recursive: true,
@@ -60,7 +91,7 @@ async function writeToDocuments(input: WriteFileInput): Promise<{ ok: true; uri:
   return { ok: true, uri: result.uri };
 }
 
-export function createFileService(): FileService {
+export function createFileService(): PersonFileService {
   return {
     async pickOpen(filters): Promise<PickedFile | null> {
       const input = document.createElement("input");
@@ -103,7 +134,7 @@ export function createFileService(): FileService {
       };
     },
 
-    write: writeToDocuments,
+    exportFile: writeToDocuments,
 
     async share(input): Promise<FileOutcome> {
       try {

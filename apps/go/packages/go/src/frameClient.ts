@@ -20,9 +20,14 @@ import {
 } from "./frame.js";
 import type {
   DocumentRecord,
+  FileEntry,
+  FileFilter,
+  FileOutcome,
+  FileService,
   ModuleHost,
   NotificationOutcome,
   NotificationPermission,
+  PickedFile,
   ThemeTokens,
 } from "./host.js";
 
@@ -33,7 +38,12 @@ interface ReplyValue {
 
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  // Chunked because a file is not a document title: spreading 256 MiB of bytes
+  // into one `String.fromCharCode` call overflows the argument limit.
+  const chunk = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
+  }
   return btoa(binary);
 }
 
@@ -195,6 +205,96 @@ export function createFrameHost(options: FrameHostOptions): FrameHost {
     },
   };
 
+  const files: FileService = {
+    async list(path?: string) {
+      const value = await send(
+        path === undefined ? { method: "files.list" } : { method: "files.list", path },
+      );
+      return (Array.isArray(value) ? value : []) as unknown as readonly FileEntry[];
+    },
+    async stat(path: string) {
+      const value = await send({ method: "files.stat", path });
+      const entry = value.entry;
+      return entry === null || entry === undefined ? null : (entry as FileEntry);
+    },
+    async mkdir(path: string) {
+      await send({ method: "files.mkdir", path });
+    },
+    async read(path: string, options) {
+      const value = await send(
+        options?.maxBytes === undefined
+          ? { method: "files.read", path }
+          : { method: "files.read", path, maxBytes: options.maxBytes },
+      );
+      return fromBase64(value.bytes ?? "");
+    },
+    async write(path: string, bytes: Uint8Array, options) {
+      const value = await send(
+        {
+          method: "files.write",
+          path,
+          ...(options?.atomic === undefined ? {} : { atomic: options.atomic }),
+          ...(options?.expectedMtimeMs === undefined
+            ? {}
+            : { expectedMtimeMs: options.expectedMtimeMs }),
+        },
+        toBase64(bytes),
+      );
+      return value.entry as FileEntry;
+    },
+    async rename(from: string, to: string) {
+      await send({ method: "files.rename", from, to });
+    },
+    async remove(path: string, options) {
+      await send({
+        method: "files.remove",
+        path,
+        ...(options?.recursive === undefined ? {} : { recursive: options.recursive }),
+      });
+    },
+    async backup(path: string) {
+      const value = await send({ method: "files.backup", path });
+      if (typeof value.path !== "string") throw new Error("the host refused the backup");
+      return value.path;
+    },
+    async lock(path: string) {
+      const value = await send({ method: "files.lock", path });
+      const token = typeof value.token === "string" ? value.token : "";
+      if (token.length === 0) throw new Error("the host refused the lock");
+      // The token stays in this closure. A pack gets the `FileLock` shape it
+      // expects and cannot replay the token against another frame.
+      return {
+        path,
+        release: async () => {
+          await send({ method: "files.unlock", token });
+        },
+      };
+    },
+    async pickOpen(filters: readonly FileFilter[]) {
+      const value = await send({ method: "files.pickOpen", filters });
+      if (typeof value.bytes !== "string") return null;
+      return {
+        name: typeof value.name === "string" ? value.name : "",
+        mimeType: typeof value.mimeType === "string" ? value.mimeType : "",
+        bytes: fromBase64(value.bytes),
+      } satisfies PickedFile;
+    },
+    async exportFile(input) {
+      const value = await send(
+        { method: "files.exportFile", name: input.name, mimeType: input.mimeType },
+        toBase64(input.bytes),
+      );
+      return { ok: true, uri: typeof value.uri === "string" ? value.uri : "" };
+    },
+    async share(input) {
+      const value = await send(
+        { method: "files.share", name: input.name, mimeType: input.mimeType },
+        toBase64(input.bytes),
+      );
+      return value as unknown as FileOutcome;
+    },
+  };
+
   return {
     moduleId: options.moduleId,
     documents,
@@ -223,19 +323,7 @@ export function createFrameHost(options: FrameHostOptions): FrameHost {
       },
       forget: () => undefined,
     },
-    files: {
-      // Nothing in the frame bridge carries a file yet. Answering `null` and a refusal is
-      // honest; silently succeeding would be worse than a disabled control.
-      pickOpen: async () => null,
-      write: async () => {
-        throw new Error("Files are not available inside a frame yet.");
-      },
-      share: async () => ({
-        ok: false,
-        reason: "failed",
-        message: "Files are not available inside a frame yet.",
-      }),
-    },
+    files,
     notifications: {
       async permission() {
         const value = await send({ method: "notifications.permission" });

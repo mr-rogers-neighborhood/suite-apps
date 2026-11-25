@@ -6,6 +6,7 @@ import { type CatalogueEntry, createCatalogue } from "../host/catalogue.js";
 import { createDocumentStore } from "../host/documents.js";
 import { createFileService, mimeFor } from "../host/files.js";
 import { createNotifications } from "../host/notifications.js";
+import { createPackFiles, packFilesScopeOf } from "../host/packFiles.js";
 import { createPackStore, type InstalledPack } from "../host/packs.js";
 import { createPins, orderModules } from "../host/pins.js";
 import { createRecents, type RecentEntry } from "../host/recents.js";
@@ -374,6 +375,13 @@ export function App() {
   const host = useMemo<ModuleHost | null>(() => {
     if (route.kind !== "module") return null;
     const moduleId = route.moduleId;
+    // One store per mounted domain. An installed pack carries its publisher, so a
+    // different publisher under the same id inherits nothing; a built-in module
+    // keeps the first-party segment.
+    const installedManifest = installed.find((pack) => pack.manifest.id === moduleId)?.manifest;
+    const moduleFiles = createPackFiles(
+      installedManifest === undefined ? { packId: moduleId } : packFilesScopeOf(installedManifest),
+    );
     return {
       moduleId,
       documents,
@@ -386,7 +394,7 @@ export function App() {
         },
         close: () => void closeModule(),
       },
-      files,
+      files: moduleFiles,
       notifications,
       recents: {
         remember: (documentId, title) => {
@@ -402,7 +410,7 @@ export function App() {
       },
       theme,
     };
-  }, [route, closeModule, refreshRecents, theme]);
+  }, [route, closeModule, refreshRecents, theme, installed]);
 
   const modules = [
     ...createModuleRegistry([scratchModule, canvasModule]).modules,

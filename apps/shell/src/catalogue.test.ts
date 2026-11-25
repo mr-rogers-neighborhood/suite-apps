@@ -98,7 +98,16 @@ function trust(publicKey: string): PackTrustOptions {
     publishers: [{ id: "suite", key: publicKey, source: "preinstalled" }],
     hostContractVersion: 1,
     hostVersion: 1,
-    hostCapabilities: ["documents", "files", "network"],
+    // The desktop host's real surface, so a pack refused here is refused by the
+    // platform comparison rather than by a narrower test harness.
+    hostCapabilities: [
+      "documents",
+      "files",
+      "identity.pack",
+      "network",
+      "notifications",
+      "recents",
+    ],
   };
 }
 
@@ -208,8 +217,10 @@ describe("catalogue scanning", () => {
   it("lists a pack Go cannot run and refuses its install with the reason", async () => {
     const root = await temporaryRoot();
     const packsRoot = await temporaryRoot();
+    // `identity.pack` is served by the desktop and not by Go. `files` used to
+    // stand here until Suite Go grew a scoped file store.
     const fixturePack = await fixture({
-      capabilities: ["documents", "files"],
+      capabilities: ["documents", "identity.pack"],
       platforms: ["desktop", "mobile"],
     });
     await writeArchive(root, "demo-1.0.0.suitepack", fixturePack.archive);
@@ -217,7 +228,7 @@ describe("catalogue scanning", () => {
     const entries = await loadCatalogue(root, trust(fixturePack.publicKey), null, GO_HOST);
     expect(entries[0]?.platform).toEqual({
       state: "unavailable",
-      reason: "not available on Go — needs `files`",
+      reason: "not available on Go — needs `identity.pack`",
     });
 
     const entry = entries[0];
@@ -226,7 +237,7 @@ describe("catalogue scanning", () => {
       installCataloguePack(entry, packsRoot, trust(fixturePack.publicKey)),
     ).rejects.toMatchObject({
       reason: "platform",
-      message: "not available on Go — needs `files`",
+      message: "not available on Go — needs `identity.pack`",
     });
     expect(await readdir(packsRoot)).toEqual([]);
   });

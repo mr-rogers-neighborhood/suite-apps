@@ -89,14 +89,18 @@ A failed install or update leaves the previous version active: the new files wer
 into a version directory, and the swap restores the old directory if the rename fails. Removal
 asks once and says the documents stay.
 
-## Capabilities Go does not serve
+## The capabilities a pack may declare
 
-Go serves `documents`, `storage`, `recents`, `notifications` and `network` to a pack. `files` is
-not served: the shell's own file service exists, but the frame protocol has no `files.*` request,
-so a pack that declares it would half-work. S4.8 is applied at install **and** on every load, and
-the refusal names the capability (`asks for files, which Suite Go does not serve`) rather than
-hiding the pack. The desktop has its own list because it serves a different surface; both refuse
-a pack they cannot run instead of installing it.
+Go serves `documents`, `storage`, `files`, `recents`, `notifications` and `network` to a pack. It
+does not serve `relay`, `commands` or `identity.pack`; a pack that asks for one of those is refused
+at install **and** on every load, and the sentence names the capability rather than hiding the pack.
+The desktop has its own list because it serves a different surface; both refuse a pack they cannot
+run instead of installing it.
+
+`files` is the pack's own scoped store plus the platform picker and share sheet. A pack sees relative
+paths inside its root; another pack's root, a climb and an absolute path are refused before a
+filesystem call. [The contract](contract.md#files-belong-to-one-pack) states the refusals and the
+atomic-write rule.
 
 ## Why `/_capacitor_file_/` is the whole trick
 

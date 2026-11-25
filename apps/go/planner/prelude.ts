@@ -246,9 +246,37 @@ const bridge: PlannerBridge = {
   requestNotifications,
   onCommand: () => () => undefined,
 
-  // A pack has no file picker in this host yet. Cancelling is the contract's own word for it.
-  exportWorkspace: async () => ({ canceled: true }),
-  importWorkspace: async () => ({ canceled: true }),
+  // The person picks the file and the share sheet carries it. The pack names a
+  // file and bytes; neither a source nor a destination path crosses the bridge.
+  exportWorkspace: async () => {
+    if (loro === null) return { canceled: true };
+    const outcome = await host.files.share({
+      name: documentName,
+      mimeType: "application/json",
+      bytes: loro.export({ mode: "snapshot" }),
+    });
+    return outcome.ok ? { canceled: false } : { canceled: true };
+  },
+
+  importWorkspace: async () => {
+    const picked = await host.files.pickOpen([
+      { name: "Planner workspace", extensions: ["planner"] },
+    ]);
+    if (picked === null) return { canceled: true };
+
+    // Throws on a file that is not a Planner snapshot, and the renderer shows the
+    // failure. The pack owns the schema, so this is the only place that can decide.
+    const next = LoroDoc.fromSnapshot(picked.bytes);
+    loro = next;
+    if (picked.name.length > 0) documentName = picked.name;
+
+    const id = await ensureDocument();
+    await host.documents.save(id, { bytes: picked.bytes, title: DOCUMENT_TITLE });
+    host.recents.remember(id, DOCUMENT_TITLE);
+    dirty = false;
+    for (const listener of replacements) listener(picked.bytes);
+    return { canceled: false };
+  },
 
   info: async () => ({ path: documentName, schemaVersion: 0 }),
   platform: async () => "android",

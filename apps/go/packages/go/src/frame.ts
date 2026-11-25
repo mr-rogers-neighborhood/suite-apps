@@ -9,7 +9,7 @@
  * `host.documents.save(...)` in either mode and does not know which one it is in; that is what
  * keeps a pack portable between them and what stops the contract from growing a second dialect.
  */
-import type { ColorScheme, DocumentSummary, ThemeDensity } from "./host.js";
+import type { ColorScheme, DocumentSummary, FileFilter, ThemeDensity } from "./host.js";
 
 export const FRAME_PROTOCOL = "suite.frame.v1";
 
@@ -43,7 +43,44 @@ export type FrameRequest =
       readonly at: number;
     }
   | { readonly method: "notifications.cancel"; readonly id: string }
-  | { readonly method: "notifications.cancelAll" };
+  | { readonly method: "notifications.cancelAll" }
+  /**
+   * The pack's own files.
+   *
+   * Every path is relative, slash-separated and names a location inside the
+   * pack's own root. Nothing on this wire carries a root: the host resolves the
+   * sender's frame to a pack identity and picks the store. An absolute path or a
+   * climb is refused by the shared path rule before the filesystem is touched.
+   */
+  | { readonly method: "files.list"; readonly path?: string }
+  | { readonly method: "files.stat"; readonly path: string }
+  | { readonly method: "files.mkdir"; readonly path: string }
+  | { readonly method: "files.read"; readonly path: string; readonly maxBytes?: number }
+  /** `payload` carries the bytes as base64. */
+  | {
+      readonly method: "files.write";
+      readonly path: string;
+      readonly atomic?: boolean;
+      readonly expectedMtimeMs?: number;
+    }
+  | { readonly method: "files.rename"; readonly from: string; readonly to: string }
+  | { readonly method: "files.remove"; readonly path: string; readonly recursive?: boolean }
+  | { readonly method: "files.backup"; readonly path: string }
+  /**
+   * A host-issued lock token. The pack never sees the token; the frame client
+   * turns it into a `FileLock` whose `release` sends `files.unlock`.
+   */
+  | { readonly method: "files.lock"; readonly path: string }
+  | { readonly method: "files.unlock"; readonly token: string }
+  /**
+   * The person-consented surface. The pack asks; the platform picker and share
+   * sheet answer. No path crosses either way.
+   */
+  | { readonly method: "files.pickOpen"; readonly filters: readonly FileFilter[] }
+  /** `payload` carries the bytes as base64. */
+  | { readonly method: "files.exportFile"; readonly name: string; readonly mimeType: string }
+  /** `payload` carries the bytes as base64. */
+  | { readonly method: "files.share"; readonly name: string; readonly mimeType: string };
 
 export interface FrameEnvelope {
   readonly protocol: typeof FRAME_PROTOCOL;

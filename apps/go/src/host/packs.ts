@@ -72,18 +72,19 @@ export const PACK_PUBLIC_KEY = SUITE_PACK_PUBLIC_KEY;
  * What this build implements. Bumped when the host services a pack may call change.
  *
  * 2 added `notifications`: a pack may ask for a reminder to be delivered by the phone's own alarm
- * clock. A pack that declares 2 needs a host that has it; a pack that declares 1 still installs.
+ * clock. 3 added `files`: the pack-scoped store and the platform picker and share sheet. A pack
+ * that declares 3 needs a host that has it; a pack that declares 1 or 2 still installs.
  */
-export const HOST_CONTRACT_VERSION = 2;
+export const HOST_CONTRACT_VERSION = 3;
 export const HOST_VERSION = 1;
 
 /**
  * The pack capabilities this host actually serves.
  *
- * Go's frame bridge answers `documents`, `storage`, `recents` and `notifications`; `network` is
- * the pack's own declared egress, which the host permits and holds to a sealed CSP. `files` is
- * not served to a pack: the shell uses the file service itself, but the frame protocol has no
- * `files.*` request, so a pack that declares it would half-work.
+ * Go's frame bridge answers `documents`, `storage`, `recents`, `notifications` and `files`;
+ * `network` is the pack's own declared egress, which the host permits and holds to a sealed CSP.
+ * `files` is the pack's own scoped store plus the platform picker and share sheet. The store is
+ * built from the frame's manifest, never from a request, so two packs cannot reach one root.
  *
  * S4.8 says a host refuses a pack naming a capability it does not implement, rather than
  * installing it and letting the first call fail. The desktop's list is its own

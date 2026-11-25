@@ -430,9 +430,13 @@ describe("verification at load", () => {
 describe("the capability a host serves (S4.8)", () => {
   it("refuses a pack that asks for a capability Go does not serve, by name", async () => {
     resetDisk();
+    // A build that serves only documents. Every current Go capability is served,
+    // so the refusal is exercised against a narrower host rather than a real gap.
     const { manifest, files } = await signedManifest(sealed, ["documents", "files"]);
 
-    const outcome = await store().install(packArchive(manifest, files));
+    const outcome = await store({ capabilities: ["documents"] }).install(
+      packArchive(manifest, files),
+    );
 
     expect(outcome).toMatchObject({ ok: false, reason: "capability" });
     expect(outcome.ok ? "" : outcome.message).toContain("files");
@@ -447,7 +451,7 @@ describe("the capability a host serves (S4.8)", () => {
     disk.set(`${dir}/manifest.json`, encoder.encode(JSON.stringify(manifest)));
     for (const [path, bytes] of Object.entries(files)) disk.set(`${dir}/${path}`, bytes);
 
-    const packs = store();
+    const packs = store({ capabilities: ["documents"] });
     expect(await packs.discover()).toEqual([]);
     const issues = await packs.issues();
     expect(issues[0]).toMatchObject({ id: "probe", version: "1.0.0", reason: "capability" });
