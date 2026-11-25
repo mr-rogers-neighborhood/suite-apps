@@ -3,23 +3,16 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-const core = fileURLToPath(new URL("./packages/core/src/index.ts", import.meta.url));
 const renderer = fileURLToPath(new URL("./src/renderer/src", import.meta.url));
 
+// `@suite/budget-core` is a workspace package now, so its tests run with the
+// pack that owns it. This config covers the frozen shell's own main and
+// renderer tests.
 export default defineConfig({
   test: {
     testTimeout: 20_000,
     projects: [
       {
-        resolve: { alias: { "@suite/budget-core": core } },
-        test: {
-          name: "core",
-          environment: "node",
-          include: ["packages/core/src/**/*.test.ts"],
-        },
-      },
-      {
-        resolve: { alias: { "@suite/budget-core": core } },
         test: {
           name: "main",
           environment: "node",
@@ -28,7 +21,7 @@ export default defineConfig({
       },
       {
         plugins: [react()],
-        resolve: { alias: { "@suite/budget-core": core, "@renderer": renderer } },
+        resolve: { alias: { "@renderer": renderer } },
         test: {
           name: "renderer",
           environment: "jsdom",

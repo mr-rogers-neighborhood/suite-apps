@@ -16,12 +16,13 @@ legacy/
   canvas/       @suite/canvas renderer; desktop/ shell;
                 packages/graph, packages/import-obsidian; e2e, docs, handbook, internal
   planner/      @suite/planner desktop app; packages/core; docs
-  budget/       @suite/budget desktop app; packages/core; docs
+  budget/       @suite/budget desktop app; docs
   help/         @suite/help documentation app: explorer and handbook
 packs/
   canvas/pack/  Canvas pack source
   planner/pack/ Planner pack source
   budget/pack/  Budget pack source
+  budget/packages/core/ Budget's core document layer, owned by the pack
   help/pack/    Help pack source
 services/
   relay/        @suite/sync-server; packages/protocol, packages/host; app, deploy, docs
@@ -37,8 +38,8 @@ renders `docs/` as the handbook. It is offline, ships through Flatpak, and never
 fact: the code and `docs/` are the source of truth.
 
 `pnpm-workspace.yaml` includes `hosts/*`, `hosts/*/packages/*`, `legacy/*`, `legacy/*/*`,
-`legacy/*/packages/*`, `packs/*`, `services/*`, `services/*/*`, `services/*/packages/*` and
-`packages/*`. It
+`legacy/*/packages/*`, `packs/*`, `packs/*/packages/*`, `services/*`, `services/*/*`,
+`services/*/packages/*` and `packages/*`. It
 also owns the overrides, patches and build permissions the apps need.
 
 ## Packages
@@ -55,7 +56,7 @@ also owns the overrides, patches and build permissions the apps need.
 | `@suite/planner-core` | `legacy/planner/packages/core` | Planner schema and document layer |
 | `@suite/budget` | `legacy/budget` | Budget |
 | `@suite/budget-pack` | `packs/budget` | Budget pack build |
-| `@suite/budget-core` | `legacy/budget/packages/core` | Budget schema and document layer |
+| `@suite/budget-core` | `packs/budget/packages/core` | Budget schema and document layer |
 | `@suite/help` | `legacy/help` | Documentation app: explorer and handbook |
 | `@suite/help-pack` | `packs/help` | Help pack build |
 | `@suite/sync-server` | `services/relay` | Sync server |

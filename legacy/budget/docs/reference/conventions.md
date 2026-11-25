@@ -21,7 +21,7 @@ Zustand; transient view state may live in React. Never keep a second copy.
 ## Money
 
 - Amounts are signed integer minor units. Negative is an outflow.
-- `packages/core/src/money.ts` owns `parseMoney`, `formatMoney`, `formatMoneyPlain`, and
+- `packs/budget/packages/core/src/money.ts` owns `parseMoney`, `formatMoney`, `formatMoneyPlain`, and
   `currencyScale`.
 - `parseFloat` and `toFixed` are banned outside `money.ts` and tests; `pnpm shape` enforces it.
 - Never add two currencies. One budget has one currency and one scale.
@@ -29,7 +29,7 @@ Zustand; transient view state may live in React. Never keep a second copy.
 
 ## Files and folders
 
-Folder by feature, not by file type: `packages/core/src/{loro,plan,rules,import,file,reports,templates}`,
+Folder by feature, not by file type: `packs/budget/packages/core/src/{loro,plan,rules,import,file,reports,templates}`,
 `src/{main,preload}`, and
 `src/renderer/src/{app,launcher,plan,accounts,payees,rules,schedules,import,reports,command,components,charts,store,platform,theme}`.
 
@@ -82,7 +82,7 @@ No new dependency without a stated job and the correct package.
 | A network call                                                 | Delete it; there is no sync            |
 
 `pnpm shape` enforces the mechanical half: file length, the single `observe` call site, Loro imports
-confined to `packages/core/src/loro`, `nodeIntegration: true` banned, no float money, no network calls
+confined to `packs/budget/packages/core/src/loro`, `nodeIntegration: true` banned, no float money, no network calls
 in the app source, `node:fs` confined to main and scripts, and no logging in core.
 
 ## TypeScript

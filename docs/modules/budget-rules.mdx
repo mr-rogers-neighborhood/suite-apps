@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/budget/packages/core/src/rules
+module: packs/budget/packages/core/src/rules
 title: Budget rules
 summary: "The pure match, the total order and the draft that lets a rule run without a document."
 ---
@@ -24,7 +24,7 @@ value; a rule with no
 matching condition changes nothing. The outcome is not an error but an unchanged
 draft, which the caller can compare against its input.
 
-## legacy/budget/packages/core/src/rules/evaluate.ts#RuleDraft
+## packs/budget/packages/core/src/rules/evaluate.ts#RuleDraft
 
 The draft is the transaction-shaped input to a rule run: ids and names for
 account and category, both the display payee and the imported raw payee, plus
@@ -33,7 +33,7 @@ import row has no id yet, and a test should not need a document. Keeping names
 in the draft lets a condition match what a person sees while the action writes
 an id.
 
-## legacy/budget/packages/core/src/rules/evaluate.ts#RuleContext
+## packs/budget/packages/core/src/rules/evaluate.ts#RuleContext
 
 Context supplies the two facts evaluation cannot read from the draft: the
 currency and scale used to parse an amount condition, and the id-to-name map
@@ -41,7 +41,7 @@ needed to keep `categoryName` in step after `setCategory`. Passing it in keeps
 the function pure; the renderer builds it from the same snapshot the draft came
 from. A missing category name becomes an empty string, not a failed match.
 
-## legacy/budget/packages/core/src/rules/evaluate.ts#RuleResult
+## packs/budget/packages/core/src/rules/evaluate.ts#RuleResult
 
 The result is the rewritten draft plus the ids of every rule that matched, in
 execution order. It is not a patch or a document: the caller compares the draft
@@ -49,7 +49,7 @@ to decide which fields changed, which is what the rules screen does before
 writing. Returning all matched ids, not just the last, is what makes "why did
 this change" answerable.
 
-## legacy/budget/packages/core/src/rules/rank.ts#specificityScore
+## packs/budget/packages/core/src/rules/rank.ts#specificityScore
 
 Specificity is a number used only for ordering: the strongest operator in the
 rule (`is` and `isNot` 5, `oneOf` 4, `notOneOf` 4, `contains` 3,
@@ -58,7 +58,7 @@ the number of conditions. A rule with one exact condition therefore outranks a
 broader rule with many loose ones, and a rule with more conditions outranks an
 otherwise equal one. The score is not a confidence and is never shown as one.
 
-## legacy/budget/packages/core/src/rules/rank.ts#rankRules
+## packs/budget/packages/core/src/rules/rank.ts#rankRules
 
 The order is stage first (`pre`, `default`, `post`), then ascending
 specificity, then creation time and id. Ascending specificity is the
@@ -67,7 +67,7 @@ so its action is the one left in the draft. Disabled rules are filtered before
 the sort. The id tiebreak makes the order total, so two runs over the same rules
 cannot disagree.
 
-## file: legacy/budget/packages/core/src/rules/evaluate.ts
+## file: packs/budget/packages/core/src/rules/evaluate.ts
 
 Evaluate owns the matching itself. A condition reads one field; `amount` is
 parsed through `money.ts` so a rule compares the integer the transaction stores;

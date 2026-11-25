@@ -105,7 +105,7 @@ projections compute the month, targets, rules, reports, and imports.
 | Path                          | What lives there                                                                    |
 | ----------------------------- | ----------------------------------------------------------------------------------- |
 | `src`                         | Electron main, preload bridge, React renderer, Storybook, Playwright                |
-| `packages/core`               | Schema, `BudgetDocument`, month math, rules, importers, exports, reports, templates |
+| `packs/budget/packages/core`  | Schema, `BudgetDocument`, month math, rules, importers, exports, reports, templates |
 | `../../packs/budget`          | The signed pack: its own renderer copy, prelude, manifest and build                 |
 | `docs/reference`              | Architecture, conventions, data model, interface                                    |
 | `docs/reference/decisions.md` | The rules that shape Budget                                                         |

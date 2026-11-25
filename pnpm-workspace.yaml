@@ -5,6 +5,7 @@ packages:
   - "legacy/*/*"
   - "legacy/*/packages/*"
   - "packs/*"
+  - "packs/*/packages/*"
   - "services/*"
   - "services/*/*"
   - "services/*/packages/*"

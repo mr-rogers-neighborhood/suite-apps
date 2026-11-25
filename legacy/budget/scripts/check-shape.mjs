@@ -21,10 +21,24 @@ const SKIP = new Set([
 ]);
 const SOURCE = /\.(ts|tsx|mjs|js)$/;
 const MAX_LINES = 900;
+const PACK_CORE = join(root, "../../packs/budget/packages/core");
+const PACK_CORE_PREFIX = "packs/budget/packages/core/";
 const OBSERVE_OWNER = "packages/document-runtime/src/replica.ts";
-const LORO_ALLOWED = "packages/core/src/loro/";
-const MONEY_ALLOWED = "packages/core/src/money.ts";
+const LORO_ALLOWED = `${PACK_CORE_PREFIX}src/loro/`;
+const MONEY_ALLOWED = `${PACK_CORE_PREFIX}src/money.ts`;
 const FS_ALLOWED = ["src/main/", "scripts/"];
+
+/**
+ * The pack-owned core lives outside this frozen shell, but the shell's shape
+ * check still owns the rule that only its `src/loro` touch Loro and only its
+ * `money.ts` does float arithmetic. Give those files their repository path so
+ * the rules read the same as before the move.
+ */
+function relOf(file) {
+  const inPackCore = relative(PACK_CORE, file);
+  if (!inPackCore.startsWith("..")) return `${PACK_CORE_PREFIX}${inPackCore}`;
+  return relative(root, file);
+}
 
 /** @param {string} dir @returns {Promise<string[]>} */
 async function walk(dir) {
@@ -41,10 +55,14 @@ async function walk(dir) {
 
 const problems = [];
 const observeSites = [];
-const files = [...(await walk(root)), ...(await walk(join(root, "../../packs/budget/pack")))];
+const files = [
+  ...(await walk(root)),
+  ...(await walk(PACK_CORE)),
+  ...(await walk(join(root, "../../packs/budget/pack"))),
+];
 
 for (const file of files) {
-  const rel = relative(root, file);
+  const rel = relOf(file);
   if (rel === "scripts/check-shape.mjs") continue;
   const text = await readFile(file, "utf8");
   const lines = text.split("\n").length;
@@ -59,7 +77,7 @@ for (const file of files) {
   }
 
   if (/from\s+["']loro-crdt["']/.test(text) && !rel.startsWith(LORO_ALLOWED)) {
-    problems.push(`${rel}: imports loro-crdt; only packages/core/src/loro may touch Loro`);
+    problems.push(`${rel}: imports loro-crdt; only ${LORO_ALLOWED} may touch Loro`);
   }
 
   if (/nodeIntegration\s*:\s*true/.test(text)) {
@@ -68,11 +86,14 @@ for (const file of files) {
 
   if (!isTest && rel !== MONEY_ALLOWED) {
     if (/\bparseFloat\s*\(/.test(text) || /\.toFixed\s*\(/.test(text)) {
-      problems.push(`${rel}: floats are not money; use packages/core/src/money.ts`);
+      problems.push(`${rel}: floats are not money; use ${MONEY_ALLOWED}`);
     }
   }
 
-  if ((rel.startsWith("src/") || rel.startsWith("packages/")) && !isTest) {
+  if (
+    (rel.startsWith("src/") || rel.startsWith("packages/") || rel.startsWith(PACK_CORE_PREFIX)) &&
+    !isTest
+  ) {
     // `net.fetch` is not a network call: it is Electron's only way to read a
     // `file:` URL, and the protocol handler that serves the renderer needs it.
     // Everything else that fetches is.
@@ -92,7 +113,7 @@ for (const file of files) {
       problems.push(`${rel}: node:fs belongs in the main process, not the renderer or core`);
   }
 
-  if (rel.startsWith("packages/core/") && !isTest && /\bconsole\.log\s*\(/.test(text)) {
+  if (rel.startsWith(PACK_CORE_PREFIX) && !isTest && /\bconsole\.log\s*\(/.test(text)) {
     problems.push(`${rel}: the pure core does not log`);
   }
 

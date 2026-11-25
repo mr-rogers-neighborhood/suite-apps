@@ -9,7 +9,7 @@
   "description": "Budget's pack source and its build. The Electron shell is frozen in legacy/budget.",
   "scripts": {
     "build": "vite build --config pack/vite.config.ts",
-    "typecheck": "tsc --noEmit -p pack/tsconfig.json",
+    "typecheck": "tsc --noEmit -p pack/tsconfig.json && pnpm --dir packages/core run typecheck",
     "test": "vitest run --config pack/vitest.config.mts",
     "check:full": "pnpm typecheck && pnpm test"
   },

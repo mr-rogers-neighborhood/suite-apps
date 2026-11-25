@@ -27,7 +27,7 @@ The gate is local. There is no CI and no scratchpad in this repo.
 ## 2. Architectural invariants
 
 1. **One writer.** Document data goes through `BudgetDocument` in `@suite/budget-core`. Never write raw
-   Loro, and never import `loro-crdt` outside `packages/core/src/loro`.
+   Loro, and never import `loro-crdt` outside `packs/budget/packages/core/src/loro`.
 2. **State separation.** Document truth is Loro; UI state is Zustand; transient view state is React.
 3. **Money is integers.** Amounts are signed minor units. `money.ts` owns parsing and formatting;
    `parseFloat` and `toFixed` are banned elsewhere.
@@ -46,12 +46,12 @@ The one test that matters most:
 sum(available for every category) + readyToAssign = onBudgetBalance
 ```
 
-The property test in `packages/core/src/plan/invariant.test.ts` generates documents and fails on drift.
+The property test in `packs/budget/packages/core/src/plan/invariant.test.ts` generates documents and fails on drift.
 A change to month math must keep it green and add a hand-computed fixture for the new case.
 
 ## 4. Adding a feature
 
-1. Schema and types in `packages/core/src/schema.ts` with tests.
+1. Schema and types in `packs/budget/packages/core/src/schema.ts` with tests.
 2. A typed accessor or mutation on `BudgetDocument`.
 3. Consume it through `useWorkspaceSnapshot` and the Zustand store.
 4. A story where it is visual, a test where behaviour is non-trivial.

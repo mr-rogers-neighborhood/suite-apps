@@ -184,7 +184,7 @@ async function collectPackages() {
     }
   }
 
-  for (const base of ["hosts", "legacy", "services", "packages"]) await visit(base, 0);
+  for (const base of ["hosts", "legacy", "services", "packages", "packs"]) await visit(base, 0);
   return [...found.values()].sort((a, b) => b.dir.length - a.dir.length);
 }
 
@@ -195,13 +195,16 @@ function isConfigFile(file) {
 }
 
 /**
- * A pack's source lives beside its host app rather than inside it, so map a
- * `packs/<app>/` file back to the app package that owns it. The module index and
- * its notes still describe one app; only the directory changed.
+ * A pack's `pack/` source lives beside its host app rather than inside it, so map
+ * a `packs/<app>/pack/` file back to the app package that owns it. The module
+ * index and its notes still describe one app; only the directory changed.
+ *
+ * A pack can also own workspace packages (`packs/<app>/packages/*`); those keep
+ * their own path so the index presents them as the package they are.
  */
 function packOwnerPath(file) {
-  const match = /^packs\/([^/]+)\//.exec(file);
-  return match === null ? file : `legacy/${match[1]}/${file.slice(match[0].length)}`;
+  const match = /^packs\/([^/]+)\/pack\//.exec(file);
+  return match === null ? file : `legacy/${match[1]}/${file.slice(`packs/${match[1]}/`.length)}`;
 }
 
 function configOwner(file, packages) {

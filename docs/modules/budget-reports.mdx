@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/budget/packages/core/src/reports
+module: packs/budget/packages/core/src/reports
 title: Budget reports
 summary: "The ledger-backed series behind every report tab and dashboard widget."
 ---
@@ -19,7 +19,7 @@ pin the distinctions the reports make: a refund reduces net spending, an
 internal transfer does not change on-budget cash, and an off-budget loan still
 counts toward net worth by default.
 
-## legacy/budget/packages/core/src/reports/range.ts#monthsForRange
+## packs/budget/packages/core/src/reports/range.ts#monthsForRange
 
 A fixed range ends at the current month, even when the ledger has no rows for
 those months; `ytd` starts at January, and `all` starts at the ledger's first
@@ -27,7 +27,7 @@ month but still stops at the current month. That clamp keeps a future-dated
 transaction from widening a chart. The month list is the only input the other
 series take, so the range decision lives here once.
 
-## legacy/budget/packages/core/src/reports/budgetVsActual.ts#budgetVsActual
+## packs/budget/packages/core/src/reports/budgetVsActual.ts#budgetVsActual
 
 The report is a projection over `monthState`, flattened one row per category
 with the group name carried alongside. Assigned, activity and available are the
@@ -35,7 +35,7 @@ same numbers the plan view shows because they come from the same fold; the
 function stores nothing. A category with no activity still appears, which is
 what makes the plan and the report comparable line by line.
 
-## legacy/budget/packages/core/src/reports/incomeExpense.ts#incomeExpenseSeries
+## packs/budget/packages/core/src/reports/incomeExpense.ts#incomeExpenseSeries
 
 Income is the ledger's Ready to Assign inflow for the month. Expense is
 categorized outflow net of refunds, plus the negative part of uncategorized
@@ -43,7 +43,7 @@ activity; a positive uncategorized amount does not become income. Net is income
 minus expense. The series follows the supplied months, so a gap in the ledger
 becomes a zero-filled point rather than a missing column.
 
-## legacy/budget/packages/core/src/reports/spending.ts#spendingByCategory
+## packs/budget/packages/core/src/reports/spending.ts#spendingByCategory
 
 Spending is net per category across the whole range, so a refund reduces the row
 and a category whose refunds outweigh its spending disappears. Rows are sorted
@@ -51,7 +51,7 @@ by spend descending and carry the group name for display. Only categories
 present in the snapshot are considered; an uncategorized row has no category to
 rank and is left to the income/expense series.
 
-## legacy/budget/packages/core/src/reports/netWorth.ts#netWorthSeries
+## packs/budget/packages/core/src/reports/netWorth.ts#netWorthSeries
 
 Net worth is the sum of every account balance at the end of each month.
 Off-budget accounts are included by default because a loan is still a liability;
@@ -59,7 +59,7 @@ pass `includeOffBudget: false` to see only the budget's own accounts. A month
 with no activity still reports the carried balance, so the line is continuous
 rather than dropping to zero.
 
-## legacy/budget/packages/core/src/reports/netWorth.ts#accountBalanceSeries
+## packs/budget/packages/core/src/reports/netWorth.ts#accountBalanceSeries
 
 This is the single-account version of net worth, used when a chart follows one
 account. It reads the same per-month balance map and returns zero for a month
@@ -67,7 +67,7 @@ before the account existed, which is a display choice rather than a claim that
 the account had no value. It does not apply the net-worth off-budget filter; the
 caller asked for one account.
 
-## legacy/budget/packages/core/src/reports/cashFlow.ts#cashFlowSeries
+## packs/budget/packages/core/src/reports/cashFlow.ts#cashFlowSeries
 
 Cash flow pairs the on-budget balance at each month end with that month's income
 and expense. The balance is the ledger's on-budget total, so internal transfers
@@ -75,7 +75,7 @@ between on-budget accounts do not change it; the flows come from the
 income/expense series so the two charts cannot disagree. The latest point is the
 number the summary card shows.
 
-## legacy/budget/packages/core/src/reports/ageOfMoney.ts#ageOfMoney
+## packs/budget/packages/core/src/reports/ageOfMoney.ts#ageOfMoney
 
 Age of money is a FIFO lens: income to Ready to Assign creates lots dated by the
 transaction, and each outflow consumes the oldest dollars first and is aged by

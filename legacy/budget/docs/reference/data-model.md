@@ -1,6 +1,6 @@
 # Data model
 
-The schema is `packages/core/src/schema.ts`. Zod is the source of truth; types are `z.infer`. Every
+The schema is `packs/budget/packages/core/src/schema.ts`. Zod is the source of truth; types are `z.infer`. Every
 write is parsed before it reaches the CRDT.
 
 ## Roots
@@ -192,7 +192,7 @@ Notes that matter:
 sum(available for every category) + readyToAssign = onBudgetBalance
 ```
 
-The property test in `packages/core/src/plan/invariant.test.ts` generates documents and asserts it. A
+The property test in `packs/budget/packages/core/src/plan/invariant.test.ts` generates documents and asserts it. A
 hand-computed month in `monthState.test.ts` covers income, assigned, an overspend, a credit card, an
 on/off-budget transfer, a split, a refund, and an uncategorized row.
 
