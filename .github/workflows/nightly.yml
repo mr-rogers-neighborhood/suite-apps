@@ -258,7 +258,7 @@ jobs:
 
   report:
     name: report
-    needs: [published, gate, package-linux, package-android, review, publish]
+    needs: [published, gate, package-linux, package-android, publish]
     # Green nights close the rolling issue; red ones open or update it. One
     # issue, not one per night (C10.1).
     if: always()
@@ -276,7 +276,6 @@ jobs:
           GATE: ${{ needs.gate.result }}
           LINUX: ${{ needs.package-linux.result }}
           ANDROID: ${{ needs.package-android.result }}
-          REVIEW: ${{ needs.review.result }}
           PUBLISH: ${{ needs.publish.result }}
         with:
           script: |
@@ -292,7 +291,6 @@ jobs:
               gate: process.env.GATE,
               "package-linux": process.env.LINUX,
               "package-android": process.env.ANDROID,
-              "ocr-review-nightly": process.env.REVIEW,
               "publish-nightly": process.env.PUBLISH,
             };
             const failed = Object.entries(results).filter(

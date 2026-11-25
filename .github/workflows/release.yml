@@ -118,8 +118,8 @@ jobs:
     #
     # Keep this out of `publish`: that job holds the signing keys and the
     # release upload. The boundary workflow has `contents: read` and the model
-    # secret only. `continue-on-error` means a DeepRelay outage never blocks a
-    # signed release.
+    # secret only. Its `advisory` default keeps a DeepRelay outage from blocking
+    # a signed release.
     #
     # Nightly publishes through this workflow call; a non-publishing nightly
     # calls the same workflow from nightly.yml.
@@ -137,7 +137,8 @@ jobs:
     name: approve-${{ inputs.channel }}
     # A schedule cannot wait for a reviewer. `preview` and `stable` can, and do.
     # Approval waits for the advisory review so the report is available first;
-    # the review's `continue-on-error` keeps a provider failure from blocking it.
+    # the boundary workflow's `advisory` default keeps a provider failure from
+    # blocking it, and `always()` keeps a skipped review from stranding the job.
     needs: review
     # `always()` is load-bearing: `review` is skipped for a rehearsal
     # (`publish: false`), and a skipped dependency would otherwise skip
@@ -151,7 +152,7 @@ jobs:
 
   publish:
     name: publish-${{ inputs.channel }}
-    needs: [review, approval]
+    needs: approval
     if: always() && (inputs.channel == 'nightly' || needs.approval.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 120

@@ -31,7 +31,7 @@
       "merge_system_rule": true
     },
     {
-      "path": "apps/shell/src/**",
+      "path": "apps/desk/src/**",
       "rule": "The desktop host. Enforce:\n\n- Resolve the sender to a pack before acting; check the capability per call and by the resolved sender, not once at open. A missing capability is a refusal, not an empty success.\n- The host carries bytes and never parses a pack document.\n- Document and external-file handles are opaque tokens; absolute paths stay in main.\n- Pack views keep per-pack origin, session partition, denied navigation/window.open/downloads, and all permissions denied.\n- A new privileged act should be a declaration the host performs, not a pack-side back door.",
       "merge_system_rule": true
     },

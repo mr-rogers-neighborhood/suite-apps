@@ -15,7 +15,7 @@ same command locally and in CI. Read `docs/reference/commands.md` for the full c
 `scripts/lib/pipeline.mjs` `PIPELINE`, in order:
 
 ```text
-sync, shell, help, canvas, planner, budget, go
+sync, desk, help, canvas, planner, budget, go
 ```
 
 Prelude rows, before the pipeline:

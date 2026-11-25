@@ -10,7 +10,10 @@
 # `release.yml` calls it before approval for preview/stable (and for a nightly
 # publish). A manual dispatch runs one review for testing or a spot check.
 #
-# The caller owns `continue-on-error`; this workflow itself fails visibly.
+# Advisory by default: `workflow_call` leaves `advisory: true`, so a provider
+# failure never blocks a release. A manual dispatch defaults it to false so a
+# test fails visibly. A reusable-workflow call job cannot set
+# `continue-on-error`; the input is the mechanism.
 name: ocr-boundary
 
 on:
@@ -82,6 +85,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ocr-${{ inputs.channel }}
+  cancel-in-progress: false
+
 jobs:
   review:
     name: ocr-${{ inputs.channel }}
@@ -111,6 +118,7 @@ jobs:
           set -euo pipefail
           if [ -z "${DEEPRELAY_API_KEY}" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=OCR skipped::DEEPRELAY_API_KEY is not set; no boundary review was produced."
             echo "DEEPRELAY_API_KEY is not set; the advisory review is skipped." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -172,3 +180,7 @@ jobs:
           name: ocr-${{ inputs.channel }}-${{ github.run_id }}
           path: .dev/ocr/review.json
           retention-days: 30
+
+      - name: Report a failed advisory review
+        if: failure()
+        run: echo "::warning title=OCR review failed::The boundary review did not complete; the artifact may be missing."
