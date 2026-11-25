@@ -154,4 +154,18 @@ describe("slop targets in this repository", () => {
     assert.equal(result.desk, true);
     assert.equal(result.go, true);
   });
+
+  it("keeps a shared package in each host's dependency closure", () => {
+    // A host-only build still has to produce @suite/pack's dist; the workflow
+    // cannot drop the dependency build when it drops one host (#448).
+    const projects = readProjects(ROOT);
+    const byName = new Map(projects.map((project) => [project.name, project]));
+    for (const target of slopTargets(PIPELINE)) {
+      const host = byName.get(target.package);
+      assert.ok(
+        host.dependencies.includes("@suite/pack"),
+        `${target.package} imports @suite/pack`,
+      );
+    }
+  });
 });

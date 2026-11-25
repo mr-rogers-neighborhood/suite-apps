@@ -6,6 +6,7 @@ import {
   classifyReleaseView,
   goApkAssetName,
   GO_APK_ALIAS,
+  goBuildCommands,
   newestManifestTags,
   parseApksignerFingerprint,
   parseArgs,
@@ -17,6 +18,20 @@ import {
   versionCodePreflight,
 } from "./android-release.mjs";
 import { groupedFingerprint, normaliseFingerprint } from "./lib/androidKey.mjs";
+
+describe("scoped build inputs", () => {
+  it("builds the workspace dependency closure before the Go app", () => {
+    const commands = goBuildCommands();
+    const dependency = commands.findIndex(([, args]) => args.includes("@suite/go-app^..."));
+    const app = commands.findIndex(
+      ([, args]) => args.includes("@suite/go-app") && !args.includes("@suite/go-app^..."),
+    );
+
+    assert.ok(dependency >= 0, "the dependency closure is built");
+    assert.ok(app > dependency, "the app is built after its packages");
+    assert.deepEqual(commands[dependency][1], ["--filter", "@suite/go-app^...", "run", "build"]);
+  });
+});
 
 describe("release lookup", () => {
   it("treats a successful read as present", () => {
