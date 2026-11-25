@@ -11,7 +11,7 @@ each app:
 | `apps/go` | `apps/go/AGENTS.md` | `node scripts/gate.mjs --only go` |
 | `apps/sync` | `apps/sync/README.md` and `docs/` | `node scripts/gate.mjs --only sync` |
 | `apps/help` | `apps/help/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only help` |
-| `apps/shell` | `apps/shell/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only shell` |
+| `apps/desk` | `apps/desk/AGENTS.md` and `README.md` | `node scripts/gate.mjs --only desk` |
 
 The full gate is `node scripts/gate.mjs`; `--fresh` proves the commit rather
 than the working tree. Use `mise exec --` so the Node and pnpm versions pinned

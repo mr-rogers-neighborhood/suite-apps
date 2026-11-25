@@ -16,7 +16,7 @@ because it installs packs into its own data directory and leaves Flatpak
 deployments to Flatpak. `scripts/flatpak.mjs` signs the repository summary with
 the store key and adds the remote with the public half.
 
-## file: packaging/flatpak/run.suite.shell.yml
+## file: packaging/flatpak/run.suite.desk.yml
 
 The host's sandbox is `--share=ipc`, `--share=network`, Wayland with an X11
 fallback, and `--device=dri`. The network namespace carries a pack that declares

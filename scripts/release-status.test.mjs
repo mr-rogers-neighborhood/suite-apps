@@ -51,11 +51,11 @@ import {
   writesReleasesPage,
 } from "./release-status.mjs";
 
-const shell = APPS.find((app) => app.id === "shell");
+const desk = APPS.find((app) => app.id === "desk");
 const go = APPS.find((app) => app.id === "go");
 
-const shellEntry = {
-  app: shell,
+const deskEntry = {
+  app: desk,
   version: "0.2.0",
   date: "2026-11-22",
   section: "### Added\n\n- **The host.** It exists.",
@@ -69,9 +69,9 @@ const goEntry = {
   section: "### Added\n\n- **The first version.** It exists.",
 };
 
-/** Every app in the shape collectReleases() builds; only shell and go render. */
+/** Every app in the shape collectReleases() builds; only desk and go render. */
 const entries = [
-  shellEntry,
+  deskEntry,
   {
     app: APPS.find((app) => app.id === "canvas"),
     version: "0.1.11",
@@ -567,7 +567,7 @@ describe("per-app releases are retired", () => {
     assert.ok(
       commands.every((step) =>
         step.args.every(
-          (arg) => !/(?:shell|start|go|canvas|planner|budget|sync|help)-v/u.test(arg),
+          (arg) => !/(?:desk|start|go|canvas|planner|budget|sync|help)-v/u.test(arg),
         ),
       ),
     );
@@ -603,13 +603,13 @@ describe("per-app releases are retired", () => {
 
 describe("channels and maturity", () => {
   it("labels the superapp rows with their channel and maturity", () => {
-    const shell = APPS.find((app) => app.id === "shell");
+    const desk = APPS.find((app) => app.id === "desk");
     const goApp = APPS.find((app) => app.id === "go");
-    assert.equal(channelLabel(shell), "stable");
-    assert.equal(maturityLabel(shell), "alpha");
+    assert.equal(channelLabel(desk), "stable");
+    assert.equal(maturityLabel(desk), "alpha");
     assert.equal(channelLabel(goApp), "stable");
     assert.equal(maturityLabel(goApp), "pre-alpha");
-    assert.deepEqual(releaseLabels(shell), [
+    assert.deepEqual(releaseLabels(desk), [
       "- **Channel:** stable",
       "- **Maturity:** alpha",
     ]);
@@ -662,14 +662,14 @@ describe("release bodies", () => {
   it("renders only the two superapps with version, channel and install", () => {
     assert.deepEqual(
       superappEntries(entries).map((entry) => entry.app.id),
-      ["shell", "go"],
+      ["desk", "go"],
     );
     const body = aggregateReleaseBody(entries, { date: "2026-11-22" });
     assert.match(body, /Suite Desk/u);
     assert.match(body, /Suite Go/u);
     assert.match(body, /\| \[Suite Desk\]\([^)]*\) \| stable \| alpha \| 0\.2\.0 \|/u);
     assert.match(body, /\| \[Suite Go\]\([^)]*\) \| stable \| pre-alpha \| 0\.1\.0 \|/u);
-    assert.match(body, /flatpak install --user suite run\.suite\.shell/u);
+    assert.match(body, /flatpak install --user suite run\.suite\.desk/u);
     assert.match(body, new RegExp(flatpakrepoUrl().replaceAll(".", "\\."), "u"));
     assert.doesNotMatch(body, /\| \[Suite Start\]/u);
     assert.doesNotMatch(body, /\| \[Suite Canvas\]/u);
@@ -711,9 +711,9 @@ describe("sections and the Suite Go APK", () => {
   it("keeps the desktop rows in reading order and Go alone on mobile", () => {
     assert.deepEqual(
       APPS.filter((app) => app.section === "desktop").map((app) => app.id),
-      ["shell", "canvas", "planner", "budget", "help"],
+      ["desk", "canvas", "planner", "budget", "help"],
     );
-    assert.equal(APPS[0].id, "shell");
+    assert.equal(APPS[0].id, "desk");
     assert.deepEqual(
       APPS.filter((app) => app.section === "mobile").map((app) => app.id),
       ["go"],
@@ -724,20 +724,20 @@ describe("sections and the Suite Go APK", () => {
   });
 
   it("carries the host as Suite Desk, first in the desktop table", () => {
-    assert.equal(shell.name, "Suite Desk");
-    assert.equal(shell.packageJson, "apps/shell/package.json");
-    assert.equal(shell.changelog, "apps/shell/CHANGELOG.md");
-    assert.equal(shell.kind, "flatpak");
-    assert.equal(shell.section, "desktop");
-    assert.equal(shell.flatpakId, "run.suite.shell");
-    assert.equal(installCommand(shell), "flatpak install --user suite run.suite.shell");
+    assert.equal(desk.name, "Suite Desk");
+    assert.equal(desk.packageJson, "apps/desk/package.json");
+    assert.equal(desk.changelog, "apps/desk/CHANGELOG.md");
+    assert.equal(desk.kind, "flatpak");
+    assert.equal(desk.section, "desktop");
+    assert.equal(desk.flatpakId, "run.suite.desk");
+    assert.equal(installCommand(desk), "flatpak install --user suite run.suite.desk");
 
-    const desktop = aggregateSection("Desktop", [shellEntry], {
+    const desktop = aggregateSection("Desktop", [deskEntry], {
       tag: "suite-2026.11.22",
     });
     const rows = desktop.filter((line) => line.startsWith("| ["));
     assert.match(rows[0], /\| \[Suite Desk\]/u);
-    assert.match(rows[0], /run\.suite\.shell/u);
+    assert.match(rows[0], /run\.suite\.desk/u);
   });
 
   it("renders a section as a title and its own rows", () => {
@@ -839,8 +839,8 @@ describe("sections and the Suite Go APK", () => {
 
   it("names the aggregate tag from the newest changelog date", () => {
     const files = {
-      "apps/shell/package.json": '{"version":"0.2.0"}',
-      "apps/shell/CHANGELOG.md": "## [0.2.0] - 2026-11-21\n",
+      "apps/desk/package.json": '{"version":"0.2.0"}',
+      "apps/desk/CHANGELOG.md": "## [0.2.0] - 2026-11-21\n",
       "apps/go/package.json": '{"version":"0.1.0"}',
       "apps/go/CHANGELOG.md": "## [0.1.0] - 2026-11-18\n",
     };
@@ -1029,7 +1029,7 @@ describe("release notes name their channel", () => {
     });
     assert.match(body, /\*\*Channel:\*\* preview/u);
     assert.doesNotMatch(body, /\*\*Channel:\*\* stable/u);
-    assert.ok(body.includes("flatpak install --user suite run.suite.preview.shell//preview"));
+    assert.ok(body.includes("flatpak install --user suite run.suite.preview.desk//preview"));
   });
 
   it("installs each pre-release id on its own branch, not the stable or slop id", () => {
@@ -1038,16 +1038,16 @@ describe("release notes name their channel", () => {
       tag: "suite-nightly-2026.11.23",
       channel: "nightly",
     });
-    assert.ok(body.includes("flatpak install --user suite run.suite.nightly.shell//nightly"));
-    assert.ok(body.includes("flatpak run run.suite.nightly.shell//nightly"));
-    assert.ok(!body.includes("flatpak install --user suite run.suite.shell"));
-    assert.ok(!body.includes("flatpak run run.suite.shell"));
-    assert.ok(!body.includes("run.suite.slop.shell"));
-    assert.ok(!body.includes("run.suite.preview.shell"));
+    assert.ok(body.includes("flatpak install --user suite run.suite.nightly.desk//nightly"));
+    assert.ok(body.includes("flatpak run run.suite.nightly.desk//nightly"));
+    assert.ok(!body.includes("flatpak install --user suite run.suite.desk"));
+    assert.ok(!body.includes("flatpak run run.suite.desk"));
+    assert.ok(!body.includes("run.suite.slop.desk"));
+    assert.ok(!body.includes("run.suite.preview.desk"));
 
     const stable = aggregateReleaseBody(entries, { date: "2026-11-23" });
-    assert.ok(stable.includes("flatpak install --user suite run.suite.shell\n"));
-    assert.ok(!stable.includes("run.suite.nightly.shell"));
+    assert.ok(stable.includes("flatpak install --user suite run.suite.desk\n"));
+    assert.ok(!stable.includes("run.suite.nightly.desk"));
   });
 
   it("still says stable on a stable body", () => {
@@ -1059,11 +1059,11 @@ describe("release notes name their channel", () => {
   });
 
   it("keeps releaseLabels on the standalone release channel too", () => {
-    assert.deepEqual(releaseLabels(shell, "preview"), [
+    assert.deepEqual(releaseLabels(desk, "preview"), [
       "- **Channel:** preview",
       "- **Maturity:** alpha",
     ]);
-    assert.deepEqual(releaseLabels(shell), [
+    assert.deepEqual(releaseLabels(desk), [
       "- **Channel:** stable",
       "- **Maturity:** alpha",
     ]);
@@ -1082,10 +1082,10 @@ describe("the Artifacts section", () => {
     artifacts: [
       {
         kind: "flatpak",
-        id: "run.suite.nightly.shell",
+        id: "run.suite.nightly.desk",
         branch: "nightly",
         commit: flatpakCommit,
-        file: ".dev/release/suite-shell-nightly.flatpak",
+        file: ".dev/release/suite-desk-nightly.flatpak",
         sha256: flatpakSha,
         size: 1024,
       },
@@ -1123,8 +1123,8 @@ describe("the Artifacts section", () => {
       assert.ok(body.includes("branch `nightly`"), "the Flatpak branch is named");
       assert.ok(body.includes(`[${MANIFEST_FILE}](${releaseAssetUrl(tag, MANIFEST_FILE)})`));
       assert.match(body, /sha256sum -c suite-go-nightly-0\.1\.0\.apk\.sha256/u);
-      assert.ok(body.includes("flatpak install --user suite run.suite.nightly.shell//nightly"));
-      assert.ok(body.includes("flatpak info run.suite.nightly.shell//nightly"));
+      assert.ok(body.includes("flatpak install --user suite run.suite.nightly.desk//nightly"));
+      assert.ok(body.includes("flatpak info run.suite.nightly.desk//nightly"));
 
       const draft = aggregateReleaseBody(entries, {
         date: "2026-11-23",

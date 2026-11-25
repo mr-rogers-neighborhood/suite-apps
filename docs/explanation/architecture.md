@@ -12,7 +12,7 @@ share a process, a document or a trust boundary. This page describes those bound
 | Host | Suite Desk (desktop), Suite Go (mobile) | Installing packs, rendering their tabs, routing a link, and handing over bytes |
 | Service | Suite Sync | A transport, a membership log and a persisted room |
 
-The host is not a document editor. The shell opens a signed pack in its own origin and session, hands
+The host is not a document editor. The host opens a signed pack in its own origin and session, hands
 it bytes, and never parses them; it cannot edit a document. Go mounts a domain module inside its own
 window, but the module owns the document.
 
@@ -42,7 +42,7 @@ Suite Desk and Suite Go enforce the same separation in different places:
   live outside the pack root and stay until the person removes them. A frozen Flatpak is not the
   host's to update: Flatpak owns that deployment.
 - **Go never learns a domain.** It routes on what a module declares. There is no
-  `if (module.id === "planner")` in the shell, and a change that needs one belongs in that domain's
+  `if (module.id === "planner")` in Go's shell, and a change that needs one belongs in that domain's
   module.
 - **Go never reads a document.** Modules receive a document handle; the container does not know the
   format.
@@ -63,7 +63,7 @@ and a server a person runs on a device they control. It never defines an app sch
 ## The desktop superapp boundary
 
 Desktop Suite is the host plus signed packs, with the frozen Flatpaks still shipped beside them. It is
-not one application that mounts domain code. [`apps/shell`](../../apps/shell/README.md) is one
+not one application that mounts domain code. [`apps/desk`](../../apps/desk/README.md) is one
 Electron app with a `WebContentsView` per pack, each in its own custom-protocol origin and session
 partition, rendering a signed pack instead of launching a separate process. It owns the catalogue,
 Home and the Screens manager; Flatpak owns the host's own deployment and the frozen apps' deployments.
@@ -76,8 +76,8 @@ session. [Shipping packs](../reference/decisions.md#shipping-packs) owns the rul
 
 ### Why not one container window
 
-The obvious alternative is one window that mounts every domain in the shell's process. It loses the
-boundaries the suite relies on. One crash takes the shell and every open domain with it; a renderer
+The obvious alternative is one window that mounts every domain in the host's process. It loses the
+boundaries the suite relies on. One crash takes the host and every open domain with it; a renderer
 bug can read another app's memory; accessibility is per window and per document, so a container that
 draws its own chrome gives the platform one surface instead of each app's; and one release owns every
 domain's cadence. Mobile Go accepts a narrower version of this trade because it mounts a pack inside
@@ -113,7 +113,7 @@ target: the MiniApp Packaging specification is
 it. The [Suite superapp specification](../spec/superapp.md) is the target for the host and pack
 contract; [The mini-app model](mini-app-model.md) owns the comparison.
 
-The two host seams are named rather than implied: [the shell's decisions](../../apps/shell/docs/reference/decisions.md)
+The two host seams are named rather than implied: [the host's decisions](../../apps/desk/docs/reference/decisions.md)
 state the pack boundary, and [the sync capability](../../apps/sync/docs/reference/sync-capability.md)
 states the sealed-frame contract.
 

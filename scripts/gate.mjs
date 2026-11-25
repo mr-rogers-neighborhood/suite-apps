@@ -218,7 +218,7 @@ const scripts =
             "scripts/proof-of-changes.test.mjs",
             "scripts/release-manifest.test.mjs",
             "scripts/channel.test.mjs",
-            "scripts/shell-channel.test.mjs",
+            "scripts/desk-channel.test.mjs",
             "scripts/android-release.test.mjs",
             "scripts/release-status.test.mjs",
             "scripts/release-index.test.mjs",

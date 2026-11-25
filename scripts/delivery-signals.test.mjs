@@ -32,7 +32,7 @@ const fixture = {
     { tagName: "suite-2026.11.22", publishedAt: "2026-11-22T22:00:00Z" },
     { tagName: "canvas-v0.1.12", publishedAt: "2026-11-21T22:14:37Z" },
     { tagName: "suite-nightly-2026.11.22", publishedAt: "2026-11-23T08:00:00Z" },
-    { tagName: "nightly-shell-v0.2.0", publishedAt: "2026-11-20T03:00:00Z" },
+    { tagName: "nightly-desk-v0.2.0", publishedAt: "2026-11-20T03:00:00Z" },
     { tagName: "suite-preview-2026.11.19", publishedAt: "2026-11-19T03:00:00Z" },
     { tagName: "slop-canvas-v0.1.12", publishedAt: "2026-11-18T03:00:00Z" },
     { tagName: "start-v9.9.9", isDraft: true, createdAt: "2026-11-17T03:00:00Z" },
@@ -89,7 +89,7 @@ describe("channels and release counts", () => {
     assert.equal(channelForTag("suite-2026.11.22"), "stable");
     assert.equal(channelForTag("canvas-v0.1.12"), "stable");
     assert.equal(channelForTag("suite-nightly-2026.11.22"), "nightly");
-    assert.equal(channelForTag("nightly-shell-v0.2.0"), "nightly");
+    assert.equal(channelForTag("nightly-desk-v0.2.0"), "nightly");
     assert.equal(channelForTag("suite-preview-2026.11.19"), "preview");
     assert.equal(channelForTag("slop-canvas-v0.1.12"), "slop");
     assert.equal(channelForTag("v0.1.0"), "stable");

@@ -9,8 +9,8 @@
  * gate proved:
  *
  * 1. `scripts/gate.mjs --fresh` — proves HEAD, writes `.dev/gate-status.json`.
- * 2. `pnpm --filter @suite/shell package:dir` — the Electron tree.
- * 3. `scripts/flatpak.mjs --app shell` — build, sign and install locally.
+ * 2. `pnpm --filter @suite/desk package:dir` — the Electron tree.
+ * 3. `scripts/flatpak.mjs --app desk` — build, sign and install locally.
  * 4. `scripts/flatpak-remote.mjs --target <s3|lan> --publish` — the signed
  *    remote. `s3` is the public store; `lan` is the fallback test host.
  * 5. `scripts/release-status.mjs --draft` — create or update the rolling
@@ -150,14 +150,14 @@ export function releaseSteps({
   steps.push({
     id: "package",
     command: "pnpm",
-    args: ["--filter", "@suite/shell", "package:dir"],
+    args: ["--filter", "@suite/desk", "package:dir"],
     note: "build the host's unpacked Electron tree",
   });
   steps.push({
     id: "flatpak",
     command: "node",
-    args: ["scripts/flatpak.mjs", "--app", "shell"],
-    note: "build, sign and install run.suite.shell locally",
+    args: ["scripts/flatpak.mjs", "--app", "desk"],
+    note: "build, sign and install run.suite.desk locally",
   });
   steps.push({
     id: "remote",
@@ -255,8 +255,8 @@ function goVersion() {
 export function installLines(version = goVersion()) {
   const lines = [
     "Suite Desk (desktop):",
-    "  flatpak install --user suite run.suite.shell",
-    "  flatpak run run.suite.shell",
+    "  flatpak install --user suite run.suite.desk",
+    "  flatpak run run.suite.desk",
   ];
   if (version !== null) {
     const apk = join(APK_DIR, goApkName(version));

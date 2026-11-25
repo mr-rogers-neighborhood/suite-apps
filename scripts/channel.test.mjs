@@ -31,13 +31,13 @@ describe("pre-release identity", () => {
 
   it("keeps the four ids distinct, so every channel is its own install", () => {
     const ids = ["stable", "slop", "nightly", "preview"].map((channel) =>
-      flatpakId("shell", channel),
+      flatpakId("desk", channel),
     );
     assert.deepEqual(ids, [
-      "run.suite.shell",
-      "run.suite.slop.shell",
-      "run.suite.nightly.shell",
-      "run.suite.preview.shell",
+      "run.suite.desk",
+      "run.suite.slop.desk",
+      "run.suite.nightly.desk",
+      "run.suite.preview.desk",
     ]);
     assert.equal(new Set(ids).size, ids.length);
   });
@@ -59,7 +59,7 @@ describe("pre-release identity", () => {
       assert.equal(channelProblemForApp(app, "stable"), null);
       assert.equal(channelProblemForApp(app, "slop", { session: true }), null);
     }
-    assert.equal(channelProblemForApp("shell", "nightly"), null);
+    assert.equal(channelProblemForApp("desk", "nightly"), null);
     assert.equal(channelProblemForApp("go", "preview"), null);
   });
 

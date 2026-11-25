@@ -62,13 +62,13 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Build the shared libraries and the shell
-        run: pnpm --filter @suite/shell build:all
+      - name: Build the shared libraries and Desk
+        run: pnpm --filter @suite/desk build:all
       # Unsigned zip, per platforms.md section 4: no NSIS installer, no
       # Authenticode, no auto-update. `directories.output` is `release`, so the
-      # artifact lands in apps/shell/release.
+      # artifact lands in apps/desk/release.
       - name: Package the unsigned Windows zip
-        run: pnpm --filter @suite/shell exec electron-builder --win zip --publish never
+        run: pnpm --filter @suite/desk exec electron-builder --win zip --publish never
       # P5.1: start the packaged .exe, prove it is still running after ten
       # seconds, then stop it. A failure here blocks the Windows artifact, not
       # the Linux release (P2.3).
@@ -76,7 +76,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $zip = Get-ChildItem "apps/shell/release" -Filter *.zip | Select-Object -First 1
+          $zip = Get-ChildItem "apps/desk/release" -Filter *.zip | Select-Object -First 1
           if (-not $zip) { throw "no zip was packaged" }
           $dest = Join-Path $env:RUNNER_TEMP "smoke"
           if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
@@ -96,7 +96,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $dir = "apps/shell/release"
+          $dir = "apps/desk/release"
           $lines = Get-ChildItem $dir -Filter *.zip | Sort-Object Name | ForEach-Object {
             "$((Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           }
@@ -123,25 +123,25 @@ jobs:
           )
           Get-Content (Join-Path $dir "SHA256SUMS")
       - name: SBOM
-        run: pnpm sbom --sbom-format spdx --out suite-shell-windows-x64.spdx.json
+        run: pnpm sbom --sbom-format spdx --out suite-desk-windows-x64.spdx.json
       - name: Attest provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: apps/shell/release/*.zip
+          subject-path: apps/desk/release/*.zip
       - name: Attest the SBOM
         uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
-          sbom-path: suite-shell-windows-x64.spdx.json
-          subject-path: apps/shell/release/*.zip
+          sbom-path: suite-desk-windows-x64.spdx.json
+          subject-path: apps/desk/release/*.zip
       - name: Upload the test artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: suite-shell-windows-x64-unsigned
+          name: suite-desk-windows-x64-unsigned
           path: |
-            apps/shell/release/*.zip
-            apps/shell/release/SHA256SUMS
-            apps/shell/release/README.txt
-            suite-shell-windows-x64.spdx.json
+            apps/desk/release/*.zip
+            apps/desk/release/SHA256SUMS
+            apps/desk/release/README.txt
+            suite-desk-windows-x64.spdx.json
           retention-days: 14
           if-no-files-found: error
 
@@ -172,19 +172,19 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Build the shared libraries and the shell
-        run: pnpm --filter @suite/shell build:all
+      - name: Build the shared libraries and Desk
+        run: pnpm --filter @suite/desk build:all
       # `--mac zip` because a dmg needs a signing/notarization story this build
       # does not have; the arch is the runner's own arm64.
       - name: Package the unsigned macOS zip
-        run: pnpm --filter @suite/shell exec electron-builder --mac zip --publish never
+        run: pnpm --filter @suite/desk exec electron-builder --mac zip --publish never
       # P5.1: run the binary inside the .app, prove it is still running after
       # ten seconds, then stop it. A failure here blocks the macOS artifact, not
       # the Linux release (P2.3).
       - name: Launch smoke
         run: |
           set -euo pipefail
-          zip="$(find apps/shell/release -maxdepth 1 -name '*.zip' -print -quit)"
+          zip="$(find apps/desk/release -maxdepth 1 -name '*.zip' -print -quit)"
           test -n "${zip}"
           dest="${RUNNER_TEMP}/smoke"
           rm -rf "${dest}"
@@ -221,7 +221,7 @@ jobs:
       - name: Checksums and README
         run: |
           set -euo pipefail
-          cd apps/shell/release
+          cd apps/desk/release
           shasum -a 256 ./*.zip > SHA256SUMS
           cat > README.txt <<'EOF'
           Suite Desk - unsigned macOS test build
@@ -239,25 +239,25 @@ jobs:
           EOF
           cat SHA256SUMS
       - name: SBOM
-        run: pnpm sbom --sbom-format spdx --out suite-shell-macos-arm64.spdx.json
+        run: pnpm sbom --sbom-format spdx --out suite-desk-macos-arm64.spdx.json
       - name: Attest provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: apps/shell/release/*.zip
+          subject-path: apps/desk/release/*.zip
       - name: Attest the SBOM
         uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
-          sbom-path: suite-shell-macos-arm64.spdx.json
-          subject-path: apps/shell/release/*.zip
+          sbom-path: suite-desk-macos-arm64.spdx.json
+          subject-path: apps/desk/release/*.zip
       - name: Upload the test artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: suite-shell-macos-arm64-unsigned
+          name: suite-desk-macos-arm64-unsigned
           path: |
-            apps/shell/release/*.zip
-            apps/shell/release/SHA256SUMS
-            apps/shell/release/README.txt
-            suite-shell-macos-arm64.spdx.json
+            apps/desk/release/*.zip
+            apps/desk/release/SHA256SUMS
+            apps/desk/release/README.txt
+            suite-desk-macos-arm64.spdx.json
           retention-days: 14
           if-no-files-found: error
 
@@ -288,14 +288,14 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Build the shared libraries and the shell
-        run: pnpm --filter @suite/shell build:all
+      - name: Build the shared libraries and Desk
+        run: pnpm --filter @suite/desk build:all
       - name: Package the unsigned macOS Intel zip
-        run: pnpm --filter @suite/shell exec electron-builder --mac zip --x64 --publish never
+        run: pnpm --filter @suite/desk exec electron-builder --mac zip --x64 --publish never
       - name: Checksums and README
         run: |
           set -euo pipefail
-          cd apps/shell/release
+          cd apps/desk/release
           shasum -a 256 ./*.zip > SHA256SUMS
           cat > README.txt <<'EOF'
           Suite Desk - unsigned macOS Intel test build
@@ -315,11 +315,11 @@ jobs:
       - name: Upload the test artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: suite-shell-macos-intel-unsigned
+          name: suite-desk-macos-intel-unsigned
           path: |
-            apps/shell/release/*.zip
-            apps/shell/release/SHA256SUMS
-            apps/shell/release/README.txt
+            apps/desk/release/*.zip
+            apps/desk/release/SHA256SUMS
+            apps/desk/release/README.txt
           retention-days: 14
           if-no-files-found: error
       - name: Report the tier
@@ -328,7 +328,7 @@ jobs:
           echo "macos-intel (Tier 3, build-only): ${{ job.status }}. A failure is reported, not release-blocking (platforms.md, P2.3)." >> "${GITHUB_STEP_SUMMARY}"
 
   # Tier 3 (platforms.md, section 2): build-only, no artifact promise and no
-  # release wiring. A Windows arm64 build proves Electron and the shell compile
+  # release wiring. A Windows arm64 build proves Electron and Desk compile
   # for the architecture; it is not offered as a download.
   windows-arm64:
     name: windows-arm64
@@ -351,17 +351,17 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Build the shared libraries and the shell
-        run: pnpm --filter @suite/shell build:all
+      - name: Build the shared libraries and Desk
+        run: pnpm --filter @suite/desk build:all
       # The runner is arm64; naming it keeps the target explicit if the image
       # changes under the label.
       - name: Package the unsigned Windows arm64 zip
-        run: pnpm --filter @suite/shell exec electron-builder --win zip --arm64 --publish never
+        run: pnpm --filter @suite/desk exec electron-builder --win zip --arm64 --publish never
       - name: Checksums and README
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $dir = "apps/shell/release"
+          $dir = "apps/desk/release"
           $lines = Get-ChildItem $dir -Filter *.zip | Sort-Object Name | ForEach-Object {
             "$((Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           }
@@ -390,11 +390,11 @@ jobs:
       - name: Upload the test artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: suite-shell-windows-arm64-unsigned
+          name: suite-desk-windows-arm64-unsigned
           path: |
-            apps/shell/release/*.zip
-            apps/shell/release/SHA256SUMS
-            apps/shell/release/README.txt
+            apps/desk/release/*.zip
+            apps/desk/release/SHA256SUMS
+            apps/desk/release/README.txt
           retention-days: 14
           if-no-files-found: error
       - name: Report the tier
@@ -444,7 +444,7 @@ jobs:
       - name: Flatpak runtimes
         run: |
           set -euo pipefail
-          manifest="packaging/flatpak/run.suite.shell.yml"
+          manifest="packaging/flatpak/run.suite.desk.yml"
           field() {
             sed -n "s/^$1: *'\?\([^']*\)'\?$/\1/p" "${manifest}"
           }
@@ -463,12 +463,12 @@ jobs:
       # `--dir` build. Build first, name the directory the manifest expects,
       # then hand the result to flatpak.mjs with `--no-build` so it does not
       # rebuild and look at the old name.
-      - name: Build the unpacked shell
-        run: pnpm --filter @suite/shell run package:dir
+      - name: Build the unpacked Desk
+        run: pnpm --filter @suite/desk run package:dir
       - name: Name the unpacked directory the manifest expects
         run: |
           set -euo pipefail
-          release="apps/shell/release"
+          release="apps/desk/release"
           unpacked="${release}/linux-unpacked"
           if [ ! -d "${unpacked}" ]; then
             arch_dir="$(find "${release}" -maxdepth 1 -type d -name 'linux-*-unpacked' -print -quit)"
@@ -478,17 +478,17 @@ jobs:
           test -x "${unpacked}/suite"
           ls -d "${unpacked}"
       - name: Build the host Flatpak
-        run: node scripts/flatpak.mjs --app shell --no-build --no-install
+        run: node scripts/flatpak.mjs --app desk --no-build --no-install
       - name: Bundle the Flatpak
         run: |
           set -euo pipefail
-          bundle="suite-shell-linux-aarch64.flatpak"
-          flatpak build-bundle "${SUITE_FLATPAK_REPO}" "${bundle}" run.suite.shell master
+          bundle="suite-desk-linux-aarch64.flatpak"
+          flatpak build-bundle "${SUITE_FLATPAK_REPO}" "${bundle}" run.suite.desk master
           ls -l "${bundle}"
       - name: Install the bundle into a throwaway user installation
         run: |
           set -euo pipefail
-          flatpak install --user -y --noninteractive --no-deps suite-shell-linux-aarch64.flatpak
+          flatpak install --user -y --noninteractive --no-deps suite-desk-linux-aarch64.flatpak
           flatpak list --user --app --columns=application,branch,origin
       - name: Launch smoke
         run: |
@@ -505,7 +505,7 @@ jobs:
           echo "smoke: DISPLAY=${DISPLAY}"
           # A hosted runner has no session bus, and zypak refuses to start
           # Electron without one. Give this step its own bus.
-          dbus-run-session -- flatpak run run.suite.shell --disable-gpu --disable-dev-shm-usage \
+          dbus-run-session -- flatpak run run.suite.desk --disable-gpu --disable-dev-shm-usage \
             > "${RUNNER_TEMP}/smoke.log" 2>&1 &
           app_pid=$!
           for second in 1 2 3 4 5 6 7 8 9 10; do
@@ -520,20 +520,20 @@ jobs:
           echo "smoke: first lines of the app log"
           sed -n '1,10p' "${RUNNER_TEMP}/smoke.log" || true
           flatpak ps || true
-          flatpak kill run.suite.shell 2>/dev/null || true
+          flatpak kill run.suite.desk 2>/dev/null || true
           kill "${app_pid}" 2>/dev/null || true
           wait "${app_pid}" 2>/dev/null || true
       - name: Checksums and README
         run: |
           set -euo pipefail
-          sha256sum suite-shell-linux-aarch64.flatpak > SHA256SUMS
+          sha256sum suite-desk-linux-aarch64.flatpak > SHA256SUMS
           cat > README.txt <<'EOF'
           Suite Desk - unsigned Linux aarch64 test bundle
 
           This is a test artifact, not a release. The Flatpak bundle is not
           signed, so install it by hand into your user installation:
 
-            flatpak install --user ./suite-shell-linux-aarch64.flatpak
+            flatpak install --user ./suite-desk-linux-aarch64.flatpak
 
           A bundle installed this way does not auto-update. The test remote, not
           this file, is the update path when it carries this architecture.
@@ -546,9 +546,9 @@ jobs:
       - name: Upload the test artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: suite-shell-linux-aarch64-unsigned
+          name: suite-desk-linux-aarch64-unsigned
           path: |
-            suite-shell-linux-aarch64.flatpak
+            suite-desk-linux-aarch64.flatpak
             SHA256SUMS
             README.txt
           retention-days: 14

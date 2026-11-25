@@ -90,7 +90,7 @@ once. Slop keeps the id it has always had; nightly and preview moved from the sh
 pre-release data is migrated.
 
 ```sh
-node scripts/flatpak.mjs --app shell --channel nightly
+node scripts/flatpak.mjs --app desk --channel nightly
 node scripts/flatpak-remote.mjs --target s3 --channel nightly --publish
 ```
 
@@ -192,8 +192,8 @@ mise exec -- node scripts/release-suite.mjs --publish                 # the publ
 mise exec -- node scripts/release-suite.mjs --target lan --publish    # the suite-dev fallback
 ```
 
-It runs, in order: `node scripts/gate.mjs --fresh`; `pnpm --filter @suite/shell package:dir`;
-`node scripts/flatpak.mjs --app shell`; `node scripts/flatpak-remote.mjs --target s3|lan --publish`;
+It runs, in order: `node scripts/gate.mjs --fresh`; `pnpm --filter @suite/desk package:dir`;
+`node scripts/flatpak.mjs --app desk`; `node scripts/flatpak-remote.mjs --target s3|lan --publish`;
 `node scripts/release-status.mjs --draft`; `node scripts/android-release.mjs --publish`, which attaches
 the APK to that draft; `node scripts/release-status.mjs --publish`, which publishes the draft and
 writes `RELEASES.md` with the APK link.
@@ -208,7 +208,7 @@ Without `--publish` the command is a dry run: it prints every step and passes `-
 child, so nothing is built, signed, uploaded or written. A publish refuses unless
 `.dev/gate-status.json` names HEAD, says `ok`, came from a clean `--fresh` export and is not an
 `--only` run. `--skip-gate` does not waive that rule; it only avoids running the gate again. The
-sequence prints the install lines for `run.suite.shell` and the APK path and alias at the end.
+sequence prints the install lines for `run.suite.desk` and the APK path and alias at the end.
 
 ## Suite Go (Android)
 
@@ -325,7 +325,7 @@ into the artifact.
 
 | What | Where the version lives |
 | --- | --- |
-| Suite Desk | `apps/shell/package.json` |
+| Suite Desk | `apps/desk/package.json` |
 | Planner, Budget, Help | `apps/<app>/package.json` |
 | Canvas | `apps/canvas/desktop/package.json` |
 | The relay (`suite-sync`) | `apps/sync/package.json` |

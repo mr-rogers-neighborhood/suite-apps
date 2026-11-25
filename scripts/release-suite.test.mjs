@@ -20,11 +20,11 @@ describe("the release sequence", () => {
     );
   });
 
-  it("packages the host and builds run.suite.shell", () => {
+  it("packages the host and builds run.suite.desk", () => {
     const steps = releaseSteps({ publish: true });
     const byId = Object.fromEntries(steps.map((step) => [step.id, step]));
-    assert.equal(commandText(byId.package), "pnpm --filter @suite/shell package:dir");
-    assert.equal(commandText(byId.flatpak), "node scripts/flatpak.mjs --app shell");
+    assert.equal(commandText(byId.package), "pnpm --filter @suite/desk package:dir");
+    assert.equal(commandText(byId.flatpak), "node scripts/flatpak.mjs --app desk");
     assert.equal(byId.remote.args[byId.remote.args.indexOf("--target") + 1], DEFAULT_TARGET);
   });
 
@@ -101,7 +101,7 @@ describe("the gate proof", () => {
   });
 
   it("refuses an --only run", () => {
-    assert.match(publishRefusal({ ...goodStatus, only: "shell" }, head), /--only shell/u);
+    assert.match(publishRefusal({ ...goodStatus, only: "desk" }, head), /--only desk/u);
   });
 
   it("refuses a proof of another commit", () => {
@@ -147,9 +147,9 @@ describe("the install commands", () => {
   it("names the host install and the APK path and alias", () => {
     const lines = installLines("0.1.0");
     assert.ok(lines.includes("Suite Desk (desktop):"));
-    assert.ok(lines.some((line) => line.includes("flatpak install --user suite run.suite.shell")));
+    assert.ok(lines.some((line) => line.includes("flatpak install --user suite run.suite.desk")));
     assert.ok(lines.includes("Suite Go (mobile):"));
-    assert.ok(lines.some((line) => line.includes("flatpak run run.suite.shell")));
+    assert.ok(lines.some((line) => line.includes("flatpak run run.suite.desk")));
     assert.ok(lines.some((line) => line.includes("adb install -r -t apps/go/.dev/release/suite-go-0.1.0.apk")));
     assert.match(lines.at(-1), /apps\/go\/\.dev\/release\/suite-go\.apk/u);
   });

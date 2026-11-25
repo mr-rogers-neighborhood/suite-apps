@@ -12,7 +12,7 @@ the pipeline is [ci.md](ci.md); the delivery contract is [delivery.md](delivery.
 lives under `packages/` only when two or more apps consume it. An app's private packages stay under
 `apps/<app>/packages/`.
 
-**R1.3** The desktop host is `apps/shell` (`@suite/shell`), and it is the way in: it reads a verified
+**R1.3** The desktop host is `apps/desk` (`@suite/desk`), and it is the way in: it reads a verified
 index, installs packs and opens them. It is the only desktop install path. The legacy Start hub was
 retired in [#314](https://github.com/mrrnbhd/suite-apps/issues/314); its catalogue and Home moved
 here, and a frozen Flatpak keeps its documented `flatpak install` line. Go is the mobile host. The
@@ -68,7 +68,7 @@ must not import Electron, Node or DOM unless its package name and README say so.
 
 ## 4. Release identity
 
-**R4.1** The superapp is `shell` and `go`. A pack is per app. A legacy Flatpak is frozen. A channel
+**R4.1** The superapp is `desk` and `go`. A pack is per app. A legacy Flatpak is frozen. A channel
 belongs to the superapp; a pack carries a version.
 
 **R4.2** The app's `package.json` owns the app version; the Android Gradle file owns the Android
@@ -108,8 +108,8 @@ Do not big-bang move the tree. The order is:
    launch in a window, install/update/remove. Do not port the next app until the first passes.
 4. **Retire the old path.** When a legacy app is a pack, remove its Flatpak release lane, keep its
    last artifact, and mark it frozen.
-5. **Retire the hub.** Start's Home and Screens manager moved into the shell and the rest of the hub
-   was removed (#314); there is one install path, the shell catalogue, not two.
+5. **Retire the hub.** Start's Home and Screens manager moved into the host and the rest of the hub
+   was removed (#314); there is one install path, the host catalogue, not two.
 
 ## 7. Non-goals
 

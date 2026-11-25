@@ -14,7 +14,7 @@ import { parseWith } from "./parse.js";
  *    sentence. Nothing in the shape names a file, a path or a document.
  *
  * A widget id is app-local — `quick-task` — and the host registers it as
- * `<app id>.<widget id>` so two apps cannot collide and a host widget such as `shell.apps`
+ * `<app id>.<widget id>` so two apps cannot collide and a host widget such as `desk.apps`
  * is an ordinary entry in the same table.
  */
 const WIDGET_ID_PATTERN = /^[a-z][a-z0-9-]{0,31}$/u;

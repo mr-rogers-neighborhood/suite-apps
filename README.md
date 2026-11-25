@@ -11,14 +11,14 @@ project operates.
 
 | Host | What it is | State | Install |
 | --- | --- | --- | --- |
-| **Suite Desk** | The desktop host: one window, a tab per pack, a Home Screen and a local catalogue | Alpha | `flatpak install --user suite run.suite.shell` |
+| **Suite Desk** | The desktop host: one window, a tab per pack, a Home Screen and a local catalogue | Alpha | `flatpak install --user suite run.suite.desk` |
 | **Suite Go** | The mobile host: one container, one pack at a time, the same document boundary | v0 | [suite-go.apk](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk) |
 
 Add the signed store once; every desktop install comes from it:
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite https://flatpak.suite.run/suite.flatpakrepo
-flatpak install --user suite run.suite.shell
+flatpak install --user suite run.suite.desk
 ```
 
 Suite Go is not a Flatpak. Download the APK and `adb install -r -t suite-go.apk`. Pre-release builds
@@ -57,7 +57,7 @@ Node and pnpm are pinned in `package.json`; `mise exec --` resolves both.
 ```sh
 mise exec -- pnpm install
 mise exec -- node scripts/gate.mjs               # every row, in dependency order
-mise exec -- node scripts/gate.mjs --only shell
+mise exec -- node scripts/gate.mjs --only desk
 mise exec -- node scripts/gate.mjs --fresh       # prove the commit, not the tree
 ```
 

@@ -13,7 +13,7 @@ describe("desktop proof runner", () => {
     const selected = selectProofApps({ rows: PIPELINE });
     assert.deepEqual(
       selected.map((row) => row.repo),
-      ["shell", "help", "canvas", "planner", "budget"],
+      ["desk", "help", "canvas", "planner", "budget"],
     );
   });
 
@@ -114,7 +114,7 @@ describe("desktop proof runner", () => {
     const empty = evaluateProofOutcome({
       exitStatus: 0,
       scenarios: [{ status: "passed" }],
-      screenshots: [{ name: "01-open.png", relPath: "shell/01-open.png" }],
+      screenshots: [{ name: "01-open.png", relPath: "desk/01-open.png" }],
       emptyScreenshots: ["02-focus.png"],
     });
     assert.equal(empty.ok, false);
@@ -123,7 +123,7 @@ describe("desktop proof runner", () => {
     const valid = evaluateProofOutcome({
       exitStatus: 0,
       scenarios: [{ status: "passed" }],
-      screenshots: [{ name: "01-open.png", relPath: "shell/01-open.png" }],
+      screenshots: [{ name: "01-open.png", relPath: "desk/01-open.png" }],
       emptyScreenshots: [],
     });
     assert.equal(valid.ok, true);

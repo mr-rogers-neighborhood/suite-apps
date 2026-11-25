@@ -13,7 +13,7 @@ Each desktop row in `scripts/lib/pipeline.mjs` (`desktop: true`) has one `proof.
 
 | App | Spec | What it proves |
 | --- | --- | --- |
-| `shell` | `apps/shell/e2e/proof.spec.ts` | Opens the Home Screen, creates a `Focus` Screen document, and switches to it |
+| `desk` | `apps/desk/e2e/proof.spec.ts` | Opens the Home Screen, creates a `Focus` Screen document, and switches to it |
 | `help` | `apps/help/e2e/proof.spec.ts` | Opens the indexed code explorer, searches the handbook, and renders an article |
 | `canvas` | `apps/canvas/e2e/tests/desktop/proof.spec.ts` | Creates a `.canvas` workspace document, adds a card, and renders it on the board |
 | `planner` | `apps/planner/e2e/proof.spec.ts` | Opens a `.planner` document, captures a task, and shows it on the day plan |
@@ -33,7 +33,7 @@ mise exec -- pnpm proof
 
 Options:
 
-- `--only <app>`: run one desktop app (`shell`, `help`, `canvas`, `planner`, `budget`).
+- `--only <app>`: run one desktop app (`desk`, `help`, `canvas`, `planner`, `budget`).
 - `--affected`: select only the desktop rows whose diff can break them via `scripts/affected.mjs`.
 - `--base <ref>`: base ref for `--affected` (defaults to `origin/main`).
 - `--out <dir>`: output directory for the summary and artifacts (defaults to `.dev/proof`).

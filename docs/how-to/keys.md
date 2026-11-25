@@ -113,7 +113,7 @@ A pin is a trust root, so rotation is a sequence, not an edit.
 **Pack key.** Generate, pin `SUITE_PACK_PUBLIC_KEY` in `packages/pack/src/pinnedKey.ts`, rebuild every
 pack and reinstall them. The pin is shared: Suite Go re-exports it as `PACK_PUBLIC_KEY` and the desktop
 host verifies with the same constant, so no host has a second copy. But the pin is a trust root, not
-an install-time receipt: the shell re-verifies every installed manifest at boot, so moving the pin
+an install-time receipt: the host re-verifies every installed manifest at boot, so moving the pin
 makes packs signed with the old key fail as `untrusted` and they stop loading. A rotation therefore
 refuses the old packs; rebuild and reinstall them, and ship the new pin with those packs.
 

@@ -88,7 +88,7 @@ export const HOST_VERSION = 1;
  *
  * S4.8 says a host refuses a pack naming a capability it does not implement, rather than
  * installing it and letting the first call fail. The desktop's list is its own
- * (`HOST_CAPABILITIES` in `apps/shell/src/packs.ts`) because the two hosts serve different
+ * (`HOST_CAPABILITIES` in `apps/desk/src/packs.ts`) because the two hosts serve different
  * surfaces; they agree on the manifests and on the refusal, not on this set.
  */
 export const GO_HOST_CAPABILITIES = GO_HOST.capabilities;

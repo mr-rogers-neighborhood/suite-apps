@@ -30,13 +30,13 @@ const PROJECTS = [
   { name: "@suite/ui", dir: "packages/ui", dependencies: [] },
   { name: "@suite/contracts", dir: "packages/contracts", dependencies: [] },
   { name: "@suite/canvas", dir: "apps/canvas", dependencies: ["@suite/ui", "@suite/contracts"] },
-  { name: "@suite/shell", dir: "apps/shell", dependencies: ["@suite/ui"] },
+  { name: "@suite/desk", dir: "apps/desk", dependencies: ["@suite/ui"] },
   { name: "@suite/budget", dir: "apps/budget", dependencies: ["@suite/ui"] },
   { name: "@suite/budget-pack", dir: "apps/budget/packages/pack", dependencies: [] },
 ];
 
 const ROWS = [
-  { repo: "shell", package: "@suite/shell" },
+  { repo: "desk", package: "@suite/desk" },
   { repo: "canvas", package: "@suite/canvas" },
   { repo: "budget", package: "@suite/budget" },
 ];
@@ -60,7 +60,7 @@ describe("affected selection", () => {
 
   it("walks a shared package to every consumer that depends on it", () => {
     const result = affected(["packages/ui/src/button.tsx"]);
-    assert.deepEqual(repos(result), ["shell", "canvas", "budget"]);
+    assert.deepEqual(repos(result), ["desk", "canvas", "budget"]);
     assert.equal(result.e2e, false, "no row carries an e2e suite");
   });
 
@@ -71,7 +71,7 @@ describe("affected selection", () => {
   });
 
   it("sends a docs-only change to no app row", () => {
-    const result = affected(["docs/reference/status.md", "apps/shell/docs/reference/foo.md"]);
+    const result = affected(["docs/reference/status.md", "apps/desk/docs/reference/foo.md"]);
     assert.deepEqual(repos(result), []);
     assert.equal(result.docsOnly, true);
     assert.equal(result.spec, false);
@@ -87,7 +87,7 @@ describe("affected selection", () => {
 
   it("runs everything for a path outside every project", () => {
     const result = affected([".github/workflows/ci.yml"]);
-    assert.deepEqual(repos(result), ["shell", "canvas", "budget"]);
+    assert.deepEqual(repos(result), ["desk", "canvas", "budget"]);
     assert.equal(result.global, true);
     assert.equal(result.docsOnly, false);
     assert.equal(
@@ -128,7 +128,7 @@ describe("workspace reading", () => {
 
   it("expands a pattern to project directories", () => {
     const dirs = expandPattern(ROOT, "apps/*");
-    assert.ok(dirs.includes("apps/shell"));
+    assert.ok(dirs.includes("apps/desk"));
     assert.ok(dirs.includes("apps/canvas"));
   });
 
@@ -147,22 +147,22 @@ describe("workspace reading", () => {
   it("maps a real app file to its gate row", () => {
     const projects = readProjects(ROOT);
     const result = computeAffected({
-      paths: ["apps/shell/src/main.ts"],
+      paths: ["apps/desk/src/main.ts"],
       projects,
       rows: PIPELINE,
     });
     assert.deepEqual(
       result.rows.map((row) => row.repo),
-      ["shell"],
+      ["desk"],
     );
     assert.equal(result.e2e, false);
   });
 
   it("runs e2e only for a row that marks one", () => {
     const result = computeAffected({
-      paths: ["apps/shell/src/main.ts"],
+      paths: ["apps/desk/src/main.ts"],
       projects: PROJECTS,
-      rows: [{ repo: "shell", package: "@suite/shell", e2e: true }],
+      rows: [{ repo: "desk", package: "@suite/desk", e2e: true }],
     });
     assert.equal(result.e2e, true);
   });
@@ -179,7 +179,7 @@ describe("workspace reading", () => {
     assert.equal(result.global, false);
     assert.deepEqual(
       result.proofRows.map((row) => row.repo),
-      ["shell", "help", "canvas", "planner", "budget"],
+      ["desk", "help", "canvas", "planner", "budget"],
     );
   });
 
