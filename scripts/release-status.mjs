@@ -86,11 +86,25 @@ export const REMOTE_URL = DEFAULT_PUBLIC_URL;
 /** The generated human mirror of the Latest release, committed at the root. */
 export const RELEASES_FILE = "RELEASES.md";
 
-/** The README carries the same channel table; `--check-readme` keeps it honest. */
+/** The README carries the same tables; `--check-readme` keeps them honest. */
 export const README_FILE = "README.md";
 export const CHANNELS_BLOCK_START =
   "<!-- BEGIN generated:channels (scripts/release-status.mjs; do not edit by hand) -->";
 export const CHANNELS_BLOCK_END = "<!-- END generated:channels -->";
+
+/**
+ * The one brand asset, and where the pages that cannot use a relative path read it.
+ *
+ * The tree has no separate brand mark yet, so the canonical file is the icon
+ * Suite Desk ships (`hosts/desk/build/icons/512x512.png`, copied to
+ * `docs/assets/suite-icon.png`). The README renders it from `docs/assets`; a
+ * GitHub release body is not in the tree, so it reads the same bytes from the
+ * `main` branch over HTTPS.
+ */
+export const LOGO_PATH = "docs/assets/suite-icon.png";
+export const LOGO_URL = `https://raw.githubusercontent.com/${RELEASE_REPO}/main/${LOGO_PATH}`;
+export const SITE_URL = "https://suite.run";
+export const DOCS_URL = `https://github.com/${RELEASE_REPO}/blob/main/docs/README.md`;
 
 /** Where a publish writes each release body before handing it to `gh`. */
 export const NOTES_DIR = ".dev/releases";
@@ -146,14 +160,102 @@ export function newestPages(releases) {
   return pages;
 }
 
+/** The pre-release order the README reads: newest promise first, slop last. */
+export const README_PRE_RELEASE_ORDER = [...PRE_RELEASE_CHANNELS].reverse();
+
+/** The stable-page order of the other channels: stable first, slop last. */
+export function otherChannels(channel) {
+  const order =
+    channel === STABLE_CHANNEL ? [...CHANNEL_ORDER].reverse() : [...CHANNEL_ORDER];
+  return order.filter((name) => name !== channel);
+}
+
+/** The install cell a channel's Suite Go column carries on a page. */
+function goChannelCell(
+  name,
+  {
+    channel = null,
+    tag = null,
+    goApp = null,
+    goVersion = null,
+    apkLive = false,
+    draft = false,
+    revision = null,
+  } = {},
+) {
+  if (goApp === null) return "—";
+  if (name === channel && goVersion !== null) {
+    return installCell(goApp, { version: goVersion, tag, apkLive, draft, channel: name, revision });
+  }
+  if (name === STABLE_CHANNEL) {
+    return `[\`suite-go.apk\`](https://github.com/${RELEASE_REPO}/releases/latest/download/suite-go.apk)`;
+  }
+  return `\`suite-go-${name}-<version>.apk\` on that page`;
+}
+
+/**
+ * One channel row, shared by the own-channel table, the other-channels table,
+ * the README and `RELEASES.md`.
+ *
+ * The same four columns everywhere: the channel, the Desk command, the Go
+ * artifact, and the page. `pages === null` renders the tag shape instead of a
+ * link, which is what a version-free README wants when no release list was read.
+ * The page's own row says "this page"; every other row links the newest
+ * published page of that channel, or says it has none.
+ */
+export function channelRow(
+  name,
+  {
+    mode = "page",
+    channel = null,
+    tag = null,
+    pages = {},
+    shellApp = null,
+    goApp = null,
+    goVersion = null,
+    apkLive = false,
+    draft = false,
+    revision = null,
+    latestPage = false,
+  } = {},
+) {
+  const shape =
+    name === STABLE_CHANNEL
+      ? "`suite-<date>`"
+      : name === "slop"
+        ? "`suite-slop-<date>-<revision>`"
+        : `\`suite-${name}-<date>\``;
+  const page = name === channel && tag !== null ? tag : (pages?.[name] ?? null);
+  const where =
+    latestPage && name === STABLE_CHANNEL
+      ? `[${shape}](https://github.com/${RELEASE_REPO}/releases/latest)`
+      : pages === null
+        ? shape
+        : name === channel && tag !== null
+          ? `this page (\`${tag}\`)`
+          : page === null
+            ? "not published yet"
+            : `[\`${page}\`](${releaseUrl(page)})`;
+  const desk = shellApp === null ? "—" : `\`${installCommand(shellApp, name)}\``;
+  const go = goChannelCell(name, {
+    channel,
+    tag,
+    goApp,
+    goVersion,
+    apkLive,
+    draft,
+    revision,
+  });
+  return `| \`${name}\` | ${desk} | ${go} | ${where} |`;
+}
+
 /**
  * The channel table every release page and `RELEASES.md` carries.
  *
- * `mode` decides the third column: a release page names the Flatpak id a reader
- * types after adding the remote, and the README spends the extra width on the
- * whole command, because that is the page a person starts from. Both render the
- * same rows from the same list, so the two cannot disagree about a channel or a
- * branch.
+ * `order` decides which channels and in which direction: the page's own table
+ * has one row, a pre-release page lists the others ascending (slop → stable),
+ * and the Latest page lists them descending (stable → slop). `mode` is kept for
+ * the callers that only want the shape; both modes render the same four columns.
  */
 export function channelTable({
   mode = "page",
@@ -161,44 +263,72 @@ export function channelTable({
   tag = null,
   pages = {},
   shellApp = null,
+  goApp = null,
+  goVersion = null,
+  apkLive = false,
+  draft = false,
+  revision = null,
+  latestPage = false,
+  order = CHANNEL_ORDER,
 } = {}) {
-  const header =
-    mode === "install"
-      ? ["| Channel | Suite Desk | Suite Go | Page |", "| --- | --- | --- | --- |"]
-      : ["| Channel | Newest page | Suite Desk |", "| --- | --- | --- |"];
-  const rows = CHANNEL_ORDER.map((name) => {
-    const shape =
-      name === "stable"
-        ? "`suite-<date>`"
-        : name === "slop"
-          ? "`suite-slop-<date>-<revision>`"
-          : `\`suite-${name}-<date>\``;
-    const page = name === channel && tag !== null ? tag : (pages?.[name] ?? null);
-    const where =
-      pages === null
-        ? shape
-        : name === channel && tag !== null
-          ? `this page (\`${tag}\`)`
-          : page === null
-            ? "not published yet"
-            : `[\`${page}\`](${releaseUrl(page)})`;
-    if (mode === "install") {
-      const command = shellApp === null ? "—" : `\`${installCommand(shellApp, name)}\``;
-      const apk =
-        name === "stable"
-          ? `[\`suite-go.apk\`](https://github.com/${RELEASE_REPO}/releases/latest/download/suite-go.apk)`
-          : `\`suite-go-${name}-<version>.apk\` on that page`;
-      return `| \`${name}\` | ${command} | ${apk} | ${where} |`;
-    }
-    const id = shellApp === null ? "—" : `\`${releaseFlatpakRef(shellApp, name)}\``;
-    return `| \`${name}\` | ${where} | ${id} |`;
-  });
+  const header = ["| Channel | Suite Desk | Suite Go | Page |", "| --- | --- | --- | --- |"];
+  const rows = order.map((name) =>
+    channelRow(name, {
+      mode,
+      channel,
+      tag,
+      pages,
+      shellApp,
+      goApp,
+      goVersion,
+      apkLive,
+      draft,
+      revision,
+      latestPage,
+    }),
+  );
   return [...header, ...rows];
 }
 
-/** The README block: the version-free channel table, between its markers. */
+/**
+ * The README's tables: version-free, page-pattern-free of live tags.
+ *
+ * The README is the page a person starts from and the page that must not drift.
+ * A version belongs to `package.json` (D6.4) and a pre-release tag belongs to
+ * the release list, so this block names only the channel, the install command,
+ * the Go asset and the page shape. The stable row links the Latest page; a
+ * pre-release row names the tag pattern, never a tag that pruning will delete.
+ */
+export function readmeTables() {
+  const deskApp = APPS.find((app) => app.id === "desk") ?? null;
+  const goApp = APPS.find((app) => app.id === "go") ?? null;
+  return [
+    "### Release",
+    "",
+    ...channelTable({
+      mode: "install",
+      pages: null,
+      order: [STABLE_CHANNEL],
+      latestPage: true,
+      shellApp: deskApp,
+      goApp,
+    }),
+    "",
+    "### Pre-Release",
+    "",
+    ...channelTable({
+      mode: "install",
+      pages: null,
+      order: README_PRE_RELEASE_ORDER,
+      shellApp: deskApp,
+      goApp,
+    }),
+  ];
+}
+
+/** The README block between its generated markers. */
 export function channelsBlock() {
-  return [CHANNELS_BLOCK_START, "", ...channelInstallTable(), "", CHANNELS_BLOCK_END].join("\n");
+  return [CHANNELS_BLOCK_START, "", ...readmeTables(), "", CHANNELS_BLOCK_END].join("\n");
 }
 
 /** `text` with the generated channels block replaced. */
@@ -212,12 +342,13 @@ export function withChannelsBlock(text, block = channelsBlock()) {
 }
 
 /**
- * Why `text`'s channels block is out of date, or null when it is current.
+ * Why `text`'s generated block is out of date, or null when it is current.
  *
  * A hand-edited table and the generator drift silently otherwise, and the README
- * is the page a person installs from. The gate runs this, so a channel rename or
- * a new channel cannot leave the README telling someone to run a command that
- * installs nothing.
+ * is the page a person installs from. `--check-readme` runs this, so a channel
+ * rename or a new channel cannot leave the README telling someone to run a
+ * command that installs nothing. The block restates no version (D6.4) and names
+ * no live pre-release tag, so this check needs no tree and no release list.
  */
 export function readmeChannelsDrift(text) {
   const start = text.indexOf(CHANNELS_BLOCK_START);
@@ -228,17 +359,21 @@ export function readmeChannelsDrift(text) {
   const current = text.slice(start, end + CHANNELS_BLOCK_END.length);
   if (current === channelsBlock()) return null;
   return (
-    `${README_FILE}'s channels table is out of date; run ` +
+    `${README_FILE}'s Release and Pre-Release tables are out of date; run ` +
     "`node scripts/release-status.mjs --write` and commit the result"
   );
 }
 
-/** The version-free table the README and `RELEASES.md` share. */
-export function channelInstallTable() {
+/** The version-free table `RELEASES.md` carries. */
+export function channelInstallTable({ order = CHANNEL_ORDER, pages = null } = {}) {
+  const deskApp = APPS.find((app) => app.id === "desk") ?? null;
+  const goApp = APPS.find((app) => app.id === "go") ?? null;
   return channelTable({
     mode: "install",
-    pages: null,
-    shellApp: APPS.find((app) => app.id === "desk") ?? null,
+    pages,
+    order,
+    shellApp: deskApp,
+    goApp,
   });
 }
 
@@ -364,8 +499,8 @@ const USAGE = `usage: node scripts/release-status.mjs [options]
   --revision <sha7>    commit the slop page, tag and APK name carry; required for slop
   --check-published    print one sentence and stop when this run's tag is already
                        published; print nothing and exit 0 when it is not
-  --check-readme       fail when the README's channel table is not what --write
-                       would generate
+  --check-readme       fail when the README's Release and Pre-Release tables are
+                       not what --write would generate
   --manifest <path>    release manifest for the Artifacts section
                        (default: .dev/release/release-manifest.json when it exists)
   --prune              delete old published pre-release releases (never stable)
@@ -1334,6 +1469,52 @@ export function slopProofLines(revision) {
   ];
 }
 
+/** The one heading a page puts above its own channel: Latest or Pre-Release. */
+export function ownChannelHeading(channel) {
+  if (channel === STABLE_CHANNEL) return "## Latest Release";
+  const label = `${channel[0].toUpperCase()}${channel.slice(1)}`;
+  return `## Pre-Release (${label})`;
+}
+
+/**
+ * The callout that says what this page is, and what installs beside it.
+ *
+ * A pre-release page is not a quieter stable page: a reader who lands on it must
+ * be told that stable is the other install and that neither replaces the other.
+ * Stable gets the inverse sentence, so neither page can imply the other does not
+ * exist.
+ */
+export function channelCallout(channel) {
+  const stableGo =
+    `[\`suite-go.apk\`](https://github.com/${RELEASE_REPO}/releases/latest/download/suite-go.apk)`;
+  if (channel === STABLE_CHANNEL) {
+    return [
+      "> **Stable release.** This is the stable build, the one to install unless you mean to test.",
+      "> Pre-release channels install beside it: preview, nightly and slop can be installed at the",
+      "> same time as stable, so you can try one without removing the release you rely on.",
+      "",
+    ];
+  }
+  const desk = APPS.find((app) => app.id === "desk");
+  return [
+    `> **Pre-release.** This is the \`${channel}\` build, not the stable release. Install stable`,
+    `> instead with \`${installCommand(desk)}\`, or install ${stableGo} from the release the`,
+    "> project supports. Any number of channels can be installed side by side, so testing this one",
+    "> leaves stable in place.",
+    "",
+  ];
+}
+
+/** The logo at the top of a page, linked to the site. */
+export function pageLogo() {
+  return `[<img src="${LOGO_URL}" alt="Suite" width="96" height="96">](${SITE_URL})`;
+}
+
+/** The site and docs links every page carries. */
+export function pageLinks() {
+  return `[Site](${SITE_URL}) · [Documentation](${DOCS_URL})`;
+}
+
 /**
  * The aggregate release body: the two superapps and how they install.
  *
@@ -1370,7 +1551,21 @@ export function aggregateReleaseBody(
   // The Desk install block is always present, even on a tree whose Desk row
   // could not be collected, so it reads its id from the app table.
   const deskApp = APPS.find((app) => app.id === "desk");
+  const goApp = APPS.find((app) => app.id === "go") ?? null;
+  const tableOptions = {
+    channel,
+    tag,
+    pages,
+    shellApp: deskApp,
+    goApp,
+    goVersion: go?.version ?? null,
+    apkLive,
+    draft,
+    revision,
+  };
   return [
+    pageLogo(),
+    "",
     `**Suite Desk** is the desktop superapp; **Suite Go** is the mobile superapp. ` +
       (channel === "stable"
         ? `This is the ${date} build.`
@@ -1378,14 +1573,21 @@ export function aggregateReleaseBody(
     "Only the two superapps have a release page; a pack carries a signed version and no page.",
     "",
     ...(channel === "slop" && isRevision(revision) ? slopProofLines(revision) : []),
-    "## Channels",
+    ...channelCallout(channel),
+    pageLinks(),
+    "",
+    ownChannelHeading(channel),
+    "",
+    ...channelTable({ ...tableOptions, order: [channel] }),
+    "",
+    "## Other channels",
     "",
     `Every channel is a promise; [Channels](${blobUrl("docs/explanation/channels.md")}) owns what each`,
-    "one carries. This page is the " + `\`${channel}\` build, and the other three install beside it.`,
+    "one carries. These install beside this page:",
     "",
-    ...channelTable({ channel, tag, pages, shellApp: deskApp }),
+    ...channelTable({ ...tableOptions, order: otherChannels(channel) }),
     "",
-    `Install one after the remote below is added: \`flatpak install --user ${REMOTE_NAME} <id>\`.`,
+    "Each Desk cell above is the full install command; add the remote below once, then run that row.",
     "",
     "## Suite Desk (desktop)",
     "",
@@ -2127,7 +2329,7 @@ async function main(argv) {
       process.stderr.write(`${drift}\n`);
       process.exit(1);
     }
-    process.stdout.write(`${README_FILE}: the channels table is current\n`);
+    process.stdout.write(`${README_FILE}: the Release and Pre-Release tables are current\n`);
     return;
   }
 
@@ -2364,7 +2566,7 @@ async function main(argv) {
     writeReleasesPage("write", page);
     process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
     writeReadmeChannels("write");
-    process.stdout.write(`wrote the ${README_FILE} channels table\n`);
+    process.stdout.write(`wrote the ${README_FILE} Release and Pre-Release tables\n`);
     return;
   }
 
