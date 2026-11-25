@@ -29,7 +29,7 @@ const PAIRS: readonly { readonly name: string; readonly on: string; readonly ink
   { name: "Toast info", on: SURFACE.base, ink: INK.base },
   { name: "Toast error", on: SURFACE.base, ink: INK.danger },
   { name: "Field", on: SURFACE.base, ink: INK.base },
-  { name: "Dialog", on: SURFACE.base, ink: INK.base },
+  { name: "Modal", on: SURFACE.base, ink: INK.base },
   { name: "Launch heading on the page", on: "bg-[var(--canvas)]", ink: INK.base },
 ];
 

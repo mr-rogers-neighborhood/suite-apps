@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "./Button.js";
 import { cx } from "./cx.js";
-import { EDGE, INK, PRESSABLE, SURFACE } from "./tokens.js";
+import { EDGE, FOCUS_RING, INK, PRESSABLE, SURFACE } from "./tokens.js";
 
 /** One thing an app can import, and what to do when it is chosen. */
 export interface ImportOption {
@@ -109,7 +109,7 @@ export function ImportMenu({
           ref={panel}
           id={panelId}
           className={cx(
-            "absolute left-0 z-20 mt-1 flex min-w-[220px] flex-col gap-0.5 rounded-lg p-1 shadow-lg",
+            "absolute left-0 z-20 mt-1 flex min-w-[220px] flex-col gap-0.5 rounded-lg p-1 shadow-[var(--shadow-xl)]",
             SURFACE.base,
             "border",
             EDGE.strong,
@@ -126,7 +126,8 @@ export function ImportMenu({
               className={cx(
                 "flex flex-col items-start rounded-md px-[var(--control-padding-x-sm,0.625rem)] py-[var(--row-padding-y,0.625rem)] text-left",
                 PRESSABLE,
-                "hover:bg-[var(--surface-sunk)] focus-visible:bg-[var(--surface-sunk)]",
+                FOCUS_RING,
+                "hover:bg-[var(--surface-sunk)]",
                 INK.base,
               )}
             >

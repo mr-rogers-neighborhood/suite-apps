@@ -1,7 +1,7 @@
 import { type HTMLAttributes, type ReactNode, useId } from "react";
 import { cx } from "./cx.js";
 import { ImportMenu, type ImportOption } from "./ImportMenu.js";
-import { INK } from "./tokens.js";
+import { FOCUS_RING, INK } from "./tokens.js";
 
 /**
  * The screen a person lands on when no document is open.
@@ -80,8 +80,10 @@ export interface LaunchProps extends Omit<HTMLAttributes<HTMLDivElement>, "title
  * as a place to start rather than as a toolbar above a list.
  */
 const FRAME = {
+  // The frame's radius and elevation are the published steps, so switching a preset can
+  // change the depth of the card without touching this component.
   outer:
-    "mx-auto w-[min(760px,100%)] overflow-hidden rounded-2xl border border-[var(--hairline)] bg-[var(--surface)] shadow-[0_30px_80px_-40px_rgba(0,0,0,0.55)]",
+    "mx-auto w-[min(760px,100%)] overflow-hidden rounded-xl border border-[var(--hairline)] bg-[var(--surface)] shadow-[var(--shadow-2xl)]",
   header: "flex items-end justify-between gap-6 border-b border-[var(--hairline)] px-8 pt-8 pb-7",
   title: "text-[length:var(--text-display,34px)] font-semibold tracking-tight",
   body: "px-8 py-6",
@@ -152,7 +154,10 @@ export function Launch({
                   <button
                     type="button"
                     onClick={() => onOpenRecent?.(recent.id)}
-                    className="flex min-w-0 flex-1 flex-col items-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]"
+                    className={cx(
+                      "flex min-w-0 flex-1 flex-col items-start text-left",
+                      FOCUS_RING,
+                    )}
                   >
                     <span className="truncate text-[length:var(--text-body,13px)] font-medium">
                       {recent.name}

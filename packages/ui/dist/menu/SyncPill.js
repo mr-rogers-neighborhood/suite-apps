@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { cx } from "../cx.js";
-import { FOCUS_RING } from "../tokens.js";
+import { FOCUS_RING, MOTION } from "../tokens.js";
 const SITUATION_DOT = {
     synced: "bg-[var(--success)]",
     syncing: "bg-[var(--success)]",
@@ -21,6 +21,6 @@ const SITUATION_DOT = {
  */
 export function SyncPill({ situation, label, tooltip, peerCount, onClick, className, dotClassName, role, type = "button", "data-testid": testId = "sync-status", ...props }) {
     const showPeers = peerCount !== undefined && peerCount > 1;
-    return (_jsxs("button", { type: type, "data-testid": testId, "data-handbook-region": "sync-status", "data-status": situation, "data-role": role, title: tooltip ?? "Sync and people", onClick: onClick, className: cx("inline-flex h-6 select-none items-center gap-1.5 rounded-md px-1.5 text-[11px] leading-none text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunk)]", FOCUS_RING, className), ...props, children: [_jsx("span", { "aria-hidden": "true", className: cx("h-1.5 w-1.5 shrink-0 rounded-full", dotClassName ?? SITUATION_DOT[situation] ?? "bg-[var(--ink-muted)]") }), label, showPeers ? _jsxs("span", { className: "tabular-nums", children: ["\u00B7 ", peerCount] }) : null] }));
+    return (_jsxs("button", { type: type, "data-testid": testId, "data-handbook-region": "sync-status", "data-status": situation, "data-role": role, title: tooltip ?? "Sync and people", onClick: onClick, className: cx("inline-flex h-6 select-none items-center gap-1.5 rounded-md px-1.5 text-[length:var(--text-caption,11px)] leading-none text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)]", MOTION, FOCUS_RING, className), ...props, children: [_jsx("span", { "aria-hidden": "true", className: cx("h-1.5 w-1.5 shrink-0 rounded-full", dotClassName ?? SITUATION_DOT[situation] ?? "bg-[var(--ink-muted)]") }), label, showPeers ? _jsxs("span", { className: "tabular-nums", children: ["\u00B7 ", peerCount] }) : null] }));
 }
 //# sourceMappingURL=SyncPill.js.map

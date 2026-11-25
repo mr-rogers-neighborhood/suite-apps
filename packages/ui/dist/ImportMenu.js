@@ -2,7 +2,7 @@ import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "./Button.js";
 import { cx } from "./cx.js";
-import { EDGE, INK, PRESSABLE, SURFACE } from "./tokens.js";
+import { EDGE, FOCUS_RING, INK, PRESSABLE, SURFACE } from "./tokens.js";
 /**
  * A trigger that offers several ways to bring material in.
  *
@@ -63,9 +63,9 @@ export function ImportMenu({ options, label = "Import", disabled = false, classN
         const only = options[0];
         return (_jsxs(Button, { variant: "secondary", onClick: only.onSelect, disabled: disabled, className: className, children: [label, "\u2026"] }));
     }
-    return (_jsxs("div", { className: cx("relative", className), children: [_jsxs(Button, { ref: trigger, variant: "secondary", disabled: disabled, "aria-expanded": open, "aria-controls": open ? panelId : undefined, onClick: () => setOpen((was) => !was), children: [label, "\u2026"] }), open ? (_jsx("div", { ref: panel, id: panelId, className: cx("absolute left-0 z-20 mt-1 flex min-w-[220px] flex-col gap-0.5 rounded-lg p-1 shadow-lg", SURFACE.base, "border", EDGE.strong), children: options.map((option) => (_jsxs("button", { type: "button", onClick: () => {
+    return (_jsxs("div", { className: cx("relative", className), children: [_jsxs(Button, { ref: trigger, variant: "secondary", disabled: disabled, "aria-expanded": open, "aria-controls": open ? panelId : undefined, onClick: () => setOpen((was) => !was), children: [label, "\u2026"] }), open ? (_jsx("div", { ref: panel, id: panelId, className: cx("absolute left-0 z-20 mt-1 flex min-w-[220px] flex-col gap-0.5 rounded-lg p-1 shadow-[var(--shadow-xl)]", SURFACE.base, "border", EDGE.strong), children: options.map((option) => (_jsxs("button", { type: "button", onClick: () => {
                         setOpen(false);
                         option.onSelect();
-                    }, className: cx("flex flex-col items-start rounded-md px-[var(--control-padding-x-sm,0.625rem)] py-[var(--row-padding-y,0.625rem)] text-left", PRESSABLE, "hover:bg-[var(--surface-sunk)] focus-visible:bg-[var(--surface-sunk)]", INK.base), children: [_jsx("span", { className: "text-[length:var(--text-body,13px)] font-medium", children: option.label }), option.detail === undefined ? null : (_jsx("span", { className: cx("text-[length:var(--text-caption,11px)]", INK.muted), children: option.detail }))] }, option.label))) })) : null] }));
+                    }, className: cx("flex flex-col items-start rounded-md px-[var(--control-padding-x-sm,0.625rem)] py-[var(--row-padding-y,0.625rem)] text-left", PRESSABLE, FOCUS_RING, "hover:bg-[var(--surface-sunk)]", INK.base), children: [_jsx("span", { className: "text-[length:var(--text-body,13px)] font-medium", children: option.label }), option.detail === undefined ? null : (_jsx("span", { className: cx("text-[length:var(--text-caption,11px)]", INK.muted), children: option.detail }))] }, option.label))) })) : null] }));
 }
 //# sourceMappingURL=ImportMenu.js.map

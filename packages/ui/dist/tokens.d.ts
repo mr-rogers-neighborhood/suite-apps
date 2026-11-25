@@ -50,6 +50,14 @@ export declare const INK: {
  * what focus looks like.
  */
 export declare const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas)]";
+/**
+ * The one transition every primitive uses.
+ *
+ * The duration and curve come from the host's motion layer, with the values that shipped as
+ * fallbacks. `transition-colors` alone would silently keep Tailwind's static 150ms and a preset
+ * could never slow or quicken it.
+ */
+export declare const MOTION = "transition-colors duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))]";
 /** Shared by every pressable thing: no text selection, no pointer events when disabled. */
-export declare const PRESSABLE = "inline-flex select-none items-center justify-center font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
+export declare const PRESSABLE = "inline-flex select-none items-center justify-center font-medium transition-colors duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))] disabled:pointer-events-none disabled:opacity-50";
 //# sourceMappingURL=tokens.d.ts.map

@@ -2,11 +2,13 @@ import { type ReactNode } from "react";
 /**
  * A dialog surface: the backdrop, the focus trap, Escape, and the ARIA.
  *
- * The behaviours here are the ones every hand-written modal gets subtly wrong. Focus moves in
- * on open and returns to whatever had it on close, Tab wraps inside the panel, Escape closes,
- * and the click-away backdrop is a real button so it is reachable by a screen reader rather
- * than a `div` with an `onClick`. An app that has its own modal keeps it; this is for the five
- * dialogs that are all the same shape.
+ * The behaviour is Radix Dialog's, not another hand-written focus trap. It moves focus in on
+ * open, returns it on close, wraps Tab inside the panel, closes on Escape and on a press
+ * outside, and marks the rest of the page inert. Those are the parts every hand-written modal
+ * gets subtly wrong, and they are exactly what the chosen primitive already owns.
+ *
+ * The public API stays the app-facing one: `open`, `onClose`, `label`, `size`. Radix's
+ * `onOpenChange` is only the bridge; a caller never learns that the implementation changed.
  */
 export interface ModalProps {
     readonly open: boolean;
@@ -18,5 +20,5 @@ export interface ModalProps {
     readonly size?: "sm" | "md" | "lg";
     readonly className?: string;
 }
-export declare function Modal({ open, onClose, label, children, size, className }: ModalProps): import("react").ReactPortal | null;
+export declare function Modal({ open, onClose, label, children, size, className }: ModalProps): import("react").JSX.Element;
 //# sourceMappingURL=Modal.d.ts.map

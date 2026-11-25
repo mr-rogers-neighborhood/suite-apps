@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { cx } from "../cx.js";
-import { FOCUS_RING } from "../tokens.js";
+import { FOCUS_RING, MOTION } from "../tokens.js";
 
 export type SyncSituation =
   | "synced"
@@ -72,7 +72,8 @@ export function SyncPill({
       title={tooltip ?? "Sync and people"}
       onClick={onClick}
       className={cx(
-        "inline-flex h-6 select-none items-center gap-1.5 rounded-md px-1.5 text-[11px] leading-none text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunk)]",
+        "inline-flex h-6 select-none items-center gap-1.5 rounded-md px-1.5 text-[length:var(--text-caption,11px)] leading-none text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)]",
+        MOTION,
         FOCUS_RING,
         className,
       )}

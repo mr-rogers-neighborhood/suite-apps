@@ -23,7 +23,13 @@ export interface PrivacyLineProps {
 
 export function PrivacyLine({ where, className, sentence = true }: PrivacyLineProps) {
   return (
-    <div className={cx("flex min-w-0 flex-col gap-0.5 text-[11px]", INK.faint, className)}>
+    <div
+      className={cx(
+        "flex min-w-0 flex-col gap-0.5 text-[length:var(--text-caption,11px)]",
+        INK.faint,
+        className,
+      )}
+    >
       {where === undefined ? null : (
         <span className="truncate" title={where}>
           {where}

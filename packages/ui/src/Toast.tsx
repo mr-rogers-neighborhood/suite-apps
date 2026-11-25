@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { cx } from "./cx.js";
-import { EDGE, INK, SURFACE } from "./tokens.js";
+import { EDGE, INK, MOTION, SURFACE } from "./tokens.js";
 
 /**
  * One transient message, in the corner.
@@ -42,7 +42,7 @@ export function Toast({ notice, onDismiss, duration = DEFAULT_DURATION, classNam
     <div
       role={failed ? "alert" : "status"}
       className={cx(
-        "fixed bottom-5 right-5 z-[80] flex max-w-md items-start gap-3 rounded-lg border px-4 py-3 text-[length:var(--text-body,13px)] shadow-2xl",
+        "fixed bottom-5 right-5 z-[80] flex max-w-md items-start gap-3 rounded-lg border px-4 py-3 text-[length:var(--text-body,13px)] shadow-[var(--shadow-2xl)]",
         SURFACE.base,
         failed ? cx(EDGE.danger, INK.danger) : cx(EDGE.hairline, INK.base),
         className,
@@ -54,7 +54,8 @@ export function Toast({ notice, onDismiss, duration = DEFAULT_DURATION, classNam
         onClick={onDismiss}
         aria-label="Dismiss"
         className={cx(
-          "shrink-0 text-[length:var(--text-caption,11px)] transition-colors hover:text-[var(--ink)]",
+          "shrink-0 text-[length:var(--text-caption,11px)] hover:text-[var(--ink)]",
+          MOTION,
           INK.muted,
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]",
         )}

@@ -13,6 +13,6 @@ import { INK } from "./tokens.js";
  */
 export const PRIVACY_SENTENCE = "Local file. No account, no server, no telemetry.";
 export function PrivacyLine({ where, className, sentence = true }) {
-    return (_jsxs("div", { className: cx("flex min-w-0 flex-col gap-0.5 text-[11px]", INK.faint, className), children: [where === undefined ? null : (_jsx("span", { className: "truncate", title: where, children: where })), sentence ? _jsx("span", { children: PRIVACY_SENTENCE }) : null] }));
+    return (_jsxs("div", { className: cx("flex min-w-0 flex-col gap-0.5 text-[length:var(--text-caption,11px)]", INK.faint, className), children: [where === undefined ? null : (_jsx("span", { className: "truncate", title: where, children: where })), sentence ? _jsx("span", { children: PRIVACY_SENTENCE }) : null] }));
 }
 //# sourceMappingURL=PrivacyLine.js.map

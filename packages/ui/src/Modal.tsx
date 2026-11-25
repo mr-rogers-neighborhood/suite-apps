@@ -1,16 +1,18 @@
-import { type ReactNode, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { type ReactNode, useRef } from "react";
 import { cx } from "./cx.js";
 import { EDGE, INK, SURFACE } from "./tokens.js";
 
 /**
  * A dialog surface: the backdrop, the focus trap, Escape, and the ARIA.
  *
- * The behaviours here are the ones every hand-written modal gets subtly wrong. Focus moves in
- * on open and returns to whatever had it on close, Tab wraps inside the panel, Escape closes,
- * and the click-away backdrop is a real button so it is reachable by a screen reader rather
- * than a `div` with an `onClick`. An app that has its own modal keeps it; this is for the five
- * dialogs that are all the same shape.
+ * The behaviour is Radix Dialog's, not another hand-written focus trap. It moves focus in on
+ * open, returns it on close, wraps Tab inside the panel, closes on Escape and on a press
+ * outside, and marks the rest of the page inert. Those are the parts every hand-written modal
+ * gets subtly wrong, and they are exactly what the chosen primitive already owns.
+ *
+ * The public API stays the app-facing one: `open`, `onClose`, `label`, `size`. Radix's
+ * `onOpenChange` is only the bridge; a caller never learns that the implementation changed.
  */
 export interface ModalProps {
   readonly open: boolean;
@@ -29,79 +31,55 @@ const SIZES = {
   lg: "w-[min(760px,calc(100vw-2rem))]",
 } as const;
 
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 export function Modal({ open, onClose, label, children, size = "md", className }: ModalProps) {
-  const panel = useRef<HTMLDivElement | null>(null);
+  // Radix restores focus on close, but capture the opener explicitly as well: a caller may
+  // unmount the dialog in the same render that closes it, and the explicit target survives
+  // that. This is the one behaviour the package owned before Radix and still promises.
   const restoreTo = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    restoreTo.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const first = panel.current?.querySelector<HTMLElement>(FOCUSABLE) ?? panel.current;
-    first?.focus();
-    return () => restoreTo.current?.focus();
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || panel.current === null) return;
-      // Wrap inside the panel: without this, Tab walks out into the page behind the dialog,
-      // which is still visible but not reachable by anything else.
-      const items = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-        (node) => node.offsetParent !== null,
-      );
-      const first = items[0];
-      const last = items.at(-1);
-      if (first === undefined || last === undefined) return;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-[70] flex items-center justify-center">
-      <button
-        type="button"
-        aria-label={`Close ${label}`}
-        className="absolute inset-0 cursor-default border-0 bg-black/30 backdrop-blur-[2px]"
-        onClick={onClose}
-      />
-      <div
-        ref={panel}
-        role="dialog"
-        aria-modal="true"
-        aria-label={label}
-        tabIndex={-1}
-        className={cx(
-          "relative max-h-[calc(100vh-4rem)] overflow-y-auto rounded-2xl border p-5 shadow-2xl",
-          SURFACE.base,
-          EDGE.hairline,
-          INK.base,
-          SIZES[size],
-          className,
-        )}
-      >
-        {children}
-      </div>
-    </div>,
-    document.body,
+  return (
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(next) => {
+        // A caller's `onClose` is the only close event it cares about. Opening is controlled
+        // by `open`; Radix never asks to open a dialog from inside one.
+        if (!next) onClose();
+      }}
+    >
+      <DialogPrimitive.Portal>
+        {/* The scrim is the theme's ink at 30%, not `black`: a preset can change what "dimmed"
+            means without a component holding a colour. */}
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[70] bg-[color-mix(in_srgb,var(--ink)_30%,transparent)] backdrop-blur-[2px]" />
+        <DialogPrimitive.Content
+          // A visible heading belongs to the caller. The hidden title is what names the
+          // dialog for assistive technology; there is no description unless the caller adds one.
+          aria-describedby={undefined}
+          aria-modal="true"
+          onOpenAutoFocus={() => {
+            restoreTo.current =
+              document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            if (restoreTo.current?.isConnected === true) restoreTo.current.focus();
+          }}
+          className={cx(
+            "fixed left-1/2 top-1/2 z-[71] max-h-[calc(100vh-4rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border p-5 shadow-[var(--shadow-2xl)] outline-none",
+            SURFACE.base,
+            EDGE.hairline,
+            INK.base,
+            SIZES[size],
+            className,
+          )}
+        >
+          {/* A span, not Radix's default h2: the caller's visible heading is the only heading
+              the dialog should add to the document. Radix still uses this text as the name. */}
+          <DialogPrimitive.Title asChild>
+            <span className="sr-only">{label}</span>
+          </DialogPrimitive.Title>
+          {children}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

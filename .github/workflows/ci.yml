@@ -183,6 +183,21 @@ jobs:
       - name: Playwright browser (Canvas stories)
         if: matrix.repo == 'canvas'
         run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
+      - name: Resolve the Playwright version (UI)
+        if: matrix.repo == 'ui'
+        id: playwright-ui
+        run: |
+          version="$(node -e 'console.log(require("./packages/ui/node_modules/playwright/package.json").version)')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Playwright browser cache (UI stories)
+        if: matrix.repo == 'ui'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-ui-${{ runner.os }}-${{ steps.playwright-ui.outputs.version }}
+      - name: Playwright browser (UI stories)
+        if: matrix.repo == 'ui'
+        run: pnpm --filter @suite/ui exec playwright install --with-deps chromium
       - name: Nothing affected
         if: matrix.repo == 'none'
         run: echo "No app gate is affected by this change."

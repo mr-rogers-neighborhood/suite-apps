@@ -35,9 +35,11 @@ export interface AppMarkProps {
 }
 
 const SIZES: Record<AppMarkSize, { tile: string; inset: string }> = {
-  sm: { tile: "h-6 w-6 rounded-[8px]", inset: "h-4 w-4" },
-  md: { tile: "h-7 w-7 rounded-[9px]", inset: "h-[18px] w-[18px]" },
-  lg: { tile: "h-12 w-12 rounded-2xl", inset: "h-7 w-7" },
+  // `rounded-lg` and `rounded-xl` compile to `var(--radius-lg)` / `var(--radius-xl)`, so a
+  // preset or a host scale reaches the tile. The old 9px middle step was not on any scale.
+  sm: { tile: "h-6 w-6 rounded-lg", inset: "h-4 w-4" },
+  md: { tile: "h-7 w-7 rounded-lg", inset: "h-[18px] w-[18px]" },
+  lg: { tile: "h-12 w-12 rounded-xl", inset: "h-7 w-7" },
 };
 
 export function AppMark({
