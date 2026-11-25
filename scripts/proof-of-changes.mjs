@@ -33,10 +33,10 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const DEFAULT_OUT_DIR = join(ROOT, ".dev", "proof");
 
 const DESKTOP_TARGETS = {
-  shell: {
-    dir: "apps/shell",
+  desk: {
+    dir: "apps/desk",
     playwrightArgs: ["exec", "playwright", "test", "--grep", "@proof"],
-    buildCommands: [["pnpm", ["--filter", "@suite/shell", "run", "build:all"]]],
+    buildCommands: [["pnpm", ["--filter", "@suite/desk", "run", "build:all"]]],
   },
   help: {
     dir: "apps/help",

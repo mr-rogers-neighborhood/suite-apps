@@ -15,11 +15,11 @@ Each app has its own library override; see [Environment](environment.md).
 
 ## Host documents
 
-The shell's document service keeps a pack's documents under its own data root, one folder per
+The host's document service keeps a pack's documents under its own data root, one folder per
 container and pack:
 
 ```
-<shell data root>/documents/<container>/<pack>/<name>
+<host data root>/documents/<container>/<pack>/<name>
 ```
 
 That is the first-party publisher's layout, kept so an existing install is not moved. A pack from

@@ -127,7 +127,7 @@ on `pagehide`, and on the host's flush. Documents are identified by their pack d
 and QIF files go through the host's `pickOpen`/`pickSave` handles.
 
 What is not built yet: the host has no "show in folder", so reveal is a notice; the pack has no sync;
-and the shell integration is not claimed until the host half lands and installs this pack.
+and the host integration is not claimed until the host half lands and installs this pack.
 
 ## Security
 

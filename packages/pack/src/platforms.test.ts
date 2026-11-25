@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { GO_HOST, hostsOfKind, platformFit, SHELL_HOST } from "./platforms.js";
+import { DESK_HOST, GO_HOST, hostsOfKind, platformFit } from "./platforms.js";
 
 describe("platform fit", () => {
   // spec: S3.5
   it("is available when the host kind is declared and every capability is served", () => {
     const fit = platformFit(
       { platforms: ["desktop"], capabilities: ["documents", "files"] },
-      SHELL_HOST,
+      DESK_HOST,
     );
     expect(fit.state).toBe("available");
     expect(fit.reason).toBeNull();
@@ -57,7 +57,7 @@ describe("platform fit", () => {
   it("finds a host by kind without closing the vocabulary", () => {
     expect(hostsOfKind("mobile")).toEqual([GO_HOST]);
     expect(hostsOfKind("tv")).toEqual([]);
-    expect(platformFit({ platforms: ["tv"], capabilities: [] }, SHELL_HOST).state).toBe(
+    expect(platformFit({ platforms: ["tv"], capabilities: [] }, DESK_HOST).state).toBe(
       "unavailable",
     );
   });

@@ -16,7 +16,7 @@ body:
     attributes:
       label: Context
       description: What the tree looks like today and why that is a problem. File paths and commands beat adjectives.
-      placeholder: "`apps/shell/src/catalogue.ts` loads the local catalogue, and the index URL appears once in the trust module ..."
+      placeholder: "`apps/desk/src/catalogue.ts` loads the local catalogue, and the index URL appears once in the trust module ..."
     validations:
       required: true
   - type: textarea

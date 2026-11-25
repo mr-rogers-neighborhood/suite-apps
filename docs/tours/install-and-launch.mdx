@@ -16,46 +16,46 @@ every later step assumes a manifest that parsed: the schema is strict, pins the
 deep-link prefix to the app's own id, and has no field for a binary, so nothing
 downstream can be redirected by one.
 
-## apps/shell/src/catalogue.ts#catalogueRootFor
+## apps/desk/src/catalogue.ts#catalogueRootFor
 
 The host has one place to look for a local catalogue. The environment override
 exists for a test; the default is the host's own data directory, so a new machine
 starts with an empty catalogue rather than a guessed path.
 
-## apps/shell/src/catalogue.ts#loadCatalogue
+## apps/desk/src/catalogue.ts#loadCatalogue
 
 Only now is an archive offered. The loader reads a local `.suitepack` and any
 entry the verified index displayed, then verifies each one against the trust
 store before it can appear as installable.
 
-## apps/shell/src/installedPacks.ts#checkPackArchive
+## apps/desk/src/installedPacks.ts#checkPackArchive
 
 The next stop is the guard between the offer and the disk. The manifest signature,
 host fit, capability list and every file hash are checked; a refused archive is
 described in one sentence and never partly extracted.
 
-## apps/shell/src/installedPacks.ts#installPackArchive
+## apps/desk/src/installedPacks.ts#installPackArchive
 
 Installation writes the verified files under a version directory. A reinstall
 replaces that directory only after the new archive verified and extracted into a
 temporary sibling, so a failure leaves the previous version running.
 
-## apps/shell/src/installedPacks.ts#loadInstalledPacks
+## apps/desk/src/installedPacks.ts#loadInstalledPacks
 
 Once an install exists, discovery decides whether it may run. Re-verifying on
 load is what makes a changed file a refusal rather than a running pack.
 
-## apps/shell/src/packs.ts#discoverPacks
+## apps/desk/src/packs.ts#discoverPacks
 
 Discovery answers which version is current and where its renderer lives. The
 absolute root stays in the main process; the view gets one pack-owned origin.
 
-## apps/shell/src/window.ts#ShellWindow
+## apps/desk/src/window.ts#ShellWindow
 
 What a person sees is a tab over that view. The window owns the tab strip, the
 space document and the pack view; the pack owns everything inside its own origin.
 
-## apps/shell/src/deepLink.ts#parseSuiteLink
+## apps/desk/src/deepLink.ts#parseSuiteLink
 
 Pressing a `suite://` link hands over an untrusted string, so routing sits between
 the link and any tab. It names an installed pack or refuses; it never installs.

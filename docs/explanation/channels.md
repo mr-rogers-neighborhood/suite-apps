@@ -93,19 +93,24 @@ branch and the data folder are what make a channel.
 
 | Build | Form | What carries the channel | Data |
 | --- | --- | --- | --- |
-| Suite Desk, stable | Flatpak | `run.suite.shell` on the remote's default branch | the host's own data root |
-| Suite Desk, pre-release | Flatpak | `run.suite.<channel>.shell` on the `<channel>` branch | that channel's data root |
+| Suite Desk, stable | Flatpak | `run.suite.desk` on the remote's default branch | the host's own data root |
+| Suite Desk, pre-release | Flatpak | `run.suite.<channel>.desk` on the `<channel>` branch | that channel's data root |
 | Suite Go, stable | Release APK | the package id `run.suite.go` | the app's own data |
 | Suite Go, pre-release | Release APK | the package id `run.suite.<channel>.go` | that app's own data |
 | Legacy mini-app (frozen) | Flatpak | the last stable ref; no new channel is published | `Documents/Suite/<App>` |
 
-Each channel is its own id, branch and data root. Stable is `run.suite.shell` on Desk and
-`run.suite.go` on Go; slop, nightly and preview are `run.suite.<channel>.shell` and
+Each channel is its own id, branch and data root. Stable is `run.suite.desk` on Desk and
+`run.suite.go` on Go; slop, nightly and preview are `run.suite.<channel>.desk` and
 `run.suite.<channel>.go`. Four ids mean four installs, so stable, slop, nightly and preview can be
-installed and updated side by side. The ids were not always separate: slop has always been
-`run.suite.slop`, while nightly and preview moved from the shared `run.suite.slop` id, so an install
-made before the change reinstalls once under the new id. No pre-release data is migrated: the new id
+installed and updated side by side. The ids were not always separate: slop had already carried its
+own id, while nightly and preview moved from a shared `run.suite.slop` id (#380), so an install made
+before that change reinstalls once under the new id. No pre-release data is migrated: the new id
 starts with an empty data root, and the old one is not copied or renamed.
+
+The Desk rename is a second fresh start. `run.suite.desk` and its slop, nightly and preview ids are a
+new application identity, not an update of `run.suite.shell`: an existing install does not update into
+them. The new id opens an empty data root, `~/.var/app/run.suite.shell` is ignored, and the owner may
+remove it. The old refs stay on the signed remote as history and are not rebuilt.
 
 Data is keyed by id, so every channel has a separate tree. On Desk that tree is the Flatpak sandbox
 under `~/.var/app/<id>`; Go has its own app data. A frozen mini-app's pre-release build is the

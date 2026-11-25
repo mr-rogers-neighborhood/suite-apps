@@ -48,9 +48,9 @@ release. A Tier 2 failure opens an issue and blocks that platform's artifact, no
 
 | Component | Current line | Policy |
 | --- | --- | --- |
-| Electron | [The apps' `package.json`](../../apps/shell/package.json) | Latest three stable majors; 8-week cadence; upgrade within two majors of current |
+| Electron | [The apps' `package.json`](../../apps/desk/package.json) | Latest three stable majors; 8-week cadence; upgrade within two majors of current |
 | Node.js | [`engines` in the root `package.json`](../../package.json) | Active/Maintenance LTS; plan the next LTS before the current one leaves maintenance |
-| Flatpak runtime | [The shell manifest](../../packaging/flatpak/run.suite.shell.yml) | Two-year lifecycle; review annually and upgrade before security-only |
+| Flatpak runtime | [The Desk manifest](../../packaging/flatpak/run.suite.desk.yml) | Two-year lifecycle; review annually and upgrade before security-only |
 | Android SDK | [`variables.gradle`](../../apps/go/android/variables.gradle) | Target the current API; revisit minSdk when device data supports a higher floor |
 | macOS | Electron's current minimum | Unsigned builds; notarization later |
 | Windows | Electron's current minimum | Unsigned builds; Authenticode later |

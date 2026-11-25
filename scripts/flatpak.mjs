@@ -11,13 +11,13 @@
  *   node scripts/flatpak.mjs --app budget    # Budget stable, same path
  *   node scripts/flatpak.mjs --app help      # Help stable, same path
  *   node scripts/flatpak.mjs --app sync      # the retired relay build, local only
- *   node scripts/flatpak.mjs --app shell     # Suite Desk (the host) stable, same path
+ *   node scripts/flatpak.mjs --app desk     # Suite Desk (the host) stable, same path
  *   node scripts/flatpak.mjs --no-build      # reuse the unpacked build
- *   node scripts/flatpak.mjs --app shell --channel slop
+ *   node scripts/flatpak.mjs --app desk --channel slop
  *                                            # the slop id on the slop branch
- *   node scripts/flatpak.mjs --app shell --channel nightly
+ *   node scripts/flatpak.mjs --app desk --channel nightly
  *                                            # the host's nightly id on nightly
- *   node scripts/flatpak.mjs --app shell --channel nightly --dry-run
+ *   node scripts/flatpak.mjs --app desk --channel nightly --dry-run
  *                                            # write the generated files and print
  *                                            # the identity; no build or install
  *   node scripts/flatpak.mjs --app planner --channel slop --session
@@ -34,7 +34,7 @@
  * the channel, and the desktop entry registers no MIME type and no scheme
  * handler. Each pre-release channel is its own id and data root, so stable,
  * slop, nightly and preview install and update side by side. Other apps keep the
- * `suite.app.json` pre-release manifest; the Shell has no such file, so it
+ * `suite.app.json` pre-release manifest; the host has no such file, so it
  * rewrites its stable manifest to the channel's id instead and lets the Flatpak
  * sandbox keep its data apart. The stable flow reads the committed manifest and
  * is otherwise unchanged.
@@ -57,7 +57,7 @@ import {
   preReleaseMetainfo,
   channelRecord,
 } from "./lib/channel.mjs";
-import { shellDataRoot, shellPreReleaseManifest } from "./lib/shellChannel.mjs";
+import { deskDataRoot, deskPreReleaseManifest } from "./lib/deskChannel.mjs";
 import { STATIC_DELTA_ARGUMENTS } from "./lib/flatpakRemote.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -111,17 +111,17 @@ const APPS = {
     metainfo: join(ROOT, "packaging", "flatpak", "run.suite.help.metainfo.xml"),
     unpacked: join(ROOT, "apps", "help", "release", "linux-unpacked"),
   },
-  shell: {
-    id: "run.suite.shell",
+  desk: {
+    id: "run.suite.desk",
     name: "Suite Desk",
-    package: "@suite/shell",
-    project: join(ROOT, "apps", "shell"),
-    folder: "shell",
+    package: "@suite/desk",
+    project: join(ROOT, "apps", "desk"),
+    folder: "desk",
     binary: "suite",
-    manifest: join(ROOT, "packaging", "flatpak", "run.suite.shell.yml"),
-    desktop: join(ROOT, "packaging", "flatpak", "run.suite.shell.desktop"),
-    metainfo: join(ROOT, "packaging", "flatpak", "run.suite.shell.metainfo.xml"),
-    unpacked: join(ROOT, "apps", "shell", "release", "linux-unpacked"),
+    manifest: join(ROOT, "packaging", "flatpak", "run.suite.desk.yml"),
+    desktop: join(ROOT, "packaging", "flatpak", "run.suite.desk.desktop"),
+    metainfo: join(ROOT, "packaging", "flatpak", "run.suite.desk.metainfo.xml"),
+    unpacked: join(ROOT, "apps", "desk", "release", "linux-unpacked"),
   },
   sync: {
     id: "run.suite.sync",
@@ -218,7 +218,7 @@ if (session && isPreRelease(channel)) {
 // Sync ships no suite.app.json, so it has no pre-release app identity to
 // generate. Refuse before a package build or a manifest is written: it is a
 // server that happens to have a tray, and a channel would be a second mailbox on
-// the same data. The Shell does have a channel: it rewrites its own manifest
+// the same data. The Desk does have a channel: it rewrites its own manifest
 // rather than reading suite.app.json, so it is not listed here.
 const noPreRelease = { sync: "Suite Sync" };
 if (Object.hasOwn(noPreRelease, appName) && isPreRelease(channel)) {
@@ -263,9 +263,9 @@ if (dryRun) {
     process.stdout.write(`metainfo · ${join(sourceDir, `${id}.metainfo.xml`)}\n`);
     process.stdout.write(`launcher · ${join(sourceDir, id)}\n`);
   }
-  // The Shell has no shared Documents folder; its data is the sandbox keyed by
+  // The host has no shared Documents folder; its data is the sandbox keyed by
   // the id, and each channel's id is what keeps its data apart.
-  if (appName === "shell") process.stdout.write(`data · ${shellDataRoot(channel)}\n`);
+  if (appName === "desk") process.stdout.write(`data · ${deskDataRoot(channel)}\n`);
   process.stdout.write("dry run: no build, no repository write, no install\n");
   process.exit(0);
 }
@@ -325,15 +325,15 @@ function desktopField(text, key) {
 }
 
 /**
- * Write the Shell pre-release files and its rewritten manifest.
+ * Write the Desk pre-release files and its rewritten manifest.
  *
  * The desktop entry, metainfo, launcher and icon names all carry the
  * pre-release id. The icons are the stable PNGs copied under the new name, so
  * the rewritten manifest's install lines find them without a second icon
  * source. The stable manifest's build steps, asar desktop-name patch and
- * narrow grants are preserved by `shellPreReleaseManifest`.
+ * narrow grants are preserved by `deskPreReleaseManifest`.
  */
-function generateShellPreReleaseManifest() {
+function generateDeskPreReleaseManifest() {
   mkdirSync(sourceDir, { recursive: true });
 
   const stableDesktop = readFileSync(app.desktop, "utf8");
@@ -373,7 +373,7 @@ function generateShellPreReleaseManifest() {
     );
   }
 
-  const manifest = shellPreReleaseManifest(readFileSync(app.manifest, "utf8"), {
+  const manifest = deskPreReleaseManifest(readFileSync(app.manifest, "utf8"), {
     id,
     channel,
     stableId: app.id,
@@ -392,12 +392,12 @@ function generateShellPreReleaseManifest() {
  * folder differ. Keeping the grants in one place means a permission decided for
  * stable is not silently different for a tier.
  *
- * Shell takes the other branch: it ships no suite.app.json, and its data is the
+ * Desk takes the other branch: it ships no suite.app.json, and its data is the
  * Flatpak sandbox rather than a Documents folder, so the generated manifest is
- * the stable Shell manifest rewritten to the pre-release id.
+ * the stable Desk manifest rewritten to the pre-release id.
  */
 function generatePreReleaseManifest() {
-  if (appName === "shell") return generateShellPreReleaseManifest();
+  if (appName === "desk") return generateDeskPreReleaseManifest();
 
   const stableManifest = readFileSync(app.manifest, "utf8");
   const finishStart = stableManifest.indexOf("finish-args:");

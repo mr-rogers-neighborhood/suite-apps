@@ -58,8 +58,8 @@ packs keep the previous version. No channel may silently erase the last good art
 
 | Artifact | Identity | Form | Signed by | Public |
 | --- | --- | --- | --- | --- |
-| Suite Desk stable | `run.suite.shell` | Flatpak OSTree commit on `master` | Store key (summary) | Yes, own remote |
-| Suite Desk pre-release | `run.suite.<channel>.shell` | Flatpak commit on the branch of the same name | Store key | Yes, own remote |
+| Suite Desk stable | `run.suite.desk` | Flatpak OSTree commit on `master` | Store key (summary) | Yes, own remote |
+| Suite Desk pre-release | `run.suite.<channel>.desk` | Flatpak commit on the branch of the same name | Store key | Yes, own remote |
 | Suite Go stable | `run.suite.go` | APK, stable asset | Android release key | Yes, GitHub release |
 | Suite Go pre-release | `run.suite.<channel>.go` | APK, channel asset | Android release key | Yes, GitHub release |
 | Pack | `publisher/id` | `.suitepack` + manifest | Publisher key | Yes, file or catalogue |
@@ -68,7 +68,12 @@ packs keep the previous version. No channel may silently erase the last good art
 | SBOM/provenance | any | attestation | GitHub/Sigstore | Yes, alongside release |
 
 `<channel>` is `slop`, `nightly` or `preview`; each pre-release id has its own branch of the same
-name, an id names one channel, and stable keeps `run.suite.shell` and `run.suite.go`.
+name, an id names one channel, and stable keeps `run.suite.desk` and `run.suite.go`.
+
+Suite Desk's ids are a fresh start. `run.suite.desk` and `run.suite.<channel>.desk` are new
+application identities, not an update of `run.suite.shell`: an existing install does not update into
+them, the new id opens an empty data root, and `~/.var/app/run.suite.shell` is ignored and may be
+removed by the owner. The old refs stay on the signed remote as history and are not rebuilt.
 
 **D2.1** Every artifact has a digest, a source commit, a lockfile hash and a signer identity in a
 release manifest. The manifest is the promotion input; a channel points at a manifest entry, never at

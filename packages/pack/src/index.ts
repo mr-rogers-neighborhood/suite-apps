@@ -91,6 +91,7 @@ export {
   SUITE_PUBLISHER_ID,
 } from "./pinnedKey.js";
 export {
+  DESK_HOST,
   GO_HOST,
   HOST_DECLARATIONS,
   type HostDeclaration,
@@ -103,7 +104,6 @@ export {
   type PlatformFitView,
   platformFit,
   platformFitView,
-  SHELL_HOST,
 } from "./platforms.js";
 export {
   base64ToBytes,

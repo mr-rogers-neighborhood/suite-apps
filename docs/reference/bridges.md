@@ -15,7 +15,7 @@ to run all three has to know how. It is written from the code, not from intent.
 
 ## Canvas: `window.suiteDesktop`
 
-Identity is a marker plus a version, and the renderer refuses to look like a browser when the shell
+Identity is a marker plus a version, and the renderer refuses to look like a browser when the host
 is merely out of date:
 
 ```ts
@@ -28,15 +28,15 @@ Ten callable methods, all required:
 
 | Method                  | Contract                                                                                                                                                            |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `loadDocument()`        | The open document and its snapshot, or `null` when the shell has none.                                                                                              |
-| `saveDocument(request)` | Write a snapshot plus the manifest the shell stores beside it.                                                                                                      |
+| `loadDocument()`        | The open document and its snapshot, or `null` when the host has none.                                                                                              |
+| `saveDocument(request)` | Write a snapshot plus the manifest the host stores beside it.                                                                                                      |
 | `flushDocument()`       | Wait for anything queued to reach disk. Returns `{ ok }` or a failure.                                                                                              |
 | `documentInfo()`        | The open document's identity, or `null`.                                                                                                                            |
 | `appInfo()`             | Host, version, platform, for diagnostics.                                                                                                                           |
 | `createDocument(seed)`  | Create a file and open the window on it. **Cannot be a navigation**: on the desktop the file _is_ the document, so a workspace id in the address bar means nothing. |
 | `openFileDialog()`      | Show the open dialog and open the choice. The renderer passes no path.                                                                                              |
-| `openDocument(path)`    | Open a path this shell reported earlier, re-validated in main.                                                                                                      |
-| `recentFiles()`         | What the shell remembers.                                                                                                                                           |
+| `openDocument(path)`    | Open a path this host reported earlier, re-validated in main.                                                                                                      |
+| `recentFiles()`         | What the host remembers.                                                                                                                                           |
 | `forgetRecent(path)`    | Drop one entry.                                                                                                                                                     |
 
 **Why the staleness check matters.** A window left open by a previous build keeps the preload it
@@ -91,7 +91,7 @@ from disk never implements it.
 That asymmetry is the whole contract in one line: **the host may carry a document, so it must neither
 create one nor be the only reason one is lost.**
 
-A host that always has a file — the desktop shell always opens one — never returns `null`.
+A host that always has a file — Suite Desk always opens one — never returns `null`.
 
 ## Budget: `window.suiteBudget`
 
@@ -142,7 +142,7 @@ which are Electron ceremony.
 ## Specified but not built: MenuBar & capsule bridge (`menuBar`)
 
 Mini-apps delegate top chrome to `@suite/ui/MenuBar`; the zones and takeover rule are in
-[the menu bar reference](menu-bar.md). In a multi-app container such as `suite-go` or desktop shell
+[the menu bar reference](menu-bar.md). In a multi-app container such as `suite-go` or Suite Desk
 tabs, the host would control the physical application bar while the active mini-app populated
 semantic slots through these hooks. **No preload exposes this bridge and no host consumes it yet.**
 The shape below is the specification, not a shipped contract:

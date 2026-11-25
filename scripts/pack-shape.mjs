@@ -30,7 +30,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-// The host declarations are the same values the shell and Go import. Node's type
+// The host declarations are the same values Desk and Go import. Node's type
 // stripping loads this source file without a build step; the file has no runtime
 // imports of its own.
 import { HOST_DECLARATIONS, platformFit } from "../packages/pack/src/platforms.ts";

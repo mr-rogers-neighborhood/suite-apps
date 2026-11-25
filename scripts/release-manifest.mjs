@@ -20,10 +20,10 @@
  * Usage:
  *   node scripts/release-manifest.mjs \
  *     --channel preview \
- *     --flatpak .dev/release/suite-shell-preview.flatpak \
- *     --flatpak-id run.suite.preview.shell \
+ *     --flatpak .dev/release/suite-desk-preview.flatpak \
+ *     --flatpak-id run.suite.preview.desk \
  *     --flatpak-branch preview \
- *     --flatpak-commit-file .dev/release/suite-shell-preview.commit \
+ *     --flatpak-commit-file .dev/release/suite-desk-preview.commit \
  *     --apk apps/go/.dev/release/suite-go-preview-0.1.0.apk \
  *     --apk-id run.suite.preview.go \
  *     --commit "$GITHUB_SHA" \

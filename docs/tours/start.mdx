@@ -16,35 +16,35 @@ The manifest is the contract between an app and the host. It says what the app
 is and which capabilities it declares. The schema is strict and has no field for
 a binary, so a tampered manifest cannot redirect a launch.
 
-## apps/shell/src/catalogue.ts#loadCatalogue
+## apps/desk/src/catalogue.ts#loadCatalogue
 
 The catalogue is the host's opinion about the packs it can install. It reads
 local `.suitepack` files and, when the operator-signed index verified, the
 entries that index displayed. Nothing here extracts an archive.
 
-## apps/shell/src/catalogue.ts#installCataloguePack
+## apps/desk/src/catalogue.ts#installCataloguePack
 
 Install is the host's, not a second process. The entry is checked again, the
 publisher key and every file hash are verified, and only then does the archive
 land under the host's pack root.
 
-## apps/shell/src/installedPacks.ts#loadInstalledPacks
+## apps/desk/src/installedPacks.ts#loadInstalledPacks
 
 Discovery is the other half: every installed version is verified on load, so a
 file changed after install cannot become a running pack. A refused version is
 reported with a sentence, not silently skipped.
 
-## apps/shell/src/packs.ts#discoverPacks
+## apps/desk/src/packs.ts#discoverPacks
 
 A pack is code on a pack-owned origin. This is where the host decides which
 installed version a view runs and what URL it may load.
 
-## apps/shell/src/window.ts#ShellWindow
+## apps/desk/src/window.ts#ShellWindow
 
 The window owns the tab and the view. A pack tab gets its own `WebContentsView`,
 origin and session partition; a Screen tab is host chrome and creates no view.
 
-## apps/shell/src/deepLink.ts#parseSuiteLink
+## apps/desk/src/deepLink.ts#parseSuiteLink
 
 A `suite://` link is untrusted input. This parser names an installed pack or
 refuses with one sentence; a link can never install or update anything.

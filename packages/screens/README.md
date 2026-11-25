@@ -13,7 +13,7 @@ The decision is [Widgets and Screens](../../docs/reference/decisions.md#widgets-
   "id": "home",
   "name": "Home",
   "widgets": [
-    { "registryId": "shell.apps", "size": "full" },
+    { "registryId": "desk.apps", "size": "full" },
     { "registryId": "planner.quick-task", "size": "2x1", "settings": { "project": "inbox" } }
   ]
 }
@@ -39,7 +39,7 @@ of app data.
   set/clear a setting). The host owns the path, the atomic write and the backup. Every
   unknown widget id and unknown setting survives a mutation and a snapshot.
 - `src/registry.ts` — `createWidgetRegistry`: resolve an app's declared `widgets` under
-  its id, resolve a host widget the same way (`shell.apps`), apply settings defaults,
+  its id, resolve a host widget the same way (`desk.apps`), apply settings defaults,
   validate settings, and build the capture payload `{ widget, action, values, settings }`.
   An unknown setting stays on the Screen and is reported; it is not sent to an app whose
   descriptor cannot use it.

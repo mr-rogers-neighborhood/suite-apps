@@ -11,7 +11,7 @@
 export const PIPELINE = [
   { repo: "sync", package: "@suite/sync-server" },
   // The host. It depends on the shared Electron policy and theme, not on any app.
-  { repo: "shell", package: "@suite/shell", desktop: true },
+  { repo: "desk", package: "@suite/desk", desktop: true },
   { repo: "help", package: "@suite/help", desktop: true },
   { repo: "canvas", package: "@suite/canvas", desktop: true },
   { repo: "planner", package: "@suite/planner", desktop: true },

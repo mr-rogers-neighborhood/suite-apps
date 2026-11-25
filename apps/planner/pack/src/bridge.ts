@@ -464,7 +464,7 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
       } catch (error) {
         fail("could not read the host's platform", error);
       }
-      return "suite-shell";
+      return "suite-desk";
     },
 
     exportWorkspace,

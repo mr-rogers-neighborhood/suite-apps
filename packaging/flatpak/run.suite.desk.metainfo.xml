@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The AppStream record is what a store reads: name, summary, categories, icon.
+  It is written once here rather than in a second copy beside the build.
+-->
+<component type="desktop-application">
+  <id>run.suite.desk</id>
+  <name>Suite Desk</name>
+  <summary>Suite Desk, the desktop Suite host</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://github.com/mrrnbhd/suite-apps</url>
+  <developer id="run.suite">
+    <name>Suite contributors</name>
+  </developer>
+  <description>
+    <p>
+      Suite Desk is the host: one window that opens signed, sandboxed packs as tabs.
+      It owns the chrome, Home and the capability boundary; a pack owns its own
+      document, and the host carries bytes without parsing them.
+    </p>
+    <p>
+      This is a preview of the host, not the shipping desktop app. Packs and
+      their documents stay on your machine in the app's own data directory:
+      there is no account and no suite-operated server.
+    </p>
+  </description>
+  <launchable type="desktop-id">run.suite.desk.desktop</launchable>
+  <provides>
+    <binary>suite</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <icon type="stock">run.suite.desk</icon>
+  <releases>
+    <release version="0.3.0" date="2026-11-24"/>
+    <release version="0.2.0" date="2026-11-22"/>
+    <release version="0.1.0" date="2026-11-22"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

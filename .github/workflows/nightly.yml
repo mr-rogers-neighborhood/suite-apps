@@ -133,29 +133,29 @@ jobs:
       - name: Build the host Flatpak (nightly branch)
         env:
           SUITE_FLATPAK_REPO: ${{ github.workspace }}/.nightly/flatpak-repo
-        run: node scripts/flatpak.mjs --app shell --channel nightly --no-install
+        run: node scripts/flatpak.mjs --app desk --channel nightly --no-install
       - name: Bundle
         run: |
-          flatpak build-bundle "$GITHUB_WORKSPACE/.nightly/flatpak-repo" suite-shell-nightly.flatpak \
-            run.suite.nightly.shell nightly
+          flatpak build-bundle "$GITHUB_WORKSPACE/.nightly/flatpak-repo" suite-desk-nightly.flatpak \
+            run.suite.nightly.desk nightly
       - name: SBOM
-        run: pnpm sbom --sbom-format spdx --out suite-shell-nightly.spdx.json
+        run: pnpm sbom --sbom-format spdx --out suite-desk-nightly.spdx.json
       - name: Attest the bundle
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: suite-shell-nightly.flatpak
+          subject-path: suite-desk-nightly.flatpak
       - name: Attest the SBOM
         uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
-          subject-path: suite-shell-nightly.flatpak
-          sbom-path: suite-shell-nightly.spdx.json
+          subject-path: suite-desk-nightly.flatpak
+          sbom-path: suite-desk-nightly.spdx.json
       - name: Upload the bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: suite-shell-nightly-flatpak
+          name: suite-desk-nightly-flatpak
           path: |
-            suite-shell-nightly.flatpak
-            suite-shell-nightly.spdx.json
+            suite-desk-nightly.flatpak
+            suite-desk-nightly.spdx.json
           retention-days: 14
           if-no-files-found: error
 

@@ -145,13 +145,13 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  */
 export const APPS = [
   {
-    id: "shell",
+    id: "desk",
     name: "Suite Desk",
-    packageJson: "apps/shell/package.json",
-    changelog: "apps/shell/CHANGELOG.md",
+    packageJson: "apps/desk/package.json",
+    changelog: "apps/desk/CHANGELOG.md",
     kind: "flatpak",
     section: "desktop",
-    flatpakId: "run.suite.shell",
+    flatpakId: "run.suite.desk",
     channel: "stable",
     maturity: "alpha",
   },
@@ -336,7 +336,7 @@ export function flatpakrepoUrl() {
  * pre-release channel, its stable id otherwise.
  *
  * Only a superapp carries a channel. Since #380 each pre-release channel has its
- * own id (`run.suite.nightly.shell`) and branch (`nightly`), so its install must
+ * own id (`run.suite.nightly.desk`) and branch (`nightly`), so its install must
  * name both; the frozen legacy rows keep their stable ids on every page, because
  * no pre-release build replaces them.
  */
@@ -354,7 +354,7 @@ function refBranch(app, channel) {
 /**
  * The full Flatpak ref a release installs or runs.
  *
- * A pre-release is `run.suite.nightly.shell//nightly`: the id names the channel
+ * A pre-release is `run.suite.nightly.desk//nightly`: the id names the channel
  * and the branch names the build line, so stable and every pre-release are
  * separate refs.
  */
@@ -714,7 +714,7 @@ export function planTag({ tag, version, changelog, localCommit, remoteCommit, ch
  * only Suite Desk and Suite Go appear. The other `APPS` entries stay for their
  * version and changelog facts, which the aggregate date reads.
  */
-export const SUPERAPP_IDS = ["shell", "go"];
+export const SUPERAPP_IDS = ["desk", "go"];
 
 /** The two superapp entries from a collected tree, by id and in page order. */
 export function superappEntries(entries) {
@@ -909,7 +909,7 @@ function artifactFileName(artifact) {
  * numbers come from `release-manifest.json` as it was written beside the built
  * artifacts, so a draft can state them: the bytes exist before publication and
  * `--publish` only locks them. The install and info commands name the manifest's
- * own Flatpak id and channel branch — `run.suite.nightly.shell//nightly` on a
+ * own Flatpak id and channel branch — `run.suite.nightly.desk//nightly` on a
  * pre-release — and the APK's `.sha256` file is the one uploaded beside the APK.
  */
 export function artifactsSection(manifest, { tag = null, draft = false, channel = "stable" } = {}) {
@@ -961,7 +961,7 @@ export function artifactsSection(manifest, { tag = null, draft = false, channel 
   if (apkFile !== null) commands.push(`sha256sum -c ${apkFile}.sha256`);
   if (flatpak !== null && typeof flatpak.id === "string" && flatpak.id.length > 0) {
     // A pre-release carries the channel in its id and its branch, so the ref
-    // needs both: `run.suite.nightly.shell//nightly`. Stable is the default
+    // needs both: `run.suite.nightly.desk//nightly`. Stable is the default
     // branch and keeps the plain id a shipped install already has.
     const artifactBranch =
       typeof flatpak.branch === "string" && flatpak.branch.length > 0
@@ -1048,11 +1048,11 @@ export function aggregateReleaseBody(
   },
 ) {
   const superapps = superappEntries(entries);
-  const shell = superapps.find((entry) => entry.app.id === "shell") ?? null;
+  const desk = superapps.find((entry) => entry.app.id === "desk") ?? null;
   const go = superapps.find((entry) => entry.app.id === "go") ?? null;
-  // The Shell install block is always present, even on a tree whose Shell row
+  // The Desk install block is always present, even on a tree whose Desk row
   // could not be collected, so it reads its id from the app table.
-  const shellApp = APPS.find((app) => app.id === "shell");
+  const deskApp = APPS.find((app) => app.id === "desk");
   return [
     `**Suite Desk** is the desktop superapp; **Suite Go** is the mobile superapp. ` +
       (channel === "stable"
@@ -1071,11 +1071,11 @@ export function aggregateReleaseBody(
         ]),
     "## Suite Desk (desktop)",
     "",
-    ...(shell === null ? [] : [...releaseLabels(shell.app, channel), ""]),
+    ...(desk === null ? [] : [...releaseLabels(desk.app, channel), ""]),
     "```sh",
     `flatpak remote-add --user --if-not-exists --from ${REMOTE_NAME} ${flatpakrepoUrl()}`,
-    installCommand(shellApp, channel),
-    `flatpak run ${releaseFlatpakRef(shellApp, channel)}`,
+    installCommand(deskApp, channel),
+    `flatpak run ${releaseFlatpakRef(deskApp, channel)}`,
     "```",
     "",
     `Remote: [${REMOTE_NAME}.flatpakrepo](${flatpakrepoUrl()})`,

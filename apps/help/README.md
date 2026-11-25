@@ -152,7 +152,7 @@ Why this is the first stop.
 
 ## interlude: The handoff
 
-The next three stops cross from Start to the desktop shell.
+The next three stops cross from Start to the desktop host.
 
 ### overlay: Why the manifest has no binary
 

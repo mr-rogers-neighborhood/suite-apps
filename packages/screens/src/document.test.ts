@@ -9,7 +9,7 @@ const initial: Screen = {
   id: "home",
   name: "Home",
   widgets: [
-    { registryId: "shell.apps", size: "full" },
+    { registryId: "desk.apps", size: "full" },
     {
       registryId: "planner.quick-task",
       size: "2x1",
@@ -31,16 +31,16 @@ describe("ScreenDocument", () => {
     expect(document.state().widgets.at(-1)?.registryId).toBe("budget.saved-views");
 
     expect(
-      document.add({ registryId: "canvas.recent-cards", size: "1x1" }, { before: "shell.apps" }),
+      document.add({ registryId: "canvas.recent-cards", size: "1x1" }, { before: "desk.apps" }),
     ).toBe(true);
     expect(document.state().widgets[0]?.registryId).toBe("canvas.recent-cards");
 
     expect(
-      document.add({ registryId: "budget.month", size: "full" }, { after: "shell.apps" }),
+      document.add({ registryId: "budget.month", size: "full" }, { after: "desk.apps" }),
     ).toBe(true);
     expect(document.state().widgets.map((widget) => widget.registryId)).toEqual([
       "canvas.recent-cards",
-      "shell.apps",
+      "desk.apps",
       "budget.month",
       "planner.quick-task",
       "future.unknown-widget",
@@ -50,7 +50,7 @@ describe("ScreenDocument", () => {
 
   it("refuses a duplicate instance and an unknown placement anchor", () => {
     const document = ScreenDocument.create(initial);
-    expect(document.add({ registryId: "shell.apps", size: "1x1" })).toBe(false);
+    expect(document.add({ registryId: "desk.apps", size: "1x1" })).toBe(false);
     expect(
       document.add({ registryId: "canvas.recent-cards", size: "1x1" }, { before: "nothing.here" }),
     ).toBe(false);
@@ -59,30 +59,30 @@ describe("ScreenDocument", () => {
 
   it("moves an instance before and after another", () => {
     const document = ScreenDocument.create(initial);
-    expect(document.move("future.unknown-widget", { before: "shell.apps" })).toBe(true);
+    expect(document.move("future.unknown-widget", { before: "desk.apps" })).toBe(true);
     expect(document.state().widgets.map((widget) => widget.registryId)).toEqual([
       "future.unknown-widget",
-      "shell.apps",
+      "desk.apps",
       "planner.quick-task",
     ]);
-    expect(document.move("shell.apps", { after: "planner.quick-task" })).toBe(true);
+    expect(document.move("desk.apps", { after: "planner.quick-task" })).toBe(true);
     expect(document.state().widgets.map((widget) => widget.registryId)).toEqual([
       "future.unknown-widget",
       "planner.quick-task",
-      "shell.apps",
+      "desk.apps",
     ]);
   });
 
   it("does not move to an unknown anchor", () => {
     const document = ScreenDocument.create(initial);
-    expect(document.move("shell.apps", { after: "nothing.here" })).toBe(false);
+    expect(document.move("desk.apps", { after: "nothing.here" })).toBe(false);
   });
 
   it("removes an instance and keeps the rest in order", () => {
     const document = ScreenDocument.create(initial);
     expect(document.remove("planner.quick-task")).toBe(true);
     expect(document.state().widgets.map((widget) => widget.registryId)).toEqual([
-      "shell.apps",
+      "desk.apps",
       "future.unknown-widget",
     ]);
     expect(document.remove("planner.quick-task")).toBe(false);
@@ -90,10 +90,10 @@ describe("ScreenDocument", () => {
 
   it("resizes an instance and refuses an unknown size", () => {
     const document = ScreenDocument.create(initial);
-    expect(document.resize("shell.apps", "1x1")).toBe(true);
+    expect(document.resize("desk.apps", "1x1")).toBe(true);
     expect(document.state().widgets[0]?.size).toBe("1x1");
     // The type refuses this at compile time; a stored file can still ask at runtime.
-    expect(document.resize("shell.apps", "3x1" as never)).toBe(false);
+    expect(document.resize("desk.apps", "3x1" as never)).toBe(false);
     expect(document.resize("nothing.here", "1x1")).toBe(false);
   });
 
@@ -123,7 +123,7 @@ describe("ScreenDocument", () => {
 
   it("round-trips a snapshot with unknown widgets and settings intact", () => {
     const document = ScreenDocument.create(initial);
-    document.resize("shell.apps", "2x1");
+    document.resize("desk.apps", "2x1");
     const opened = ScreenDocument.open(document.export());
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;
@@ -150,8 +150,8 @@ describe("ScreenDocument", () => {
     header.set("version", 2);
     header.set("id", "home");
     header.set("name", "Home");
-    doc.getList("order").push("shell.apps");
-    doc.getMap("widgets").ensureMergeableMap("shell.apps").set("size", "full");
+    doc.getList("order").push("desk.apps");
+    doc.getMap("widgets").ensureMergeableMap("desk.apps").set("size", "full");
     doc.commit();
 
     const opened = ScreenDocument.open(doc.export({ mode: "snapshot" }));

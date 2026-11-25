@@ -30,7 +30,7 @@ build can still be `alpha`.
 
 | App | Channel | Maturity | Version | Install |
 | --- | --- | --- | --- | --- |
-| [Suite Desk](https://github.com/mrrnbhd/suite-apps/blob/main/apps/shell/CHANGELOG.md) | stable | alpha | 0.3.0 | `flatpak install --user suite run.suite.shell` |
+| [Suite Desk](https://github.com/mrrnbhd/suite-apps/blob/main/apps/desk/CHANGELOG.md) | stable | alpha | 0.3.0 | `flatpak install --user suite run.suite.desk` |
 
 ## Mobile
 

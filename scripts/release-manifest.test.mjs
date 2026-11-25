@@ -44,8 +44,8 @@ describe("release manifest", () => {
 
   it("writes the file from an artifact and a commit file", () => {
     const dir = mkdtempSync(join(tmpdir(), "suite-manifest-"));
-    const flatpak = join(dir, "suite-shell-preview.flatpak");
-    const commitFile = join(dir, "suite-shell-preview.commit");
+    const flatpak = join(dir, "suite-desk-preview.flatpak");
+    const commitFile = join(dir, "suite-desk-preview.commit");
     const apk = join(dir, "suite-go-preview-0.1.0.apk");
     const out = join(dir, "release-manifest.json");
     writeFileSync(flatpak, "flatpak bytes");
@@ -61,7 +61,7 @@ describe("release manifest", () => {
         "--flatpak",
         flatpak,
         "--flatpak-id",
-        "run.suite.preview.shell",
+        "run.suite.preview.desk",
         "--flatpak-branch",
         "preview",
         "--flatpak-commit-file",
@@ -104,7 +104,7 @@ describe("release manifest", () => {
         "--flatpak",
         flatpak,
         "--flatpak-id",
-        "run.suite.preview.shell",
+        "run.suite.preview.desk",
         "--flatpak-branch",
         "preview",
         "--flatpak-commit-file",
@@ -152,8 +152,8 @@ describe("APK channel identity", () => {
       ["preview", "run.suite.preview.go", 3],
     ]) {
       const dir = mkdtempSync(join(tmpdir(), "suite-manifest-"));
-      const flatpak = join(dir, "suite-shell.flatpak");
-      const commitFile = join(dir, "suite-shell.commit");
+      const flatpak = join(dir, "suite-desk.flatpak");
+      const commitFile = join(dir, "suite-desk.commit");
       const apk = join(dir, "suite-go.apk");
       const out = join(dir, "release-manifest.json");
       writeFileSync(flatpak, "flatpak bytes");
@@ -169,7 +169,7 @@ describe("APK channel identity", () => {
           "--flatpak",
           flatpak,
           "--flatpak-id",
-          channel === "stable" ? "run.suite.shell" : `run.suite.${channel}.shell`,
+          channel === "stable" ? "run.suite.desk" : `run.suite.${channel}.desk`,
           "--flatpak-branch",
           channel === "stable" ? "master" : channel,
           "--flatpak-commit-file",

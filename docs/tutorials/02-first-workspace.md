@@ -12,7 +12,7 @@ flatpak install --user suite run.suite.canvas
 ```
 
 Flatpak writes the menu entry, so Canvas opens without a hub. If the app later becomes a pack, install
-it from the shell's catalogue instead.
+it from the host's catalogue instead.
 
 ## Create a workspace
 

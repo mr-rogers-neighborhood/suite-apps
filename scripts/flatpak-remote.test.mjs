@@ -202,8 +202,8 @@ describe("restoring the refs this run built", () => {
     const steps = restoreRefCommands({
       repo,
       builtRefs: [
-        { ref: "app/run.suite.nightly.shell/x86_64/nightly", commit },
-        { ref: "runtime/run.suite.nightly.shell.Debug/x86_64/nightly", commit: "b".repeat(64) },
+        { ref: "app/run.suite.nightly.desk/x86_64/nightly", commit },
+        { ref: "runtime/run.suite.nightly.desk.Debug/x86_64/nightly", commit: "b".repeat(64) },
       ],
     });
     assert.equal(steps.length, 2);
@@ -216,7 +216,7 @@ describe("restoring the refs this run built", () => {
       "refs",
       "--force",
       "--create",
-      "app/run.suite.nightly.shell/x86_64/nightly",
+      "app/run.suite.nightly.desk/x86_64/nightly",
       commit,
     ]);
   });
@@ -295,42 +295,42 @@ describe("when there is nothing to merge", () => {
 
 describe("the refs a publication did not build", () => {
   const local = [
-    "app/run.suite.nightly.shell/x86_64/nightly",
+    "app/run.suite.nightly.desk/x86_64/nightly",
     "appstream/x86_64",
     "appstream2/x86_64",
-    "runtime/run.suite.nightly.shell.Debug/x86_64/nightly",
+    "runtime/run.suite.nightly.desk.Debug/x86_64/nightly",
   ];
   const merged = [
     ...local,
     "app/run.suite.planner/x86_64/master",
-    "app/run.suite.shell/x86_64/master",
-    "runtime/run.suite.shell.Debug/x86_64/master",
+    "app/run.suite.desk/x86_64/master",
+    "runtime/run.suite.desk.Debug/x86_64/master",
   ];
 
   it("names the refs the bucket had and this build did not", () => {
     assert.deepEqual(foreignRefs(local, merged), [
+      "app/run.suite.desk/x86_64/master",
       "app/run.suite.planner/x86_64/master",
-      "app/run.suite.shell/x86_64/master",
-      "runtime/run.suite.shell.Debug/x86_64/master",
+      "runtime/run.suite.desk.Debug/x86_64/master",
     ]);
   });
 
   it("names every merged ref this publication did not publish", () => {
-    assert.deepEqual(preservedRefs(["app/run.suite.nightly.shell/x86_64/nightly"], merged), [
+    assert.deepEqual(preservedRefs(["app/run.suite.nightly.desk/x86_64/nightly"], merged), [
+      "app/run.suite.desk/x86_64/master",
       "app/run.suite.planner/x86_64/master",
-      "app/run.suite.shell/x86_64/master",
       "appstream/x86_64",
       "appstream2/x86_64",
-      "runtime/run.suite.nightly.shell.Debug/x86_64/nightly",
-      "runtime/run.suite.shell.Debug/x86_64/master",
+      "runtime/run.suite.desk.Debug/x86_64/master",
+      "runtime/run.suite.nightly.desk.Debug/x86_64/nightly",
     ]);
   });
 
   it("names only app ids, so runtime and appstream refs add no flag", () => {
     assert.deepEqual(appIdsOf(merged), [
-      "run.suite.nightly.shell",
+      "run.suite.desk",
+      "run.suite.nightly.desk",
       "run.suite.planner",
-      "run.suite.shell",
     ]);
   });
 });
@@ -353,8 +353,8 @@ describe("the build-update-repo arguments", () => {
         repo,
         keyId,
         foreignRefs: [
-          "app/run.suite.shell/x86_64/master",
-          "runtime/run.suite.shell.Debug/x86_64/master",
+          "app/run.suite.desk/x86_64/master",
+          "runtime/run.suite.desk.Debug/x86_64/master",
           "app/run.suite.canvas/x86_64/master",
         ],
       }),
@@ -363,7 +363,7 @@ describe("the build-update-repo arguments", () => {
         ...STATIC_DELTA_ARGUMENTS,
         "--no-update-appstream",
         "--static-delta-ignore-ref=run.suite.canvas",
-        "--static-delta-ignore-ref=run.suite.shell",
+        "--static-delta-ignore-ref=run.suite.desk",
         `--gpg-sign=${keyId}`,
         repo,
       ],
@@ -374,12 +374,12 @@ describe("the build-update-repo arguments", () => {
 describe("refusing a summary that lost a ref", () => {
   const commit = "a".repeat(64);
   const threeRefs = [
-    "* app/run.suite.shell/x86_64/master",
+    "* app/run.suite.desk/x86_64/master",
     "    Latest Commit (892 bytes):",
     `      ${commit}`,
     "    Timestamp (ostree.commit.timestamp): 2026-11-23T13:44:11-07",
     "",
-    "* app/run.suite.nightly.shell/x86_64/nightly",
+    "* app/run.suite.nightly.desk/x86_64/nightly",
     "    Latest Commit (1.1 kB):",
     `      ${"b".repeat(64)}`,
     "    Timestamp (ostree.commit.timestamp): 2026-11-23T13:44:11-07",
@@ -393,8 +393,8 @@ describe("refusing a summary that lost a ref", () => {
 
   it("reads the refs a summary advertises from the view", () => {
     assert.deepEqual(refsFromSummaryView(threeRefs), [
-      "app/run.suite.nightly.shell/x86_64/nightly",
-      "app/run.suite.shell/x86_64/master",
+      "app/run.suite.desk/x86_64/master",
+      "app/run.suite.nightly.desk/x86_64/nightly",
       "appstream/x86_64",
     ]);
     assert.deepEqual(refsFromSummaryView(""), []);
@@ -405,8 +405,8 @@ describe("refusing a summary that lost a ref", () => {
     assert.equal(
       summaryPreservationProblem({
         mergedRefs: [
-          "app/run.suite.shell/x86_64/master",
-          "app/run.suite.nightly.shell/x86_64/nightly",
+          "app/run.suite.desk/x86_64/master",
+          "app/run.suite.nightly.desk/x86_64/nightly",
           "appstream/x86_64",
         ],
         summaryRefs,
@@ -421,7 +421,7 @@ describe("refusing a summary that lost a ref", () => {
 
   it("refuses a fixture summary that dropped the stable ref", () => {
     const nightlyOnly = [
-      "* app/run.suite.nightly.shell/x86_64/nightly",
+      "* app/run.suite.nightly.desk/x86_64/nightly",
       "    Latest Commit (1.1 kB):",
       `      ${"b".repeat(64)}`,
       "",
@@ -431,16 +431,16 @@ describe("refusing a summary that lost a ref", () => {
       "",
     ].join("\n");
     const mergedRefs = [
-      "app/run.suite.shell/x86_64/master",
-      "app/run.suite.nightly.shell/x86_64/nightly",
+      "app/run.suite.desk/x86_64/master",
+      "app/run.suite.nightly.desk/x86_64/nightly",
       "appstream/x86_64",
     ];
     const summaryRefs = refsFromSummaryView(nightlyOnly);
     assert.deepEqual(missingSummaryRefs({ mergedRefs, summaryRefs }), [
-      "app/run.suite.shell/x86_64/master",
+      "app/run.suite.desk/x86_64/master",
     ]);
     const problem = summaryPreservationProblem({ mergedRefs, summaryRefs });
-    assert.match(problem, /app\/run\.suite\.shell\/x86_64\/master/u);
+    assert.match(problem, /app\/run\.suite\.desk\/x86_64\/master/u);
     assert.match(problem, /Refusing to publish a summary that would hide a channel/u);
   });
 });
@@ -521,17 +521,17 @@ describe("publishing an existing repository", () => {
 });
 
 describe("the commit file", () => {
-  const shell = "a".repeat(64);
+  const desk = "a".repeat(64);
   const go = "b".repeat(64);
 
   it("names every shipped ref and its commit, sorted by ref", () => {
     assert.equal(
       commitFileText([
-        { ref: "app/run.suite.shell/x86_64/master", commit: shell },
+        { ref: "app/run.suite.desk/x86_64/master", commit: desk },
         { ref: "app/run.suite.go/x86_64/master", commit: go },
       ]),
-      `${go}  app/run.suite.go/x86_64/master\n` +
-        `${shell}  app/run.suite.shell/x86_64/master\n`,
+      `${desk}  app/run.suite.desk/x86_64/master\n` +
+        `${go}  app/run.suite.go/x86_64/master\n`,
     );
   });
 
@@ -541,9 +541,9 @@ describe("the commit file", () => {
 
   it("refuses a line without a commit", () => {
     assert.throws(
-      () => commitFileText([{ ref: "app/run.suite.shell/x86_64/master", commit: "nope" }]),
+      () => commitFileText([{ ref: "app/run.suite.desk/x86_64/master", commit: "nope" }]),
       /no OSTree commit/u,
     );
-    assert.throws(() => commitFileText([{ ref: "", commit: shell }]), /needs a ref/u);
+    assert.throws(() => commitFileText([{ ref: "", commit: desk }]), /needs a ref/u);
   });
 });

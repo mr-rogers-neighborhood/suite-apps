@@ -1,0 +1,86 @@
+# Suite Desk — the host — as a Flatpak.
+#
+# Build the unpacked app first, then let this manifest package it:
+#
+#   pnpm --filter @suite/desk run package:dir
+#   node scripts/flatpak.mjs --app desk
+#   node scripts/flatpak.mjs --app desk --channel nightly
+#
+# The stable manifest is the only hand-written one. A pre-release rewrites it to
+# `run.suite.<channel>.desk`: the id names the desktop entry, metainfo, icon and
+# launcher, and the branch (slop, nightly or preview) carries the same channel. The
+# grants and build steps below are shared, so a permission decided for stable is
+# not silently wider in a pre-release.
+#
+# The manifest packages what electron-builder produced rather than rebuilding it
+# inside flatpak-builder. The renderer and the host are built by the same gate
+# the other artifact forms use, and the sandbox should not carry a second pnpm
+# and a network build. `org.electronjs.Electron2.BaseApp` supplies zypak, which
+# gives Electron its sandbox without a setuid chrome-sandbox.
+#
+# The host is not the package manager. It installs packs into its own sandbox
+# data directory and opens them as tabs, so its sandbox is the narrow one: no
+# host Flatpak service, no host filesystem grants. The file picker and links go
+# through the document and desktop portals.
+app-id: run.suite.desk
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: run.suite.desk
+separate-locales: false
+
+# Build-time only. The Electron BaseApp's asar patchers rewrite `desktopName`
+# while the manifest builds; the app commit carries a copy of the base's
+# `/app/bin`, and nothing at runtime reads either tool. `cleanup` only matches
+# files a module installed, and these came from the base, so the patterns have
+# to run as cleanup commands.
+cleanup-commands:
+  - rm -f /app/bin/patch-desktop-filename /app/bin/patch-electron-desktop-filename
+
+finish-args:
+  # Chromium's browser and renderer processes share memory through this.
+  - --share=ipc
+  # A pack with the `network` capability runs inside the host's sandbox, so the
+  # host needs the host's network namespace to carry its HTTPS and WSS requests.
+  # The per-pack session policy and the capability are still the gate: this
+  # grant only makes the namespace reachable when a pack declares network.
+  - --share=network
+  # Native Wayland first, with X11 as the fallback for an X11 session.
+  - --socket=wayland
+  - --socket=fallback-x11
+  # GPU acceleration for the window; without it Electron renders in software.
+  - --device=dri
+
+modules:
+  - name: suite-desk
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/desk
+      - cp -a app/. /app/desk/
+      # Electron's XDG application id and WM_CLASS come from package.json's
+      # `desktopName`, so the BaseApp helper rewrites the asar copy to the
+      # Flatpak id. Without it Wayland groups the window under `suite`.
+      - patch-desktop-filename /app/desk/resources/app.asar
+      - install -Dm755 run.suite.desk /app/bin/run.suite.desk
+      - install -Dm644 run.suite.desk.desktop /app/share/applications/run.suite.desk.desktop
+      - install -Dm644 run.suite.desk.metainfo.xml /app/share/metainfo/run.suite.desk.metainfo.xml
+      - install -Dm644 icons/run.suite.desk-48.png /app/share/icons/hicolor/48x48/apps/run.suite.desk.png
+      - install -Dm644 icons/run.suite.desk-64.png /app/share/icons/hicolor/64x64/apps/run.suite.desk.png
+      - install -Dm644 icons/run.suite.desk-128.png /app/share/icons/hicolor/128x128/apps/run.suite.desk.png
+      - install -Dm644 icons/run.suite.desk-256.png /app/share/icons/hicolor/256x256/apps/run.suite.desk.png
+      - install -Dm644 icons/run.suite.desk-512.png /app/share/icons/hicolor/512x512/apps/run.suite.desk.png
+    sources:
+      - type: dir
+        path: ../../apps/desk/release/linux-unpacked
+        dest: app
+      - type: file
+        path: run.suite.desk
+      - type: file
+        path: run.suite.desk.desktop
+      - type: file
+        path: run.suite.desk.metainfo.xml
+      - type: dir
+        path: icons
+        dest: icons

@@ -16,11 +16,25 @@ portable install; they are not configuration a normal user needs.
 | `SUITE_BUDGET_DATA` | Budget | the application data directory |
 | `SUITE_BUDGET_USER_DATA` | Budget | Electron's `userData` |
 
+## Suite Desk
+
+| Variable | Replaces |
+| --- | --- |
+| `SUITE_DESK_DATA` | the host data root, `<userData>/desk` |
+| `SUITE_DESK_USER_DATA` | Electron's `userData` |
+| `SUITE_DESK_DEV_PACKS` | loads unsigned `packs/` directories in an unpackaged build |
+| `SUITE_DESK_CATALOGUE` | the local catalogue directory under the data root |
+| `SUITE_DESK_INDEX` | the published catalogue index URL, or `none` for the local directory only |
+| `SUITE_DESK_TRUST` | the publisher trust store and consent record under the data root |
+
+These are the Desk names. The old `SUITE_SHELL_*` names are not read or aliased; the Desk rename is a
+fresh start with no compatibility alias.
+
 ## Sync
 
 The desktop apps take the relay address in their own Sync dialog. `SUITE_SYNC_URL`,
 `SUITE_SYNC_MEMBER`, `SUITE_SYNC_WORKSPACE`, `SUITE_SYNC_EPOCH` and `SUITE_SYNC_DEVICE` were listed
-here but no shell reads them. The host reads no relay variable: the relay's configuration belongs to
+here but nothing reads them. The host reads no relay variable: the relay's configuration belongs to
 the process that runs it, and the host seam that takes it over will decide where that lives.
 
 ## Packaging

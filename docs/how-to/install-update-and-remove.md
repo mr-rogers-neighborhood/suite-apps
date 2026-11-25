@@ -1,12 +1,12 @@
 # Install, update and remove apps
 
-Suite Desk is the desktop host and the way in. [Install the host](../../apps/shell/README.md#install-as-a-flatpak)
+Suite Desk is the desktop host and the way in. [Install the host](../../apps/desk/README.md#install-as-a-flatpak)
 once, then install, update, remove and reinstall packs from its catalogue. A `.suitepack` file still
-installs on its own. [The shell's README](../../apps/shell/README.md#installing-updating-and-removing-a-pack)
+installs on its own. [The host's README](../../apps/desk/README.md#installing-updating-and-removing-a-pack)
 owns that lifecycle, and neither the host nor an app edits a document.
 
 The frozen Canvas, Planner, Budget and Help Flatpaks keep the one `flatpak install` line the release
-page prints. Suite Start no longer exists (#314); its catalogue and Home moved into the shell. Suite
+page prints. Suite Start no longer exists (#314); its catalogue and Home moved into the host. Suite
 Sync is retired as a shipped app (#315): the signed remote keeps its last published ref, but no new
 `run.suite.sync` build is published and the tray app is not the target surface.
 
@@ -14,16 +14,16 @@ Sync is retired as a shipped app (#315): the signed remote keeps its last publis
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite https://flatpak.suite.run/suite.flatpakrepo
-flatpak install --user suite run.suite.shell
+flatpak install --user suite run.suite.desk
 ```
 
 Updates arrive through Flatpak: `flatpak update --user` replaces the deployment, and the host does not
-check for or install its own update. From a checkout, `node scripts/flatpak.mjs --app shell` builds the
+check for or install its own update. From a checkout, `node scripts/flatpak.mjs --app desk` builds the
 same unpacked tree into the local store.
 
 ## Install a pack
 
-Home's `shell.apps` widget shows the catalogue. A trusted entry offers **Install**, **Update** or
+Home's `desk.apps` widget shows the catalogue. A trusted entry offers **Install**, **Update** or
 **Reinstall** as its state requires; a refused entry stays visible with the sentence that explains it
 and cannot be installed. A `.suitepack` file can also be opened on its own. Removing a pack leaves its
 documents and files on disk until the person removes them.

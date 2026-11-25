@@ -12,7 +12,7 @@ apps/
   help/         @suite/help documentation app: explorer and handbook
   sync/         @suite/sync-server; packages/protocol, packages/host; deploy, docs
   go/           @suite/go-app mobile container; packages/go contract; docs
-  shell/        @suite/shell host: one window, sandboxed packs, space document
+  desk/         @suite/desk host: one window, sandboxed packs, space document
 packages/       contracts, files, document-runtime, screens, desktop, theme, ui,
                 pack, pack-runtime, pack-host
 docs/           Cross-cutting documentation
@@ -46,7 +46,7 @@ owns the overrides, patches and build permissions the apps need.
 | `@suite/host` | `apps/sync/packages/host` | Sync host |
 | `@suite/go-app` | `apps/go` | Go container |
 | `@suite/go` | `apps/go/packages/go` | Go module contract |
-| `@suite/shell` | `apps/shell` | Desktop host |
+| `@suite/desk` | `apps/desk` | Desktop host |
 | `@suite/contracts` | `packages/contracts` | Shared app and deployment contracts |
 | `@suite/files` | `packages/files` | Shared file envelopes |
 | `@suite/document-runtime` | `packages/document-runtime` | Shared document replica and atomic store |

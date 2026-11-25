@@ -49,10 +49,10 @@ export interface HostDeclaration {
   readonly capabilities: readonly PackCapability[];
 }
 
-/** The desktop shell: Electron, its document and file services, and the pack bridge. */
-export const SHELL_HOST = {
-  id: "shell",
-  name: "Suite",
+/** The desktop host: Suite Desk — Electron, its document and file services, and the pack bridge. */
+export const DESK_HOST = {
+  id: "desk",
+  name: "Suite Desk",
   kind: "desktop",
   capabilities: ["documents", "files", "identity.pack", "network", "notifications", "recents"],
 } as const satisfies HostDeclaration;
@@ -70,7 +70,7 @@ export const GO_HOST = {
 } as const satisfies HostDeclaration;
 
 /** Every host build in this tree, for a checker that needs to judge a declaration. */
-export const HOST_DECLARATIONS: readonly HostDeclaration[] = [SHELL_HOST, GO_HOST];
+export const HOST_DECLARATIONS: readonly HostDeclaration[] = [DESK_HOST, GO_HOST];
 
 /** The hosts that report a kind, in declaration order. Empty means this tree has no such host. */
 export function hostsOfKind(kind: HostKind): readonly HostDeclaration[] {

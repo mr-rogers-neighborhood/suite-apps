@@ -273,13 +273,13 @@ jobs:
             echo "SUITE_GO_KEYSTORE=${keys}/suite-go-release.jks"
           } >> "${GITHUB_ENV}"
 
-      - name: Build the Shell Flatpak (${{ inputs.channel }})
+      - name: Build the Desk Flatpak (${{ inputs.channel }})
         env:
           CHANNEL: ${{ inputs.channel }}
           SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
         run: |
           set -euo pipefail
-          args=(--app shell)
+          args=(--app desk)
           if [ "${CHANNEL}" != "stable" ]; then args+=(--channel "${CHANNEL}"); fi
           node scripts/flatpak.mjs "${args[@]}" --no-install
 
@@ -293,20 +293,20 @@ jobs:
           set -euo pipefail
           mkdir -p .dev/release
           if [ "${CHANNEL}" = "stable" ]; then
-            ref=run.suite.shell
+            ref=run.suite.desk
             branch=master
           else
-            ref="run.suite.${CHANNEL}.shell"
+            ref="run.suite.${CHANNEL}.desk"
             branch="${CHANNEL}"
           fi
           # Flatpak refs live at app/<id>/<arch>/<branch>, not at refs/heads/<id>.
           arch="$(flatpak --default-arch)"
           commit="$(ostree --repo="${SUITE_FLATPAK_REPO}" \
             rev-parse "app/${ref}/${arch}/${branch}")"
-          printf '%s\n' "${commit}" > ".dev/release/suite-shell-${CHANNEL}.commit"
-          cat ".dev/release/suite-shell-${CHANNEL}.commit"
+          printf '%s\n' "${commit}" > ".dev/release/suite-desk-${CHANNEL}.commit"
+          cat ".dev/release/suite-desk-${CHANNEL}.commit"
           flatpak build-bundle "${SUITE_FLATPAK_REPO}" \
-            ".dev/release/suite-shell-${CHANNEL}.flatpak" "${ref}" "${branch}"
+            ".dev/release/suite-desk-${CHANNEL}.flatpak" "${ref}" "${branch}"
 
       - name: Build the Suite Go release APK (${{ inputs.channel }})
         id: apk
@@ -350,20 +350,20 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${CHANNEL}" = "stable" ]; then
-            app_id=run.suite.shell
+            app_id=run.suite.desk
             branch=master
             apk_id=run.suite.go
           else
-            app_id="run.suite.${CHANNEL}.shell"
+            app_id="run.suite.${CHANNEL}.desk"
             branch="${CHANNEL}"
             apk_id="run.suite.${CHANNEL}.go"
           fi
           node scripts/release-manifest.mjs \
             --channel "${CHANNEL}" \
-            --flatpak ".dev/release/suite-shell-${CHANNEL}.flatpak" \
+            --flatpak ".dev/release/suite-desk-${CHANNEL}.flatpak" \
             --flatpak-id "${app_id}" \
             --flatpak-branch "${branch}" \
-            --flatpak-commit-file ".dev/release/suite-shell-${CHANNEL}.commit" \
+            --flatpak-commit-file ".dev/release/suite-desk-${CHANNEL}.commit" \
             --apk "${APK}" \
             --apk-id "${apk_id}" \
             --out .dev/release/release-manifest.json
@@ -375,7 +375,7 @@ jobs:
       # `release-index.mjs` publishes both or neither. A build that fails stops
       # the job here, before anything is signed or uploaded; a run with no
       # --build prints the skip sentence instead. The index reads only
-      # .dev/release/packs, so the sample packs under apps/shell/packs stay
+      # .dev/release/packs, so the sample packs under apps/desk/packs stay
       # fixtures and are never staged for publication.
       - name: Build the catalogue index
         if: inputs.publish
@@ -401,7 +401,7 @@ jobs:
         if: inputs.publish
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: .dev/release/suite-shell-${{ inputs.channel }}.flatpak
+          subject-path: .dev/release/suite-desk-${{ inputs.channel }}.flatpak
 
       - name: Attest the APK provenance
         if: inputs.publish
@@ -413,7 +413,7 @@ jobs:
         if: inputs.publish
         uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
-          subject-path: .dev/release/suite-shell-${{ inputs.channel }}.flatpak
+          subject-path: .dev/release/suite-desk-${{ inputs.channel }}.flatpak
           sbom-path: .dev/release/suite-apps.spdx.json
 
       - name: Attest the APK SBOM
@@ -517,20 +517,20 @@ jobs:
           expected=""
           if [ "${PUBLISH}" = "true" ]; then
             if [ "${CHANNEL}" = "stable" ]; then
-              app=run.suite.shell
+              app=run.suite.desk
               branch=master
             else
-              app="run.suite.${CHANNEL}.shell"
+              app="run.suite.${CHANNEL}.desk"
               branch="${CHANNEL}"
             fi
-            commit_file=".dev/release/suite-shell-${CHANNEL}.commit"
+            commit_file=".dev/release/suite-desk-${CHANNEL}.commit"
             test -s "${commit_file}"
             expected="$(cat "${commit_file}")"
           else
             # A rehearsal published nothing, so the only ref it can prove is
             # what the public remote serves on the stable branch today. No
             # build published means nothing to install, and that is a skip.
-            app=run.suite.shell
+            app=run.suite.desk
             branch=master
             if ! flatpak remote-ls --user suite --app \
               --columns=application,branch \
@@ -598,8 +598,8 @@ jobs:
           path: |
             .dev/release/suite-apps.spdx.json
             .dev/release/release-manifest.json
-            .dev/release/suite-shell-${{ inputs.channel }}.commit
-            .dev/release/suite-shell-${{ inputs.channel }}.flatpak
+            .dev/release/suite-desk-${{ inputs.channel }}.commit
+            .dev/release/suite-desk-${{ inputs.channel }}.flatpak
             ${{ steps.apk.outputs.path }}
           include-hidden-files: true
           retention-days: 90
