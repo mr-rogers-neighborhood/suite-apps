@@ -10,5 +10,3 @@ dist/
 packaging/flatpak/.build/
 # Sync's unpacked build, outside services/relay so electron-builder cannot package it back in.
 .artifacts/
-# The pack tree borrows its legacy shell's installed tree; scripts/pack-links.mjs creates the link.
-packs/*/node_modules

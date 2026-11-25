@@ -23,13 +23,12 @@
     "start": "electron .",
     "package:dir": "pnpm build && electron-builder --dir",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "typecheck:all": "pnpm typecheck && tsc --noEmit -p ../../packs/help/pack/tsconfig.json",
+    "typecheck:all": "pnpm typecheck",
     "lint": "biome check .",
     "format": "biome format --write .",
     "test": "vitest run",
-    "test:pack": "pnpm index && pnpm sync && vitest run --config ../../packs/help/pack/vitest.config.mts",
     "e2e:proof": "playwright test --grep @proof",
-    "check": "biome check . && pnpm typecheck:all && vitest run && pnpm test:pack",
+    "check": "biome check . && pnpm typecheck:all && vitest run",
     "check:full": "pnpm check && pnpm build && pnpm index:check"
   },
   "dependencies": {

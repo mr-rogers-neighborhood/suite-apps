@@ -20,7 +20,7 @@ mise exec -- node scripts/affected.mjs --base origin/main  # rows a diff selects
 
 The gate builds the workspace libraries (`packages/*`, `hosts/*/packages/*`, `legacy/*/packages/*`
 and `services/*/packages/*`) once, runs the root
-scripts' `node --test` checks (pack, budget pack, affected, channel, release and spec), then runs each
+scripts' `node --test` checks (pack, affected, channel, release and spec), then runs each
 app's own `check:full` in dependency order. It writes `.dev/gate-status.json`. `--fresh` exports
 `HEAD` with `git archive`, installs from the lockfile, and runs the same order in that clean tree. A
 row marked with a Playwright suite would run it after the checks, under `xvfb-run` when there is no

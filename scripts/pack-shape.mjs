@@ -46,7 +46,7 @@ export const REQUIRED = [
 ];
 
 /**
- * A pack test. The gate runs the app's `test:pack` script, and CI is where a
+ * A pack test. The gate runs the pack package's `test` script, and CI is where a
  * pack's tests become proof, so a pack with none fails here.
  */
 export const PACK_TEST = /\.test\.[cm]?[jt]sx?$/u;
@@ -311,7 +311,7 @@ export function checkPackShape({
 
     if (walkPack(packDir, problems) === 0) {
       problems.push(
-        `${relative(root, packDir)}: no pack test; add at least one *.test.* and wire it into the app's test:pack script`,
+        `${relative(root, packDir)}: no pack test; add at least one *.test.* and wire it into the pack package's test script`,
       );
     }
 

@@ -6,8 +6,9 @@ pack READMEs link, not a second copy of the clause. The manifest itself is
 [S3.5–S3.7](../spec/superapp.md#3-pack-format-canonical-bytes-and-manifest) and
 [manifest.schema.json](../spec/manifest.schema.json).
 
-A pack is source under `packs/<app>/pack/`. It is not a workspace package, so nothing is installed or
-built into it; the build writes to a generated directory outside it.
+A pack is its own workspace package at `packs/<app>` (`@suite/<app>-pack`); its source lives in
+`pack/`. The package owns the build toolchain, so nothing is installed or built inside `pack/`; the
+build writes to a generated directory outside it.
 
 ## What the directory holds
 
@@ -16,7 +17,7 @@ built into it; the build writes to a generated directory outside it.
 | `manifest.json` | The source manifest. `version` equals the app's `package.json` version. The build adds `format`, `publisher`, `files` and `signature`. |
 | `src/` | The pack entry and its prelude. Renderer-only: no Electron, no Node. |
 | `vite.config.ts` | The one build config, named the same in every app. |
-| `*.test.*` | At least one test, run by the app's `test:pack` script. |
+| `*.test.*` | At least one test, run by the pack package's `test` script. |
 | `README.md` | Points at this page and names the app's build command. |
 
 Anything else is allowed. `dist/`, `node_modules/` and other generated directories are not: the
@@ -47,24 +48,24 @@ rather than failed. Declaring it is the step that opts into the rule.
 
 ## Build and test
 
-The app's own scripts own the commands; there is no shared pack build entry point. Budget, Planner,
-Canvas and Help are the worked examples:
+Each pack is its own workspace package and owns the commands; there is no shared pack build entry
+point. Budget, Planner, Canvas and Help are the worked examples:
 
 ```sh
-mise exec -- pnpm --dir legacy/budget run test:pack
-mise exec -- pnpm --dir legacy/budget run typecheck:all
+mise exec -- pnpm --filter @suite/budget-pack run test
+mise exec -- pnpm --filter @suite/budget-pack run typecheck
 mise exec -- pnpm budget:pack
 
-mise exec -- pnpm --dir legacy/planner run test:pack
-mise exec -- pnpm --dir legacy/planner run typecheck:all
+mise exec -- pnpm --filter @suite/planner-pack run test
+mise exec -- pnpm --filter @suite/planner-pack run typecheck
 mise exec -- pnpm planner:pack
 
-mise exec -- pnpm --dir legacy/canvas run test:pack
-mise exec -- pnpm --dir legacy/canvas run typecheck:all
+mise exec -- pnpm --filter @suite/canvas-pack run test
+mise exec -- pnpm --filter @suite/canvas-pack run typecheck
 mise exec -- pnpm canvas:pack
 
-mise exec -- pnpm --dir legacy/help run test:pack
-mise exec -- pnpm --dir legacy/help run typecheck:all
+mise exec -- pnpm --filter @suite/help-pack run test
+mise exec -- pnpm --filter @suite/help-pack run typecheck
 mise exec -- pnpm help:pack
 ```
 
@@ -88,9 +89,8 @@ It builds twice into generated directories and compares every payload path and S
 signing key. A pack whose bytes come from generated content must not change hash without a source
 change; a mismatch fails the command and names the paths.
 
-The app's `test:pack` script runs the pack tests from the app directory, with the pack's config and
-an explicit `root`. That is what keeps `node_modules` out of `pack/` while the tests still import
-the app's Vitest and jsdom.
+The pack package's `test` script runs the pack tests with the pack's config and an explicit `root`.
+That is what keeps `node_modules` out of `pack/`; the package itself owns Vite, Vitest and jsdom.
 
 ## Check it
 

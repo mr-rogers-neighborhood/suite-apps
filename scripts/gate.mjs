@@ -218,7 +218,6 @@ const scripts =
             "scripts/help-pack.test.mjs",
             "scripts/pack-card.test.mjs",
             "scripts/pack-shape.test.mjs",
-            "scripts/pack-links.test.mjs",
             "scripts/affected.test.mjs",
             "scripts/proof-of-changes.test.mjs",
             "scripts/release-manifest.test.mjs",
@@ -254,35 +253,7 @@ if (!scripts.ok) {
   });
 }
 
-// The prelude's tests live with Budget's app, which owns the Vitest version. They
-// need no signing key; the signed round-trip above is the key-bearing path, and
-// this is the bridge's list/create/commit/export/import behaviour.
-const packTests =
-  dry || !build.ok || !scripts.ok
-    ? { ok: build.ok && scripts.ok, detail: dry ? "dry run" : "not run: earlier step failed" }
-    : (() => {
-        if (!json) process.stdout.write("\n▶ budget pack\n");
-        const result = run("pnpm", ["--dir", "legacy/budget", "run", "test:pack"], workdir);
-        return {
-          ok: result.status === 0,
-          detail: result.status === 0 ? "prelude tests" : `exit ${result.status}`,
-        };
-      })();
-
-if (!json) {
-  process.stdout.write(`${packTests.ok ? "ok  " : "FAIL"}  budget pack  ${packTests.detail}\n`);
-}
-
-if (!packTests.ok) {
-  results.push({
-    repo: "budget pack",
-    package: "legacy/budget (test:pack)",
-    ok: false,
-    detail: packTests.detail,
-  });
-}
-
-for (const entry of build.ok && scripts.ok && packTests.ok ? selected : []) {
+for (const entry of build.ok && scripts.ok ? selected : []) {
   const repoDir = join(workdir, entry.dir);
   if (!existsSync(join(repoDir, "package.json"))) {
     results.push({ ...entry, ok: false, detail: "missing repo" });
@@ -295,9 +266,19 @@ for (const entry of build.ok && scripts.ok && packTests.ok ? selected : []) {
     continue;
   }
 
-  const result = run("pnpm", ["--filter", entry.package, "run", "check:full"], workdir);
-  const ok = result.status === 0;
-  results.push({ ...entry, ok, detail: ok ? "passed" : `exit ${result.status}` });
+  // A frozen app's pack is its own workspace package, but it is the same gate
+  // row: run the shell first, then its pack, rather than adding a second row.
+  // They are sequential because Help's pack reads the generated handbook the
+  // shell writes, and pnpm would otherwise run both at once.
+  const packages = [entry.package, ...(entry.pack === undefined ? [] : [entry.pack])];
+  let status = 0;
+  for (const name of packages) {
+    const result = run("pnpm", ["--filter", name, "run", "check:full"], workdir);
+    status = result.status ?? 1;
+    if (status !== 0) break;
+  }
+  const ok = status === 0;
+  results.push({ ...entry, ok, detail: ok ? "passed" : `exit ${status}` });
   if (!ok) break;
 }
 

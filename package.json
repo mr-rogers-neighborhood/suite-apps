@@ -34,7 +34,7 @@
     "help:pack": "node scripts/help-pack.mjs",
     "format": "pnpm --filter \"./hosts/*\" --filter \"./hosts/*/packages/*\" --filter \"./legacy/*\" --filter \"./legacy/*/*\" --filter \"./legacy/*/packages/*\" --filter \"./services/*\" --filter \"./services/*/*\" --filter \"./services/*/packages/*\" --filter \"./packages/*\" --workspace-concurrency=1 run format",
     "build": "pnpm --filter \"./hosts/*\" --filter \"./hosts/*/packages/*\" --filter \"./legacy/*\" --filter \"./legacy/*/*\" --filter \"./legacy/*/packages/*\" --filter \"./services/*\" --filter \"./services/*/*\" --filter \"./services/*/packages/*\" --filter \"./packages/*\" --workspace-concurrency=1 run build",
-    "prepare": "husky && node scripts/pack-links.mjs"
+    "prepare": "husky"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

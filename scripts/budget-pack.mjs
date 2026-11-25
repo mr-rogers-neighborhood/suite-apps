@@ -23,7 +23,8 @@ import { writePackCard } from "./lib/packCard.mjs";
 import { bundlePack, platformsSummary, publicKeyOfSigningKey } from "./pack.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const PACK_DIR = join(ROOT, "packs", "budget", "pack");
+const PACK_ROOT = join(ROOT, "packs", "budget");
+const PACK_DIR = join(PACK_ROOT, "pack");
 const APP_DIR = join(ROOT, "legacy", "budget");
 const DIST = join(APP_DIR, ".dev", "pack");
 const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
@@ -174,7 +175,7 @@ async function main(argv) {
   );
   await run(
     "pnpm",
-    ["--dir", APP_DIR, "exec", "vite", "build", "--config", join(ROOT, "packs", "budget", "pack", "vite.config.ts")],
+    ["--dir", PACK_ROOT, "exec", "vite", "build", "--config", "pack/vite.config.ts"],
     ROOT,
   );
 

@@ -33,7 +33,8 @@ renders `docs/` as the handbook. It is offline, ships through Flatpak, and never
 fact: the code and `docs/` are the source of truth.
 
 `pnpm-workspace.yaml` includes `hosts/*`, `hosts/*/packages/*`, `legacy/*`, `legacy/*/*`,
-`legacy/*/packages/*`, `services/*`, `services/*/*`, `services/*/packages/*` and `packages/*`. It
+`legacy/*/packages/*`, `packs/*`, `services/*`, `services/*/*`, `services/*/packages/*` and
+`packages/*`. It
 also owns the overrides, patches and build permissions the apps need.
 
 ## Packages
@@ -41,14 +42,18 @@ also owns the overrides, patches and build permissions the apps need.
 | Package | Directory | Owner |
 | --- | --- | --- |
 | `@suite/canvas` | `legacy/canvas` | Canvas renderer |
+| `@suite/canvas-pack` | `packs/canvas` | Canvas pack build |
 | `@suite/canvas-desktop` | `legacy/canvas/desktop` | Canvas Electron shell |
 | `@suite/graph` | `legacy/canvas/packages/graph` | Canvas schema and document layer |
 | `@suite/import-obsidian` | `legacy/canvas/packages/import-obsidian` | Canvas import |
 | `@suite/planner` | `legacy/planner` | Planner |
+| `@suite/planner-pack` | `packs/planner` | Planner pack build |
 | `@suite/planner-core` | `legacy/planner/packages/core` | Planner schema and document layer |
 | `@suite/budget` | `legacy/budget` | Budget |
+| `@suite/budget-pack` | `packs/budget` | Budget pack build |
 | `@suite/budget-core` | `legacy/budget/packages/core` | Budget schema and document layer |
 | `@suite/help` | `legacy/help` | Documentation app: explorer and handbook |
+| `@suite/help-pack` | `packs/help` | Help pack build |
 | `@suite/sync-server` | `services/relay` | Sync server |
 | `@suite/sync-app` | `services/relay/app` | The retired relay app the last `run.suite.sync` build packaged |
 | `@suite/sync` | `services/relay/packages/protocol` | Sync protocol |

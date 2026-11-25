@@ -129,6 +129,7 @@ describe("workspace reading", () => {
   it("reads the real workspace patterns", () => {
     const patterns = workspacePatterns(ROOT);
     assert.ok(patterns.includes("hosts/*"), "hosts/* is declared");
+    assert.ok(patterns.includes("packs/*"), "packs/* is declared");
     assert.ok(patterns.includes("packages/*"), "packages/* is declared");
   });
 
@@ -147,6 +148,9 @@ describe("workspace reading", () => {
         existsSync(join(ROOT, row.dir, "package.json")),
         `${row.dir} exists`,
       );
+      if (row.pack !== undefined) {
+        assert.ok(names.has(row.pack), `${row.pack} is a workspace project`);
+      }
     }
   });
 

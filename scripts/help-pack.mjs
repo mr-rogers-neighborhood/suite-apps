@@ -29,7 +29,8 @@ import { writePackCard } from "./lib/packCard.mjs";
 import { bundlePack, platformsSummary, publicKeyOfSigningKey } from "./pack.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const PACK_DIR = join(ROOT, "packs", "help", "pack");
+const PACK_ROOT = join(ROOT, "packs", "help");
+const PACK_DIR = join(PACK_ROOT, "pack");
 const APP_DIR = join(ROOT, "legacy", "help");
 const DIST = join(APP_DIR, ".dev", "pack");
 const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
@@ -178,12 +179,12 @@ export async function buildPayload(outDir, cacheDir) {
     "pnpm",
     [
       "--dir",
-      APP_DIR,
+      PACK_ROOT,
       "exec",
       "vite",
       "build",
       "--config",
-      join(ROOT, "packs", "help", "pack", "vite.config.ts"),
+      "pack/vite.config.ts",
       "--outDir",
       outDir,
       "--emptyOutDir",
@@ -316,7 +317,7 @@ async function main(argv) {
   await generateContent();
   await run(
     "pnpm",
-    ["--dir", APP_DIR, "exec", "vite", "build", "--config", join(ROOT, "packs", "help", "pack", "vite.config.ts")],
+    ["--dir", PACK_ROOT, "exec", "vite", "build", "--config", "pack/vite.config.ts"],
     ROOT,
   );
 
