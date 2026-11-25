@@ -17,10 +17,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build:all": "pnpm --filter @suite/sync --filter @suite/host --filter @suite/sync-server --filter @suite/sync-app --workspace-concurrency=1 run build",
     "typecheck:all": "pnpm --filter @suite/sync-server --filter @suite/host --filter @suite/sync --filter @suite/sync-app run typecheck",
-    "check": "biome check . && pnpm build:all && pnpm typecheck:all && vitest run",
+    "check": "node ../../scripts/lint.mjs && pnpm build:all && pnpm typecheck:all && vitest run",
     "check:full": "pnpm check",
     "format": "biome format --write .",
-    "lint": "biome check .",
+    "lint": "node ../../scripts/lint.mjs",
     "test": "vitest run",
     "verify": "pnpm check"
   },

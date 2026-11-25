@@ -94,6 +94,16 @@ describe("release refusals", () => {
     );
   });
 
+  it("refuses a status left by a trunk prelude run", () => {
+    const head = "abcdef1234567890";
+    const problems = gateProblems(
+      { ok: true, fresh: true, commit: "abcdef1", only: null, prelude: true },
+      head,
+    );
+    assert.match(problems.join(), /prelude/u);
+    assert.equal(problems.length, 1);
+  });
+
   it("accepts a fresh, passing gate that names HEAD", () => {
     assert.deepEqual(
       gateProblems({ ok: true, fresh: true, commit: "abcdef1" }, "abcdef1234567890"),

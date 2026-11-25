@@ -10,6 +10,9 @@ name: ci
 on:
   pull_request:
     branches: [main]
+    # `labeled` is load-bearing: adding the `proof` label (or `ci:full` on a
+    # fork) has to start a run, and GitHub only starts one for a listed type.
+    types: [opened, synchronize, reopened, labeled]
   merge_group:
   workflow_dispatch:
 
@@ -165,6 +168,18 @@ jobs:
       - name: Install
         if: matrix.repo != 'none'
         run: pnpm install --frozen-lockfile
+      - name: Resolve the Playwright version
+        if: matrix.repo == 'canvas'
+        id: playwright
+        run: |
+          version="$(node -e 'console.log(require("./legacy/canvas/node_modules/@playwright/test/package.json").version)')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Playwright browser cache
+        if: matrix.repo == 'canvas'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Playwright browser (Canvas stories)
         if: matrix.repo == 'canvas'
         run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
@@ -178,13 +193,19 @@ jobs:
   proof:
     name: proof (${{ matrix.repo }})
     # Evidence, not a required check (matching C8.3 for Revyl): runs only for
-    # the desktop rows whose diff can break them, and writes the "Proof of
-    # Changes" block to the step summary alongside uploaded screenshot/trace
+    # the desktop rows whose diff can break them, writes the "Proof of
+    # Changes" block to the step summary, and uploads screenshot/trace
     # artifacts.
+    #
+    # On a pull request it waits for the `proof` label: the same harness, on
+    # demand, instead of a screenshot artifact per push (#407). A manual
+    # dispatch still runs it, so the mechanism is reachable without a label.
     needs: detect
     if: >-
       needs.detect.result == 'success' && needs.detect.outputs.proof_matrix != '' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'pull_request' &&
+        contains(github.event.pull_request.labels.*.name, 'proof'))) &&
       (github.event_name != 'pull_request' ||
        github.event.pull_request.head.repo.full_name == github.repository ||
        contains(github.event.pull_request.labels.*.name, 'ci:full'))
@@ -244,6 +265,16 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Resolve the Playwright version
+        id: playwright
+        run: |
+          version="$(node -e 'console.log(require("./legacy/canvas/node_modules/@playwright/test/package.json").version)')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Playwright browser cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Playwright browser (Canvas stories)
         run: pnpm --filter @suite/canvas exec playwright install --with-deps chromium
       - name: Fresh gate

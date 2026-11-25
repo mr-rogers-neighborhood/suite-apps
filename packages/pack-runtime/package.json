@@ -19,9 +19,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "biome check .",
+    "lint": "node ../../scripts/lint.mjs",
     "format": "biome format --write .",
-    "check": "biome check . && tsc --noEmit -p tsconfig.json"
+    "check": "node ../../scripts/lint.mjs && tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "typescript": "~5.9.3",

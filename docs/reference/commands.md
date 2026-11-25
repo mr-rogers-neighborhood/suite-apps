@@ -13,6 +13,7 @@ mise exec -- node scripts/gate.mjs
 ```sh
 mise exec -- node scripts/gate.mjs                 # this working tree
 mise exec -- node scripts/gate.mjs --only canvas
+mise exec -- node scripts/gate.mjs --prelude       # shared libraries + script tests, no app row
 mise exec -- node scripts/gate.mjs --fresh         # this commit, clean install
 mise exec -- node scripts/gate.mjs --no-e2e        # skip a row marked with an e2e suite
 mise exec -- node scripts/affected.mjs --base origin/main  # rows a diff selects
@@ -25,6 +26,10 @@ app's own `check:full` in dependency order. It writes `.dev/gate-status.json`. `
 `HEAD` with `git archive`, installs from the lockfile, and runs the same order in that clean tree. A
 row marked with a Playwright suite would run it after the checks, under `xvfb-run` when there is no
 display; no row marks one after Start's retirement.
+
+`--prelude` runs only that build and the script tests, with no app row, and records `prelude: true`
+in the status file. A trunk push runs it to confirm the SHA resolves; the merge queue proved the rows
+and the nightly keeps the full tree. `release.mjs` refuses a status that came from a prelude run.
 
 CI does not run a second pipeline: `detect` calls `scripts/affected.mjs`, and each selected row calls
 `node scripts/gate.mjs --only <app>`. `scripts/affected.mjs` reads the workspace graph, so a shared
