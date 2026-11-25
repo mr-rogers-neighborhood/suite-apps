@@ -233,9 +233,17 @@ function pagesIn(root, section) {
     }
   };
   walk(base);
-  // Newest first. With no dates to compare, title is the only stable order, and the committed
-  // index is compared on content rather than reshuffled.
-  return pages.sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title));
+  // Newest first. Compare instants, not the ISO strings: a rebased commit keeps one offset while
+  // an older page keeps another, and a string comparison would order two real dates by their
+  // spelling instead of their time. With no dates to compare, title is the only stable order.
+  return pages.sort((a, b) => {
+    const left = Date.parse(a.date);
+    const right = Date.parse(b.date);
+    if (Number.isNaN(left) || Number.isNaN(right)) {
+      return b.date.localeCompare(a.date) || a.title.localeCompare(b.title);
+    }
+    return right - left || a.title.localeCompare(b.title);
+  });
 }
 
 function table(pages) {
