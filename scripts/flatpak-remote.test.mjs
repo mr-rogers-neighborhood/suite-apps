@@ -16,7 +16,7 @@ import {
   commitFileText,
   flatpakrepoUrl,
   foreignRefs,
-  hasPublishedRefs,
+  listingHasObjects,
   invalidationCommand,
   missingSummaryRefs,
   normalizeRemoteUrl,
@@ -267,9 +267,23 @@ describe("merging the published refs before signing", () => {
 
 describe("when there is nothing to merge", () => {
   it("recognises an empty bucket ref listing", () => {
-    assert.equal(hasPublishedRefs(""), false);
-    assert.equal(hasPublishedRefs("\n   \n"), false);
-    assert.equal(hasPublishedRefs("2026-11-23 13:44:11   65 refs/heads/appstream/x86_64\n"), true);
+    assert.equal(listingHasObjects(""), false);
+    assert.equal(listingHasObjects('  '), false);
+    assert.equal(
+      listingHasObjects('{"KeyCount": 0, "MaxKeys": 1, "IsTruncated": false}'),
+      false,
+    );
+    assert.equal(
+      listingHasObjects(
+        '{"KeyCount": 1, "Contents": [{"Key": "refs/heads/appstream/x86_64"}]}',
+      ),
+      true,
+    );
+  });
+
+  it("refuses an unreadable listing instead of calling it empty", () => {
+    assert.throws(() => listingHasObjects("<html>Access Denied</html>"), /not JSON/u);
+    assert.throws(() => listingHasObjects('{"Contents": "nope"}'), /neither KeyCount/u);
   });
 
   it("skips the merge on a first publication", () => {
