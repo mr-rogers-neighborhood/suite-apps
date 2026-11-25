@@ -16,14 +16,18 @@ each app:
 The full gate is `node scripts/gate.mjs`; `--fresh` proves the commit rather
 than the working tree. Use `mise exec --` so the Node and pnpm versions pinned
 in `package.json` resolve.
-The gate runs suite-start's e2e suite after the repository checks pass, under
-`xvfb-run` when there is no display; `--no-e2e` skips it for a quick loop.
+A frozen app's row runs its shell in `legacy/` and then its pack in `packs/`,
+sequentially. The gate runs a row's e2e suite after the repository checks pass,
+under `xvfb-run` when there is no display; no row marks one today, so `--no-e2e`
+changes nothing until the first host suite.
 Desktop Proof of Changes (`@proof` specs, `scripts/proof-of-changes.mjs`, and
 artifact paths) is documented in
 [docs/reference/desktop-proof.md](docs/reference/desktop-proof.md).
 
-CI is the independent proof: `.github/workflows/main.yml` runs the full fresh gate on every push to
-`main`, and the merge queue runs the affected rows plus Start's e2e. The old `vm` remote, its
+CI is the independent proof: the merge queue runs the affected rows and proves
+the exact SHA, `main` on push runs the prelude only to confirm the trunk SHA
+resolves, and the nightly keeps the full gate. A full `--fresh` run stays
+available by dispatch. The old `vm` remote, its
 `scripts/ci/` hook and the `suite-dev` gate are retired; `suite-dev` remains only the LAN Flatpak test
 host.
 
@@ -47,8 +51,10 @@ host.
 ## Releases and pull requests
 
 The signed Flatpak remote is the update path. GitHub Releases are a human mirror:
-per-app releases are `<app>-v<version>` and are not marked Latest, and one rolling
-`suite-YYYY.MM.DD` release is marked Latest. `RELEASES.md` is generated from the same versions by
+the rolling `suite-YYYY.MM.DD` release is marked Latest, and the pre-release channel pages
+(`suite-nightly-*`, `suite-preview-*`, `suite-slop-*`) are history rather than candidates.
+Per-app tags and releases are retired: an app's version lives in its `package.json` and the rolling
+release carries it. `RELEASES.md` is generated from the same versions by
 `scripts/release-status.mjs`. There is no GitHub Packages channel for the Flatpaks; a relay
 container, if it ever exists, is a separate decision.
 

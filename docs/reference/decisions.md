@@ -11,9 +11,10 @@ owns the rationale, and [Status](status.md) owns what exists.
 - Each app owns its gate. The root gate builds shared packages once, then runs each app's gate in
   dependency order.
 - The gate is local and CI runs the same command. `--fresh` proves a commit, not the working tree. A
-  pull request runs the rows its diff can break (`scripts/affected.mjs`), `main` runs the full fresh
-  gate, and a row marked with an e2e suite runs it on the merge queue. No row marks one after Start's
-  retirement (#314). The `vm` remote and its gate are retired.
+  pull request runs the rows its diff can break (`scripts/affected.mjs`); the merge queue proves that
+  exact SHA and runs a row's e2e suite when one is marked (no row marks one after Start's retirement,
+  #314); the nightly keeps the full gate; `main` on push runs the prelude only. The `vm` remote and
+  its gate are retired.
 - `@suite/desktop` is shared Electron policy. Canvas's shell is `@suite/canvas-desktop`.
 - Suite Help (`legacy/help`) is the documentation reader and it is a shipped app. It indexes every
   file and declaration, renders the handbook from `docs/`, and keeps module notes in
@@ -36,16 +37,53 @@ owns the rationale, and [Status](status.md) owns what exists.
 - Tour membership is data: the index records which curated and composed tours target a file or
   symbol, and the file view lists them. `Full descent`, interludes and overlays do not mark a file.
 
+### The trunk stops re-running the full tree (#407, #422)
+
+Recorded 2026-11-25.
+
+- **`main` on push runs the prelude only** — the `libraries` build, the `scripts` checks and the
+  Budget pack round-trip, about 0.4 minutes — to confirm the merged SHA resolves and the declared
+  project set is intact. The merge queue's whole-row run is the proof for the exact SHA, the 02:00
+  nightly is the scheduled full-tree proof, and `workflow_dispatch` keeps the full `--fresh` tree as
+  a manual proof.
+- **The basis is measured.** In a fixed 24-hour window of about 2,100 job records (#422), 88 of 94
+  trunk pushes were already queue-proven SHAs, the trunk's full-tree export had 0 true catches in 56
+  hours, and 15 of its reds were false — a `biome check .` that saw zero files. About 1,540
+  job-minutes a week went to re-proving what the queue had proved.
+- **Expected and re-measured.** Trunk job-minutes should fall from about 220 to about 15 a day, and
+  after a week the same window should show no trunk red that the queue did not also catch.
+- **The docs moved with the decision.** This rewrites "`main` runs the full fresh gate" in
+  [ci.md](../spec/ci.md) (C1.2, C4.4) and the root `AGENTS.md`; the workflow edit lands separately.
+
 ## Layout
 
-- Apps live under `apps/<name>`. Each app owns its private packages: Canvas has `desktop/` and
-  `packages/graph`, Planner has `pack/` and `packages/core`, and so on.
+- The tree has four roots. `hosts/<host>` is a host (`desk`, `go`), `packs/<app>` is a pack
+  workspace package (`@suite/<app>-pack`) whose `pack/` holds the source, `legacy/<app>` is a frozen
+  app and its Electron shell, and `services/relay` is the relay. Shared packages live at the root
+  `packages/`, cross-app pages in `docs/`, and the Flatpak manifests in `packaging/`.
 - Packages used by two or more apps live at the root `packages/`.
 - Planner and Budget share `@suite/document-runtime`: one renderer replica owns the `observe` call
   site, and one main-process store owns the debounced temp-file rename. Each app keeps its document
   factory, schema, file format, directory and backup policy.
 - The top bar is a host–app contract: the host keeps `mark` and `controls`, and the active app takes
   over the middle. [Menu bar](menu-bar.md) names the seven zones.
+
+### The tree moved to hosts/, packs/, legacy/ and services/ (#408, #429)
+
+Recorded 2026-11-25.
+
+- **The move is one mechanical pull request, not a rename with rewrites.** It landed as #429:
+  `apps/desk` → `hosts/desk`, `apps/go` → `hosts/go`, `apps/<app>/pack` → `packs/<app>/pack`, the
+  rest of Canvas, Planner, Budget and Help → `legacy/<app>`, and `apps/sync` → `services/relay`.
+  Package names, gate rows and commands did not change.
+- **Why one PR.** A staged move keeps two path conventions alive for weeks, and every page, script
+  and test that names a path is then edited twice. One reviewed diff with a green gate is cheaper
+  than weeks of parallel truth. This is the recorded exception to spec R6; the rest of the migration
+  stays staged.
+- **What proved it.** The gate ran the same rows and stayed green, and the same change made the gate
+  discover `scripts/*.test.mjs` from the directory instead of a hand-maintained list, so a moved
+  script test could not silently stop running.
+- **No migration.** Paths are build and working-copy facts; no user data directory names one.
 
 ## Desktop host
 
@@ -159,6 +197,27 @@ owns the rationale, and [Status](status.md) owns what exists.
   installable on the other. Pack files are the distribution path today; a signed remote index is a
   later path, and the intent is that both are first-class once the host has one. The host itself
   updates through its OS package.
+
+### A pack is a workspace package (#408, #429)
+
+Recorded 2026-11-25.
+
+- **`packs/<app>` is a workspace package, `@suite/<app>-pack`.** Its `package.json` declares
+  `"suite": { "pack": true }` and owns the pack's Vite and Vitest toolchain. pnpm installs it like
+  any other workspace package, so there is still one dependency graph and one lockfile.
+- **This departs from R2.2's earlier wording, "a pack is source, not a workspace package".** The
+  source-only rule now applies to `pack/`, not to the package: `pack/` holds the manifest, `src/`,
+  one Vite config, the tests and the README, and no `node_modules/` or output. The installed tree is
+  `packs/<app>/node_modules/`, which pnpm creates and git ignores; the build output is
+  `packs/<app>/.dev/pack`. [repo-structure.md R2.2](../spec/repo-structure.md#2-packs) carries the
+  amended rule.
+- **Why.** `pack/` had to reach Vite, Vitest and TypeScript through the legacy shell's installed
+  tree; linking it at install time was a second, invisible dependency graph that could disagree with
+  the lockfile. Making the pack a package keeps the toolchain with the source and still keeps
+  `pack/` free of generated files.
+- **The app version stays with the shell.** The source manifest's `version` still equals the legacy
+  app's `package.json` version, and a gate row runs the shell and then the pack, so the row names and
+  count do not change.
 
 ### Shipping packs
 
