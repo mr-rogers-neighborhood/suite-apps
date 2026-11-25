@@ -61,6 +61,7 @@ import {
   publishReleaseArgs,
   readIndexRelease,
   readManifest,
+  readPublishedIndex,
   readPublishedManifest,
   releaseAssetUrl,
   releaseDates,
@@ -879,6 +880,16 @@ describe("rerendering a published page", () => {
     { tagName: "suite-nightly-2026.11.23", isDraft: false },
     { tagName: "suite-slop-2026.11.25-abc1234", isDraft: false },
   ];
+  const catalogue = {
+    sequence: 7,
+    url: "https://flatpak.suite.run/index.json",
+    signatureUrl: "https://flatpak.suite.run/index.json.sig",
+    expires: "2026-12-01T00:00:00.000Z",
+    fingerprint:
+      "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+  };
+  // A clean checkout has no `.dev/release/` at all.
+  const missingIndex = join(tmpdir(), "suite-no-such-release-index", INDEX_RELEASE_FILE);
 
   it("reads the publication day and the slop commit from the tag", () => {
     assert.equal(tagDateFromTag("suite-2026.11.24", "stable"), "2026-11-24");
@@ -937,6 +948,62 @@ describe("rerendering a published page", () => {
     assert.throws(
       () => rerenderBody(entries, { tag: "suite-preview-2026.11.24", channel: "stable", releases }),
       /not a stable tag/u,
+    );
+  });
+
+  it("keeps the catalogue section on a clean checkout when the release carries it", () => {
+    const index =
+      readIndexRelease(missingIndex) ??
+      readPublishedIndex("suite-2026.11.24", {
+        listed: [{ name: INDEX_RELEASE_FILE }],
+        download: () => JSON.stringify(catalogue),
+      });
+    const body = rerenderBody(entries, {
+      tag: "suite-2026.11.24",
+      channel: "stable",
+      releases,
+      index,
+    });
+    assert.match(body, /## Catalogue index/u);
+    assert.ok(body.includes("sequence 7"));
+    assert.ok(body.includes(`Catalogue operator fingerprint: \`${catalogue.fingerprint}\``));
+  });
+
+  it("omits the catalogue section when neither the checkout nor the release has it", () => {
+    let downloads = 0;
+    const index =
+      readIndexRelease(missingIndex) ??
+      readPublishedIndex("suite-2026.11.24", {
+        listed: [{ name: MANIFEST_FILE }],
+        download: () => {
+          downloads += 1;
+          return JSON.stringify(catalogue);
+        },
+      });
+    assert.equal(index, null);
+    assert.equal(downloads, 0);
+    const body = rerenderBody(entries, {
+      tag: "suite-2026.11.24",
+      channel: "stable",
+      releases,
+      index,
+    });
+    assert.doesNotMatch(body, /## Catalogue index/u);
+  });
+
+  it("refuses to drop a catalogue report the release carries but cannot read", () => {
+    const listed = [{ name: INDEX_RELEASE_FILE }];
+    assert.throws(
+      () => readPublishedIndex("suite-2026.11.24", { listed, download: () => null }),
+      /carries index-release\.json, but it could not be downloaded/u,
+    );
+    assert.throws(
+      () => readPublishedIndex("suite-2026.11.24", { listed, download: () => "not json" }),
+      /not valid JSON/u,
+    );
+    assert.throws(
+      () => readPublishedIndex("suite-2026.11.24", { listed: null }),
+      /could not list the assets/u,
     );
   });
 });
