@@ -248,7 +248,7 @@ jobs:
       - name: Playwright version
         id: playwright
         run: |
-          version="$(node -e 'console.log(require("./legacy/canvas/node_modules/@playwright/test/package.json").version)')"
+          version="$(node -e 'console.log(require("./legacy/canvas/e2e/node_modules/@playwright/test/package.json").version)')"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Playwright browser cache
