@@ -12,9 +12,8 @@ import {
   projectDebtPayoff,
   type TargetKind,
 } from "@suite/budget-core";
-import { Button } from "@suite/ui";
+import { Button, Field, TextInput } from "@suite/ui";
 import { useEffect, useMemo, useState } from "react";
-import { Field, TextInput } from "../components/Field";
 import { Modal } from "../components/Modal";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore } from "../store/uiStore";
