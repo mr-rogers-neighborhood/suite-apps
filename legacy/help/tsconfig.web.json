@@ -5,9 +5,12 @@
     "jsx": "react-jsx",
     "types": ["vite/client"],
     "paths": {
-      "@/*": ["./src/renderer/src/*"],
-      "@renderer/*": ["./src/renderer/src/*"]
+      "@/*": ["../../packs/help/pack/src/renderer/*"],
+      "@renderer/*": ["../../packs/help/pack/src/renderer/*"]
     }
   },
-  "include": ["src/renderer/src/**/*.ts", "src/renderer/src/**/*.tsx"]
+  "include": [
+    "../../packs/help/pack/src/renderer/**/*.ts",
+    "../../packs/help/pack/src/renderer/**/*.tsx"
+  ]
 }

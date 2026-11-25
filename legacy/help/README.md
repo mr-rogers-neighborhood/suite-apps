@@ -42,13 +42,13 @@ to that page's own route, and an old `/handbook/...` link to a developer page fo
 From the repository root:
 
 ```sh
-mise exec -- pnpm docs:index        # build legacy/help/public/data
+mise exec -- pnpm docs:index        # build packs/help/public/data
 mise exec -- pnpm docs:index:check  # validate notes, tours and generated data
 mise exec -- pnpm docs:coverage     # authored vs generated prose; never fails on a gap
 mise exec -- pnpm docs:explain <node-id> # scaffold one note section in its module MDX
 mise exec -- pnpm docs:build        # index, sync docs/ and build the app
 mise exec -- pnpm docs:dev          # index, sync and start Vite + Electron (foreground)
-mise exec -- pnpm docs:clean        # remove out, release, .generated and public/data
+mise exec -- pnpm docs:clean        # remove out, release, .dev, .generated and public/data
 mise exec -- pnpm help:pack         # build and sign Help's pack from the same content
 ```
 
@@ -57,31 +57,29 @@ From this directory: `pnpm index`, `pnpm sync`, `pnpm dev`, `pnpm build`, `pnpm 
 
 ## The pack
 
-`pack/` is Help's pack source: the same renderer and handbook built into a signed archive for the
-Suite host. It runs under `HashRouter` rather than the desktop app's `BrowserRouter`, because the
-host serves one entry file and answers only files that exist. The archive carries the generated
-`public/data` index and the compiled MDX pages, so the explorer and handbook work with no checkout.
+`packs/help/pack/` is Help's pack source, and it owns the renderer the desktop shell also compiles:
+the same explorer and handbook built into a signed archive for the Suite host. The pack entry runs
+under `HashRouter` rather than the desktop app's `BrowserRouter`, because the host serves one entry
+file and answers only files that exist. The archive carries the generated `public/data` index and the
+compiled MDX pages, so the explorer and handbook work with no checkout.
 
 The pack's `capabilities` list is empty by decision, not by omission: it reads only its own bundle
-and asks the host for nothing. See [the pack source](pack/README.md) for the generated corpus and the
-two-build reproducibility check.
+and asks the host for nothing. See [the pack source](../../packs/help/pack/README.md) for the generated
+corpus and the two-build reproducibility check.
 
 ## What is where
 
-| Path                                     | Purpose                                                                                                                                                           |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/main/`                              | Electron main: window policy and the `suite-help://app/` protocol.                                                                                                |
-| `src/preload/`                           | The one `contextBridge` fact the renderer reads.                                                                                                                  |
-| `src/renderer/src/explorer/`             | The three-mode explorer, tree, detail pane, search and code view.                                                                                                 |
-| `src/renderer/src/handbook/`             | The docs reader, its page tree, contents and MDX components; both sections mount it.                                                                              |
-| `src/renderer/src/lib/source.ts`         | Fumadocs headless source: one generated docs tree, two loaders (`/handbook`, `/developer`).                                                                       |
-| `src/renderer/src/lib/handbook-pages.ts` | The audience index: section routes, the filter over the page tree, and a tour's `doc` target.                                                                     |
-| `src/renderer/src/theme.ts`              | `@suite/theme` preset and mode resolution, the `suite.theme` store, and the `data-theme-mode` attributes Fumadocs and Shiki follow.                               |
-| `src/renderer/src/theme-control.tsx`     | The preset and brightness selects in both navigator footers.                                                                                                      |
-| `scripts/index-code.mjs`                 | TypeScript compiler index: files, declarations, imports, tests, modules.                                                                                          |
-| `scripts/sync-docs.mjs`                  | Mirrors `docs/` into `.generated/docs/` and writes the offline search index.                                                                                      |
-| `public/data/`                           | Generated `tree.json`, `search.json`, `modules.json`, `modules/*.json`, `tours.json`, `tour-membership.json`, `docs.json`, `handbook-search.json`. Not committed. |
-| `.generated/docs/`                       | Generated handbook content for the Fumadocs source. Not committed.                                                                                                |
+| Path                                      | Purpose                                                                                                                                                           |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/`                               | Electron main: window policy and the `suite-help://app/` protocol.                                                                                                |
+| `src/preload/`                            | The one `contextBridge` fact the renderer reads.                                                                                                                  |
+| `../../packs/help/pack/src/renderer/`     | The shared renderer: explorer, handbook reader, theme and the desktop entry.                                                                                      |
+| `../../packs/help/scripts/index-code.mjs` | TypeScript compiler index: files, declarations, imports, tests, modules.                                                                                          |
+| `../../packs/help/scripts/sync-docs.mjs`  | Mirrors `docs/` into `.generated/docs/` and writes the offline search index.                                                                                      |
+| `scripts/coverage.mjs`                    | Reports authored vs generated prose; never fails on a gap.                                                                                                        |
+| `scripts/explain.mjs`                     | Scaffolds one note section in its module MDX.                                                                                                                     |
+| `../../packs/help/public/data/`           | Generated `tree.json`, `search.json`, `modules.json`, `modules/*.json`, `tours.json`, `tour-membership.json`, `docs.json`, `handbook-search.json`. Not committed. |
+| `../../packs/help/.generated/docs/`       | Generated handbook content for the Fumadocs source. Not committed.                                                                                                |
 
 Nothing under `public/data/` or `.generated/docs/` is edited by hand: `docs:index` and `docs:build`
 write them from the code and `docs/`.

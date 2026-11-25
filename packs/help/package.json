@@ -6,12 +6,22 @@
   "suite": {
     "pack": true
   },
-  "description": "Help's pack source and its build. The Electron shell stays in legacy/help.",
+  "description": "Help's renderer, generator and pack build. The Electron shell stays in legacy/help.",
   "scripts": {
-    "build": "pnpm --dir ../../legacy/help index && pnpm --dir ../../legacy/help sync && vite build --config pack/vite.config.ts",
+    "index": "node scripts/index-code.mjs",
+    "index:check": "node scripts/index-code.mjs --check",
+    "sync": "node scripts/sync-docs.mjs",
+    "build": "pnpm index && pnpm sync && vite build --config pack/vite.config.ts",
     "typecheck": "tsc --noEmit -p pack/tsconfig.json",
-    "test": "pnpm --dir ../../legacy/help index && pnpm --dir ../../legacy/help sync && vitest run --config pack/vitest.config.mts",
+    "test": "pnpm index && pnpm sync && vitest run --config pack/vitest.config.mts",
     "check:full": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@suite/theme": "workspace:*",
+    "lucide-react": "^1.71.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "shiki": "^4.6.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.4",
@@ -27,9 +37,11 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-router": "^8.5.1",
+    "ts-morph": "^28.0.0",
     "typescript": "~5.9.3",
     "vite": "^8.3.5",
-    "vitest": "5.1.0"
+    "vitest": "5.1.0",
+    "yaml": "^2.9.1"
   },
   "license": "MIT"
 }

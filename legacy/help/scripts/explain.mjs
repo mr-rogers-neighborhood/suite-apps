@@ -12,7 +12,7 @@ import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const dataDir = join(root, "legacy", "help", "public", "data");
+const dataDir = join(root, "packs", "help", "public", "data");
 const modulesDir = join(root, "docs/modules");
 const target = process.argv[2];
 

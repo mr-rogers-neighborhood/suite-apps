@@ -5,9 +5,9 @@
  *   pnpm help:pack [--key <base64>] [--out <file.suitepack>] [--version <semver>]
  *   pnpm help:pack --check-repro
  *
- * `packs/help/pack/vite.config.ts` builds the app's renderer, the compiled handbook pages and the
+ * `packs/help/pack/vite.config.ts` builds Help's renderer, the compiled handbook pages and the
  * generated `public/data` index into `packs/help/.dev/pack`, which is the pack's build output, not
- * its source. This script runs the app's generators first, writes the generated manifest there and
+ * its source. This script runs Help's generators first, writes the generated manifest there and
  * hands the directory to `bundlePack`.
  *
  * `--check-repro` is the issue's reproducibility proof: it runs the same build twice into two
@@ -31,7 +31,6 @@ import { bundlePack, platformsSummary, publicKeyOfSigningKey } from "./pack.mjs"
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PACK_ROOT = join(ROOT, "packs", "help");
 const PACK_DIR = join(PACK_ROOT, "pack");
-const APP_DIR = join(ROOT, "legacy", "help");
 const DIST = join(PACK_ROOT, ".dev", "pack");
 const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
 
@@ -169,8 +168,8 @@ function run(command, args, cwd) {
 
 /** Regenerate the explorer data and the handbook pages the pack carries. */
 export async function generateContent() {
-  await run("node", [join(APP_DIR, "scripts", "index-code.mjs")], ROOT);
-  await run("node", [join(APP_DIR, "scripts", "sync-docs.mjs")], ROOT);
+  await run("node", [join(PACK_ROOT, "scripts", "index-code.mjs")], ROOT);
+  await run("node", [join(PACK_ROOT, "scripts", "sync-docs.mjs")], ROOT);
 }
 
 /** Build the pack's payload into `outDir`, with a cache of its own. */

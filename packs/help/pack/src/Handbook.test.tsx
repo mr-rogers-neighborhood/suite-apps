@@ -10,7 +10,7 @@ import { sources } from "@/lib/source";
 /**
  * The handbook pages travel inside the pack, in two sections.
  *
- * `pnpm --dir legacy/help sync` writes `.generated/docs`, and `fumadocs-mdx/vite`
+ * `pnpm --dir packs/help sync` writes `.generated/docs`, and `fumadocs-mdx/vite`
  * compiles every page into the bundle; this is the test that the archive has
  * pages, not only the explorer's index JSON. The generated audience index says
  * which page opens where, so the stub below is the smallest one that proves the

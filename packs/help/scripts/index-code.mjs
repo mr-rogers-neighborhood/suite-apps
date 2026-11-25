@@ -24,7 +24,7 @@
  * Prose notes come from `docs/modules/`; tours from `docs/tours/`.
  * The generator never overwrites either.
  *
- * Usage: node legacy/help/scripts/index-code.mjs
+ * Usage: node packs/help/scripts/index-code.mjs
  */
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, extname, join, posix, relative, sep } from "node:path";
@@ -34,7 +34,7 @@ import { parse as parseYaml } from "yaml";
 import { docsSlug, isAudience, readAudience } from "../../../scripts/lib/audiences.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const outDir = join(root, "legacy", "help", "public", "data");
+const outDir = join(root, "packs", "help", "public", "data");
 const check = process.argv.includes("--check");
 const docsDir = join(root, "docs");
 const modulesDir = join(root, "docs/modules");

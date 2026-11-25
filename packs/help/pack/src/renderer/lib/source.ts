@@ -7,10 +7,10 @@ import { SECTION_BASES } from "@/lib/handbook-pages";
 /**
  * The handbook source.
  *
- * `sync-docs` writes the repository's Markdown into `.generated/docs` with the
- * frontmatter and `_meta.json` files Fumadocs reads. The macro is compiled by
- * `fumadocs-mdx/vite`, so the page tree and the MDX bodies are baked into the
- * static bundle: no server, no request for content.
+ * `sync-docs` writes the repository's Markdown into `packs/help/.generated/docs`
+ * with the frontmatter and `_meta.json` files Fumadocs reads. The macro is
+ * compiled by `fumadocs-mdx/vite`, so the page tree and the MDX bodies are baked
+ * into the static bundle: no server, no request for content.
  *
  * There is one source and two loaders over it. `baseUrl` is the only difference:
  * the User Handbook opens under `/handbook`, the Developer Documentation under
@@ -18,8 +18,9 @@ import { SECTION_BASES } from "@/lib/handbook-pages";
  * neither loader keeps a list of its own.
  */
 const docs = defineDocs({
-  // Relative to the renderer root (`src/renderer`); the generated tree lives at the app root.
-  dir: "../../.generated/docs",
+  // Relative to this renderer root (`packs/help/pack/src/renderer`), which both the desktop
+  // shell and the pack use; the generated tree lives at the Help package root.
+  dir: "../../../.generated/docs",
   docs: {
     schema: pageSchema,
     postprocess: { includeProcessedMarkdown: true },

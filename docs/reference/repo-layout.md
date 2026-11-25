@@ -17,13 +17,13 @@ legacy/
                 packages/graph, packages/import-obsidian; e2e, docs, handbook, internal
   planner/      @suite/planner desktop app; packages/core; docs
   budget/       @suite/budget desktop app; docs
-  help/         @suite/help documentation app: explorer and handbook
+  help/         @suite/help Electron shell for the documentation app
 packs/
   canvas/pack/  Canvas pack source
   planner/pack/ Planner pack source
   budget/pack/  Budget pack source
   budget/packages/core/ Budget's core document layer, owned by the pack
-  help/pack/    Help pack source
+  help/         @suite/help-pack: shared renderer, docs generator and pack source
 services/
   relay/        @suite/sync-server; packages/protocol, packages/host; app, deploy, docs
 packages/       contracts, files, document-runtime, screens, desktop, theme, ui,
@@ -33,9 +33,10 @@ packaging/      Flatpak manifests
 scripts/        gate.mjs, flatpak.mjs, ci/, docs-check.mjs
 ```
 
-`legacy/help` renders the explorer over `docs/modules/`, `docs/tours/` and the generated index, and
-renders `docs/` as the handbook. It is offline, ships through Flatpak, and never owns a documentation
-fact: the code and `docs/` are the source of truth.
+`packs/help/pack/src/renderer` renders the explorer over `docs/modules/`, `docs/tours/` and the
+generated index, and renders `docs/` as the handbook; `legacy/help` is the Electron shell around it.
+It is offline, ships through Flatpak, and never owns a documentation fact: the code and `docs/` are
+the source of truth.
 
 `pnpm-workspace.yaml` includes `hosts/*`, `hosts/*/packages/*`, `legacy/*`, `legacy/*/*`,
 `legacy/*/packages/*`, `packs/*`, `packs/*/packages/*`, `services/*`, `services/*/*`,
@@ -57,8 +58,8 @@ also owns the overrides, patches and build permissions the apps need.
 | `@suite/budget` | `legacy/budget` | Budget |
 | `@suite/budget-pack` | `packs/budget` | Budget pack build |
 | `@suite/budget-core` | `packs/budget/packages/core` | Budget schema and document layer |
-| `@suite/help` | `legacy/help` | Documentation app: explorer and handbook |
-| `@suite/help-pack` | `packs/help` | Help pack build |
+| `@suite/help` | `legacy/help` | Help Electron shell |
+| `@suite/help-pack` | `packs/help` | Help renderer, docs generator and pack build |
 | `@suite/sync-server` | `services/relay` | Sync server |
 | `@suite/sync-app` | `services/relay/app` | The retired relay app the last `run.suite.sync` build packaged |
 | `@suite/sync` | `services/relay/packages/protocol` | Sync protocol |

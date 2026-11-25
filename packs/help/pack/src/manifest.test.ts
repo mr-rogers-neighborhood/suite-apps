@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import packageText from "../../../../legacy/help/package.json?raw";
 import manifestText from "../manifest.json?raw";
 
 /**
@@ -7,7 +6,8 @@ import manifestText from "../manifest.json?raw";
  *
  * Help has no document of its own and no host service to call, so its capability list is empty on
  * purpose. A list that is empty because nothing was written looks the same as one that is empty by
- * decision; this test is the decision, and the README says why.
+ * decision; this test is the decision, and the README says why. `scripts/pack-shape.mjs` compares
+ * the manifest version with the app's `package.json`, so the two numbers cannot drift.
  */
 const manifest = JSON.parse(manifestText) as {
   readonly id: string;
@@ -17,12 +17,10 @@ const manifest = JSON.parse(manifestText) as {
   readonly documents?: unknown;
 };
 
-const app = JSON.parse(packageText) as { readonly version: string };
-
 describe("Help's source manifest", () => {
-  it("names the app's one version and its generated entry", () => {
+  it("names its generated entry and a version the build can sign", () => {
     expect(manifest.id).toBe("help");
-    expect(manifest.version).toBe(app.version);
+    expect(manifest.version).toMatch(/^\d+\.\d+\.\d+(?:[-+].+)?$/u);
     expect(manifest.entry).toBe("index.html");
   });
 

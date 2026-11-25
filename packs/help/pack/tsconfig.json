@@ -1,13 +1,14 @@
 {
-  "extends": "../../../legacy/help/tsconfig.base.json",
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "types": ["node", "vite/client"],
+    "noEmit": true,
     "paths": {
-      "@/*": ["../../../legacy/help/src/renderer/src/*"],
-      "@renderer/*": ["../../../legacy/help/src/renderer/src/*"]
+      "@/*": ["./src/renderer/*"],
+      "@renderer/*": ["./src/renderer/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "../../../legacy/help/src/renderer/src/env.d.ts", "*.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/renderer/env.d.ts", "*.config.ts"]
 }

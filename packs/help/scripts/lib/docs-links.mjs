@@ -6,7 +6,7 @@
  * two pages keeps the reader in the app and sends them to the target's own
  * section, so a user page can point at a developer page without dropping the
  * reader into the wrong tree. The old `/docs` URL belonged to the Next app that
- * `legacy/help` replaced, so leaving even one of these links as `/docs/...` sends
+ * Suite Help replaced, so leaving even one of these links as `/docs/...` sends
  * the reader to the not-found page. A link that leaves `docs/` points at a file
  * the app does not render, so it becomes a GitHub URL. Everything else — an
  * external link, a same-page anchor, an absolute path — stays as written.

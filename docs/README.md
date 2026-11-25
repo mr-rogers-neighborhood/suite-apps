@@ -46,7 +46,7 @@ derived.
 | Canvas | [README](../legacy/canvas/README.md) · [docs](../legacy/canvas/docs/README.md) · [handbook](../legacy/canvas/handbook/) |
 | Planner | [README](../legacy/planner/README.md) · [docs](../legacy/planner/docs/reference/architecture.md) |
 | Budget | [README](../legacy/budget/README.md) · [docs](../legacy/budget/docs/reference/architecture.md) |
-| Help | [README](../legacy/help/README.md) · [AGENTS](../legacy/help/AGENTS.md) |
+| Help | [README](../legacy/help/README.md) · [AGENTS](../legacy/help/AGENTS.md) · [pack](../packs/help/pack/README.md) |
 | Sync | [README](../services/relay/README.md) · [protocol](../services/relay/docs/protocol.md) · [threat model](../services/relay/docs/threat-model.md) |
 | Go | [README](../hosts/go/README.md) · [contract](../hosts/go/docs/reference/contract.md) |
 
@@ -107,9 +107,9 @@ Never restate a version in prose here. Link to the file that holds it.
   duplicates a source file.
 - **One module MDX, not one file MDX.** A module's narrative and its `## <node-id>` notes live in one
   `docs/modules/*.mdx`. The explorer splits it by file and declaration at render time.
-- **The reader is local.** Suite Help (`legacy/help`) is the shipped documentation app. It is
-  offline, keeps no canonical copy of a page, and reads the generated index plus `docs/`; Flatpak
-  owns updates.
+- **The reader is local.** Suite Help is the shipped documentation app; its renderer is
+  `packs/help/pack/src/renderer` and its shell is `legacy/help`. It is offline, keeps no canonical
+  copy of a page, and reads the generated index plus `docs/`; Flatpak owns updates.
 - **Neutral voice.** State the fact. No first person, no marketing cadence, no section summary that
   repeats the heading.
 
