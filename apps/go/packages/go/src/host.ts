@@ -175,23 +175,83 @@ export interface NotificationService {
 }
 
 /**
- * Reading and writing files the person can reach.
+ * A file in a pack's own root, as the host lists it.
  *
- * Three verbs, because a phone has three real capabilities and pretending otherwise
- * produces buttons that fail: pick a file from the platform picker, write one into
- * the app's own documents, and hand one to the share sheet so it can leave.
- *
- * There is deliberately no "reveal in file manager". A desktop has one; a phone does
- * not, and the share sheet is the honest replacement.
+ * The path is relative and slash-separated. The absolute root never crosses the
+ * bridge: a pack names a path inside its own store, and the host maps the sender
+ * to that store.
  */
-export interface FileService {
+export interface FileEntry {
+  readonly path: string;
+  readonly name: string;
+  readonly kind: "file" | "directory";
+  readonly size: number;
+  readonly mtimeMs: number;
+}
+
+export interface FileReadOptions {
+  readonly maxBytes?: number;
+}
+
+export interface FileWriteOptions {
+  readonly atomic?: boolean;
+  /**
+   * Refuse the write when the file's mtime is not this value. The host compares
+   * before it writes, so a stale writer loses instead of overwriting a newer one.
+   */
+  readonly expectedMtimeMs?: number;
+}
+
+export interface RemoveOptions {
+  readonly recursive?: boolean;
+}
+
+export interface FileLock {
+  readonly path: string;
+  release(): Promise<void>;
+}
+
+/**
+ * A pack's own files.
+ *
+ * Relative paths only, inside a root the host owns. Atomic writes, backups and
+ * locks are host-owned so a pack does not have to reimplement them, and a
+ * second lock on one path is refused rather than queued. This is the same
+ * surface a desktop pack sees; the frame bridge carries it request by request.
+ */
+export interface PackFileStoreService {
+  list(path?: string): Promise<readonly FileEntry[]>;
+  stat(path: string): Promise<FileEntry | null>;
+  mkdir(path: string): Promise<void>;
+  read(path: string, options?: FileReadOptions): Promise<Uint8Array>;
+  write(path: string, bytes: Uint8Array, options?: FileWriteOptions): Promise<FileEntry>;
+  rename(from: string, to: string): Promise<void>;
+  remove(path: string, options?: RemoveOptions): Promise<void>;
+  /** Host-managed backup; returns the relative path of the backup file. */
+  backup(path: string): Promise<string>;
+  /** One writer per path in this host process. A held path is refused, not queued. */
+  lock(path: string): Promise<FileLock>;
+}
+
+/**
+ * The person-consented file surface a phone actually has: pick a file from the
+ * platform picker, write one into the app's own documents, and hand one to the
+ * share sheet so it can leave.
+ *
+ * There is deliberately no "reveal in file manager". A desktop has one; a phone
+ * does not, and the share sheet is the honest replacement.
+ */
+export interface PersonFileService {
   /** Opens the platform's picker. `null` means the person cancelled. */
   pickOpen(filters: readonly FileFilter[]): Promise<PickedFile | null>;
   /** Writes into the app's own documents directory and reports the URI. */
-  write(input: WriteFileInput): Promise<{ readonly ok: true; readonly uri: string }>;
+  exportFile(input: WriteFileInput): Promise<{ readonly ok: true; readonly uri: string }>;
   /** Offers the file to the platform share sheet. */
   share(input: WriteFileInput): Promise<FileOutcome>;
 }
+
+/** What a module sees: its own scoped store plus the person's picker and share sheet. */
+export interface FileService extends PackFileStoreService, PersonFileService {}
 
 export type ThemeDensity = "compact" | "cozy" | "comfortable";
 export type ColorScheme = "light" | "dark";

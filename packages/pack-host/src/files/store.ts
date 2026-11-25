@@ -15,8 +15,11 @@ import {
 import { basename, dirname, join } from "node:path";
 import type { FileEntry, FileLock, FileReadOptions, FileWriteOptions } from "@suite/pack-runtime";
 import { FileStoreError } from "./errors.js";
+import { PACK_FILE_MAX_BYTES } from "./limits.js";
 import { LockTable } from "./lock.js";
 import { assertRelativePath, isInside, normaliseRoot, resolveInside } from "./path.js";
+
+export { PACK_FILE_MAX_BYTES };
 
 export interface RemoveOptions {
   readonly recursive?: boolean;
@@ -26,9 +29,6 @@ export interface PackFileStoreOptions {
   readonly maxFileBytes?: number;
   readonly now?: () => Date;
 }
-
-/** The pack-host default cap for one file, in bytes. The shell's external surface uses the same number. */
-export const PACK_FILE_MAX_BYTES = 256 * 1024 * 1024;
 
 function codeOf(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException | undefined)?.code;

@@ -53,7 +53,7 @@ describe("files service and helpers", () => {
   describe("createFileService", () => {
     it("writes to the sandboxed Documents directory", async () => {
       const service = createFileService();
-      const outcome = await service.write({
+      const outcome = await service.exportFile({
         name: "test.planner",
         mimeType: "application/json",
         bytes: new Uint8Array([1, 2, 3]),

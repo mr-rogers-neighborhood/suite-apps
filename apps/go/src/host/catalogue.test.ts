@@ -225,7 +225,7 @@ describe("loading a catalogue index", () => {
   });
 
   it("marks a pack needing an unserved capability unavailable and refuses it before download", async () => {
-    const text = signedText([entry({ capabilities: ["documents", "files"] })]);
+    const text = signedText([entry({ capabilities: ["documents", "relay"] })]);
     const { catalogue, fetch } = catalogueFor(text);
 
     const loaded = await catalogue.load();
@@ -233,7 +233,7 @@ describe("loading a catalogue index", () => {
     if (!loaded.ok) return;
     expect(loaded.entries[0]?.platform).toEqual({
       state: "unavailable",
-      reason: "not available on Go — needs `files`",
+      reason: "not available on Go — needs `relay`",
     });
 
     const result = await catalogue.install("probe", "1.0.0");

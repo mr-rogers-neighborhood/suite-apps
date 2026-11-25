@@ -51,14 +51,15 @@ nobody can reproduce.
 
 `ModuleHost` gives a mounted module these services:
 
-| Service         | Shape                                                                               | The refusal                                                                                            |
-| --------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `documents`     | list, create, open, save, remove                                                    | Never returns a parsed document. Bytes, a name, a title, a timestamp                                   |
-| `storage`       | get, set, delete, keys                                                              | Already namespaced per module, so one module cannot read another's key                                 |
-| `navigation`    | `setTitle`, `close`                                                                 | Not a general stack: leaving a module returns to home, always                                          |
-| `theme`         | scheme, density, CSS variables                                                      | Names no colour and no spacing value                                                                   |
-| `notifications` | permission, request, schedule, cancel                                               | Carries a title and a time, stores nothing, and restarts nothing                                       |
-| `sync`          | **Reserved, not implemented.** status, enable, disable, invite, join, sealed frames | A future host moves sealed frames and readable membership only; keys and the document stay in the pack |
+| Service         | Shape                                                                                     | The refusal                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `documents`     | list, create, open, save, remove                                                          | Never returns a parsed document. Bytes, a name, a title, a timestamp                                      |
+| `files`         | list, stat, mkdir, read, write, rename, remove, backup, lock; pickOpen, exportFile, share | Relative paths only, inside the pack's own root; a link, a device, an absolute path or a climb is refused |
+| `storage`       | get, set, delete, keys                                                                    | Already namespaced per module, so one module cannot read another's key                                    |
+| `navigation`    | `setTitle`, `close`                                                                       | Not a general stack: leaving a module returns to home, always                                             |
+| `theme`         | scheme, density, CSS variables                                                            | Names no colour and no spacing value                                                                      |
+| `notifications` | permission, request, schedule, cancel                                                     | Carries a title and a time, stores nothing, and restarts nothing                                          |
+| `sync`          | **Reserved, not implemented.** status, enable, disable, invite, join, sealed frames       | A future host moves sealed frames and readable membership only; keys and the document stay in the pack    |
 
 `sync` is a reserved row, not a shipped service. No Go build implements it, no pack can call it
 through `ModuleHost` today, and it is not a claim that sync works on mobile. It is named here so the
@@ -89,6 +90,35 @@ Two things make that safe rather than sloppy:
 
 The sync protocol has a full session type of its own, with projections and the epoch rule stated once, in
 [suite-sync's protocol note](../../../sync/docs/protocol-sessions.md).
+
+### Files belong to one pack
+
+A pack's own files live under one host-owned root per `(publisher, pack)`, in the app's private
+data directory. The pack sees relative, slash-separated paths; it never sees a root, and no request
+carries one. The frame bridge resolves the sender's frame to the manifest the shell mounted it with,
+so a message cannot name another pack's store.
+
+The rule is shared with the desktop: `@suite/pack-host/files/core` owns the path check, the error
+vocabulary, the in-process lock table and the byte cap. The desktop's `PackFileStore` is Node-backed
+and cannot be bundled into a WebView, so Go enforces the same rules over Capacitor's Filesystem
+plugin. Both refuse:
+
+| Attempt                                          | Answer                                      |
+| ------------------------------------------------ | ------------------------------------------- |
+| `../other/secret.txt`, `/etc/passwd`, `a\b`      | `invalid path (invalid-path)`               |
+| a symlink, a device, or any non-regular entry    | `path is not a regular file (symlink)`      |
+| a second lock on a path this frame already holds | `file is locked (locked)`                   |
+| a file larger than the shared cap                | `file is too large (too-large)`             |
+| a write whose `expectedMtimeMs` is stale         | `file changed since it was read (conflict)` |
+| another pack's file, by its own relative name    | `file not found (not-found)`                |
+
+Writes are atomic by default: the bytes go to a temporary sibling and are renamed into place, so a
+kill mid-write leaves the previous file intact. `backup` copies to a dated sibling and returns the
+relative path; `lock` is one writer per path in this process, released by the frame's teardown.
+
+The picker and the share sheet are the person-consented half of the same capability: `pickOpen`
+returns bytes and a name, `exportFile` writes into the app's documents, and `share` hands the file to
+Android. None of them hands a path to the pack, and a phone has no "reveal in folder" to offer.
 
 ## Registration is checked, loudly
 

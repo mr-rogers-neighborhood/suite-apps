@@ -57,12 +57,16 @@ export const SHELL_HOST = {
   capabilities: ["documents", "files", "identity.pack", "network", "notifications", "recents"],
 } as const satisfies HostDeclaration;
 
-/** Suite Go on a phone. It has no `files` bridge, so a pack that needs one is not mobile-ready. */
+/**
+ * Suite Go on a phone. It serves its own scoped file store, so a pack that
+ * declares `files` is mobile-ready; the picker and share sheet are the
+ * person-consented half of the same capability.
+ */
 export const GO_HOST = {
   id: "go",
   name: "Go",
   kind: "mobile",
-  capabilities: ["documents", "storage", "recents", "notifications", "network"],
+  capabilities: ["documents", "files", "storage", "recents", "notifications", "network"],
 } as const satisfies HostDeclaration;
 
 /** Every host build in this tree, for a checker that needs to judge a declaration. */

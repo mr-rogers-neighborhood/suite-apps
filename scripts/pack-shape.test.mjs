@@ -155,7 +155,7 @@ describe("the pack shape check", () => {
 
   it("refuses a platform whose host does not serve the pack's capabilities", () => {
     const { root } = workspace({
-      manifest: { platforms: ["desktop", "mobile"], capabilities: ["documents", "files"] },
+      manifest: { platforms: ["desktop", "mobile"], capabilities: ["documents", "relay"] },
     });
 
     const result = check(root);
@@ -163,7 +163,7 @@ describe("the pack shape check", () => {
     assert.ok(
       result.problems.some(
         (problem) =>
-          problem.includes('platforms "mobile" cannot run') && problem.includes("needs `files`"),
+          problem.includes('platforms "mobile" cannot run') && problem.includes("needs `relay`"),
       ),
       result.problems.join("\n"),
     );

@@ -23,6 +23,12 @@
       "development": "./src/files/index.ts",
       "import": "./dist/files/index.js",
       "default": "./dist/files/index.js"
+    },
+    "./files/core": {
+      "types": "./dist/files/core.d.ts",
+      "development": "./src/files/core.ts",
+      "import": "./dist/files/core.js",
+      "default": "./dist/files/core.js"
     }
   },
   "files": [

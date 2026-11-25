@@ -69,8 +69,17 @@ function hostWith(store: DocumentStore) {
     },
     navigation: { setTitle: () => undefined, close: () => undefined },
     files: {
+      list: async () => [],
+      stat: async () => null,
+      mkdir: async () => undefined,
+      read: async () => new Uint8Array(0),
+      write: async () => ({ path: "", name: "", kind: "file", size: 0, mtimeMs: 0 }),
+      rename: async () => undefined,
+      remove: async () => undefined,
+      backup: async () => "",
+      lock: async (path) => ({ path, release: async () => undefined }),
       pickOpen: async () => null,
-      write: async () => ({ ok: true, uri: "file:///documents/test" }),
+      exportFile: async () => ({ ok: true, uri: "file:///documents/test" }),
       share: async () => ({ ok: false, reason: "cancelled" }),
     },
     recents: {

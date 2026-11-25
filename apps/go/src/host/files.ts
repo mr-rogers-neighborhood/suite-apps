@@ -1,6 +1,12 @@
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
-import type { FileFilter, FileOutcome, FileService, PickedFile, WriteFileInput } from "@suite/go";
+import type {
+  FileFilter,
+  FileOutcome,
+  PersonFileService,
+  PickedFile,
+  WriteFileInput,
+} from "@suite/go";
 
 /**
  * Files a person can actually reach, with no third-party plugin.
@@ -60,7 +66,7 @@ async function writeToDocuments(input: WriteFileInput): Promise<{ ok: true; uri:
   return { ok: true, uri: result.uri };
 }
 
-export function createFileService(): FileService {
+export function createFileService(): PersonFileService {
   return {
     async pickOpen(filters): Promise<PickedFile | null> {
       const input = document.createElement("input");
@@ -103,7 +109,7 @@ export function createFileService(): FileService {
       };
     },
 
-    write: writeToDocuments,
+    exportFile: writeToDocuments,
 
     async share(input): Promise<FileOutcome> {
       try {

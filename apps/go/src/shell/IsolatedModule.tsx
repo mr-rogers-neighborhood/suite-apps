@@ -1,5 +1,6 @@
 import { type ModuleHost, type PackManifest, requestFrameFlush } from "@suite/go";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { createPackFiles, packFilesScopeOf, releasePackFileLocks } from "../host/packFiles.js";
 import { resolveTheme } from "../host/theme.js";
 import { serveFrame } from "./frameBridge.js";
 import { ModuleHeader } from "./ModuleHeader.js";
@@ -49,11 +50,20 @@ export function IsolatedModule({
    * and the shell would wait out the timeout on a module the person closed immediately.
    */
   const loaded = useRef(false);
+  /**
+   * The pack's file store, built from the manifest this frame was mounted with.
+   *
+   * Deliberately not `host.files`: the sender is this frame, and its identity is
+   * the manifest the shell installed. A request never names a root, and a
+   * message cannot talk the bridge into another pack's store.
+   */
+  const files = useMemo(() => createPackFiles(packFilesScopeOf(manifest)), [manifest]);
 
   useEffect(() => {
     const stop = serveFrame({
       host,
       manifest: () => manifest,
+      files,
       theme: () => {
         const tokens = resolveTheme();
         return { scheme: tokens.scheme, density: tokens.density, variables: tokens.cssVariables };
@@ -69,8 +79,12 @@ export function IsolatedModule({
     };
     onFrameReady?.(flush);
 
-    return stop;
-  }, [host, manifest, onFrameReady]);
+    return () => {
+      stop();
+      // The frame is gone; anything it still held is stale.
+      void releasePackFileLocks(packFilesScopeOf(manifest));
+    };
+  }, [host, manifest, files, onFrameReady]);
 
   return (
     <div className="module">

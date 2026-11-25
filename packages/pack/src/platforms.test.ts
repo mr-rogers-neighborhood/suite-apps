@@ -15,10 +15,20 @@ describe("platform fit", () => {
 
   // spec: S4.8
   it("names the capability a declared platform cannot get", () => {
-    const fit = platformFit({ platforms: ["desktop", "mobile"], capabilities: ["files"] }, GO_HOST);
+    const fit = platformFit({ platforms: ["desktop", "mobile"], capabilities: ["relay"] }, GO_HOST);
     expect(fit.state).toBe("unavailable");
-    expect(fit.reason).toBe("not available on Go — needs `files`");
-    expect(fit.missingCapabilities).toEqual(["files"]);
+    expect(fit.reason).toBe("not available on Go — needs `relay`");
+    expect(fit.missingCapabilities).toEqual(["relay"]);
+  });
+
+  // spec: S4.8 — Go serves its own scoped file store, so a pack that needs one installs.
+  it("serves files on the phone as well as the desktop", () => {
+    const fit = platformFit(
+      { platforms: ["desktop", "mobile"], capabilities: ["documents", "files"] },
+      GO_HOST,
+    );
+    expect(fit.state).toBe("available");
+    expect(fit.missingCapabilities).toEqual([]);
   });
 
   // spec: S3.5
@@ -38,9 +48,9 @@ describe("platform fit", () => {
 
   // spec: S4.8
   it("still refuses a missing capability when the platform declaration is absent", () => {
-    const fit = platformFit({ capabilities: ["files"] }, GO_HOST);
+    const fit = platformFit({ capabilities: ["commands"] }, GO_HOST);
     expect(fit.state).toBe("unavailable");
-    expect(fit.reason).toBe("not available on Go — needs `files`");
+    expect(fit.reason).toBe("not available on Go — needs `commands`");
   });
 
   // spec: S3.5
