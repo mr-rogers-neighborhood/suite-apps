@@ -22,7 +22,7 @@ Read [docs/reference/conventions.md](docs/reference/conventions.md) before writi
 | `src/main`                    | Document authority, library, atomic file store, backups, recovery, IPC, menu |
 | `src/preload`                 | The allowlisted `contextBridge` surface                                      |
 | `src/renderer/src`            | React app: launcher, plan, accounts, reports, rules, schedules, payees       |
-| `packages/core`               | Schema, document layer, pure projections, importers, exports, reports        |
+| `packs/budget/packages/core`  | Schema, document layer, pure projections, importers, exports, reports        |
 | `docs/reference`              | Architecture, conventions, data model, interface                             |
 | `docs/reference/decisions.md` | The rules that shape Budget                                                  |
 
@@ -63,7 +63,7 @@ All verification gates are local. Every gate claim names a local command.
 ## Rules
 
 1. Document data goes through `@suite/budget-core` (`BudgetDocument`). Never touch Loro from a
-   component, and never import `loro-crdt` outside `packages/core/src/loro`.
+   component, and never import `loro-crdt` outside `packs/budget/packages/core/src/loro`.
 2. Document truth never lives in Zustand, React state, or localStorage. Zustand holds UI state only.
 3. Validate every write with the Zod schema. A write sets the leaf keys that changed, never the whole
    record.
@@ -93,7 +93,7 @@ transient view state in React.
 
 ## Feature path
 
-1. Model it in `packages/core/src/schema.ts` with tests.
+1. Model it in `packs/budget/packages/core/src/schema.ts` with tests.
 2. Add a typed accessor or mutation on `BudgetDocument`.
 3. Consume it through `useWorkspaceSnapshot` and the Zustand store.
 4. Add a story where it is visual, a test where behaviour is non-trivial.

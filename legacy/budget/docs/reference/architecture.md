@@ -14,7 +14,7 @@ This page is the map. The rules are in [conventions.md](conventions.md), the rec
    the bundle; bank sync is deliberately absent.
 2. **Loro owns the document.** The UI reads through `@suite/budget-core` and writes through
    `BudgetDocument`, never raw Loro.
-3. **Every write is validated.** Zod schemas in `packages/core/src/schema.ts` parse at the boundary
+3. **Every write is validated.** Zod schemas in `packs/budget/packages/core/src/schema.ts` parse at the boundary
    before a value reaches the CRDT.
 
 ## Process model

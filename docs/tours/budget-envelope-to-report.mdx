@@ -14,14 +14,14 @@ package owns the record shapes, money, rules and projections; main owns the open
 document and its file; the renderer owns the forms and the view state. Nothing
 on the path opens a network connection, and there is no bank sync to opt into.
 
-## legacy/budget/packages/core/src/schema.ts#transactionSchema
+## packs/budget/packages/core/src/schema.ts#transactionSchema
 
 A transaction is the only input the budget cannot derive: an account, a date and
 a signed integer amount, with payee, category, memo, flag and cleared optional.
 Zero is refused here, so no later projection has to defend against it. See the
 Budget core module for the record set.
 
-## legacy/budget/packages/core/src/money.ts#parseMoney
+## packs/budget/packages/core/src/money.ts#parseMoney
 
 Text becomes signed minor units in one place, rounded once at the currency
 scale; a bad amount is a `Result`, and an amount that would lose digits is
@@ -47,14 +47,14 @@ The next three stops are the rule path. Rules are pure functions over a draft,
 ranked so a specific rule wins over a broad one, and applied by the renderer
 before a transaction is written or re-run over existing records.
 
-## legacy/budget/packages/core/src/rules/evaluate.ts#applyRules
+## packs/budget/packages/core/src/rules/evaluate.ts#applyRules
 
 Rules run in rank order over a copy of the draft: a condition reads one field,
 an action replaces one, and the result carries the draft and the matched ids. An
 invalid regular expression matches nothing, and the function never writes. The
 Budget core module explains evaluation; the Budget rules module owns the order.
 
-## legacy/budget/packages/core/src/rules/rank.ts#rankRules
+## packs/budget/packages/core/src/rules/rank.ts#rankRules
 
 Disabled rules drop out first; the rest sort by stage, then ascending
 specificity, then creation time and id. Broad rules therefore run before
@@ -68,7 +68,7 @@ records, activity comes from transactions, and the available balance is a fold
 over every month up to the one on screen. The document stores the inputs; the
 core derives the envelope.
 
-## legacy/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument
+## packs/budget/packages/core/src/loro/BudgetDocument.ts#BudgetDocument
 
 The typed document is the only writer. Record mutations parse with Zod and set
 only the changed leaf keys, so concurrent edits merge; the outer call commits
@@ -76,7 +76,7 @@ once, and `batch` relies on that depth. A snapshot opens with a fresh peer id,
 and undo travels as an ordinary delta. The Budget Loro module covers the
 lifecycle.
 
-## legacy/budget/packages/core/src/plan/monthState.ts#monthState
+## packs/budget/packages/core/src/plan/monthState.ts#monthState
 
 The month state is the envelope fold: only a positive balance carries forward,
 so an overspent envelope closes at the boundary instead of borrowing. Ready to
@@ -90,7 +90,7 @@ replica. Auto-assign builds its delta map in core, the component applies it, and
 the notice reports total and shortfall; collapsed groups, the prompt and the
 month are view state. The Budget renderer module covers the view.
 
-## legacy/budget/packages/core/src/reports/budgetVsActual.ts#budgetVsActual
+## packs/budget/packages/core/src/reports/budgetVsActual.ts#budgetVsActual
 
 The report is a projection over month state, one row per category, so assigned,
 activity and available are the plan's numbers and cannot drift. The Budget
@@ -110,7 +110,7 @@ file, then replace it atomically. The flush chain survives a failure, `saveError
 reaches the renderer, and the renderer never writes the file. The Budget main
 module covers the store.
 
-## legacy/budget/packages/core/src/file/budgetFile.ts#decodeBudgetFile
+## packs/budget/packages/core/src/file/budgetFile.ts#decodeBudgetFile
 
 The `.budget` file is a JSON envelope around a base64 CRDT snapshot. Decoding
 refuses in order: not JSON, not this format, a newer file version, a newer

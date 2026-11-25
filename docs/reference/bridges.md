@@ -15,7 +15,7 @@ to run all three has to know how. It is written from the code, not from intent.
 | ------- | --------------------- | ----------------------------------------- | ----------------- | ----------------------------------- |
 | Canvas  | `window.suiteDesktop` | `legacy/canvas/src/host/bridge.ts`          | `host: "desktop"` | **Yes** — `REQUIRED_BRIDGE_METHODS` |
 | Planner | `window.suitePlanner` | `legacy/planner/packages/core/src/ports.ts` | none              | no                                  |
-| Budget  | `window.suiteBudget`  | `legacy/budget/packages/core/src/ports.ts`  | none              | no                                  |
+| Budget  | `window.suiteBudget`  | `packs/budget/packages/core/src/ports.ts`  | none              | no                                  |
 
 ## Canvas: `window.suiteDesktop`
 

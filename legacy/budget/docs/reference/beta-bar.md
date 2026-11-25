@@ -54,7 +54,7 @@ do not replace it.
 - [x] **No schema migration ships in this change.** `SCHEMA_VERSION` stays `1`. A later migration
   bumps it, ships a migration and a fixture from the previous release, and is tested by opening
   that fixture; a build older than the file refuses it instead of downgrading it
-  ([budgetFile.ts](../../packages/core/src/file/budgetFile.ts)).
+  ([budgetFile.ts](../../../../packs/budget/packages/core/src/file/budgetFile.ts)).
 - [x] A save is atomic (temp file → rename), keeps the previous copy, keeps seven daily backups, and
   never overwrites a damaged file ([budgetStore.ts](../../src/main/budgetStore.ts),
   [recovery.ts](../../src/main/recovery.ts)).
@@ -72,26 +72,26 @@ do not replace it.
 ## 5. Import and export tell the truth
 
 - [x] A `.budget` file round-trips every root through `encodeBudgetFile` → `decodeBudgetFile` →
-  `BudgetDocument.fromSnapshot` ([file.test.ts](../../packages/core/src/file/file.test.ts)).
+  `BudgetDocument.fromSnapshot` ([file.test.ts](../../../../packs/budget/packages/core/src/file/file.test.ts)).
 - [x] A records export round-trips every root and refuses a broken reference
-  ([file.test.ts](../../packages/core/src/file/file.test.ts)).
+  ([file.test.ts](../../../../packs/budget/packages/core/src/file/file.test.ts)).
 - [x] A CSV file this app wrote re-imports its dates, payees, memos, amounts, categories and the
   reserved `Ready to Assign` name, and writes a split as its child rows
-  ([export.test.ts](../../packages/core/src/file/export.test.ts)).
+  ([export.test.ts](../../../../packs/budget/packages/core/src/file/export.test.ts)).
 - [x] A QIF file this app wrote re-imports splits, cleared state, the `N` reference and the
   `L[Account]` transfer target. A transfer's direction comes from the importing register's amount
   sign, and the leg naming that register is skipped
-  ([export.test.ts](../../packages/core/src/file/export.test.ts),
-  [resolve.ts](../../packages/core/src/import/resolve.ts)).
+  ([export.test.ts](../../../../packs/budget/packages/core/src/file/export.test.ts),
+  [resolve.ts](../../../../packs/budget/packages/core/src/import/resolve.ts)).
 - [x] Currency is one per budget. An import uses the destination's currency and scale and rounds once
   at parse time; a `.budget` or records import opens as a new budget with the currency it was
   written with. Zero-, two- and three-decimal currencies round-trip
-  ([export.test.ts](../../packages/core/src/file/export.test.ts),
-  [money.test.ts](../../packages/core/src/money.test.ts)).
+  ([export.test.ts](../../../../packs/budget/packages/core/src/file/export.test.ts),
+  [money.test.ts](../../../../packs/budget/packages/core/src/money.test.ts)).
 - [x] Empty and malformed input is reported, not guessed: an empty file is an error; a bad row names
   its line and the good rows still import; a file with no readable row is refused with the first
   reason; a separator-only amount is refused instead of becoming zero; a BOM, CRLF and a quoted
-  line break read correctly ([import.test.ts](../../packages/core/src/import/import.test.ts)).
+  line break read correctly ([import.test.ts](../../../../packs/budget/packages/core/src/import/import.test.ts)).
 - [x] The limits are stated rather than hidden: CSV carries transactions only and does not re-import
   cleared state or flag, a split is flattened to its child rows, and a QIF flattens a line break
   in a name or memo to a space. A transfer that crosses the budget boundary needs a category, and
@@ -133,18 +133,18 @@ Needs a person:
 ## 7. The money model survives a regression test
 
 - [x] Amounts are signed integer minor units; `parseFloat` and `toFixed` are banned outside
-  [money.ts](../../packages/core/src/money.ts) and tests, and `pnpm shape` enforces it.
+  [money.ts](../../../../packs/budget/packages/core/src/money.ts) and tests, and `pnpm shape` enforces it.
 - [x] The cash-basis invariant `sum(available) + readyToAssign = onBudgetBalance` holds over generated
-  budgets ([invariant.test.ts](../../packages/core/src/plan/invariant.test.ts)).
+  budgets ([invariant.test.ts](../../../../packs/budget/packages/core/src/plan/invariant.test.ts)).
 - [x] A hand-computed month covers income, an overspend, a credit card, an on/off-budget transfer, a
   split, a refund and an uncategorized row
-  ([monthState.test.ts](../../packages/core/src/plan/monthState.test.ts)).
+  ([monthState.test.ts](../../../../packs/budget/packages/core/src/plan/monthState.test.ts)).
 - [x] Parsing and formatting round-trip, round half up at the boundary, and refuse misplaced signs,
-  broken grouping and separator-only input ([money.test.ts](../../packages/core/src/money.test.ts)).
+  broken grouping and separator-only input ([money.test.ts](../../../../packs/budget/packages/core/src/money.test.ts)).
 - [x] An export and its re-import agree on every amount at the budget's scale
-  ([export.test.ts](../../packages/core/src/file/export.test.ts)).
+  ([export.test.ts](../../../../packs/budget/packages/core/src/file/export.test.ts)).
 - [x] Two replicas from one snapshot converge after concurrent edits
-  ([document.test.ts](../../packages/core/src/loro/document.test.ts)).
+  ([document.test.ts](../../../../packs/budget/packages/core/src/loro/document.test.ts)).
 - [x] There is no bank sync, no network client, no updater and no analytics. `pnpm shape` bans
   `fetch`, `XMLHttpRequest` and `WebSocket` in the app source.
 

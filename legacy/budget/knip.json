@@ -4,9 +4,6 @@
     ".": {
       "entry": ["../../packs/budget/pack/vite.config.ts"],
       "project": ["scripts/**/*.mjs", "src/**/*.{ts,tsx}", ".storybook/**/*.ts", "e2e/**/*.ts"]
-    },
-    "packages/core": {
-      "project": ["src/**/*.ts"]
     }
   },
   "ignoreDependencies": ["tailwindcss", "loro-crdt"]
