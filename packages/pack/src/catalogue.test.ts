@@ -226,14 +226,34 @@ describe("catalogue index", () => {
   // spec: S12.2
   it("refuses a rolled-back or unchained index", async () => {
     const operator = await generatePackKeyPair();
-    const first = signPackIndex(core(), [operator.secretKeyBase64]);
+    const first = signPackIndex(core({ sequence: 2 }), [operator.secretKeyBase64]);
     const head = { sequence: 2, digest: await packIndexDigest(first) };
 
-    const same = signPackIndex(
+    // The index this host already trusts, fetched again: a relaunch, not a
+    // replay. It must not be refused, or the catalogue works once and then
+    // fails until the publisher cuts a new sequence.
+    const refetched = await verifyPackIndex(first, {
+      operatorKeys: [operator.publicKeyBase64],
+      now: NOW,
+      head,
+    });
+    expect(refetched.ok).toBe(true);
+
+    const rewritten = signPackIndex(
       core({ sequence: 2, previous: head.digest, generatedAt: "2026-02-01T00:00:00.000Z" }),
       [operator.secretKeyBase64],
     );
-    const rolledBack = await verifyPackIndex(same, {
+    const reusedSequence = await verifyPackIndex(rewritten, {
+      operatorKeys: [operator.publicKeyBase64],
+      now: NOW,
+      head,
+    });
+    expect(reusedSequence.ok).toBe(false);
+    expect((reusedSequence as { reason: string }).reason).toBe("chain");
+    expect((reusedSequence as { message: string }).message).toContain("cannot rewrite a sequence");
+
+    const older = signPackIndex(core({ sequence: 1 }), [operator.secretKeyBase64]);
+    const rolledBack = await verifyPackIndex(older, {
       operatorKeys: [operator.publicKeyBase64],
       now: NOW,
       head,

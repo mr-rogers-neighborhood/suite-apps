@@ -216,7 +216,9 @@ function describeVerification(
     return message;
   }
   if (reason === "chain") {
-    return "This catalogue index does not name the digest of the index it would replace, so the chain is refused.";
+    return message.length > 0
+      ? message
+      : "This catalogue index does not name the digest of the index it would replace, so the chain is refused.";
   }
   return message;
 }

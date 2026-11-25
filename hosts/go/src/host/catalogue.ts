@@ -6,7 +6,6 @@ import {
   type PackIndexEntry,
   type PackIndexFailureReason,
   type PlatformFitView,
-  packIndexDigest,
   parsePackIndexJson,
   platformFit,
   platformFitView,
@@ -212,20 +211,10 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
       };
     }
 
-    // An identical index re-fetched on Refresh is not a replay: it is the bytes this host already
-    // trusted. The shared verifier refuses `sequence <= head`, which is the right rule for a
-    // *different* index; comparing the digest first keeps a repeated load from looking like a
-    // rollback while every signature and expiry check still runs. A same-sequence index with
-    // different bytes falls through to the verifier and is refused.
-    const sameTrustedIndex =
-      head !== null &&
-      parsed.value.sequence === head.sequence &&
-      (await packIndexDigest(parsed.value)) === head.digest;
-
     const verified = await verifyPackIndex(parsed.value, {
       operatorKeys,
       now: now(),
-      head: sameTrustedIndex ? null : head,
+      head,
     });
     if (!verified.ok) {
       return {
@@ -476,7 +465,9 @@ function describeVerification(
   if (reason === "expired") return message;
   if (reason === "rollback") return message;
   if (reason === "chain") {
-    return "This catalogue index does not name the digest of the index it would replace, so the chain is refused.";
+    return message.length > 0
+      ? message
+      : "This catalogue index does not name the digest of the index it would replace, so the chain is refused.";
   }
   return message;
 }
