@@ -1,0 +1,80 @@
+# Advisory OCR review for pull requests.
+#
+# This is evidence, not a required check: it is deliberately absent from the
+# `ci` aggregator in ci.yml, and it never runs on the merge queue, `main` push,
+# nightly, platforms or a release. The gate stays deterministic; OCR adds a
+# second reviewer's findings to the PR.
+#
+# Trigger and secret:
+# - `pull_request` (same-repo branches). The repository is public, and GitHub
+#   blocks `pull_request_target` by default in hosted public repositories from
+#   2026-12-02 unless an Actions event policy allows it. Every Suite change
+#   lands from a branch in this repository, so `pull_request` gets the secret
+#   and needs no policy.
+# - `DEEPRELAY_API_KEY` is a repository secret. Fork PRs do not receive it and
+#   the job skips them rather than running without a provider.
+#
+# Cost:
+# - effort low, 200k token budget, concurrency 4, 10-minute subtask timeout.
+# - checkpoint_range reviews only the commits since the previous run, so a
+#   long-lived PR does not pay for the same diff on every push. sticky_summary
+#   and incremental keep comments in place instead of piling up.
+#
+name: ocr-review
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "apps/*/handbook/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ocr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: ocr-review
+    # A draft does not need a paid review; ready_for_review triggers the first
+    # one. A fork PR has no DEEPRELAY_API_KEY, so it is skipped explicitly
+    # rather than failing after paying for a checkout.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Open Code Review
+        uses: alibaba/open-code-review@f6379f71edba1e59dbc056e8f455df1f84396498 # v1.14.3
+        with:
+          # Pin the CLI as well as the Action: the Action installs the CLI at
+          # run time, so the Action SHA alone does not freeze review behavior.
+          ocr_version: "1.14.3"
+          llm_url: https://api.deeprelay.ai/v1/chat/completions
+          llm_auth_token: ${{ secrets.DEEPRELAY_API_KEY }}
+          llm_model: deeprelay/deepseek-v4.1-flash
+          llm_protocol: openai
+          llm_use_anthropic: "false"
+          # The Action's default extra_body disables `thinking`; DeepSeek does
+          # not accept that field. Start empty and let reasoning_effort carry
+          # the depth instead.
+          llm_extra_body: "{}"
+          llm_reasoning_effort: low
+          llm_timeout: "300"
+          effort: low
+          max_tokens_budget: "200000"
+          review_concurrency: 4
+          review_task_timeout: "10"
+          language: English
+          sticky_summary: "true"
+          incremental: "true"
+          checkpoint_range: "true"
+          background: ${{ github.event.pull_request.title }}
+          upload_artifacts: "true"

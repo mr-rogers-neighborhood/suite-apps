@@ -18,6 +18,8 @@ Facts to look up. These pages describe the repository as it is today.
 | [Glossary](glossary.md) | The words shared across apps: app, domain, pack, document, workspace |
 | [Suite Help](help.md) | The documentation app: explorer, handbook and Flatpak packaging |
 | [Status](status.md) | What works, per subsystem, and what is missing |
+| [Agent skills](agent-skills.md) | Where skills live, how to author and prune them, and the current set |
+| [Code review](code-review.md) | Native OCR on DeepRelay, the token budget and the fallback |
 | [Ideas](ideas.md) | The planning tracker: Now, Next and Someday, each linked to the page that owns the fact |
 
 Versions are not listed here. They live in `package.json` and each app's `CHANGELOG.md`.

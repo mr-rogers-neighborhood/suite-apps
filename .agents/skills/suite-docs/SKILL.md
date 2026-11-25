@@ -1,6 +1,6 @@
 ---
-name: Suite Docs
-description: Write and review Suite Help's module narratives, tours and code-index notes. Use when assigning or doing documentation work, deciding which symbols to explain first, validating notes/tours, or reviewing prose before it is marked human-authored.
+name: suite-docs
+description: Write or review Suite Help's module narratives, tours, and code-index notes. Use when doing documentation work, choosing symbols to explain, validating notes or tours, or reviewing prose before it is marked human-authored.
 ---
 
 # Suite docs
@@ -21,7 +21,7 @@ mise exec -- pnpm docs:explain <id>   # scaffold one note section
 mise exec -- pnpm docs:build          # headless app build
 ```
 
-Do not run `pnpm docs:dev`, Electron or Playwright in a headless session.
+Do not run `pnpm docs:dev`, Electron, or Playwright in a headless session.
 
 ## Authoring rules
 
@@ -32,9 +32,9 @@ Do not run `pnpm docs:dev`, Electron or Playwright in a headless session.
 - A tour is `docs/tours/<id>.mdx`: intro, then headings that are real node IDs.
   `## interlude: <title>` is a chapter. `### overlay: <title>` inside a step adds a commentary card.
 - A composed tour is `docs/tours/<id>.tour.mjs` and only exists when the path crosses module, file,
-  symbol, tour or doc targets, or needs an overlay that is not prose.
+  symbol, tour, or doc targets, or needs an overlay that is not prose.
 - Keep tour notes short and deictic; the durable explanation belongs in the module note.
-- Never mirror a signature or narrate line by line. Explain why, invariants, failure modes and test
+- Never mirror a signature or narrate line by line. Explain why, invariants, failure modes, and test
   intent.
 - Get node IDs from `apps/help/public/data/search.json`; never invent one.
 - **Never add `reviewed: human`.** That is a person's claim after reading or rewriting the prose.
@@ -52,6 +52,6 @@ Priority is the tour, then the module:
 ## Review gate
 
 - `pnpm docs:index:check` passes.
-- `pnpm --dir apps/help lint` passes.
+- `mise exec -- pnpm --dir apps/help lint` passes.
 - A person reads the prose, fixes claims against the code, and only then adds `reviewed: human`.
-- Work in a branch/worktree; open a pull request. Do not merge your own review.
+- Work in a branch or worktree; open a pull request. Do not merge your own review.

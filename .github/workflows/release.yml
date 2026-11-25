@@ -109,9 +109,92 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  review:
+    name: ocr-review-${{ inputs.channel }}
+    # Advisory evidence for the channel boundary: nightly -> preview asks "is it
+    # shaped right?" and preview -> stable asks "is it a release?". A person
+    # still decides; OCR only supplies a code review of the range since the
+    # channel's last tag. It runs before approval so the approver can read it.
+    #
+    # Keep this out of `publish`: that job holds the signing keys and the
+    # release upload. This job has `contents: read` and the model secret only.
+    # `continue-on-error` means a DeepRelay outage never blocks a signed
+    # release; the evidence is best-effort and the gate remains the proof.
+    if: inputs.publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Install OCR
+        run: npm install -g @alibaba-group/open-code-review@1.14.3
+
+      - name: Configure DeepRelay
+        env:
+          DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEEPRELAY_API_KEY}" ]; then
+            echo "DEEPRELAY_API_KEY is not set; the advisory review is skipped." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          ocr config set provider deeprelay
+          ocr config set custom_providers.deeprelay.url https://api.deeprelay.ai/v1
+          ocr config set custom_providers.deeprelay.protocol openai
+          ocr config set custom_providers.deeprelay.model deeprelay/deepseek-v4.1-flash
+          ocr config set custom_providers.deeprelay.api_key_cmd 'printf "%s" "$DEEPRELAY_API_KEY"'
+          ocr llm test
+
+      - name: Review the channel range
+        env:
+          DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          if [ "${CHANNEL}" = "stable" ]; then
+            base="$(git tag --list 'suite-*' --sort=-creatordate \
+              | grep -vE -- '-(nightly|preview|slop)-' | head -1 || true)"
+          else
+            base="$(git tag --list "suite-${CHANNEL}-*" --sort=-creatordate | head -1 || true)"
+          fi
+          if [ -z "${base}" ]; then
+            echo "No previous ${CHANNEL} tag; nothing to compare. Skipping the advisory review." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "Reviewing ${base}..HEAD for the ${CHANNEL} boundary." | tee -a "$GITHUB_STEP_SUMMARY"
+          node .agents/skills/suite-review/scripts/review.mjs \
+            --from "${base}" --effort medium --budget 400000
+          if ls .dev/ocr/*.json >/dev/null 2>&1; then
+            latest="$(ls -t .dev/ocr/*.json | head -1)"
+            cp "${latest}" .dev/ocr/release.json
+          fi
+
+      - name: Upload the review evidence
+        if: always() && hashFiles('.dev/ocr/release.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ocr-release-${{ inputs.channel }}-${{ github.run_id }}
+          path: .dev/ocr/release.json
+          retention-days: 30
+
   approval:
     name: approve-${{ inputs.channel }}
     # A schedule cannot wait for a reviewer. `preview` and `stable` can, and do.
+    # Approval waits for the advisory review so the report is available first;
+    # the review's `continue-on-error` keeps a provider failure from blocking it.
+    needs: review
     if: inputs.channel != 'nightly'
     runs-on: ubuntu-latest
     environment: approval
@@ -121,7 +204,7 @@ jobs:
 
   publish:
     name: publish-${{ inputs.channel }}
-    needs: approval
+    needs: [review, approval]
     if: always() && (inputs.channel == 'nightly' || needs.approval.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 120
