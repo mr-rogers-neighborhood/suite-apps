@@ -158,14 +158,19 @@ export const CHANNEL_ORDER = [...PRE_RELEASE_CHANNELS, STABLE_CHANNEL];
  */
 export function newestPages(releases) {
   const published = (releases ?? []).filter((row) => row?.isDraft === false);
+  const newestFirst = [...published].sort((left, right) => {
+    // One day can carry several slop pages, so publication time decides before
+    // the tag spelling does; a fixture without publishedAt falls back to the tag.
+    const leftDate = left.publishedAt ?? "";
+    const rightDate = right.publishedAt ?? "";
+    if (leftDate !== rightDate) return rightDate.localeCompare(leftDate);
+    return String(right.tagName ?? "").localeCompare(String(left.tagName ?? ""));
+  });
   const pages = {};
   for (const channel of CHANNEL_ORDER) {
     const pattern = channelTagPattern(channel);
     pages[channel] =
-      published
-        .map((row) => row.tagName ?? "")
-        .filter((tagName) => pattern.test(tagName))
-        .sort((left, right) => right.localeCompare(left))[0] ?? null;
+      newestFirst.find((row) => pattern.test(row.tagName ?? ""))?.tagName ?? null;
   }
   return pages;
 }
@@ -2134,11 +2139,23 @@ function remoteTagCommit(tag) {
  *
  * `isDraft` is the whole draft/publish decision: a draft is mutable, and a
  * published release is immutable (D6.3) and must never be edited again.
+ * `publishedAt` decides the newest page when one day carries several slop
+ * pages, where the tag spelling alone is not the order.
+ *
+ * Exported for `scripts/site-check.mjs`: one reader means the site check and the
+ * release generator compare the pages against the same list.
  */
-function existingReleases() {
+export function existingReleases() {
   const result = spawnSync(
     "gh",
-    ["release", "list", "--limit", "200", "--json", "tagName,isLatest,isDraft,isImmutable"],
+    [
+      "release",
+      "list",
+      "--limit",
+      "200",
+      "--json",
+      "tagName,isLatest,isDraft,isImmutable,publishedAt",
+    ],
     { cwd: ROOT, encoding: "utf8", env: process.env },
   );
   if (result.error || result.status !== 0) return null;

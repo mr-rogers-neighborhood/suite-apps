@@ -61,6 +61,7 @@ one copy is already wrong.
 | Local-first goals and what is met today | [Local-first](explanation/local-first.md) |
 | Host, packs and the MiniApp model | [The mini-app model](explanation/mini-app-model.md) |
 | Release tiers and their promises | [Channels](explanation/channels.md) |
+| The newest release pages | [GitHub Releases](https://github.com/mrrnbhd/suite-apps/releases/latest) |
 | App and process boundaries | [Architecture](explanation/architecture.md) |
 | The rules that shape the repository | [Decisions](reference/decisions.md) |
 | The superapp and pack contract | [Specification](spec/README.md) |

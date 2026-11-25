@@ -25,6 +25,7 @@
     "docs:build": "pnpm --dir legacy/help build",
     "docs:clean": "pnpm --dir legacy/help clean",
     "site:build": "pnpm --dir site build",
+    "site:check": "node scripts/site-check.mjs",
     "keys": "node scripts/keys.mjs",
     "android:key": "node scripts/android-release.mjs",
     "pack": "node scripts/pack.mjs",

@@ -61,8 +61,8 @@ other. The release pages and the README carry the same tables of them, generated
 `--check-readme` refuses a README whose tables are not what `--write` would generate, so renaming an
 id or adding a channel cannot leave the install instructions pointing at a ref that does not exist.
 The block restates no version and names no live pre-release tag, so the check needs no tree and no
-release list; [the site check](https://github.com/mrrnbhd/suite-apps/issues/414) owns comparing the
-release pages and their newest links at build time.
+release list; `scripts/site-check.mjs` compares the README, the landing page and the docs index with
+the release list on `main`, where the newest published page of every channel is known.
 
 A page that is already published is re-rendered from the tree and the release list without a build:
 
