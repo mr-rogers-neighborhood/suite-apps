@@ -129,5 +129,51 @@
     { "clause": "S3.5", "name": "empty license", "set": { "license": "" } },
     { "clause": "S3.5", "name": "deprecated is not a boolean", "set": { "deprecated": "yes" } },
     { "clause": "S3.5", "name": "sunset is not a date", "set": { "sunset": "soon" } }
-  ]
+  ],
+  "catalogue": {
+    "_comment": "A version 2 catalogue index (S12.9). `valid` must validate against catalogue.schema.json; each `invalid` entry must fail after its `remove`/`set` paths are applied.",
+    "valid": {
+      "format": "suite.catalogue",
+      "version": 2,
+      "sequence": 2,
+      "generatedAt": "2026-11-20T00:00:00.000Z",
+      "previous": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expires": "2026-12-20T00:00:00.000Z",
+      "threshold": 1,
+      "entries": [
+        {
+          "id": "chart",
+          "name": "Chart",
+          "publisher": "suite",
+          "version": "1.2.0",
+          "ring": "preview",
+          "contractVersion": 2,
+          "minHost": 2,
+          "archive": {
+            "url": "https://packs.example.com/chart-1.2.0.suitepack",
+            "size": 1200,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+          "description": "A local-first chart pack.",
+          "capabilities": ["documents", "network", "sync", "identity.pack"],
+          "platforms": ["desktop", "mobile", "tv"]
+        }
+      ],
+      "signatures": [
+        {
+          "key": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+          "signature": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=="
+        }
+      ]
+    },
+    "invalid": [
+      { "clause": "S12.9", "name": "v2 entry without a ring", "remove": [["entries", 0, "ring"]] },
+      { "clause": "S12.9", "name": "v2 entry without a contract version", "remove": [["entries", 0, "contractVersion"]] },
+      { "clause": "S12.9", "name": "v2 entry without a grouped archive", "remove": [["entries", 0, "archive"]] },
+      { "clause": "S12.9", "name": "v2 entry with the flat archive fields", "set": [[["entries", 0, "url"], "https://packs.example.com/chart-1.2.0.suitepack"]] },
+      { "clause": "S12.9", "name": "v2 entry with an unknown ring", "set": [[["entries", 0, "ring"], "nightly"]] },
+      { "clause": "S12.9", "name": "index version is not two", "set": [[["version"], 1]] }
+    ]
+  }
 }

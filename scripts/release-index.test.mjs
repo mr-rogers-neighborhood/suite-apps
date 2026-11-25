@@ -136,7 +136,7 @@ describe("release catalogue index", () => {
     assert.match(staged.index.expires, /^2026-01-31T00:00:00\.000Z$/u);
     assert.equal(staged.index.entries[0]?.id, "demo");
     assert.equal(
-      staged.index.entries[0]?.url,
+      staged.index.entries[0]?.archive.url,
       "https://flatpak.suite.run/packs/demo-0.1.0.suitepack",
     );
 
@@ -250,15 +250,16 @@ describe("release catalogue index", () => {
       assert.deepEqual(entry.platforms, ["desktop", "mobile"]);
       // The signed entry schema is strict: a card must never appear here.
       assert.deepEqual(Object.keys(entry).sort(), [
+        "archive",
         "capabilities",
+        "contractVersion",
         "description",
         "id",
         "name",
         "platforms",
         "publisher",
-        "sha256",
-        "size",
-        "url",
+        "ring",
+        "signature",
         "version",
       ]);
     }

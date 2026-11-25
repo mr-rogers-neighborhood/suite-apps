@@ -3,13 +3,21 @@ import { join } from "node:path";
 import { type SuiteWidget, suiteWidgetsSchema } from "@suite/contracts";
 import { resolveProtocolAsset } from "@suite/desktop";
 import {
+  DEFAULT_PACK_RING,
+  type HostContract,
+  isPackRing,
   isSafePackId,
   isSafePackPath,
   PACK_CONTRACT_VERSION,
   PACK_FORMAT,
   type PackDocument,
+  type PackManifestCore,
+  type PackRing,
   packAllows,
   packDocumentSchema,
+  packFitsHost,
+  packMinimumHost,
+  packRing,
 } from "@suite/pack/manifest";
 import { DESK_HOST, platformFit } from "@suite/pack/platforms";
 import { z } from "zod";
@@ -36,6 +44,25 @@ export const HOST_CONTRACT_VERSION = PACK_CONTRACT_VERSION;
 export const HOST_VERSION = 1;
 
 /**
+ * The rings this host offers by default (S12.10).
+ *
+ * `stable` alone. `preview` is added only by the person's explicit choice, which
+ * is a host setting: a pack may declare its ring, but never widen the set.
+ */
+export const HOST_RINGS: readonly PackRing[] = [DEFAULT_PACK_RING];
+
+/** The rings a host setting names, falling back to the default when it names none. */
+export function hostRingsFor(value: string | undefined): readonly PackRing[] {
+  const requested = (value ?? "")
+    .split(/[\s,]+/u)
+    .map((ring) => ring.trim())
+    .filter((ring) => ring.length > 0);
+  const rings = requested.filter(isPackRing);
+  // `stable` is always the base; a setting can only add `preview` to it.
+  return rings.length === 0 ? HOST_RINGS : [...new Set([DEFAULT_PACK_RING, ...rings])];
+}
+
+/**
  * The capabilities this host actually serves.
  *
  * The declaration lives in `@suite/pack/platforms` beside the Go host's, so the
@@ -47,16 +74,37 @@ export const HOST_CAPABILITIES = DESK_HOST.capabilities;
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 
+/**
+ * A host floor is a whole host version from 1, under either spelling (S3.11).
+ * The older `minimumHostVersion` is the same fact a manifest signed before the
+ * field existed carries.
+ */
+const hostFloorSchema = z
+  .number()
+  .int("a whole host version of 1 or more")
+  .min(1, "a whole host version of 1 or more");
+
+const ringSchema = z
+  .custom<PackRing>((value) => typeof value === "string" && isPackRing(value), {
+    error: (issue) => {
+      const rejected = JSON.stringify(issue.input) ?? String(issue.input);
+      return `a pack ring: "stable" or "preview"; ${rejected} is not one (a channel is a host property, never a pack ring)`;
+    },
+  })
+  .optional();
+
 const manifestSchema = z
   .object({
     format: z.literal(PACK_FORMAT),
     id: z.string().refine(isSafePackId, "lower kebab-case, at most 32 characters"),
     name: z.string().min(1).max(64),
     version: z.string().regex(SEMVER),
+    ring: ringSchema,
     entry: z.string().refine(isSafePackPath, "a relative path inside the pack"),
     description: z.string().max(200).optional(),
     contractVersion: z.number().int().positive(),
-    minimumHostVersion: z.number().int().positive().optional(),
+    minHost: hostFloorSchema.optional(),
+    minimumHostVersion: hostFloorSchema.optional(),
     publisher: z
       .object({ key: z.string().min(32), id: z.string().min(1).max(64).optional() })
       .strict()
@@ -68,11 +116,24 @@ const manifestSchema = z
     platforms: z.array(z.string()).min(1).optional(),
     widgets: suiteWidgetsSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    // One floor has one spelling in a manifest, or a reader has to choose (S3.11).
+    if (value.minHost !== undefined && value.minimumHostVersion !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["minHost"],
+        message: `minHost (${value.minHost}) and minimumHostVersion (${value.minimumHostVersion}) are the same host floor; carry one spelling, not both`,
+      });
+    }
+  });
 
 /** A pack plus where its files live. `root` never crosses the IPC bridge. */
 export interface PackInfo extends PackSummary {
   readonly root: string;
+  /** The pack's effective ring and host floor, for the catalogue and refusal copy. */
+  readonly ring?: PackRing;
+  readonly minHost?: number;
   /** Widget descriptors the manifest declares. The host draws them; it runs no code. */
   readonly widgets?: readonly SuiteWidget[];
   /** Documents the manifest declares, with their migrations and projection. */
@@ -151,7 +212,7 @@ export function packPartition(
   return `persist:${containerId}:${packStorageKey(publisherId, id)}`;
 }
 
-function readPack(directory: string): PackInfo | null {
+function readPack(directory: string, host: HostContract): PackInfo | null {
   const manifestPath = join(directory, "manifest.json");
   if (!existsSync(manifestPath)) return null;
 
@@ -163,19 +224,23 @@ function readPack(directory: string): PackInfo | null {
       return null;
     }
 
-    if (parsed.data.contractVersion > HOST_CONTRACT_VERSION) {
-      console.warn(
-        `[desk] ${parsed.data.id} needs contract ${parsed.data.contractVersion}; this host implements ${HOST_CONTRACT_VERSION}`,
-      );
-      return null;
-    }
-    if (
-      parsed.data.minimumHostVersion !== undefined &&
-      parsed.data.minimumHostVersion > HOST_VERSION
-    ) {
-      console.warn(
-        `[desk] ${parsed.data.id} needs host ${parsed.data.minimumHostVersion}; this host is ${HOST_VERSION}`,
-      );
+    // The development schema is the unsigned subset this loader accepts; the
+    // fit rules come from the one shared contract, not a second copy.
+    const manifest = parsed.data as unknown as PackManifestCore;
+    const fit = packFitsHost(manifest, host);
+    if (!fit.ok) {
+      // S3.12 names the pack, the requirement and the host's own value. A ring
+      // refusal names the ring and the host's offered set, which is the setting
+      // that would have to change.
+      if (fit.reason === "ring") {
+        const ring = packRing(manifest);
+        const offered = host.rings ?? HOST_RINGS;
+        console.warn(
+          `[desk] ${manifest.id} is a ${ring} ring pack; this host offers ${offered.join(", ") || "no ring"}`,
+        );
+      } else {
+        console.warn(`[desk] ${manifest.id}: ${fit.message}`);
+      }
       return null;
     }
 
@@ -214,6 +279,10 @@ function readPack(directory: string): PackInfo | null {
       description: parsed.data.description ?? null,
       entry: parsed.data.entry,
       capabilities: parsed.data.capabilities as readonly PackCapability[],
+      ring: packRing(manifest),
+      ...(packMinimumHost(manifest) === undefined
+        ? {}
+        : { minHost: packMinimumHost(manifest) as number }),
       documents: (parsed.data.documents ?? []) as readonly PackDocument[],
       widgets: parsed.data.widgets ?? [],
       publisher: null,
@@ -226,9 +295,27 @@ function readPack(directory: string): PackInfo | null {
   }
 }
 
-export function discoverPacks(root: string): readonly PackInfo[] {
+export interface PackDiscoveryOptions {
+  /** The rings this host offers; defaults to `HOST_RINGS` (`stable` alone). */
+  readonly rings?: readonly PackRing[];
+  readonly hostVersion?: number;
+  readonly contractVersion?: number;
+}
+
+export function discoverPacks(
+  root: string,
+  options: PackDiscoveryOptions | readonly PackRing[] = {},
+): readonly PackInfo[] {
   if (!existsSync(root)) return [];
 
+  const resolved: PackDiscoveryOptions = Array.isArray(options)
+    ? { rings: options as readonly PackRing[] }
+    : (options as PackDiscoveryOptions);
+  const host: HostContract = {
+    contractVersion: resolved.contractVersion ?? HOST_CONTRACT_VERSION,
+    hostVersion: resolved.hostVersion ?? HOST_VERSION,
+    rings: resolved.rings ?? HOST_RINGS,
+  };
   const found: PackInfo[] = [];
   const seen = new Set<string>();
   const entries = readdirSync(root, { withFileTypes: true }).sort((left, right) =>
@@ -236,7 +323,7 @@ export function discoverPacks(root: string): readonly PackInfo[] {
   );
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const pack = readPack(join(root, entry.name));
+    const pack = readPack(join(root, entry.name), host);
     if (pack === null) continue;
     if (seen.has(pack.id)) {
       console.warn(`[desk] duplicate pack id ${pack.id}; ignoring ${pack.root}`);

@@ -20,7 +20,10 @@ import {
   isSafePackPath,
   isSafePublisherId,
   type PackManifest,
+  type PackRing,
   packFitsHost,
+  packMinimumHost,
+  packRing,
   parsePackManifest,
   platformFit,
   type ResolvedPublisher,
@@ -67,6 +70,11 @@ export interface PackTrustOptions {
   readonly hostContractVersion: number;
   readonly hostVersion: number;
   readonly hostCapabilities: readonly PackCapability[];
+  /**
+   * The rings this host offers (S12.10). Absent means `stable` alone; `preview`
+   * is added only by the person's explicit host setting.
+   */
+  readonly rings?: readonly PackRing[];
   /** The kind this host reports. Defaults to the desktop host's `desktop`. */
   readonly hostKind?: string;
   /** Permit replacing an id's publisher. The migration changes no stored data. */
@@ -1100,6 +1108,7 @@ async function verifyManifest(
   const fit = packFitsHost(manifest, {
     contractVersion: options.hostContractVersion,
     hostVersion: options.hostVersion,
+    ...(options.rings === undefined ? {} : { rings: options.rings }),
   });
   if (!fit.ok) return { ok: false, refusal: { reason: "host", message: fit.message } };
 
@@ -1194,6 +1203,10 @@ function installedInfo(
     description: manifest.description ?? null,
     entry: manifest.entry,
     capabilities: manifest.capabilities,
+    ring: packRing(manifest),
+    ...(packMinimumHost(manifest) === undefined
+      ? {}
+      : { minHost: packMinimumHost(manifest) as number }),
     documents: manifest.documents ?? [],
     widgets: manifest.widgets ?? [],
     publisher: { id: publisher.id, fingerprint: publisher.fingerprint },

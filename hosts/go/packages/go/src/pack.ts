@@ -39,6 +39,21 @@ hashes.sha512 = sha512;
 
 export const PACK_FORMAT = "suite.pack";
 
+/**
+ * The rings a pack may declare (S3.11).
+ *
+ * A ring is the pack's own stability, not a host channel. The channel names
+ * `slop` and `nightly` describe the host build, so they are deliberately not in
+ * this list; the vocabulary is closed like a capability.
+ */
+export const PACK_RINGS = ["stable", "preview"] as const;
+export type PackRing = (typeof PACK_RINGS)[number];
+export const DEFAULT_PACK_RING: PackRing = "stable";
+
+export function isPackRing(value: unknown): value is PackRing {
+  return typeof value === "string" && (PACK_RINGS as readonly string[]).includes(value);
+}
+
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 const SHA256_HEX = /^[0-9a-f]{64}$/u;
 // Host kinds are an open vocabulary: this only rejects malformed values, never
@@ -106,7 +121,12 @@ export interface PackManifestCore {
   readonly version: string;
   /** The module file to import, relative to the pack root. */
   readonly entry: string;
+  /** The pack's own stability; absent means `stable` (S3.11). */
+  readonly ring?: PackRing;
   readonly contractVersion: number;
+  /** The lowest host version that can run this pack. Absent means no floor. */
+  readonly minHost?: number;
+  /** The pre-S3.11 spelling of `minHost`; a manifest carries one spelling, never both. */
   readonly minimumHostVersion?: number;
   /** True when the pack opens on its own, without the hub. */
   readonly independent: boolean;
@@ -160,6 +180,16 @@ export function isSafePackPath(path: string): boolean {
   return path.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
+/** The rejected value as its author wrote it, for a refusal sentence. */
+function describeRejected(value: unknown): string {
+  try {
+    const text = JSON.stringify(value);
+    return text === undefined ? String(value) : text;
+  } catch {
+    return String(value);
+  }
+}
+
 export function parsePackManifest(value: unknown): PackParse {
   const issues: PackIssue[] = [];
 
@@ -181,6 +211,13 @@ export function parsePackManifest(value: unknown): PackParse {
   const version = typeof raw.version === "string" ? raw.version : "";
   if (!SEMVER.test(version)) fail("version", "semver");
 
+  if (raw.ring !== undefined && !isPackRing(raw.ring)) {
+    fail(
+      "ring",
+      `a pack ring: "stable" or "preview"; ${describeRejected(raw.ring)} is not one (a channel is a host property, never a pack ring)`,
+    );
+  }
+
   const entry = typeof raw.entry === "string" ? raw.entry : "";
   if (!isSafePackPath(entry)) fail("entry", "a relative path inside the pack");
 
@@ -190,10 +227,22 @@ export function parsePackManifest(value: unknown): PackParse {
       : Number.NaN;
   if (Number.isNaN(contractVersion)) fail("contractVersion", "an integer");
 
-  if (raw.minimumHostVersion !== undefined) {
-    if (typeof raw.minimumHostVersion !== "number" || !Number.isInteger(raw.minimumHostVersion)) {
-      fail("minimumHostVersion", "an integer when present");
+  // `minHost` and the older `minimumHostVersion` are one fact in two spellings
+  // (S3.11). Either is a whole host version from 1; both together is refused.
+  for (const spelling of ["minHost", "minimumHostVersion"] as const) {
+    const floor = raw[spelling];
+    if (
+      floor !== undefined &&
+      (typeof floor !== "number" || !Number.isInteger(floor) || floor < 1)
+    ) {
+      fail(spelling, `a whole host version of 1 or more; ${describeRejected(floor)} is not one`);
     }
+  }
+  if (raw.minHost !== undefined && raw.minimumHostVersion !== undefined) {
+    fail(
+      "minHost",
+      `minHost (${String(raw.minHost)}) and minimumHostVersion (${String(raw.minimumHostVersion)}) are the same host floor; carry one spelling, not both`,
+    );
   }
 
   if (typeof raw.independent !== "boolean") fail("independent", "true or false");
@@ -330,8 +379,10 @@ export function parsePackManifest(value: unknown): PackParse {
       id,
       name,
       version,
+      ...(raw.ring === undefined ? {} : { ring: raw.ring as PackRing }),
       entry,
       contractVersion,
+      ...(raw.minHost === undefined ? {} : { minHost: raw.minHost as number }),
       ...(raw.minimumHostVersion === undefined
         ? {}
         : { minimumHostVersion: raw.minimumHostVersion as number }),
@@ -359,8 +410,13 @@ export function canonicalManifestBytes(manifest: PackManifestCore): Uint8Array {
     id: manifest.id,
     name: manifest.name,
     version: manifest.version,
+    // New optional fields are omitted when absent, so a manifest signed before
+    // S3.11 keeps the bytes and the signature it already had. `minimumHostVersion`
+    // stays as it was written by this host's earlier canonical form.
+    ...(manifest.ring === undefined ? {} : { ring: manifest.ring }),
     entry: manifest.entry,
     contractVersion: manifest.contractVersion,
+    ...(manifest.minHost === undefined ? {} : { minHost: manifest.minHost }),
     minimumHostVersion: manifest.minimumHostVersion ?? null,
     independent: manifest.independent,
     isolation: manifest.isolation,
@@ -547,7 +603,11 @@ export async function verifyPackFiles(
  */
 export type HostFit =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: "contract" | "host"; readonly message: string };
+  | {
+      readonly ok: false;
+      readonly reason: "contract" | "host" | "ring";
+      readonly message: string;
+    };
 
 /**
  * May this pack make this request?
@@ -644,10 +704,29 @@ export function checkNetworkPolicy(
   return { ok: true };
 }
 
-export function packFitsHost(
-  manifest: PackManifest,
-  host: { readonly contractVersion: number; readonly hostVersion: number },
-): HostFit {
+/** The ring a manifest declares, with an absent value meaning `stable`. */
+export function packRing(manifest: Pick<PackManifestCore, "ring">): PackRing {
+  return manifest.ring ?? DEFAULT_PACK_RING;
+}
+
+/** The host floor a manifest declares, under either spelling. */
+export function packMinimumHost(
+  manifest: Pick<PackManifestCore, "minHost" | "minimumHostVersion">,
+): number | undefined {
+  return manifest.minHost ?? manifest.minimumHostVersion;
+}
+
+export interface HostContract {
+  readonly contractVersion: number;
+  readonly hostVersion: number;
+  /**
+   * The rings this host offers. Absent means `stable` alone (S12.10); preview is
+   * added only by an explicit host setting, never by a pack.
+   */
+  readonly rings?: readonly PackRing[];
+}
+
+export function packFitsHost(manifest: PackManifest, host: HostContract): HostFit {
   if (manifest.contractVersion > host.contractVersion) {
     return {
       ok: false,
@@ -655,11 +734,21 @@ export function packFitsHost(
       message: `${manifest.name} needs a newer version of Suite Go. Update the app to open it.`,
     };
   }
-  if (manifest.minimumHostVersion !== undefined && host.hostVersion < manifest.minimumHostVersion) {
+  const minimumHost = packMinimumHost(manifest);
+  if (minimumHost !== undefined && host.hostVersion < minimumHost) {
     return {
       ok: false,
       reason: "host",
-      message: `${manifest.name} needs Suite Go ${manifest.minimumHostVersion} or later.`,
+      message: `${manifest.name} needs Suite Go ${minimumHost} or later; this host is ${host.hostVersion}.`,
+    };
+  }
+  const ring = packRing(manifest);
+  const offered = host.rings ?? [DEFAULT_PACK_RING];
+  if (!offered.includes(ring)) {
+    return {
+      ok: false,
+      reason: "ring",
+      message: `${manifest.name} is a ${ring} ring pack; Suite Go offers ${offered.join(" and ") || "no ring"}.`,
     };
   }
   return { ok: true };

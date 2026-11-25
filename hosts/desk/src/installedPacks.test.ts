@@ -55,7 +55,9 @@ interface FixtureOptions {
   readonly description?: string;
   readonly version?: string;
   readonly contractVersion?: number;
+  readonly minHost?: number;
   readonly minimumHostVersion?: number;
+  readonly ring?: PackManifest["ring"];
   readonly capabilities?: readonly PackCapability[];
   /** Documents the manifest declares. */
   readonly documents?: PackManifest["documents"];
@@ -93,7 +95,9 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
     name: options.name ?? "Demo",
     version: options.version ?? "1.0.0",
     entry: "index.html",
+    ...(options.ring === undefined ? {} : { ring: options.ring }),
     contractVersion: options.contractVersion ?? 1,
+    ...(options.minHost === undefined ? {} : { minHost: options.minHost }),
     ...(options.legacyPublisher === true
       ? {}
       : { publisher: { id: options.publisherId ?? "suite", key: keys.publicKeyBase64 } }),
@@ -260,6 +264,33 @@ describe("installed pack verification", () => {
       version: "1.0.1",
       reason: "host",
     });
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  // spec: S3.12
+  it("refuses a preview pack by default and installs it when the host offers preview", async () => {
+    const root = await temporaryRoot();
+    const preview = await fixture({ ring: "preview" });
+
+    await expect(install(root, preview)).rejects.toMatchObject({
+      id: "demo",
+      version: "1.0.0",
+      reason: "host",
+    });
+    expect(await readdir(root)).toEqual([]);
+
+    const installedPack = await install(root, preview, { rings: ["stable", "preview"] });
+    expect(installedPack.ring).toBe("preview");
+  });
+
+  // spec: S3.11
+  it("treats minHost and minimumHostVersion as the same floor", async () => {
+    const root = await temporaryRoot();
+    const modern = await fixture({ version: "1.0.1", minHost: 2 });
+    const legacy = await fixture({ version: "1.0.2", minimumHostVersion: 2 });
+
+    await expect(install(root, modern)).rejects.toMatchObject({ reason: "host" });
+    await expect(install(root, legacy)).rejects.toMatchObject({ reason: "host" });
     expect(await readdir(root)).toEqual([]);
   });
 

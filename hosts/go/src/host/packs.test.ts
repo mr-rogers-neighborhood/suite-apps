@@ -99,7 +99,7 @@ const pair = await (async () => {
 async function signedManifest(
   html: string,
   capabilities: PackManifest["capabilities"] = ["documents"],
-  overrides: Partial<Pick<PackManifest, "id" | "name" | "version">> = {},
+  overrides: Partial<Pick<PackManifest, "id" | "name" | "version" | "ring" | "minHost">> = {},
   extraFiles: Record<string, Uint8Array> = {},
 ): Promise<{ manifest: PackManifest; files: Record<string, Uint8Array> }> {
   const files = { "index.html": encoder.encode(html), ...extraFiles };
@@ -456,6 +456,43 @@ describe("the capability a host serves (S4.8)", () => {
     const issues = await packs.issues();
     expect(issues[0]).toMatchObject({ id: "probe", version: "1.0.0", reason: "capability" });
     expect(issues[0]?.message).toContain("files");
+  });
+});
+
+describe("the ring a host offers (S3.12)", () => {
+  it("refuses a preview pack by default and installs it when preview is offered", async () => {
+    resetDisk();
+    const { manifest, files } = await signedManifest(sealed, ["documents"], {
+      ring: "preview",
+    });
+    const archive = packArchive(manifest, files);
+
+    const refused = await store().install(archive);
+    expect(refused).toMatchObject({ ok: false, reason: "host" });
+    expect(refused.ok ? "" : refused.message).toContain("preview");
+    expect(refused.ok ? "" : refused.message).toContain("stable");
+
+    expect(await store({ rings: ["stable", "preview"] }).install(archive)).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it("stops offering an installed pack when the host no longer offers its ring", async () => {
+    resetDisk();
+    const { manifest, files } = await signedManifest(sealed, ["documents"], {
+      ring: "preview",
+    });
+    const dir = "packs/probe/1.0.0";
+    disk.set(`${dir}/manifest.json`, encoder.encode(JSON.stringify(manifest)));
+    for (const [path, bytes] of Object.entries(files)) disk.set(`${dir}/${path}`, bytes);
+
+    const refused = store();
+    expect(await refused.discover()).toEqual([]);
+    const issues = await refused.issues();
+    expect(issues[0]).toMatchObject({ id: "probe", version: "1.0.0", reason: "host" });
+
+    const offered = store({ rings: ["stable", "preview"] });
+    expect((await offered.discover()).map((pack) => pack.manifest.id)).toEqual(["probe"]);
   });
 });
 

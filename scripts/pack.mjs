@@ -173,6 +173,10 @@ export async function bundlePack({
         ? undefined
         : positiveInteger(source.minimumHostVersion, `${SOURCE_MANIFEST} minimumHostVersion`)
       : positiveInteger(minimumHostVersion, "--min-host");
+  const minHost =
+    source.minHost === undefined
+      ? undefined
+      : positiveInteger(source.minHost, `${SOURCE_MANIFEST} minHost`);
 
   const output = outPath ?? `${id}-${version}.suitepack`;
   const skip = new Set([resolve(output), resolve(`${output}.sha256`)]);
@@ -219,8 +223,10 @@ export async function bundlePack({
     name,
     ...(source.description === undefined ? {} : { description: source.description }),
     version,
+    ...(source.ring === undefined ? {} : { ring: source.ring }),
     entry,
     contractVersion: contract,
+    ...(minHost === undefined ? {} : { minHost }),
     ...(minimumHost === undefined ? {} : { minimumHostVersion: minimumHost }),
     publisher: { id: publisherId, key: actualPublicKey },
     capabilities: Array.isArray(source.capabilities) ? source.capabilities : [],

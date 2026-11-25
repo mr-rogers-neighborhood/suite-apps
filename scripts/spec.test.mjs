@@ -17,6 +17,9 @@ const LEDGER = readFileSync(join(ROOT, "docs", "spec", "ledger.md"), "utf8");
 const SCHEMA = JSON.parse(
   readFileSync(join(ROOT, "docs", "spec", "manifest.schema.json"), "utf8"),
 );
+const CATALOGUE_SCHEMA = JSON.parse(
+  readFileSync(join(ROOT, "docs", "spec", "catalogue.schema.json"), "utf8"),
+);
 const FIXTURES = JSON.parse(
   readFileSync(join(ROOT, "docs", "spec", "fixtures.json"), "utf8"),
 );
@@ -55,22 +58,39 @@ const TAG_SCAN_FILES = [
   "hosts/desk/src/blobs.test.ts",
   "hosts/desk/src/exportBundle.test.ts",
   "hosts/desk/src/installedPacks.test.ts",
+  "hosts/desk/src/packs.test.ts",
   "hosts/desk/src/packIdentity.test.ts",
   "hosts/desk/src/packIdentityKey.test.ts",
   "hosts/desk/src/packRevocation.test.ts",
   "hosts/desk/src/publisherRotation.test.ts",
   "hosts/desk/src/publisherTrust.test.ts",
+  "hosts/go/packages/go/src/pack.test.ts",
 ];
 
-function resolveRef(ref) {
-  assert.match(ref, /^#\//u, `unsupported $ref ${ref}`);
-  return ref
-    .slice(2)
-    .split("/")
-    .reduce((node, key) => {
-      assert.ok(node !== undefined, `unresolved $ref ${ref}`);
-      return node[key];
-    }, SCHEMA);
+function resolveRef(ref, root) {
+  if (ref.startsWith("#/")) {
+    return ref
+      .slice(2)
+      .split("/")
+      .reduce((node, key) => {
+        assert.ok(node !== undefined, `unresolved $ref ${ref}`);
+        return node[key];
+      }, root);
+  }
+
+  // The catalogue entry reuses the manifest's capability vocabulary rather than
+  // copying it (S4.1), so a cross-file reference resolves against that schema.
+  const [file, pointer] = ref.split("#");
+  if (file === "manifest.schema.json" && pointer !== undefined) {
+    return pointer
+      .replace(/^\//u, "")
+      .split("/")
+      .reduce((node, key) => {
+        assert.ok(node !== undefined, `unresolved $ref ${ref}`);
+        return node[key];
+      }, SCHEMA);
+  }
+  assert.fail(`unsupported $ref ${ref}`);
 }
 
 function typeOf(value) {
@@ -80,11 +100,12 @@ function typeOf(value) {
   return typeof value;
 }
 
-/** The JSON Schema subset in `manifest.schema.json`. */
-function validate(schema, value, path = "$") {
+/** The JSON Schema subset in `manifest.schema.json` and `catalogue.schema.json`. */
+function validate(schema, value, path = "$", root = SCHEMA) {
   const errors = [];
   if (schema.$ref !== undefined) {
-    return validate(resolveRef(schema.$ref), value, path);
+    const targetRoot = schema.$ref.startsWith("manifest.schema.json#") ? SCHEMA : root;
+    return validate(resolveRef(schema.$ref, targetRoot), value, path, targetRoot);
   }
 
   if (schema.type !== undefined) {
@@ -104,7 +125,7 @@ function validate(schema, value, path = "$") {
   if (schema.enum !== undefined && !schema.enum.includes(value)) {
     errors.push(`${path}: not one of ${schema.enum.join(", ")}`);
   }
-  if (schema.not !== undefined && validate(schema.not, value, path).length === 0) {
+  if (schema.not !== undefined && validate(schema.not, value, path, root).length === 0) {
     // Used once: `minHost` and `minimumHostVersion` are the same fact in two
     // spellings and may not appear together (S3.11).
     errors.push(`${path}: matches a forbidden shape ${JSON.stringify(schema.not)}`);
@@ -136,7 +157,9 @@ function validate(schema, value, path = "$") {
       if (seen.size !== value.length) errors.push(`${path}: duplicate items`);
     }
     if (schema.items !== undefined) {
-      value.forEach((item, index) => errors.push(...validate(schema.items, item, `${path}[${index}]`)));
+      value.forEach((item, index) =>
+        errors.push(...validate(schema.items, item, `${path}[${index}]`, root)),
+      );
     }
   }
 
@@ -150,11 +173,11 @@ function validate(schema, value, path = "$") {
         if (schema.additionalProperties === false) {
           errors.push(`${path}: unknown field ${key}`);
         } else if (typeof schema.additionalProperties === "object") {
-          errors.push(...validate(schema.additionalProperties, item, `${path}.${key}`));
+          errors.push(...validate(schema.additionalProperties, item, `${path}.${key}`, root));
         }
         continue;
       }
-      errors.push(...validate(child, item, `${path}.${key}`));
+      errors.push(...validate(child, item, `${path}.${key}`, root));
     }
   }
 
@@ -289,6 +312,25 @@ function fixtureVariant(fixture) {
   return manifest;
 }
 
+function catalogueVariant(fixture) {
+  const index = structuredClone(FIXTURES.catalogue.valid);
+  for (const path of fixture.remove ?? []) {
+    const last = path.at(-1);
+    const parent = path
+      .slice(0, -1)
+      .reduce((node, key) => node?.[key], index);
+    if (parent !== undefined) delete parent[last];
+  }
+  for (const [path, value] of fixture.set ?? []) {
+    const last = path.at(-1);
+    const parent = path
+      .slice(0, -1)
+      .reduce((node, key) => node?.[key], index);
+    if (parent !== undefined) parent[last] = value;
+  }
+  return index;
+}
+
 describe("the superapp spec", () => {
   it("gives every clause an ID and one ledger row", () => {
     const spec = clauseIds(SPEC);
@@ -343,7 +385,14 @@ describe("the superapp spec", () => {
   });
 
   it("names the schema, ledger, fixtures and agent order", () => {
-    for (const target of ["README.md", "manifest.schema.json", "ledger.md", "AGENTS.md", "fixtures.json"]) {
+    for (const target of [
+      "README.md",
+      "manifest.schema.json",
+      "catalogue.schema.json",
+      "ledger.md",
+      "AGENTS.md",
+      "fixtures.json",
+    ]) {
       assert.ok(SPEC.includes(`(${target})`) || SPEC.includes(`[${target}]`), `spec does not link ${target}`);
     }
     assert.match(SPEC, /\bMUST\b/u);
@@ -377,6 +426,29 @@ describe("the superapp spec", () => {
 
   it("accepts the valid manifest", () => {
     assert.deepEqual(validate(SCHEMA, FIXTURES.valid), []);
+  });
+
+  // spec: S12.9
+  it("accepts the version 2 catalogue fixture", () => {
+    assert.deepEqual(
+      validate(CATALOGUE_SCHEMA, FIXTURES.catalogue.valid, "$", CATALOGUE_SCHEMA),
+      [],
+    );
+  });
+
+  // spec: S12.9
+  it("refuses every invalid catalogue fixture and names a real clause", () => {
+    const spec = new Set(clauseIds(SPEC));
+    for (const fixture of FIXTURES.catalogue.invalid) {
+      assert.ok(spec.has(fixture.clause), `${fixture.name}: unknown clause ${fixture.clause}`);
+      const errors = validate(
+        CATALOGUE_SCHEMA,
+        catalogueVariant(fixture),
+        "$",
+        CATALOGUE_SCHEMA,
+      );
+      assert.ok(errors.length > 0, `${fixture.name}: expected a refusal`);
+    }
   });
 
   it("keeps the valid fixture internally consistent", () => {

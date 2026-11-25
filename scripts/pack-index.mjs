@@ -36,6 +36,8 @@ import {
   PACK_INDEX_FORMAT,
   PACK_INDEX_VERSION,
   packIndexDigest,
+  packMinimumHost,
+  packRing,
   parsePackIndex,
   parsePackManifestJson,
   publisherKeyDigest,
@@ -113,17 +115,26 @@ async function entryFor(path, urlBase) {
     throw new Error(`${urlBase} does not produce a safe HTTPS archive URL for ${basename(path)}.`);
   }
 
+  const minHost = packMinimumHost(manifest);
   const entry = {
     id: manifest.id,
     name: manifest.name,
     publisher: manifest.publisher.id ?? (await publisherKeyDigest(manifest.publisher.key)),
     version: manifest.version,
+    // The effective ring and floor, not the spelling the manifest happened to use
+    // (S12.9): an absent ring is `stable`, and both spellings name the same floor.
+    ring: packRing(manifest),
+    contractVersion: manifest.contractVersion,
+    ...(minHost === undefined ? {} : { minHost }),
     ...(manifest.description === undefined ? {} : { description: manifest.description }),
     capabilities: manifest.capabilities,
     ...(manifest.platforms === undefined ? {} : { platforms: manifest.platforms }),
-    size: bytes.byteLength,
-    sha256: await sha256Hex(bytes),
-    url,
+    archive: {
+      url,
+      size: bytes.byteLength,
+      sha256: await sha256Hex(bytes),
+    },
+    signature: manifest.signature,
   };
   return entry;
 }

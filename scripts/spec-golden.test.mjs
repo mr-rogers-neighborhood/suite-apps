@@ -3,8 +3,13 @@
  * one flipped byte in the canonical form or the signature makes it fail.
  */
 import assert from "node:assert/strict";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, it } from "node:test";
-import { readGoldenVector, verifyGoldenVector } from "./spec-golden.mjs";
+import {
+  canonicalManifestBytes,
+  readGoldenVector,
+  verifyGoldenVector,
+} from "./spec-golden.mjs";
 
 const GOLDEN_CANONICAL_BYTES = 1352;
 
@@ -38,6 +43,53 @@ describe("the golden vector", () => {
       result.problems.some((problem) => problem.includes("does not match the canonical form")),
       result.problems.join("\n"),
     );
+  });
+
+  // spec: S3.11
+  it("signs and verifies a vector that carries both ring and minHost in field order", () => {
+    const manifest = {
+      format: "suite.pack",
+      id: "rings",
+      name: "Rings",
+      version: "1.0.0",
+      ring: "preview",
+      entry: "index.html",
+      contractVersion: 2,
+      minHost: 2,
+      capabilities: ["documents"],
+      files: [
+        {
+          path: "index.html",
+          sha256: "a".repeat(64),
+          bytes: 12,
+        },
+      ],
+    };
+
+    const canonical = canonicalManifestBytes(manifest);
+    const fields = Object.keys(JSON.parse(canonical.toString("utf8")));
+    assert.equal(fields[fields.indexOf("version") + 1], "ring");
+    assert.equal(fields[fields.indexOf("contractVersion") + 1], "minHost");
+    assert.equal(fields.at(-1), "files");
+
+    // A fresh ephemeral key makes this a real vector: the independent verifier
+    // rebuilds the same bytes from the manifest and checks the signature.
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    const signature = sign(null, canonical, privateKey);
+    const publicKeyBase64 = Buffer.from(publicKey.export({ format: "jwk" }).x, "base64url").toString(
+      "base64",
+    );
+    const vector = {
+      manifest: { ...manifest, signature: signature.toString("base64") },
+      manifestText: JSON.stringify(manifest),
+      canonical,
+      signature: signature.toString("base64"),
+      publicKey: publicKeyBase64,
+    };
+
+    const result = verifyGoldenVector(vector);
+    assert.deepEqual(result.problems, []);
+    assert.equal(result.ok, true);
   });
 
   // spec: S3.4

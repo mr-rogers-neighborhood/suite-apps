@@ -1,6 +1,7 @@
 import { type PackManifest, sha256Hex } from "@suite/go";
 import {
   generatePackKeyPair,
+  PACK_INDEX_VERSION,
   type PackIndexCore,
   type PackIndexEntry,
   packIndexDigest,
@@ -31,17 +32,24 @@ const DAY = 24 * HOUR;
 const operator = await generatePackKeyPair();
 const otherOperator = await generatePackKeyPair();
 
+const MANIFEST_SIGNATURE = `${"A".repeat(86)}==`;
+
 function entry(overrides: Partial<PackIndexEntry> = {}): PackIndexEntry {
   return {
     id: "probe",
     name: "Probe",
     publisher: "suite",
     version: "1.0.0",
+    ring: "stable",
+    contractVersion: 1,
     description: "A small app",
     capabilities: ["documents"],
-    size: 120,
-    sha256: "a".repeat(64),
-    url: "https://flatpak.suite.run/packs/probe-1.0.0.suitepack",
+    archive: {
+      url: "https://flatpak.suite.run/packs/probe-1.0.0.suitepack",
+      size: 120,
+      sha256: "a".repeat(64),
+    },
+    signature: MANIFEST_SIGNATURE,
     ...overrides,
   };
 }
@@ -52,7 +60,7 @@ function core(
 ): PackIndexCore {
   return {
     format: "suite.catalogue",
-    version: 1,
+    version: PACK_INDEX_VERSION,
     sequence: 1,
     generatedAt: new Date(NOW.getTime() - HOUR).toISOString(),
     expires: new Date(NOW.getTime() + 30 * DAY).toISOString(),
@@ -203,7 +211,7 @@ describe("loading a catalogue index", () => {
   it("lists the newest version of each pack with the installed action", async () => {
     const text = signedText([
       entry({ version: "1.0.0" }),
-      entry({ version: "2.0.0", size: 240 }),
+      entry({ version: "2.0.0", archive: { ...entry().archive, size: 240 } }),
       entry({ id: "other", name: "Other", version: "1.0.0" }),
       entry({ id: "fresh", name: "Fresh", version: "1.0.0" }),
     ]);
@@ -394,9 +402,11 @@ describe("installing from the catalogue", () => {
   function available(installedVersion: string | null): PackIndexEntry {
     return entry({
       version: installedVersion === null ? "1.0.0" : "2.0.0",
-      size: archive.byteLength,
-      sha256: digest,
-      url: "https://flatpak.suite.run/packs/probe.suitepack",
+      archive: {
+        url: "https://flatpak.suite.run/packs/probe.suitepack",
+        size: archive.byteLength,
+        sha256: digest,
+      },
     });
   }
 

@@ -3,8 +3,10 @@ import {
   bytesToBase64,
   checkNetworkPolicy,
   comparePackVersions,
+  DEFAULT_PACK_RING,
   type PackCapability,
   type PackManifest,
+  type PackRing,
   packAllows,
   packDocumentSealsNetwork,
   packFitsHost,
@@ -371,6 +373,11 @@ export function createPackStore(
     readonly publicKey?: string;
     readonly contractVersion?: number;
     readonly hostVersion?: number;
+    /**
+     * The rings this host offers (S12.10). Defaults to `stable` alone; `preview`
+     * is added only by the person's explicit host setting.
+     */
+    readonly rings?: readonly PackRing[];
     /** The pack capabilities this host serves. Production is `GO_HOST_CAPABILITIES`. */
     readonly capabilities?: readonly PackCapability[];
     /** Test seams for the archive caps. Production uses `MAX_ARCHIVE_BYTES` and the reader defaults. */
@@ -382,6 +389,7 @@ export function createPackStore(
   const host = {
     contractVersion: options.contractVersion ?? HOST_CONTRACT_VERSION,
     hostVersion: options.hostVersion ?? HOST_VERSION,
+    rings: options.rings ?? [DEFAULT_PACK_RING],
   };
   const platformHost = { ...GO_HOST, capabilities: servedCapabilities };
   const archiveLimits: PackArchiveLimits = {
@@ -449,6 +457,11 @@ export function createPackStore(
     if (capability !== null) {
       return refuse("capability", `${id} ${version}: ${capability}`);
     }
+
+    // S3.12 applies to what is on disk as well as to what arrives: a host setting
+    // that stops offering a ring must not keep launching that pack.
+    const fit = packFitsHost(manifest, host);
+    if (!fit.ok) return refuse("host", `${id} ${version}: ${fit.message}`);
 
     // S4.8: a pack that does not name this phone's kind, or needs a capability it
     // lacks, is refused when it is read rather than when its first call fails.
