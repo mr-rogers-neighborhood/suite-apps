@@ -4,7 +4,6 @@ import { mkdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 const EXCLUDES = [
-  "apps/start/**",
   ".dev/**",
   ".artifacts/**",
   ".flatpak-builder/**",

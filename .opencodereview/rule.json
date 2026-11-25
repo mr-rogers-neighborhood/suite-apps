@@ -1,6 +1,5 @@
 {
   "exclude": [
-    "apps/start/**",
     ".dev/**",
     ".artifacts/**",
     ".flatpak-builder/**",

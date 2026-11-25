@@ -54,7 +54,7 @@ Use only when `ocr llm test` or the native review fails on quota, credit, auth, 
 spends this agent's model and tokens instead of DeepRelay's.
 
 ```sh
-EXCLUDES='apps/start/**,.dev/**,.artifacts/**,node_modules/**,dist/**,.opencode/**,.agents/**,.commandcode/**'
+EXCLUDES='.dev/**,.artifacts/**,node_modules/**,dist/**,.opencode/**,.agents/**,.commandcode/**'
 ocr delegate preview --format json --exclude "$EXCLUDES" --from main
 ocr delegate rule --from main --format json <path> [<path> ...]
 git --no-pager diff --no-ext-diff --no-textconv --no-color <merge_base>..<to> -- "<path>"

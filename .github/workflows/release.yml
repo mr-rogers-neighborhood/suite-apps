@@ -138,12 +138,14 @@ jobs:
     # A schedule cannot wait for a reviewer. `preview` and `stable` can, and do.
     # Approval waits for the advisory review so the report is available first;
     # the boundary workflow's `advisory` default keeps a provider failure from
-    # blocking it, and `always()` keeps a skipped review from stranding the job.
+    # blocking it, and `!cancelled()` keeps a skipped review from stranding the
+    # job.
     needs: review
-    # `always()` is load-bearing: `review` is skipped for a rehearsal
+    # `!cancelled()` is load-bearing: `review` is skipped for a rehearsal
     # (`publish: false`), and a skipped dependency would otherwise skip
-    # approval and strand the publish job. The review is advisory either way.
-    if: always() && inputs.channel != 'nightly'
+    # approval and strand the publish job. It is not `always()`: a cancelled run
+    # must not queue an approval deployment for an operator who already stopped.
+    if: (!cancelled()) && inputs.channel != 'nightly'
     runs-on: ubuntu-latest
     environment: approval
     steps:
@@ -153,7 +155,10 @@ jobs:
   publish:
     name: publish-${{ inputs.channel }}
     needs: approval
-    if: always() && (inputs.channel == 'nightly' || needs.approval.result == 'success')
+    # `!cancelled()`, not `always()`: this job holds the signing keys, so a
+    # cancelled run must not start it after the operator stopped. A nightly has
+    # no approval job, so the channel check is what admits it.
+    if: (!cancelled()) && (inputs.channel == 'nightly' || needs.approval.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: release
