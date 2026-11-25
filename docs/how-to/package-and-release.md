@@ -103,9 +103,12 @@ gets no new pre-release. `--session` builds one locally for the factory profile,
 never published. Budget has no pre-release lane at all: its Flatpak lane is retired and its signed
 pack carries the version instead.
 
-Slop is the exception that does not wait for a person: every code push to `main` publishes it. The
-`slop` workflow builds the host on `--channel slop`, publishes `run.suite.slop.desk//slop`, builds
-the Suite Go slop APK and writes the page. It runs no fresh gate, e2e, clean install, SBOM,
+Slop is the exception that does not wait for a person: every code push to `main` that changes a host
+publishes it. The `slop` workflow reads the push diff and builds only the host whose sources changed —
+the Desk host on `--channel slop` (`run.suite.slop.desk//slop`), and/or the Suite Go slop APK — then
+writes the page. A docs or workflow-only push publishes nothing, and a shared-package or packaging
+change rebuilds both hosts.
+It runs no fresh gate, e2e, clean install, SBOM,
 attestation or pack index; the page says **merge-queue-proven, not full-gate-proven**. Its tag is
 `suite-slop-<YYYY.MM.DD>-<sha7>` and the APK is `suite-go-slop-<version>-<sha7>.apk`. The seven
 newest slop pages are kept, a second run for the same commit is a no-op, and stable refs and Latest

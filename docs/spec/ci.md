@@ -14,7 +14,8 @@ and the Go debug APK, attests each with provenance and an SPDX SBOM, and keeps t
 Once the repository variable `NIGHTLY_PUBLISH` is `true` and the `release` environment holds its
 keys, the nightly instead runs `.github/workflows/release.yml` for the nightly channel: the
 release-signed APK and the signed Flatpak are published automatically (D3.2).
-`.github/workflows/slop.yml` publishes the slop channel on every code push to `main`; it is a
+`.github/workflows/slop.yml` publishes the slop channel on every code push to `main` that changes a
+host; only the changed host is rebuilt, and a shared change rebuilds both. It is a
 publication, not a check, and it runs no gate, e2e, clean install, SBOM, attestation or pack index
 (delivery D3.1). The `main` ruleset requires the `ci` check and a merge queue (HEADGREEN grouping,
 merge commits), and `ci.yml` triggers on `merge_group`. The VM gate is retired; GitHub Actions is
@@ -88,7 +89,7 @@ trigger is required. If the plan or API cannot enable it, the pull-request rule 
 | Job | Runs on | What it does | Cache |
 | --- | --- | --- | --- |
 | `detect` | ubuntu-latest | Diff base…head, map files to projects, write the job matrix | none |
-| `fast` | ubuntu-latest | Lint, typecheck, unit, scripts/spec/docs checks for affected | pnpm store |
+| `fast` | ubuntu-latest | Lint, typecheck, unit, scripts/spec/docs checks for affected; actionlint when the diff touches a workflow | pnpm store |
 | `build` | ubuntu-latest | Build affected projects and packages; no packaging | pnpm store, build cache |
 | `main-gate` | ubuntu-latest | Prelude only: `libraries`, `scripts`, Budget pack; a dispatch runs the full `--fresh` tree | pnpm store |
 | `nightly-gate` | ubuntu-latest | Full `node scripts/gate.mjs --fresh` | pnpm store, Playwright |

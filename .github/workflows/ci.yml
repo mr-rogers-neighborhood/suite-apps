@@ -5,6 +5,8 @@
 #
 # The affected map is scripts/affected.mjs, which reads the workspace graph. A
 # path it does not understand selects every row; it never silently skips one.
+# actionlint lives in `fast` behind the same map (#422): a workflow change runs
+# it, every other pull request and merge does not pay for a Go install.
 name: ci
 
 on:
@@ -34,6 +36,7 @@ jobs:
       proof_any: ${{ steps.affected.outputs.proof_any }}
       e2e: ${{ steps.affected.outputs.e2e }}
       docs_only: ${{ steps.affected.outputs.docs_only }}
+      workflows: ${{ steps.affected.outputs.workflows }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,6 +59,7 @@ jobs:
 
   fast:
     name: fast
+    needs: detect
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -72,6 +76,22 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Go
+        # Only a workflow diff needs actionlint; installing Go on every pull
+        # request was the separate `workflows` job (#422).
+        if: needs.detect.outputs.workflows == 'true'
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: "1.27.x"
+          cache: false
+      - name: actionlint
+        if: needs.detect.outputs.workflows == 'true'
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          # SC2016 fires on the intentional single-quoted `node -e` scripts
+          # (release.yml's OIDC claims, weekly.yml's cache filter); the `$` is
+          # for node, not the shell.
+          "$(go env GOPATH)/bin/actionlint" -ignore 'SC2016' .github/workflows/*.yml
       - name: Spec check (when the spec is present)
         if: hashFiles('scripts/spec.test.mjs') != ''
         run: node --test scripts/spec.test.mjs
@@ -85,6 +105,7 @@ jobs:
         run: >-
           node --test
           scripts/affected.test.mjs
+          scripts/slop-targets.test.mjs
           scripts/proof-of-changes.test.mjs
           scripts/release-manifest.test.mjs
           scripts/channel.test.mjs
@@ -93,28 +114,6 @@ jobs:
           scripts/release-status.test.mjs
           scripts/delivery-signals.test.mjs
           scripts/flatpak-remote.test.mjs
-
-  workflows:
-    name: workflows
-    # Cheap enough to run on every change, like the docs checks: a broken
-    # workflow is a red pull request, not a surprise after merge (C4.3).
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Go
-        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
-        with:
-          go-version: "1.27.x"
-          cache: false
-      - name: actionlint
-        run: |
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-          # SC2016 fires on the intentional single-quoted `node -e` scripts
-          # (release.yml's OIDC claims, weekly.yml's cache filter); the `$` is
-          # for node, not the shell.
-          "$(go env GOPATH)/bin/actionlint" -ignore 'SC2016' .github/workflows/*.yml
 
   dependency-review:
     name: dependency-review
@@ -283,14 +282,13 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [detect, fast, workflows, apps, full-gate]
+    needs: [detect, fast, apps, full-gate]
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate
         run: |
           test "${{ needs.detect.result }}" = "success"
           test "${{ needs.fast.result }}" = "success"
-          test "${{ needs.workflows.result }}" = "success"
           if [ "${{ needs.apps.result }}" != "success" ] && [ "${{ needs.apps.result }}" != "skipped" ]; then
             echo "apps: ${{ needs.apps.result }}"
             exit 1

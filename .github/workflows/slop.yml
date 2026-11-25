@@ -1,5 +1,5 @@
 # Slop publication: the build being worked on, published from every push to
-# `main`.
+# `main` that changes a host.
 #
 # Slop is the session channel (#386). The merge queue already proved the change,
 # so this workflow does not run the fresh gate, e2e, a clean install, an SBOM or
@@ -7,6 +7,12 @@
 # keeps that honest. It publishes only the slop identities: the Desk Flatpak on
 # `run.suite.slop.desk//slop` and the Suite Go APK named for the commit. It
 # never touches the stable refs, GitHub's Latest release or the pack index.
+#
+# The `targets` job reads the push diff and the workspace graph (#422): a Desk
+# source change builds only the Desk Flatpak, a Go change only the APK, and a
+# shared package reaches both through the host's declared dependencies. A
+# scripts, packaging, lockfile or unrecognised path rebuilds both. A docs or
+# workflow-only push publishes nothing.
 #
 # A burst of pushes builds only the tip. A second run for the same commit is a
 # no-op: the tag, the assets and the page carry the commit, so the cheap check
@@ -51,8 +57,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The cheap question, before any key is imported or tooling installed. This
+  # job is the only cost of a push that changes no host.
+  targets:
+    name: slop-targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      desk: ${{ steps.targets.outputs.desk }}
+      go: ${{ steps.targets.outputs.go }}
+      any: ${{ steps.targets.outputs.any }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # A first push and a dispatch have no parent to diff against; the script
+      # treats an empty base as "build both" rather than guessing a scope.
+      - name: Resolve the push base
+        run: |
+          set -euo pipefail
+          echo "SUITE_BASE=${{ github.event.before }}" >> "$GITHUB_ENV"
+      - name: Host targets
+        id: targets
+        run: node scripts/slop-targets.mjs --base "${SUITE_BASE}"
+
   publish:
     name: publish-slop
+    needs: targets
+    if: needs.targets.outputs.any == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # The keys live here. Slop has no `approval` job: the push is the decision,
@@ -85,6 +118,7 @@ jobs:
           cache: pnpm
 
       - name: Java
+        if: needs.targets.outputs.go == 'true'
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
@@ -117,10 +151,13 @@ jobs:
           printf '%s\n' "${sentence}" >> "${GITHUB_STEP_SUMMARY}"
           echo "published=true" >> "${GITHUB_OUTPUT}"
 
-      # Fail before a build when the S3 publication variables are missing. The
-      # publisher refuses too, but a named step says which variable is absent.
+      # Fail before a build when the S3 publication variables are missing. Only
+      # the Flatpak remote lives in S3; an APK-only run does not need them.
       - name: Check the S3 publishing configuration
-        if: env.SLOP_PUBLISH == 'true' && steps.check.outputs.published != 'true'
+        if: >-
+          env.SLOP_PUBLISH == 'true' &&
+          needs.targets.outputs.desk == 'true' &&
+          steps.check.outputs.published != 'true'
         env:
           ROLE_ARN: ${{ vars.AWS_RELEASE_ROLE_ARN }}
           BUCKET: ${{ vars.SUITE_FLATPAK_S3_BUCKET }}
@@ -140,6 +177,7 @@ jobs:
       - name: AWS credentials (OIDC)
         if: >-
           env.SLOP_PUBLISH == 'true' &&
+          needs.targets.outputs.desk == 'true' &&
           steps.check.outputs.published != 'true' &&
           vars.AWS_RELEASE_ROLE_ARN != ''
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -190,11 +228,15 @@ jobs:
           } >> "${GITHUB_ENV}"
 
       - name: Flatpak tooling
-        if: steps.check.outputs.published != 'true'
+        if: >-
+          needs.targets.outputs.desk == 'true' &&
+          steps.check.outputs.published != 'true'
         run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder ostree
 
       - name: Flatpak runtimes
-        if: steps.check.outputs.published != 'true'
+        if: >-
+          needs.targets.outputs.desk == 'true' &&
+          steps.check.outputs.published != 'true'
         run: |
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y --noninteractive flathub \
@@ -205,13 +247,18 @@ jobs:
       # The build being worked on, on its own id and branch. No gate runs here:
       # the merge queue already proved the change, and the page says so.
       - name: Build the Desk Flatpak (slop)
-        if: steps.check.outputs.published != 'true'
+        if: >-
+          needs.targets.outputs.desk == 'true' &&
+          steps.check.outputs.published != 'true'
         env:
           SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
         run: node scripts/flatpak.mjs --app desk --channel slop --no-install
 
       - name: Publish the signed Flatpak remote (slop)
-        if: env.SLOP_PUBLISH == 'true' && steps.check.outputs.published != 'true'
+        if: >-
+          env.SLOP_PUBLISH == 'true' &&
+          needs.targets.outputs.desk == 'true' &&
+          steps.check.outputs.published != 'true'
         env:
           SUITE_STORE_KEY_ID: ${{ secrets.SUITE_STORE_KEY_ID }}
           SUITE_FLATPAK_S3_BUCKET: ${{ vars.SUITE_FLATPAK_S3_BUCKET }}
@@ -221,7 +268,9 @@ jobs:
           --channel slop --merge-queue-proven --publish
 
       - name: Build the Suite Go slop APK
-        if: steps.check.outputs.published != 'true'
+        if: >-
+          needs.targets.outputs.go == 'true' &&
+          steps.check.outputs.published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           SUITE_GO_KEYSTORE_PASSWORD: ${{ secrets.SUITE_GO_KEYSTORE_PASSWORD }}
@@ -239,7 +288,10 @@ jobs:
           --revision "${REVISION}"
 
       - name: Attach the APK to the slop draft
-        if: env.SLOP_PUBLISH == 'true' && steps.check.outputs.published != 'true'
+        if: >-
+          env.SLOP_PUBLISH == 'true' &&
+          needs.targets.outputs.go == 'true' &&
+          steps.check.outputs.published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           SUITE_GO_KEYSTORE_PASSWORD: ${{ secrets.SUITE_GO_KEYSTORE_PASSWORD }}

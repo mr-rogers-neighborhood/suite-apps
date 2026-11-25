@@ -33,7 +33,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 /** Paths that are documentation wherever they live. */
 const DOC_SUFFIXES = [".md", ".mdx"];
 
-function normalizePath(path) {
+export function normalizePath(path) {
   return path.replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
@@ -193,6 +193,9 @@ export function computeAffected({ paths, projects, rows }) {
   const changed = paths.map(normalizePath).filter((path) => path.length > 0);
   const docsOnly = changed.length > 0 && changed.every(isDocPath);
   const spec = changed.some(isSpecPath);
+  // The actionlint check is a workflow-file check: it runs in `fast` only when
+  // this is true, instead of a separate job on every pull request and merge.
+  const workflows = changed.some((path) => path.startsWith(".github/workflows/"));
 
   const direct = new Set();
   let global = false;
@@ -211,7 +214,7 @@ export function computeAffected({ paths, projects, rows }) {
   const selected = global ? rows : rows.filter((row) => closure.has(row.package));
   const proofRows = selected.filter((row) => row.desktop === true);
 
-  return { rows: selected, proofRows, docsOnly, spec, global, e2e, changed: changed.length };
+  return { rows: selected, proofRows, docsOnly, spec, workflows, global, e2e, changed: changed.length };
 }
 
 function changedPaths(root, base) {
@@ -250,6 +253,7 @@ function main() {
       `e2e=${result.e2e}`,
       `docs_only=${result.docsOnly}`,
       `spec=${result.spec}`,
+      `workflows=${result.workflows}`,
     ];
     appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
   }
