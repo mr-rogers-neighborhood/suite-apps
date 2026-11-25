@@ -14,12 +14,14 @@
  * - `theme` — the schema. Both modes are required, because a theme that forgets dark is a
  *   bug that only appears after sunset.
  * - `presets` — the themes that ship. Suite first, so the default changes nothing.
+ * - `scale` — type, density, radius, elevation and motion as custom properties, so a host can
+ *   publish one record and a pack's utilities follow it.
  * - `apply` — the one function an app calls.
  */
 export { applyTheme, colorSchemeFor, cssVariableFor, cssVariables, type Paintable, } from "./apply.js";
 export { CONTRAST_LARGE, CONTRAST_TEXT, CONTRAST_UI, contrastRatio, INK_CANDIDATES, type InkChoice, isMeasurable, luminance, pickInk, } from "./contrast.js";
 export { DEFAULT_THEME_ID, defaultTheme, PRESETS, presetById, resolveThemeId, THEME_ID_ALIASES, } from "./presets/index.js";
 export { CHART_ROLES, type ChartRole, HUE_ROLES, type HueRole, isThemeRole, MARK_ROLES, type MarkRole, PAINT_INK, PAINT_ROLES, type PaintRole, REQUIRED_ROLES, THEME_ROLES, type ThemeRole, type ThemeValues, } from "./roles.js";
-export { applyScale, DEFAULT_DENSITY, DENSITIES, DENSITY_SCALE, type Density, type DensityMetrics, densityVariables, TYPE_ROLES, TYPE_SCALE, type TypeRole, type TypeStep, typeVariableFor, typeVariables, } from "./scale.js";
+export { applyScale, DEFAULT_DENSITY, DENSITIES, DENSITY_SCALE, type Density, type DensityMetrics, densityVariables, DURATIONS, DURATION_SCALE, type Duration, EASE_STANDARD, motionVariables, RADIUS_ROLES, RADIUS_SCALE, type RadiusRole, radiusVariables, scaleVariables, SHADOW_ROLES, SHADOW_SCALE, type ShadowRole, shadowVariables, TYPE_ROLES, TYPE_SCALE, type TypeRole, type TypeStep, typeVariableFor, typeVariables, } from "./scale.js";
 export { isSuiteTheme, isThemeMode, ROLE_ORDER, SUITE_THEME_FORMAT, type SuiteTheme, THEME_CONTRACT_VERSION, THEME_MODES, type ThemeMode, valuesFor, } from "./theme.js";
 //# sourceMappingURL=index.d.ts.map

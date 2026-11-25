@@ -14,6 +14,8 @@
  * - `theme` — the schema. Both modes are required, because a theme that forgets dark is a
  *   bug that only appears after sunset.
  * - `presets` — the themes that ship. Suite first, so the default changes nothing.
+ * - `scale` — type, density, radius, elevation and motion as custom properties, so a host can
+ *   publish one record and a pack's utilities follow it.
  * - `apply` — the one function an app calls.
  */
 export {
@@ -66,6 +68,20 @@ export {
   type Density,
   type DensityMetrics,
   densityVariables,
+  DURATIONS,
+  DURATION_SCALE,
+  type Duration,
+  EASE_STANDARD,
+  motionVariables,
+  RADIUS_ROLES,
+  RADIUS_SCALE,
+  type RadiusRole,
+  radiusVariables,
+  scaleVariables,
+  SHADOW_ROLES,
+  SHADOW_SCALE,
+  type ShadowRole,
+  shadowVariables,
   TYPE_ROLES,
   TYPE_SCALE,
   type TypeRole,
