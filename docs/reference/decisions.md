@@ -283,6 +283,35 @@ frozen apps remain separate Flatpaks until each passes.
 - Go's format split is [#202](https://github.com/mrrnbhd/suite-apps/issues/202); that
   issue owns the detail. The desktop pack format does not converge here.
 
+### Retiring a frozen shell
+
+Recorded 2026-11-25. Owner-approved.
+
+A frozen app owes its last **published artifact**, not its source forever. The artifact stays
+installable from the signed remote, and the shell may retire once the app's pack passes the
+[shipping bar](#shipping-packs): a signed pack with its documents and consented export/import, proven
+in a window and by a release-archive install
+([#358](https://github.com/mrrnbhd/suite-apps/issues/358)).
+
+- **Retirement is the end of a successful port, not a way to skip one.** The pack owns the renderer,
+  document layer and generator; a shell that still owns a fact the pack needs is not ready.
+- **The last artifact survives.** The signed remote keeps the last published ref, the same rule as the
+  retired Sync app (#315). Nothing is unpublished, and a person who installed the Flatpak keeps it.
+- **What moves before the directory goes.** A retirement change is one checklist:
+  1. Move the shell's docs, e2e and proof specs, and its `CHANGELOG.md` into the pack.
+  2. Update the row in `scripts/lib/pipeline.mjs`.
+  3. Update `scripts/proof-of-changes.mjs`.
+  4. Update `scripts/release-status.mjs`.
+  5. Update the `docs-check.mjs` ignores.
+  6. Update the `pnpm-workspace.yaml` globs.
+  7. Update the Flatpak manifests in `packaging/flatpak/`.
+  8. Update [Status](status.md).
+- **The order is Budget → Help → Planner → Canvas.** Budget is the first witness and already ships as
+  a pack; Help has the smallest shell; Planner follows the pack work that moved its renderer and core;
+  Canvas is last because its shell, e2e and private packages are the largest surface.
+- **A shell is retired, not erased from history.** `legacy/canvas` keeps Canvas's pre-import history;
+  the retirement removes a build lane and a stale tree, not the record of what shipped.
+
 ## Retiring Start (#314)
 
 Start was removed once the host installed a pack from the catalogue (#223, #331) and Home was the
@@ -336,30 +365,36 @@ The last published ref is the last published ref. A person who already installed
 have and keeps updating from whatever `origin` it has; this change is about what the pipeline ships
 next, not about unpublishing or removing a ref from the store.
 
-### The relay becomes a host capability, and the shape is owed
+### The relay becomes a supervised child of the host
+
+Recorded 2026-11-25. Owner-approved.
 
 Sync is a capability of the host, not an app a person installs. The host's tray absorbs the states and
 controls the separate app owned: whether sync is on, the relay address, code and fingerprint, and
-starting or stopping the relay. Two shapes are still on the table, and this record does not pick one:
+starting or stopping the relay. The chosen shape is a **supervised child** the host starts and
+watches, not a module inside the host process.
 
-- **A module inside the host process.** The host imports the relay and runs it in its own main process.
-  It costs the least: one process to start, one lifecycle, one place to read state, and no IPC for
-  address, code and fingerprint. It also gives the host and the relay one crash and one event loop, so
-  a relay bug can take the host down and a host restart is a relay restart.
-- **A supervised child the host starts and watches.** The host spawns the relay, watches it, restarts
-  it and reads its status. The relay keeps its own process, memory and exit code, so a crash is
-  contained and its file access can stay narrower than the host's. It costs a supervisor: spawn and
-  restart policy, a status IPC, readiness and shutdown ordering, and a second story per platform (a
-  Flatpak sandbox on desktop, background limits on mobile).
-
-**What both owe is the same guarantee: the relay never reads a document.** The relay's code path holds
-only the sealed-frame store and the signed membership records it already needs; it is never handed a
-document handle, a document path or a decrypted frame. In the module shape the boundary is an audited
-code path inside one process, enforced by review and tests rather than by an OS boundary. In the
-supervised-child shape the boundary can also be an OS one, because the child starts without a
-documents grant and with only its own store. The shape therefore decides whether the guarantee is a
-code convention, an operating-system boundary, or both. **The decision is owed by the host seam that
-implements it; this change records the two options and chooses neither.**
+- **The host owns the lifecycle.** It spawns the relay with its own store, watches its exit, applies a
+  bounded restart policy, and stops it before the host exits. A crash is contained in the child; a
+  relay restart is not a host restart.
+- **Status crosses one IPC surface.** The host reads readiness, address, code, fingerprint,
+  reachability and the last error over a status channel; it writes start, stop and reach changes back.
+  The relay owns no UI, and the host parses no frame.
+- **Ordering is explicit.** The host waits for readiness before it reports sync as available or opens
+  a sync call. On shutdown it stops new work, flushes the relay's store, waits for the child to exit,
+  then exits itself; a child that does not answer is killed after the bound.
+- **The boundary is narrower than a module would give.** The child starts without a `documents` grant
+  and with only its own store, so "the relay never reads a document" becomes an operating-system
+  boundary where the platform allows one — the Flatpak sandbox on desktop, and the mobile host's
+  process model on Android and iOS. Where the platform cannot enforce it, the same rule stays a
+  code-path and test boundary.
+- **Frames stay opaque.** The host may open the pinned socket and forward bytes; the relay persists
+  sealed frames and signed membership records and never receives a document handle, a path or a
+  plaintext frame. A module inside the host was rejected because it gives the relay the host's crash
+  domain and lets a relay bug take the host down.
+- **State is the host's to show.** The host stores the reach choice and owns the tray surface; the
+  relay reads the choice it is started with and reports status back. The relay keeps its existing
+  store shape.
 
 ### Android and iOS
 
@@ -405,9 +440,11 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
   slop 1, nightly 2, preview 3). It increases within a channel as the base does. Each package id grows
   on its own sequence: promotion installs a second app rather than updating a shared pre-release id,
   and a lower code on one id is refused rather than made legal by an uninstall.
-- Canvas, Planner, Budget and Help are frozen legacy apps until they become packs: their code and last
-  artifact stay, and no new pre-release channel is published for them. Sync is retired rather than
-  frozen: it is not on a channel and it is not a shipped artifact at all (#315).
+- Canvas, Planner, Budget and Help are frozen legacy apps until they become packs: their last published
+  artifact stays installable, and no new pre-release channel is published for them. Their source stays
+  until the pack passes the [shipping bar](#shipping-packs) and the
+  [retirement checklist](#retiring-a-frozen-shell) runs; then the shell may retire. Sync is retired
+  rather than frozen: it is not on a channel and it is not a shipped artifact at all (#315).
 - `scripts/flatpak.mjs` builds the local deployment and signs the repository summary with the store
   key; `scripts/flatpak-remote.mjs --publish` publishes the signed repository to the public
   `https://flatpak.suite.run/` store, or to `suite-dev` with `--target lan`. The last published
@@ -420,8 +457,10 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
   relay uses the same store shape without the app's tray.
 - The relay's reach is a stored choice, not a bind the build ships: `loopback` by default, `tailnet`
   when Tailscale is running, and `network` only after a confirmation — the last app's form of the
-  CLI's `--trust-all-remote`. `SUITE_SYNC_BIND` overrides it for a test or a host unit. The host seam
-  that owns the relay decides how that choice is stored and shown next; this change does not.
+  CLI's `--trust-all-remote`. `SUITE_SYNC_BIND` overrides it for a test or a host unit. The host stores
+  and shows the choice and starts the supervised child with it;
+  [The relay becomes a supervised child of the host](#the-relay-becomes-a-supervised-child-of-the-host)
+  records the shape.
 - A version lives in one place and the rolling release carries it; per-app tags are retired.
   [Version ownership](../how-to/package-and-release.md#version-ownership) states which file owns it.
 - The Flatpak store key signs the OSTree summary. Flatpak verifies the summary and every object's
@@ -575,6 +614,74 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
   by an app; synced or app-owned layouts in this slice; host-held app data or a host-side document
   cache; a descriptor that needs the app running to render; a widget bundle as a second packaging
   format; a second descriptor for Go.
+
+## Command Surface
+
+### The Command Surface and Composite Widget contract (#224)
+
+Recorded 2026-11-25. Draft: no code ships with this record. The points marked **open** need an owner
+call before the first provider lands; they are listed again at the end.
+
+The [Command Surface epic](https://github.com/mrrnbhd/suite-apps/issues/217) puts capture, commands and
+search on one host-owned surface, and the Composite Widget (Capture Card) reuses the same providers in
+a compact card. This record fixes the contract the host, pack and UI issues
+([#225](https://github.com/mrrnbhd/suite-apps/issues/225),
+[#226](https://github.com/mrrnbhd/suite-apps/issues/226),
+[#227](https://github.com/mrrnbhd/suite-apps/issues/227)) implement against, so none of them invents a
+second grammar.
+
+- **One surface, three modes.** Capture, Command and Search share one input. The active app is a mode,
+  not an `@app` token. Universal tokens are `#tag`, `@mention` and `/command`; each token's meaning is
+  app-scoped, and a pack may declare extra namespaced tokens. Parsing is deterministic in v1: no
+  model and no network.
+- **The declaration.** A provider declares one entry per command:
+  - `id` — stable pack-local command id, dotted lower kebab-case (`planner.quick-task`), the shape
+    `contributions.commands[].id` already uses.
+  - `title` — one line, 1–80 characters, the primary label.
+  - `subtitle` — optional second line, 1–120 characters, normally the scope or the pack name.
+  - `keywords` — optional up to 12 lower-case strings; the deterministic matcher uses them and never
+    replaces the title.
+  - `icon` — optional pack-relative path listed in `files`; the host draws it in a bounded slot and
+    refuses a path outside the pack (S3.6).
+  - `scope` — `global`, `documents`, or a provider-defined scope id; what the command acts on.
+  - `provider` — the pack-side entry or method the host calls; the host never imports it.
+- **Where it lives.** The command half extends the signed `contributions.commands` entry, which today
+  carries `{id, title, category?, keybinding?}`, so the manifest stays the one declaration. Search,
+  scope rows and capture need their own entry because they answer calls rather than describe a menu
+  item. **Open:** one `contributions.providers` block (`{kind, entry, scopes}`) or three sibling lists
+  (`search`, `scopes`, `capture`). This record assumes one block; the manifest schema change waits on
+  that call.
+- **Discovery is installed packs plus the host.** The host lists its own commands and those of
+  installed packs whose manifest parses and whose `commands` capability is granted (S4.6). A provider
+  entry the manifest does not list is refused, not called. An app or scope this build cannot resolve
+  stays visible as a named placeholder; it is never hidden.
+- **Ranking is deterministic and local.** Exact title match, then prefix, then keyword match, then
+  recency within the current host session, then title order. There is no popularity, telemetry or
+  cross-app signal (S12.4). **Open:** whether recency is stored at all. If it is, it is local,
+  clearable, and never leaves the host.
+- **Invocation.** The host sends `{commandId, scope, arguments}` over the scoped pack command channel;
+  the pack validates the arguments and answers with `{ok, message, open?}`. The host parses `open` as
+  a `suite://` link before opening it. No document bytes cross the channel.
+- **Search.** A search provider returns opaque result ids plus display metadata for a query and a
+  scope; the host aggregates and opens a result through a deep link (S5.2). The host never indexes
+  document content (S11.3).
+- **List and capture.** The scope provider answers `scopes()`, `items(scopeId, limit)`,
+  `capture(scopeId, values)` and `open(scopeId, itemId?)`. The host caches only display rows with an
+  age and offers "Open app to refresh", because a closed pack cannot answer; no document bytes and no
+  content cache.
+- **The Composite Widget is a widget, not a nested Screen.** It switches apps and scopes, lists the
+  active scope, captures with "+", and stores its app/scope selection in its widget settings. It
+  shares the Command Surface's provider and deterministic shorthand, and unknown apps or scopes render
+  as named placeholders.
+- **Go depends on the same contract.** Go's composite quick capture and the Android home-screen widget
+  ([#186](https://github.com/mrrnbhd/suite-apps/issues/186),
+  [#227](https://github.com/mrrnbhd/suite-apps/issues/227)) open the same scope provider; the desktop
+  tray opens the Command Surface. Invocation differs by host; the contract does not.
+- **What this does not decide.** The provider entry syntax, the manifest block shape, whether ranking
+  stores local recency, and whether the command channel is the same channel as the document and file
+  bridge or a sibling with its own scopes. The last is **open** and belongs with
+  [#226](https://github.com/mrrnbhd/suite-apps/issues/226) once a second provider exists. No markup
+  grammar, no model and no host-side app data are introduced.
 
 ## Declared, not executed
 

@@ -57,13 +57,15 @@ locales, export entry and add-ons in the manifest. A field a host does not imple
 not a silent skip. [manifest.schema.json](manifest.schema.json) is the field list and the closed
 capability vocabulary; a checker reads it rather than repeating it.
 
-**R2.5** Legacy Canvas, Planner and Help stay frozen at their last Flatpak artifact until each
-becomes a pack. Budget is frozen and ships as `packs/budget`: its last Flatpak artifact stays
-published, its Flatpak lane is retired, and its app source, docs and last artifact stay under
-`legacy/budget/`. Planner's renderer and document layer are already pack-owned:
-`packs/planner/pack/src/renderer` is the one renderer tree and `packages/planner-core` is the shared
-package, while `legacy/planner` keeps the frozen Electron shell. A frozen app is not deleted; its
-code, docs and last artifact stay under `legacy/<app>/` unless a clause moves a piece.
+**R2.5** All four apps are pack-owned, and their last Flatpak artifacts stay published. Canvas,
+Planner and Help stay frozen at the artifact they shipped; Budget ships as `packs/budget` with its
+Flatpak lane retired and its last artifact still published. The pack owns the renderer, the document
+layer and the docs generator; `legacy/<app>` keeps the frozen Electron shell, the last artifact's
+build and its own docs until the pack passes the [shipping bar](../reference/decisions.md#shipping-packs)
+and the [retirement checklist](../reference/decisions.md#retiring-a-frozen-shell) moves what remains
+into the pack. A frozen app is not deleted for agreeing with the bar: its last artifact stays
+installable, and the shell may retire only after the checklist runs. The order is Budget, Help,
+Planner, Canvas.
 
 ## 3. Ownership
 
