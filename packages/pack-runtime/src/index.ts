@@ -1,4 +1,28 @@
 export type {
+  PackBridge,
+  PackBridgeHost,
+  PackBridgeOptions,
+  PackEmitter,
+  PackFail,
+  PackHostInfo,
+  PackLifecycle,
+  PackWriter,
+} from "./bridge.js";
+
+export {
+  createEmitter,
+  createPackBridge,
+  dateStamp,
+  describeError,
+  hostPlatform,
+  PackFilePickerError,
+  pickFolder,
+  safeFileName,
+  withPickedFile,
+  withSaveFile,
+  writeTextToHandle,
+} from "./bridge.js";
+export type {
   CommandRegistration,
   CommandsService,
   Disposable,
@@ -34,3 +58,14 @@ export type {
   ScheduledNotification,
   ThemeTokens,
 } from "./services.js";
+export type {
+  MemoryDocuments,
+  MemoryFiles,
+  MemoryRecents,
+} from "./testing/fakeHost.js";
+export {
+  memoryDocuments,
+  memoryFiles,
+  memoryRecents,
+  textOf,
+} from "./testing/fakeHost.js";

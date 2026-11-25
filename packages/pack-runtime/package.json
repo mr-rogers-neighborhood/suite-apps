@@ -1,7 +1,7 @@
 {
   "name": "@suite/pack-runtime",
   "version": "0.1.0",
-  "description": "The pack-side view of the Suite host: pack files, external file handles, opaque relay transport, commands, notifications and lifecycle. Types only; no Electron, no Node, no host policy.",
+  "description": "The pack-side view of the Suite host: service types plus the save, boundary, picker and disposal runtime every pack shares. No Electron, no Node, no host policy.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,6 +11,18 @@
       "development": "./src/index.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./bridge": {
+      "types": "./dist/bridge.d.ts",
+      "development": "./src/bridge.ts",
+      "import": "./dist/bridge.js",
+      "default": "./dist/bridge.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/fakeHost.d.ts",
+      "development": "./src/testing/fakeHost.ts",
+      "import": "./dist/testing/fakeHost.js",
+      "default": "./dist/testing/fakeHost.js"
     }
   },
   "files": [
@@ -19,12 +31,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
     "lint": "node ../../scripts/lint.mjs",
     "format": "biome format --write .",
-    "check": "node ../../scripts/lint.mjs && tsc --noEmit -p tsconfig.json"
+    "check": "node ../../scripts/lint.mjs && tsc --noEmit -p tsconfig.json && vitest run"
   },
   "devDependencies": {
     "typescript": "~5.9.3",
+    "vitest": "5.1.0",
     "@biomejs/biome": "2.6.4"
   },
   "repository": {

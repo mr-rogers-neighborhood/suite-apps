@@ -7,12 +7,20 @@ import {
   type WorkspaceFileManifest,
 } from "@suite/graph";
 import type {
-  DocumentsService,
-  FileHandle,
-  FilesService,
   ImportedFolder,
   RecentDocument,
   RecentsService,
+} from "@suite/pack-runtime";
+import {
+  type PackBridgeHost,
+  createPackBridge,
+  describeError,
+  hostPlatform,
+  pickFolder,
+  safeFileName,
+  withPickedFile,
+  withSaveFile,
+  writeTextToHandle,
 } from "@suite/pack-runtime";
 import type {
   BridgeAttachment,
@@ -37,6 +45,10 @@ import type {
  * `.canvas` envelope — snapshot, manifest and embedded images — because that is the file a person
  * exports and re-imports. The host never parses it, and the pack never sees a path.
  *
+ * Everything that is not Canvas's schema lives in `@suite/pack-runtime`: the save debounce, the
+ * boundary flush, the picker and notice sentences, and the disposal list. This file is the adapter
+ * that owns the `.canvas` envelope, the attachment store and the recent-title memory.
+ *
  * What this pack cannot do is the interesting part. It cannot choose a folder, watch one, reveal a
  * document in one, or open a file where it lies by itself: the host offers a picker, a scoped
  * document store, a copy into the pack's own root, a reveal action and a change notice, and the pack
@@ -50,35 +62,12 @@ const DOCUMENT_KEY = "suite.canvas.pack.document";
 const MAX_LISTED_DOCUMENTS = 100;
 /** How long edits are coalesced before a write. The desktop shell uses 400 ms for the same reason. */
 const FLUSH_DEBOUNCE_MS = 250;
-const NOTICE_LIMIT = 20;
 
 const CANVAS_FILTERS = [{ name: "Suite Canvas", extensions: ["canvas", "suite", "json"] }] as const;
 
-/** The part of `window.suite.info()` this pack relies on. */
-interface SuiteInfo {
-  readonly platform?: string | undefined;
-  readonly [key: string]: unknown;
-}
-
-/** The lifecycle surface a host may expose. */
-interface PackLifecycle {
-  onFlush?(listener: () => void | Promise<void>): () => void;
-  onSuspend?(listener: () => void | Promise<void>): () => void;
-}
-
-/**
- * The host services this pack uses.
- *
- * `files` is optional so a host without the grant gives a sentence rather than a crash. The
- * document service is required to do anything at all; a method called without it throws the
- * sentence a person sees.
- */
-export interface CanvasPackHost {
-  readonly documents?: DocumentsService | undefined;
+/** The host services this pack uses. */
+export interface CanvasPackHost extends PackBridgeHost {
   readonly recents?: RecentsService | undefined;
-  readonly files?: Partial<FilesService> | undefined;
-  readonly info?: (() => Promise<SuiteInfo>) | undefined;
-  readonly lifecycle?: PackLifecycle | undefined;
 }
 
 export interface CanvasPackOptions {
@@ -126,13 +115,8 @@ interface OpenDocument {
   readonly info: BridgeDocumentInfo;
 }
 
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function safeFileName(name: string): string {
-  const cleaned = name.replace(/[^\w.-]+/gu, "-").replace(/^-+|-+$/gu, "");
-  return cleaned.length > 0 ? cleaned : "workspace.canvas";
+function safeWorkspaceName(name: string): string {
+  return safeFileName(name, "workspace.canvas");
 }
 
 function newDocumentId(): string {
@@ -270,40 +254,23 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
   const withBoundaries = options.boundaries !== false;
   const reload = options.reload ?? (() => globalThis.location?.reload());
 
-  let current: OpenDocument | null = null;
+  const runtime = createPackBridge<OpenDocument>({
+    app: "Suite Canvas",
+    noun: "canvas",
+    host,
+    boundaries: withBoundaries,
+    pageBoundaries: false,
+    debounceMs: FLUSH_DEBOUNCE_MS,
+    captureFailure: true,
+    retryOnFailure: false,
+    write: writePending,
+  });
+
   let currentSnapshot: Uint8Array | null = null;
   /** The images the last envelope carried, so a document-only save keeps them. */
   let previousAttachments: WorkspaceFileAttachmentInputs = {};
   let pendingSave: BridgeSaveRequest | null = null;
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  let writing: Promise<void> = Promise.resolve();
-  let saveFailure: string | null = null;
-  const noticeLog: string[] = [];
   const changeLog: string[] = [];
-  const cleanups: Array<() => void> = [];
-
-  function notice(message: string): void {
-    console.warn(`Suite Canvas pack: ${message}`);
-    noticeLog.push(message);
-    if (noticeLog.length > NOTICE_LIMIT) noticeLog.shift();
-  }
-
-  function fail(context: string, error: unknown): void {
-    console.error(`Suite Canvas pack: ${context}`, error);
-  }
-
-  function documents(): DocumentsService {
-    if (host.documents === undefined) {
-      throw new Error(
-        "This host does not provide the documents service, so Suite Canvas cannot open a canvas.",
-      );
-    }
-    return host.documents;
-  }
-
-  function files(): Partial<FilesService> | null {
-    return host.files ?? null;
-  }
 
   function infoFor(id: string, workspaceId: string, name: string): BridgeDocumentInfo {
     return {
@@ -319,11 +286,11 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
   function adopt(id: string, parsed: ParsedWorkspaceFile, snapshot: Uint8Array): void {
     const workspaceId = parsed.file.workspaceId;
     const name = displayName(parsed, id);
-    current = {
+    runtime.setCurrent({
       id,
       workspaceId,
       info: infoFor(id, workspaceId, name),
-    };
+    });
     currentSnapshot = snapshot;
     previousAttachments = fromParsedAttachments(parsed);
     rememberDocument(id);
@@ -344,30 +311,31 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
     try {
       return await pending.call(service);
     } catch (error) {
-      fail("could not read the documents that changed", error);
+      runtime.fail("could not read the documents that changed", error);
       return [];
     }
   }
 
   async function summaryOf(id: string): Promise<boolean> {
-    const summaries = await documents().list();
+    const summaries = await runtime.documents().list();
     return summaries.some((summary) => summary.id === id);
   }
 
   async function ensureDocument(id: string): Promise<void> {
     if (await summaryOf(id)) return;
-    await documents().create(id);
+    await runtime.documents().create(id);
   }
 
   async function writeDocument(id: string, bytes: Uint8Array): Promise<void> {
     const existed = await summaryOf(id);
-    if (!existed) await documents().create(id);
+    if (!existed) await runtime.documents().create(id);
     try {
-      await documents().save(id, bytes);
+      await runtime.documents().save(id, bytes);
     } catch (error) {
       // A document created blank for this write must not be left as a trap for the next open.
       if (!existed)
-        await documents()
+        await runtime
+          .documents()
           .remove(id)
           .catch(() => undefined);
       throw error;
@@ -381,7 +349,7 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
    * store no longer holds falls through to the newest rather than failing an open.
    */
   async function resolveDocumentId(): Promise<string | null> {
-    const summaries = await documents().list();
+    const summaries = await runtime.documents().list();
     if (summaries.length === 0) return null;
     const remembered = rememberedDocument();
     if (remembered !== null && summaries.some((summary) => summary.id === remembered)) {
@@ -395,8 +363,9 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
     info: BridgeDocumentInfo;
     snapshot: Uint8Array;
   } | null> {
-    if (current !== null && currentSnapshot !== null) {
-      return { info: current.info, snapshot: currentSnapshot };
+    const open = runtime.current();
+    if (open !== null && currentSnapshot !== null) {
+      return { info: open.info, snapshot: currentSnapshot };
     }
 
     // Ask before opening: the host records an open as seen, so the pending list
@@ -404,7 +373,7 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
     const pending = await pendingChanges();
     const id = await resolveDocumentId();
     if (id === null) return null;
-    const record = await documents().open(id);
+    const record = await runtime.documents().open(id);
     // A document the host made and never filled is not an open document; the launcher is the
     // honest surface for it, and nothing has been lost.
     if (record === null || record.bytes.byteLength === 0) return null;
@@ -414,96 +383,70 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
     recordChanges(pending);
     if (pending.includes(id)) {
       // The open above already read the file as it is now, so the newer document is what is open.
-      notice("This canvas changed on disk while Canvas was closed; the newer file is open.");
+      runtime.notice(
+        "This canvas changed on disk while Canvas was closed; the newer file is open.",
+      );
     }
-    return { info: current?.info ?? infoFor(id, parsed.file.workspaceId, id), snapshot };
+    return {
+      info: runtime.current()?.info ?? infoFor(id, parsed.file.workspaceId, id),
+      snapshot,
+    };
   }
 
-  function scheduleSave(request: BridgeSaveRequest): void {
-    pendingSave = request;
-    if (saveTimer !== null) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      void flushPending();
-    }, FLUSH_DEBOUNCE_MS);
-  }
-
-  function flushPending(): Promise<void> {
+  async function writePending(target: OpenDocument): Promise<void> {
     const request = pendingSave;
-    if (request === null) return writing;
+    if (request === null) return;
     pendingSave = null;
-    writing = writing
-      .then(async () => {
-        const target = current;
-        if (target === null) throw new Error("No canvas is open.");
-        const attachments =
-          request.attachments === undefined
-            ? previousAttachments
-            : toAttachmentInputs(request.attachments);
-        const envelope = buildWorkspaceFile({
-          workspaceId: target.workspaceId,
-          snapshot: request.snapshot,
-          manifest: request.manifest,
-          attachments,
-        });
-        await documents().save(target.id, new TextEncoder().encode(JSON.stringify(envelope)));
-        previousAttachments = attachments;
-        saveFailure = null;
-      })
-      .catch((error: unknown) => {
-        saveFailure = describeError(error);
-        notice(`The canvas could not be saved: ${saveFailure}`);
-      });
-    return writing;
+    const attachments =
+      request.attachments === undefined
+        ? previousAttachments
+        : toAttachmentInputs(request.attachments);
+    const envelope = buildWorkspaceFile({
+      workspaceId: target.workspaceId,
+      snapshot: request.snapshot,
+      manifest: request.manifest,
+      attachments,
+    });
+    await runtime.documents().save(target.id, new TextEncoder().encode(JSON.stringify(envelope)));
+    previousAttachments = attachments;
   }
 
   async function flushDocument(): Promise<{ ok: true } | BridgeFailure> {
-    if (saveTimer !== null) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-    }
-    // A save may arrive while a write is in flight; its timer is cleared by the next pass.
-    for (;;) {
-      if (pendingSave !== null) {
-        if (saveTimer !== null) {
-          clearTimeout(saveTimer);
-          saveTimer = null;
-        }
-        await flushPending();
-        continue;
-      }
-      await writing;
-      if (pendingSave === null && saveTimer === null) break;
-    }
-    return saveFailure === null
+    await runtime.flush();
+    const failure = runtime.failure();
+    return failure === null
       ? { ok: true }
-      : { ok: false, code: "write-failed", message: saveFailure };
+      : { ok: false, code: "write-failed", message: failure };
   }
 
   async function saveDocument(request: BridgeSaveRequest): Promise<void> {
-    if (current === null || current.workspaceId !== request.workspaceId) {
+    let target = runtime.current();
+    if (target === null || target.workspaceId !== request.workspaceId) {
       const id = request.workspaceId;
       await ensureDocument(id);
-      current = {
+      target = {
         id,
         workspaceId: request.workspaceId,
         info: infoFor(id, request.workspaceId, request.title ?? id),
       };
+      runtime.setCurrent(target);
       currentSnapshot = request.snapshot;
       previousAttachments = {};
       rememberDocument(id);
       if (request.title !== undefined) rememberTitle(id, request.title.trim());
     }
 
-    if (request.title !== undefined && request.title.trim().length > 0 && current !== null) {
-      current = { ...current, info: { ...current.info, name: request.title.trim() } };
-      rememberTitle(current.id, request.title.trim());
+    if (request.title !== undefined && request.title.trim().length > 0 && target !== null) {
+      target = { ...target, info: { ...target.info, name: request.title.trim() } };
+      runtime.setCurrent(target);
+      rememberTitle(target.id, request.title.trim());
     }
     if (request.attachments !== undefined) {
       previousAttachments = toAttachmentInputs(request.attachments);
     }
     currentSnapshot = request.snapshot;
-    scheduleSave(request);
+    pendingSave = request;
+    runtime.markDirty();
   }
 
   async function createDocument(seed: BridgeCreateRequest): Promise<BridgeCreateResult> {
@@ -519,11 +462,11 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
         attachments: parsedAttachments,
       });
       await writeDocument(id, new TextEncoder().encode(JSON.stringify(envelope)));
-      current = {
+      runtime.setCurrent({
         id,
         workspaceId: id,
         info: infoFor(id, id, seed.title),
-      };
+      });
       currentSnapshot = seed.snapshot;
       previousAttachments = parsedAttachments;
       rememberDocument(id);
@@ -549,12 +492,12 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
           await options.storeAttachment(attachment.id, attachment.bytes, attachment.mime);
         } catch (error) {
           // One image that cannot be cached must not cost the document.
-          fail(`could not restore ${attachment.id} from ${pickedName}`, error);
-          notice("One image could not be restored; the rest of the canvas imported.");
+          runtime.fail(`could not restore ${attachment.id} from ${pickedName}`, error);
+          runtime.notice("One image could not be restored; the rest of the canvas imported.");
         }
       }
     } else if (parsed.attachments.length > 0) {
-      notice("This host cannot store images, so imported images will show a placeholder.");
+      runtime.notice("This host cannot store images, so imported images will show a placeholder.");
     }
 
     const snapshot = new Uint8Array(parsed.workspace.exportSnapshot());
@@ -565,11 +508,11 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       attachments: fromParsedAttachments(parsed),
     });
     await writeDocument(id, new TextEncoder().encode(JSON.stringify(envelope)));
-    current = {
+    runtime.setCurrent({
       id,
       workspaceId: id,
       info: infoFor(id, id, displayName(parsed, pickedName)),
-    };
+    });
     currentSnapshot = snapshot;
     previousAttachments = fromParsedAttachments(parsed);
     rememberDocument(id);
@@ -580,22 +523,15 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
   async function openFileDialog(): Promise<void> {
     // Leave the open canvas durable before the page moves to the imported one.
     await flushDocument();
-    const service = files();
-    const pickOpen = service?.pickOpen;
-    if (service === null || typeof pickOpen !== "function") {
-      throw new Error("This host has no file picker, so a canvas could not be imported.");
-    }
-
-    const handle = await pickOpen.call(service, CANVAS_FILTERS);
-    if (handle === null) return;
-    const pickedName = handle.info.name;
-    let bytes: Uint8Array;
-    try {
-      bytes = await handle.read();
-    } finally {
-      await handle.close().catch(() => undefined);
-    }
-    await importEnvelope(bytes, pickedName);
+    const picked = await withPickedFile(
+      runtime.files(),
+      CANVAS_FILTERS,
+      "This host has no file picker, so a canvas could not be imported.",
+      runtime.fail,
+      async (handle) => ({ name: handle.info.name, bytes: await handle.read() }),
+    );
+    if (picked === null) return;
+    await importEnvelope(picked.bytes, picked.name);
   }
 
   async function openDocument(path: string): Promise<void> {
@@ -614,7 +550,7 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       try {
         rows = await recents.list();
       } catch (error) {
-        notice(`Recent files are unavailable: ${describeError(error)}`);
+        runtime.notice(`Recent files are unavailable: ${describeError(error)}`);
         return [];
       }
       const entries: BridgeRecentFile[] = [];
@@ -639,7 +575,7 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
 
   /** The old listing, for a host that has no recent-file service of its own. */
   async function storeRecents(): Promise<readonly BridgeRecentFile[]> {
-    const summaries = await documents().list();
+    const summaries = await runtime.documents().list();
     const entries: BridgeRecentFile[] = [];
     for (const summary of summaries
       .slice()
@@ -647,13 +583,13 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       .slice(0, MAX_LISTED_DOCUMENTS)) {
       let name = summary.id;
       try {
-        const record = await documents().open(summary.id);
+        const record = await runtime.documents().open(summary.id);
         if (record !== null && record.bytes.byteLength > 0) {
           name = displayName(parseEnvelope(record.bytes), summary.id);
         }
       } catch (error) {
         // One unreadable document must not blank the launcher for the others.
-        fail(`could not read ${summary.id} while listing`, error);
+        runtime.fail(`could not read ${summary.id} while listing`, error);
       }
       entries.push({
         path: summary.id,
@@ -667,13 +603,14 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
 
   /** Show the open canvas where the host keeps it. The pack never learns the path. */
   async function revealDocument(): Promise<boolean> {
-    if (current === null) throw new Error("No canvas is open.");
-    const service = documents();
+    const open = runtime.current();
+    if (open === null) throw new Error("No canvas is open.");
+    const service = runtime.documents();
     const reveal = service.reveal;
     if (reveal === undefined) throw new Error("This host cannot show a document's folder.");
-    const summary = await reveal.call(service, current.id);
+    const summary = await reveal.call(service, open.id);
     if (summary === null) {
-      notice("That canvas is no longer in this pack's document store.");
+      runtime.notice("That canvas is no longer in this pack's document store.");
       return false;
     }
     return true;
@@ -681,32 +618,24 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
 
   /** Copy a person-chosen folder into this pack's own root through the host's picker. */
   async function importFolder(): Promise<ImportedFolder | null> {
-    const service = files();
-    const importFolderFromHost = service?.importFolder;
-    if (service === null || importFolderFromHost === undefined) {
-      throw new Error("This host cannot import a folder.");
-    }
-    return importFolderFromHost.call(service);
+    return pickFolder(runtime.files(), "This host cannot import a folder.");
   }
 
   async function saveTextFile(
     name: string,
     text: string,
   ): Promise<{ saved: boolean; name?: string }> {
-    const service = files();
-    const pickSave = service?.pickSave;
-    if (service === null || typeof pickSave !== "function") {
-      throw new Error("This host has no file picker, so the canvas could not be exported.");
-    }
-
-    const handle: FileHandle | null = await pickSave.call(service, safeFileName(name));
-    if (handle === null) return { saved: false };
-    try {
-      await handle.write(new TextEncoder().encode(text));
-      return { saved: true, name: handle.info.name };
-    } finally {
-      await handle.close().catch(() => undefined);
-    }
+    const path = await withSaveFile(
+      runtime.files(),
+      safeWorkspaceName(name),
+      "This host has no file picker, so the canvas could not be exported.",
+      runtime.fail,
+      async (handle) => {
+        await writeTextToHandle(handle, text, "The canvas could not be written");
+        return handle.info.name;
+      },
+    );
+    return path === null ? { saved: false } : { saved: true, name: path };
   }
 
   const bridge: DesktopBridge = {
@@ -722,14 +651,7 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       return opened?.info ?? null;
     },
     appInfo: async () => {
-      let platform = "unknown";
-      try {
-        const info = await host.info?.();
-        if (typeof info?.platform === "string" && info.platform.length > 0)
-          platform = info.platform;
-      } catch (error) {
-        fail("could not read the host's platform", error);
-      }
+      const platform = await hostPlatform(host.info, "unknown", runtime.fail);
       return { host: "desktop", version: "0.0.0", platform };
     },
     createDocument,
@@ -740,73 +662,49 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
       const recents = host.recents;
       if (recents === undefined) {
         // A host with no recents service has no row to remove; the document is not the row.
-        notice(`${path} stays in this pack's document store; this host has no recent-file list.`);
+        runtime.notice(
+          `${path} stays in this pack's document store; this host has no recent-file list.`,
+        );
         return;
       }
       try {
         // The row goes; the document stays. That is what a person asked for.
         await recents.forget(path);
       } catch (error) {
-        notice(`The recent entry could not be removed: ${describeError(error)}`);
+        runtime.notice(`The recent entry could not be removed: ${describeError(error)}`);
       }
     },
     saveTextFile,
   };
 
-  function installBoundaries(): void {
-    const lifecycle = host.lifecycle;
-    if (lifecycle?.onFlush !== undefined) {
-      cleanups.push(
-        lifecycle.onFlush(async () => {
-          await flushDocument();
-        }),
-      );
-    }
-    if (lifecycle?.onSuspend !== undefined) {
-      cleanups.push(
-        lifecycle.onSuspend(async () => {
-          await flushDocument();
-        }),
-      );
-    }
+  // The change watch is Canvas's own: it records ids and names the canvas in the sentence. The
+  // flush boundaries themselves are the runtime's.
+  if (withBoundaries) {
     const documentsService = host.documents;
     const onChanged = documentsService?.onChanged;
     if (documentsService !== undefined && onChanged !== undefined) {
-      cleanups.push(
+      runtime.addCleanup(
         onChanged.call(documentsService, (documentIds) => {
           recordChanges(documentIds);
-          if (current !== null && documentIds.includes(current.id)) {
-            notice("This canvas changed on disk. Reopen it to load the newer file.");
+          const open = runtime.current();
+          if (open !== null && documentIds.includes(open.id)) {
+            runtime.notice("This canvas changed on disk. Reopen it to load the newer file.");
           }
         }),
       );
     }
   }
 
-  if (withBoundaries) installBoundaries();
-
   return {
     bridge,
     flush: async () => {
       await flushDocument();
     },
-    documentId: () => current?.id ?? null,
+    documentId: () => runtime.current()?.id ?? null,
     reveal: revealDocument,
     importFolder,
     libraryChanges: () => [...changeLog],
-    notices: () => [...noticeLog],
-    dispose: () => {
-      if (saveTimer !== null) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-      }
-      for (const cleanup of cleanups.splice(0)) {
-        try {
-          cleanup();
-        } catch (error) {
-          fail("a lifecycle listener could not be removed", error);
-        }
-      }
-    },
+    notices: runtime.notices,
+    dispose: runtime.dispose,
   };
 }

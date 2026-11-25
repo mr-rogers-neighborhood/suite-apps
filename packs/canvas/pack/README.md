@@ -13,9 +13,12 @@ steps live in [the pack authoring reference](../../../docs/reference/pack-author
   bridge, so the pack reuses it rather than teaching the app a second storage mode.
 - `src/bridge.ts` is the adapter: the host document envelope carries a `.canvas` envelope unchanged,
   and the pack owns the schema, snapshot writes at a durability boundary, and export/import through
-  the host's file picker. It also uses the host's file-and-library surface: reveal the open document
-  where the host keeps it, read the host's recent list, notice a document that changed while the pack
-  was closed and while it is open, and copy a person-chosen folder into the pack's own root.
+  the host's file picker. The debounce, boundary flush, picker handle lifecycle, notices and
+  disposal come from `@suite/pack-runtime`'s shared bridge; this file keeps Canvas's envelope, its
+  attachment store and its remembered titles. It also uses the host's file-and-library surface:
+  reveal the open document where the host keeps it, read the host's recent list, notice a document
+  that changed while the pack was closed and while it is open, and copy a person-chosen folder into
+  the pack's own root.
 - `src/PackRender.test.tsx` mounts Canvas's own renderer over the same services the shell's preload
   exposes and opens a board, edits it, saves it, exports it and re-imports it.
 - `vite.config.ts` builds into `packs/canvas/.dev/pack`, outside this source tree.

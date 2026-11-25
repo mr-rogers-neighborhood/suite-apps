@@ -1,9 +1,15 @@
-import type {
-  DocumentsService,
-  FileHandle,
-  FilesService,
-  PackLaunchContext,
-  ProjectionsService,
+import type { PackLaunchContext, ProjectionsService } from "@suite/pack-runtime";
+import {
+  type PackBridgeHost,
+  createEmitter,
+  createPackBridge,
+  dateStamp,
+  describeError,
+  hostPlatform,
+  safeFileName,
+  withPickedFile,
+  withSaveFile,
+  writeTextToHandle,
 } from "@suite/pack-runtime";
 import {
   decodeWorkspaceFile,
@@ -30,6 +36,10 @@ import { projectReminders, REMINDER_PACK_ID, REMINDER_PROJECTION } from "./proje
  * host owns the envelope, the atomic write and the backup; this pack must not keep a second
  * backup scheme, because two can disagree.
  *
+ * The debounce, the boundary listeners, the picker and the notice list live in
+ * `@suite/pack-runtime`; this file supplies Planner's document layer, its export/import codec and
+ * its projection.
+ *
  * It goes through `WorkspaceDocument` rather than `loro-crdt` on purpose: this repository keeps
  * every touch of Loro inside `packages/planner-core/src/loro`, and `scripts/check-shape.mjs` fails the gate
  * if something else imports it. The wrapper is not a restriction here — the schema-initialising
@@ -46,18 +56,6 @@ const FLUSH_DEBOUNCE_MS = 300;
 
 const PLANNER_FILTERS = [{ name: "Suite Planner", extensions: ["planner"] }] as const;
 
-/** The part of `window.suite.info()` this pack relies on. */
-interface SuiteInfo {
-  readonly platform?: string | undefined;
-  readonly [key: string]: unknown;
-}
-
-/** The lifecycle surface a host may expose; the shell does not yet. */
-interface PackLifecycle {
-  onFlush?(listener: () => void | Promise<void>): () => void;
-  onSuspend?(listener: () => void | Promise<void>): () => void;
-}
-
 /**
  * The host services this prelude uses.
  *
@@ -65,12 +63,8 @@ interface PackLifecycle {
  * service is required to do anything at all; a method called without it throws the sentence a
  * person sees in the app's error modal.
  */
-export interface PlannerPackHost {
+export interface PlannerPackHost extends PackBridgeHost {
   readonly packId?: string | undefined;
-  readonly documents?: DocumentsService | undefined;
-  readonly files?: Partial<FilesService> | undefined;
-  readonly info?: (() => Promise<SuiteInfo>) | undefined;
-  readonly lifecycle?: PackLifecycle | undefined;
   readonly launch?: (() => Promise<PackLaunchContext>) | undefined;
   /** A link the host routes to this tab while it is already open. */
   readonly onDeepLink?: ((listener: (url: string) => void) => () => void) | undefined;
@@ -100,16 +94,8 @@ interface OpenDocument {
   doc: WorkspaceDocument;
 }
 
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function safeName(name: string): string {
-  return name.replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "") || "planner";
-}
-
-function dateStamp(now: Date): string {
-  return now.toISOString().slice(0, 10);
+  return safeFileName(name, "planner", { dots: false });
 }
 
 function documentFromSnapshot(bytes: Uint8Array): WorkspaceDocument {
@@ -121,26 +107,31 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
   const clock = options.now ?? (() => new Date());
   const withBoundaries = options.boundaries !== false;
 
-  let current: OpenDocument | null = null;
+  const runtime = createPackBridge<OpenDocument>({
+    app: "Suite Planner",
+    noun: "workspace",
+    host,
+    boundaries: withBoundaries,
+    pageBoundaries: true,
+    debounceMs: FLUSH_DEBOUNCE_MS,
+    captureFailure: false,
+    retryOnFailure: true,
+    scheduleFailure: "could not save the workspace",
+    write: writeWorkspace,
+  });
+
   /** True when this session started with no document; the renderer shows its launcher then. */
   let created = false;
   /** True once the pack has a document in hand, whether it read one or the app adopted one. */
   let hasDocument = false;
-  /** True when the open document has updates the file has not seen. */
-  let dirty = false;
-  /** The write in flight, so two boundaries cannot save out of order. */
-  let saving: Promise<void> | null = null;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let opening: Promise<void> | null = null;
-  const replacements = new Set<(snapshot: Uint8Array) => void>();
-  const cleanups: Array<() => void> = [];
+  const replacements = createEmitter<Uint8Array>();
   const packId = host.packId ?? REMINDER_PACK_ID;
 
   // The manifest names `reminders`. The pack binds that entry; the host supplies
   // a read-only handle for the document it already resolved. A projection that
   // runs on save must not schedule, poll or show anything itself.
   if (host.projections !== undefined) {
-    cleanups.push(
+    runtime.addCleanup(
       host.projections.register(REMINDER_PROJECTION, async (projected) => {
         const bytes = await projected.read();
         return projectReminders(bytes, { packId, now: clock() });
@@ -148,36 +139,8 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
     );
   }
 
-  function fail(context: string, error: unknown): void {
-    console.error(`Suite Planner pack: ${context}`, error);
-  }
-
-  function documents(): DocumentsService {
-    if (host.documents === undefined) {
-      throw new Error(
-        "This host does not provide the documents service, so Suite Planner cannot open a workspace.",
-      );
-    }
-    return host.documents;
-  }
-
-  function files(): Partial<FilesService> | null {
-    return host.files ?? null;
-  }
-
-  function cancelTimer(): void {
-    if (timer !== null) clearTimeout(timer);
-    timer = null;
-  }
-
-  function schedule(): void {
-    cancelTimer();
-    timer = setTimeout(() => {
-      timer = null;
-      void flush().catch((error: unknown) => {
-        fail("could not save the workspace", error);
-      });
-    }, FLUSH_DEBOUNCE_MS);
+  async function writeWorkspace(target: OpenDocument): Promise<void> {
+    await runtime.documents().save(target.id, target.doc.snapshot());
   }
 
   /**
@@ -186,8 +149,8 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
    * The first run is normally `planner`. A host can hand back an empty record that a previous
    * create wrote, so the loop only runs when a name is already in use.
    */
-  async function freshDocumentId(service: DocumentsService): Promise<string> {
-    const existing = new Set((await service.list()).map((summary) => summary.id));
+  async function freshDocumentId(): Promise<string> {
+    const existing = new Set((await runtime.documents().list()).map((summary) => summary.id));
     if (!existing.has(DOCUMENT_ID)) return DOCUMENT_ID;
     for (let suffix = 2; ; suffix += 1) {
       const candidate = `${DOCUMENT_ID}-${suffix}`;
@@ -204,7 +167,7 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
    * replaced by a fresh empty workspace.
    */
   async function open(): Promise<void> {
-    const service = documents();
+    const service = runtime.documents();
     const summaries = await service.list();
     let emptyId: string | null = null;
     let refusal: unknown = null;
@@ -218,7 +181,7 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
       }
       try {
         const doc = documentFromSnapshot(record.bytes);
-        current = { id: record.id, doc };
+        runtime.setCurrent({ id: record.id, doc });
         created = false;
         hasDocument = true;
         return;
@@ -231,16 +194,18 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
     if (refusal !== null) throw refusal;
 
     if (emptyId !== null) {
-      current = { id: emptyId, doc: WorkspaceDocument.create() };
+      runtime.setCurrent({ id: emptyId, doc: WorkspaceDocument.create() });
       created = true;
       return;
     }
 
-    const id = await freshDocumentId(service);
+    const id = await freshDocumentId();
     await service.create(id);
-    current = { id, doc: WorkspaceDocument.create() };
+    runtime.setCurrent({ id, doc: WorkspaceDocument.create() });
     created = true;
   }
+
+  let opening: Promise<void> | null = null;
 
   function ensure(): Promise<void> {
     opening ??= open();
@@ -248,193 +213,106 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
   }
 
   async function flush(): Promise<void> {
-    cancelTimer();
-    const target = current;
-    if (target === null || !dirty) return;
-
-    if (saving !== null) {
-      await saving;
-      if (current === target && dirty) await flush();
-      return;
-    }
-
-    dirty = false;
-    let bytes: Uint8Array;
-    try {
-      bytes = target.doc.snapshot();
-    } catch (error) {
-      if (current === target) dirty = true;
-      throw error;
-    }
-
-    saving = documents()
-      .save(target.id, bytes)
-      .then(
-        () => undefined,
-        (error: unknown) => {
-          if (current === target) dirty = true;
-          throw error;
-        },
-      );
-
-    try {
-      await saving;
-    } finally {
-      saving = null;
-    }
-
-    if (current === target && dirty) await flush();
+    await runtime.flush();
   }
-
-  const onHidden = () => {
-    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-      void flush().catch((error) => fail("flush on hide", error));
-    }
-  };
-
-  const onPageHide = () => {
-    void flush().catch((error) => fail("flush on page hide", error));
-  };
-
-  function installBoundaries(): void {
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", onHidden);
-      cleanups.push(() => document.removeEventListener("visibilitychange", onHidden));
-    }
-    if (typeof window !== "undefined") {
-      window.addEventListener("pagehide", onPageHide);
-      cleanups.push(() => window.removeEventListener("pagehide", onPageHide));
-    }
-    const lifecycle = host.lifecycle;
-    if (lifecycle?.onFlush !== undefined) cleanups.push(lifecycle.onFlush(() => flush()));
-    if (lifecycle?.onSuspend !== undefined) cleanups.push(lifecycle.onSuspend(() => flush()));
-  }
-
-  if (withBoundaries) installBoundaries();
 
   function emitReplaced(snapshot: Uint8Array): void {
-    for (const listener of [...replacements]) {
-      try {
-        listener(snapshot);
-      } catch (error) {
-        fail("a workspace-replaced listener failed", error);
-      }
-    }
+    replacements.emit(snapshot, runtime.fail, "a workspace-replaced listener failed");
   }
 
   async function exportWorkspace(): Promise<ExportResult> {
     await ensure();
-    const target = current;
+    const target = runtime.current();
     if (target === null) throw new Error("No workspace is open.");
     await flush();
 
-    const service = files();
-    const pickSave = service?.pickSave;
-    if (service === null || typeof pickSave !== "function") {
-      throw new Error("This host has no file picker, so the workspace could not be exported.");
-    }
-
-    let handle: FileHandle | null;
-    try {
-      handle = await pickSave.call(service, `${safeName(target.id)}-${dateStamp(clock())}.planner`);
-    } catch (error) {
-      throw new Error(`The file picker could not open: ${describeError(error)}`);
-    }
-    if (handle === null) return { canceled: true };
-
-    try {
-      const text = encodeWorkspaceFile(target.doc, clock());
-      await handle.write(new TextEncoder().encode(text));
-      return { canceled: false, path: handle.info.name };
-    } catch (error) {
-      throw new Error(`The workspace could not be written: ${describeError(error)}`);
-    } finally {
-      await handle.close().catch((error: unknown) => fail("could not close the export", error));
-    }
+    const path = await withSaveFile(
+      runtime.files(),
+      `${safeName(target.id)}-${dateStamp(clock())}.planner`,
+      "This host has no file picker, so the workspace could not be exported.",
+      runtime.fail,
+      async (handle) => {
+        const text = encodeWorkspaceFile(target.doc, clock());
+        await writeTextToHandle(handle, text, "The workspace could not be written");
+        return handle.info.name;
+      },
+    );
+    return path === null ? { canceled: true } : { canceled: false, path };
   }
 
   async function importWorkspace(): Promise<ImportResult> {
-    const service = files();
-    const pickOpen = service?.pickOpen;
-    if (service === null || typeof pickOpen !== "function") {
-      throw new Error("This host has no file picker, so a workspace could not be imported.");
-    }
+    const decoded = await withPickedFile(
+      runtime.files(),
+      PLANNER_FILTERS,
+      "This host has no file picker, so a workspace could not be imported.",
+      runtime.fail,
+      async (handle) => {
+        const bytes = await handle.read();
+        const file = decodeWorkspaceFile(new TextDecoder().decode(bytes));
+        if (file.isErr()) throw file.error;
 
-    let handle: FileHandle | null;
-    try {
-      handle = await pickOpen.call(service, PLANNER_FILTERS);
-    } catch (error) {
-      throw new Error(`The file picker could not open: ${describeError(error)}`);
-    }
-    if (handle === null) return { canceled: true };
+        let next: WorkspaceDocument;
+        try {
+          next = WorkspaceDocument.fromSnapshot(file.value);
+        } catch (error) {
+          throw new Error(`That workspace could not be opened: ${describeError(error)}`);
+        }
+        const validation = next.validate();
+        if (validation.isErr()) {
+          throw new Error("That workspace file failed validation.");
+        }
+        return next;
+      },
+    );
+    if (decoded === null) return { canceled: true };
 
-    try {
-      const bytes = await handle.read();
-      const decoded = decodeWorkspaceFile(new TextDecoder().decode(bytes));
-      if (decoded.isErr()) throw decoded.error;
+    await ensure();
+    const target = runtime.current();
+    if (target === null) throw new Error("No workspace is open.");
+    await flush();
 
-      let next: WorkspaceDocument;
-      try {
-        next = WorkspaceDocument.fromSnapshot(decoded.value);
-      } catch (error) {
-        throw new Error(`That workspace could not be opened: ${describeError(error)}`);
-      }
-      const validation = next.validate();
-      if (validation.isErr()) {
-        throw new Error("That workspace file failed validation.");
-      }
-
-      await ensure();
-      const target = current;
-      if (target === null) throw new Error("No workspace is open.");
-      await flush();
-
-      target.doc = next;
-      hasDocument = true;
-      dirty = true;
-      await flush();
-      emitReplaced(next.snapshot());
-      return { canceled: false };
-    } finally {
-      await handle.close().catch((error: unknown) => fail("could not close the import", error));
-    }
+    target.doc = decoded;
+    hasDocument = true;
+    runtime.markDirty();
+    await flush();
+    emitReplaced(decoded.snapshot());
+    return { canceled: false };
   }
 
   const bridge: PlannerBridge = {
     async loadSnapshot() {
       await ensure();
-      if (!hasDocument || current === null) return null;
+      const target = runtime.current();
+      if (!hasDocument || target === null) return null;
       // A snapshot, not an update: the app's `fromSnapshot` needs the schema, and updates after
       // creation do not carry it.
-      return current.doc.snapshot();
+      return target.doc.snapshot();
     },
 
     async adopt(snapshot: Uint8Array) {
       await ensure();
-      if (current === null) return;
+      const target = runtime.current();
+      if (target === null) return;
       // The renderer invented this document after receiving `null`; keep it before the person can
       // edit it. Everything afterwards arrives as a local update. `created` stays true for the
       // session: it is what the renderer's launcher asked, not whether the file now has bytes.
-      current.doc.applyUpdate(snapshot);
+      target.doc.applyUpdate(snapshot);
       hasDocument = true;
-      dirty = true;
+      runtime.markDirty();
       await flush();
     },
 
     async commit(update: Uint8Array) {
       await ensure();
-      if (current === null) return;
-      current.doc.applyUpdate(update);
-      dirty = true;
-      schedule();
+      const target = runtime.current();
+      if (target === null) return;
+      target.doc.applyUpdate(update);
+      runtime.markDirty();
     },
 
     // Nothing replaces the document until an import arrives; sync is a later phase.
     onWorkspaceReplaced(listener) {
-      replacements.add(listener);
-      return () => {
-        replacements.delete(listener);
-      };
+      return replacements.add(listener);
     },
 
     // The OS shows a notification, so there is no in-app event to deliver.
@@ -453,18 +331,12 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
 
     async info(): Promise<WorkspaceInfo> {
       await ensure();
-      const schemaVersion = current?.doc.getMeta().schemaVersion ?? 0;
+      const schemaVersion = runtime.current()?.doc.getMeta().schemaVersion ?? 0;
       return { path: DOCUMENT_NAME, schemaVersion };
     },
 
     async platform(): Promise<string> {
-      try {
-        const info = await host.info?.();
-        if (typeof info?.platform === "string" && info.platform.length > 0) return info.platform;
-      } catch (error) {
-        fail("could not read the host's platform", error);
-      }
-      return "suite-desk";
+      return hostPlatform(host.info, "suite-desk", runtime.fail);
     },
 
     exportWorkspace,
@@ -478,16 +350,9 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
   return {
     bridge,
     flush,
-    documentId: () => current?.id ?? null,
+    documentId: () => runtime.current()?.id ?? null,
     dispose: () => {
-      cancelTimer();
-      for (const cleanup of cleanups.splice(0)) {
-        try {
-          cleanup();
-        } catch (error) {
-          fail("a boundary listener could not be removed", error);
-        }
-      }
+      runtime.dispose();
       replacements.clear();
     },
   };
