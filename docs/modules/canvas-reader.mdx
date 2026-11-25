@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/canvas/src/reader
+module: packs/canvas/src/reader
 title: Canvas / Reader
 summary: "EPUB reading: the chapter surface, highlights as records, and the carry into a card."
 ---
@@ -19,7 +19,7 @@ highlights; a reading position and a raised surface are per reader. The handbook
 "Reading a book" section owns the user-facing rules; these notes are the two places
 where the code makes a promise.
 
-## legacy/canvas/src/reader/ReaderChapter.tsx#ReaderChapter
+## packs/canvas/src/reader/ReaderChapter.tsx#ReaderChapter
 
 This is the one `dangerouslySetInnerHTML` site in the app, and it is one function
 in one file for that reason. `sanitiseChapter` decides what survives — no script,
@@ -34,7 +34,7 @@ throws when a range crosses an element. A repaint unwraps the marks already ther
 before it draws, and a highlight is painted only when its `locator` names this
 chapter; one that cannot be placed is counted and reported rather than guessed.
 
-## legacy/canvas/src/reader/promote.ts#promoteAnnotation
+## packs/canvas/src/reader/promote.ts#promoteAnnotation
 
 A promotion reads the annotation back from the document before it decides
 anything. The caller's copy may predate a write, and a promotion that trusted it

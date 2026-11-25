@@ -23,7 +23,7 @@ import type {
   BridgeRecentFile,
   BridgeSaveRequest,
   DesktopBridge,
-} from "../../../../legacy/canvas/src/host/bridge";
+} from "../../src/host/bridge";
 
 /**
  * Canvas's bridge, built out of the host's `window.suite` services.

@@ -1,9 +1,12 @@
 @import "tailwindcss";
 
 /*
- * The shared primitives live in `node_modules`, which Tailwind does not scan. Without this
- * line every class in `@suite/ui` compiles to nothing.
+ * The renderer is pack-owned source, while the Electron shell still builds it
+ * from its own root. Name the tree explicitly so both builds scan every class,
+ * and point at the shared primitives in `node_modules`, which Tailwind does not
+ * scan on its own.
  */
+@source "../";
 @source "../../node_modules/@suite/ui/dist";
 
 /* Class-based dark mode (Tailwind v4). */

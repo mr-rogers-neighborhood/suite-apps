@@ -5,8 +5,8 @@ import { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { createNodeFromLoroObj, type LoroNode } from "loro-prosemirror";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { WorkspaceDocument } from "../../packages/graph/src/loro/WorkspaceDocument";
-import { insertTourStep } from "../../packages/graph/src/tutorial";
+import { WorkspaceDocument } from "@suite/graph";
+import { insertTourStep } from "@suite/graph";
 import { TourStep } from "./TourStep";
 
 // The node view reads the live workspace; serialisation and the Loro tree do not.

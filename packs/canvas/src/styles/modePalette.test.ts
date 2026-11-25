@@ -25,7 +25,10 @@ import { describe, expect, it } from "vitest";
  * both layouts (repo root, or the package directory) are tried.
  */
 function read(name: string): string {
-  const candidates = [`legacy/canvas/src/styles/${name}`, `src/styles/${name}`];
+  const candidates = [
+    `packs/canvas/src/styles/${name}`,
+    `src/styles/${name}`,
+  ];
   for (const candidate of candidates) {
     try {
       return readFileSync(candidate, "utf8");

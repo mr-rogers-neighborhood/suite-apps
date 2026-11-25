@@ -47,7 +47,7 @@ describe("the workspace menu", () => {
 
 /**
  * Source-level guard rail. Nothing here executes the app: it reads
- * `legacy/canvas/src` and fails when a file grows a network call.
+ * `packs/canvas/src` and fails when a file grows a network call.
  *
  * The app talks to nothing. Before the relay was retired this listed the modules
  * allowed to reach it and the files that gated them off; now the list is down to
@@ -56,7 +56,7 @@ describe("the workspace menu", () => {
  */
 describe("no network calls", () => {
   const SRC =
-    ["legacy/canvas/src", "src"]
+    ["packs/canvas/src", "src"]
       .map((candidate) => path.resolve(process.cwd(), candidate))
       .find((candidate) => existsSync(path.join(candidate, "main.tsx"))) ??
     path.resolve(process.cwd(), "src");

@@ -47,7 +47,7 @@ export default defineConfig({
   root: packRoot,
   base: "./",
   // The app's public files (the asset-path script and the favicon) travel into the pack.
-  publicDir: fileURLToPath(new URL("../../../legacy/canvas/public", import.meta.url)),
+  publicDir: fileURLToPath(new URL("./public", import.meta.url)),
   cacheDir: fileURLToPath(new URL("vite", outputRoot)),
   plugins: [react(), tailwindcss(), wasm(), excalidrawFonts()],
   define: {
@@ -56,9 +56,18 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // The schema and document layer are the pack's own; build them from source so a stale
-      // `dist` can never describe a document the pack does not write.
-      "@suite/graph": fileURLToPath(new URL("../../../legacy/canvas/packages/graph/src/index.ts", import.meta.url)),
+      // The schema, document layer and importer are the pack's own; build them from source so
+      // a stale `dist` can never describe a document the pack does not write.
+      "@suite/graph": fileURLToPath(
+        new URL("../../../legacy/canvas/packages/graph/src/index.ts", import.meta.url),
+      ),
+      "@suite/import-obsidian": fileURLToPath(
+        new URL("../../../legacy/canvas/packages/import-obsidian/src/index.ts", import.meta.url),
+      ),
+      "@suite/sync": fileURLToPath(
+        new URL("../../../services/relay/packages/protocol/src/index.ts", import.meta.url),
+      ),
+      "@suite/ui": fileURLToPath(new URL("../../../packages/ui/src/index.ts", import.meta.url)),
     },
     dedupe: ["react", "react-dom"],
   },

@@ -6,6 +6,8 @@ steps live in [the pack authoring reference](../../../docs/reference/pack-author
 
 - `manifest.json` is the source manifest; its version tracks `legacy/canvas/package.json`, and its
   `documents` entry declares the `.canvas` workspace format at `SCHEMA_VERSION` from `@suite/graph`.
+- `src/renderer/` is Canvas's renderer, its styles, its tests and its test setup. It is the one
+  copy: the Electron shell in `legacy/canvas` builds the same source through its own entry.
 - `src/prelude.ts` installs `window.suiteDesktop` over the host's `window.suite`; `src/main.ts`
   imports it before the renderer. The renderer's desktop path already owns the document through that
   bridge, so the pack reuses it rather than teaching the app a second storage mode.

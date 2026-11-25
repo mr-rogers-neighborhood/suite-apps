@@ -25,13 +25,12 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text-summary", "lcov"],
       reportsDirectory: "coverage",
-      include: ["packages/graph/src/**", "src/**"],
+      include: ["packages/graph/src/**", "../packs/canvas/pack/src/renderer/**"],
       exclude: [
         "**/*.test.*",
         "**/*.spec.*",
         "**/*.stories.*",
         "**/dist/**",
-        "src/test/**",
         "**/*.d.ts",
         "**/*.css",
       ],
@@ -74,14 +73,6 @@ export default defineConfig({
           name: "desktop",
           environment: "node",
           include: ["desktop/src/**/*.test.ts"],
-        },
-      },
-      {
-        test: {
-          name: "canvas",
-          environment: "jsdom",
-          include: ["src/**/*.test.{ts,tsx}"],
-          setupFiles: ["src/test/setup.ts"],
         },
       },
       {

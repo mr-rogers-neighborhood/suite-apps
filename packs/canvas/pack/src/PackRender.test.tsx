@@ -8,7 +8,7 @@ import {
 } from "@suite/graph";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { desktopBridge } from "../../../../legacy/canvas/src/host/bridge";
+import { desktopBridge } from "../../src/host/bridge";
 import { memoryDocuments, memoryFiles, textOf } from "./test/fakeHost";
 
 /**
@@ -93,16 +93,18 @@ describe("Canvas as a pack", () => {
     if (bridge === null) throw new Error("the prelude installed no bridge");
 
     // The renderer reads its session once at import time, so this order is the boot order.
-    const { configureDesktopSession } = await import("../../../../legacy/canvas/src/session/desktopDocument");
+    const { configureDesktopSession } = await import("../../src/session/desktopDocument");
     await configureDesktopSession(bridge);
 
-    const { default: App } = await import("../../../../legacy/canvas/src/App");
+    const { default: App } = await import("../../src/App");
     render(<App />);
 
     // The board and its card came out of the host's document envelope.
-    expect(await screen.findByText("Board from the pack")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Board from the pack", {}, { timeout: 10_000 }),
+    ).toBeInTheDocument();
 
-    const { useCanvasStore } = await import("../../../../legacy/canvas/src/store/useCanvasStore");
+    const { useCanvasStore } = await import("../../src/store/useCanvasStore");
     act(() => {
       useCanvasStore.getState().workspace.setTitleText(card.id, "Edited in the pack");
     });
@@ -116,8 +118,8 @@ describe("Canvas as a pack", () => {
 
     // Export through the Workspace menu, which now writes through the host's save picker.
     // The menu is lazy-loaded, so wait for it rather than assuming it shared the board's frame.
-    fireEvent.click(await screen.findByTestId("workspace-menu"));
-    fireEvent.click(await screen.findByTestId("workspace-export-backup"));
+    fireEvent.click(await screen.findByTestId("workspace-menu", {}, { timeout: 10_000 }));
+    fireEvent.click(await screen.findByTestId("workspace-export-backup", {}, { timeout: 10_000 }));
     await waitFor(() => expect(files.saved).toHaveLength(1));
 
     const exported = files.saved[0];

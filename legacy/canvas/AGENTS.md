@@ -22,7 +22,8 @@ Read [docs/README.md](docs/README.md) for the four documentation sections, and
 
 | Path | Purpose |
 | --- | --- |
-| `src` | The canvas itself: launcher, boards, cards, editor, library, panels, collab provider, Zustand store |
+| `packs/canvas/src` | The canvas itself: launcher, boards, cards, editor, library, panels, collab provider, Zustand store |
+| `src/main.tsx` | The shell's entry, which loads the pack-owned renderer |
 | `desktop` | The Electron shell — the window, the `suite.app.json` a hub discovers, and the updater |
 | `packages/graph` | `@suite/graph`: schema, types, typed Loro layer, workspace file and portable export |
 | `e2e` | Playwright specs, tagged `@smoke` for the smoke tier |

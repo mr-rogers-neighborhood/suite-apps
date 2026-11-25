@@ -5,7 +5,7 @@ import {
   type WorkspaceFileManifest,
 } from "@suite/graph";
 import { describe, expect, it } from "vitest";
-import type { BridgeCreateRequest, BridgeSaveRequest } from "../../../../legacy/canvas/src/host/bridge";
+import type { BridgeCreateRequest, BridgeSaveRequest } from "../../src/host/bridge";
 import { createCanvasPack } from "./bridge";
 import { memoryDocuments, memoryFiles, memoryRecents, textOf } from "./test/fakeHost";
 

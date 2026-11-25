@@ -55,7 +55,7 @@ earlier and re-checks. A sandboxed preload cannot import the shared channel
 constants, so `preload.test.ts` compares the names spelled here. The Canvas
 Desktop / Preload note owns the boundary.
 
-## legacy/canvas/src/host/bridge.ts#desktopBridge
+## packs/canvas/src/host/bridge.ts#desktopBridge
 
 The host signal. Its presence means the page is in the shell, not that a build
 flag was set; it requires the marker and a version because those are what an
@@ -63,7 +63,7 @@ older preload still publishes. The callable half is checked separately, because
 a missing method is a version mismatch rather than a reason to write elsewhere.
 The Canvas / Host note owns the required list.
 
-## legacy/canvas/src/main.tsx#bootDesktop
+## packs/canvas/src/main.tsx#bootDesktop
 
 The desktop answer is the open file, not the address bar: the shell says which
 document is open, and the session is configured from it before `App` and the
@@ -72,7 +72,7 @@ would key the document to nothing. `boot` refuses a missing method before this
 runs. The Canvas / Host note owns the mismatch, and the Canvas note owns the boot
 order.
 
-## legacy/canvas/src/App.tsx#App
+## packs/canvas/src/App.tsx#App
 
 With no workspace the shell renders the launcher; with one it renders the canvas.
 A successful desktop open owns the window, so the launcher is the state for "no
@@ -81,7 +81,7 @@ when a file was handed over, which is what leaves a place to work when the open
 is refused. `App` reads the session and the store; it neither parses the file nor
 chooses the adapter. The Canvas note owns the surface.
 
-## legacy/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
+## packs/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
 
 The adapter hydrates from the snapshot the boot already took, so a large document
 does not cross the boundary twice, and it subscribes to local updates only: an
@@ -89,7 +89,7 @@ update that arrived from sync must not be echoed back as a save. Its pending fla
 is a "something changed" bit; the snapshot is taken at write time, after the
 edits settle. The Canvas / Storage note owns the coalescing and the failure path.
 
-## legacy/canvas/src/store/useCanvasStore.ts#useCanvasStore
+## packs/canvas/src/store/useCanvasStore.ts#useCanvasStore
 
 The store holds the live document the adapter hydrated. `ready` keeps the canvas
 from painting before hydration finishes, and `flush` asks persistence to catch up

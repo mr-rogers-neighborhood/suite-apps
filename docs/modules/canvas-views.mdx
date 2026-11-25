@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/canvas/src/views
+module: packs/canvas/src/views
 title: Canvas / Views
 summary: "Saved views, the one surface that reads them, and the flag that keeps the doors shut."
 ---
@@ -18,7 +18,7 @@ shared. `views/availability.ts` is the one switch that decides whether the doors
 exist in a build; the code behind them stays. The handbook's views section and
 `legacy/canvas/docs/reference/ui.md` own the feature's rules.
 
-## legacy/canvas/src/views/availability.ts#viewsEnabled
+## packs/canvas/src/views/availability.ts#viewsEnabled
 
 `false` in every build, not only production. The flag gates the nav-row icon, the
 layer, the projection float, the library tab, the two canvas rows that make a view
@@ -31,7 +31,7 @@ blanks because a feature is paused is worse than a card nobody can edit yet.
 Turning the surface back on is this flag plus the mount sites it names; a second
 boolean somewhere else is how the two halves would disagree.
 
-## legacy/canvas/src/views/ViewSurface.tsx#ViewSurface
+## packs/canvas/src/views/ViewSurface.tsx#ViewSurface
 
 Reading and editing are two states of one surface, not two components. In read mode
 a cell is a value and a row opens its card; in edit mode the same cell is an input

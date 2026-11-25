@@ -11,19 +11,19 @@ committed as one document change, projected back into the board, snapshotted and
 written to the user's file. Two rules run through it. One gesture is one undo step,
 and a save is this window's edits rather than every change the CRDT has seen.
 
-## legacy/canvas/src/cards/PropertyField.tsx#FieldValueInput
+## packs/canvas/src/cards/PropertyField.tsx#FieldValueInput
 
 The gesture starts as a local draft. The control holds the typed text, and the
 document still has the old value, so a keystroke cannot become a write. The commit
 happens on blur, and an unparseable number or date is cancelled instead of stored.
 
-## legacy/canvas/src/cards/CardBodyEditor.tsx#CardTitleEditor
+## packs/canvas/src/cards/CardBodyEditor.tsx#CardTitleEditor
 
 The title is the other edit path. It is a single paragraph in its own container, so
 renaming a card does not touch its body, and Enter commits unless the `@` picker is
 consuming the key. An empty title is drawn as decoration, not written as text.
 
-## legacy/canvas/src/editor/LoroCollaboration.ts#LoroCollaboration
+## packs/canvas/src/editor/LoroCollaboration.ts#LoroCollaboration
 
 Each editor binds one container and owns its undo stack. Origins belonging to
 another surface, and the structural `struct:` prefix, are excluded, which is why a
@@ -51,13 +51,13 @@ template install that committed piecemeal would cost one undo press per call.
 The write is already true for the document. These next stops are how the rest of
 the app learns about it without copying it.
 
-## legacy/canvas/src/store/workspaceSnapshotStore.ts#WorkspaceSnapshotStore
+## packs/canvas/src/store/workspaceSnapshotStore.ts#WorkspaceSnapshotStore
 
 The projection applies the change to the previous snapshot and keeps the identity
 of what did not move. A card whose record changed gets a new object; the board
 around it does not.
 
-## legacy/canvas/src/store/workspaceStore.ts#useCard
+## packs/canvas/src/store/workspaceStore.ts#useCard
 
 A narrow subscriber asks for one card by id, so a field edit re-renders that card
 rather than every card on the board. The value it reads is the document's, not a
@@ -68,13 +68,13 @@ React or Zustand copy.
 A document change is not a save. The last stops are the path that turns local edits
 into bytes a backup can hold.
 
-## legacy/canvas/src/store/useCanvasStore.ts#useCanvasStore
+## packs/canvas/src/store/useCanvasStore.ts#useCanvasStore
 
 The store holds the adapter and the one `flush` action that asks persistence to
 catch up before a publish or a close. It does not assemble the file or decide where
 it goes.
 
-## legacy/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
+## packs/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
 
 The desktop adapter subscribes to local updates only, so an edit that arrived from
 a peer is not echoed back as this window's save. It keeps a pending flag and takes
