@@ -387,6 +387,57 @@ describe("packFitsHost", () => {
     expect(fit.reason).toBe("host");
     expect(fit.message).toContain("3 or later");
   });
+
+  // spec: S3.11
+  it("reads minHost and minimumHostVersion as the same effective floor", async () => {
+    const modern = await makeManifest({ minHost: 3 });
+    const legacy = await makeManifest({ minimumHostVersion: 3 });
+    const host = { contractVersion: 1, hostVersion: 2 };
+
+    expect(packFitsHost(modern, host)).toEqual(packFitsHost(legacy, host));
+    expect(packFitsHost(modern, { ...host, hostVersion: 3 })).toEqual({ ok: true });
+  });
+
+  // spec: S3.11
+  it("refuses a manifest that carries both spellings of the floor", async () => {
+    const parsed = parsePackManifest(await makeManifest({ minHost: 3, minimumHostVersion: 3 }));
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.issues.map((issue) => issue.path)).toContain("minHost");
+    expect(parsed.issues[0]?.message).toContain("carry one spelling, not both");
+  });
+
+  // spec: S3.11
+  it("refuses an unknown ring, including a host channel name", async () => {
+    for (const ring of ["nightly", "slop", "beta", "Stable"]) {
+      const parsed = parsePackManifest(
+        await makeManifest({ ring } as unknown as Partial<PackManifest>),
+      );
+      expect(parsed.ok, ring).toBe(false);
+      if (parsed.ok) continue;
+      expect(parsed.issues.map((issue) => issue.path)).toContain("ring");
+      expect(parsed.issues[0]?.message).toContain(JSON.stringify(ring));
+    }
+  });
+
+  // spec: S3.12
+  it("refuses a ring the host does not offer and names the ring and the host setting", async () => {
+    const preview = await makeManifest({ ring: "preview" });
+    const fit = packFitsHost(preview, { contractVersion: 1, hostVersion: 1 });
+    expect(fit).toEqual({
+      ok: false,
+      reason: "ring",
+      message: "Probe is a preview ring pack; Suite Go offers stable.",
+    });
+
+    expect(
+      packFitsHost(preview, {
+        contractVersion: 1,
+        hostVersion: 1,
+        rings: ["stable", "preview"],
+      }),
+    ).toEqual({ ok: true });
+  });
 });
 
 describe("the network a pack did not ask for", () => {

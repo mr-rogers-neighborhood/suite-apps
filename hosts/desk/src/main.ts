@@ -76,6 +76,7 @@ import {
   HOST_CAPABILITIES,
   HOST_CONTRACT_VERSION,
   HOST_VERSION,
+  hostRingsFor,
   type PackInfo,
   packAllows,
   packOrigin,
@@ -396,6 +397,7 @@ function packTrustOptions(): PackTrustOptions {
     hostContractVersion: HOST_CONTRACT_VERSION,
     hostVersion: HOST_VERSION,
     hostCapabilities: HOST_CAPABILITIES,
+    rings: hostRingsFor(process.env.SUITE_DESK_RINGS),
     revocations,
   };
 }
@@ -669,7 +671,9 @@ async function refreshPacks(): Promise<void> {
   }
 
   const development = devPacksEnabled({ isPackaged: app.isPackaged, env: process.env })
-    ? discoverPacks(packsRootFor(app.getAppPath()))
+    ? discoverPacks(packsRootFor(app.getAppPath()), {
+        rings: hostRingsFor(process.env.SUITE_DESK_RINGS),
+      })
     : [];
 
   packs = mergePackSources({ installed: scan.packs, development });

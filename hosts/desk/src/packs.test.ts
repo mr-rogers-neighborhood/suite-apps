@@ -2,10 +2,11 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isSafePackPath } from "@suite/pack/manifest";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   discoverPacks,
   externalLinkFor,
+  hostRingsFor,
   packAllows,
   packOrigin,
   packPartition,
@@ -89,6 +90,69 @@ describe("pack discovery", () => {
     const root = await temporaryRoot();
     await writePack(root, "future", { minimumHostVersion: 99 });
     expect(discoverPacks(root)).toEqual([]);
+  });
+
+  // spec: S3.11
+  it("reads minHost and minimumHostVersion as the same effective floor", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "modern", { minHost: 2 });
+    await writePack(root, "legacy", { minimumHostVersion: 2 });
+
+    // Both spellings are above host 1, and both load at host 2.
+    expect(discoverPacks(root, { hostVersion: 1 })).toEqual([]);
+    expect(
+      discoverPacks(root, { hostVersion: 2 })
+        .map((pack) => pack.id)
+        .sort(),
+    ).toEqual(["legacy", "modern"]);
+  });
+
+  // spec: S3.11
+  it("refuses a manifest that carries both spellings of the floor", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "confused", { minHost: 1, minimumHostVersion: 1 });
+    expect(discoverPacks(root)).toEqual([]);
+  });
+
+  // spec: S3.11
+  it("refuses an unknown ring", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "nightly", { ring: "nightly" });
+    expect(discoverPacks(root)).toEqual([]);
+  });
+
+  // spec: S3.12
+  it("refuses a ring the host does not offer, naming the pack, ring and host setting", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "preview", { ring: "preview" });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      expect(discoverPacks(root)).toEqual([]);
+      const messages = warn.mock.calls.map((call) => call.join(" "));
+      expect(messages.some((message) => message.includes("preview"))).toBe(true);
+      expect(messages.some((message) => message.includes("stable"))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  // spec: S12.10
+  it("keeps stable and adds preview only when the setting names it", () => {
+    expect(hostRingsFor(undefined)).toEqual(["stable"]);
+    expect(hostRingsFor("stable")).toEqual(["stable"]);
+    expect(hostRingsFor("preview")).toEqual(["stable", "preview"]);
+    expect(hostRingsFor("preview, beta")).toEqual(["stable", "preview"]);
+  });
+
+  // spec: S3.12
+  it("offers a preview pack only when the host's ring setting includes preview", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "preview", { ring: "preview" });
+
+    const packs = discoverPacks(root, { rings: ["stable", "preview"] });
+    expect(packs.map((pack) => pack.id)).toEqual(["preview"]);
+    expect(packs[0]?.ring).toBe("preview");
   });
 
   it("refuses a capability the host does not serve yet", async () => {

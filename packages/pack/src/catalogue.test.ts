@@ -19,17 +19,24 @@ import {
 /** 2026-06-01: the verification time every test uses unless it is testing expiry. */
 const NOW = new Date("2026-06-01T00:00:00.000Z");
 
+const MANIFEST_SIGNATURE = `${"A".repeat(86)}==`;
+
 function entry(overrides: Partial<PackIndexEntry> = {}): PackIndexEntry {
   return {
     id: "canvas",
     name: "Canvas",
     publisher: "suite",
     version: "0.2.0",
+    ring: "stable",
+    contractVersion: 1,
     description: "A whiteboard for the Suite.",
     capabilities: ["files", "relay"],
-    size: 12_345,
-    sha256: "a".repeat(64),
-    url: "https://packs.suite.run/canvas-0.2.0.suitepack",
+    archive: {
+      url: "https://packs.suite.run/canvas-0.2.0.suitepack",
+      size: 12_345,
+      sha256: "a".repeat(64),
+    },
+    signature: MANIFEST_SIGNATURE,
     ...overrides,
   };
 }
@@ -103,7 +110,7 @@ describe("catalogue index", () => {
     const signed = signPackIndex(core(), [operator.secretKeyBase64]);
     const tampered: PackIndex = {
       ...signed,
-      entries: [{ ...entry(), size: 12_346 }],
+      entries: [{ ...entry(), archive: { ...entry().archive, size: 12_346 } }],
     };
 
     const verified = await verifyPackIndex(tampered, {
@@ -128,14 +135,14 @@ describe("catalogue index", () => {
       expect(wrongFormat.issues.some((issue) => issue.path === "format")).toBe(true);
     }
 
-    const wrongVersion = parsePackIndex({ ...signed, version: 2 });
+    const wrongVersion = parsePackIndex({ ...signed, version: 3 });
     expect(wrongVersion.ok).toBe(false);
     if (!wrongVersion.ok) {
       expect(wrongVersion.issues.some((issue) => issue.path === "version")).toBe(true);
     }
 
     // A caller that skipped parsing still refuses a newer format.
-    const verified = await verifyPackIndex({ ...signed, version: 2 } as unknown as PackIndex, {
+    const verified = await verifyPackIndex({ ...signed, version: 3 } as unknown as PackIndex, {
       operatorKeys: [operator.publicKeyBase64],
       now: NOW,
     });
@@ -150,7 +157,7 @@ describe("catalogue index", () => {
 
     const duplicateEntry = parsePackIndex({
       ...signed,
-      entries: [entry(), entry({ sha256: "b".repeat(64) })],
+      entries: [entry(), entry({ archive: { ...entry().archive, sha256: "b".repeat(64) } })],
     });
     expect(duplicateEntry.ok).toBe(false);
     if (!duplicateEntry.ok) {
@@ -278,10 +285,27 @@ describe("catalogue index", () => {
       ["id", entry({ id: "../canvas" })],
       ["publisher", entry({ publisher: "Suite" })],
       ["version", entry({ version: "0.2" })],
-      ["sha256", entry({ sha256: "A".repeat(64) })],
-      ["url", entry({ url: "http://packs.suite.run/canvas.suitepack" })],
-      ["url", entry({ url: "https://user:pass@packs.suite.run/canvas.suitepack" })],
-      ["url", entry({ url: "https://packs.suite.run/canvas.suitepack#fragment" })],
+      ["signature", entry({ signature: "not-a-signature" })],
+      ["archive.sha256", entry({ archive: { ...entry().archive, sha256: "A".repeat(64) } })],
+      [
+        "archive.url",
+        entry({ archive: { ...entry().archive, url: "http://packs.suite.run/c.suitepack" } }),
+      ],
+      [
+        "archive.url",
+        entry({
+          archive: {
+            ...entry().archive,
+            url: "https://user:pass@packs.suite.run/canvas.suitepack",
+          },
+        }),
+      ],
+      [
+        "archive.url",
+        entry({
+          archive: { ...entry().archive, url: "https://packs.suite.run/canvas.suitepack#frag" },
+        }),
+      ],
     ];
 
     for (const [path, invalid] of cases) {
@@ -311,14 +335,15 @@ describe("catalogue index", () => {
       entries: Record<string, unknown>[];
     };
     expect(Object.keys(canonical.entries[0] ?? {})).toEqual([
+      "archive",
       "capabilities",
+      "contractVersion",
       "description",
       "id",
       "name",
       "publisher",
-      "sha256",
-      "size",
-      "url",
+      "ring",
+      "signature",
       "version",
     ]);
     expect(canonical.entries[0]?.capabilities).toEqual(["files", "relay"]);
@@ -339,10 +364,15 @@ describe("catalogue index", () => {
       name: "Canvas",
       publisher: "suite",
       version: "0.2.0",
+      ring: "stable",
+      contractVersion: 1,
       capabilities: ["files", "relay"],
-      size: 12_345,
-      sha256: "a".repeat(64),
-      url: "https://packs.suite.run/canvas-0.2.0.suitepack",
+      archive: {
+        url: "https://packs.suite.run/canvas-0.2.0.suitepack",
+        size: 12_345,
+        sha256: "a".repeat(64),
+      },
+      signature: MANIFEST_SIGNATURE,
     };
     const absent = new TextDecoder().decode(
       canonicalPackIndexBytes(core({ entries: [noDescription] })),
@@ -360,6 +390,55 @@ describe("catalogue index", () => {
     const operator = await generatePackKeyPair();
     const signed = signPackIndex(withTwo, [operator.secretKeyBase64]);
     expect(canonicalPackIndexBytes(signed)).toEqual(canonicalPackIndexBytes(withTwo));
+  });
+
+  // spec: S12.9
+  it("reads a version 1 index as contract 1 and stable without changing its bytes", async () => {
+    const operator = await generatePackKeyPair();
+    const normalized = core({
+      version: 1,
+      entries: [entry({ ring: "preview", contractVersion: 7, minHost: 9 })],
+    });
+    const signed = signPackIndex(normalized, [operator.secretKeyBase64]);
+
+    // A real v1 index has the flat archive fields and none of the v2 facts. The
+    // signature above covers that v1 canonical form, not the normalised object.
+    const v1Json = {
+      ...signed,
+      entries: signed.entries.map((value) => ({
+        id: value.id,
+        name: value.name,
+        publisher: value.publisher,
+        version: value.version,
+        description: value.description,
+        capabilities: value.capabilities,
+        size: value.archive.size,
+        sha256: value.archive.sha256,
+        url: value.archive.url,
+      })),
+    };
+
+    const parsed = parsePackIndexJson(JSON.stringify(v1Json));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.version).toBe(1);
+    expect(parsed.value.entries[0]).toMatchObject({
+      ring: "stable",
+      contractVersion: 1,
+      archive: {
+        url: "https://packs.suite.run/canvas-0.2.0.suitepack",
+        size: 12_345,
+        sha256: "a".repeat(64),
+      },
+    });
+    expect(parsed.value.entries[0]).not.toHaveProperty("signature");
+
+    // Verification still uses the v1 canonical bytes, so the old signature holds.
+    const verified = await verifyPackIndex(parsed.value, {
+      operatorKeys: [operator.publicKeyBase64],
+      now: NOW,
+    });
+    expect(verified.ok).toBe(true);
   });
 
   // spec: S12.2

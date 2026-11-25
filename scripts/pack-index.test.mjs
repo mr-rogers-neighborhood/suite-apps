@@ -28,7 +28,17 @@ function workspace() {
 /** Build one signed pack and return its archive path. */
 async function buildPack(
   root,
-  { id, name, version, description, capabilities, platforms = ["desktop"] },
+  {
+    id,
+    name,
+    version,
+    description,
+    capabilities,
+    platforms = ["desktop"],
+    ring,
+    minHost,
+    contractVersion = 1,
+  },
 ) {
   const directory = join(root, `${id}-${version}`);
   mkdirSync(join(directory, "assets"), { recursive: true });
@@ -39,8 +49,10 @@ async function buildPack(
       name,
       version,
       description,
+      ...(ring === undefined ? {} : { ring }),
       entry: "index.html",
-      contractVersion: 1,
+      contractVersion,
+      ...(minHost === undefined ? {} : { minHost }),
       capabilities,
       platforms,
     }),
@@ -105,10 +117,12 @@ describe("pack-index build", () => {
     assert.equal(canvasEntry.description, "A whiteboard for the Suite.");
     assert.deepEqual(canvasEntry.capabilities, ["files", "relay"]);
     assert.deepEqual(canvasEntry.platforms, ["desktop"]);
-    assert.equal(canvasEntry.url, "https://packs.suite.run/canvas-0.2.0.suitepack");
+    assert.equal(canvasEntry.ring, "stable");
+    assert.equal(canvasEntry.contractVersion, 1);
+    assert.equal(canvasEntry.archive.url, "https://packs.suite.run/canvas-0.2.0.suitepack");
     const canvasBytes = readFileSync(canvas);
-    assert.equal(canvasEntry.size, statSync(canvas).size);
-    assert.equal(canvasEntry.sha256, await sha256Hex(canvasBytes));
+    assert.equal(canvasEntry.archive.size, statSync(canvas).size);
+    assert.equal(canvasEntry.archive.sha256, await sha256Hex(canvasBytes));
 
     const verified = await verifyPackIndexJson(readFileSync(outPath, "utf8"), {
       operatorKeys: [operator.publicKeyBase64],
@@ -116,6 +130,46 @@ describe("pack-index build", () => {
     });
     assert.equal(verified.ok, true);
     if (verified.ok) assert.equal(verified.digest, built.digest);
+  });
+
+  // spec: S12.9
+  it("writes the effective ring and floor into a v2 entry and reads them back", async () => {
+    const root = workspace();
+    const preview = await buildPack(root, {
+      id: "canvas",
+      name: "Canvas",
+      version: "0.3.0",
+      capabilities: ["documents"],
+      ring: "preview",
+      minHost: 2,
+      contractVersion: 2,
+    });
+    const operator = await generatePackKeyPair();
+
+    const built = await buildPackIndex({
+      archives: [preview],
+      urlBase: "https://packs.suite.run/",
+      sequence: 1,
+      generatedAt: GENERATED_AT,
+      expires: EXPIRES,
+      privateKeys: [operator.secretKeyBase64],
+    });
+
+    assert.equal(built.index.version, 2);
+    const entry = built.index.entries[0];
+    assert.equal(entry.ring, "preview");
+    assert.equal(entry.contractVersion, 2);
+    assert.equal(entry.minHost, 2);
+    assert.match(entry.signature, /^[A-Za-z0-9+/]{86}==$/u);
+
+    const parsed = parsePackIndexJson(built.json);
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    assert.equal(parsed.value.version, 2);
+    assert.equal(parsed.value.entries[0]?.ring, "preview");
+    assert.equal(parsed.value.entries[0]?.contractVersion, 2);
+    assert.equal(parsed.value.entries[0]?.minHost, 2);
+    assert.equal(parsed.value.entries[0]?.archive.sha256, entry.archive.sha256);
   });
 
   // spec: S12.2

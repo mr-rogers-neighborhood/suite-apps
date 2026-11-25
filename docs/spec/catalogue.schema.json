@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://suite.run/spec/superapp/0.1/catalogue.schema.json",
   "title": "Suite catalogue index",
-  "description": "The signed catalogue index a host verifies before it lists a pack (S12.2). Version 2 adds the ring, the contract version, the host floor and the manifest signature to each entry (S12.9). The entry shape here is the target: `@suite/pack` parses index version 1 today, and the builder and the host switch to v2 together.",
+  "description": "The signed catalogue index a host verifies before it lists a pack (S12.2). Version 2 adds the ring, the contract version, the host floor and the manifest signature to each entry (S12.9). `@suite/pack` parses this shape and reads a version 1 index as contract 1.",
   "$comment": "Capabilities resolve to the pack manifest's closed vocabulary in manifest.schema.json, so a new capability is added once. `entries` order is id, then version, then publisher; the canonical bytes sort it that way.",
   "type": "object",
   "additionalProperties": false,

@@ -277,9 +277,9 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
           version: entry.version,
           capabilities: entry.capabilities,
           platform: cataloguePlatform(entry.platforms, entry.capabilities),
-          sizeBytes: entry.size,
-          sha256: entry.sha256,
-          url: entry.url,
+          sizeBytes: entry.archive.size,
+          sha256: entry.archive.sha256,
+          url: entry.archive.url,
           publisher: entry.publisher,
           installedVersion,
           action: actionFor(installedVersion, entry.version),
@@ -332,7 +332,7 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
 
     let bytes: Uint8Array;
     try {
-      bytes = await fetchArchive(entry.url, fetchImpl);
+      bytes = await fetchArchive(entry.archive.url, fetchImpl);
     } catch (error) {
       return {
         ok: false,
@@ -343,7 +343,7 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
 
     // Checked here as well as inside the store so the refusal happens before the zip reader sees
     // a byte. The store repeats it because it is the last gate before extraction.
-    if ((await sha256Hex(bytes)) !== entry.sha256) {
+    if ((await sha256Hex(bytes)) !== entry.archive.sha256) {
       return {
         ok: false,
         reason: "digest",
@@ -359,8 +359,8 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
       expected: {
         id: entry.id,
         version: entry.version,
-        sha256: entry.sha256,
-        size: entry.size,
+        sha256: entry.archive.sha256,
+        size: entry.archive.size,
       },
     });
     if (!outcome.ok) {
@@ -441,9 +441,9 @@ function entryToCatalogue(entry: PackIndexEntry): CatalogueEntry {
     version: entry.version,
     capabilities: entry.capabilities,
     platform: cataloguePlatform(entry.platforms, entry.capabilities),
-    sizeBytes: entry.size,
-    sha256: entry.sha256,
-    url: entry.url,
+    sizeBytes: entry.archive.size,
+    sha256: entry.archive.sha256,
+    url: entry.archive.url,
     publisher: entry.publisher,
     installedVersion: null,
     action: "install",

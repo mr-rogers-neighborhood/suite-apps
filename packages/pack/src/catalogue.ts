@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { canonicalJsonValue, compareCodeUnits, findDuplicateJsonKey } from "./canonical.js";
 import { PACK_CAPABILITIES, type PackCapability } from "./capabilities.js";
-import { isSafePackId, isSafePackVersion, isSha256Hex } from "./manifest.js";
+import {
+  DEFAULT_PACK_RING,
+  isSafePackId,
+  isSafePackVersion,
+  isSha256Hex,
+  PACK_RINGS,
+  type PackRing,
+} from "./manifest.js";
 import { isSafePackPlatform } from "./platforms.js";
 import { publicKeyFromSecret, sha256Hex, signBytes, verifyBytes } from "./signature.js";
 import { isPublisherKey, isSafePublisherId } from "./trust.js";
@@ -29,7 +36,13 @@ import { isPublisherKey, isSafePublisherId } from "./trust.js";
  */
 
 export const PACK_INDEX_FORMAT = "suite.catalogue";
-export const PACK_INDEX_VERSION = 1;
+/**
+ * The index version this host writes. A host still reads version 1, whose entries
+ * carry the archive fields at the top level and no ring, as pack contract 1.
+ */
+export const PACK_INDEX_VERSION = 2;
+export const PACK_INDEX_VERSIONS = [1, 2] as const;
+export type PackIndexVersion = (typeof PACK_INDEX_VERSIONS)[number];
 
 /** A host refuses an index file larger than this before parsing it. */
 export const MAX_INDEX_BYTES = 2 * 1024 * 1024;
@@ -63,7 +76,25 @@ export function isSafeArchiveUrl(value: string): boolean {
   );
 }
 
-/** What the catalogue says about one pack version, and where its archive is. */
+/** Where a `.suitepack` is and what it hashes to (S12.9). */
+export interface PackIndexArchive {
+  /** An absolute HTTPS URL for the `.suitepack` archive. */
+  readonly url: string;
+  /** The archive's byte length. */
+  readonly size: number;
+  /** Lower-case hex SHA-256 of the archive bytes. */
+  readonly sha256: string;
+}
+
+/**
+ * What the catalogue says about one pack version.
+ *
+ * The shape is the v2 entry's, whichever index version it came from: a version 1
+ * entry is normalised on read so a caller sees one entry type. A v1 entry has no
+ * `ring`, `contractVersion` or manifest `signature` in its bytes, so reading it
+ * yields `stable`, contract `1` and no signature, exactly what S12.9 says an
+ * index written before the clause means.
+ */
 export interface PackIndexEntry {
   /** The pack id, the same one its manifest carries. */
   readonly id: string;
@@ -72,6 +103,12 @@ export interface PackIndexEntry {
   /** The publisher id whose key signed the pack. */
   readonly publisher: string;
   readonly version: string;
+  /** The pack's effective ring; an index v1 entry is `stable`. */
+  readonly ring: PackRing;
+  /** The effective pack contract; an index v1 entry is contract `1`. */
+  readonly contractVersion: number;
+  /** The effective host floor, absent when the manifest declares none. */
+  readonly minHost?: number;
   readonly description?: string;
   readonly capabilities: readonly PackCapability[];
   /**
@@ -80,12 +117,13 @@ export interface PackIndexEntry {
    * field existed; the host then reports the row as unknown, never universal.
    */
   readonly platforms?: readonly string[];
-  /** The archive's byte length. */
-  readonly size: number;
-  /** Lower-case hex SHA-256 of the archive bytes. */
-  readonly sha256: string;
-  /** An absolute HTTPS URL for the `.suitepack` archive. */
-  readonly url: string;
+  /** Where the archive is and what it hashes to. */
+  readonly archive: PackIndexArchive;
+  /**
+   * The manifest's Ed25519 signature, standard base64, so a host can compare the
+   * entry with the archive it unpacked (S12.7). Absent on a v1 entry.
+   */
+  readonly signature?: string;
 }
 
 /** One operator's Ed25519 signature over the canonical index bytes. */
@@ -100,7 +138,7 @@ export interface PackIndexSignature {
 export interface PackIndexCore {
   readonly format: typeof PACK_INDEX_FORMAT;
   /** The index format version, not the catalogue's contents. */
-  readonly version: typeof PACK_INDEX_VERSION;
+  readonly version: PackIndexVersion;
   /** Increases by at least one with every published index. */
   readonly sequence: number;
   /** When this index was generated, as an ISO 8601 timestamp. */
@@ -127,22 +165,50 @@ export type PackIndexParse =
   | { readonly ok: true; readonly value: PackIndex }
   | { readonly ok: false; readonly issues: readonly PackIndexIssue[] };
 
-const entrySchema = z
+/** Standard base64 of a 64-byte Ed25519 signature, the manifest signature a v2 entry copies. */
+const PACK_SIGNATURE = /^[A-Za-z0-9+/]{86}==$/u;
+
+const entryBaseShape = {
+  id: z.string().refine(isSafePackId, "a lower-case pack id"),
+  name: z.string().min(1).max(64),
+  publisher: z.string().refine(isSafePublisherId, "a lower-case publisher id"),
+  version: z.string().refine(isSafePackVersion, "a semver version"),
+  description: z.string().min(1).max(200).optional(),
+  capabilities: z.array(z.enum(PACK_CAPABILITIES)).refine(unique, "duplicate capability"),
+  platforms: z
+    .array(z.string().refine(isSafePackPlatform, "a lower-case host kind"))
+    .min(1)
+    .refine(unique, "duplicate platform")
+    .optional(),
+};
+
+/** A version 1 entry: the archive fields at the top level and no ring (S12.9). */
+const entryV1Schema = z
   .object({
-    id: z.string().refine(isSafePackId, "a lower-case pack id"),
-    name: z.string().min(1).max(64),
-    publisher: z.string().refine(isSafePublisherId, "a lower-case publisher id"),
-    version: z.string().refine(isSafePackVersion, "a semver version"),
-    description: z.string().min(1).max(200).optional(),
-    capabilities: z.array(z.enum(PACK_CAPABILITIES)).refine(unique, "duplicate capability"),
-    platforms: z
-      .array(z.string().refine(isSafePackPlatform, "a lower-case host kind"))
-      .min(1)
-      .refine(unique, "duplicate platform")
-      .optional(),
+    ...entryBaseShape,
     size: z.number().int().nonnegative(),
     sha256: z.string().refine(isSha256Hex, "a lower-case hex SHA-256"),
     url: z.string().refine(isSafeArchiveUrl, "an absolute HTTPS archive URL"),
+  })
+  .strict();
+
+const archiveSchema = z
+  .object({
+    url: z.string().refine(isSafeArchiveUrl, "an absolute HTTPS archive URL"),
+    size: z.number().int().nonnegative(),
+    sha256: z.string().refine(isSha256Hex, "a lower-case hex SHA-256"),
+  })
+  .strict();
+
+/** A version 2 entry: the grouped archive, effective ring and contract, and the manifest signature. */
+const entryV2Schema = z
+  .object({
+    ...entryBaseShape,
+    ring: z.enum(PACK_RINGS),
+    contractVersion: z.number().int().positive(),
+    minHost: z.number().int().positive().optional(),
+    archive: archiveSchema,
+    signature: z.string().regex(PACK_SIGNATURE, "a 64-byte base64 Ed25519 signature"),
   })
   .strict();
 
@@ -157,19 +223,38 @@ function unique<T>(items: readonly T[]): boolean {
   return new Set(items).size === items.length;
 }
 
-const indexSchema = z
+const indexV1Schema = z
   .object({
     format: z.literal(PACK_INDEX_FORMAT),
-    version: z.literal(PACK_INDEX_VERSION),
+    version: z.literal(1),
     sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     generatedAt: z.string().refine(isIsoTimestamp, "an ISO 8601 timestamp"),
     previous: z.string().refine(isSha256Hex, "a lower-case hex SHA-256").optional(),
     expires: z.string().refine(isIsoTimestamp, "an ISO 8601 timestamp"),
     threshold: z.number().int().positive(),
-    entries: z.array(entrySchema).max(MAX_INDEX_ENTRIES),
+    entries: z.array(entryV1Schema).max(MAX_INDEX_ENTRIES),
     signatures: z.array(signatureSchema).min(1).max(MAX_INDEX_SIGNATURES),
   })
-  .strict()
+  .strict();
+
+const indexV2Schema = z
+  .object({
+    format: z.literal(PACK_INDEX_FORMAT),
+    version: z.literal(2),
+    sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    generatedAt: z.string().refine(isIsoTimestamp, "an ISO 8601 timestamp"),
+    previous: z.string().refine(isSha256Hex, "a lower-case hex SHA-256").optional(),
+    expires: z.string().refine(isIsoTimestamp, "an ISO 8601 timestamp"),
+    threshold: z.number().int().positive(),
+    entries: z.array(entryV2Schema).max(MAX_INDEX_ENTRIES),
+    signatures: z.array(signatureSchema).min(1).max(MAX_INDEX_SIGNATURES),
+  })
+  .strict();
+
+type RawPackIndex = z.infer<typeof indexV1Schema> | z.infer<typeof indexV2Schema>;
+
+const indexSchema = z
+  .discriminatedUnion("version", [indexV1Schema, indexV2Schema])
   .superRefine((value, context) => {
     const versions = new Set<string>();
     value.entries.forEach((entry, index) => {
@@ -228,6 +313,63 @@ const indexSchema = z
     }
   });
 
+/**
+ * Put a parsed index into the one entry shape callers see.
+ *
+ * A version 1 index is read as contract 1 and `stable`, with its top-level
+ * archive fields grouped. Its bytes are untouched: `canonicalPackIndexBytes`
+ * still writes the v1 shape for it, so the signature an older index carries
+ * keeps verifying.
+ */
+function normaliseIndex(value: RawPackIndex): PackIndex {
+  const head = {
+    format: value.format,
+    version: value.version,
+    sequence: value.sequence,
+    generatedAt: value.generatedAt,
+    ...(value.previous === undefined ? {} : { previous: value.previous }),
+    expires: value.expires,
+    threshold: value.threshold,
+    signatures: value.signatures,
+  };
+
+  if (value.version === 2) {
+    return {
+      ...head,
+      entries: value.entries.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        publisher: entry.publisher,
+        version: entry.version,
+        ring: entry.ring,
+        contractVersion: entry.contractVersion,
+        ...(entry.minHost === undefined ? {} : { minHost: entry.minHost }),
+        ...(entry.description === undefined ? {} : { description: entry.description }),
+        capabilities: entry.capabilities,
+        ...(entry.platforms === undefined ? {} : { platforms: entry.platforms }),
+        archive: entry.archive,
+        signature: entry.signature,
+      })),
+    };
+  }
+
+  return {
+    ...head,
+    entries: value.entries.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      publisher: entry.publisher,
+      version: entry.version,
+      ring: DEFAULT_PACK_RING,
+      contractVersion: 1,
+      ...(entry.description === undefined ? {} : { description: entry.description }),
+      capabilities: entry.capabilities,
+      ...(entry.platforms === undefined ? {} : { platforms: entry.platforms }),
+      archive: { url: entry.url, size: entry.size, sha256: entry.sha256 },
+    })),
+  };
+}
+
 export function parsePackIndex(value: unknown): PackIndexParse {
   const parsed = indexSchema.safeParse(value);
   if (!parsed.success) {
@@ -239,7 +381,7 @@ export function parsePackIndex(value: unknown): PackIndexParse {
       })),
     };
   }
-  return { ok: true, value: parsed.data as PackIndex };
+  return { ok: true, value: normaliseIndex(parsed.data) };
 }
 
 /**
@@ -321,7 +463,7 @@ export function canonicalPackIndexBytes(index: PackIndexCore): Uint8Array {
     if (field === "entries") {
       canonical.entries = [...index.entries]
         .sort(comparePackIndexEntries)
-        .map((entry) => canonicalEntry(entry));
+        .map((entry) => canonicalEntry(entry, index.version));
     } else {
       canonical[field] = value;
     }
@@ -329,9 +471,36 @@ export function canonicalPackIndexBytes(index: PackIndexCore): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(canonical));
 }
 
-function canonicalEntry(entry: PackIndexEntry): Record<string, unknown> {
+/**
+ * The entry as the index version writes it.
+ *
+ * A version 1 index keeps the flat archive fields its signature covers; a
+ * version 2 index writes the grouped archive plus the effective ring, contract
+ * and manifest signature.
+ */
+function canonicalEntry(entry: PackIndexEntry, version: PackIndexVersion): Record<string, unknown> {
+  const capabilities = [...new Set(entry.capabilities)].sort(compareCodeUnits);
+
+  if (version === 1) {
+    const canonical: Record<string, unknown> = {
+      id: entry.id,
+      name: entry.name,
+      publisher: entry.publisher,
+      version: entry.version,
+      capabilities,
+      size: entry.archive.size,
+      sha256: entry.archive.sha256,
+      url: entry.archive.url,
+    };
+    if (entry.description !== undefined) canonical.description = entry.description;
+    if (entry.platforms !== undefined) {
+      canonical.platforms = [...new Set(entry.platforms)].sort(compareCodeUnits);
+    }
+    return canonicalJsonValue(canonical) as Record<string, unknown>;
+  }
+
   const canonical = canonicalJsonValue(entry) as Record<string, unknown>;
-  canonical.capabilities = [...new Set(entry.capabilities)].sort(compareCodeUnits);
+  canonical.capabilities = capabilities;
   if (entry.platforms !== undefined) {
     canonical.platforms = [...new Set(entry.platforms)].sort(compareCodeUnits);
   }
@@ -428,11 +597,11 @@ export async function verifyPackIndex(
       message: `This is not a Suite catalogue index: format is ${JSON.stringify(index.format)}.`,
     };
   }
-  if (index.version !== PACK_INDEX_VERSION) {
+  if (!(PACK_INDEX_VERSIONS as readonly number[]).includes(index.version)) {
     return {
       ok: false,
       reason: "version",
-      message: `This index is format version ${index.version}; this host implements ${PACK_INDEX_VERSION}.`,
+      message: `This index is format version ${index.version}; this host implements ${PACK_INDEX_VERSIONS.join(" and ")}.`,
     };
   }
 

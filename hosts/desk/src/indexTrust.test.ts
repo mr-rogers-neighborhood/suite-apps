@@ -57,10 +57,15 @@ async function fixture(overrides: Partial<PackIndexCore> = {}): Promise<Fixture>
     name: "Demo",
     publisher: "suite",
     version: "1.0.0",
+    ring: "stable",
+    contractVersion: 1,
     capabilities: [],
-    size: archive.byteLength,
-    sha256: await sha256Hex(archive),
-    url: ARCHIVE_URL,
+    archive: {
+      url: ARCHIVE_URL,
+      size: archive.byteLength,
+      sha256: await sha256Hex(archive),
+    },
+    signature: `${"A".repeat(86)}==`,
   };
   return {
     core: {

@@ -258,9 +258,9 @@ function indexPack(entry: PackIndexEntry, fetchImpl: CatalogueFetch): VerifiedIn
     version: entry.version,
     description: entry.description ?? null,
     capabilities: entry.capabilities,
-    sizeBytes: entry.size,
-    sha256: entry.sha256,
-    readArchive: () => readArchive(entry.url, fetchImpl),
+    sizeBytes: entry.archive.size,
+    sha256: entry.archive.sha256,
+    readArchive: () => readArchive(entry.archive.url, fetchImpl),
   };
 }
 
