@@ -11,7 +11,9 @@ pnpm site:build        # writes site/dist
 ```
 
 `pnpm site:build` is the only render command. The output is a pure function of `docs/`, `site/src/`
-and `docs/assets/suite-icon.png`.
+and `docs/assets/suite-icon.png`. `scripts/site-check.mjs` runs on `main` from
+`.github/workflows/site-check.yml`; it checks the newest release links on the README, landing page
+and docs index, where the release list is available.
 
 ## Layout
 

@@ -1,0 +1,32 @@
+# Check the newest release links on the README, landing page and docs index.
+#
+# The site itself builds on Cloudflare Pages. This check needs the release list
+# and the `gh` CLI, so it stays in GitHub Actions on main and manual dispatch,
+# not in the Pages build.
+
+name: site-check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-links:
+    name: release links
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Site and docs release links
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/site-check.mjs
