@@ -63,14 +63,14 @@ The write becomes one change. The commit's origin is also the change message, so
 one gesture is one undo step and one history point. A write that commits inside
 another gesture is what splits it in the panel.
 
-## legacy/canvas/src/store/useCanvasStore.ts#useCanvasStore
+## packs/canvas/src/store/useCanvasStore.ts#useCanvasStore
 
 Canvas holds the live document the store created, so the write the reader makes
 is already on the document the rest of this path reads. The store's `flush` action
 is the one call that asks persistence to catch up, and the store module's note
 owns the state around it.
 
-## legacy/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
+## packs/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
 
 The adapter subscribes to local updates only, so a peer's synced edit is not
 echoed back as a save. It holds the invariant that a save is this window's edits,

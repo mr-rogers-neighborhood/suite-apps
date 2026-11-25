@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/canvas/src/editor
+module: packs/canvas/src/editor
 title: Canvas / Editor
 summary: "The body schema, the collaboration plugins and the media nodes behind every card."
 ---
@@ -18,7 +18,7 @@ separate decisions. Media bytes live beside the document, not inside it.
 `legacy/canvas/docs/reference/editing.md` owns the editing rules; these notes are the
 seams the rest of the app depends on.
 
-## legacy/canvas/src/editor/LoroCollaboration.ts#LoroCollaboration
+## packs/canvas/src/editor/LoroCollaboration.ts#LoroCollaboration
 
 One extension instance binds one editor to one Loro container. The title and the
 body each get their own, which is why renaming a card does not touch its body and
@@ -31,7 +31,7 @@ schema, and the cursor plugin is added only when a cursor store exists. The
 invariant is scoped undo: what a keystroke reverses is decided by which editor the
 caret is in, and no editor reaches into another card's text.
 
-## legacy/canvas/src/editor/cardEditorExtensions.ts#cardBodySchemaExtensions
+## packs/canvas/src/editor/cardEditorExtensions.ts#cardBodySchemaExtensions
 
 The body schema, with no collaboration in it. StarterKit supplies the block nodes
 and marks with its own undo history disabled, because `LoroCollaboration` ships
@@ -47,7 +47,7 @@ registered on purpose: a document written before the `media` block existed must
 keep rendering, and `migrateLegacyMedia` converts it the first time the body is
 edited.
 
-## file: legacy/canvas/src/editor/editorSchemaContract.test.ts
+## file: packs/canvas/src/editor/editorSchemaContract.test.ts
 
 The contract is the test's whole subject: build the schema the way the editor does,
 minus collaboration, and compare its node names, mark names and per-node attributes

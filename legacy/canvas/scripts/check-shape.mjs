@@ -21,6 +21,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_ROOTS = [
   "src",
   "../../packs/canvas/pack",
+  "../../packs/canvas/src",
   "legacy/collab-server/src",
   "legacy/control-plane/src",
   "services",
@@ -39,7 +40,7 @@ const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const DATA_LIST = /(?:^|\/)recoveryWords\.ts$/;
 const MAX_FILE_LINES = 900;
 const MAX_PARAMS = 6;
-const OBSERVE_ALLOWED = "src/store/workspaceSnapshotStore.ts";
+const OBSERVE_ALLOWED = "../../packs/canvas/src/store/workspaceSnapshotStore.ts";
 
 /**
  * The one file allowed to inject markup, and why it is not a hole.
@@ -58,13 +59,13 @@ const OBSERVE_ALLOWED = "src/store/workspaceSnapshotStore.ts";
  * time, so neither has a path from a reader to the markup.
  */
 const DYNAMIC_HTML_ALLOWED = new Map([
-  ["src/icons/IconGlyph.tsx", "icon markup authored in the repository"],
+  ["../../packs/canvas/src/icons/IconGlyph.tsx", "icon markup authored in the repository"],
   [
-    "src/handbook/HandbookBubble.tsx",
+    "../../packs/canvas/src/handbook/HandbookBubble.tsx",
     "article HTML rendered from handbook/*.md by scripts/sync-handbook.mjs",
   ],
   [
-    "src/reader/ReaderChapter.tsx",
+    "../../packs/canvas/src/reader/ReaderChapter.tsx",
     "an EPUB chapter after sanitiseChapter, which allowlists elements and refuses remote resources",
   ],
 ]);

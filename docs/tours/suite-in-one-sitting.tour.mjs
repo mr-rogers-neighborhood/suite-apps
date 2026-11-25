@@ -47,7 +47,7 @@ export default {
     },
     {
       kind: "node",
-      target: { kind: "symbol", id: "legacy/canvas/src/App.tsx#App", level: "file" },
+      target: { kind: "symbol", id: "packs/canvas/src/App.tsx#App", level: "file" },
       note: "The renderer boots without reading the document format; the bridge supplies it.",
     },
     {

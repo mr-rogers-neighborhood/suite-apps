@@ -58,7 +58,8 @@ the CRDT and nowhere else.
 
 | Path | What lives there |
 | --- | --- |
-| `src` | The renderer: launcher, boards, cards, editor, panels |
+| `packs/canvas/src` | The renderer: launcher, boards, cards, editor, panels |
+| `src/main.tsx` | The shell's entry, which loads the pack-owned renderer |
 | `desktop` | The Electron shell: the file, the lock, the window, packaging |
 | `packages/graph` | `@suite/graph`: the schema and the document layer |
 | `packages/import-obsidian` | Reads an Obsidian vault into a document |

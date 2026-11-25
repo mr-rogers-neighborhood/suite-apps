@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/canvas/src/canvas
+module: packs/canvas/src/canvas
 title: Canvas / Canvas
 summary: "The board surface: placements drawn as nodes, gestures with one owner, and a camera over a document it never writes."
 ---
@@ -21,7 +21,7 @@ the preview and the committed result come from one function.
 `legacy/canvas/docs/reference/canvas.md` owns the gesture table and the board module
 map; this page records the invariants a reader needs before changing one.
 
-## legacy/canvas/src/canvas/board/BoardView.tsx#BoardView
+## packs/canvas/src/canvas/board/BoardView.tsx#BoardView
 
 Hook order is the invariant. The projection is derived first, then the refs that
 hold gesture flags, then sections, nodes, selection, commands, keyboard and menu,
@@ -36,7 +36,7 @@ Pointer presence is published from the same root, throttled, in flow coordinates
 A recorded tour claims the click on the capture phase too, because the purpose has
 to decide the gesture before the card or React Flow does.
 
-## legacy/canvas/src/canvas/board/BoardSurface.tsx#BoardSurface
+## packs/canvas/src/canvas/board/BoardSurface.tsx#BoardSurface
 
 The React Flow element, configured for a document rather than a diagram.
 `onlyRenderVisibleElements` unmounts a card outside the viewport while React Flow
@@ -51,7 +51,7 @@ on top as a second refusal. Panning and zooming stay in every mode; selection
 leaves with the drag. Double-click on the pane creates, so `zoomOnDoubleClick` is
 off — one gesture cannot both make a card and move the camera.
 
-## legacy/canvas/src/canvas/board/useBoardProjection.ts#useBoardProjection
+## packs/canvas/src/canvas/board/useBoardProjection.ts#useBoardProjection
 
 Every board-scoped map is derived once per snapshot change and nothing here
 writes. `boardPlacements` is keyed by card id, `boardOrder` is paint order (z, then
@@ -65,7 +65,7 @@ line while the relationship stays in the inspector. That rule belongs here rathe
 than in the edge component, because the geometry is what decides whether the link
 is drawable at all.
 
-## legacy/canvas/src/canvas/board/useBoardNodes.ts#useBoardNodes
+## packs/canvas/src/canvas/board/useBoardNodes.ts#useBoardNodes
 
 Placements become React Flow nodes here. The node type is chosen from the card:
 `isWhiteboardCard` first, then `isPortalCard`, else `note`. React Flow holds the
@@ -79,7 +79,7 @@ when the payload clears, so a remote gesture never becomes a local save. A node
 whose data and position did not change is returned as the same object, which is
 what keeps a card that did not move from remounting its editor.
 
-## legacy/canvas/src/canvas/board/useBoardCamera.ts#useBoardCamera
+## packs/canvas/src/canvas/board/useBoardCamera.ts#useBoardCamera
 
 The camera is reader state, one viewport per board in `useUiStore.boardViewports`.
 It is written from `onMoveEnd` and once when a board opens, so a return lands where

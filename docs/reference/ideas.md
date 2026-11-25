@@ -66,5 +66,5 @@ command reports and never fails on a gap; re-run it rather than trusting a stale
 
 The largest modules with no prose are `legacy/canvas/packages/import-obsidian` (143 symbols), the Canvas
 graph publish package (125), `legacy/help` (121), `legacy/help/src/renderer` (120) and
-`legacy/canvas/src/library` (114). The help and Canvas rows are the densest, but they are app-owned
+`packs/canvas/src/library` (114). The help and Canvas rows are the densest, but they are app-owned
 prose: this pass records them and does not write app module notes.

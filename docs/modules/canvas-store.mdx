@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/canvas/src/store
+module: packs/canvas/src/store
 title: Canvas / Store
 summary: "The live document, the persistence adapter and the UI state around them."
 ---
@@ -17,7 +17,7 @@ or localStorage. A component reads the document through a selector and writes it
 through the graph's facade; the stores only remember which document is open and
 what the interface is doing.
 
-## legacy/canvas/src/store/useCanvasStore.ts#useCanvasStore
+## packs/canvas/src/store/useCanvasStore.ts#useCanvasStore
 
 One document per tab, created at module load after the session has settled. The
 store holds the `WorkspaceDocument`, the presence stores, the persistence adapter
@@ -29,14 +29,14 @@ writes to IndexedDB in a browser and to the shell's file on the desktop. A store
 that imported `App` or created its document before the session resolved would key
 the document to nothing, which is why the entry point settles the session first.
 
-## legacy/canvas/src/store/useCanvasStore.ts#ROOM_ID
+## packs/canvas/src/store/useCanvasStore.ts#ROOM_ID
 
 The room is the identity a local copy and a sync session are keyed by. It is the
 workspace id for the owner and a projection id for a share, so a viewer never
 loads the owner's cached workspace just because both links name the same board.
 The room comes from the session, not from a URL param read here.
 
-## legacy/canvas/src/store/useCanvasStore.ts#persistence
+## packs/canvas/src/store/useCanvasStore.ts#persistence
 
 The local copy is an adapter behind three methods: load, write and flush. The
 store does not know whether those bytes go to IndexedDB or to a file owned by the
@@ -44,7 +44,7 @@ main process, and that is what keeps a browser build from growing a second save
 path. A failed write is reported through the adapter rather than thrown into a
 React render.
 
-## legacy/canvas/src/store/workspaceSnapshotStore.ts#WorkspaceSnapshotStore
+## packs/canvas/src/store/workspaceSnapshotStore.ts#WorkspaceSnapshotStore
 
 The projection is derived, not stored. The class subscribes to the document's
 observer, applies one change to the previous snapshot and keeps array identity
@@ -58,33 +58,33 @@ not keep the document alive. `refresh` re-reads the whole document when hydratio
 or the first sync lands between the initial read and the observer registration;
 it merges into the existing snapshot so unchanged sections keep their identity.
 
-## legacy/canvas/src/store/workspaceSnapshotStore.ts#workspaceSnapshotStore
+## packs/canvas/src/store/workspaceSnapshotStore.ts#workspaceSnapshotStore
 
 One snapshot store per live `WorkspaceDocument`, held in a `WeakMap`. Two
 components that call the hook for the same document share one subscription and
 one cache; a new document gets a new store without an explicit teardown step.
 
-## legacy/canvas/src/store/workspaceStore.ts#useWorkspaceSnapshot
+## packs/canvas/src/store/workspaceStore.ts#useWorkspaceSnapshot
 
 The whole-workspace binding for consumers that genuinely read several sections.
 It refreshes the projection when `ready` or `synced` changes, then reads through
 `useSyncExternalStore`, so React sees the document, not a Zustand mirror of it.
 
-## legacy/canvas/src/store/workspaceStore.ts#useCard
+## packs/canvas/src/store/workspaceStore.ts#useCard
 
 The narrow form of the same binding. A card consumer subscribes to one lookup
 keyed by id, so moving another card or renaming a board does not re-render it.
 The record objects come from the graph and keep identity, which is what makes the
 subscription cheap.
 
-## legacy/canvas/src/store/useUiStore.ts#useUiStore
+## packs/canvas/src/store/useUiStore.ts#useUiStore
 
 Selection, panels, menus, viewport and the library scope live here because they
 are interface state, not document state. A reload may forget them without losing
 work. A field that a second device should see belongs in the graph instead; a
 field that only this window needs belongs here.
 
-## legacy/canvas/src/store/projectionStore.ts#useProjectionStore
+## packs/canvas/src/store/projectionStore.ts#useProjectionStore
 
 A projection is a persisted view preference: which board is floating, where it
 sits and which corner it snaps to. It is deliberately localStorage-backed because

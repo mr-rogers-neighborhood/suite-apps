@@ -1,6 +1,7 @@
 import { cpSync, createReadStream, existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, extname, join, normalize, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
@@ -57,6 +58,9 @@ function excalidrawFontAssets(): Plugin {
 
 // One profile: the app, as a static bundle that reaches nothing.
 export default defineConfig({
+  // The renderer is pack-owned; the shell build serves its public files and loads it through
+  // the one entry in `src/main.tsx`.
+  publicDir: fileURLToPath(new URL("../../packs/canvas/pack/public", import.meta.url)),
   plugins: [react(), tailwindcss(), wasm(), excalidrawFontAssets()],
   resolve: {
     dedupe: ["react", "react-dom"],

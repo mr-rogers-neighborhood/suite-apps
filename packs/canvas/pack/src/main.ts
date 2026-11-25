@@ -7,4 +7,4 @@ import "./prelude";
  * renderer be imported, because `boot()` reads that global at import time and the store reads the
  * session once. This is the same order the Electron build uses; the host is the only difference.
  */
-await import("../../../../legacy/canvas/src/main");
+await import("../../src/main");

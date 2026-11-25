@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { bridgeMissing, desktopBridge, REQUIRED_BRIDGE_METHODS } from "../../../../legacy/canvas/src/host/bridge";
+import { bridgeMissing, desktopBridge, REQUIRED_BRIDGE_METHODS } from "../../src/host/bridge";
 import { memoryDocuments, memoryFiles } from "./test/fakeHost";
 
 /**

@@ -32,10 +32,21 @@ import { registerTypeScript } from "./ts-loader.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceDir = join(root, "handbook");
-const canvasTarget = join(root, "src/handbook/articles.generated.ts");
+const canvasTarget = join(
+  root,
+  "..",
+  "..",
+  "packs",
+  "canvas",
+  "src",
+  "handbook",
+  "articles.generated.ts",
+);
 
 registerTypeScript();
-const { HANDBOOK_REGIONS, isHandbookRegion } = await import("../src/handbook/regions.ts");
+const { HANDBOOK_REGIONS, isHandbookRegion } = await import(
+  "../../../packs/canvas/src/handbook/regions.ts"
+);
 
 const TARGET_KINDS = new Set(["ui", "card", "board", "section"]);
 const DEFAULT_ORDER = 100;
@@ -85,7 +96,7 @@ function readTargets(data, file) {
     if (kind === "ui" && !isHandbookRegion(id)) {
       fail(
         file,
-        `targets[${index}] names the region "${id}", which is not in src/handbook/regions.ts`,
+        `targets[${index}] names the region "${id}", which is not in the pack renderer's handbook regions`,
       );
     }
     return { kind, id };
@@ -176,7 +187,7 @@ function assertCoverage(articles) {
   if (missing.length > 0) {
     throw new HandbookError(
       `handbook/: these regions have no article: ${missing.map((region) => region.id).join(", ")}\n` +
-        "  Write one, or remove the region from src/handbook/regions.ts.",
+        "  Write one, or remove the region from the pack renderer's handbook regions.",
     );
   }
 }

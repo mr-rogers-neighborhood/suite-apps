@@ -16,27 +16,27 @@ The module notes own the invariants; each stop is the place where one of them is
 The renderer does not write a file. It hands whole snapshots to a port, and the host decides which
 adapter receives them.
 
-## legacy/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
+## packs/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence
 
 The adapter is the renderer's whole save surface. The storage module owns how it hydrates and what
 it deliberately does not know.
 
-## legacy/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence.write
+## packs/canvas/src/storage/desktopPersistence.ts#LoroDesktopPersistence.write
 
 The point where an edit becomes a snapshot. The storage module owns coalescing, the local-only
 subscription and the failure callback.
 
-## legacy/canvas/src/storage/workspacePersistence.ts#createWorkspacePersistence
+## packs/canvas/src/storage/workspacePersistence.ts#createWorkspacePersistence
 
 The host chooses the adapter here, and a missing one is a loud failure. The storage module owns why
 there is no memory fallback.
 
-## legacy/canvas/src/collab/loroPersistence.ts#LoroIndexeddbPersistence.compact
+## packs/canvas/src/collab/loroPersistence.ts#LoroIndexeddbPersistence.compact
 
 The browser's other save path: an update log beside a snapshot. The collab module owns the leader
 rule and the proof required before a row is deleted.
 
-## legacy/canvas/src/collab/loroPersistence.ts#versionCovers
+## packs/canvas/src/collab/loroPersistence.ts#versionCovers
 
 The proof itself. A row may be deleted only when the stored snapshot already contains it.
 
@@ -81,12 +81,12 @@ inspect or restore.
 The last gate on the recovery path: a file becomes a document or a sentence. The graph module owns
 the refusal vocabulary and the damaged-image rule.
 
-## legacy/canvas/src/session/workspaceTransfer.ts#prepareWorkspaceBackup
+## packs/canvas/src/session/workspaceTransfer.ts#prepareWorkspaceBackup
 
 A backup is the envelope plus the images the document references. The session module owns the
 missing-image warning and why it never cancels the export.
 
-## legacy/canvas/src/session/workspaceTransfer.ts#importWorkspaceFile
+## packs/canvas/src/session/workspaceTransfer.ts#importWorkspaceFile
 
 Recovery into a new workspace, never a merge. The session module owns the new id and the
 attachment restore.

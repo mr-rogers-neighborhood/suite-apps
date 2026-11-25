@@ -1,4 +1,4 @@
-import { storeLocalAttachment } from "../../../../legacy/canvas/src/editor/attachmentNode";
+import { storeLocalAttachment } from "../../src/editor/attachmentNode";
 import { type CanvasPackHost, createCanvasPack } from "./bridge";
 
 /**
