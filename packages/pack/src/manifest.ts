@@ -19,6 +19,24 @@ import { isSafePackPlatform, type PackPlatform } from "./platforms.js";
 export const PACK_FORMAT = "suite.pack";
 export const PACK_CONTRACT_VERSION = 1;
 
+/**
+ * The rings a pack may declare (S3.11).
+ *
+ * A ring is the pack's own stability, not a host channel (S12.8). The channel names `slop` and
+ * `nightly` describe the host build, so they are deliberately not in this list: a manifest that
+ * names one is refused rather than treated as some future ring. The vocabulary is closed, like a
+ * capability, not open like a host kind.
+ */
+export const PACK_RINGS = ["stable", "preview"] as const;
+export type PackRing = (typeof PACK_RINGS)[number];
+
+/** What an absent `ring` means. It is never written into the canonical bytes. */
+export const DEFAULT_PACK_RING: PackRing = "stable";
+
+export function isPackRing(value: string): value is PackRing {
+  return (PACK_RINGS as readonly string[]).includes(value);
+}
+
 const PACK_ID = /^[a-z0-9][a-z0-9-]{0,31}$/u;
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 const SHA256_HEX = /^[a-f0-9]{64}$/u;
@@ -193,8 +211,20 @@ export interface PackManifestCore {
    */
   readonly description?: string;
   readonly version: string;
+  /**
+   * The pack's own stability: `stable` when absent, or `preview`. Part of the
+   * signed version, so it cannot be changed without a new signature (S12.10).
+   */
+  readonly ring?: PackRing;
   readonly entry: string;
   readonly contractVersion: number;
+  /** The lowest host version that can run this pack. Absent means no floor. */
+  readonly minHost?: number;
+  /**
+   * The pre-S3.11 spelling of `minHost`. A manifest signed before the field was
+   * named carries it, so the parser still accepts it; a manifest may carry one
+   * spelling or the other, never both.
+   */
   readonly minimumHostVersion?: number;
   readonly publisher?: PackPublisher;
   readonly capabilities: readonly PackCapability[];
@@ -346,6 +376,37 @@ const inputSchema = z
 
 const localesSchema = z.array(z.string().regex(LOCALE)).refine(unique, "duplicate item");
 
+/**
+ * The ring is a closed vocabulary, so an unknown value is a refusal (S3.11).
+ * The message names the two values, the rejected value and the reason a channel
+ * name is not one: `JSON.stringify` is what a manifest author can search for.
+ */
+const ringSchema = z
+  .custom<PackRing>((value) => typeof value === "string" && isPackRing(value), {
+    error: (issue) =>
+      `a pack ring: "stable" or "preview"; ${describeRejected(issue.input)} is not one (a channel is a host property, never a pack ring)`,
+  })
+  .optional();
+
+/** A host version is a whole number from 1, under either spelling of the field. */
+const hostFloorSchema = z.custom<number>(
+  (value) => typeof value === "number" && Number.isInteger(value) && value >= 1,
+  {
+    error: (issue) =>
+      `a whole host version of 1 or more; ${describeRejected(issue.input)} is not one`,
+  },
+);
+
+/** The rejected value as a manifest author wrote it, for a refusal sentence. */
+function describeRejected(value: unknown): string {
+  try {
+    const text = JSON.stringify(value);
+    return text === undefined ? String(value) : text;
+  } catch {
+    return String(value);
+  }
+}
+
 const widgetDataSchema = z
   .object({
     scope: z.enum(["projection", "scoped", "full"]),
@@ -410,9 +471,11 @@ function manifestSchema(requireSignature: boolean) {
       name: z.string().min(1).max(64),
       description: z.string().min(1).max(200).optional(),
       version: z.string().regex(SEMVER),
+      ring: ringSchema,
       entry: z.string().refine(isSafePackPath, "a relative path inside the pack"),
       contractVersion: z.number().int().positive(),
-      minimumHostVersion: z.number().int().positive().optional(),
+      minHost: hostFloorSchema.optional(),
+      minimumHostVersion: hostFloorSchema.optional(),
       publisher: publisherSchema.optional(),
       capabilities: z.array(z.enum(PACK_CAPABILITIES)).default([]),
       optionalCapabilities: z.array(z.enum(PACK_CAPABILITIES)).optional(),
@@ -444,6 +507,16 @@ function manifestSchema(requireSignature: boolean) {
     })
     .strict()
     .superRefine((value, context) => {
+      // Two spellings of one fact would sign the same floor twice and leave a
+      // reader to choose; a manifest carries exactly one (S3.11).
+      if (value.minHost !== undefined && value.minimumHostVersion !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["minHost"],
+          message: `minHost (${value.minHost}) and minimumHostVersion (${value.minimumHostVersion}) are the same host floor; carry one spelling, not both`,
+        });
+      }
+
       const files = new Set<string>();
       value.files.forEach((file, index) => {
         if (files.has(file.path)) {
@@ -590,8 +663,10 @@ const MANIFEST_FIELD_ORDER: readonly (keyof PackManifestCore)[] = [
   "name",
   "description",
   "version",
+  "ring",
   "entry",
   "contractVersion",
+  "minHost",
   "minimumHostVersion",
   "publisher",
   "capabilities",
@@ -667,11 +742,33 @@ function canonicalContributions(contributions: PackContributions): Record<string
 export interface HostContract {
   readonly contractVersion: number;
   readonly hostVersion: number;
+  /**
+   * The rings this host offers. Absent means `stable` alone: a preview pack is
+   * not offered until a person turns its ring on (S12.10). The set is the host's
+   * preference, never something a pack can widen.
+   */
+  readonly rings?: readonly PackRing[];
 }
 
 export type HostFit =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: "contract" | "host"; readonly message: string };
+  | { readonly ok: false; readonly reason: "contract" | "host" | "ring"; readonly message: string };
+
+/**
+ * The ring a manifest declares, with the absent case defaulted to `stable`.
+ * Reading the default here, rather than parsing it into the manifest, is what
+ * keeps a manifest without a ring byte-identical to the one that was signed.
+ */
+export function packRing(manifest: Pick<PackManifestCore, "ring">): PackRing {
+  return manifest.ring ?? DEFAULT_PACK_RING;
+}
+
+/** The host floor a manifest declares, under either spelling. */
+export function packMinimumHost(
+  manifest: Pick<PackManifestCore, "minHost" | "minimumHostVersion">,
+): number | undefined {
+  return manifest.minHost ?? manifest.minimumHostVersion;
+}
 
 export function packFitsHost(manifest: PackManifestCore, host: HostContract): HostFit {
   if (manifest.contractVersion > host.contractVersion) {
@@ -681,11 +778,21 @@ export function packFitsHost(manifest: PackManifestCore, host: HostContract): Ho
       message: `${manifest.name} needs pack contract ${manifest.contractVersion}; this host implements ${host.contractVersion}.`,
     };
   }
-  if (manifest.minimumHostVersion !== undefined && manifest.minimumHostVersion > host.hostVersion) {
+  const minimumHost = packMinimumHost(manifest);
+  if (minimumHost !== undefined && minimumHost > host.hostVersion) {
     return {
       ok: false,
       reason: "host",
-      message: `${manifest.name} needs host ${manifest.minimumHostVersion}; this host is ${host.hostVersion}.`,
+      message: `${manifest.name} needs host ${minimumHost}; this host is ${host.hostVersion}.`,
+    };
+  }
+  const ring = packRing(manifest);
+  const offered = host.rings ?? [DEFAULT_PACK_RING];
+  if (!offered.includes(ring)) {
+    return {
+      ok: false,
+      reason: "ring",
+      message: `${manifest.name} is a ${ring} ring pack; this host offers ${offered.join(" and ") || "no ring"}.`,
     };
   }
   return { ok: true };

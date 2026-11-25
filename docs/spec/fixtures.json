@@ -6,8 +6,10 @@
     "name": "Chart",
     "description": "A local-first chart pack.",
     "version": "1.2.0",
+    "ring": "preview",
     "entry": "index.html",
     "contractVersion": 2,
+    "minHost": 2,
     "publisher": { "key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "id": "suite" },
     "capabilities": ["documents", "network", "sync", "identity.pack"],
     "optionalCapabilities": ["notifications"],
@@ -92,6 +94,12 @@
     "signature": "c2lnbmF0dXJl"
   },
   "invalid": [
+    { "clause": "S3.11", "name": "unknown pack ring", "set": { "ring": "nightly" } },
+    { "clause": "S3.11", "name": "ring is not lower case", "set": { "ring": "Stable" } },
+    { "clause": "S3.11", "name": "host floor below one", "set": { "minHost": 0 } },
+    { "clause": "S3.11", "name": "host floor is not a whole number", "set": { "minHost": 1.5 } },
+    { "clause": "S3.11", "name": "host floor is not a number", "set": { "minHost": "2" } },
+    { "clause": "S3.11", "name": "both spellings of the host floor", "set": { "minHost": 2, "minimumHostVersion": 2 } },
     { "clause": "S3.5", "name": "missing signature", "delete": ["signature"] },
     { "clause": "S3.7", "name": "unknown top-level field", "set": { "telemetry": true } },
     { "clause": "S3.6", "name": "entry escapes the pack", "set": { "entry": "../evil.html" } },

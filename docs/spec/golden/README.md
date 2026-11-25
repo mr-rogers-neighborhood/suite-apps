@@ -19,11 +19,12 @@ Ed25519 follows RFC 8032. The signature covers `canonical.json`, not the JSON te
 
 The canonical form is the S3.3 rule:
 
-- Fields appear in the fixed order `format`, `id`, `name`, `description`, `version`, `entry`,
-  `contractVersion`, `minimumHostVersion`, `publisher`, `capabilities`, `optionalCapabilities`,
-  `documents`, `blobs`, `sync`, `network`, `platforms`, `input`, `defaultLocale`, `locales`,
-  `widgets`, `codeWidgets`, `components`, `contributions`, `subpackages`, `addons`, `export`,
-  `license`, `source`, `deprecated`, `replacement`, `sunset`, `files`, with `signature` excluded.
+- Fields appear in the fixed order `format`, `id`, `name`, `description`, `version`, `ring`, `entry`,
+  `contractVersion`, `minHost`, `minimumHostVersion`, `publisher`, `capabilities`,
+  `optionalCapabilities`, `documents`, `blobs`, `sync`, `network`, `platforms`, `input`,
+  `defaultLocale`, `locales`, `widgets`, `codeWidgets`, `components`, `contributions`,
+  `subpackages`, `addons`, `export`, `license`, `source`, `deprecated`, `replacement`, `sunset`,
+  `files`, with `signature` excluded.
 - An absent optional field contributes no key; the canonical form never contains `null`.
 - `capabilities`, `optionalCapabilities`, `contributions.fileExtensions` and
   `contributions.deepLinks` are deduplicated and sorted by UTF-16 code unit.

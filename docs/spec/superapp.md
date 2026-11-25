@@ -86,13 +86,13 @@ reject duplicate JSON keys before parsing. Ed25519 follows RFC 8032 with standar
 and its signature. A second implementation MUST verify the same vector.
 
 **S3.5** The manifest declares `format`, `id`, `name`, `version`, `entry`, `contractVersion`,
-`publisher`, `capabilities`, `files` and `signature`. Optional fields cover documents, blobs, sync,
-network, platforms, input, locales, widgets, code widgets, components, contributions, subpackages,
-add-ons, export, license and deprecation. A `platforms` value is an opaque **host kind** (`desktop`,
-`mobile`, `tv`, `tablet`, `foldable`, `xr`, …), not a build target. An unknown kind parses and
-simply matches no host: the list is open, and rejecting the manifest would make the pack
-uninstallable everywhere. A manifest with no `platforms` is **unknown**, never universal; an
-unknown value is the deliberate exception to the closed vocabularies in S3.7.
+`publisher`, `capabilities`, `files` and `signature`. Optional fields cover a ring and host floor
+(S3.11), documents, blobs, sync, network, platforms, input, locales, widgets, code widgets,
+components, contributions, subpackages, add-ons, export, license and deprecation. A `platforms` value
+is an opaque **host kind** (`desktop`, `mobile`, `tv`, `tablet`, `foldable`, `xr`, …), not a build
+target. An unknown kind parses and simply matches no host: the list is open, and rejecting the
+manifest would make the pack uninstallable everywhere. A manifest with no `platforms` is **unknown**,
+never universal; an unknown value is the deliberate exception to the closed vocabularies in S3.7.
 
 **S3.6** `id` is a stable lower-case id, 1–32 characters. `entry` is a relative HTML path listed in
 `files`; a path with `..`, a backslash or a leading slash is refused. Every file carries a lower-case
@@ -113,6 +113,21 @@ add-on MUST NOT update itself. Registry auto-update is not part of this version.
 **S3.10** The archive writer SHOULD be deterministic (fixed timestamps, sorted paths) so two builds of
 the same tree produce the same hash. The manifest's optional fields MUST be omitted, not `null`, when
 absent.
+
+**S3.11** A manifest MAY declare a `ring` and a host floor. `ring` is `stable` or `preview`; absent
+means `stable`. It is the pack's own stability, signed as part of the version, and it is not a channel
+(S12.8): `slop` and `nightly` name the host build, so they are refused as a ring, and so is any other
+value, because the vocabulary is closed like a capability (S3.7), not open like a host kind (S3.5). The
+host floor is `minHost`, an integer host version of 1 or more, and absent means no floor. A manifest
+signed before this revision carries the same floor as `minimumHostVersion`; a host MUST accept either
+spelling and MUST refuse a manifest that carries both. Neither field is a capability and neither is
+guessed: a host that does not know a ring refuses the pack.
+
+**S3.12** A host MUST refuse a pack whose `minHost` is above its own host version, and a pack whose
+`ring` is not among the rings it offers (S12.10), before it installs or launches it, in one sentence
+that names the pack, the requirement and the host's own value. It MUST NOT install the version, start a
+renderer and fail part-way, and it MUST NOT quietly substitute an older ring. A refusal leaves an
+installed older version running (S12.6) and says which value would have to change.
 
 ## 4. Capabilities, consent and associations
 
@@ -400,6 +415,35 @@ displayed. A mismatch is a refusal, not a warning.
 
 **S12.8** Host updates and distribution channels are outside this contract; `docs/explanation/channels.md`
 and `docs/reference/packaging-channels.md` own them. A pack carries a signed version, never a channel.
+A pack's `ring` (S3.11) is the pack's own stability, not a channel: `slop`, `nightly`, `preview` and
+`stable` describe what a host build has survived, and the host decides which channels it moves through
+and which rings it offers. A pack never learns a channel name, and a channel name is never a pack value.
+
+**S12.9** A catalogue index `version` 2 entry names one signed pack version:
+`{id, name, publisher, version, ring, contractVersion, minHost?, archive: {url, size, sha256}, signature, capabilities, platforms?, description?}`
+([catalogue.schema.json](catalogue.schema.json)). `version`, `ring`, `contractVersion` and `minHost`
+MUST equal the manifest's **effective** values: an absent `ring` is `stable`, and the floor is the same
+value under either spelling (S3.11), so a manifest signed before S3.11 matches an entry that says
+`stable` and one floor. `contractVersion` is required — the manifest requires it, a generated entry
+always carries it, and an entry without it is refused; a `version` 1 index written before this clause
+has no such field and is read as contract 1. `archive.url`, `archive.size` and `archive.sha256` are the
+only place an entry carries where the archive is and what it hashes to. `signature` is the manifest's
+Ed25519 signature, standard base64, so the host can compare the entry with the manifest it unpacked
+(S12.7) before it installs. The index is generated, not authored: an entry with an unknown ring, or
+with no `ring`, is refused. An index written before this clause keeps `version` 1, whose entries carry
+`url`, `size` and `sha256` at the top level and no ring; every such entry is `stable`.
+
+**S12.10** A host offers a set of rings, and the default is `stable` alone; `preview` is added only by
+the person's explicit choice, which is a host setting and never something a pack can widen. For one
+pack id the host offers the highest version whose `ring` is in that set and whose `contractVersion`
+(S12.9), `minHost` and platform claims fit (S3.12); the same checks run again on the unpacked manifest
+before install (S12.7). A ring above the host's preference is never offered, even when its version is
+newer. A version's ring is fixed by its signature. An operator stages a preview by signing a version
+whose manifest says `ring: "preview"` and publishing it in the next index with the same ring and a
+higher `sequence`; promotion is a new version signed with `ring: "stable"`, normally a patch bump,
+never a re-signed archive under the same version. The preview version stays in the catalogue for
+rollback (S12.6). A pack whose ring the host does not offer is not listed, and a direct install of one
+is refused by S3.12 rather than installed quietly.
 
 ## 13. Security and privacy
 

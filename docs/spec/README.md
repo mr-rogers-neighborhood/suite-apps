@@ -1,7 +1,8 @@
 # Suite superapp specification
 
 Status: **draft 0.1**. The normative text is [superapp.md](superapp.md); the machine-readable manifest
-is [manifest.schema.json](manifest.schema.json); the fixture corpus is [fixtures.json](fixtures.json);
+is [manifest.schema.json](manifest.schema.json); the catalogue index is
+[catalogue.schema.json](catalogue.schema.json); the fixture corpus is [fixtures.json](fixtures.json);
 what actually exists is [ledger.md](ledger.md). [AGENTS.md](AGENTS.md) is the reading order for an
 agent.
 

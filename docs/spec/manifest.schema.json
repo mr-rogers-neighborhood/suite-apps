@@ -5,6 +5,10 @@
   "description": "The signed manifest a Suite host verifies before running a pack. Every field except signature is covered by the canonical bytes. Unknown top-level fields are refused.",
   "type": "object",
   "additionalProperties": false,
+  "not": {
+    "description": "`minHost` and `minimumHostVersion` are the same host floor in two spellings (S3.11). A manifest carries one or the other, never both.",
+    "required": ["minHost", "minimumHostVersion"]
+  },
   "required": [
     "format",
     "id",
@@ -26,11 +30,22 @@
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
     },
+    "ring": {
+      "description": "The pack's own stability. Absent means stable. Not a host channel: slop and nightly belong to the host build and are refused here.",
+      "$comment": "A closed vocabulary, unlike `platforms`. The value is signed as part of the version and cannot be changed without a new signature (S12.10); promoting a preview to stable is a new version.",
+      "enum": ["stable", "preview"]
+    },
     "entry": {
       "type": "string",
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)[^\\u0000-\\u001f\\u007f]+\\.html$"
     },
     "contractVersion": { "type": "integer", "minimum": 1 },
+    "minHost": {
+      "description": "The lowest host version that can run this pack. Absent means no floor.",
+      "$comment": "`minimumHostVersion` is the same fact in the spelling a manifest signed before S3.11 carries. A manifest MUST NOT carry both; see the S3.11 clause.",
+      "type": "integer",
+      "minimum": 1
+    },
     "minimumHostVersion": { "type": "integer", "minimum": 1 },
     "publisher": {
       "type": "object",
