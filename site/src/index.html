@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Suite — work you keep in your own files</title>
+  <meta name="description" content="Suite Desk runs signed packs on your computer. Suite Go runs the same packs on your phone. Every document is a file you own: no account, no telemetry and no server the project operates.">
+  <link rel="icon" href="docs/assets/suite-icon.png">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // The docs host is the same Pages artifact. Its root belongs in docs/, not
+    // on the landing page; links within the docs stay under /docs/ afterwards.
+    if (
+      location.hostname === "docs.suite.run" &&
+      location.pathname !== "/docs" &&
+      !location.pathname.startsWith("/docs/")
+    ) {
+      let path = location.pathname;
+      if (!path.endsWith("/") && !/\.[^/]+$/.test(path)) path += ".html";
+      location.replace("/docs" + path + location.search + location.hash);
+    }
+  </script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <a class="brand" href="https://suite.run/">
+    <img src="docs/assets/suite-icon.png" alt="" width="32" height="32">
+    <span>Suite</span>
+  </a>
+  <nav class="site-nav" aria-label="Suite">
+    <a href="#what">What it is</a>
+    <a href="#hosts">Hosts</a>
+    <a href="#install">Install</a>
+    <a href="https://docs.suite.run/">Docs</a>
+    <a href="https://github.com/mrrnbhd/suite-apps">GitHub</a>
+  </nav>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <img class="hero-mark" src="docs/assets/suite-icon.png" alt="" width="96" height="96">
+    <p class="eyebrow">Local-first · MIT licensed</p>
+    <h1>Work you keep in your own files.</h1>
+    <p class="lede">
+      Suite Desk runs signed packs on your computer. Suite Go runs the same packs on your phone.
+      Every document a pack opens is a file you own: copy it, back it up, open it offline.
+      There is no account, no telemetry and no server the project operates.
+    </p>
+    <div class="actions">
+      <a class="button button-primary" href="#install">Install Suite</a>
+      <a class="button" href="https://docs.suite.run/">Read the docs</a>
+    </div>
+    <p class="note">
+      <strong>Alpha.</strong> Suite Desk is alpha and Suite Go is v0. Linux x86_64 and Android
+      arm64 are the only published targets. Keep documents somewhere you back up.
+    </p>
+  </section>
+
+  <section id="what" aria-labelledby="what-title">
+    <h2 id="what-title">What Suite is</h2>
+    <div class="card-grid">
+      <article class="card">
+        <h3>Documents, not accounts</h3>
+        <p>
+          A document is a file, handed to a pack as an opaque handle scoped to that pack. Nothing
+          here has an account or a hosted copy.
+        </p>
+      </article>
+      <article class="card">
+        <h3>Packs with a contract</h3>
+        <p>
+          A pack is a signed web bundle with a manifest. The host verifies the publisher key and
+          every file hash before it runs, gives the pack its own origin and session, and enforces
+          the capabilities the manifest declares.
+        </p>
+      </article>
+      <article class="card">
+        <h3>Two hosts, one model</h3>
+        <p>
+          Canvas for boards, Planner for days, Budget for money: the same pack contract on the
+          desktop and on a phone. A pack renders its UI; the host carries bytes and never parses a
+          document.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section id="hosts" aria-labelledby="hosts-title">
+    <h2 id="hosts-title">The two hosts</h2>
+    <div class="host-grid">
+      <article class="host">
+        <div class="host-heading">
+          <h3>Suite Desk</h3>
+          <span class="tag">Alpha</span>
+        </div>
+        <p>
+          The desktop host: one window, a tab per pack, a Home Screen and a local catalogue. It
+          installs and updates from the signed Flatpak remote on Linux x86_64.
+        </p>
+      </article>
+      <article class="host">
+        <div class="host-heading">
+          <h3>Suite Go</h3>
+          <span class="tag">v0</span>
+        </div>
+        <p>
+          The mobile host: one container, one pack at a time, and the same document boundary. It
+          ships as an Android arm64 APK, not a Flatpak.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section id="install" aria-labelledby="install-title">
+    <h2 id="install-title">Install</h2>
+    <p>
+      The README carries the channel tables: the current install command and release page for
+      each host, plus the preview, nightly and slop channels that install beside the stable one.
+    </p>
+    <ul class="link-list">
+      <li><a href="https://github.com/mrrnbhd/suite-apps#release">Release channel</a> — the stable Suite Desk and Suite Go builds.</li>
+      <li><a href="https://github.com/mrrnbhd/suite-apps#pre-release">Pre-release channels</a> — preview, nightly and slop.</li>
+      <li><a href="https://docs.suite.run/docs/explanation/channels.html">Channels</a> — what each channel promises.</li>
+    </ul>
+    <p class="note">
+      The signed Flatpak remote is the update path. The rolling
+      <a href="https://github.com/mrrnbhd/suite-apps/releases/latest">GitHub release</a> is the
+      mirror.
+    </p>
+  </section>
+
+  <section id="docs" aria-labelledby="docs-title">
+    <h2 id="docs-title">Documentation</h2>
+    <p>
+      The documentation is built from the same <code>docs/</code> tree the repository and Suite
+      Help read. Start with the handbook if you are using Suite, or the developer documentation if
+      you are changing it.
+    </p>
+    <div class="actions">
+      <a class="button" href="https://docs.suite.run/docs/handbook/">User Handbook</a>
+      <a class="button" href="https://docs.suite.run/docs/developer/">Developer Documentation</a>
+      <a class="button" href="https://github.com/mrrnbhd/suite-apps">GitHub</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p><img src="docs/assets/suite-icon.png" alt="" width="20" height="20"> Suite is local-first, MIT licensed.</p>
+  <nav aria-label="Elsewhere">
+    <a href="https://docs.suite.run/">docs.suite.run</a>
+    <a href="https://github.com/mrrnbhd/suite-apps">GitHub</a>
+    <a href="https://github.com/mrrnbhd/suite-apps/blob/main/LICENSE">Licence</a>
+  </nav>
+</footer>
+</body>
+</html>

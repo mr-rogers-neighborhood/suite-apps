@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found — Suite</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/docs/assets/suite-icon.png">
+  <link rel="stylesheet" href="/style.css">
+  <script>
+    // GitHub Pages serves this file for any unknown path on the shared artifact,
+    // so a deep link to docs.suite.run lands here before the landing page and its
+    // redirect run. Send it into /docs/, whose own 404 is this page again — the
+    // /docs/ guard stops the second pass.
+    if (
+      location.hostname === "docs.suite.run" &&
+      location.pathname !== "/docs" &&
+      !location.pathname.startsWith("/docs/")
+    ) {
+      let path = location.pathname;
+      if (!path.endsWith("/") && !/\.[^/]+$/.test(path)) path += ".html";
+      location.replace("/docs" + path + location.search + location.hash);
+    }
+  </script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <a class="brand" href="https://suite.run/">
+    <img src="/docs/assets/suite-icon.png" alt="" width="32" height="32">
+    <span>Suite</span>
+  </a>
+  <nav class="site-nav" aria-label="Suite">
+    <a href="https://docs.suite.run/docs/">Docs</a>
+    <a href="https://github.com/mrrnbhd/suite-apps">GitHub</a>
+  </nav>
+</header>
+
+<main id="main" class="prose">
+  <h1>Page not found</h1>
+  <p>This address is not a page in the Suite documentation. Pages keep their path under
+  <code>docs/</code>, so <code>docs/reference/status.md</code> is
+  <code>/docs/reference/status.html</code>.</p>
+  <p><a href="https://docs.suite.run/docs/">Documentation</a> ·
+  <a href="https://suite.run/">suite.run</a> ·
+  <a href="https://github.com/mrrnbhd/suite-apps">GitHub</a></p>
+</main>
+
+<footer class="site-footer">
+  <p>Suite is local-first, MIT licensed.</p>
+</footer>
+</body>
+</html>

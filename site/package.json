@@ -1,0 +1,16 @@
+{
+  "name": "@suite/site",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The published Suite site: suite.run and docs.suite.run.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "marked": "18.3.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
