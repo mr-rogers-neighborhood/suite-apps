@@ -9,6 +9,7 @@ packages:
   - "services/*/*"
   - "services/*/packages/*"
   - "packages/*"
+  - "site"
 
 # Shared packages are workspace packages. A local edit is the one that builds.
 linkWorkspacePackages: true

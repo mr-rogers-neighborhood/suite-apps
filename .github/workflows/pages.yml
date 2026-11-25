@@ -1,0 +1,69 @@
+# Publish suite.run and docs.suite.run from one Pages artifact.
+#
+# The artifact is a file tree, not a second build service: `pnpm site:build`
+# renders the landing page and the repository's `docs/`, then this workflow
+# uploads exactly that directory. `pnpm docs:check` stays the repository's link
+# and anchor check before the renderer sees the tree.
+#
+# One GitHub Pages site carries one custom domain. `suite.run` is that domain;
+# `docs.suite.run` is a proxied CNAME to the same site, and the landing page's
+# first script sends that host's root to `/docs/`. The DNS records and the
+# Cloudflare requirement are in the pull request and `site/README.md`.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 12.17.0
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Docs links and anchors
+        run: pnpm docs:check
+      - name: Build the site
+        run: pnpm site:build
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: site/dist
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
