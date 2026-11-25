@@ -389,10 +389,12 @@ export function channelInstallTable({ order = CHANNEL_ORDER, pages = null } = {}
 
 
 /**
- * The apps frozen as legacy until they become packs.
+ * The apps frozen at their last Flatpak artifact.
  *
  * The list lives in the channel library so the Flatpak builder refuses a new
- * pre-release build for the same apps this table marks frozen. Sync is retired
+ * pre-release build for the same apps this table marks frozen. Budget has gone
+ * further: it ships as the signed pack in `packs/budget`, so its Flatpak lane is
+ * retired and its version now comes from the pack manifest. Sync is retired
  * rather than frozen: it leaves this table entirely (#315) and the relay becomes
  * a host capability, so there is no row to name a channel for.
  */
@@ -406,6 +408,7 @@ export { LEGACY_FROZEN_IDS } from "./lib/channel.mjs";
  * place that turns it into a cell:
  *
  * - `flatpak` — a signed deployment on the OSTree remote.
+ * - `pack` — a signed catalogue pack; the host owns the install.
  * - `apk` — a release-signed APK attached to the rolling suite release.
  *
  * `section` is the table a row belongs to: `desktop` or `mobile`. The table is
@@ -477,11 +480,14 @@ export const APPS = [
   {
     id: "budget",
     name: "Suite Budget",
+    // The frozen app's package.json owns the version and its changelog owns the date. The pack
+    // manifest restates the version; `scripts/pack-shape.mjs` fails when the two disagree.
     packageJson: "legacy/budget/package.json",
     changelog: "legacy/budget/CHANGELOG.md",
-    kind: "flatpak",
+    // The installed bytes are the signed pack; the last Flatpak stays published on the remote.
+    kind: "pack",
     section: "desktop",
-    flatpakId: "run.suite.budget",
+    flatpakId: null,
     maturity: "pre-alpha",
     frozen: true,
   },
@@ -817,6 +823,7 @@ export function installCell(
   } = {},
 ) {
   if (app.kind === "flatpak") return `\`${installCommand(app, channel)}\``;
+  if (app.kind === "pack") return `\`${app.name}\` from the Desk catalogue`;
   if (app.kind === "apk") {
     const name =
       version === null ? "suite-go.apk" : goApkName(version, channel, revision);

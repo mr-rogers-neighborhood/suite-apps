@@ -25,7 +25,6 @@ import { bundlePack, platformsSummary, publicKeyOfSigningKey } from "./pack.mjs"
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PACK_ROOT = join(ROOT, "packs", "budget");
 const PACK_DIR = join(PACK_ROOT, "pack");
-const APP_DIR = join(ROOT, "legacy", "budget");
 const DIST = join(PACK_ROOT, ".dev", "pack");
 const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
 
@@ -159,18 +158,11 @@ async function main(argv) {
 
   // The renderer resolves shared packages through their published `dist`, as the
   // monorepo gate does. Build them first so `pnpm budget:pack` works on a clean
-  // checkout, not only after some other build has run.
+  // checkout, not only after some other build has run. Budget's core exports its
+  // source, so it needs no build step of its own.
   await run(
     "pnpm",
-    [
-      "--filter",
-      "./packages/*",
-      "--filter",
-      "./legacy/*/packages/*",
-      "--workspace-concurrency=2",
-      "run",
-      "build",
-    ],
+    ["--filter", "./packages/*", "--workspace-concurrency=2", "run", "build"],
     ROOT,
   );
   await run(

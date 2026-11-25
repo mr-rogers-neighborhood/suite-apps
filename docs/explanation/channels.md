@@ -104,9 +104,10 @@ signed version. A pack update is a version update, not a channel move.
 - **Suite Go** is the mobile superapp and the container that opens domains as packs.
 - **Packs** carry a signed version, a contract version and a hash-pinned file set. They do not carry a
   channel.
-- **Legacy apps are frozen.** Canvas, Planner, Budget and Help remain the separate Flatpaks at their
-  last artifacts. Their code stays in the tree, but they get no new release and no new pre-release
-  channel until they become packs.
+- **Legacy apps are frozen.** Canvas, Planner and Help remain the separate Flatpaks at their last
+  artifacts. Their code stays in the tree, but they get no new release and no new pre-release channel
+  until they become packs. Budget is frozen too, and its pack is the install path: its last Flatpak
+  artifact stays installable, but its Flatpak lane is retired.
 - **Sync is retired as a shipped app.** `run.suite.sync` is not a superapp and carries no channel; it
   gets no new build, and the signed remote keeps the last published ref for anyone who already has it.
   The host is the surface that carries sync state as the relay becomes a host capability

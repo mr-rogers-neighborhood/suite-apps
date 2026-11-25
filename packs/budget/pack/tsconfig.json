@@ -1,19 +1,14 @@
 {
-  "extends": "../../../legacy/budget/tsconfig.base.json",
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "types": ["node", "vite/client"],
     "paths": {
-      "@suite/budget-core": ["../../../legacy/budget/packages/core/src/index.ts"],
-      "@suite/pack-runtime": ["../../../packages/pack-runtime/src/index.ts"]
+      "@suite/pack-runtime": ["../../../packages/pack-runtime/src/index.ts"],
+      "@suite/ui": ["../../../packages/ui/src/index.ts"],
+      "@suite/document-runtime": ["../../../packages/document-runtime/src/index.ts"]
     }
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "../../../legacy/budget/src/renderer/src/platform/window.d.ts",
-    "*.config.ts",
-    "*.config.mts"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "*.config.ts", "*.config.mts"]
 }

@@ -98,9 +98,10 @@ node scripts/flatpak.mjs --app desk --channel nightly
 node scripts/flatpak-remote.mjs --target s3 --channel nightly --publish
 ```
 
-A frozen legacy mini-app (Canvas, Planner, Budget, Help) is refused here: it keeps its last stable ref
-and gets no new pre-release. `--session` builds one locally for the factory profile, and that build is
-never published.
+A frozen legacy mini-app (Canvas, Planner, Help) is refused here: it keeps its last stable ref and
+gets no new pre-release. `--session` builds one locally for the factory profile, and that build is
+never published. Budget has no pre-release lane at all: its Flatpak lane is retired and its signed
+pack carries the version instead.
 
 Slop is the exception that does not wait for a person: every code push to `main` publishes it. The
 `slop` workflow builds the host on `--channel slop`, publishes `run.suite.slop.desk//slop`, builds

@@ -5,6 +5,8 @@
   "version": "0.4.2",
   "entry": "index.html",
   "contractVersion": 1,
+  "ring": "stable",
+  "minHost": 1,
   "capabilities": ["documents", "files"],
   "platforms": ["desktop", "mobile"],
   "documents": [

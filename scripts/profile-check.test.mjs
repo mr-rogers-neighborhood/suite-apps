@@ -30,7 +30,7 @@ function withSchema(schema, run) {
 }
 
 describe("the Suite app-set profile", () => {
-  it("passes the FactoryProfileSchema shape and lists the four queueable apps", () => {
+  it("passes the FactoryProfileSchema shape and lists the queueable apps", () => {
     const result = validateProfile(profile(), { root: ROOT, env: {} });
     assert.deepEqual(result.errors, []);
     assert.equal(result.ok, true);
@@ -38,7 +38,7 @@ describe("the Suite app-set profile", () => {
     assert.equal(profile().id, "suite-apps");
     assert.deepEqual(
       profile().apps.map((app) => app.id),
-      ["canvas", "planner", "budget", "help"],
+      ["canvas", "planner", "help"],
     );
   });
 
@@ -211,7 +211,7 @@ describe("the profile check mirrors FactoryProfileSchema", () => {
       manifest: "services/relay/package.json",
       slop_build_path: "services/relay/slop",
     });
-    assert.match(failures(extra).join("\n"), /must list canvas, planner, budget, help/u);
+    assert.match(failures(extra).join("\n"), /must list canvas, planner, help/u);
   });
 
   it("refuses a slop build path outside the app", () => {

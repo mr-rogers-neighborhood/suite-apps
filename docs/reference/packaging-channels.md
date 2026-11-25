@@ -4,25 +4,31 @@ audience: developer
 
 # Packaging channels
 
-Linux desktop apps in the suite ship as Flatpaks. Suite Go ships as a release-signed Android APK on
-four channels. `run.suite.sync` was the last relay Flatpak: it had a tray app for a desktop and the
-same app's CLI for a machine with no display, and it is retired as a shipped artifact (#315). The forms
-differ in **who owns the installed files**, and that decides who may update them.
+Linux desktop apps in the suite ship as Flatpaks, except Suite Budget, which ships as a signed pack
+installed from the Desk catalogue. Suite Go ships as a release-signed Android APK on four channels.
+`run.suite.sync` was the last relay Flatpak: it had a tray app for a desktop and the same app's CLI
+for a machine with no display, and it is retired as a shipped artifact (#315). The forms differ in
+**who owns the installed files**, and that decides who may update them.
 
 | Form | Built for | Who owns the files | Updates arrive by | Root |
 | --- | --- | --- | --- | --- |
-| Flatpak | Suite Desk, Canvas, Planner, Budget and Help | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
+| Flatpak | Suite Desk, Canvas, Planner and Help | Flatpak, inside a sandbox | an OSTree remote | no for `--user` |
+| Signed pack | Suite Budget (install from the Desk catalogue) | the host, under its data root | the pack catalogue | no |
 | Release APK | Suite Go | the person, through `adb` or the file manager | the person installs the next APK | no |
 
 There is no AppImage, Arch package, `deb`, `rpm` or `snap`. Help is a Flatpak like the rest, and Suite
 Go has no Play Store listing.
 
-Canvas, Planner, Budget and Help are **frozen legacy apps**: their code and last Flatpak artifact stay
-available, but they get no new release and no new pre-release channel until they become packs. Suite
-Desk and Suite Go are the superapp; [Channels](../explanation/channels.md) owns the model and
-[Status](status.md) lists which rows are frozen. Sync is **retired**, not frozen: its code stays as
-the protocol, client library and relay implementation, and the signed remote keeps the last published
-`run.suite.sync` ref without publishing a new one.
+Canvas, Planner and Help are **frozen legacy apps**: their code and last Flatpak artifact stay
+available, but they get no new release and no new pre-release channel until they become packs. Budget
+is frozen too, and it now **ships as a signed pack**: its last `run.suite.budget` Flatpak artifact
+stays published for anyone who already installed it, but its Flatpak lane is retired and the pack is
+the install path. A person exports the document from the frozen Budget app, installs **Suite Budget**
+from the Desk catalogue and imports that export there. Suite Desk and Suite Go are the superapp;
+[Channels](../explanation/channels.md) owns the model and [Status](status.md) lists which rows are
+frozen. Sync is **retired**, not frozen: its code stays as the protocol, client library and relay
+implementation, and the signed remote keeps the last published `run.suite.sync` ref without publishing
+a new one.
 
 The release channels a build can carry, and what each promises, are [Channels](../explanation/channels.md).
 
@@ -30,9 +36,11 @@ The release channels a build can carry, and what each promises, are [Channels](.
 
 **Flatpak owns a Flatpak deployment; the host owns its packs.**
 
-The frozen apps and the host are Flatpaks. Flatpak installs, updates and removes them, and no Suite
-process writes into a deployment or replaces it. A person uses the one `flatpak install` line the
-release page prints, and `flatpak update --user` for every installed ref.
+The frozen Canvas, Planner and Help apps and the host are Flatpaks. Flatpak installs, updates and
+removes them, and no Suite process writes into a deployment or replaces it. A person uses the one
+`flatpak install` line the release page prints, and `flatpak update --user` for every installed ref.
+Budget is the exception: its last Flatpak ref stays installed and updatable, and the signed pack is
+the install path from now on.
 
 ## One system for the channels
 
@@ -76,16 +84,17 @@ a second Flatpak manager.
 
 ## Flatpak
 
-Suite Desk, Canvas, Planner, Budget and Help each have a manifest beside the others. The retired
-`run.suite.sync` keeps its manifest too, so the last build can still be reproduced from the tree:
+Suite Desk, Canvas, Planner and Help each have a live manifest beside the others. Budget and the
+retired `run.suite.sync` keep theirs so their last builds can still be reproduced from the tree;
+`scripts/flatpak.mjs --app budget` refuses a new build because Budget ships as a signed pack:
 
 ```
 packaging/flatpak/run.suite.canvas.yml
 packaging/flatpak/run.suite.planner.yml
-packaging/flatpak/run.suite.budget.yml
 packaging/flatpak/run.suite.help.yml
 packaging/flatpak/run.suite.desk.yml
-packaging/flatpak/run.suite.sync.yml
+packaging/flatpak/run.suite.budget.yml     # retired: reproduce the last artifact only
+packaging/flatpak/run.suite.sync.yml       # retired: reproduce the last artifact only
 ```
 
 The manifest packages the unpacked build `package:dir` produced, using zypak from
@@ -101,7 +110,6 @@ Nothing in the tree has an i18n framework or a translated string, so electron-bu
 ```sh
 node scripts/flatpak.mjs                       # Canvas: package, build, publish, install
 node scripts/flatpak.mjs --app planner         # Planner, same path
-node scripts/flatpak.mjs --app budget          # Budget, same path
 node scripts/flatpak.mjs --app desk             # the host, same path
 node scripts/flatpak.mjs --app help             # Help
 node scripts/flatpak.mjs --app sync             # the retired relay build, local only
@@ -109,6 +117,10 @@ node scripts/flatpak.mjs --app planner --no-build   # reuse release/linux-unpack
 node scripts/flatpak.mjs --app desk --channel slop    # the slop id on branch slop
 flatpak run run.suite.slop.desk
 ```
+
+Budget is not in that list. Its last Flatpak artifact stays on the remote, but
+`node scripts/flatpak.mjs --app budget` exits with the retired-lane sentence; install the signed
+pack from the Desk catalogue instead.
 
 Canvas stays the default so an existing habit keeps working. The script exports to
 `~/suite-flatpak/repo`, adds it as the user remote `suite-local`, and installs from that remote, so
@@ -118,16 +130,18 @@ A deployment updates from the remote it was installed from: Flatpak reads its ow
 from `suite-local` is not measured against the public `suite` store. The host does not compare commits
 or offer an update button; `flatpak update --user` is the path for every Flatpak.
 
-A stable Canvas, Planner or Budget reaches one documents folder and nothing broader:
+A stable Canvas or Planner reaches one documents folder and nothing broader; the frozen Budget app's
+last Flatpak had the same grant, so a person can export a `Documents/Suite/Budget` document from it:
 
 ```
 --filesystem=xdg-documents/Suite:create
 ```
 
-Canvas writes `Documents/Suite/Canvas`, Planner writes `Documents/Suite/Planner` and Budget writes
-`Documents/Suite/Budget`; `:create` lets a first launch make the folder. Canvas and Planner also have
-`--share=network` because they sync a workspace with the other devices in it. Budget has no network
-permission: it has no bank sync, no updater and no other client.
+Canvas writes `Documents/Suite/Canvas`, Planner writes `Documents/Suite/Planner` and the frozen Budget
+app wrote `Documents/Suite/Budget`; `:create` lets a first launch make the folder. Canvas and Planner
+also have `--share=network` because they sync a workspace with the other devices in it. Budget had no
+network permission: it has no bank sync, no updater and no other client. The Budget pack reads the
+export through the host's file picker, not a filesystem grant.
 
 The last `run.suite.sync` build was the one app granted no documents folder at all. Its sandbox had
 `--share=network` because it is the relay other devices connect to,
@@ -137,11 +151,11 @@ asked. Its store and certificate pair live in the app's own data directory. A ho
 keeps the same "no documents grant" rule.
 
 The `.desktop` file is named for the Flatpak id, and each app's `desktopName` is that id, so Wayland
-associates the window with the entry and keeps its icon. Planner and Budget follow that rule; Canvas's
-shell still declares the older `suite-canvas.desktop` name. A frozen mini-app's pre-release session
-build reuses the stable manifest's runtime but replaces its documents grant: the stable folder is
-read-only, and it writes `Suite Slop`. The superapp has no documents grant at all, so its channel's
-id and sandbox are what keep its data apart. Either way the generated files carry the channel's own
+associates the window with the entry and keeps its icon. Planner follows that rule, and Budget's
+retired lane did too; Canvas's shell still declares the older `suite-canvas.desktop` name. A frozen
+mini-app's pre-release session build reuses the stable manifest's runtime but replaces its documents
+grant: the stable folder is read-only, and it writes `Suite Slop`. The superapp has no documents
+grant at all, so its channel's id and sandbox are what keep its data apart. Either way the generated files carry the channel's own
 id, desktop entry, metainfo and icon names.
 
 ### The relay's last Flatpak
@@ -180,9 +194,10 @@ accepted for Suite Desk, as [Pre-release channels](#pre-release-channels) descri
 flatpak install --user suite run.suite.desk
 ```
 
-**OSTree owns updates inside Flatpak.** The sandbox sets `FLATPAK_ID`, and Canvas, Planner and Budget
-then skip their own update check and write a "not checked" report instead of offering a download.
-`flatpak update` replaces the deployment. There is no second copy or rollback version.
+**OSTree owns updates inside Flatpak.** The sandbox sets `FLATPAK_ID`, and Canvas, Planner and
+Budget's last Flatpak then skip their own update check and write a "not checked" report instead of
+offering a download. `flatpak update` replaces the deployment. There is no second copy or rollback
+version.
 
 `scripts/store-key.sh` makes the store's signing key once. When it has run, `flatpak.mjs` signs the
 repository summary, exports the public key beside the fingerprint in `~/suite-flatpak`, and adds the
@@ -320,9 +335,10 @@ flatpak run run.suite.nightly.desk
 ```
 
 `--channel` accepts `slop`, `nightly` or `preview`; `canary`, `beta` and anything else is refused
-before the build. A pre-release branch is not published for a frozen legacy app (Canvas, Planner,
-Budget or Help), and the builder refuses to create one unless `--session` names a factory session
-build, which is local only. Suite Desk carries a channel too: `run.suite.<channel>.desk` on the same
+before the build. A pre-release branch is not published for a frozen legacy app (Canvas, Planner or
+Help), and the builder refuses to create one unless `--session` names a factory session build, which
+is local only. Budget has no pre-release lane at all: its Flatpak lane is retired and its pack carries
+a signed version instead. Suite Desk carries a channel too: `run.suite.<channel>.desk` on the same
 three branches, with its data in the channel's Flatpak sandbox rather than a `Documents/Suite Slop`
 folder. Sync refuses `--channel`: it is not a superapp.
 
@@ -446,14 +462,14 @@ A pre-release install is its own identity, not a second window on the stable dat
 cannot open slop data. Stable Go keeps its app data under `run.suite.go`, and each pre-release
 package id has its own.
 
-A frozen mini-app is the exception, because its pre-release build is a local factory session rather
-than a shipped channel: it keeps `Documents/Suite Slop/<App>` while stable keeps
-`Documents/Suite/<App>`. A stable document handed to it by a path, a link, or a file manager is
-copied into that folder and the copy is opened, so the stable file, its backup and its temporary file
-are never written. Export is explicit, writes where the person chooses, and refuses the stable
-folder. The rule is in [Canvas's paths](../../legacy/canvas/desktop/src/main/paths.ts),
-[Planner's workspace location](../../legacy/planner/src/main/workspaceLocation.ts) and
-[Budget's library](../../legacy/budget/src/main/library.ts), with tests beside each.
+A frozen mini-app with a factory session lane (Canvas, Planner or Help) is the exception, because
+its pre-release build is local rather than a shipped channel: it keeps `Documents/Suite Slop/<App>`
+while stable keeps `Documents/Suite/<App>`. A stable document handed to it by a path, a link, or a
+file manager is copied into that folder and the copy is opened, so the stable file, its backup and
+its temporary file are never written. Export is explicit, writes where the person chooses, and
+refuses the stable folder. The rule is in [Canvas's paths](../../legacy/canvas/desktop/src/main/paths.ts)
+and [Planner's workspace location](../../legacy/planner/src/main/workspaceLocation.ts), with tests
+beside each. Budget has no session lane; its frozen app exports a document and the pack imports it.
 
 ## Packs and cards
 

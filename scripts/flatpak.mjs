@@ -8,7 +8,7 @@
  *
  *   node scripts/flatpak.mjs                 # Canvas stable: package, build, install
  *   node scripts/flatpak.mjs --app planner   # Planner stable, same path
- *   node scripts/flatpak.mjs --app budget    # Budget stable, same path
+ *   node scripts/flatpak.mjs --app budget    # retired: Budget ships as the signed pack
  *   node scripts/flatpak.mjs --app help      # Help stable, same path
  *   node scripts/flatpak.mjs --app sync      # the retired relay build, local only
  *   node scripts/flatpak.mjs --app desk     # Suite Desk (the host) stable, same path
@@ -51,6 +51,7 @@ import {
   desktopEntry,
   displayName,
   flatpakId,
+  flatpakLaneProblem,
   isPreRelease,
   launcherScript,
   preReleaseAppManifest,
@@ -165,6 +166,12 @@ const channelMiss = channelProblem(channel);
 if (channelMiss !== null) {
   process.stderr.write(`${channelMiss}\n`);
   process.exit(2);
+}
+
+const laneMiss = flatpakLaneProblem(appName);
+if (laneMiss !== null) {
+  process.stderr.write(`${laneMiss}\n`);
+  process.exit(1);
 }
 
 const frozenMiss = channelProblemForApp(appName, channel, { session });

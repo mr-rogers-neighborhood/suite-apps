@@ -11,6 +11,9 @@ import manifestText from "../manifest.json?raw";
  * it cannot, so this test reads the manifest the build signs.
  */
 const manifest = JSON.parse(manifestText) as {
+  readonly ring?: string;
+  readonly minHost?: number;
+  readonly capabilities?: readonly string[];
   readonly documents?: readonly {
     readonly id: string;
     readonly format: string;
@@ -29,5 +32,11 @@ describe("Budget's declared document", () => {
         mode: "multi",
       },
     ]);
+  });
+
+  it("names its ring, host floor and capabilities for the catalogue", () => {
+    expect(manifest.ring).toBe("stable");
+    expect(manifest.minHost).toBe(1);
+    expect(manifest.capabilities).toEqual(["documents", "files"]);
   });
 });

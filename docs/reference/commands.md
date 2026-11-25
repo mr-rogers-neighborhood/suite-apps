@@ -91,10 +91,11 @@ that build is local and is never published. Each app's `slop_build_path` is `leg
 change lands on `slop/<name>`; the `slop → nightly → preview → stable` ladder stays with the app set,
 and the profile carries only the `slop` channel.
 
-Only Canvas, Planner, Budget and Help can be queued: they are the legacy apps with a Flatpak manifest
-and an existing `slop` identity. They are frozen for release and get no new pre-release channel until
-they become packs; the factory `slop` build is the session channel, not a shipped channel. Sync ships
-no `suite.app.json` and refuses a pre-release build, Go builds for Android, and Desk has its own
+Only Canvas, Planner and Help can be queued: they are the frozen legacy apps with a Flatpak manifest
+and an existing `slop` identity. They get no new pre-release channel until they become packs; the
+factory `slop` build is the session channel, not a shipped channel. Budget's Flatpak lane is retired
+because it ships as a signed pack, so there is no session build to queue for it. Sync ships no
+`suite.app.json` and refuses a pre-release build, Go builds for Android, and Desk has its own
 manifest. Their gates still run at the root.
 
 The toolchain names what the factory image must provide: the pinned Node and pnpm, `git`, Docker for

@@ -57,8 +57,10 @@ locales, export entry and add-ons in the manifest. A field a host does not imple
 not a silent skip. [manifest.schema.json](manifest.schema.json) is the field list and the closed
 capability vocabulary; a checker reads it rather than repeating it.
 
-**R2.5** Legacy Canvas, Planner, Budget and Help stay frozen at their last Flatpak artifact until
-each becomes a pack. A frozen app is not deleted; its code, docs and last artifact stay under
+**R2.5** Legacy Canvas, Planner and Help stay frozen at their last Flatpak artifact until each
+becomes a pack. Budget is frozen and ships as `packs/budget`: its last Flatpak artifact stays
+published, its Flatpak lane is retired, and its app source, docs and last artifact stay under
+`legacy/budget/`. A frozen app is not deleted; its code, docs and last artifact stay under
 `legacy/<app>/`.
 
 ## 3. Ownership

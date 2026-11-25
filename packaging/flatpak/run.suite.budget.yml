@@ -1,9 +1,15 @@
-# Suite Budget as a Flatpak.
+# Suite Budget as a Flatpak: retired lane, kept for reproducibility.
+#
+# Budget now ships as the signed pack in `packs/budget`; install it from the
+# Desk catalogue. `scripts/flatpak.mjs --app budget` refuses to build a new
+# artifact, and the last published `run.suite.budget` ref stays on the signed
+# remote. This manifest is kept so that last build can still be reproduced.
 #
 # Build the unpacked app first, then let this manifest package it:
 #
 #   pnpm --filter @suite/budget run package:dir
-#   node scripts/flatpak.mjs --app budget
+#   flatpak-builder --repo=... packaging/flatpak/.build/run.suite.budget \
+#     packaging/flatpak/run.suite.budget.yml
 #
 # The manifest packages what electron-builder produced rather than rebuilding it
 # inside flatpak-builder. The renderer and the shell are built by the same gate

@@ -742,6 +742,31 @@ describe("channels and maturity", () => {
     }
   });
 
+  it("reads each frozen row's version and changelog from the same tree", () => {
+    // Budget's pack manifest restates the app version; `pack-shape` owns that
+    // check. The release table must keep one owner, so the pair cannot split.
+    const budget = APPS.find((row) => row.id === "budget");
+    assert.equal(budget.packageJson, "legacy/budget/package.json");
+    assert.equal(budget.changelog, "legacy/budget/CHANGELOG.md");
+
+    for (const app of APPS.filter((row) => row.frozen === true)) {
+      const tree = app.packageJson.split("/").slice(0, 2).join("/");
+      assert.ok(
+        app.changelog.startsWith(`${tree}/`),
+        `${app.id}: ${app.packageJson} and ${app.changelog} are in different trees`,
+      );
+    }
+  });
+
+  it("sends Budget to the catalogue instead of a Flatpak lane", () => {
+    const budget = APPS.find((row) => row.id === "budget");
+    assert.equal(budget.kind, "pack");
+    assert.equal(budget.flatpakId, null);
+    assert.equal(installCommand(budget), null);
+    assert.match(installCell(budget), /Desk catalogue/u);
+    assert.doesNotMatch(installCell(budget), /flatpak install/u);
+  });
+
   it("retires Suite Sync from the release table and still checks every row it keeps", () => {
     assert.equal(APPS.find((row) => row.id === "sync"), undefined);
     assert.ok(

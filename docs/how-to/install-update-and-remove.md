@@ -9,10 +9,13 @@ once, then install, update, remove and reinstall packs from its catalogue. A `.s
 installs on its own. [The host's README](../../hosts/desk/README.md#installing-updating-and-removing-a-pack)
 owns that lifecycle, and neither the host nor an app edits a document.
 
-The frozen Canvas, Planner, Budget and Help Flatpaks keep the one `flatpak install` line the release
-page prints. Suite Start no longer exists (#314); its catalogue and Home moved into the host. Suite
-Sync is retired as a shipped app (#315): the signed remote keeps its last published ref, but no new
-`run.suite.sync` build is published and the tray app is not the target surface.
+The frozen Canvas, Planner and Help Flatpaks keep the one `flatpak install` line the release page
+prints. Budget is frozen and its pack is the install path: install **Suite Budget** from the Desk
+catalogue, and export from the last `run.suite.budget` Flatpak to import there; that last ref stays
+published, but no new Budget app build is made. Suite Start no longer exists (#314); its catalogue and
+Home moved into the host. Suite Sync is retired as a shipped app (#315): the signed remote keeps its
+last published ref, but no new `run.suite.sync` build is published and the tray app is not the target
+surface.
 
 ## Install the host
 
@@ -34,17 +37,25 @@ documents and files on disk until the person removes them.
 
 ## Install a frozen Flatpak
 
-The frozen apps are not packs yet. Each keeps its last signed deployment:
+Canvas, Planner and Help are not packs yet. Each keeps its last signed deployment:
 
 ```sh
 flatpak install --user suite run.suite.canvas
 flatpak install --user suite run.suite.planner
-flatpak install --user suite run.suite.budget
 flatpak install --user suite run.suite.help
 ```
 
 The signed remote is the same one the host uses. A new build updated the deployment with
 `flatpak update --user`; the apps are frozen, so there is no new release until each becomes a pack.
+
+Budget is separate: its pack is the install path. [Install **Suite Budget** from the Desk
+catalogue](#install-a-pack) and import the document there. Its last `run.suite.budget` Flatpak stays
+installable on the same remote for exporting an existing `Documents/Suite/Budget` document to a
+`.budget` file; no new Budget Flatpak build is published.
+
+```sh
+flatpak install --user suite run.suite.budget
+```
 
 ## The relay
 
