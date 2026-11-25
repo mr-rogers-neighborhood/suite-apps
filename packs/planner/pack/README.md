@@ -13,7 +13,9 @@ steps live in [the pack authoring reference](../../../docs/reference/pack-author
 - `src/prelude.ts` installs `window.suitePlanner` over the host's `window.suite`; `src/main.ts`
   imports it before the renderer.
 - `src/bridge.ts` is the adapter: the host document envelope carries a Loro snapshot unchanged, and
-  the pack owns the schema, the debounced snapshot writes and export/import.
+  the pack owns the schema, the snapshot export/import codec and the reminder projection. The
+  debounce, boundary flush, picker handle lifecycle, notices and disposal come from
+  `@suite/pack-runtime`'s shared bridge; this file keeps Planner's `WorkspaceDocument`.
 - `src/projection.ts` is the declared reminder projection: it returns display rows from one
   snapshot and never schedules, polls or shows a notification. The host calls it on save and on
   open, then owns the queue and delivery.

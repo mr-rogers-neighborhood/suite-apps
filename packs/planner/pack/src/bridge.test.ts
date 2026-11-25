@@ -117,16 +117,6 @@ describe("the pack's Planner bridge", () => {
     expect(documents.saves.length).toBe(afterAdopt + 1);
   });
 
-  it("does not write when there is nothing new to write", async () => {
-    const { pack, documents } = setup();
-    active = pack;
-    await pack.bridge.loadSnapshot();
-
-    const before = documents.saves.length;
-    await pack.flush();
-    expect(documents.saves.length).toBe(before);
-  });
-
   it("refuses a document it cannot read instead of replacing it", async () => {
     const documents = memoryDocuments({
       planner: new TextEncoder().encode(JSON.stringify({ format: "other.app" })),
