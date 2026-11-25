@@ -121,9 +121,12 @@ index with a pack key, and nothing verifies a pack with an operator key.
   index entry is a claim, not the proof.
 
 The entry above is index `version` 1, which is what the builder writes today. S12.9 defines
-`version` 2: the entry gains `ring`, `minHost` and the manifest `signature`, and the archive's `url`,
-`size` and `sha256` move under `archive`. This package does not parse v2 yet; the reader, the builder
-and the host's ring preference switch together.
+`version` 2: the entry gains `ring`, a required `contractVersion`, `minHost` and the manifest
+`signature`, and the archive's `url`, `size` and `sha256` move under `archive`. `ring` and `minHost`
+are the manifest's _effective_ values, so an absent ring matches `stable` and a manifest carrying
+`minimumHostVersion` matches a `minHost` entry. The shape is written down in
+[docs/spec/catalogue.schema.json](../../docs/spec/catalogue.schema.json). This package does not parse
+v2 yet; the reader, the builder and the host's ring preference switch together.
 
 `parsePackIndexJson`, `verifyPackIndex` and `packIndexDigest` are the shared implementation. The
 canonical bytes reuse the S3.3 rules in `canonical.ts`: fixed field order, an absent optional field

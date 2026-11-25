@@ -378,20 +378,34 @@ const localesSchema = z.array(z.string().regex(LOCALE)).refine(unique, "duplicat
 
 /**
  * The ring is a closed vocabulary, so an unknown value is a refusal (S3.11).
- * The message names the two values and the reason a channel name is not one.
+ * The message names the two values, the rejected value and the reason a channel
+ * name is not one: `JSON.stringify` is what a manifest author can search for.
  */
 const ringSchema = z
-  .string()
-  .refine(
-    isPackRing,
-    'a pack ring: "stable" or "preview" (a channel such as "nightly" is a host property)',
-  )
+  .custom<PackRing>((value) => typeof value === "string" && isPackRing(value), {
+    error: (issue) =>
+      `a pack ring: "stable" or "preview"; ${describeRejected(issue.input)} is not one (a channel is a host property, never a pack ring)`,
+  })
   .optional();
 
 /** A host version is a whole number from 1, under either spelling of the field. */
-const hostFloorSchema = z
-  .number()
-  .refine((value) => Number.isInteger(value) && value >= 1, "a whole host version of 1 or more");
+const hostFloorSchema = z.custom<number>(
+  (value) => typeof value === "number" && Number.isInteger(value) && value >= 1,
+  {
+    error: (issue) =>
+      `a whole host version of 1 or more; ${describeRejected(issue.input)} is not one`,
+  },
+);
+
+/** The rejected value as a manifest author wrote it, for a refusal sentence. */
+function describeRejected(value: unknown): string {
+  try {
+    const text = JSON.stringify(value);
+    return text === undefined ? String(value) : text;
+  } catch {
+    return String(value);
+  }
+}
 
 const widgetDataSchema = z
   .object({
@@ -499,8 +513,7 @@ function manifestSchema(requireSignature: boolean) {
         context.addIssue({
           code: "custom",
           path: ["minHost"],
-          message:
-            "minHost and minimumHostVersion are the same host floor; carry one spelling, not both",
+          message: `minHost (${value.minHost}) and minimumHostVersion (${value.minimumHostVersion}) are the same host floor; carry one spelling, not both`,
         });
       }
 

@@ -5,6 +5,10 @@
   "description": "The signed manifest a Suite host verifies before running a pack. Every field except signature is covered by the canonical bytes. Unknown top-level fields are refused.",
   "type": "object",
   "additionalProperties": false,
+  "not": {
+    "description": "`minHost` and `minimumHostVersion` are the same host floor in two spellings (S3.11). A manifest carries one or the other, never both.",
+    "required": ["minHost", "minimumHostVersion"]
+  },
   "required": [
     "format",
     "id",

@@ -420,25 +420,30 @@ A pack's `ring` (S3.11) is the pack's own stability, not a channel: `slop`, `nig
 and which rings it offers. A pack never learns a channel name, and a channel name is never a pack value.
 
 **S12.9** A catalogue index `version` 2 entry names one signed pack version:
-`{id, name, publisher, version, ring, minHost?, archive: {url, size, sha256}, signature, capabilities, platforms?, description?}`.
-`version`, `ring` and `minHost` MUST equal the values the manifest carries, and `archive.url`,
-`archive.size` and `archive.sha256` are the only place an entry carries where the archive is and what
-it hashes to. `signature` is the manifest's Ed25519 signature, standard base64, so the host can compare
-the entry with the manifest it unpacked (S12.7) before it installs. The index is generated, not
-authored: an entry with an unknown ring, or with no `ring`, is refused. An index written before this
-clause keeps `version` 1, whose entries carry `url`, `size` and `sha256` at the top level and no ring;
-every such entry is `stable`.
+`{id, name, publisher, version, ring, contractVersion, minHost?, archive: {url, size, sha256}, signature, capabilities, platforms?, description?}`
+([catalogue.schema.json](catalogue.schema.json)). `version`, `ring`, `contractVersion` and `minHost`
+MUST equal the manifest's **effective** values: an absent `ring` is `stable`, and the floor is the same
+value under either spelling (S3.11), so a manifest signed before S3.11 matches an entry that says
+`stable` and one floor. `contractVersion` is required — the manifest requires it, a generated entry
+always carries it, and an entry without it is refused; a `version` 1 index written before this clause
+has no such field and is read as contract 1. `archive.url`, `archive.size` and `archive.sha256` are the
+only place an entry carries where the archive is and what it hashes to. `signature` is the manifest's
+Ed25519 signature, standard base64, so the host can compare the entry with the manifest it unpacked
+(S12.7) before it installs. The index is generated, not authored: an entry with an unknown ring, or
+with no `ring`, is refused. An index written before this clause keeps `version` 1, whose entries carry
+`url`, `size` and `sha256` at the top level and no ring; every such entry is `stable`.
 
 **S12.10** A host offers a set of rings, and the default is `stable` alone; `preview` is added only by
 the person's explicit choice, which is a host setting and never something a pack can widen. For one
-pack id the host offers the highest version whose ring is in that set and whose `minHost`,
-`contractVersion` and platform claims fit (S3.12); a ring above the host's preference is never offered,
-even when its version is newer. A version's ring is fixed by its signature. An operator stages a
-preview by signing a version whose manifest says `ring: "preview"` and publishing it in the next index
-with the same ring and a higher `sequence`; promotion is a new version signed with
-`ring: "stable"`, normally a patch bump, never a re-signed archive under the same version. The preview
-version stays in the catalogue for rollback (S12.6). A pack whose ring the host does not offer is not
-listed, and a direct install of one is refused by S3.12 rather than installed quietly.
+pack id the host offers the highest version whose `ring` is in that set and whose `contractVersion`
+(S12.9), `minHost` and platform claims fit (S3.12); the same checks run again on the unpacked manifest
+before install (S12.7). A ring above the host's preference is never offered, even when its version is
+newer. A version's ring is fixed by its signature. An operator stages a preview by signing a version
+whose manifest says `ring: "preview"` and publishing it in the next index with the same ring and a
+higher `sequence`; promotion is a new version signed with `ring: "stable"`, normally a patch bump,
+never a re-signed archive under the same version. The preview version stays in the catalogue for
+rollback (S12.6). A pack whose ring the host does not offer is not listed, and a direct install of one
+is refused by S3.12 rather than installed quietly.
 
 ## 13. Security and privacy
 

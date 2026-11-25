@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://suite.run/spec/superapp/0.1/catalogue.schema.json",
+  "title": "Suite catalogue index",
+  "description": "The signed catalogue index a host verifies before it lists a pack (S12.2). Version 2 adds the ring, the contract version, the host floor and the manifest signature to each entry (S12.9). The entry shape here is the target: `@suite/pack` parses index version 1 today, and the builder and the host switch to v2 together.",
+  "$comment": "Capabilities resolve to the pack manifest's closed vocabulary in manifest.schema.json, so a new capability is added once. `entries` order is id, then version, then publisher; the canonical bytes sort it that way.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "sequence",
+    "generatedAt",
+    "expires",
+    "threshold",
+    "entries",
+    "signatures"
+  ],
+  "properties": {
+    "format": { "const": "suite.catalogue" },
+    "version": { "const": 2 },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "generatedAt": { "$ref": "#/$defs/timestamp" },
+    "previous": {
+      "description": "The digest of the index this one replaces. Sequence 1 omits it; every later index names its predecessor.",
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expires": { "$ref": "#/$defs/timestamp" },
+    "threshold": {
+      "description": "How many distinct pinned operator signatures must verify. It is inside the signed bytes, so it cannot be lowered without them.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 2048,
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/signature" }
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "description": "An ISO 8601 instant with a zone.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "archive": {
+      "description": "Where the `.suitepack` is and what it hashes to. The only place a v2 entry carries these facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "size", "sha256"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "^https://[^\\s]+$",
+          "$comment": "Absolute HTTPS, no credentials, no fragment. The pattern is the shape; the parser is the enforcement point."
+        },
+        "size": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "entry": {
+      "description": "One signed pack version. `version`, `ring`, `contractVersion` and `minHost` equal the manifest's effective values: an absent `ring` is `stable`, and a manifest that carries `minimumHostVersion` matches a `minHost` entry (S12.9).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "publisher",
+        "version",
+        "ring",
+        "contractVersion",
+        "archive",
+        "signature",
+        "capabilities"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "publisher": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        },
+        "ring": {
+          "description": "The pack's own stability, copied from the manifest. Absent in the manifest means `stable`. A ring is not a host channel.",
+          "enum": ["stable", "preview"]
+        },
+        "contractVersion": {
+          "description": "The pack contract the manifest declares. Required: the manifest requires it, so a generated entry always carries it, and an entry without it is refused. An index written before S12.9 (version 1) has no such field and is read as contract 1.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "minHost": {
+          "description": "The host floor, copied from the manifest's effective floor. Omitted when the manifest declares none.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "archive": { "$ref": "#/$defs/archive" },
+        "signature": {
+          "description": "The pack manifest's Ed25519 signature, standard base64, so the host can compare the entry with the manifest it unpacked (S12.7).",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{86}==$"
+        },
+        "description": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "manifest.schema.json#/$defs/capability" }
+        },
+        "platforms": {
+          "description": "The host kinds the manifest declared, so a row can judge platform fit before download.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" }
+        }
+      }
+    },
+    "signature": {
+      "description": "One operator's Ed25519 signature over the canonical index bytes. A publisher key never verifies an index.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "signature"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[A-Za-z0-9+/]{43}=$" },
+        "signature": { "type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$" }
+      }
+    }
+  }
+}

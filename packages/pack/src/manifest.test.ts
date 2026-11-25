@@ -15,7 +15,13 @@ import {
   parsePackManifest,
   parsePackManifestJson,
 } from "./manifest.js";
-import { digestPackFiles, generatePackKeyPair, sha256Hex, signPackManifest } from "./signature.js";
+import {
+  digestPackFiles,
+  generatePackKeyPair,
+  sha256Hex,
+  signPackManifest,
+  verifyPackSignature,
+} from "./signature.js";
 
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
@@ -553,6 +559,8 @@ describe("rings and the host floor", () => {
       expect(value.issues.map((issue) => issue.path)).toContain("ring");
       expect(value.issues[0]?.message).toContain('"stable" or "preview"');
       expect(value.issues[0]?.message).toContain("host property");
+      // The refusal echoes the value the author wrote, so it can be found.
+      expect(value.issues[0]?.message).toContain(JSON.stringify(ring));
     }
   });
 
@@ -566,10 +574,15 @@ describe("rings and the host floor", () => {
     expect(legacy.ok).toBe(true);
     if (legacy.ok) expect(packMinimumHost(legacy.value)).toBe(3);
 
-    for (const minHost of [0, -1, 1.5, "3"]) {
-      const value = parsePackManifest(manifest({ minHost }));
-      expect(value.ok, String(minHost)).toBe(false);
-      if (!value.ok) expect(value.issues.map((issue) => issue.path)).toContain("minHost");
+    for (const spelling of ["minHost", "minimumHostVersion"] as const) {
+      for (const floor of [0, -1, 1.5, "3"]) {
+        const value = parsePackManifest(manifest({ [spelling]: floor }));
+        expect(value.ok, `${spelling} ${String(floor)}`).toBe(false);
+        if (value.ok) continue;
+        expect(value.issues.map((issue) => issue.path)).toContain(spelling);
+        expect(value.issues[0]?.message).toContain(JSON.stringify(floor));
+        expect(value.issues[0]?.message).toContain("1 or more");
+      }
     }
 
     const both = parsePackManifest(manifest({ minHost: 3, minimumHostVersion: 3 }));
@@ -577,6 +590,28 @@ describe("rings and the host floor", () => {
     if (both.ok) return;
     expect(both.issues.map((issue) => issue.path)).toContain("minHost");
     expect(both.issues[0]?.message).toContain("carry one spelling, not both");
+    expect(both.issues[0]?.message).toContain("(3)");
+  });
+
+  // spec: S3.11
+  it("refuses a duplicate ring or floor key before parsing it", () => {
+    const withRing = JSON.stringify(manifest({ ring: "stable" })).replace(
+      '"ring":"stable"',
+      '"ring":"stable","ring":"preview"',
+    );
+    expect(parsePackManifestJson(withRing)).toEqual({
+      ok: false,
+      issues: [{ path: "ring", message: 'duplicate key "ring"' }],
+    });
+
+    const withFloor = JSON.stringify(manifest({ minHost: 1 })).replace(
+      '"minHost":1',
+      '"minHost":1,"minHost":2',
+    );
+    expect(parsePackManifestJson(withFloor)).toEqual({
+      ok: false,
+      issues: [{ path: "minHost", message: 'duplicate key "minHost"' }],
+    });
   });
 
   // spec: S3.12
@@ -623,7 +658,98 @@ describe("rings and the host floor", () => {
         reason: "ring",
         message: "Canvas is a stable ring pack; this host offers preview.",
       });
+
+      // A host that offers nothing refuses everything, with a readable sentence.
+      expect(packFitsHost(stable.value, { contractVersion: 1, hostVersion: 1, rings: [] })).toEqual(
+        {
+          ok: false,
+          reason: "ring",
+          message: "Canvas is a stable ring pack; this host offers no ring.",
+        },
+      );
     }
+  });
+
+  // spec: S3.12
+  it("checks the contract, then the floor, then the ring", () => {
+    const all = parsePackManifest(manifest({ contractVersion: 9, minHost: 9, ring: "preview" }));
+    expect(all.ok).toBe(true);
+    if (!all.ok) return;
+
+    expect(packFitsHost(all.value, { contractVersion: 1, hostVersion: 1 })).toEqual({
+      ok: false,
+      reason: "contract",
+      message: "Canvas needs pack contract 9; this host implements 1.",
+    });
+    expect(packFitsHost(all.value, { contractVersion: 9, hostVersion: 1 })).toEqual({
+      ok: false,
+      reason: "host",
+      message: "Canvas needs host 9; this host is 1.",
+    });
+    expect(
+      packFitsHost(all.value, { contractVersion: 9, hostVersion: 9, rings: ["stable"] }),
+    ).toEqual({
+      ok: false,
+      reason: "ring",
+      message: "Canvas is a preview ring pack; this host offers stable.",
+    });
+    expect(
+      packFitsHost(all.value, {
+        contractVersion: 9,
+        hostVersion: 9,
+        rings: ["stable", "preview"],
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  // spec: S3.3
+  // spec: S3.11
+  it("signs a manifest with a ring and a floor, and a changed ring breaks the signature", async () => {
+    const keys = await generatePackKeyPair();
+    const parsed = parsePackManifest(
+      manifest({
+        ring: "preview",
+        minHost: 2,
+        publisher: { key: keys.publicKeyBase64, id: "suite" },
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const { signature: _unsigned, ...core } = parsed.value;
+    const signature = signPackManifest(core, keys.secretKeyBase64);
+    const text = JSON.stringify({ ...core, signature });
+
+    const signed = parsePackManifestJson(text);
+    expect(signed.ok).toBe(true);
+    if (!signed.ok) return;
+    expect(signed.value.ring).toBe("preview");
+    expect(packMinimumHost(signed.value)).toBe(2);
+    expect(await verifyPackSignature(signed.value, keys.publicKeyBase64)).toBe(true);
+
+    // The ring is inside the signed bytes: promoting it under the same version
+    // is a different document and the old signature no longer verifies.
+    const promoted = parsePackManifestJson(JSON.stringify({ ...core, ring: "stable", signature }));
+    expect(promoted.ok).toBe(true);
+    if (!promoted.ok) return;
+    expect(await verifyPackSignature(promoted.value, keys.publicKeyBase64)).toBe(false);
+
+    const raised = parsePackManifestJson(JSON.stringify({ ...core, minHost: 3, signature }));
+    expect(raised.ok).toBe(true);
+    if (!raised.ok) return;
+    expect(await verifyPackSignature(raised.value, keys.publicKeyBase64)).toBe(false);
+
+    // The older spelling signs and verifies the same way, under its own key.
+    const legacyCore = { ...core, minimumHostVersion: 2 } as typeof core;
+    delete (legacyCore as { minHost?: number }).minHost;
+    const legacySignature = signPackManifest(legacyCore, keys.secretKeyBase64);
+    const legacy = parsePackManifestJson(
+      JSON.stringify({ ...legacyCore, signature: legacySignature }),
+    );
+    expect(legacy.ok).toBe(true);
+    if (!legacy.ok) return;
+    expect(packMinimumHost(legacy.value)).toBe(2);
+    expect(await verifyPackSignature(legacy.value, keys.publicKeyBase64)).toBe(true);
   });
 
   // spec: S3.3
