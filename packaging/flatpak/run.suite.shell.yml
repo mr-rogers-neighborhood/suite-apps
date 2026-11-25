@@ -7,8 +7,8 @@
 #   node scripts/flatpak.mjs --app shell --channel nightly
 #
 # The stable manifest is the only hand-written one. A pre-release rewrites it to
-# `run.suite.slop.shell`: the id names the desktop entry, metainfo, icon and
-# launcher, and the branch (slop, nightly or preview) carries the channel. The
+# `run.suite.<channel>.shell`: the id names the desktop entry, metainfo, icon and
+# launcher, and the branch (slop, nightly or preview) carries the same channel. The
 # grants and build steps below are shared, so a permission decided for stable is
 # not silently wider in a pre-release.
 #

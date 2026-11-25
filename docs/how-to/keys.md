@@ -135,9 +135,9 @@ the release can sign with a key a host does not trust yet, and that is what make
 **Android release key.** Generate a new keystore, pin its digest in `ANDROID_RELEASE_CERT_SHA256`,
 and rebuild every channel. Android compares the certificate of an update with the installed app's,
 so every installed build signed with the old key is refused; a person has to uninstall it before the
-new one installs. There is no side-by-side migration for the same package id, and the pre-release id
-is separate only from stable. Plan a rotation as a release, not as a machine setup step. The build
-steps are in [Android](../../apps/go/docs/reference/android.md#release-signing-and-channels).
+new one installs. There is no side-by-side migration for the same package id, and each pre-release id
+is separate from stable and from every other channel. Plan a rotation as a release, not as a machine
+setup step. The build steps are in [Android](../../apps/go/docs/reference/android.md#release-signing-and-channels).
 
 ## Back up
 

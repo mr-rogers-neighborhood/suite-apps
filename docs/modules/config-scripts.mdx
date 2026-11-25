@@ -26,10 +26,11 @@ are history and the relay's last Flatpak ref stays on the signed remote without 
 ## scripts/lib/channel.mjs#suiteAppId
 
 Stable and pre-release are two identities, and this function names the manifest
-one. Stable keeps `<app>`; a pre-release is `slop-<app>` with a hyphen. The
-Flatpak id is a different field and keeps its dots (`run.suite.slop.<app>`); the
-tier is the branch, so moving from slop to canary replaces the pre-release
-rather than adding a third install.
+one. Stable keeps `<app>`; a pre-release manifest id is `slop-<app>` with a
+hyphen, the marker the frozen mini-apps classify as a pre-release. The Flatpak id
+is a different field: it names the channel (`run.suite.<channel>.<app>`), and the
+branch carries the same channel. Each pre-release channel is its own install, so
+moving from slop to nightly adds a channel rather than replacing one.
 
 The older dotted `slop.<app>` form is still read for an installed build and is
 never written. Keeping that distinction here is what lets the shell, the Flatpak

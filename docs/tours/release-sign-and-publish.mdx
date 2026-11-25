@@ -64,12 +64,13 @@ kept until they are retired deliberately.
 
 ## scripts/lib/channel.mjs#flatpakId
 
-Stable keeps `run.suite.<app>`; a pre-release takes `run.suite.slop.<app>`. That
-id is the card and the profile, so stable and a pre-release can coexist without
-sharing documents or an update path.
+Stable keeps `run.suite.<app>`; each pre-release channel takes
+`run.suite.<channel>.<app>`. That id is the card and the profile, so stable and
+every pre-release can coexist without sharing documents or an update path.
 
 ## scripts/lib/channel.mjs#branchFor
 
-The tier is the Flatpak branch, not part of the id. One pre-release id across
-`slop`, `canary` and `beta` means a tier move replaces the deployment instead of
-adding a second install.
+A pre-release channel publishes on a branch of the same name; stable keeps
+`master`. Each channel keeps its own id and branch, so an update moves within its
+channel and a promotion installs the next channel rather than replacing the one
+it came from.
