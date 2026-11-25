@@ -34,7 +34,7 @@
     "test": "vitest run",
     "lint": "node ../../scripts/lint.mjs",
     "format": "biome format --write .",
-    "check": "node ../../scripts/lint.mjs && tsc --noEmit -p tsconfig.json"
+    "check": "node ../../scripts/lint.mjs && tsc --noEmit -p tsconfig.json && vitest run"
   },
   "devDependencies": {
     "typescript": "~5.9.3",
