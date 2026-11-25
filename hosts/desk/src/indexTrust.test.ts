@@ -258,6 +258,28 @@ describe("loading a verified index", () => {
     expect(second).toMatchObject({ ok: true });
   });
 
+  it("refuses the same sequence with different bytes as an equivocation", async () => {
+    // spec: S12.2 — a publisher rewriting a sequence is refused, and the refusal
+    // has to reach the person with the reason, not the generic chain sentence.
+    const operator = await generatePackKeyPair();
+    const { core } = await fixture({ sequence: 4, previous: "a".repeat(64) });
+    const index = signPackIndex(core, [operator.secretKeyBase64]);
+    const headRoot = await temporaryRoot();
+    await writeCatalogueIndexHead(headRoot, { sequence: 4, digest: "b".repeat(64) });
+
+    const loaded = await loadCatalogueIndex({
+      url: INDEX_URL,
+      headRoot,
+      operatorKeys: [operator.publicKeyBase64],
+      now: NOW,
+      fetch: fetcher({ [INDEX_URL]: JSON.stringify(index) }),
+    });
+
+    expect(loaded).toMatchObject({ ok: false, reason: "refused" });
+    if (loaded.ok) return;
+    expect(loaded.message).toContain("cannot rewrite a sequence");
+  });
+
   it("refuses a previous that names another index", async () => {
     // spec: S12.2
     const operator = await generatePackKeyPair();
