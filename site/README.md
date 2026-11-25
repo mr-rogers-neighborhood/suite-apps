@@ -1,16 +1,17 @@
 # Suite site
 
 The published static site: `suite.run` is the landing page and `docs.suite.run` is the documentation.
-Both are one GitHub Pages artifact built by `.github/workflows/pages.yml`; no server, no Cloudflare
-build token.
+Both are one Cloudflare Pages project, `suite`, connected to this repository. The production build
+runs `pnpm docs:check && pnpm site:build` on `main` and uploads `site/dist`; there is no GitHub Pages
+deployment and no build token in the repository.
 
 ```sh
 pnpm install
 pnpm site:build        # writes site/dist
 ```
 
-`pnpm site:build` is the only command. The output is a pure function of `docs/`, `site/src/` and
-`docs/assets/suite-icon.png`.
+`pnpm site:build` is the only render command. The output is a pure function of `docs/`, `site/src/`
+and `docs/assets/suite-icon.png`.
 
 ## Layout
 
@@ -70,11 +71,13 @@ without a second tree.
 
 ## Hosts and DNS
 
-The artifact has `/` (landing) and `/docs/` (the docs). One GitHub Pages site cannot carry two custom
-domains, so the deployment is:
+The artifact has `/` (landing) and `/docs/` (the docs). One Cloudflare Pages project carries both
+custom domains, so there is one deployment and no redirect between hosts:
 
-- `suite.run` is the Pages custom domain (apex `A`/`AAAA`, `www` CNAME).
-- `docs.suite.run` is a proxied `CNAME` to the same Pages site. The landing page's first script sends
-  that host's root to `/docs/`; links inside the docs stay under `/docs/`. `404.html` carries the same
-  redirect for a deep link that arrives without the prefix.
-- The owner keeps both names on Cloudflare DNS; the workflow carries no Cloudflare credential.
+- `suite.run` is the canonical custom domain for the project.
+- `docs.suite.run` is a second custom domain on the same project. The landing page's first script
+  sends that host's root to `/docs/`; links inside the docs stay under `/docs/`. `404.html` carries the
+  same redirect for a deep link that arrives without the prefix.
+- `www.suite.run` is a 301 to the apex at the Cloudflare edge.
+- DNS lives in the same Cloudflare account as the project; the repository carries no Cloudflare
+  credential. GitHub Pages is no longer a deployment target.
