@@ -236,6 +236,28 @@ describe("loading a verified index", () => {
     expect(loaded.message).toContain("cannot move backwards");
   });
 
+  it("accepts a refetch of the index it already trusts", async () => {
+    // spec: S12.2 — the same sequence with the same bytes is a relaunch, not a
+    // replay. Refusing it makes the catalogue work once and then fail.
+    const operator = await generatePackKeyPair();
+    const { core } = await fixture({ sequence: 4, previous: "a".repeat(64) });
+    const index = signPackIndex(core, [operator.secretKeyBase64]);
+    const headRoot = await temporaryRoot();
+    const load = () =>
+      loadCatalogueIndex({
+        url: INDEX_URL,
+        headRoot,
+        operatorKeys: [operator.publicKeyBase64],
+        now: NOW,
+        fetch: fetcher({ [INDEX_URL]: JSON.stringify(index) }),
+      });
+
+    const first = await load();
+    expect(first).toMatchObject({ ok: true });
+    const second = await load();
+    expect(second).toMatchObject({ ok: true });
+  });
+
   it("refuses a previous that names another index", async () => {
     // spec: S12.2
     const operator = await generatePackKeyPair();

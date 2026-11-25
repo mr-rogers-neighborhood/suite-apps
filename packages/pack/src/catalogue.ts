@@ -496,6 +496,7 @@ export async function verifyPackIndex(
   }
 
   const head = options.head ?? null;
+  const digest = await packIndexDigest(index);
   if (head !== null) {
     if (!Number.isInteger(head.sequence) || head.sequence < 0 || !isSha256Hex(head.digest)) {
       return {
@@ -504,12 +505,29 @@ export async function verifyPackIndex(
         message: "The trusted index head is malformed.",
       };
     }
-    if (index.sequence <= head.sequence) {
+    if (index.sequence < head.sequence) {
       return {
         ok: false,
         reason: "rollback",
         message: `This index is sequence ${index.sequence}; the trusted index is ${head.sequence}. A catalogue cannot move backwards.`,
       };
+    }
+    // The same sequence with the same bytes is the index this host already
+    // trusts: a refetch on the next launch, not a replay. Refusing it would make
+    // the catalogue work once and then fail until the publisher cut a new
+    // sequence, which is exactly what a person sees when they reopen the app.
+    if (index.sequence === head.sequence) {
+      if (digest !== head.digest) {
+        return {
+          ok: false,
+          reason: "chain",
+          message:
+            `This index reuses sequence ${index.sequence} with different content; ` +
+            `the trusted index at that sequence is ${head.digest.slice(0, 12)}…. ` +
+            "A catalogue cannot rewrite a sequence.",
+        };
+      }
+      return { ok: true, index, digest };
     }
     if (index.previous !== head.digest) {
       return {
@@ -520,7 +538,7 @@ export async function verifyPackIndex(
     }
   }
 
-  return { ok: true, index, digest: await packIndexDigest(index) };
+  return { ok: true, index, digest };
 }
 
 /** Parse and verify index text in one call. */
