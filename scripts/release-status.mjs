@@ -216,6 +216,7 @@ export function channelRow(
     apkLive = false,
     draft = false,
     revision = null,
+    latestPage = false,
   } = {},
 ) {
   const shape =
@@ -226,13 +227,15 @@ export function channelRow(
         : `\`suite-${name}-<date>\``;
   const page = name === channel && tag !== null ? tag : (pages?.[name] ?? null);
   const where =
-    pages === null
-      ? shape
-      : name === channel && tag !== null
-        ? `this page (\`${tag}\`)`
-        : page === null
-          ? "not published yet"
-          : `[\`${page}\`](${releaseUrl(page)})`;
+    latestPage && name === STABLE_CHANNEL
+      ? `[${shape}](https://github.com/${RELEASE_REPO}/releases/latest)`
+      : pages === null
+        ? shape
+        : name === channel && tag !== null
+          ? `this page (\`${tag}\`)`
+          : page === null
+            ? "not published yet"
+            : `[\`${page}\`](${releaseUrl(page)})`;
   const desk = shellApp === null ? "—" : `\`${installCommand(shellApp, name)}\``;
   const go = goChannelCell(name, {
     channel,
@@ -265,6 +268,7 @@ export function channelTable({
   apkLive = false,
   draft = false,
   revision = null,
+  latestPage = false,
   order = CHANNEL_ORDER,
 } = {}) {
   const header = ["| Channel | Suite Desk | Suite Go | Page |", "| --- | --- | --- | --- |"];
@@ -280,55 +284,51 @@ export function channelTable({
       apkLive,
       draft,
       revision,
+      latestPage,
     }),
   );
   return [...header, ...rows];
 }
 
-/** The README's Release table: the stable versions and how each installs. */
-export function stableReleaseTable(entries) {
-  const rows = superappEntries(entries).map(({ app, version }) => {
-    const install =
-      app.kind === "apk"
-        ? `[\`suite-go.apk\`](https://github.com/${RELEASE_REPO}/releases/latest/download/suite-go.apk)`
-        : `\`${installCommand(app, STABLE_CHANNEL)}\``;
-    return `| **${app.name}** | ${version} | ${install} |`;
-  });
-  return ["| Host | Version | Install |", "| --- | --- | --- |", ...rows];
-}
-
-/** The README block: the stable Release table and the Pre-Release table. */
-export function readmeTables({ entries = [], pages = null } = {}) {
+/**
+ * The README's tables: version-free, page-pattern-free of live tags.
+ *
+ * The README is the page a person starts from and the page that must not drift.
+ * A version belongs to `package.json` (D6.4) and a pre-release tag belongs to
+ * the release list, so this block names only the channel, the install command,
+ * the Go asset and the page shape. The stable row links the Latest page; a
+ * pre-release row names the tag pattern, never a tag that pruning will delete.
+ */
+export function readmeTables() {
   const deskApp = APPS.find((app) => app.id === "desk") ?? null;
   const goApp = APPS.find((app) => app.id === "go") ?? null;
-  const goVersion = entries.find((entry) => entry.app.id === "go")?.version ?? null;
   return [
     "### Release",
     "",
-    ...stableReleaseTable(entries),
+    ...channelTable({
+      mode: "install",
+      pages: null,
+      order: [STABLE_CHANNEL],
+      latestPage: true,
+      shellApp: deskApp,
+      goApp,
+    }),
     "",
     "### Pre-Release",
     "",
     ...channelTable({
       mode: "install",
-      pages,
+      pages: null,
       order: README_PRE_RELEASE_ORDER,
       shellApp: deskApp,
       goApp,
-      goVersion,
     }),
   ];
 }
 
 /** The README block between its generated markers. */
-export function channelsBlock({ entries = [], pages = null } = {}) {
-  return [
-    CHANNELS_BLOCK_START,
-    "",
-    ...readmeTables({ entries, pages }),
-    "",
-    CHANNELS_BLOCK_END,
-  ].join("\n");
+export function channelsBlock() {
+  return [CHANNELS_BLOCK_START, "", ...readmeTables(), "", CHANNELS_BLOCK_END].join("\n");
 }
 
 /** `text` with the generated channels block replaced. */
@@ -346,18 +346,18 @@ export function withChannelsBlock(text, block = channelsBlock()) {
  *
  * A hand-edited table and the generator drift silently otherwise, and the README
  * is the page a person installs from. `--check-readme` runs this, so a channel
- * rename, a version bump or a new channel cannot leave the README telling
- * someone to run a command that installs nothing or names a version the tree no
- * longer ships.
+ * rename or a new channel cannot leave the README telling someone to run a
+ * command that installs nothing. The block restates no version (D6.4) and names
+ * no live pre-release tag, so this check needs no tree and no release list.
  */
-export function readmeChannelsDrift(text, { entries = [], pages = null } = {}) {
+export function readmeChannelsDrift(text) {
   const start = text.indexOf(CHANNELS_BLOCK_START);
   const end = text.indexOf(CHANNELS_BLOCK_END);
   if (start < 0 || end < start) {
     return `${README_FILE} has no generated channels block; restore ${CHANNELS_BLOCK_START}`;
   }
   const current = text.slice(start, end + CHANNELS_BLOCK_END.length);
-  if (current === channelsBlock({ entries, pages })) return null;
+  if (current === channelsBlock()) return null;
   return (
     `${README_FILE}'s Release and Pre-Release tables are out of date; run ` +
     "`node scripts/release-status.mjs --write` and commit the result"
@@ -1498,7 +1498,7 @@ export function channelCallout(channel) {
   const desk = APPS.find((app) => app.id === "desk");
   return [
     `> **Pre-release.** This is the \`${channel}\` build, not the stable release. Install stable`,
-    `> instead with \`${installCommand(desk)}\`, or the ${stableGo} to start from the release the`,
+    `> instead with \`${installCommand(desk)}\`, or install ${stableGo} from the release the`,
     "> project supports. Any number of channels can be installed side by side, so testing this one",
     "> leaves stable in place.",
     "",
@@ -1587,7 +1587,7 @@ export function aggregateReleaseBody(
     "",
     ...channelTable({ ...tableOptions, order: otherChannels(channel) }),
     "",
-    `Install one after the remote below is added: \`flatpak install --user ${REMOTE_NAME} <id>\`.`,
+    "Each Desk cell above is the full install command; add the remote below once, then run that row.",
     "",
     "## Suite Desk (desktop)",
     "",
@@ -1819,13 +1819,13 @@ export function writesReleasesPage(mode) {
  * The guard is the invariant, not a comment: `--draft` and `--dry-run` can
  * never reach the file, whatever a future branch does.
  */
-function writeReadmeChannels(mode, { entries = [], pages = null } = {}) {
+function writeReadmeChannels(mode) {
   if (!writesReleasesPage(mode)) {
     throw new Error(`${mode} must not write ${README_FILE}`);
   }
   const path = join(ROOT, README_FILE);
   const text = readFileSync(path, "utf8");
-  writeFileSync(path, withChannelsBlock(text, channelsBlock({ entries, pages })));
+  writeFileSync(path, withChannelsBlock(text));
 }
 
 function writeReleasesPage(mode, content) {
@@ -2324,22 +2324,7 @@ async function main(argv) {
   }
 
   if (options.checkReadme) {
-    // The Pre-Release table links the newest published page of each channel,
-    // so the check needs the same release list --write reads. Run it where gh
-    // can reach the repository; the tables otherwise have nothing to compare.
-    const releases = existingReleases();
-    if (releases === null) {
-      throw new Error(
-        "gh release list failed; the README's Pre-Release table names the newest page of " +
-          "each channel, so --check-readme needs the release list it would compare against",
-      );
-    }
-    const { problems, entries } = collectReleases();
-    if (problems.length > 0) throw new Error(problems.join("\n\n"));
-    const drift = readmeChannelsDrift(readFileSync(join(ROOT, README_FILE), "utf8"), {
-      entries,
-      pages: newestPages(releases),
-    });
+    const drift = readmeChannelsDrift(readFileSync(join(ROOT, README_FILE), "utf8"));
     if (drift !== null) {
       process.stderr.write(`${drift}\n`);
       process.exit(1);
@@ -2580,7 +2565,7 @@ async function main(argv) {
   if (mode === "write") {
     writeReleasesPage("write", page);
     process.stdout.write(`\nwrote ${RELEASES_FILE}\n`);
-    writeReadmeChannels("write", { entries, pages });
+    writeReadmeChannels("write");
     process.stdout.write(`wrote the ${README_FILE} Release and Pre-Release tables\n`);
     return;
   }

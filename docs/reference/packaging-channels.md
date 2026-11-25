@@ -40,15 +40,17 @@ other. The release pages and the README carry the same tables of them, generated
   **Pre-Release (Preview|Nightly|Slop)**. The other channels follow, ascending (slop → stable) on a
   pre-release page and descending (stable → slop) on the Latest page. A pre-release page says it is
   not stable and that stable installs beside it; the Latest page says the inverse.
-- The README carries a **Release** table with the stable Desk and Go versions and install commands,
-  then a **Pre-Release** table with preview, nightly and slop, newest page first, each linking that
-  channel's newest published page.
+- The README carries a version-free **Release** row for stable, then a **Pre-Release** table with
+  preview, nightly and slop. Every row names the channel, the Desk command, the Go asset and the page
+  shape (`suite-nightly-<date>`, `suite-slop-<date>-<revision>`). The stable row links the Latest
+  page; a pre-release row names the shape rather than a tag that pruning will delete. A version
+  belongs to `package.json` (D6.4), and the newest-page link belongs to the release page.
 
 `--check-readme` refuses a README whose tables are not what `--write` would generate, so renaming an
-id or bumping a version cannot leave the install instructions pointing at a ref or version the tree
-does not ship. It reads the release list because the Pre-Release table links each channel's newest
-published page, so run it where `gh` can reach the repository; [the site check](https://github.com/mrrnbhd/suite-apps/issues/414)
-owns the build-time comparison of those links.
+id or adding a channel cannot leave the install instructions pointing at a ref that does not exist.
+The block restates no version and names no live pre-release tag, so the check needs no tree and no
+release list; [the site check](https://github.com/mrrnbhd/suite-apps/issues/414) owns comparing the
+release pages and their newest links at build time.
 
 The logo on both is `docs/assets/suite-icon.png`, the canonical brand asset. The tree had no separate
 brand mark when the release UX was built, so it is the icon Suite Desk ships

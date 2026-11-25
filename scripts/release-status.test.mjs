@@ -15,7 +15,6 @@ import {
   channelsBlock,
   readmeChannelsDrift,
   readmeTables,
-  stableReleaseTable,
   aggregateReleaseCommands,
   aggregateSection,
   aggregateTag,
@@ -1105,60 +1104,51 @@ describe("channel releases", () => {
     assert.match(preview, /Any number of channels can be installed side by side/u);
   });
 
-  it("renders the README's Release and Pre-Release tables", () => {
-    const release = stableReleaseTable(entries);
-    assert.deepEqual(release[0], "| Host | Version | Install |");
-    assert.ok(release.some((row) => row.includes("**Suite Desk**") && row.includes("0.2.0")));
-    assert.ok(release.some((row) => row.includes("**Suite Go**") && row.includes("0.1.0")));
-
-    const tables = readmeTables({ entries, pages: null });
+  it("renders version-free README tables with page shapes, not live tags", () => {
+    const tables = readmeTables();
     assert.ok(tables.includes("### Release"));
     assert.ok(tables.includes("### Pre-Release"));
     const rows = tables.filter((row) => row.startsWith("| `"));
     assert.deepEqual(
       rows.map((row) => row.split("|")[1].trim()),
-      README_PRE_RELEASE_ORDER.map((name) => `\`${name}\``),
+      ["`stable`", ...README_PRE_RELEASE_ORDER.map((name) => `\`${name}\``)],
     );
     assert.deepEqual(README_PRE_RELEASE_ORDER, ["preview", "nightly", "slop"]);
+
+    const block = channelsBlock();
+    assert.match(
+      block,
+      /\[`suite-<date>`\]\(https:\/\/github\.com\/mrrnbhd\/suite-apps\/releases\/latest\)/u,
+    );
+    assert.ok(block.includes("`suite-preview-<date>`"));
+    assert.ok(block.includes("`suite-nightly-<date>`"));
+    assert.ok(block.includes("`suite-slop-<date>-<revision>`"));
+    assert.doesNotMatch(block, /\d+\.\d+\.\d+/u, "a version lives in package.json, not the README");
+    assert.doesNotMatch(block, /suite-(?:preview|nightly)-\d{4}\.\d{2}\.\d{2}/u);
+    assert.doesNotMatch(block, /suite-slop-\d{4}\.\d{2}\.\d{2}-[0-9a-f]{7}/u);
   });
 
-  it("keeps the README's generated tables in step with the generator", () => {
-    const readme = [
-      "# Suite",
-      "",
-      "<!-- BEGIN generated:channels (scripts/release-status.mjs; do not edit by hand) -->",
-      "",
-      "### Release",
-      "",
-      "<!-- END generated:channels -->",
-      "",
-    ].join("\n");
-    assert.equal(
-      readmeChannelsDrift(readme, { entries }),
-      "README.md's Release and Pre-Release tables are out of date; run " +
-        "`node scripts/release-status.mjs --write` and commit the result",
-    );
-    const current = readme.replace(
-      "### Release",
-      readmeTables({ entries }).join("\n"),
-    );
-    assert.equal(readmeChannelsDrift(current, { entries }), null);
-    const edited = current.replace(
+  it("keeps the committed README's generated tables in step with the generator", () => {
+    const readme = readFileSync(join(ROOT, README_FILE), "utf8");
+    assert.equal(readmeChannelsDrift(readme), null);
+    assert.match(readme, /BEGIN generated:channels/u);
+    assert.match(readme, /END generated:channels/u);
+    const start = readme.indexOf("<!-- BEGIN generated:channels");
+    const end = readme.indexOf("<!-- END generated:channels -->");
+    const block = readme.slice(start, end);
+    assert.doesNotMatch(block, /\d+\.\d+\.\d+/u, "no version may reappear in the README block");
+    const edited = readme.replace(
       "run.suite.nightly.desk//nightly",
       "run.suite.nightly.shell//nightly",
     );
-    assert.match(readmeChannelsDrift(edited, { entries }), /out of date/u);
-    assert.match(readmeChannelsDrift("# no block here", { entries }), /no generated channels block/u);
+    assert.match(readmeChannelsDrift(edited), /out of date/u);
+    assert.match(readmeChannelsDrift("# no block here"), /no generated channels block/u);
   });
 
-  it("keeps the committed README's logo and generated tables parseable", () => {
-    const readme = readFileSync(join(ROOT, README_FILE), "utf8");
-    assert.ok(readme.includes(`src="${LOGO_PATH}"`));
-    assert.ok(readme.includes("### Release"));
-    assert.ok(readme.includes("### Pre-Release"));
-    assert.match(readme, /BEGIN generated:channels/u);
-    assert.match(readme, /END generated:channels/u);
-    assert.equal(channelsBlock({ entries }).includes(LOGO_PATH), false);
+  it("keeps the canonical logo identical to the Desk icon it was taken from", () => {
+    const canonical = readFileSync(join(ROOT, LOGO_PATH));
+    const deskIcon = readFileSync(join(ROOT, "hosts/desk/build/icons/512x512.png"));
+    assert.deepEqual(canonical, deskIcon);
   });
 
   it("prunes only the older published releases of one channel", () => {

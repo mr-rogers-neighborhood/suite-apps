@@ -27,26 +27,26 @@ Suite Go is not a Flatpak: download `suite-go.apk` from the stable release page 
 `adb install -r -t suite-go.apk`. The Flatpak remote is the update path (`flatpak update --user`);
 [Channels](docs/explanation/channels.md) says what each channel promises.
 
-The tables below are generated from the versions in the tree and the newest published page of each
-channel. Run `node scripts/release-status.mjs --write` after a release; `--check-readme` fails when
-they drift.
+The tables below are generated from the channel model. They name the install command and the page
+shape, not a version or a live pre-release tag: `package.json` owns the version (D6.4) and pruning
+removes old pre-release pages. Run `node scripts/release-status.mjs --write` after a channel change;
+`--check-readme` fails when the tables drift.
 
 <!-- BEGIN generated:channels (scripts/release-status.mjs; do not edit by hand) -->
 
 ### Release
 
-| Host | Version | Install |
-| --- | --- | --- |
-| **Suite Desk** | 0.4.0 | `flatpak install --user suite run.suite.desk` |
-| **Suite Go** | 0.2.0 | [`suite-go.apk`](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk) |
+| Channel | Suite Desk | Suite Go | Page |
+| --- | --- | --- | --- |
+| `stable` | `flatpak install --user suite run.suite.desk` | [`suite-go.apk`](https://github.com/mrrnbhd/suite-apps/releases/latest/download/suite-go.apk) | [`suite-<date>`](https://github.com/mrrnbhd/suite-apps/releases/latest) |
 
 ### Pre-Release
 
 | Channel | Suite Desk | Suite Go | Page |
 | --- | --- | --- | --- |
-| `preview` | `flatpak install --user suite run.suite.preview.desk//preview` | `suite-go-preview-<version>.apk` on that page | [`suite-preview-2026.11.25`](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-preview-2026.11.25) |
-| `nightly` | `flatpak install --user suite run.suite.nightly.desk//nightly` | `suite-go-nightly-<version>.apk` on that page | [`suite-nightly-2026.11.25`](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-nightly-2026.11.25) |
-| `slop` | `flatpak install --user suite run.suite.slop.desk//slop` | `suite-go-slop-<version>.apk` on that page | [`suite-slop-2026.11.25-f9bd624`](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-slop-2026.11.25-f9bd624) |
+| `preview` | `flatpak install --user suite run.suite.preview.desk//preview` | `suite-go-preview-<version>.apk` on that page | `suite-preview-<date>` |
+| `nightly` | `flatpak install --user suite run.suite.nightly.desk//nightly` | `suite-go-nightly-<version>.apk` on that page | `suite-nightly-<date>` |
+| `slop` | `flatpak install --user suite run.suite.slop.desk//slop` | `suite-go-slop-<version>.apk` on that page | `suite-slop-<date>-<revision>` |
 
 <!-- END generated:channels -->
 
