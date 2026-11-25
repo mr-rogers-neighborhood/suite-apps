@@ -116,9 +116,9 @@ index with a pack key, and nothing verifies a pack with an operator key.
 }
 ```
 
-- `sequence` never decreases. A lower value is a rollback and is refused. An equal value is the
-  index the host already trusts when its digest matches (a refetch); the same sequence with
-  different bytes is an equivocation and is refused.
+- `sequence` never decreases. A lower value is a rollback and is refused; an equal value is
+  accepted only when the canonical bytes match the trusted digest (a refetch), and refused as an
+  equivocation when they do not.
 - `previous` is the `packIndexDigest` of the index being replaced. Sequence 1 omits it; every later
   index must name its predecessor.
 - `expires` is an instant; an index past it is refused.

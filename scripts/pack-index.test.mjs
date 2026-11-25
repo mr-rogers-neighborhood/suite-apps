@@ -258,7 +258,7 @@ describe("pack-index build", () => {
     });
     assert.equal(advanced.ok, true);
 
-    // The same index the host already trusted, fetched again, is a refetch.
+    // The same index, fetched again: this is a refetch, not a replay.
     const refetched = await verifyPackIndexJson(firstIndex.json, {
       operatorKeys: [first.publicKeyBase64, second.publicKeyBase64],
       now: NOW,

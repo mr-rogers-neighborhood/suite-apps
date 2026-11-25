@@ -318,6 +318,18 @@ describe("loading a catalogue index", () => {
     expect(loaded.ok ? "" : loaded.message).toContain("cannot move backwards");
   });
 
+  it("refuses the same sequence with different bytes as an equivocation", async () => {
+    const head = JSON.stringify({ version: 1, sequence: 4, digest: "b".repeat(64) });
+    const text = signedText([entry()], { sequence: 4, previous: "b".repeat(64) });
+
+    const loaded = await catalogueFor(text, {}, fakePacks().packs, {
+      [INDEX_HEAD_KEY]: head,
+    }).catalogue.load();
+
+    expect(loaded).toMatchObject({ ok: false, reason: "refused" });
+    expect(loaded.ok ? "" : loaded.message).toContain("cannot rewrite a sequence");
+  });
+
   it("refuses an index whose previous does not name the trusted digest", async () => {
     const head = JSON.stringify({ version: 1, sequence: 3, digest: "b".repeat(64) });
     const text = signedText([entry()], { sequence: 4, previous: "c".repeat(64) });
