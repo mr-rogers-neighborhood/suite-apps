@@ -186,13 +186,15 @@ node scripts/flatpak-remote.mjs --target s3 --publish    # upload, then invalida
 `--target s3` needs `SUITE_FLATPAK_S3_BUCKET` and `SUITE_FLATPAK_CLOUDFRONT_DISTRIBUTION` (or
 `--bucket` and `--distribution`), and `--publish` also needs the `aws` CLI on `PATH`; it refuses
 without them. The upload syncs `objects/`, `refs/`, `summaries/`, `deltas/` and `delta-indexes/` with
-`Cache-Control: public,max-age=31536000,immutable`, and copies `summary`, `summary.sig`,
+`Cache-Control: public,max-age=31536000,immutable`, and copies `config`, `summary`, `summary.sig`,
 `summary.idx`, `summary.idx.sig` and `suite.flatpakrepo` with `Cache-Control: no-cache`. The object
 trees never pass `--delete`: OSTree objects, static deltas and delta indexes are content-addressed, so
 an old one is harmless and a client may still be fetching it. `summaries/` is the cached-summary tree
 an OSTree client fetches after reading `summary.idx`; publishing the index without it fails the client
-with a 403. After the upload it invalidates those five summary paths, because they are the only names
-that change between publications; a new delta is a new path, so nothing invalidates it.
+with a 403. `config` is the first name an OSTree client fetches, and a bucket that never received it answers 403
+for every install however correct the summary beside it is. After the upload it invalidates those
+paths, because they are the only names that change between publications; a new delta is a new path, so
+nothing invalidates it.
 
 ### One summary names every channel
 
