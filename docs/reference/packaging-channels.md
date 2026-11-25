@@ -404,10 +404,10 @@ folder. The rule is in [Canvas's paths](../../apps/canvas/desktop/src/main/paths
 
 Canvas, Planner, Budget and Help build as signed `.suitepack` archives, and the release index job
 stages all four. Each manifest declares `"platforms": ["desktop", "mobile"]`: the desktop build is
-unchanged, and Suite Go can show the pack once the host serves what it needs. Go does not serve
-`files` yet (#382), so Canvas, Planner and Budget are visibly unavailable there until that lands;
-Help asks for no capability and is available immediately. The host's catalogue is what refuses an
-uninstallable pack, and its sentence names the missing capability.
+unchanged, and Suite Go serves `documents`, `files`, `storage`, `recents`, `notifications` and
+`network`, so all four packs are available there. Help asks for no capability and is available
+immediately. The host's catalogue is what refuses an uninstallable pack, and its sentence names the
+missing capability.
 
 A pack build also writes a **card sidecar** beside the archive:
 

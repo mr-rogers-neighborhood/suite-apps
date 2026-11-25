@@ -12,9 +12,8 @@ Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 
 - **Planner declares the phone.** The pack manifest now lists `desktop` and `mobile`, and the build
   writes a card sidecar beside the signed archive with Planner's own mark, its one-line description
-  and shelf order 2. Suite Go can show the card and offer the pack once its `files` capability
-  lands (#382); until then the catalogue names that missing capability instead of installing a
-  pack that would half-work.
+  and shelf order 2. Suite Go serves the scoped `files` root and notifications the pack asks for,
+  so the phone's catalogue shows the card and offers the install.
 
 ### Fixed
 

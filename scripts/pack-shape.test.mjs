@@ -153,23 +153,7 @@ describe("the pack shape check", () => {
     );
   });
 
-  it("notes a mobile capability a tracked issue will add, and still accepts the pack", () => {
-    const { root } = workspace({
-      manifest: { platforms: ["desktop", "mobile"], capabilities: ["documents", "relay"] },
-    });
-
-    const result = check(root);
-    assert.deepEqual(result.problems, []);
-    assert.equal(result.ok, true);
-    assert.ok(
-      result.notes.some(
-        (note) => note.includes('platforms "mobile" waits on `files`') && note.includes("#382"),
-      ),
-      result.notes.join("\n"),
-    );
-  });
-
-  it("refuses a mobile capability no tracked issue serves", () => {
+  it("refuses a platform whose host does not serve the pack's capabilities", () => {
     const { root } = workspace({
       manifest: { platforms: ["desktop", "mobile"], capabilities: ["documents", "relay"] },
     });
@@ -183,6 +167,19 @@ describe("the pack shape check", () => {
       ),
       result.problems.join("\n"),
     );
+  });
+
+  it("accepts all four pack capabilities on the phone now that files is served", () => {
+    const { root } = workspace({
+      manifest: {
+        platforms: ["desktop", "mobile"],
+        capabilities: ["documents", "files", "recents", "notifications"],
+      },
+    });
+
+    const result = check(root);
+    assert.deepEqual(result.problems, []);
+    assert.equal(result.ok, true);
   });
 
   it("accepts a kind this tree has no host for, and a desktop pack that fits", () => {

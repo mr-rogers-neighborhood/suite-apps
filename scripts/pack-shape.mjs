@@ -20,10 +20,6 @@
  *   5. Every declared `platforms` kind that this tree has a host for can actually
  *      run the pack: the host's served capabilities cover its required list. A
  *      kind no host declares is left alone, because the vocabulary is open (S3.5).
- *      A capability a host does not serve yet is allowed only when a tracked
- *      issue names the work, and the gate prints that as a note rather than
- *      pretending the pack is installable today. The host still refuses it at
- *      install (S4.8).
  *
  * A pack is declared by its app, not inferred from a directory: `package.json`
  * carries `"suite": { "pack": true }`. The declaration is what lets the rule
@@ -215,91 +211,33 @@ function walkPack(packDir, problems) {
 }
 
 /**
- * Capabilities a known host does not serve yet, and the issue that will add them.
- *
- * A platform declaration may land before the bridge it needs: the pack is ready
- * and Home can draw its tile, while the host still refuses an install with the
- * missing capability (S4.8). Naming the issue here keeps that gap visible and
- * fails any other missing capability, which would be a declaration no one has
- * planned to make true. Remove an entry once the host serves it.
- */
-export const PENDING_HOST_CAPABILITIES = {
-  mobile: { files: "#382" },
-};
-
-function unavailableFits(manifest, platform) {
-  const capabilities = Array.isArray(manifest?.capabilities) ? manifest.capabilities : [];
-  return HOST_DECLARATIONS.filter((host) => host.kind === platform).map((host) =>
-    platformFit({ platforms: [platform], capabilities }, host),
-  );
-}
-
-/** True when every missing capability is tracked for this kind. */
-function isPendingOnly(platform, fits) {
-  const pending = PENDING_HOST_CAPABILITIES[platform];
-  if (pending === undefined) return false;
-  const missing = [...new Set(fits.flatMap((fit) => fit.missingCapabilities))];
-  return (
-    missing.length > 0 &&
-    fits.every((fit) => fit.state === "unavailable") &&
-    missing.every((capability) => pending[capability] !== undefined)
-  );
-}
-
-/**
  * Every declared host kind this tree can judge must be able to run the pack.
  *
  * A pack may name a kind with no host here (`tv`, `xr`, …); the vocabulary is
  * open and this checker has no coverage declaration to compare, so it says
  * nothing. A kind we do know — `desktop` or `mobile` — either covers the pack's
- * required capabilities or the declaration is a lie the build must not sign,
- * unless the only gap is one `PENDING_HOST_CAPABILITIES` names.
+ * required capabilities or the declaration is a lie the build must not sign.
  */
 export function platformProblems(manifest) {
   const platforms = manifest?.platforms;
   if (!Array.isArray(platforms) || platforms.length === 0) return [];
+  const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
 
   const problems = [];
   for (const platform of platforms) {
     if (typeof platform !== "string") continue;
-    const fits = unavailableFits(manifest, platform);
-    if (fits.length === 0) continue;
+    const hosts = HOST_DECLARATIONS.filter((host) => host.kind === platform);
+    if (hosts.length === 0) continue;
+    const fits = hosts.map((host) =>
+      platformFit({ platforms: [platform], capabilities }, host),
+    );
     if (fits.some((fit) => fit.state === "available")) continue;
-    if (isPendingOnly(platform, fits)) continue;
     const reason = fits.find((fit) => fit.reason !== null)?.reason ?? "no host can run it";
     problems.push(
       `platforms ${JSON.stringify(platform)} cannot run with these capabilities: ${reason}`,
     );
   }
   return problems;
-}
-
-/**
- * A note for a platform whose only gap is a tracked, not-yet-served capability.
- *
- * Not a failure: the declaration is the pack's intent and the host's catalogue
- * reports the real fit. The note keeps the gate's printed output honest about
- * what has not landed.
- */
-export function platformNotes(manifest) {
-  const platforms = manifest?.platforms;
-  if (!Array.isArray(platforms) || platforms.length === 0) return [];
-
-  const notes = [];
-  for (const platform of platforms) {
-    if (typeof platform !== "string") continue;
-    const fits = unavailableFits(manifest, platform);
-    if (fits.length === 0 || fits.some((fit) => fit.state === "available")) continue;
-    if (!isPendingOnly(platform, fits)) continue;
-    const pending = PENDING_HOST_CAPABILITIES[platform];
-    const missing = [...new Set(fits.flatMap((fit) => fit.missingCapabilities))].sort();
-    notes.push(
-      `platforms ${JSON.stringify(platform)} waits on ${missing
-        .map((capability) => `\`${capability}\` (${pending[capability]})`)
-        .join(", ")}; the host refuses an install until then`,
-    );
-  }
-  return notes;
 }
 
 /** `desktop only`, `desktop, mobile`, or `unknown (no platforms declared)`. */
@@ -327,7 +265,6 @@ export function checkPackShape({
   const packs = [];
   const skipped = [];
   const problems = [];
-  const notes = [];
 
   for (const entry of readdirSync(appsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -397,14 +334,11 @@ export function checkPackShape({
     for (const problem of platformProblems(manifest)) {
       problems.push(`${relative(root, manifestPath)}: ${problem}`);
     }
-    for (const note of platformNotes(manifest)) {
-      notes.push(`${relative(root, manifestPath)}: ${note}`);
-    }
   }
 
   packs.sort((left, right) => left.app.localeCompare(right.app));
   skipped.sort((left, right) => left.app.localeCompare(right.app));
-  return { ok: problems.length === 0, packs, skipped, problems, notes };
+  return { ok: problems.length === 0, packs, skipped, problems };
 }
 
 function main(argv) {
@@ -438,9 +372,6 @@ is docs/reference/pack-authoring.md.
   }
   for (const pack of result.skipped) {
     process.stdout.write(`skip  ${pack.app.padEnd(10)} ${pack.dir} (${pack.reason})\n`);
-  }
-  for (const note of result.notes) {
-    process.stdout.write(`note  ${note}\n`);
   }
   for (const problem of result.problems) {
     process.stderr.write(`FAIL  ${problem}\n`);
