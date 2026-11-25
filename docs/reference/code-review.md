@@ -95,7 +95,8 @@ gates.
 - Trigger: `pull_request` to `main`, excluding drafts and docs-only changes. A fork PR has no secret
   and is skipped.
 - Secret: `DEEPRELAY_API_KEY` (repository secret, Settings → Secrets and variables → Actions).
-- Budget: `effort: low`, 200000 total tokens, concurrency 4, 10-minute subtask timeout.
+- Budget: `effort: low`, 400000 total tokens, concurrency 4, 10-minute subtask timeout. The cap is
+  a ceiling, not a target; most PRs spend far less.
 - `checkpoint_range` reviews only the commits since the previous run; `sticky_summary` and
   `incremental` keep the comments in place.
 - Pinned twice: the Action by full SHA and `ocr_version` in the workflow. The Action installs the CLI

@@ -120,6 +120,10 @@ jobs:
     # release upload. This job has `contents: read` and the model secret only.
     # `continue-on-error` means a DeepRelay outage never blocks a signed
     # release; the evidence is best-effort and the gate remains the proof.
+    #
+    # This is not a second PR pipeline: the range is tag..HEAD at a channel
+    # boundary, not the PR's merge-base..head. It reuses the same wrapper and
+    # provider configuration as the local skill.
     if: inputs.publish
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -142,11 +146,13 @@ jobs:
         run: npm install -g @alibaba-group/open-code-review@1.14.3
 
       - name: Configure DeepRelay
+        id: configure
         env:
           DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPRELAY_API_KEY}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "DEEPRELAY_API_KEY is not set; the advisory review is skipped." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -156,8 +162,10 @@ jobs:
           ocr config set custom_providers.deeprelay.model deeprelay/deepseek-v4.1-flash
           ocr config set custom_providers.deeprelay.api_key_cmd 'printf "%s" "$DEEPRELAY_API_KEY"'
           ocr llm test
+          echo "configured=true" >> "$GITHUB_OUTPUT"
 
       - name: Review the channel range
+        if: steps.configure.outputs.configured == 'true'
         env:
           DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
           CHANNEL: ${{ inputs.channel }}
@@ -175,11 +183,8 @@ jobs:
           fi
           echo "Reviewing ${base}..HEAD for the ${CHANNEL} boundary." | tee -a "$GITHUB_STEP_SUMMARY"
           node .agents/skills/suite-review/scripts/review.mjs \
-            --from "${base}" --effort medium --budget 400000
-          if ls .dev/ocr/*.json >/dev/null 2>&1; then
-            latest="$(ls -t .dev/ocr/*.json | head -1)"
-            cp "${latest}" .dev/ocr/release.json
-          fi
+            --from "${base}" --effort medium --budget 400000 \
+            --output .dev/ocr/release.json
 
       - name: Upload the review evidence
         if: always() && hashFiles('.dev/ocr/release.json') != ''
@@ -195,7 +200,10 @@ jobs:
     # Approval waits for the advisory review so the report is available first;
     # the review's `continue-on-error` keeps a provider failure from blocking it.
     needs: review
-    if: inputs.channel != 'nightly'
+    # `always()` is load-bearing: `review` is skipped for a rehearsal
+    # (`publish: false`), and a skipped dependency would otherwise skip
+    # approval and strand the publish job. The review is advisory either way.
+    if: always() && inputs.channel != 'nightly'
     runs-on: ubuntu-latest
     environment: approval
     steps:

@@ -50,6 +50,8 @@ jobs:
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # No checkout step: the Action performs its own fetch-depth: 0 checkout of
+    # the base and fetches the PR head, so checkpoint ranges resolve.
     steps:
       - name: Open Code Review
         uses: alibaba/open-code-review@f6379f71edba1e59dbc056e8f455df1f84396498 # v1.14.3
@@ -69,12 +71,15 @@ jobs:
           llm_reasoning_effort: low
           llm_timeout: "300"
           effort: low
-          max_tokens_budget: "200000"
+          max_tokens_budget: "400000"
           review_concurrency: 4
           review_task_timeout: "10"
           language: English
           sticky_summary: "true"
           incremental: "true"
           checkpoint_range: "true"
-          background: ${{ github.event.pull_request.title }}
+          # Fixed context, not the PR title: the title is author-controlled and
+          # would be a prompt-injection surface. The diff and the committed
+          # rules are the source of truth.
+          background: "Review this Suite pull request against the repository rules."
           upload_artifacts: "true"

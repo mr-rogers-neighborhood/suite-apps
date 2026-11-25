@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const EXCLUDES = [
   "apps/start/**",
@@ -39,6 +39,7 @@ function usage() {
   --budget <n>        Total input+output token cap (default: ${DEFAULTS.budget})
   --provider <name>   Override the configured provider
   --model <name>      Override the configured model
+  --output <path>     Write the JSON here instead of .dev/ocr/<timestamp>.json
   --print-preview     Print the free preview and stop
   --check             Run "ocr llm test" first
   -h, --help`);
@@ -63,6 +64,7 @@ function parseArgs(argv) {
       case "--budget": out.budget = Number(next()); break;
       case "--provider": out.provider = next(); break;
       case "--model": out.model = next(); break;
+      case "--output": out.output = next(); break;
       case "--print-preview": out.printPreview = true; break;
       case "--check": out.check = true; break;
       case "-h":
@@ -231,7 +233,8 @@ function main() {
   const outDir = join(process.cwd(), ".dev", "ocr");
   mkdirSync(outDir, { recursive: true });
   const stamp = new Date().toISOString().replaceAll(":", "-").replace(/\..+$/, "");
-  const outFile = join(outDir, `${stamp}.json`);
+  const outFile = args.output ? resolve(process.cwd(), args.output) : join(outDir, `${stamp}.json`);
+  mkdirSync(dirname(outFile), { recursive: true });
 
   const reviewArgs = [
     "review",
