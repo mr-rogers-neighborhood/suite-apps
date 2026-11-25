@@ -1,21 +1,11 @@
 # Pages with no `audience:` frontmatter that site/build.mjs has no unambiguous
-# folder mapping for. #417 assigns the metadata; the build prints this list on
-# every run and fails on a page that is missing here, so an unclassified page is
-# never silently guessed into a section.
+# folder mapping for. The build prints this list on every run and fails on a page
+# that is missing here, so an unclassified page is never silently guessed into a
+# section.
+#
+# Empty since #417 landed: every page under docs/ declares
+# `audience: user | developer`, so the build reports 0 unclassified pages.
 #
 # This file is a work list. Delete a line when the page declares
 # `audience: user | developer`; a line that no longer names an unclassified page
 # fails the build.
-docs/AGENTS.md
-docs/tours/budget-envelope-to-report.mdx
-docs/tours/canvas-render-loop.mdx
-docs/tours/card-edit-to-persist.mdx
-docs/tours/go-pack-to-module.mdx
-docs/tours/install-and-launch.mdx
-docs/tours/open-a-document.mdx
-docs/tours/planner-capture-to-plan.mdx
-docs/tours/release-sign-and-publish.mdx
-docs/tours/save-and-recover.mdx
-docs/tours/start.mdx
-docs/tours/sync-seal-and-deliver.mdx
-docs/tours/write-through-the-graph.mdx

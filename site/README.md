@@ -20,7 +20,7 @@ pnpm site:build        # writes site/dist
 | `site/src/404.html` | The not-found page, and the docs.suite.run redirect for deep links. |
 | `site/src/style.css` | The shared stylesheet. |
 | `site/build.mjs` | The docs renderer and link checker. |
-| `site/unclassified.txt` | Pages #417 has not given an `audience:` yet. |
+| `site/unclassified.txt` | Pages with no `audience:`; empty since #417 classified every page. |
 | `site/dist/` | Ignored build output; the Pages artifact. |
 
 ## Documentation renderer
@@ -47,8 +47,8 @@ audience: user # or developer
 ---
 ```
 
-`audience` is the minimal key #417's split can adopt. Until every page has it, the build maps only
-the folders whose audience is unambiguous:
+`audience` is the key #417's split adopted. Every page under `docs/` now declares it, so the build
+reports `0 unclassified`; the folder mapping stays as the safety net for a page that does not:
 
 | Folder | Section |
 | --- | --- |
@@ -58,18 +58,11 @@ the folders whose audience is unambiguous:
 | anything else | unclassified |
 
 An unclassified page is not guessed into a section. It still renders at its path, but it joins
-neither section, and the build prints every unclassified path and the count:
+neither section, and the build prints every unclassified path and the count.
 
-```
-site: 13 unclassified page(s) — no `audience:` frontmatter and no unambiguous folder:
-  docs/AGENTS.md
-  docs/tours/start.mdx
-  ...
-```
-
-`site/unclassified.txt` names the pages #417 has not reached yet. The build fails on an unclassified
-page missing from that list, and on a line that no longer names an unclassified page, so the list
-shrinks with the metadata instead of drifting.
+`site/unclassified.txt` is that list, and it is empty since #417 landed. The build fails on an
+unclassified page missing from the list, and on a line that no longer names one, so a new page
+cannot slip in unclassified without a decision.
 
 The switch targets are generated indexes at `docs/handbook/` and `docs/developer/`; the sidebar on a
 page lists the pages in that page's section. Add `audience:` to a page and it moves between the two
