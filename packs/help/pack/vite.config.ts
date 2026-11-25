@@ -9,28 +9,28 @@ import { defineConfig } from "vite";
  * Builds Help's renderer into `packs/help/.dev/pack`.
  *
  * The normal Electron build writes `legacy/help/out`, so this config owns a directory of its own and
- * never repoints `electron-vite`. It builds the app's existing renderer — the pack adds only an
- * entry with hash routing — and copies the generated `public/data` the explorer fetches.
+ * never repoints `electron-vite`. It builds the shared renderer under `src/renderer` — the pack adds
+ * only an entry with hash routing — and copies the generated `public/data` the explorer fetches.
  *
  * The output, Vite's cache and the fumadocs cache sit outside `pack/` on purpose: `pack/` is source,
  * and `scripts/pack-shape.mjs` fails the gate if a generated directory appears in it. The `defineDocs`
- * dir in `src/source.ts` reaches the shell's generated handbook, which sits beside this pack rather
- * than inside it.
+ * dir in `src/source.ts` reaches the generated handbook at the Help package root, beside this pack
+ * rather than inside it.
  */
 const packRoot = fileURLToPath(new URL(".", import.meta.url));
-const renderer = fileURLToPath(new URL("../../../legacy/help/src/renderer/src", import.meta.url));
+const renderer = fileURLToPath(new URL("./src/renderer", import.meta.url));
 const outputRoot = new URL("../.dev/", import.meta.url);
 
 export default defineConfig({
   root: packRoot,
   base: "./",
   cacheDir: fileURLToPath(new URL("vite", outputRoot)),
-  publicDir: fileURLToPath(new URL("../../../legacy/help/public", import.meta.url)),
+  publicDir: fileURLToPath(new URL("../public", import.meta.url)),
   plugins: [fumadocsMdx(), react(), tailwindcss()],
   resolve: {
     alias: [
-      // `defineDocs.dir` is relative to the Vite root (the pack). The pack's source mirror is used
-      // only because the handbook's own source file belongs to the shell; both name the same docs.
+      // `defineDocs.dir` is relative to the Vite root (the pack). This thin loader is used only
+      // because the shared renderer's root is one level deeper; both name the same docs.
       {
         find: /^@\/lib\/source$/,
         replacement: fileURLToPath(new URL("./src/source.ts", import.meta.url)),

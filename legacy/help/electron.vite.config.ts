@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import { fumadocsMdx } from "fumadocs-mdx/vite";
 
-const renderer = fileURLToPath(new URL("./src/renderer/src", import.meta.url));
+const renderer = fileURLToPath(new URL("../../packs/help/pack/src/renderer", import.meta.url));
 
 export default defineConfig({
   main: {
@@ -23,10 +23,13 @@ export default defineConfig({
     },
   },
   renderer: {
+    // The renderer source is the pack's, so both builds compile the same files. The desktop
+    // entry keeps its own `index.html` beside it; only the router differs from the pack entry.
+    root: renderer,
     // The production window is served from `suite-help://app/`; a root-relative base keeps
     // module and asset URLs at the origin root on every SPA route.
     base: "/",
-    publicDir: fileURLToPath(new URL("./public", import.meta.url)),
+    publicDir: fileURLToPath(new URL("../../packs/help/public", import.meta.url)),
     plugins: [
       fumadocsMdx(),
       react(),
@@ -41,5 +44,14 @@ export default defineConfig({
       },
     ],
     resolve: { alias: { "@": renderer, "@renderer": renderer } },
+    build: {
+      // electron-vite's default entry is `<app>/src/renderer/index.html`; the
+      // renderer entry now lives in the pack tree, so name it explicitly.
+      rollupOptions: {
+        input: fileURLToPath(
+          new URL("../../packs/help/pack/src/renderer/index.html", import.meta.url),
+        ),
+      },
+    },
   },
 });

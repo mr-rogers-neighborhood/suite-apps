@@ -5,7 +5,7 @@ import { fumadocsMdx } from "fumadocs-mdx/vite";
 import { defineConfig } from "vitest/config";
 
 const packRoot = fileURLToPath(new URL(".", import.meta.url));
-const renderer = fileURLToPath(new URL("../../../legacy/help/src/renderer/src", import.meta.url));
+const renderer = fileURLToPath(new URL("./src/renderer", import.meta.url));
 
 export default defineConfig({
   // The config lives with the pack, but the command runs from the app so no `node_modules` appears
@@ -26,7 +26,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.{ts,tsx}"],
+    css: true,
+    include: ["src/**/*.test.{ts,tsx}", "../scripts/**/*.test.mjs"],
     setupFiles: ["./src/test/setup.ts"],
     testTimeout: 20_000,
   },

@@ -4,8 +4,9 @@ audience: developer
 
 # Docs
 
-This lane owns the cross-app pages in `docs/` and the Help reader in `legacy/help`. An app's own
-`docs/` stays with that app's lane until its pull request merges.
+This lane owns the cross-app pages in `docs/` and the Help reader in `packs/help`; the frozen
+Electron shell stays in `legacy/help`. An app's own `docs/` stays with that app's lane until its pull
+request merges.
 
 - A docs change lands with the code that changes the fact, in the same change.
 - One fact has one home. Fix the owning page and link from the rest; never copy a paragraph.

@@ -207,27 +207,28 @@ mise exec -- node scripts/docs-check.mjs
 Checks relative links, that each `docs/` section index lists its pages, and a short list of retired
 phrases. It is not part of the gate yet; run it with any documentation change.
 
-Suite Help (`legacy/help`) is the shipped documentation app: one Vite + React renderer in an Electron
-shell. It shows Browser, Modules and Tours over the code index, and renders the `docs/` pages as the
-**Handbook**. It is offline; Flatpak owns updates.
+Suite Help is the shipped documentation app: one Vite + React renderer in an Electron shell. The
+renderer lives in `packs/help/pack/src/renderer`, and the frozen shell in `legacy/help` compiles the
+same files. It shows Browser, Modules and Tours over the code index, and renders the `docs/` pages as
+the **Handbook**. It is offline; Flatpak owns updates.
 
 ```sh
-mise exec -- pnpm docs:index     # index every file and declaration into legacy/help/public/data
+mise exec -- pnpm docs:index     # index every file and declaration into packs/help/public/data
 mise exec -- pnpm docs:index:check # resolve notes, tours and generated data
 mise exec -- pnpm docs:coverage  # report authored vs generated prose; never fails on a gap
 mise exec -- pnpm docs:explain <node-id> # scaffold one note section in its module MDX
 mise exec -- pnpm docs:dev       # index, sync docs/ and start Vite + Electron (foreground)
 mise exec -- pnpm docs:build     # index, sync and build the app
-mise exec -- pnpm docs:clean     # remove out, release, .generated and public/data
+mise exec -- pnpm docs:clean     # remove out, release, .dev, .generated and public/data
 ```
 
-`docs:index` runs `legacy/help/scripts/index-code.mjs`: every file and declaration becomes a node,
+`docs:index` runs `packs/help/scripts/index-code.mjs`: every file and declaration becomes a node,
 modules are package roots plus `src/` children, and config files become `config:*` modules. It writes
-`legacy/help/public/data/` and is not committed. `docs:index:check` resolves every note heading, tour
+`packs/help/public/data/` and is not committed. `docs:index:check` resolves every note heading, tour
 step and composed-tour target and compares the generated files with the ones on disk; it exits
 nonzero on an unknown ID or stale data. It also checks that prose tours have an intro and that
 interludes and overlays have content. `docs:dev` and `docs:build` also run
-`legacy/help/scripts/sync-docs.mjs`, which mirrors `docs/` into `legacy/help/.generated/docs/` with the
+`packs/help/scripts/sync-docs.mjs`, which mirrors `docs/` into `packs/help/.generated/docs/` with the
 frontmatter and sidebar Fumadocs expects, and writes the offline handbook search index.
 `docs:coverage` reports how many modules and tours a person has reviewed (`reviewed: human`) against
 the generated prose, file and symbol counts, and the largest modules with no prose.

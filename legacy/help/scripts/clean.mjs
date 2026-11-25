@@ -5,9 +5,12 @@ import { rm } from "node:fs/promises";
 await Promise.all([
   rm("out", { recursive: true, force: true }),
   rm("release", { recursive: true, force: true }),
-  rm(".generated", { recursive: true, force: true }),
   rm(".source", { recursive: true, force: true }),
-  rm("public/data", { recursive: true, force: true }),
+  rm("../../packs/help/.dev", { recursive: true, force: true }),
+  rm("../../packs/help/.generated", { recursive: true, force: true }),
+  rm("../../packs/help/public/data", { recursive: true, force: true }),
 ]);
 
-process.stdout.write("cleaned legacy/help: out, release, .generated, .source, public/data\n");
+process.stdout.write(
+  "cleaned legacy/help and packs/help: out, release, .dev, .generated, .source, public/data\n",
+);

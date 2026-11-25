@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Mirrors `docs/` into `legacy/help/.generated/docs/` for Suite Help.
+ * Mirrors `docs/` into `packs/help/.generated/docs/` for Suite Help.
  *
  * The repository's Markdown is plain (`docs/README.md`, no frontmatter), while a
  * Fumadocs page needs a `title`, a `description` and a place in a sidebar. This
@@ -30,7 +30,7 @@
  * The output is a pure function of `docs/`: the target is deleted first, entries
  * are walked in sorted order, and nothing is read from the previous run.
  *
- * Usage: node legacy/help/scripts/sync-docs.mjs
+ * Usage: node packs/help/scripts/sync-docs.mjs
  */
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
@@ -41,8 +41,8 @@ import { rewriteLinks } from "./lib/docs-links.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const sourceDir = join(root, "docs");
-const contentDir = join(root, "legacy", "help", ".generated", "docs");
-const dataDir = join(root, "legacy", "help", "public", "data");
+const contentDir = join(root, "packs", "help", ".generated", "docs");
+const dataDir = join(root, "packs", "help", "public", "data");
 
 const DESCRIPTION_LIMIT = 160;
 
@@ -388,5 +388,5 @@ await writeMeta();
 const assets = await copyAssets("");
 
 process.stdout.write(
-  `synced docs → legacy/help/.generated/docs: ${files.length} pages, ${assets} assets, search index\n`,
+  `synced docs → packs/help/.generated/docs: ${files.length} pages, ${assets} assets, search index\n`,
 );

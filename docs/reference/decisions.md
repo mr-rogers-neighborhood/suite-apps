@@ -20,8 +20,9 @@ owns the rationale, and [Status](status.md) owns what exists.
   #314); the nightly keeps the full gate; `main` on push runs the prelude only. The `vm` remote and
   its gate are retired.
 - `@suite/desktop` is shared Electron policy. Canvas's shell is `@suite/canvas-desktop`.
-- Suite Help (`legacy/help`) is the documentation reader and it is a shipped app. It indexes every
-  file and declaration, renders the handbook from `docs/`, and keeps module notes in
+- Suite Help is the documentation reader and it is a shipped app. Its renderer and docs generator
+  live in `packs/help`, and the frozen Electron shell in `legacy/help` compiles the same renderer. It
+  indexes every file and declaration, renders the handbook from `docs/`, and keeps module notes in
   `docs/modules/` and tours in `docs/tours/`. It is Vite + React Router + Fumadocs headless in an
   Electron shell, served from `suite-help://app/`; Flatpak owns updates. `docs/` and each app's
   `docs/` remain the source of truth.
@@ -115,6 +116,23 @@ Recorded 2026-11-25.
   discover `scripts/*.test.mjs` from the directory instead of a hand-maintained list, so a moved
   script test could not silently stop running.
 - **No migration.** Paths are build and working-copy facts; no user data directory names one.
+
+### Help's renderer and docs generator live in its pack (#432)
+
+Recorded 2026-11-25.
+
+- **The pack owns the source.** The explorer, handbook reader, theme and renderer entry moved from
+  `legacy/help/src/renderer` to `packs/help/pack/src/renderer`. The pack entry and the desktop shell
+  both compile that one copy; only the router differs.
+- **The generator moved with it.** `index-code.mjs`, `sync-docs.mjs` and their link helper now live
+  in `packs/help/scripts`. The pack runs them directly, and the shell's `index` and `sync` commands
+  call the same scripts.
+- **Generated output belongs to the pack.** The code index writes `packs/help/public/data`, and the
+  handbook mirror writes `packs/help/.generated/docs`; both are ignored and outside `pack/`, so the
+  pack-shape rule still holds.
+- **Why.** A pack that reads its source, scripts and generated files from the frozen shell keeps the
+  old inversion one layer above `node_modules`. Moving the files makes the pack's build honest
+  without changing what a reader sees.
 
 ## Desktop host
 

@@ -8,11 +8,15 @@ and the authoring steps live in [the pack authoring reference](../../../docs/ref
   `capabilities` list is empty **by decision**: Help reads only the index and pages inside its own
   archive, writes no document, opens no file and opens no socket. The host grants it nothing beyond
   loading the bundle, and the entry's own CSP seals the network as well.
-- `src/main.tsx` is the pack entry. It mounts the app's existing `App` under `HashRouter`, because a
-  host serves one entry file and answers only files that exist; the desktop window keeps
-  `BrowserRouter` and its SPA fallback.
-- `src/source.ts` is the handbook loader for this root. It differs from the app's loader in one
+- `src/renderer/` is the shared renderer: the explorer, the handbook reader and the desktop entry.
+  The desktop shell in `legacy/help` compiles the same files, so there is one copy.
+- `src/main.tsx` is the pack entry. It mounts the shared `App` under `HashRouter`, because a host
+  serves one entry file and answers only files that exist; the desktop entry beside the renderer
+  keeps `BrowserRouter` and its SPA fallback.
+- `src/source.ts` is the handbook loader for this root. It differs from the shared loader in one
   string: `defineDocs.dir` is resolved against the Vite root, and this build's root is `pack/`.
+- `../scripts/` generates the explorer index and mirrors `docs/` into `packs/help/.generated/docs`.
+  The desktop shell runs the same scripts through its own `index` and `sync` commands.
 - `vite.config.ts` builds the renderer, the compiled MDX pages and the copied `public/data` index
   into `packs/help/.dev/pack`, outside this source tree.
 - From the repository root, `pnpm help:pack` regenerates the index and handbook, builds and signs the

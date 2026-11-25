@@ -5,8 +5,9 @@ directory's `README.md` for the explorer and handbook model.
 
 ## Rules for this directory
 
-- The code, `docs/` and each app's `docs/` are the source of truth. Never edit `public/data/` or
-  `.generated/docs/`; run `pnpm docs:index` / `pnpm docs:build` to regenerate.
+- The code, `docs/` and each app's `docs/` are the source of truth. Never edit
+  `packs/help/public/data/` or `packs/help/.generated/docs/`; run `pnpm docs:index` /
+  `pnpm docs:build` to regenerate.
 - The explorer is the structure. Do not add a new Diátaxis page; new explanations go in
   `docs/modules/`, new guided paths in `docs/tours/`. `docs/` is the older notes archive and the
   handbook source.
@@ -30,8 +31,9 @@ directory's `README.md` for the explorer and handbook model.
 - Production is served from `suite-help://app/`; there is no loopback HTTP server and no `next`.
 - The app is offline. Do not add a network client, an updater or an analytics call. Flatpak owns
   updates.
-- Generated data belongs in `public/data` and `.generated/docs`; both are ignored. Build and package
-  regenerate them from the checkout.
+- Generated data belongs in `packs/help/public/data` and `packs/help/.generated/docs`; both are
+  ignored. Build and package regenerate them from the checkout. The renderer and generator are the
+  pack's source, not this shell's.
 - The handbook is Fumadocs headless: `fumadocs-core` provides the source loader and page tree,
   `fumadocs-mdx/vite` compiles the content, and the React Router provider supplies links. Do not
   bring back `fumadocs-ui` or a Next-specific route.
