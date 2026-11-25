@@ -80,6 +80,11 @@ Recorded 2026-11-25.
   workflow file, so they no longer pay its ~0.35 minutes.
 - **The proof is untouched.** Neither cut changes the merge-queue row set, the nightly full gate, or
   the `ci` aggregator's assertions.
+- **A scoped host build still builds its dependencies.** The first Go-only push after #448 failed
+  with `Rolldown failed to resolve import "@suite/pack"`: the Go APK step had been leaning on the
+  Desk Flatpak step to produce the workspace packages' `dist/`. `android-release.mjs` now builds
+  `@suite/go-app^...` before the app, the same way `flatpak.mjs` already built the libraries for the
+  Desk path. Fixed forward under #422; #448 was not reverted.
 
 ## Layout
 

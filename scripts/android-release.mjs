@@ -814,6 +814,26 @@ function assertVersionCodeCanShip({ config, channel }) {
 }
 
 /**
+ * The commands that prepare a Suite Go build, in order.
+ *
+ * The app imports workspace packages through their `dist/`, and `pnpm install`
+ * only links them. Building the dependency closure first is what a scoped host
+ * build needs: the slop Go-only path has no Desk package build ahead of it to
+ * produce those `dist/` trees, and without this it fails with `Rolldown failed
+ * to resolve import "@suite/pack"` (#448). The Desk path already does the same
+ * inside `flatpak.mjs`; this is the Go half of that symmetry.
+ *
+ * `@suite/go-app^...` is the app's dependencies without the app itself, so the
+ * app is still built once, after its packages.
+ */
+export function goBuildCommands() {
+  return [
+    ["pnpm", ["--filter", "@suite/go-app^...", "run", "build"]],
+    ["pnpm", ["--filter", "@suite/go-app", "build"]],
+  ];
+}
+
+/**
  * Build one channel's release APK, verify its identity, and name it.
  *
  * The order matters: the key is checked before the build, and the finished APK's certificate,
@@ -828,7 +848,7 @@ function build({ config, channel, revision, env, buildTools }) {
   const expectedId = CHANNEL_PACKAGE_ID[channel];
   const gradleApk = gradleApkPath(channel);
 
-  command("pnpm", ["--filter", "@suite/go-app", "build"]);
+  for (const [name, args] of goBuildCommands()) command(name, args);
   command("pnpm", ["--filter", "@suite/go-app", "exec", "cap", "sync", "android"], {
     cwd: APP_DIR,
     env,
