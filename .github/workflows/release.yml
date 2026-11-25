@@ -618,6 +618,7 @@ jobs:
             .dev/release/index.json.sig
             .dev/release/index-release.json
             .dev/release/packs/*.suitepack
+            .dev/release/packs/*.card.json
           include-hidden-files: true
           retention-days: 90
           if-no-files-found: error

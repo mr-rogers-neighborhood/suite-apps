@@ -12,8 +12,7 @@ this file and there is no AppImage release tag.
 
 - **Help is mobile-ready.** The pack now declares `desktop` and `mobile`, so Suite Go can install it:
   it asks for no host capability and reads only its own archive. The build also writes a card
-  sidecar with its one-line description and shelf order 4; because Help has no app mark yet, the
-  card uses the Suite Desk mark as a placeholder until Help gets its own artwork.
+  sidecar with Help's own headset mark, its one-line description and shelf order 4.
 
 - **Help is a pack.** The same explorer and handbook now build as a signed `.suitepack` for the
   Suite host, with the generated index and compiled documentation pages inside the archive. The

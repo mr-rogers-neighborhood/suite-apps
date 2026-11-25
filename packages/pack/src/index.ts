@@ -4,6 +4,18 @@ export {
   type PackCapability,
 } from "./capabilities.js";
 export {
+  CARD_SUFFIX,
+  cardFileNameFor,
+  cardUrlForArchiveUrl,
+  MAX_CARD_BYTES,
+  PACK_CARD_FORMAT,
+  PACK_CARD_VERSION,
+  type PackCard,
+  type PackCardIssue,
+  type PackCardParse,
+  parsePackCard,
+} from "./card.js";
+export {
   canonicalPackIndexBytes,
   comparePackIndexEntries,
   isSafeArchiveUrl,

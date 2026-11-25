@@ -85,9 +85,9 @@ brightness, paints the resolved role variables onto the document, and marks the 
 share one palette, and Shiki asks for `github-light` or `github-dark` from the host's resolved mode
 rather than a fixed theme.
 
-The window icon, the `electron-builder` icon and the Flatpak icons use the same headset on the ink
-tile. The catalogue card is the exception: Help has no app mark yet, so its card uses the Suite Desk
-mark as a placeholder until it gets artwork of its own.
+The window icon, the `electron-builder` icon, the Flatpak icons and the catalogue card all use the
+same headset on the ink tile. The card mark is white on the hub's ink and a light theme inverts the
+tile and glyph together; the packaged icon is the same artwork.
 
 ## Index rules
 

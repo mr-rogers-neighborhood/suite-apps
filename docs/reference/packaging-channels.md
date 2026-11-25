@@ -431,12 +431,13 @@ The card is one JSON object, format `suite.pack.card`, version `1`:
 | `shelf` | The suite Home order: Canvas 1, Planner 2, Budget 3, Help 4. |
 | `icon` | A base64 `data:image/svg+xml` or `data:image/png` URI. |
 
-Canvas, Planner and Budget use the glyph their `AppMark` already draws; Help has no app mark yet, so
-its card uses the Suite Desk mark as a placeholder (#381). A card is presentation only and is not
-signed. The archive's publisher signature and file hashes remain the proof, and the catalogue entry
-is what a host verifies before it offers an install. `scripts/release-index.mjs` uploads every
-archive, then its card, then the detached index signature, and writes `index.json` last; a build
-whose archive has no card fails before anything is published.
+Canvas, Planner and Budget use the glyph their `AppMark` already draws; Help uses the headset in its
+own `resources/icon.svg`. `@suite/pack` owns the card shape, parser and URL helper, so the phone
+reads the same contract as the release build. A card is presentation only and is not signed. The
+archive's publisher signature and file hashes remain the proof, and the catalogue entry is what a
+host verifies before it offers an install. `scripts/release-index.mjs` uploads every archive, then
+its card, then the detached index signature, and writes `index.json` last; a build whose archive has
+no card fails before anything is published.
 
 ## Platforms
 
