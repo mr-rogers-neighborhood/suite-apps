@@ -76,7 +76,7 @@ function fsCode(error: unknown): string | undefined {
 
 /** Log the original in main; hand the pack a sentence with no path in it. */
 function logged(message: string, error: unknown): Error {
-  console.warn(`[shell] ${message}`, error);
+  console.warn(`[desk] ${message}`, error);
   return new Error(message);
 }
 

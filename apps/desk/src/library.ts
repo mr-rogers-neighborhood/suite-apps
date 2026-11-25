@@ -182,7 +182,7 @@ export class LibraryWatch {
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== "ENOENT") {
         await rename(file, `${file}.corrupt-${Date.now()}`).catch(() => undefined);
-        console.warn("[shell] the library record could not be read; starting empty", error);
+        console.warn("[desk] the library record could not be read; starting empty", error);
       }
     }
     return new LibraryWatch(file, parsed ?? emptyData(), options.watch ?? watchDirectory);
@@ -254,7 +254,7 @@ export class LibraryWatch {
       const tabs = new Map<string, Subscription>();
       const close = this.#watch(directory, () => {
         void this.check(store, scope).catch((error: unknown) => {
-          console.warn("[shell] a document change could not be checked", error);
+          console.warn("[desk] a document change could not be checked", error);
         });
       });
       entry = { scope, store, close, tabs };

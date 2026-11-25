@@ -193,7 +193,7 @@ async function quarantine(path: string, reason: string, error?: unknown): Promis
     if ((renameError as NodeJS.ErrnoException).code === "ENOENT") return;
     throw renameError;
   }
-  console.warn(`[shell] screen document quarantined at ${backup}: ${reason}`, error);
+  console.warn(`[desk] screen document quarantined at ${backup}: ${reason}`, error);
 }
 
 /**

@@ -140,7 +140,7 @@ export class ShellWindow {
     });
     this.#chrome.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
       if (!isMainFrame) return;
-      console.error(`[shell] the chrome page failed to load ${url}: ${description} (${code})`);
+      console.error(`[desk] the chrome page failed to load ${url}: ${description} (${code})`);
       // A hidden window with a live process is worse than an empty one: the
       // person can at least close it and see the log.
       this.window.show();
@@ -148,7 +148,7 @@ export class ShellWindow {
 
     this.#layout();
     void this.#chrome.webContents.loadURL(`${CHROME_ORIGIN}/index.html`).catch((error: unknown) => {
-      console.error("[shell] the chrome page failed to load", error);
+      console.error("[desk] the chrome page failed to load", error);
     });
     this.#chrome.webContents.once("did-finish-load", () => {
       this.#layout();
@@ -160,7 +160,7 @@ export class ShellWindow {
       if (active === null) this.broadcast();
       else {
         void this.activateTab(active).catch((error: unknown) => {
-          console.warn("[shell] could not restore the active tab", error);
+          console.warn("[desk] could not restore the active tab", error);
           this.broadcast();
         });
       }

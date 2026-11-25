@@ -3,7 +3,18 @@
 Written for people, not commits. This app is a spike; its version is its own until it becomes the
 shipped host.
 
-## [Unreleased]
+## [0.4.0] - 2026-11-25
+
+### Release
+
+- **Suite Desk is the name.** Product, package, directory, Flatpak ids, gate row, window and install
+  names, and docs are Desk. Stable is `run.suite.desk`; the pre-release ids are
+  `run.suite.<channel>.desk` for `slop`, `nightly` and `preview`.
+- **Fresh start.** The new id starts with an empty data root; the old `run.suite.shell` install and
+  data are not migrated. The old releases and refs are being retired deliberately.
+- **The four packs are mobile-ready.** Canvas, Planner, Budget and Help declare desktop and mobile,
+  carry card sidecars beside their archives and are in the catalogue index. Suite Go stays at 0.2.0
+  (versionCode 3); this release does not bump it.
 
 ### Changed
 

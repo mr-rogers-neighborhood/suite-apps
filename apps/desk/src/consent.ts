@@ -319,7 +319,7 @@ export class ConsentRecord {
       if (code !== "ENOENT") {
         await rename(file, `${file}.corrupt-${Date.now()}`).catch(() => undefined);
         console.warn(
-          "[shell] the consent record could not be read; every capability is re-asked",
+          "[desk] the consent record could not be read; every capability is re-asked",
           error,
         );
       }

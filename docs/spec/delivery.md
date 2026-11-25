@@ -73,7 +73,8 @@ name, an id names one channel, and stable keeps `run.suite.desk` and `run.suite.
 Suite Desk's ids are a fresh start. `run.suite.desk` and `run.suite.<channel>.desk` are new
 application identities, not an update of `run.suite.shell`: an existing install does not update into
 them, the new id opens an empty data root, and `~/.var/app/run.suite.shell` is ignored and may be
-removed by the owner. The old refs stay on the signed remote as history and are not rebuilt.
+removed by the owner. The old refs are retired by a one-time fresh-start wipe of the signed remote
+and are not rebuilt.
 
 **D2.1** Every artifact has a digest, a source commit, a lockfile hash and a signer identity in a
 release manifest. The manifest is the promotion input; a channel points at a manifest entry, never at

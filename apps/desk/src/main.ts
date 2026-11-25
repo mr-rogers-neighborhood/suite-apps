@@ -257,10 +257,10 @@ if (!gotLock) {
   app.on("before-quit", () => {
     reminderScheduler?.stop();
     void spaceStore?.flush().catch((error: unknown) => {
-      console.warn("[shell] space document flush failed", error);
+      console.warn("[desk] space document flush failed", error);
     });
     void screenStore?.flush().catch((error: unknown) => {
-      console.warn("[shell] screen document flush failed", error);
+      console.warn("[desk] screen document flush failed", error);
     });
   });
 }
@@ -279,14 +279,14 @@ async function bootstrap(): Promise<void> {
   // and gets a fresh key; a malformed one is reported and leaves identity
   // calls refused rather than silently changing every pack's identity.
   deviceKey = await openDeviceKey(join(dataRoot, "identity")).catch((error: unknown) => {
-    console.warn("[shell] the device key could not be opened", error);
+    console.warn("[desk] the device key could not be opened", error);
     return null;
   });
   // The trust store is read before any pack: a pack is verified against it, so a
   // failure here must fall back to the preinstalled key, never to "trust all".
   trustStore = await openPublisherTrust(trustRootFor(dataRoot, process.env)).catch(
     (error: unknown) => {
-      console.warn("[shell] the publisher trust store could not be opened", error);
+      console.warn("[desk] the publisher trust store could not be opened", error);
       return preinstalledTrustStore();
     },
   );
@@ -300,7 +300,7 @@ async function bootstrap(): Promise<void> {
   revocations = await openRevocations(trustRootFor(dataRoot, process.env))
     .then((store) => store.revocations)
     .catch((error: unknown) => {
-      console.warn("[shell] the revocation advisories could not be opened", error);
+      console.warn("[desk] the revocation advisories could not be opened", error);
       return [];
     });
   // The reminder queue is host state under the profile, not pack data. Opening it
@@ -314,7 +314,7 @@ async function bootstrap(): Promise<void> {
   // or overridden path still scans as an empty catalogue.
   await mkdir(catalogueRootFor(dataRoot, process.env), { recursive: true }).catch(
     (error: unknown) => {
-      console.warn("[shell] could not create the catalogue directory", error);
+      console.warn("[desk] could not create the catalogue directory", error);
     },
   );
 
@@ -385,7 +385,7 @@ function handleDeepLink(url: string): void {
     return;
   }
   void window.openDeepLink(url).catch((error: unknown) => {
-    console.warn("[shell] could not open a Suite link", error);
+    console.warn("[desk] could not open a Suite link", error);
     window?.setNotice("That Suite link could not be opened.");
   });
 }
@@ -405,7 +405,7 @@ async function reloadRevocations(): Promise<void> {
   try {
     revocations = (await openRevocations(trustRootFor(dataRootFor()))).revocations;
   } catch (error) {
-    console.warn("[shell] the revocation advisories could not be read", error);
+    console.warn("[desk] the revocation advisories could not be read", error);
   }
 }
 
@@ -479,11 +479,11 @@ async function migrateLegacyConsentRecords(): Promise<void> {
     await reminders.discardLegacyPermission();
     if (result.notifications === "reasked") {
       console.info(
-        "[shell] the old notification permission named no pack; each pack is asked at its next reminder",
+        "[desk] the old notification permission named no pack; each pack is asked at its next reminder",
       );
     }
   } catch (error) {
-    console.warn("[shell] the legacy consent answers could not be migrated", error);
+    console.warn("[desk] the legacy consent answers could not be migrated", error);
   }
 }
 
@@ -539,11 +539,11 @@ async function askConsent(pack: PackInfo, capability: PackCapability): Promise<b
 
 function consentDetail(tier: ReturnType<typeof consentTierFor>): string {
   if (tier === "install") return "This was shown when the app was installed.";
-  if (tier === "every-use") return "Suite asks every time this is used.";
+  if (tier === "every-use") return "Suite Desk asks every time this is used.";
   if (tier === "token") {
-    return "Suite asks once; this grant expires after thirty days and is asked again then.";
+    return "Suite Desk asks once; this grant expires after thirty days and is asked again then.";
   }
-  return "Suite asks once for this version and remembers your answer, including a refusal.";
+  return "Suite Desk asks once for this version and remembers your answer, including a refusal.";
 }
 
 async function ensurePackConsent(pack: PackInfo, capability: PackCapability): Promise<boolean> {
@@ -583,7 +583,7 @@ async function rememberOpened(
     await libraryService().markSeen(documentsFor(sender), libraryScopeFor(sender), [document]);
     await recentsService().record(recentsScopeFor(sender), document.id, Date.now());
   } catch (error) {
-    console.warn("[shell] the recent list could not be updated", error);
+    console.warn("[desk] the recent list could not be updated", error);
   }
 }
 
@@ -595,7 +595,7 @@ async function markSeen(
   try {
     await libraryService().markSeen(documentsFor(sender), libraryScopeFor(sender), [document]);
   } catch (error) {
-    console.warn("[shell] the document watch could not be updated", error);
+    console.warn("[desk] the document watch could not be updated", error);
   }
 }
 
@@ -604,12 +604,12 @@ async function forgetDocument(sender: PackSender, id: string): Promise<void> {
     libraryService()
       .forget(libraryScopeFor(sender), id)
       .catch((error: unknown) => {
-        console.warn("[shell] the document watch could not forget a document", error);
+        console.warn("[desk] the document watch could not forget a document", error);
       }),
     recentsService()
       .forget(recentsScopeFor(sender), id)
       .catch((error: unknown) => {
-        console.warn("[shell] the recent list could not forget a document", error);
+        console.warn("[desk] the recent list could not forget a document", error);
       }),
   ]);
 }
@@ -641,7 +641,7 @@ async function refreshCatalogue(): Promise<void> {
     catalogue = await loadCatalogue(root, packTrustOptions(), loaded.index);
     catalogueSource = `The published catalogue index is in use (sequence ${loaded.sequence}).`;
     console.info(
-      `[shell] catalogue index sequence ${loaded.sequence} verified; ${loaded.index.packs.length} entry(ies)`,
+      `[desk] catalogue index sequence ${loaded.sequence} verified; ${loaded.index.packs.length} entry(ies)`,
     );
     return;
   }
@@ -651,7 +651,7 @@ async function refreshCatalogue(): Promise<void> {
     loaded.reason === "refused"
       ? `The local catalogue directory is in use; the published index was refused. ${loaded.message}`
       : `The local catalogue directory is in use. ${loaded.message}`;
-  console.warn(`[shell] ${loaded.message}`);
+  console.warn(`[desk] ${loaded.message}`);
 }
 
 /**
@@ -665,7 +665,7 @@ async function refreshPacks(): Promise<void> {
   const scan = await loadInstalledPacks(join(dataRootFor(), "packs"), packTrustOptions());
   for (const issue of scan.issues) {
     const label = [issue.id ?? "unknown", issue.version ?? ""].join(" ").trim();
-    console.warn(`[shell] refused pack ${label}: ${issue.message}`);
+    console.warn(`[desk] refused pack ${label}: ${issue.message}`);
   }
 
   const development = devPacksEnabled({ isPackaged: app.isPackaged, env: process.env })
@@ -676,7 +676,7 @@ async function refreshPacks(): Promise<void> {
   installedVersions = scan.versions;
   await pruneReminders();
   console.info(
-    `[shell] ${packs.length} pack(s) available; ${catalogue.length} catalogue archive(s)`,
+    `[desk] ${packs.length} pack(s) available; ${catalogue.length} catalogue archive(s)`,
   );
 }
 
@@ -764,7 +764,7 @@ async function chooseTheme(next: Partial<HostThemeChoice>): Promise<void> {
   try {
     await saveThemeChoice(dataRootFor(), choice);
   } catch (error) {
-    console.warn("[shell] the theme choice could not be saved", error);
+    console.warn("[desk] the theme choice could not be saved", error);
   }
 }
 
@@ -1107,7 +1107,7 @@ function registerIpc(): void {
     }
     if (typeof title !== "string") return;
     void window?.setTabTitle(sender.tabId, title).catch((error: unknown) => {
-      console.warn("[shell] could not persist a tab title", error);
+      console.warn("[desk] could not persist a tab title", error);
     });
   });
 }
@@ -1242,7 +1242,7 @@ async function installPackFromFile(): Promise<void> {
     const opened = shouldOpenAfterInstall(current.state().tabs, installed.id);
     if (opened) {
       await current.openPack(installed.id).catch((error: unknown) => {
-        console.warn(`[shell] could not open ${installed.id} after install`, error);
+        console.warn(`[desk] could not open ${installed.id} after install`, error);
       });
     }
     current.setNotice(
@@ -1268,7 +1268,7 @@ async function recordInstallConsent(pack: InstalledPackInfo): Promise<void> {
       capabilities: pack.capabilities,
     });
   } catch (error) {
-    console.warn("[shell] the install consent could not be recorded", error);
+    console.warn("[desk] the install consent could not be recorded", error);
   }
 }
 
@@ -1436,7 +1436,7 @@ async function offerUnknownPublisher(
     fingerprint,
     ...(requested === undefined ? {} : { id: requested }),
   }).catch((error: unknown) => {
-    console.warn("[shell] the publisher key could not be added", error);
+    console.warn("[desk] the publisher key could not be added", error);
     return null;
   });
   if (result === null || !result.ok) {
@@ -1498,14 +1498,14 @@ function installedNotice(
       : "";
   const next = opened
     ? "The app is open now."
-    : "Restart Suite to run the new version of the already-open app.";
+    : "Restart Suite Desk to run the new version of the already-open app.";
   const kept = action === "reinstall" ? " Its documents and files were kept." : "";
   return `${describePackInstall(summary, action)} ${next}${kept}${keptOlder}`;
 }
 
 function installRefusal(error: unknown): string {
   if (error instanceof InstalledPackError) return `The pack was refused: ${error.message}`;
-  console.warn("[shell] pack install failed", error);
+  console.warn("[desk] pack install failed", error);
   return "The pack could not be installed.";
 }
 
@@ -1563,7 +1563,7 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
     const opened = shouldOpenAfterInstall(current.state().tabs, installed.id);
     if (opened) {
       await current.openPack(installed.id).catch((error: unknown) => {
-        console.warn(`[shell] could not open ${installed.id} after install`, error);
+        console.warn(`[desk] could not open ${installed.id} after install`, error);
       });
     }
     current.setNotice(installedNotice(installed, previous, opened, action));
@@ -1629,7 +1629,7 @@ async function uninstallPackVersionFrom(id: string, version: string): Promise<vo
     await consentService()
       .clearForPack(id)
       .catch((error: unknown) => {
-        console.warn("[shell] the consent record could not be cleared for a removed pack", error);
+        console.warn("[desk] the consent record could not be cleared for a removed pack", error);
       });
   }
   publishPackData();
@@ -1692,7 +1692,7 @@ function startReminderScheduler(): void {
       handleDeepLink(row.deepLink);
     },
     onFailed: (row, message) => {
-      console.warn(`[shell] the reminder “${row.title}” could not be shown: ${message}`);
+      console.warn(`[desk] the reminder “${row.title}” could not be shown: ${message}`);
       window?.setReminderStatus(`“${row.title}” could not be shown.`);
     },
   });
@@ -1710,13 +1710,13 @@ function startReminderScheduler(): void {
       publishPackData();
     },
     onFailed: (row, error) => {
-      console.warn(`[shell] the reminder “${row.title}” failed`, error);
+      console.warn(`[desk] the reminder “${row.title}” failed`, error);
       window?.setReminderStatus(`“${row.title}” could not be shown.`);
     },
   });
 
   void reminderScheduler.start().catch((error: unknown) => {
-    console.warn("[shell] the reminder scheduler did not start", error);
+    console.warn("[desk] the reminder scheduler did not start", error);
   });
 }
 
@@ -1788,7 +1788,7 @@ async function refreshPackReminders(sender: PackSender, documentId: string): Pro
       new RendererProjectionRunner(sender),
     );
   } catch (error) {
-    console.warn(`[shell] ${sender.packId} did not project its reminders`, error);
+    console.warn(`[desk] ${sender.packId} did not project its reminders`, error);
     return;
   }
 
@@ -1796,7 +1796,7 @@ async function refreshPackReminders(sender: PackSender, documentId: string): Pro
   try {
     rows = parseProjectedReminders(decodeProjection(projected), sender.packId);
   } catch (error) {
-    console.warn(`[shell] ${sender.packId} projected an invalid reminder row`, error);
+    console.warn(`[desk] ${sender.packId} projected an invalid reminder row`, error);
     await queue.removePack(sender.packId);
     await reminderScheduler?.refresh();
     return;
