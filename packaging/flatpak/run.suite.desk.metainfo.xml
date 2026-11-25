@@ -34,6 +34,7 @@
   </categories>
   <icon type="stock">run.suite.desk</icon>
   <releases>
+    <release version="0.4.0" date="2026-11-25"/>
     <release version="0.3.0" date="2026-11-24"/>
     <release version="0.2.0" date="2026-11-22"/>
     <release version="0.1.0" date="2026-11-22"/>
