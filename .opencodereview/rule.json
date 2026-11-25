@@ -51,7 +51,7 @@
     },
     {
       "path": ".github/workflows/**",
-      "rule": "CI and release workflows. Enforce:\n\n- Every third-party action is pinned to a 40-hex commit SHA whose trailing version comment matches.\n- Signing keys come from the release environment only; no secret is written into the tree, the repository settings, or a generated .dev/ path.\n- A publish step is gated on a clean tree and a fresh, non---only gate status at HEAD.\n- Do not add a second pipeline or duplicate a gate row in a workflow.\n- Do not run Electron, Playwright, Storybook dev, or a Flatpak build on a self-hosted desktop without a virtual display; CI runs headless.",
+      "rule": "CI and release workflows. Enforce:\n\n- Every third-party action is pinned to a 40-hex commit SHA whose trailing version comment matches.\n- Signing keys come from the release environment only; no secret is written into the tree, the repository settings, or a generated .dev/ path.\n- A publish step is gated on a clean tree and a fresh, non---only gate status at HEAD.\n- Do not add a second required pipeline or duplicate a gate row in a workflow; an advisory review outside the `ci` aggregator is not a gate.\n- Do not run Electron, Playwright, Storybook dev, or a Flatpak build on a self-hosted desktop without a virtual display; CI runs headless.",
       "merge_system_rule": true
     },
     {
