@@ -1,6 +1,6 @@
 import { type InputHTMLAttributes, type ReactNode, useId } from "react";
 import { cx } from "./cx.js";
-import { EDGE, FOCUS_RING, INK, SURFACE } from "./tokens.js";
+import { EDGE, FOCUS_RING, INK, MOTION, SURFACE } from "./tokens.js";
 
 /**
  * A label, a control, a hint and an error, as one unit.
@@ -45,7 +45,8 @@ export function Field({ label, hint, error, trailing, id, className, ...props }:
           aria-invalid={error !== undefined}
           aria-describedby={describedBy.length === 0 ? undefined : describedBy}
           className={cx(
-            "h-[var(--control-height,2.25rem)] w-full rounded-lg border px-[var(--control-padding-x,0.75rem)] text-[length:var(--text-body,13px)] transition-colors",
+            "h-[var(--control-height,2.25rem)] w-full rounded-lg border px-[var(--control-padding-x,0.75rem)] text-[length:var(--text-body,13px)]",
+            MOTION,
             SURFACE.base,
             INK.base,
             FOCUS_RING,

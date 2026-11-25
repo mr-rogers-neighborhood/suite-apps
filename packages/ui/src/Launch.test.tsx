@@ -75,7 +75,7 @@ describe("Launch", () => {
     // One frame, because three apps a person moves between should not ask them to re-learn
     // the front door. The centred card is the one that reads as a place to start.
     const { container } = render(<Launch {...base} />);
-    expect(container.firstElementChild?.className).toContain("rounded-2xl");
+    expect(container.firstElementChild?.className).toContain("rounded-xl");
     expect(container.firstElementChild?.className).not.toContain("h-screen");
   });
 

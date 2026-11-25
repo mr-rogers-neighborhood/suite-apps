@@ -1,6 +1,6 @@
 import { type ComponentProps, forwardRef, type ReactNode, useEffect, useState } from "react";
 import { cx } from "../cx.js";
-import { FOCUS_RING } from "../tokens.js";
+import { FOCUS_RING, MOTION } from "../tokens.js";
 import { menuBarKeyDown } from "./menuKeys.js";
 
 export interface MenuBarProps extends Omit<ComponentProps<"header">, "title"> {
@@ -165,7 +165,7 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
       data-handbook-region={props["data-handbook-region"] ?? "title-bar"}
       onKeyDown={onKeyDown ?? menuBarKeyDown}
       className={cx(
-        "app-bar relative z-20 flex h-11 shrink-0 items-center gap-3 bg-[var(--surface-translucent,var(--surface))] px-4 text-[length:var(--text-body,13px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md",
+        "app-bar relative z-20 flex h-11 shrink-0 items-center gap-3 bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] px-4 text-[length:var(--text-body,13px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md",
         className,
       )}
       {...props}
@@ -176,7 +176,7 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
           <a
             href={homeHref}
             aria-label={homeAriaLabel}
-            className="flex shrink-0 items-center transition-opacity hover:opacity-70"
+            className="flex shrink-0 items-center transition-opacity duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))] hover:opacity-70"
             onClick={handleHomeClick}
           >
             {mark}
@@ -199,7 +199,7 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
               aria-label="Title"
               data-testid={titleInputTestId}
               className={cx(
-                "h-7 rounded border border-[var(--focus)] bg-[var(--surface)] px-2 text-[length:var(--text-body,13px)] font-medium text-[var(--ink)] outline-none",
+                "h-7 rounded-sm border border-[var(--focus)] bg-[var(--surface)] px-2 text-[length:var(--text-body,13px)] font-medium text-[var(--ink)] outline-none",
                 FOCUS_RING,
               )}
               onChange={(e) => {
@@ -220,7 +220,8 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
               type="button"
               data-testid={titleTestId}
               className={cx(
-                "inline-flex max-w-[200px] select-none items-center gap-1.5 truncate rounded px-1.5 py-1 font-medium transition-colors hover:bg-[var(--surface-sunk)]",
+                "inline-flex max-w-[200px] select-none items-center gap-1.5 truncate rounded-sm px-1.5 py-1 font-medium hover:bg-[var(--surface-sunk)]",
+                MOTION,
                 FOCUS_RING,
               )}
               onDoubleClick={() => {
@@ -233,12 +234,17 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
             >
               <span className="min-w-0 truncate">{title}</span>
               {subtitle ? (
-                <span className="shrink-0 text-[11px] text-[var(--ink-muted)]">{subtitle}</span>
+                <span className="shrink-0 text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]">
+                  {subtitle}
+                </span>
               ) : null}
             </button>
           )}
           {renameError ? (
-            <span role="alert" className="text-[11px] text-[var(--danger)]">
+            <span
+              role="alert"
+              className="text-[length:var(--text-caption,11px)] text-[var(--danger)]"
+            >
               {renameError}
             </span>
           ) : null}
@@ -256,12 +262,13 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
           type="button"
           data-testid="command-bar"
           data-handbook-region="command-bar"
-          aria-label="Search or run a command"
+          aria-label={`${searchPlaceholder} ${searchShortcut}`}
           aria-keyshortcuts="Meta+K Control+K"
           title="Search or run a command (⌘K)"
           onClick={onOpenSearch}
           className={cx(
-            "command-bar flex h-7 min-w-[88px] flex-1 max-w-sm items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2 text-[12px] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)]",
+            "command-bar flex h-7 min-w-[88px] flex-1 max-w-sm items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)] hover:text-[var(--ink)]",
+            MOTION,
             FOCUS_RING,
           )}
         >
@@ -271,7 +278,7 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
           <span className="command-bar__label min-w-0 flex-1 truncate text-left">
             {searchPlaceholder}
           </span>
-          <kbd className="command-bar__key rounded border border-[var(--hairline)] px-1 py-0.5 text-[10px] opacity-70">
+          <kbd className="command-bar__key rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
             {searchShortcut}
           </kbd>
         </button>

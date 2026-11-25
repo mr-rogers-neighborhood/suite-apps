@@ -1,37 +1,35 @@
 /**
- * `@suite/ui` — the primitives the suite shares.
+ * `@suite/ui` — the one component base the suite shares.
  *
- * Ten exports, chosen because the apps already had most of them separately and had already
- * drifted: two `Button`s with different variants and different hardcoded ink on a themed paint.
- *
- * Every colour is `var(--role)` from `@suite/theme`, never a Tailwind theme name and never a
- * hex. That is what lets one `Button` work in three apps that extend Tailwind differently and
- * in a fourth that has no Tailwind at all.
+ * Every component is a typed export over plain elements and, where a primitive already owns
+ * the hard part, Radix. Nothing here reads a store, remembers a theme, or ships a stylesheet:
+ * colour, type, space, radius, elevation and motion arrive as the custom properties
+ * `@suite/theme` publishes, so one component works in every pack and every preset.
  *
  * ## Consuming this
  *
  * 1. Add the package at a tag, like `@suite/contracts`.
- * 2. Teach Tailwind to scan it, or every class compiles to nothing:
+ * 2. Teach Tailwind to scan the built package, or every class compiles to nothing:
  *
  *    ```css
  *    @source "../../node_modules/@suite/ui/dist";
  *    ```
  *
- * 3. React 19 is a peer, not a dependency.
+ * 3. Publish the token layers on the view that hosts the component. A pack receives the colour
+ *    roles from its host today; the type, density, radius, shadow and motion layers are
+ *    `scaleVariables(density)` from `@suite/theme`. `@suite/ui` falls back to the values that
+ *    shipped when a host has not published them yet.
+ *
+ * 4. React 19 is a peer, not a dependency.
  */
 export { AppMark, type AppMarkProps, type AppMarkSize } from "./AppMark.js";
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button.js";
 export { type ClassValue, cx } from "./cx.js";
-export { Dialog, type DialogProps } from "./Dialog.js";
 export { EmptyState, type EmptyStateProps } from "./EmptyState.js";
 export { Field, type FieldProps } from "./Field.js";
 export { IconButton, type IconButtonProps, type IconButtonSize } from "./IconButton.js";
-export { ImportMenu, type ImportMenuProps, type ImportOption } from "./ImportMenu.js";
-export {
-  Launch,
-  type LaunchProps,
-  type LaunchRecent,
-} from "./Launch.js";
+export type { ImportOption } from "./ImportMenu.js";
+export { Launch, type LaunchProps, type LaunchRecent } from "./Launch.js";
 export { Modal, type ModalProps } from "./Modal.js";
 export { MenuBar, type MenuBarProps } from "./menu/MenuBar.js";
 export {
@@ -42,6 +40,6 @@ export {
   menuKeyDown,
 } from "./menu/menuKeys.js";
 export { SyncPill, type SyncPillProps, type SyncSituation } from "./menu/SyncPill.js";
-export { PRIVACY_SENTENCE, PrivacyLine, type PrivacyLineProps } from "./PrivacyLine.js";
+export { PrivacyLine, type PrivacyLineProps } from "./PrivacyLine.js";
 export { Toast, type ToastNotice, type ToastProps } from "./Toast.js";
-export { EDGE, FOCUS_RING, INK, INK_ON, PRESSABLE, SURFACE } from "./tokens.js";
+export { FOCUS_RING, MOTION } from "./tokens.js";

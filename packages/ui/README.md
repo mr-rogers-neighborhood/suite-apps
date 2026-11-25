@@ -1,8 +1,8 @@
 # `@suite/ui`
 
-The suite's shared primitives. Each one is a thing the apps had built separately and had already let
-drift, plus one — `MenuBar` — that only exists because three apps needed the same top bar and none of
-them had it.
+The suite's one component base. Each component is a thing the apps had built separately and had
+already let drift, painted from the custom properties `@suite/theme` publishes. Nothing here holds a
+palette, a radius or a transition duration of its own.
 
 ## Why it exists
 
@@ -12,10 +12,23 @@ had considered, that is **2.53:1** and **3.47:1** against a floor of 4.5.
 
 A shared primitive is where `on-accent` gets _enforced_ rather than remembered.
 
+## The chosen base
+
+**Radix primitives + Tailwind + CSS-variable tokens.** No Mantine: its theme is a JavaScript object
+the pack would have to own, so it cannot be driven by the values a host injects after first paint.
+No CVA: `cx()` is twelve lines and `Record<Variant, string>` already covers the variants.
+
+Radix owns the behaviour that is easy to get subtly wrong. `Modal` is Radix Dialog, so focus-in,
+focus-return, the Tab trap, Escape, outside press and the inert background come from the primitive
+rather than a local reimplementation. Everything else is a plain element or a small disclosure over
+plain elements; Radix has no primitive for a seven-zone menu bar or a transient notice. Icons stay
+with the app, and an app that owns a genuinely richer component keeps it.
+
 ## Consuming it
 
 `@suite/ui` is a workspace package. Consumers declare `"@suite/ui": "workspace:*"`; there is no tag to
-bump.
+bump. The package is built with `tsc`; there is no conditional source entry, so the `dist/` a consumer
+resolves is the same `dist/` Tailwind scans.
 
 **Then teach Tailwind to scan it.** Tailwind 4 does not read `node_modules`, so without this
 every class in a primitive compiles to nothing — and the symptom is an unstyled button, which
@@ -26,71 +39,110 @@ stylesheet that declares it:
 @source "../../../../node_modules/@suite/ui/dist";
 ```
 
-React 19 is a peer dependency. Everything else is a CSS variable.
+React 19 is a peer dependency. `@radix-ui/react-dialog` is the package's only runtime dependency.
 
-## The rule that makes one component work in four apps
+### The tokens a host publishes
 
-Every colour is `var(--role)` from `@suite/theme`. Never a Tailwind theme name, never a hex.
+| Layer | Published as | Source |
+| --- | --- | --- |
+| Colour roles | `--canvas`, `--ink`, `--accent`, … | `cssVariables(preset, mode)` |
+| Type, density, radius, shadow, motion | `--text-*`, `--control-*`, `--radius-*`, `--shadow-*`, `--duration-*` | `scaleVariables(density)` |
 
-Three apps extend Tailwind's `@theme` with their own vocabulary (`bg-panel`, `bg-raised`,
-`text-faint`) and Start has no Tailwind at all — so anything but a CSS variable would compile in
-two apps and silently do nothing in the third.
+`@suite/theme` publishes both records. The host's `themeCss()` currently injects the colour record
+only; **publishing `scaleVariables(DEFAULT_DENSITY)` from `hosts/desk` is still the host lane's
+first step**, so a pack today reaches the scale through the fallbacks in the components. Both
+fallbacks are the values that already shipped, which is why adopting the scale moves no pixel.
+
+The rule inside this package is the same one a pack must follow: every colour, radius, shadow and
+duration is a `var(--token)`, never a hex, `bg-black`, `rounded-2xl`, `shadow-lg` or
+`duration-200`. `src/tokenLiterals.test.ts` fails the package if one appears.
 
 ## What is here
 
-| Export       | What it is                                                                                                                            |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `Button`     | `primary · secondary · ghost · danger`, `sm · md`. One background class per variant, never two.                                       |
-| `IconButton` | A glyph with a **required** accessible name.                                                                                          |
-| `Field`      | Label, hint and error wired to the input, so `aria-describedby` and `aria-invalid` cannot be left out.                                |
-| `Modal`      | Focus in, focus back on close, Tab wraps, Escape closes, backdrop is a real button.                                                   |
-| `Toast`      | `role` follows the tone: `alert` for a failure, `status` otherwise.                                                                   |
-| `EmptyState` | The "nothing here yet" panel.                                                                                                         |
-| `Dialog`     | `Modal` plus a title, a body and an action row.                                                                                       |
-| `Launch`     | The no-document-open screen. Everything app-specific is a child.                                                                      |
-| `MenuBar`    | The cross-app top bar in seven named zones. Takes nodes; owns no app's state.                                                         |
-| `SyncPill`   | Sync state as one control: `synced`, `syncing`, `offline`, `conflict`. It is also the door to the dialog, so the two cannot disagree. |
+| Export | What it is |
+| --- | --- |
+| `Button` | `primary · secondary · ghost · danger`, `sm · md`. One background class per variant, never two. |
+| `IconButton` | A glyph with a **required** accessible name. |
+| `Field` | Label, hint and error wired to the input, so `aria-describedby` and `aria-invalid` cannot be left out. |
+| `Modal` | Radix Dialog: focus in, focus back on close, Tab wraps, Escape and outside press close. |
+| `Toast` | `role` follows the tone: `alert` for a failure, `status` otherwise. |
+| `EmptyState` | The "nothing here yet" panel. |
+| `Launch` | The no-document-open screen. Everything app-specific is a child. |
+| `AppMark` | An app's glyph on a themed tile, in `currentColor`. |
+| `MenuBar` | The cross-app top bar in seven named zones. Takes nodes; owns no app's state. |
+| `SyncPill` | Sync state as one control: `synced`, `syncing`, `offline`, `conflict`, … |
+| `PrivacyLine` | The one privacy sentence, said the same way everywhere. |
+| `menuKeys` | WAI-ARIA keyboard helpers for a `menubar` and its nested menus. |
+| `cx`, `FOCUS_RING`, `MOTION` | The class helpers a pack needs to compose its own control. |
 
-Plus `cx` (six lines, so the package has no runtime dependency), and the class vocabulary in
-`tokens.ts` — `SURFACE`, `INK_ON`, `EDGE`, `INK`, `FOCUS_RING`, `PRESSABLE`.
+`ImportMenu` is internal to `Launch`; its `ImportOption` type is exported because `LaunchProps`
+uses it. The former `Dialog` wrapper and the unused `defaultWorkspace` helpers were deleted: no
+pack imported them, and `Modal` plus an app's heading covers the same job.
 
-## The menu bar
+## Storybook and axe
 
-Seven zones, left to right: `mark`, `context`, `navigation`, `search`, `peers` + `sync`, `actions`,
-`controls`. Every one takes a `ReactNode`, so an app passes what it already renders and the bar decides
-nothing about it. The decision this encodes is that the _host_ keeps two anchors — where you came from
-and how you leave — while the app takes over the middle. See
-[the menu bar reference](../../docs/reference/menu-bar.md).
+Stories live beside the component (`src/**/*.stories.tsx`). The preview paints the host's colour
+record and scale record on the story document, so a story is measured under the same tokens a pack
+gets. The toolbar switches **preset** (Suite, Solarized, Warm) and **mode** (light, dark); that is
+the second-theme proof — the surface changes without a component changing.
 
-Three things it deliberately does not do: import an icon set, read a state store, or name a colour.
-`mark` is a node the app supplies, so `@suite/ui` never learns what Canvas's or Planner's logo is.
+`a11y: { test: "error" }` makes every story an axe test. A new violation fails the story rather
+than waiting for someone to open the accessibility panel.
 
-Keyboard behaviour lives in `menuKeys.ts` and is tested there rather than through the component:
-`menuBarKeyDown` traverses a `role="menubar"` horizontally with `ArrowLeft`/`ArrowRight`, `Home` and
-`End`, and steps out of the way while the person is typing in the inline rename. `menuKeyDown` and
-`focusFirstMenuItem` do the same job one level down, for a `role="menu"` inside it — including
-skipping a nested menu's rows and handing focus back to the trigger when the menu closes from inside.
+```sh
+pnpm --filter @suite/ui test           # jsdom unit tests, including the token-literal guard
+pnpm --filter @suite/ui test:stories   # every story in headless Chromium, with axe
+pnpm --filter @suite/ui build-storybook
+pnpm --filter @suite/ui check          # build, typecheck, both test runs, storybook build
+```
 
-Canvas is the reference implementation. Planner and Budget can adopt it, and the honest state of that
-is "not yet": both still draw their own chrome.
+## Migrating a pack
+
+The first consumer is Budget (#420). A pack migrates one screen at a time; nothing below changes
+the pack contract.
+
+1. **Make the tokens reachable.** Add the `@source` line above. Confirm the host's sheet carries the
+   colour record; when the host lane lands the scale record, no pack edit is needed. Until then the
+   fallbacks keep the current pixels.
+2. **Replace the local duplicates.** Import `Button`, `IconButton`, `EmptyState`, `Field`, `Modal`,
+   `Toast`, `Launch`, `AppMark` and `MenuBar` from `@suite/ui`. A local wrapper is fine when it only
+   adds layout, as Budget's `IconButton` and `EmptyState` wrappers already do.
+3. **Delete only after the last import goes.** A wrapper with one call site is churn; leave it until
+   the screen is migrated.
+4. **Move the raw controls onto the base.** A `<button>` inside a row is the common gap: `IconButton`
+   brings the required name, the density-sized target and the focus ring.
+5. **Replace literals with the published steps** (`rounded-xl`, `shadow-2xl`,
+   `text-[length:var(--text-*)]`). Do not tidy the type scale while migrating; the five roles are
+   the values that shipped.
+6. **Run the pack's own tests and the shared stories.** A pack does not need a Storybook copy; the
+   shared stories are the contract.
+
+### One screen, before and after
+
+Budget's Plan → category row → row-action affordance (`CategoryRow.tsx`, the raw trigger):
+
+```diff
+-<button type="button" aria-label={`Actions for ${entry.category.name}`}
+-  className="rounded p-0.5 text-faint opacity-0 transition-opacity hover:text-ink group-hover:opacity-100 focus-visible:opacity-100">
+-  <MoreHorizontal size={14} />
+-</button>
++<IconButton label={`Actions for ${entry.category.name}`} icon={<MoreHorizontal size={14} />}
++  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" />
+```
+
+`IconButton` adds the ring from `FOCUS_RING` and reads `--control-height-sm`; the current class has
+no ring at all. The target chip keeps its `<button>` because it wraps a progress bar, and loses
+`w-10 shrink-0` for the density gap. Net visible change: one ring, one size and one hover treatment
+per row action instead of three.
 
 ## When not to use this
 
-Being honest about the three places an app should keep its own:
-
-- **A richer component wins.** Canvas's toast is a _stack_ with pause-on-hover, remaining-time
-  tracking and reduced-motion support. Sharing one notice would be a downgrade, so Canvas keeps
-  its own.
-- **A stack-aware Escape wins.** Canvas's `Dialog` closes through its global escape layer, so
-  Escape closes the topmost thing rather than every open surface. `Modal` here uses a plain
-  document listener, which would fire under a menu. Canvas keeps its own until this one grows a
-  stack.
-- **A mature library wins.** Budget's modal is Radix Dialog, which already does the focus trap
-  and ARIA properly. Replacing it with a newer implementation of the same thing is churn with
-  negative value.
-- **A top bar is a layout, not a primitive, until two apps agree.** `MenuBar` exists because Canvas
-  built one and the other three needed one. An app with a genuinely different chrome — a full-screen
-  editor, a canvas with no bars at all — should keep its own rather than bend the zones to fit.
+- **A richer component wins.** Canvas's toast is a stack with pause-on-hover and remaining-time
+  tracking. Sharing one notice would be a downgrade, so Canvas keeps its own.
+- **A pack-specific shape with one consumer wins.** A React Flow node, Budget's money input, or a
+  chart belongs to that pack until a second consumer exists.
+- **A genuinely different chrome wins.** A full-screen editor or a barless canvas should keep its
+  own layout rather than bend the seven zones.
 
 The test is whether the _job_ is identical, not whether the _shape_ is similar.
 

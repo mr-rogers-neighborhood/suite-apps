@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useRef } from "react";
 import { cx } from "./cx.js";
 import { EDGE, INK, SURFACE } from "./tokens.js";
 const SIZES = {
@@ -8,51 +8,26 @@ const SIZES = {
     md: "w-[min(560px,calc(100vw-2rem))]",
     lg: "w-[min(760px,calc(100vw-2rem))]",
 };
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 export function Modal({ open, onClose, label, children, size = "md", className }) {
-    const panel = useRef(null);
+    // Radix restores focus on close, but capture the opener explicitly as well: a caller may
+    // unmount the dialog in the same render that closes it, and the explicit target survives
+    // that. This is the one behaviour the package owned before Radix and still promises.
     const restoreTo = useRef(null);
-    useEffect(() => {
-        if (!open)
-            return;
-        restoreTo.current =
-            document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        const first = panel.current?.querySelector(FOCUSABLE) ?? panel.current;
-        first?.focus();
-        return () => restoreTo.current?.focus();
-    }, [open]);
-    useEffect(() => {
-        if (!open)
-            return;
-        const onKey = (event) => {
-            if (event.key === "Escape") {
-                event.stopPropagation();
+    return (_jsx(DialogPrimitive.Root, { open: open, onOpenChange: (next) => {
+            // A caller's `onClose` is the only close event it cares about. Opening is controlled
+            // by `open`; Radix never asks to open a dialog from inside one.
+            if (!next)
                 onClose();
-                return;
-            }
-            if (event.key !== "Tab" || panel.current === null)
-                return;
-            // Wrap inside the panel: without this, Tab walks out into the page behind the dialog,
-            // which is still visible but not reachable by anything else.
-            const items = [...panel.current.querySelectorAll(FOCUSABLE)].filter((node) => node.offsetParent !== null);
-            const first = items[0];
-            const last = items.at(-1);
-            if (first === undefined || last === undefined)
-                return;
-            if (event.shiftKey && document.activeElement === first) {
-                event.preventDefault();
-                last.focus();
-            }
-            else if (!event.shiftKey && document.activeElement === last) {
-                event.preventDefault();
-                first.focus();
-            }
-        };
-        document.addEventListener("keydown", onKey, true);
-        return () => document.removeEventListener("keydown", onKey, true);
-    }, [open, onClose]);
-    if (!open)
-        return null;
-    return createPortal(_jsxs("div", { className: "fixed inset-0 z-[70] flex items-center justify-center", children: [_jsx("button", { type: "button", "aria-label": `Close ${label}`, className: "absolute inset-0 cursor-default border-0 bg-black/30 backdrop-blur-[2px]", onClick: onClose }), _jsx("div", { ref: panel, role: "dialog", "aria-modal": "true", "aria-label": label, tabIndex: -1, className: cx("relative max-h-[calc(100vh-4rem)] overflow-y-auto rounded-2xl border p-5 shadow-2xl", SURFACE.base, EDGE.hairline, INK.base, SIZES[size], className), children: children })] }), document.body);
+        }, children: _jsxs(DialogPrimitive.Portal, { children: [_jsx(DialogPrimitive.Overlay, { className: "fixed inset-0 z-[70] bg-[color-mix(in_srgb,var(--ink)_30%,transparent)] backdrop-blur-[2px]" }), _jsxs(DialogPrimitive.Content
+                // A visible heading belongs to the caller. The hidden title is what names the
+                // dialog for assistive technology; there is no description unless the caller adds one.
+                , { "aria-describedby": undefined, "aria-modal": "true", onOpenAutoFocus: () => {
+                        restoreTo.current =
+                            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+                    }, onCloseAutoFocus: (event) => {
+                        event.preventDefault();
+                        if (restoreTo.current?.isConnected === true)
+                            restoreTo.current.focus();
+                    }, className: cx("fixed left-1/2 top-1/2 z-[71] max-h-[calc(100vh-4rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border p-5 shadow-[var(--shadow-2xl)] outline-none", SURFACE.base, EDGE.hairline, INK.base, SIZES[size], className), children: [_jsx(DialogPrimitive.Title, { asChild: true, children: _jsx("span", { className: "sr-only", children: label }) }), children] })] }) }));
 }
 //# sourceMappingURL=Modal.js.map
