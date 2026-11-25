@@ -17,8 +17,10 @@ pnpm site:build        # writes site/dist
 | Path | What it is |
 | --- | --- |
 | `site/src/index.html` | The one landing page. |
+| `site/src/404.html` | The not-found page, and the docs.suite.run redirect for deep links. |
 | `site/src/style.css` | The shared stylesheet. |
 | `site/build.mjs` | The docs renderer and link checker. |
+| `site/unclassified.txt` | Pages #417 has not given an `audience:` yet. |
 | `site/dist/` | Ignored build output; the Pages artifact. |
 
 ## Documentation renderer
@@ -45,9 +47,29 @@ audience: user # or developer
 ---
 ```
 
-`audience` is the minimal key #417's split can adopt. Until every page has it, the renderer falls
-back on the notes archive: `tutorials/`, `how-to/` and `explanation/` are the User Handbook; every
-other page is Developer Documentation. `docs/README.md` is the overview and belongs to neither.
+`audience` is the minimal key #417's split can adopt. Until every page has it, the build maps only
+the folders whose audience is unambiguous:
+
+| Folder | Section |
+| --- | --- |
+| `tutorials/` | User Handbook |
+| `how-to/`, `explanation/`, `reference/`, `spec/`, `modules/` | Developer Documentation |
+| `README.md` | User Handbook; the docs home itself keeps the shared sidebar |
+| anything else | unclassified |
+
+An unclassified page is not guessed into a section. It still renders at its path, but it joins
+neither section, and the build prints every unclassified path and the count:
+
+```
+site: 13 unclassified page(s) — no `audience:` frontmatter and no unambiguous folder:
+  docs/AGENTS.md
+  docs/tours/start.mdx
+  ...
+```
+
+`site/unclassified.txt` names the pages #417 has not reached yet. The build fails on an unclassified
+page missing from that list, and on a line that no longer names an unclassified page, so the list
+shrinks with the metadata instead of drifting.
 
 The switch targets are generated indexes at `docs/handbook/` and `docs/developer/`; the sidebar on a
 page lists the pages in that page's section. Add `audience:` to a page and it moves between the two
@@ -60,5 +82,6 @@ domains, so the deployment is:
 
 - `suite.run` is the Pages custom domain (apex `A`/`AAAA`, `www` CNAME).
 - `docs.suite.run` is a proxied `CNAME` to the same Pages site. The landing page's first script sends
-  that host's root to `/docs/`; links inside the docs stay under `/docs/`.
+  that host's root to `/docs/`; links inside the docs stay under `/docs/`. `404.html` carries the same
+  redirect for a deep link that arrives without the prefix.
 - The owner keeps both names on Cloudflare DNS; the workflow carries no Cloudflare credential.

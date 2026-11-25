@@ -16,8 +16,11 @@
  *      stays on the site, a link that leaves `docs/` points at GitHub, and a
  *      missing file or heading fails the build the way `docs-check` does.
  *   3. A page's audience is `audience: user | developer` in frontmatter when it
- *      exists. Until #417 assigns every page, the archive folders fall back to
- *      the handbook and the code-coupled folders to the developer docs.
+ *      exists. Until #417 assigns every page, only the folders whose audience
+ *      is unambiguous are mapped (see `DIRECTORY_AUDIENCE`); every other page
+ *      stays unclassified, is listed by the build, and must be named in
+ *      `site/unclassified.txt` or the build fails. An unclassified page is
+ *      never guessed into a section.
  *   4. Non-page files under `docs/` are copied, so a linked schema, fixture or
  *      image keeps working.
  *
@@ -43,6 +46,8 @@ const styleSource = join(siteDir, "src", "style.css");
 const landingSource = join(siteDir, "src", "index.html");
 const iconSource = join(docsDir, "assets", "suite-icon.png");
 const iconOut = "docs/assets/suite-icon.png";
+const notFoundSource = join(siteDir, "src", "404.html");
+const unclassifiedList = join(siteDir, "unclassified.txt");
 
 const problems = [];
 
@@ -208,7 +213,28 @@ function pageOut(rel) {
   return `docs/${rel.replace(/\.mdx?$/, ".html")}`;
 }
 
-/** The audience key #417 will write on every page; the fallback is the archive split. */
+/**
+ * The audience #417 writes on every page, and — while it does not — the only
+ * folder mapping this build trusts.
+ *
+ * The map is deliberately conservative: a folder that holds both reader kinds
+ * is absent, so its pages stay unclassified and are reported rather than
+ * guessed. `tours/` is such a folder (walkthroughs that read like a handbook
+ * and assume a checkout), and so is the root `AGENTS.md`.
+ */
+const DIRECTORY_AUDIENCE = new Map([
+  ["tutorials", "user"],
+  ["how-to", "developer"],
+  ["explanation", "developer"],
+  ["reference", "developer"],
+  ["spec", "developer"],
+  ["modules", "developer"],
+]);
+
+/** `docs/README.md` is the docs home and the front door for a reader. */
+const README_AUDIENCE = "user";
+
+/** The audience key #417 will write on every page; null means undeclared. */
 function audienceFor(rel, data) {
   if (data.audience !== undefined) {
     if (data.audience !== "user" && data.audience !== "developer") {
@@ -216,10 +242,61 @@ function audienceFor(rel, data) {
     }
     return data.audience;
   }
-  if (rel === "README.md") return null;
-  const top = rel.split("/")[0];
-  if (top === "tutorials" || top === "how-to" || top === "explanation") return "user";
-  return "developer";
+  if (rel === "README.md") return README_AUDIENCE;
+  return DIRECTORY_AUDIENCE.get(rel.split("/")[0]) ?? null;
+}
+
+/**
+ * Pages #417 has not classified yet, one `docs/`-relative path per line.
+ * A comment starts with `#`. The file exists so the build can fail on a page
+ * nobody has decided about while still going green for the ones it knows.
+ */
+function readUnclassifiedList() {
+  if (!existsSync(unclassifiedList)) return new Set();
+  return new Set(
+    readFileSync(unclassifiedList, "utf8")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "" && !line.startsWith("#")),
+  );
+}
+
+/**
+ * Print every unclassified page and fail on the ones `site/unclassified.txt`
+ * does not name. A stale line fails too: the list is a work list for #417, so
+ * it has to shrink as `audience:` lands, not rot.
+ */
+function reportUnclassified(entries) {
+  const paths = entries.map((entry) => `docs/${entry.sourceRel}`);
+  const allowlist = readUnclassifiedList();
+  const unexpected = paths.filter((path) => !allowlist.has(path));
+  const stale = [...allowlist].filter((path) => !paths.includes(path));
+
+  if (paths.length > 0) {
+    console.log(
+      `site: ${paths.length} unclassified page(s) — no \`audience:\` frontmatter and no unambiguous folder:`,
+    );
+    for (const path of paths) console.log(`  ${path}`);
+  }
+
+  if (unexpected.length === 0 && stale.length === 0) return;
+
+  const lines = [];
+  if (unexpected.length > 0) {
+    lines.push(
+      `${unexpected.length} docs page(s) have no audience and are not in site/unclassified.txt:`,
+      ...unexpected.map((path) => `  ${path}`),
+      'Add `audience: user | developer` to the page, or list it in site/unclassified.txt while #417 is open.',
+    );
+  }
+  if (stale.length > 0) {
+    lines.push(
+      `${stale.length} line(s) in site/unclassified.txt no longer name an unclassified page:`,
+      ...stale.map((path) => `  ${path}`),
+      "Delete them; the build would otherwise hide a page that now has an audience.",
+    );
+  }
+  throw new Error(lines.join("\n"));
 }
 
 const SECTION_LABELS = {
@@ -538,15 +615,33 @@ ${sections}`;
   return pageDocument(page, body, audience);
 }
 
+/**
+ * The docs home is `docs/README.md`, rendered once at `docs/index.html`. It
+ * carries the shared sidebar: the page is the way into both sections, so it
+ * claims neither.
+ */
 function docsHomePage(pageIndex) {
   const readme = pageIndex.get("README.md");
-  const page = {
+  return {
     ...readme,
     outRel: "docs/index.html",
     sourceRel: "README.md",
     audience: null,
     index: pageIndex,
+    headings: new Set(readme.headings),
   };
+}
+
+/**
+ * A page ready to render. The heading set is a copy, so adding the title of a
+ * page with no top heading cannot mutate the shared index entry.
+ */
+function renderablePage(entry, pageIndex) {
+  const page = { ...entry, index: pageIndex, headings: new Set(entry.headings) };
+  if (!hasTopHeading(entry.body)) {
+    page.body = `# ${entry.title}\n\n${entry.body}`;
+    page.headings.add(githubSlug(entry.title));
+  }
   return page;
 }
 
@@ -588,19 +683,17 @@ async function buildDocs() {
   }
 
   for (const entry of parsed) {
-    const page = { ...entry, index: pageIndex };
-    const body = hasTopHeading(entry.body) ? entry.body : `# ${entry.title}\n\n${entry.body}`;
-    if (!hasTopHeading(entry.body)) page.headings.add(githubSlug(entry.title));
-    const html = renderPage({ ...page, body });
+    // `docs/README.md` is the docs home; it is rendered once, below.
+    if (entry.sourceRel === "README.md") continue;
+    const page = renderablePage(entry, pageIndex);
     await mkdir(dirname(join(outDir, page.outRel)), { recursive: true });
-    await writeFile(join(outDir, page.outRel), pageDocument(page, html, entry.audience), "utf8");
+    await writeFile(join(outDir, page.outRel), pageDocument(page, renderPage(page), page.audience), "utf8");
   }
 
   // The docs home is the repository's docs/README.md, not a second summary.
   const home = docsHomePage(pageIndex);
-  const homeBody = home.body;
-  const homeHtml = renderPage({ ...home, body: homeBody });
-  await writeFile(join(outDir, "docs/index.html"), pageDocument(home, homeHtml, null), "utf8");
+  const homePage = renderablePage(home, pageIndex);
+  await writeFile(join(outDir, homePage.outRel), pageDocument(homePage, renderPage(homePage), null), "utf8");
 
   for (const audience of ["user", "developer"]) {
     const out = join(outDir, "docs", audienceDir(audience), "index.html");
@@ -608,7 +701,7 @@ async function buildDocs() {
     await writeFile(out, audienceIndexDocument(audience, pageIndex), "utf8");
   }
 
-  return { count: parsed.length };
+  return { count: parsed.length, unclassified: parsed.filter((entry) => entry.audience === null) };
 }
 
 async function buildSite() {
@@ -623,6 +716,9 @@ async function buildSite() {
 
   await cp(styleSource, join(outDir, "style.css"));
   await cp(landingSource, join(outDir, "index.html"));
+  // GitHub Pages serves this for a missing path on the shared artifact, which is
+  // where a docs.suite.run deep link arrives before the /docs/ prefix.
+  await cp(notFoundSource, join(outDir, "404.html"));
 
   const docs = await buildDocs();
 
@@ -631,7 +727,11 @@ async function buildSite() {
     throw new Error(`${problems.length} site link problem(s).`);
   }
 
-  console.log(`site: landing page, ${docs.count} docs pages, links and anchors resolved.`);
+  reportUnclassified(docs.unclassified);
+
+  console.log(
+    `site: landing page, ${docs.count} docs pages (${docs.unclassified.length} unclassified), links and anchors resolved.`,
+  );
 }
 
 buildSite().catch((error) => {
