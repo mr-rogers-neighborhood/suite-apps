@@ -16,7 +16,7 @@ steps live in [the pack authoring reference](../../../docs/reference/pack-author
   open, then owns the queue and delivery.
 - `src/PackRender.test.tsx` mounts Planner's own renderer over the same services the shell's preload
   exposes and exercises a task, a day page, and an export/import pair.
-- `vite.config.ts` builds into `legacy/planner/.dev/pack`, outside this source tree.
+- `vite.config.ts` builds into `packs/planner/.dev/pack`, outside this source tree.
 - `pnpm planner:pack` builds and signs the archive.
 
 Nothing generated belongs here: `node scripts/pack-shape.mjs` fails the gate if a `dist/` or

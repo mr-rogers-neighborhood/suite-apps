@@ -14,7 +14,7 @@ and the authoring steps live in [the pack authoring reference](../../../docs/ref
 - `src/source.ts` is the handbook loader for this root. It differs from the app's loader in one
   string: `defineDocs.dir` is resolved against the Vite root, and this build's root is `pack/`.
 - `vite.config.ts` builds the renderer, the compiled MDX pages and the copied `public/data` index
-  into `legacy/help/.dev/pack`, outside this source tree.
+  into `packs/help/.dev/pack`, outside this source tree.
 - From the repository root, `pnpm help:pack` regenerates the index and handbook, builds and signs the
   archive. `pnpm help:pack --check-repro` builds twice and compares every payload path and SHA-256,
   with no signing key.

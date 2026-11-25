@@ -17,7 +17,7 @@ export default defineConfig({
   // and keep Vitest's cache with the build output.
   root: fileURLToPath(new URL(".", import.meta.url)),
   server: { fs: { allow: [repoRoot] } },
-  cacheDir: fileURLToPath(new URL("../../../legacy/budget/.dev/vitest", import.meta.url)),
+  cacheDir: fileURLToPath(new URL("../.dev/vitest", import.meta.url)),
   plugins: [react()],
   resolve: {
     alias: {

@@ -18,7 +18,7 @@ export default defineConfig({
   // appears under `pack/`. Pin the root so `include` stays pack-only, and keep Vitest's cache with
   // the build output.
   root: fileURLToPath(new URL(".", import.meta.url)),
-  cacheDir: fileURLToPath(new URL("../../../legacy/canvas/.dev/vitest", import.meta.url)),
+  cacheDir: fileURLToPath(new URL("../.dev/vitest", import.meta.url)),
   plugins: [react()],
   resolve: {
     alias: [

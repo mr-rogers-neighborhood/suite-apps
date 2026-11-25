@@ -69,7 +69,7 @@ mise exec -- pnpm --filter @suite/help-pack run typecheck
 mise exec -- pnpm help:pack
 ```
 
-All four build to `legacy/<app>/.dev/pack` and sign the archive from there. The output path is the
+All four build to `packs/<app>/.dev/pack` and sign the archive from there. The output path is the
 app's, under a generated directory the root `.gitignore` already covers; never point it back into
 `pack/`. A build also writes `<id>-<version>.card.json` beside `<id>-<version>.suitepack` for the
 catalogue's shadow tiles; [Packaging channels](packaging-channels.md#packs-and-cards) owns that

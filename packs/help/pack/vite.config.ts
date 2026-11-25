@@ -6,7 +6,7 @@ import { fumadocsMdx } from "fumadocs-mdx/vite";
 import { defineConfig } from "vite";
 
 /**
- * Builds Help's renderer into `legacy/help/.dev/pack`.
+ * Builds Help's renderer into `packs/help/.dev/pack`.
  *
  * The normal Electron build writes `legacy/help/out`, so this config owns a directory of its own and
  * never repoints `electron-vite`. It builds the app's existing renderer — the pack adds only an
@@ -19,7 +19,7 @@ import { defineConfig } from "vite";
  */
 const packRoot = fileURLToPath(new URL(".", import.meta.url));
 const renderer = fileURLToPath(new URL("../../../legacy/help/src/renderer/src", import.meta.url));
-const outputRoot = new URL("../../../legacy/help/.dev/", import.meta.url);
+const outputRoot = new URL("../.dev/", import.meta.url);
 
 export default defineConfig({
   root: packRoot,

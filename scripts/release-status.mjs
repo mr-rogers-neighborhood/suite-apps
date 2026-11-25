@@ -1864,13 +1864,16 @@ export function publishReleaseArgs({ tag, notesPath, latest, prerelease = false 
 /**
  * The title one draft or publication carries.
  *
- * A slop page names its commit as well, because more than one build can share a
- * day. Other channels keep the day-only title they already have.
+ * The channel sits in square brackets so the Releases sidebar is readable at a
+ * glance: four pages share one day and only the tag distinguishes them. A slop
+ * page names its commit as well, because more than one build can share a day.
  */
 export function releaseTitle(date, channel = "stable", revision = null) {
   const base = `Suite Desk + Suite Go — ${date}`;
-  if (channel === "stable" || !isRevision(revision)) return base;
-  return `${base} (${revision})`;
+  const label = channel === "stable" ? "Stable" : `${channel[0].toUpperCase()}${channel.slice(1)}`;
+  const titled = `${base} [${label}]`;
+  if (channel === "stable" || !isRevision(revision)) return titled;
+  return `${titled} (${revision})`;
 }
 
 /**

@@ -5,7 +5,7 @@
  *   pnpm canvas:pack [--key <base64>] [--out <file.suitepack>] [--version <semver>]
  *
  * `packs/canvas/pack/vite.config.ts` builds the renderer and its bridge into
- * `legacy/canvas/.dev/pack`, which is the pack's build output, not its source.
+ * `packs/canvas/.dev/pack`, which is the pack's build output, not its source.
  * This script writes the generated manifest there and hands the directory to
  * `bundlePack`. The entry is one module — the prelude installs `window.suiteDesktop`
  * before it imports the renderer — so no script injection step is needed.
@@ -27,7 +27,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PACK_ROOT = join(ROOT, "packs", "canvas");
 const PACK_DIR = join(PACK_ROOT, "pack");
 const APP_DIR = join(ROOT, "legacy", "canvas");
-const DIST = join(APP_DIR, ".dev", "pack");
+const DIST = join(PACK_ROOT, ".dev", "pack");
 const SOURCE_MANIFEST = join(PACK_DIR, "manifest.json");
 
 /**
@@ -112,12 +112,12 @@ function usage() {
 
   --key       Ed25519 private key, base64 PKCS#8 or a bare seed; default
               $${KEYS.pack.env}, then the pack key in the Suite keys directory
-  --out       archive to write; default legacy/canvas/.dev/canvas-<version>.suitepack
+  --out       archive to write; default packs/canvas/.dev/canvas-<version>.suitepack
   --version   pack version to record; default the version in manifest.json
   --contract  override the manifest's contractVersion
   --min-host  minimum host version to record
 
-Builds the renderer and its bridge into legacy/canvas/.dev/pack, then signs the
+Builds the renderer and its bridge into packs/canvas/.dev/pack, then signs the
 directory with the pinned pack key. A key whose public half is not
 ${KEYS.pack.pinName} is refused before anything is signed.
 `;
@@ -140,7 +140,7 @@ async function main(argv) {
   const source = JSON.parse(readFileSync(SOURCE_MANIFEST, "utf8"));
   const manifest = manifestFor(source, argumentValue(argv, "--version"));
   const out =
-    argumentValue(argv, "--out") ?? join(APP_DIR, ".dev", `canvas-${manifest.version}.suitepack`);
+    argumentValue(argv, "--out") ?? join(PACK_ROOT, ".dev", `canvas-${manifest.version}.suitepack`);
 
   const key = argumentValue(argv, "--key") ?? process.env[KEYS.pack.env] ?? readKey("pack");
   if (key === null || key === undefined || key.trim() === "") {

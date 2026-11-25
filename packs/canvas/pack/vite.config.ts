@@ -9,7 +9,7 @@ import { defineConfig, type Plugin } from "vite";
 import wasm from "vite-plugin-wasm";
 
 /**
- * Builds Canvas's own renderer and the pack prelude into `legacy/canvas/.dev/pack`.
+ * Builds Canvas's own renderer and the pack prelude into `packs/canvas/.dev/pack`.
  *
  * The normal Electron build writes `legacy/canvas/dist`, so this config owns a directory of its own
  * and never repoints `electron-vite`. The entry is the pack's page: it loads `src/main.ts`, which
@@ -20,7 +20,7 @@ import wasm from "vite-plugin-wasm";
  * `scripts/pack-shape.mjs` fails the gate if a generated directory appears in it.
  */
 const packRoot = fileURLToPath(new URL(".", import.meta.url));
-const outputRoot = new URL("../../../legacy/canvas/.dev/", import.meta.url);
+const outputRoot = new URL("../.dev/", import.meta.url);
 const outDir = fileURLToPath(new URL("pack", outputRoot));
 const require = createRequire(import.meta.url);
 

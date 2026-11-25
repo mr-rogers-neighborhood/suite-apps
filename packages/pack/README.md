@@ -32,7 +32,7 @@ The install identity is `(publisher id, pack id)`. A different publisher under a
   "version": "0.2.0",
   "entry": "index.html",
   "contractVersion": 1,
-  "minimumHostVersion": 1,
+  "minHost": 1,
   "publisher": {
     "id": "suite",
     "key": "…32-byte Ed25519 public key, standard base64…"
@@ -51,6 +51,31 @@ The install identity is `(publisher id, pack id)`. A different publisher under a
   "signature": "…"
 }
 ```
+
+## Rings and the host floor
+
+A pack is versioned, not channelled (S12.8). Two signed fields let a host decide what to offer
+without teaching the pack anything about how the host ships (S3.11):
+
+| Field     | Values                             | Absent means |
+| --------- | ---------------------------------- | ------------ |
+| `ring`    | `stable`, `preview`                | `stable`     |
+| `minHost` | an integer host version, 1 or more | no floor     |
+
+- `ring` is the pack's own stability. `slop` and `nightly` are host channels and are refused as a
+  ring, as is any other value, because the vocabulary is closed like a capability.
+- A version's ring is fixed by its signature. An operator stages a preview by signing a version with
+  `ring: "preview"` and publishing it in the next index; promoting it is a new version signed with
+  `ring: "stable"`, never a re-signed archive under the same version (S12.10).
+- `minimumHostVersion` is the same floor in the spelling a manifest signed before S3.11 carries. A
+  manifest may carry either spelling, never both.
+- Neither field is written when absent, so a manifest signed before they existed keeps the bytes and
+  the signature it already had.
+
+`packRing(manifest)` returns the effective ring, `packMinimumHost(manifest)` the effective floor, and
+`packFitsHost(manifest, { contractVersion, hostVersion, rings })` refuses a floor above the host and
+a ring the host does not offer. `rings` defaults to `["stable"]`; it is the host's preference and
+never something a pack can widen.
 
 ## Catalogue index
 
@@ -95,6 +120,14 @@ index with a pack key, and nothing verifies a pack with an operator key.
   does. The host still verifies the downloaded pack's manifest signature and file hashes (S12.7); an
   index entry is a claim, not the proof.
 
+The entry above is index `version` 1, which is what the builder writes today. S12.9 defines
+`version` 2: the entry gains `ring`, a required `contractVersion`, `minHost` and the manifest
+`signature`, and the archive's `url`, `size` and `sha256` move under `archive`. `ring` and `minHost`
+are the manifest's _effective_ values, so an absent ring matches `stable` and a manifest carrying
+`minimumHostVersion` matches a `minHost` entry. The shape is written down in
+[docs/spec/catalogue.schema.json](../../docs/spec/catalogue.schema.json). This package does not parse
+v2 yet; the reader, the builder and the host's ring preference switch together.
+
 `parsePackIndexJson`, `verifyPackIndex` and `packIndexDigest` are the shared implementation. The
 canonical bytes reuse the S3.3 rules in `canonical.ts`: fixed field order, an absent optional field
 omitted, nested keys in code-unit order, entries and capabilities sorted, and a duplicate key
@@ -126,7 +159,10 @@ the phone and the release build. The format itself is owned by
 
 ## What this package owns
 
-- `parsePackManifest` and the Zod schema, with actionable issues.
+- `parsePackManifest` and the Zod schema, with actionable issues: including the closed ring
+  vocabulary and the `minHost` host floor under either spelling.
+- `packRing` and `packMinimumHost`: the effective ring and floor, with absence defaulted to `stable`
+  and no floor.
 - `canonicalManifestBytes`, the exact bytes a signature covers. Capabilities and files are sorted (paths by UTF-16 code unit, never by locale); command and menu order is preserved.
 - `canonicalPackIndexBytes`, `parsePackIndexJson`, `verifyPackIndex`, `signPackIndex` and `packIndexDigest`: the catalogue index, signed by operator keys.
 - `parsePackCard`, `cardUrlForArchiveUrl`, `cardFileNameFor` and the card constants: the presentation sidecar that keeps the strict index entry free of card fields.

@@ -104,6 +104,11 @@ function validate(schema, value, path = "$") {
   if (schema.enum !== undefined && !schema.enum.includes(value)) {
     errors.push(`${path}: not one of ${schema.enum.join(", ")}`);
   }
+  if (schema.not !== undefined && validate(schema.not, value, path).length === 0) {
+    // Used once: `minHost` and `minimumHostVersion` are the same fact in two
+    // spellings and may not appear together (S3.11).
+    errors.push(`${path}: matches a forbidden shape ${JSON.stringify(schema.not)}`);
+  }
   if (typeof value === "string") {
     if (schema.minLength !== undefined && value.length < schema.minLength) {
       errors.push(`${path}: shorter than ${schema.minLength}`);

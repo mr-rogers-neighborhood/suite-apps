@@ -8,7 +8,7 @@ steps live in [the pack authoring reference](../../../docs/reference/pack-author
   `documents` entry declares the snapshot format at `SCHEMA_VERSION` from `@suite/budget-core`.
 - `src/` holds the prelude and the bridge, with their tests. `src/PackRender.test.tsx` mounts Budget's
   own renderer over the prelude and exercises the library, an open document, and export/import.
-- `vite.config.ts` builds into `legacy/budget/.dev/pack`, outside this source tree.
+- `vite.config.ts` builds into `packs/budget/.dev/pack`, outside this source tree.
 - `pnpm --dir ../.. run budget:pack` builds and signs the archive.
 
 Nothing generated belongs here: `node scripts/pack-shape.mjs` fails the gate if a `dist/` or

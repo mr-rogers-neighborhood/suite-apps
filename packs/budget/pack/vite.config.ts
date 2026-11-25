@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 /**
- * Builds Budget's own renderer and the pack prelude into `legacy/budget/.dev/pack`.
+ * Builds Budget's own renderer and the pack prelude into `packs/budget/.dev/pack`.
  *
  * The normal Electron build writes `legacy/budget/out`, so this config owns a
  * directory of its own and never repoints `electron-vite`. Both the app and the
@@ -18,7 +18,7 @@ import { defineConfig } from "vite";
  * in it.
  */
 const packRoot = fileURLToPath(new URL(".", import.meta.url));
-const outputRoot = new URL("../../../legacy/budget/.dev/", import.meta.url);
+const outputRoot = new URL("../.dev/", import.meta.url);
 const renderer = fileURLToPath(new URL("../../../legacy/budget/src/renderer/src", import.meta.url));
 const core = fileURLToPath(new URL("../../../legacy/budget/packages/core/src/index.ts", import.meta.url));
 

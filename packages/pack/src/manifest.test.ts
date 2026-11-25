@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PackCapability } from "./capabilities.js";
 import {
   canonicalManifestBytes,
+  DEFAULT_PACK_RING,
   isSafePackPath,
   PACK_CONTRACT_VERSION,
   PACK_FORMAT,
@@ -9,10 +10,18 @@ import {
   type PackManifestCore,
   packAllows,
   packFitsHost,
+  packMinimumHost,
+  packRing,
   parsePackManifest,
   parsePackManifestJson,
 } from "./manifest.js";
-import { digestPackFiles, generatePackKeyPair, sha256Hex, signPackManifest } from "./signature.js";
+import {
+  digestPackFiles,
+  generatePackKeyPair,
+  sha256Hex,
+  signPackManifest,
+  verifyPackSignature,
+} from "./signature.js";
 
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
@@ -45,7 +54,8 @@ function manifest(overrides: Record<string, unknown> = {}): Record<string, unkno
 function everyOptionalField(): Record<string, unknown> {
   return {
     description: "A local-first chart pack.",
-    minimumHostVersion: 2,
+    ring: "preview",
+    minHost: 2,
     publisher: { key: "A".repeat(44), id: "suite" },
     optionalCapabilities: ["notifications"],
     documents: [
@@ -361,9 +371,10 @@ describe("canonical manifest bytes", () => {
       "name",
       "description",
       "version",
+      "ring",
       "entry",
       "contractVersion",
-      "minimumHostVersion",
+      "minHost",
       "publisher",
       "capabilities",
       "optionalCapabilities",
@@ -404,6 +415,8 @@ describe("canonical manifest bytes", () => {
     const canonical = canonicalJson(parsed.value);
     for (const field of [
       "description",
+      "ring",
+      "minHost",
       "minimumHostVersion",
       "publisher",
       "optionalCapabilities",
@@ -514,6 +527,268 @@ describe("manifest JSON text", () => {
     expect(await sha256Hex(secondBytes)).toBe(await sha256Hex(firstBytes));
     // Ed25519 is deterministic per RFC 8032: the same bytes and key are the same signature.
     expect(second.signature).toBe(first.signature);
+  });
+});
+
+describe("rings and the host floor", () => {
+  // spec: S3.11
+  it("defaults an absent ring to stable and an absent floor to none", () => {
+    const value = parsePackManifest(manifest());
+    expect(value.ok).toBe(true);
+    if (!value.ok) return;
+
+    // The default is read, never written: a manifest that carries neither field
+    // signs the same bytes it would have before the fields existed.
+    expect(value.value.ring).toBeUndefined();
+    expect(value.value.minHost).toBeUndefined();
+    expect(packRing(value.value)).toBe(DEFAULT_PACK_RING);
+    expect(packMinimumHost(value.value)).toBeUndefined();
+    expect(DEFAULT_PACK_RING).toBe("stable");
+
+    const canonical = canonicalJson(value.value);
+    expect(canonical).not.toHaveProperty("ring");
+    expect(canonical).not.toHaveProperty("minHost");
+  });
+
+  // spec: S3.11
+  it("refuses an unknown ring, including a host channel name", () => {
+    for (const ring of ["nightly", "slop", "beta", "Stable", ""]) {
+      const value = parsePackManifest(manifest({ ring }));
+      expect(value.ok, ring).toBe(false);
+      if (value.ok) continue;
+      expect(value.issues.map((issue) => issue.path)).toContain("ring");
+      expect(value.issues[0]?.message).toContain('"stable" or "preview"');
+      expect(value.issues[0]?.message).toContain("host property");
+      // The refusal echoes the value the author wrote, so it can be found.
+      expect(value.issues[0]?.message).toContain(JSON.stringify(ring));
+    }
+  });
+
+  // spec: S3.11
+  it("accepts either spelling of the host floor and refuses both together", () => {
+    const current = parsePackManifest(manifest({ minHost: 3 }));
+    expect(current.ok).toBe(true);
+    if (current.ok) expect(packMinimumHost(current.value)).toBe(3);
+
+    const legacy = parsePackManifest(manifest({ minimumHostVersion: 3 }));
+    expect(legacy.ok).toBe(true);
+    if (legacy.ok) expect(packMinimumHost(legacy.value)).toBe(3);
+
+    for (const spelling of ["minHost", "minimumHostVersion"] as const) {
+      for (const floor of [0, -1, 1.5, "3"]) {
+        const value = parsePackManifest(manifest({ [spelling]: floor }));
+        expect(value.ok, `${spelling} ${String(floor)}`).toBe(false);
+        if (value.ok) continue;
+        expect(value.issues.map((issue) => issue.path)).toContain(spelling);
+        expect(value.issues[0]?.message).toContain(JSON.stringify(floor));
+        expect(value.issues[0]?.message).toContain("1 or more");
+      }
+    }
+
+    const both = parsePackManifest(manifest({ minHost: 3, minimumHostVersion: 3 }));
+    expect(both.ok).toBe(false);
+    if (both.ok) return;
+    expect(both.issues.map((issue) => issue.path)).toContain("minHost");
+    expect(both.issues[0]?.message).toContain("carry one spelling, not both");
+    expect(both.issues[0]?.message).toContain("(3)");
+  });
+
+  // spec: S3.11
+  it("refuses a duplicate ring or floor key before parsing it", () => {
+    const withRing = JSON.stringify(manifest({ ring: "stable" })).replace(
+      '"ring":"stable"',
+      '"ring":"stable","ring":"preview"',
+    );
+    expect(parsePackManifestJson(withRing)).toEqual({
+      ok: false,
+      issues: [{ path: "ring", message: 'duplicate key "ring"' }],
+    });
+
+    const withFloor = JSON.stringify(manifest({ minHost: 1 })).replace(
+      '"minHost":1',
+      '"minHost":1,"minHost":2',
+    );
+    expect(parsePackManifestJson(withFloor)).toEqual({
+      ok: false,
+      issues: [{ path: "minHost", message: 'duplicate key "minHost"' }],
+    });
+  });
+
+  // spec: S3.12
+  it("refuses a host below the floor and a ring the host does not offer", () => {
+    const floored = parsePackManifest(manifest({ minHost: 3 }));
+    expect(floored.ok).toBe(true);
+    if (!floored.ok) return;
+    expect(packFitsHost(floored.value, { contractVersion: 1, hostVersion: 2 })).toEqual({
+      ok: false,
+      reason: "host",
+      message: "Canvas needs host 3; this host is 2.",
+    });
+    expect(packFitsHost(floored.value, { contractVersion: 1, hostVersion: 3 })).toEqual({
+      ok: true,
+    });
+
+    const preview = parsePackManifest(manifest({ ring: "preview" }));
+    expect(preview.ok).toBe(true);
+    if (!preview.ok) return;
+    expect(packFitsHost(preview.value, { contractVersion: 1, hostVersion: 1 })).toEqual({
+      ok: false,
+      reason: "ring",
+      message: "Canvas is a preview ring pack; this host offers stable.",
+    });
+    expect(
+      packFitsHost(preview.value, {
+        contractVersion: 1,
+        hostVersion: 1,
+        rings: ["stable", "preview"],
+      }),
+    ).toEqual({ ok: true });
+
+    const stable = parsePackManifest(manifest());
+    expect(stable.ok).toBe(true);
+    if (stable.ok) {
+      expect(
+        packFitsHost(stable.value, {
+          contractVersion: 1,
+          hostVersion: 1,
+          rings: ["preview"],
+        }),
+      ).toEqual({
+        ok: false,
+        reason: "ring",
+        message: "Canvas is a stable ring pack; this host offers preview.",
+      });
+
+      // A host that offers nothing refuses everything, with a readable sentence.
+      expect(packFitsHost(stable.value, { contractVersion: 1, hostVersion: 1, rings: [] })).toEqual(
+        {
+          ok: false,
+          reason: "ring",
+          message: "Canvas is a stable ring pack; this host offers no ring.",
+        },
+      );
+    }
+  });
+
+  // spec: S3.12
+  it("checks the contract, then the floor, then the ring", () => {
+    const all = parsePackManifest(manifest({ contractVersion: 9, minHost: 9, ring: "preview" }));
+    expect(all.ok).toBe(true);
+    if (!all.ok) return;
+
+    expect(packFitsHost(all.value, { contractVersion: 1, hostVersion: 1 })).toEqual({
+      ok: false,
+      reason: "contract",
+      message: "Canvas needs pack contract 9; this host implements 1.",
+    });
+    expect(packFitsHost(all.value, { contractVersion: 9, hostVersion: 1 })).toEqual({
+      ok: false,
+      reason: "host",
+      message: "Canvas needs host 9; this host is 1.",
+    });
+    expect(
+      packFitsHost(all.value, { contractVersion: 9, hostVersion: 9, rings: ["stable"] }),
+    ).toEqual({
+      ok: false,
+      reason: "ring",
+      message: "Canvas is a preview ring pack; this host offers stable.",
+    });
+    expect(
+      packFitsHost(all.value, {
+        contractVersion: 9,
+        hostVersion: 9,
+        rings: ["stable", "preview"],
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  // spec: S3.3
+  // spec: S3.11
+  it("signs a manifest with a ring and a floor, and a changed ring breaks the signature", async () => {
+    const keys = await generatePackKeyPair();
+    const parsed = parsePackManifest(
+      manifest({
+        ring: "preview",
+        minHost: 2,
+        publisher: { key: keys.publicKeyBase64, id: "suite" },
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const { signature: _unsigned, ...core } = parsed.value;
+    const signature = signPackManifest(core, keys.secretKeyBase64);
+    const text = JSON.stringify({ ...core, signature });
+
+    const signed = parsePackManifestJson(text);
+    expect(signed.ok).toBe(true);
+    if (!signed.ok) return;
+    expect(signed.value.ring).toBe("preview");
+    expect(packMinimumHost(signed.value)).toBe(2);
+    expect(await verifyPackSignature(signed.value, keys.publicKeyBase64)).toBe(true);
+
+    // The ring is inside the signed bytes: promoting it under the same version
+    // is a different document and the old signature no longer verifies.
+    const promoted = parsePackManifestJson(JSON.stringify({ ...core, ring: "stable", signature }));
+    expect(promoted.ok).toBe(true);
+    if (!promoted.ok) return;
+    expect(await verifyPackSignature(promoted.value, keys.publicKeyBase64)).toBe(false);
+
+    const raised = parsePackManifestJson(JSON.stringify({ ...core, minHost: 3, signature }));
+    expect(raised.ok).toBe(true);
+    if (!raised.ok) return;
+    expect(await verifyPackSignature(raised.value, keys.publicKeyBase64)).toBe(false);
+
+    // The older spelling signs and verifies the same way, under its own key.
+    const legacyCore = { ...core, minimumHostVersion: 2 } as typeof core;
+    delete (legacyCore as { minHost?: number }).minHost;
+    const legacySignature = signPackManifest(legacyCore, keys.secretKeyBase64);
+    const legacy = parsePackManifestJson(
+      JSON.stringify({ ...legacyCore, signature: legacySignature }),
+    );
+    expect(legacy.ok).toBe(true);
+    if (!legacy.ok) return;
+    expect(packMinimumHost(legacy.value)).toBe(2);
+    expect(await verifyPackSignature(legacy.value, keys.publicKeyBase64)).toBe(true);
+  });
+
+  // spec: S3.3
+  // spec: S3.11
+  it("keeps the canonical bytes of a manifest without a ring or floor unchanged", async () => {
+    const parsed = parsePackManifest(manifest());
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const bytes = canonicalManifestBytes(parsed.value);
+    // The digest this fixture produced before `ring` and `minHost` existed. An
+    // optional field that is absent contributes no key, so the signature of a
+    // pack signed earlier still verifies.
+    expect(await sha256Hex(bytes)).toBe(
+      "304cafc1a07d430060d2455579d5fa8df314fdb7cfc2c09851fe81ee26415a2d",
+    );
+
+    // The fields are signed in the schema's order when present, and the rest of
+    // the document does not move around them.
+    const withFields = parsePackManifest(manifest({ ring: "preview", minHost: 2 }));
+    expect(withFields.ok).toBe(true);
+    if (!withFields.ok) return;
+    const canonical = canonicalJson(withFields.value);
+    const keys = Object.keys(canonical);
+    expect(keys[keys.indexOf("version") + 1]).toBe("ring");
+    expect(keys[keys.indexOf("contractVersion") + 1]).toBe("minHost");
+    expect(canonical.ring).toBe("preview");
+    expect(canonical.minHost).toBe(2);
+    expect(await sha256Hex(canonicalManifestBytes(withFields.value))).not.toBe(
+      await sha256Hex(bytes),
+    );
+
+    // The older spelling is signed in its own slot, after `minHost`.
+    const legacy = parsePackManifest(manifest({ minimumHostVersion: 2 }));
+    expect(legacy.ok).toBe(true);
+    if (!legacy.ok) return;
+    const legacyKeys = Object.keys(canonicalJson(legacy.value));
+    expect(legacyKeys[legacyKeys.indexOf("contractVersion") + 1]).toBe("minimumHostVersion");
+    expect(legacyKeys).not.toContain("minHost");
   });
 });
 

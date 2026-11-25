@@ -16,7 +16,7 @@ steps live in [the pack authoring reference](../../../docs/reference/pack-author
   was closed and while it is open, and copy a person-chosen folder into the pack's own root.
 - `src/PackRender.test.tsx` mounts Canvas's own renderer over the same services the shell's preload
   exposes and opens a board, edits it, saves it, exports it and re-imports it.
-- `vite.config.ts` builds into `legacy/canvas/.dev/pack`, outside this source tree.
+- `vite.config.ts` builds into `packs/canvas/.dev/pack`, outside this source tree.
 - `pnpm canvas:pack` builds and signs the archive.
 
 Nothing generated belongs here: `node scripts/pack-shape.mjs` fails the gate if a `dist/` or

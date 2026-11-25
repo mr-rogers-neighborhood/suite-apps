@@ -6,7 +6,7 @@ import { defineConfig } from "vite";
 import wasm from "vite-plugin-wasm";
 
 /**
- * Builds Planner's own renderer and its bridge into `legacy/planner/.dev/pack`.
+ * Builds Planner's own renderer and its bridge into `packs/planner/.dev/pack`.
  *
  * The normal Electron build writes `legacy/planner/out`, so this config owns a directory of its own
  * and never repoints `electron-vite`. The entry is the pack's page: it loads `src/main.ts`, which
@@ -17,7 +17,7 @@ import wasm from "vite-plugin-wasm";
  * `scripts/pack-shape.mjs` fails the gate if a generated directory appears in it.
  */
 const packRoot = fileURLToPath(new URL(".", import.meta.url));
-const outputRoot = new URL("../../../legacy/planner/.dev/", import.meta.url);
+const outputRoot = new URL("../.dev/", import.meta.url);
 
 export default defineConfig({
   root: packRoot,

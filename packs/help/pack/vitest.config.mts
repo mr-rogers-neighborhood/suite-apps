@@ -12,7 +12,7 @@ export default defineConfig({
   // under `pack/`. Pin the root so `include` stays pack-only, and keep Vitest's cache with the build
   // output.
   root: packRoot,
-  cacheDir: fileURLToPath(new URL("../../../legacy/help/.dev/vitest", import.meta.url)),
+  cacheDir: fileURLToPath(new URL("../.dev/vitest", import.meta.url)),
   plugins: [fumadocsMdx(), react()],
   resolve: {
     alias: [

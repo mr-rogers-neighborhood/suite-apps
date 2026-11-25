@@ -143,14 +143,14 @@ mise exec -- pnpm canvas:pack [--key <base64>] [--out <file.suitepack>] [--versi
 ```
 
 `scripts/budget-pack.mjs` builds Budget's own renderer and its prelude into
-`legacy/budget/.dev/pack`, puts the prelude in front of the app script, and signs the directory with
+`packs/budget/.dev/pack`, puts the prelude in front of the app script, and signs the directory with
 the pinned key. `scripts/planner-pack.mjs` builds Planner's renderer and its bridge into
-`legacy/planner/.dev/pack` and signs that directory; its entry is one module, so it needs no script
-injection. `scripts/canvas-pack.mjs` builds Canvas's renderer and bridge into `legacy/canvas/.dev/pack`
+`packs/planner/.dev/pack` and signs that directory; its entry is one module, so it needs no script
+injection. `scripts/canvas-pack.mjs` builds Canvas's renderer and bridge into `packs/canvas/.dev/pack`
 and signs that directory the same way, with Excalidraw's fonts beside the assets. All three signed
 manifests carry the source manifest's `documents` declaration, so the host stamps the schema version
-the app's core writes. The default outputs are `legacy/budget/.dev/budget-<version>.suitepack`,
-`legacy/planner/.dev/planner-<version>.suitepack` and `legacy/canvas/.dev/canvas-<version>.suitepack`.
+the app's core writes. The default outputs are `packs/budget/.dev/budget-<version>.suitepack`,
+`packs/planner/.dev/planner-<version>.suitepack` and `packs/canvas/.dev/canvas-<version>.suitepack`.
 The gate runs each signed round-trip with an ephemeral key, so a clean checkout with no owner key
 still proves the build and verification path.
 
