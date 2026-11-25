@@ -1,5 +1,5 @@
 {
-  "name": "@suite/import-obsidian",
+  "name": "@suite/graph",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,16 +18,20 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --testTimeout=15000",
+    "test:coverage": "vitest run --coverage --coverage.include=src/** --testTimeout=15000"
   },
   "dependencies": {
-    "@suite/graph": "workspace:*",
+    "loro-crdt": "^1.17.1",
     "neverthrow": "^8.2.0",
-    "yaml": "^2.9.1",
+    "remeda": "^2.54.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "loro-crdt-1-16": "npm:loro-crdt@1.16.4",
+    "@vitest/coverage-v8": "5.0.5",
+    "fast-check": "^4.10.2",
     "typescript": "~5.9.3",
     "vitest": "5.0.5"
   }

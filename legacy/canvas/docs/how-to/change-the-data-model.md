@@ -13,20 +13,20 @@ subsets are listed at the end.
 
 | Change | Needs a schema bump | First file to edit |
 | --- | --- | --- |
-| A new optional leaf on an existing record | no | `packages/graph/src/schema.ts` |
-| A new nested map or set inside a record | no | `packages/graph/src/schema.ts` |
-| A new record kind under an existing root | no | `packages/graph/src/schema.ts` |
-| A new root | yes, and a facade constant | `packages/graph/src/loro/keys.ts` |
+| A new optional leaf on an existing record | no | `packs/canvas/packages/graph/src/schema.ts` |
+| A new nested map or set inside a record | no | `packs/canvas/packages/graph/src/schema.ts` |
+| A new record kind under an existing root | no | `packs/canvas/packages/graph/src/schema.ts` |
+| A new root | yes, and a facade constant | `packs/canvas/packages/graph/src/loro/keys.ts` |
 | An existing field changes meaning or type | yes | update `docs/reference/decisions.md` first |
 
-`SCHEMA_VERSION` in `packages/graph/src/loro/constants.ts` is the version of the document shape, currently
+`SCHEMA_VERSION` in `packs/canvas/packages/graph/src/loro/constants.ts` is the version of the document shape, currently
 `6`. It moves when a document written by this build can no longer be read by the previous one, or when an
 old value means something new. Adding an optional field does not move it, because the previous build ignores
 a key it does not know.
 
 ## 1. Describe the record
 
-`packages/graph/src/schema.ts` is the only description of the shape, and the TypeScript type is inferred
+`packs/canvas/packages/graph/src/schema.ts` is the only description of the shape, and the TypeScript type is inferred
 from it.
 
 ```ts
@@ -45,15 +45,15 @@ on, so a `undefined` write is not the same as no key: the writer deletes the key
 Run the schema tests while editing:
 
 ```sh
-pnpm exec vitest run packages/graph/src/schema.test.ts
+pnpm exec vitest run packs/canvas/packages/graph/src/schema.test.ts
 ```
 
-Add a parse case and a reject case to `packages/graph/src/schema.test.ts`. A reject case that only checks
+Add a parse case and a reject case to `packs/canvas/packages/graph/src/schema.test.ts`. A reject case that only checks
 that something throws is not enough; assert which field the error names.
 
 ## 2. Read it back
 
-`packages/graph/src/records/` holds the one reader per record kind.
+`packs/canvas/packages/graph/src/records/` holds the one reader per record kind.
 
 | Record | Reader |
 | --- | --- |
@@ -71,11 +71,11 @@ card is turned into a complete shape.
 
 Test the reader beside the writer. When the case is "a document written before this field existed still
 opens", build the old shape with raw Loro in the test, as
-`packages/graph/src/loro/boardSectionTags.test.ts` does for a board stored before tags existed.
+`packs/canvas/packages/graph/src/loro/boardSectionTags.test.ts` does for a board stored before tags existed.
 
 ## 3. Write it
 
-Add the method to the module that owns the record under `packages/graph/src/loro/`: `boards.ts`, `edges.ts`,
+Add the method to the module that owns the record under `packs/canvas/packages/graph/src/loro/`: `boards.ts`, `edges.ts`,
 `placements.ts`, `sections.ts`, `tags.ts`, `cardTypes.ts`, `views.ts`, or `cards/` for anything on a card.
 
 ```ts
@@ -101,18 +101,18 @@ Rules that the review will ask about:
   already groups a gesture.
 - Validate at the write with the schema, as every other `set*` method does.
 
-Test it in the module's own test file. `packages/graph/src/loro/workspace.convergence.test.ts` and
-`packages/graph/src/merge.property.test.ts` show the two-document pattern: build the same document twice,
+Test it in the module's own test file. `packs/canvas/packages/graph/src/loro/workspace.convergence.test.ts` and
+`packs/canvas/packages/graph/src/merge.property.test.ts` show the two-document pattern: build the same document twice,
 apply the new write on one and a different write on the other, merge, and assert neither edit is lost.
 
 ## 4. Expose it on the facade
 
 `WorkspaceDocument.ts` delegates to the domain module. A card method goes on `CardsFacade` in
-`packages/graph/src/loro/facade/cards.ts`; everything else goes on the facade class.
+`packs/canvas/packages/graph/src/loro/facade/cards.ts`; everything else goes on the facade class.
 
 - A method that a canvas component calls needs a line here, spelled exactly as the domain module spells it.
-- A new domain module is composed in `packages/graph/src/loro/api.ts` and given a field on `DocApi`.
-- A type a caller outside the package needs is exported from `packages/graph/src/index.ts`.
+- A new domain module is composed in `packs/canvas/packages/graph/src/loro/api.ts` and given a field on `DocApi`.
+- A type a caller outside the package needs is exported from `packs/canvas/packages/graph/src/index.ts`.
 
 Then check the shape rules, which fail on a file over 900 lines, a second `WorkspaceDocument.observe` call
 site, or a raw Loro write outside the graph package:
@@ -127,18 +127,18 @@ Publishing a draft is a plan, so a field that a draft can edit needs the whole p
 
 | Step | File |
 | --- | --- |
-| Capture the value from the draft | `packages/graph/src/publish/snapshot.ts` |
-| Compare draft, baseline and source | `packages/graph/src/publish/planCards.ts` |
-| Reject a key the scope may not publish | `packages/graph/src/publish/planGuards.ts` |
-| Replay the captured value | `packages/graph/src/publish/apply.ts` |
-| Add a cap, if the field is bounded | `packages/graph/src/publish/validation/limits.ts` |
+| Capture the value from the draft | `packs/canvas/packages/graph/src/publish/snapshot.ts` |
+| Compare draft, baseline and source | `packs/canvas/packages/graph/src/publish/planCards.ts` |
+| Reject a key the scope may not publish | `packs/canvas/packages/graph/src/publish/planGuards.ts` |
+| Replay the captured value | `packs/canvas/packages/graph/src/publish/apply.ts` |
+| Add a cap, if the field is bounded | `packs/canvas/packages/graph/src/publish/validation/limits.ts` |
 
 `apply.ts` keeps one named applier per change kind, so a new kind is a new function and one line in the
 `APPLIERS` table.
 
-A field a projection must carry also travels through it: `packages/graph/src/projection/workspace.ts`
-for the selection, `packages/graph/src/projection/containers.ts` for text, and
-`packages/graph/src/projection/references.ts` for a reference that stays behind. A field left out of the
+A field a projection must carry also travels through it: `packs/canvas/packages/graph/src/projection/workspace.ts`
+for the selection, `packs/canvas/packages/graph/src/projection/containers.ts` for text, and
+`packs/canvas/packages/graph/src/projection/references.ts` for a reference that stays behind. A field left out of the
 projection is invisible to whoever receives it, and no error says so.
 
 ## 6. Repair documents already stored
@@ -151,7 +151,7 @@ repair method that is idempotent and safe to run on every client:
 - A renamed key: read both spellings in the reader, write the new one on the next edit.
 
 A test that builds the old shape with raw Loro is the proof, and a test file is the only place that may do
-it. `packages/graph/src/loro/boardSectionTags.test.ts` is the model: raw maps for the stored shape, then the
+it. `packs/canvas/packages/graph/src/loro/boardSectionTags.test.ts` is the model: raw maps for the stored shape, then the
 public read.
 
 ## 7. Verify and document
@@ -159,7 +159,7 @@ public read.
 ```sh
 pnpm exec vitest run --project graph
 pnpm --filter @suite/graph typecheck
-pnpm biome check packages/graph/src
+pnpm biome check packs/canvas/packages/graph/src
 node scripts/check-docs-symbols.mjs
 ```
 
@@ -175,8 +175,8 @@ A new record kind under an existing root: steps 1 to 4. Add `list*` and `get*` o
 a record nobody can list is not reachable by the canvas.
 
 A new root: add the key to `STRUCT_KEYS`, add it to `WorkspaceDocument.ROOT_KEYS`, open it in the facade
-constructor, and check `packages/graph/src/projection/apply.ts` and `packages/graph/src/portable.ts` for
+constructor, and check `packs/canvas/packages/graph/src/projection/apply.ts` and `packs/canvas/packages/graph/src/portable.ts` for
 anything that copies roots by name.
 
-A change to the reference index only: edit `packages/graph/src/loro/cards/references.ts`, keep the recompute
-`INDEX_ORIGIN`-tagged, and add a case to `packages/graph/src/references.test.ts`.
+A change to the reference index only: edit `packs/canvas/packages/graph/src/loro/cards/references.ts`, keep the recompute
+`INDEX_ORIGIN`-tagged, and add a case to `packs/canvas/packages/graph/src/references.test.ts`.

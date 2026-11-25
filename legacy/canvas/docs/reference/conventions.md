@@ -24,7 +24,7 @@ Zustand, and transient view state may live in React. Never keep a second copy.
 
 Folder by feature, not by file type:
 `src/{canvas,cards,chrome,command,field,library,panels,session,store,collab,editor,theme}`,
-`desktop/src/{main,preload,shared}`, and `packages/graph/src/loro/<domain>`.
+`desktop/src/{main,preload,shared}`, and `packs/canvas/packages/graph/src/loro/<domain>`.
 
 Each folder exposes one `index.ts` and nothing else as public surface. No barrel files that re-export
 everything. The facade (`WorkspaceDocument`) and the folder index are the API.
@@ -199,7 +199,7 @@ or land in the undo stack.
 
 ## Data layer
 
-Never mutate `WorkspaceDocument` internals from the UI. Add typed methods to `packages/graph` instead, and
+Never mutate `WorkspaceDocument` internals from the UI. Add typed methods to `packs/canvas/packages/graph` instead, and
 let every `set*` method validate with its Zod schema.
 
 Undo is split by scope: never add structural changes to an editor's history, and never put text in the
@@ -225,7 +225,7 @@ steps.
 
 ## Testing
 
-Unit-test pure logic in `packages/graph`: schema, records and the `WorkspaceDocument` domain modules.
+Unit-test pure logic in `packs/canvas/packages/graph`: schema, records and the `WorkspaceDocument` domain modules.
 
 Multi-client behaviour gets a two-document test. Drive both documents through conflicting edits, sync
 with `doc.export({ mode: "update" })` and `doc.import(...)` in both directions, then assert the merge.

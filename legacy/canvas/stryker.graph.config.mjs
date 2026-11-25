@@ -33,16 +33,16 @@ export default {
     related: false,
   },
   // Without this, vitest would discover the server and canvas projects too.
-  testFiles: ["packages/graph/src/**/*.test.ts"],
+  testFiles: ["packs/canvas/packages/graph/src/**/*.test.ts"],
 
   mutate: [
     // Publish planning and apply live under `publish/`; `merge.ts` is now only
     // a re-export barrel, so mutating it would score an empty file.
-    "packages/graph/src/publish/*.ts",
-    "packages/graph/src/projection.ts",
-    "packages/graph/src/search.ts",
-    "packages/graph/src/views.ts",
-    "packages/graph/src/sections.ts",
+    "packs/canvas/packages/graph/src/publish/*.ts",
+    "packs/canvas/packages/graph/src/projection.ts",
+    "packs/canvas/packages/graph/src/search.ts",
+    "packs/canvas/packages/graph/src/views.ts",
+    "packs/canvas/packages/graph/src/sections.ts",
   ],
 
   // Never copied into the sandbox: build output, coverage and Playwright

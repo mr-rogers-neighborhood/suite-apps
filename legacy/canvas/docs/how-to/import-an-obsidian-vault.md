@@ -15,7 +15,7 @@ There are three doors onto it and they share one importer:
 
 ## Read the vault
 
-`collectVaultFiles` in `packages/import-obsidian/src/drop.ts` walks the entries a drop hands over and returns
+`collectVaultFiles` in `packs/canvas/packages/import-obsidian/src/drop.ts` walks the entries a drop hands over and returns
 the shape the importer takes: paths relative to the dropped folder, with text for notes and canvases. Its
 entry types are structural, so a browser `FileSystemEntry` satisfies them without a cast.
 
@@ -65,7 +65,7 @@ spelling, so the input sets it through its `ref`.
 
 ## The mapping
 
-The table is data in `packages/import-obsidian/src/mapping.ts`, so a change to what the importer carries is a
+The table is data in `packs/canvas/packages/import-obsidian/src/mapping.ts`, so a change to what the importer carries is a
 change to one array, and the fixture vault's test walks it.
 
 | Source | Target | What travels |
@@ -120,7 +120,7 @@ colour the palette cannot name is listed under `colours.unmapped`.
 
 ## Test it
 
-The fixture vault in `packages/import-obsidian/fixtures/vault` covers a nested folder, frontmatter with tags
+The fixture vault in `packs/canvas/packages/import-obsidian/fixtures/vault` covers a nested folder, frontmatter with tags
 and custom keys, a wikilink to a note in the vault, a wikilink to a missing note, a canvas with all four node
 types and two edges, and an embedded image.
 

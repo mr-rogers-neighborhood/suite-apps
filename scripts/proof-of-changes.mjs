@@ -215,6 +215,8 @@ function buildLibraries() {
       "--filter",
       "./legacy/*/packages/*",
       "--filter",
+      "./packs/*/packages/*",
+      "--filter",
       "./services/*/packages/*",
       "--workspace-concurrency=2",
       "run",

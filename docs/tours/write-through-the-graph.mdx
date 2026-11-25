@@ -12,52 +12,52 @@ committed once, saved as a snapshot, and read back by the test that proves a
 reload. The store and the file authority are single stops; their module notes own
 their state and actions.
 
-## legacy/canvas/packages/graph/src/schema.ts#cardSchema
+## packs/canvas/packages/graph/src/schema.ts#cardSchema
 
 Every write below ends on a card, so the schema is the first stop: it is the only
 description of the record. A field that is not accepted here cannot survive a
 read, whatever a writer puts on the map.
 
-## legacy/canvas/packages/graph/src/workspaceFile.ts#workspaceFileSchema
+## packs/canvas/packages/graph/src/workspaceFile.ts#workspaceFileSchema
 
 A record only matters if it survives the file, and the envelope is the boundary
 between a document and the bytes on disk. The Graph module note owns the version
 rules; the stop is here because this is the contract a reload has to satisfy.
 
-## legacy/canvas/packages/graph/src/workspaceTemplate.ts#STARTER_TEMPLATES
+## packs/canvas/packages/graph/src/workspaceTemplate.ts#STARTER_TEMPLATES
 
 A new workspace starts from authored data instead of a constructor, and the data
 parses at import time. Starting the tour from a template gives the rest of the
 path a real, valid first write rather than a hand-built fixture.
 
-## legacy/canvas/packages/graph/src/workspaceTemplate.ts#applyWorkspaceTemplate
+## packs/canvas/packages/graph/src/workspaceTemplate.ts#applyWorkspaceTemplate
 
 The template reaches the document through the same facade a person uses: boards
 first, then sections and cards, then portals and edges, then pictures. The stop
 proves the write path is not privileged, and that the whole copy can leave one
 undo step.
 
-## legacy/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument
+## packs/canvas/packages/graph/src/loro/WorkspaceDocument.ts#WorkspaceDocument
 
 The typed entry point. From here a caller names a record and an operation; the
 facade decides which domain writes it. The Graph / Loro module note owns the
 facade's shape and its construction rule.
 
-## legacy/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.createCard
+## packs/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.createCard
 
 The first real write. It validates the record, creates the title and body
 containers, copies the type's template and places the card. A card built by hand
 instead is how a record ends up without containers or without its template
 content.
 
-## legacy/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.setProperty
+## packs/canvas/packages/graph/src/loro/facade/cards.ts#CardsFacade.setProperty
 
 A later edit is field-level rather than a whole-card replace. The invariant is
 that two people editing different properties keep both writes; the read-only
 refusal is a second rule on the same call, which is why the app and the reader go
 through one writer.
 
-## legacy/canvas/packages/graph/src/loro/context.ts#DocContext.commit
+## packs/canvas/packages/graph/src/loro/context.ts#DocContext.commit
 
 The write becomes one change. The commit's origin is also the change message, so
 one gesture is one undo step and one history point. A write that commits inside
@@ -83,7 +83,7 @@ The file authority. It assembles the envelope, keeps the lock and writes
 atomically; the renderer never touches the path. This is where the document stops
 being a CRDT and becomes the bytes a backup can hold.
 
-## legacy/canvas/packages/graph/src/workspaceFile.test.ts
+## packs/canvas/packages/graph/src/workspaceFile.test.ts
 
 The reload contract. The test creates a file, reads it into a fresh document and
 checks that the board, card and tag still exist; the other cases pin the refusals

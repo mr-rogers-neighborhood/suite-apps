@@ -13,13 +13,15 @@ hosts/
   desk/         @suite/desk host: one window, sandboxed packs, space document
   go/           @suite/go-app mobile container; packages/go contract; docs
 legacy/
-  canvas/       @suite/canvas renderer; desktop/ shell;
-                packages/graph, packages/import-obsidian; e2e, docs, handbook, internal
+  canvas/       @suite/canvas shell and build; desktop/ Electron shell;
+                e2e, docs, handbook, internal
   planner/      @suite/planner desktop app; docs (renderer and core live outside)
   budget/       @suite/budget desktop app; docs (core lives in the pack)
   help/         @suite/help Electron shell for the documentation app
 packs/
-  canvas/pack/  Canvas pack source
+  canvas/pack/  Canvas pack prelude and bridge
+  canvas/src/   Canvas renderer shared with the shell
+  canvas/packages/ Canvas's private graph and import-obsidian packages
   planner/pack/ Planner pack source
   budget/pack/  Budget pack source
   budget/packages/core/ Budget's core document layer, owned by the pack
@@ -47,11 +49,11 @@ also owns the overrides, patches and build permissions the apps need.
 
 | Package | Directory | Owner |
 | --- | --- | --- |
-| `@suite/canvas` | `legacy/canvas` | Canvas renderer |
+| `@suite/canvas` | `legacy/canvas` | Canvas shell and build |
 | `@suite/canvas-pack` | `packs/canvas` | Canvas pack build |
 | `@suite/canvas-desktop` | `legacy/canvas/desktop` | Canvas Electron shell |
-| `@suite/graph` | `legacy/canvas/packages/graph` | Canvas schema and document layer |
-| `@suite/import-obsidian` | `legacy/canvas/packages/import-obsidian` | Canvas import |
+| `@suite/graph` | `packs/canvas/packages/graph` | Canvas schema and document layer |
+| `@suite/import-obsidian` | `packs/canvas/packages/import-obsidian` | Canvas import |
 | `@suite/planner` | `legacy/planner` | Planner |
 | `@suite/planner-pack` | `packs/planner` | Planner pack build |
 | `@suite/planner-core` | `packages/planner-core` | Planner schema and document layer |
@@ -80,7 +82,7 @@ also owns the overrides, patches and build permissions the apps need.
 
 ## App-private and shared
 
-An app's private packages stay with it: `legacy/canvas/packages/graph` is Canvas's, even though it is a
+An app's private packages stay with it: `packs/canvas/packages/graph` is Canvas's, even though it is a
 workspace package. Only `@suite/contracts`, `@suite/files`, `@suite/document-runtime`,
 `@suite/screens`, `@suite/desktop`, `@suite/theme`, `@suite/ui`, `@suite/pack`,
 `@suite/pack-runtime` and `@suite/pack-host` are shared; they live at the root.

@@ -28,7 +28,7 @@
       "entry": ["scripts/*.mjs", "index.html", "src/main.tsx"],
       "project": ["scripts/*.mjs", "src/**/*.{ts,tsx}"]
     },
-    "packages/graph": {
+    "../packs/canvas/packages/graph": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
     },

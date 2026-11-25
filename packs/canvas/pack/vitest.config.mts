@@ -9,10 +9,10 @@ const require = createRequire(import.meta.url);
 const reactDir = dirname(require.resolve("react/package.json"));
 const reactDomDir = dirname(require.resolve("react-dom/package.json"));
 const graph = fileURLToPath(
-  new URL("../../../legacy/canvas/packages/graph/src/index.ts", import.meta.url),
+  new URL("../packages/graph/src/index.ts", import.meta.url),
 );
 const importer = fileURLToPath(
-  new URL("../../../legacy/canvas/packages/import-obsidian/src/index.ts", import.meta.url),
+  new URL("../packages/import-obsidian/src/index.ts", import.meta.url),
 );
 const runtime = fileURLToPath(
   new URL("../../../packages/pack-runtime/src/index.ts", import.meta.url),

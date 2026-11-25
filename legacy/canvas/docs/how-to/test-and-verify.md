@@ -80,7 +80,7 @@ refactor without a behaviour change is testing the implementation, and belongs r
 
 A test file past about 400 lines is split at its next change rather than in a sweep. Three are over
 that line today: `src/library/LibraryDrawer.test.tsx`,
-`packages/graph/src/merge.test.ts` and `src/cards/CardPanel.test.tsx`.
+`packs/canvas/packages/graph/src/merge.test.ts` and `src/cards/CardPanel.test.tsx`.
 
 ## Coverage and mutation
 

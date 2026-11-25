@@ -5,10 +5,8 @@
     "jsx": "react-jsx",
     "types": ["node", "vite/client"],
     "paths": {
-      "@suite/graph": ["../../../legacy/canvas/packages/graph/src/index.ts"],
-      "@suite/import-obsidian": [
-        "../../../legacy/canvas/packages/import-obsidian/src/index.ts"
-      ],
+      "@suite/graph": ["../packages/graph/src/index.ts"],
+      "@suite/import-obsidian": ["../packages/import-obsidian/src/index.ts"],
       "@suite/pack-runtime": ["../../../packages/pack-runtime/src/index.ts"],
       "@suite/sync": ["../../../services/relay/packages/protocol/src/index.ts"],
       "@suite/ui": ["../../../packages/ui/src/index.ts"]

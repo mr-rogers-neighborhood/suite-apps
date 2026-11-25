@@ -20,7 +20,7 @@ Anchors:
 
 - Planner core: `packages/planner-core/src/loro/`
 - Budget core: `packs/budget/packages/core/src/loro/`
-- Canvas graph: `legacy/canvas/packages/graph/src/loro/`
+- Canvas graph: `packs/canvas/packages/graph/src/loro/`
 - Shared replica/store: `packages/document-runtime/src/replica.ts`, `src/node/store.ts`
 - Shape checks: `legacy/{planner,budget,canvas}/scripts/check-shape.mjs`
 
@@ -29,7 +29,7 @@ Anchors:
 - One writer per workspace. The main process owns the authoritative document in Planner and
   Budget; the renderer is a replica and forwards updates.
 - No raw Loro import outside the document package. Canvas: no raw writes to graph roots outside
-  `packages/graph`.
+  `packs/canvas/packages/graph`.
 - Document truth never lives in Zustand, React state, or `localStorage`. Those hold UI state only.
 - Only the declared observe site calls `observe()`. Do not add a second one.
 - Parse every record with Zod on read and write. Write only the changed keys on a mergeable map so

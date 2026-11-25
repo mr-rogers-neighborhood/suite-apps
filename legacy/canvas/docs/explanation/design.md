@@ -6,7 +6,7 @@ Two rules decide most questions here. The document is the only source of truth, 
 
 ## The document
 
-`WorkspaceDocument` in `packages/graph/src/loro/` wraps a single `LoroDoc`. Inside it, `cards`, `boards`, `placements`, `sections`, `types`, `tags`, `edges`, `views` and the per-card `titles` and `content` containers are Loro maps, keyed by id. Loro merges concurrent edits, and every write goes through a Zod-validated method on that wrapper, so no component touches raw CRDT calls.
+`WorkspaceDocument` in `packs/canvas/packages/graph/src/loro/` wraps a single `LoroDoc`. Inside it, `cards`, `boards`, `placements`, `sections`, `types`, `tags`, `edges`, `views` and the per-card `titles` and `content` containers are Loro maps, keyed by id. Loro merges concurrent edits, and every write goes through a Zod-validated method on that wrapper, so no component touches raw CRDT calls.
 
 Field granularity is what makes that merge useful. A property write sets one key in `card.properties`, a section move writes `x` and `y`, a tag add writes one key. A whole-record write would turn every unrelated concurrent edit into a last-write-wins conflict that nobody sees happen.
 
@@ -55,7 +55,7 @@ One board can be named by portals on several boards, and by more than one portal
 | Document split | Waiting on a benchmark: one index document plus per-card documents, with the crash and undo costs above |
 | Search | An in-memory index over summaries first; body search would load card documents, because a central index conflicts with per-card access and offline use |
 | Card document retention | Trash retains content and purge tombstones first, while an offline client may still resurrect a purged record |
-| Publishing | Serving a workspace as a site, with routes, slugs and navigation, is not built; the draft plan in `packages/graph/src/publish/` has no surface yet |
+| Publishing | Serving a workspace as a site, with routes, slugs and navigation, is not built; the draft plan in `packs/canvas/packages/graph/src/publish/` has no surface yet |
 
 ## Judging a proposal
 

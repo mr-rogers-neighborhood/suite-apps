@@ -22,6 +22,7 @@ const SOURCE_ROOTS = [
   "src",
   "../../packs/canvas/pack",
   "../../packs/canvas/src",
+  "../../packs/canvas/packages",
   "legacy/collab-server/src",
   "legacy/control-plane/src",
   "services",
@@ -147,7 +148,7 @@ for (const file of files) {
           `Subscribe through the snapshot store.`,
       );
     }
-    if (!rel.startsWith("packages/graph/")) {
+    if (!rel.startsWith("../../packs/canvas/packages/graph/")) {
       for (const match of line.matchAll(RAW_WRITE)) {
         problems.push(
           `${rel}:${index + 1}: raw Loro write to \`${match[1]}\`. ` +

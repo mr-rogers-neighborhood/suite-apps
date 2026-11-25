@@ -53,7 +53,7 @@ A click on a card's title or body starts editing, rather than a double-click. Do
 
 That one press does two things: it puts the caret where it landed and opens the inspector beside it. The edit used to stop the click before the second half happened, which left the panel reachable only from a press on the card's frame. The toolbar's `interactionMode` decides between the halves — see [ui.md](./ui.md#what-a-press-on-a-card-does).
 
-`packages/graph/src/publish/validation/richTextSchema.ts` is the allowlist a published body is checked against: node names, mark names and the attributes each node may carry. Adding a node or an attribute to the editor without extending it fails `editorSchemaContract.test.ts`, which is the point.
+`packs/canvas/packages/graph/src/publish/validation/richTextSchema.ts` is the allowlist a published body is checked against: node names, mark names and the attributes each node may carry. Adding a node or an attribute to the editor without extending it fails `editorSchemaContract.test.ts`, which is the point.
 
 A publish validates against that allowlist because a share projection copies content into a different document. The mentions and blocks in a shared body resolve against the copy, so a chip can point at a card the viewer cannot open; those render as inert with the title the projection kept.
 
@@ -121,7 +121,7 @@ what type a card is skips the check rather than refusing a value the document al
 
 `embed` shows one card inside another. It stores the other card's id and the size the reader dragged it to, and nothing else, so the figure follows edits and can never hold a stale copy.
 
-`resolveEmbed` in `packages/graph/src/embedPlan.ts` decides what to draw before anything does: whether the card is visible to this reader, whether it still exists, and whether it is already on screen above. It is a pure function rather than a rule inside the node view, so a loop stops in one testable place. One level renders, and a deeper embed resolves to a labelled stub, because two cards embedding each other is one click away.
+`resolveEmbed` in `packs/canvas/packages/graph/src/embedPlan.ts` decides what to draw before anything does: whether the card is visible to this reader, whether it still exists, and whether it is already on screen above. It is a pure function rather than a rule inside the node view, so a loop stops in one testable place. One level renders, and a deeper embed resolves to a labelled stub, because two cards embedding each other is one click away.
 
 Each kind draws as itself, decided by `resolveEmbed` rather than by the node view: a sketch draws its
 drawing through `WhiteboardPreview`, a portal draws `BoardMiniature` of the board it opens, and everything
@@ -146,7 +146,7 @@ Nothing about the read path formats a field by hand. Values go through `formatPr
 
 A field is a `FieldDefinition`: id, name, kind, required flag, order, select options, optional sub-fields and the rating scale. Definitions belong to a type. Values belong to a card, in `card.properties`, keyed by field id.
 
-`fieldKinds` in `packages/graph/src/schema.ts` is the closed set:
+`fieldKinds` in `packs/canvas/packages/graph/src/schema.ts` is the closed set:
 
 | Kind | Stored value |
 | --- | --- |
@@ -171,11 +171,11 @@ Sub-fields are addressed as `<fieldId>:<subId>` when a group or list renders the
 
 A composing kind registers an editor instead. `registerFieldKind` in `src/field/fieldKindRegistry.tsx` maps a kind name to a component, and `src/field/compositeKinds.tsx` registers `rating`, `group` and `list` at module scope. Importing a module is what makes its kind exist, and `PropertyField.tsx` imports the composing kinds beside the switch, so a composite kind ships without editing the inspector and without each caller registering it.
 
-A read-only surface never formats a value itself. `readPropertyValue` and `formatPropertyValue` in `packages/graph/src/property.ts` produce the text, including the unavailable and not-shared labels, and the registry deliberately has no format function: two formatters for one value drifted, and the group summary in the registry counted a blank sub-field as filled while the graph did not.
+A read-only surface never formats a value itself. `readPropertyValue` and `formatPropertyValue` in `packs/canvas/packages/graph/src/property.ts` produce the text, including the unavailable and not-shared labels, and the registry deliberately has no format function: two formatters for one value drifted, and the group summary in the registry counted a blank sub-field as filled while the graph did not.
 
 ## Display templates
 
-A display template decides how one value reads where it appears: literal text plus `{{label}}`, `{{value}}`, `{{card}}` and `{{type}}`. `packages/graph/src/template.ts` parses it into segments, `ValueTemplate` in `src/cards/ValueTemplate.tsx` renders them with the label muted, and nothing richer is possible because a template is not markup.
+A display template decides how one value reads where it appears: literal text plus `{{label}}`, `{{value}}`, `{{card}}` and `{{type}}`. `packs/canvas/packages/graph/src/template.ts` parses it into segments, `ValueTemplate` in `src/cards/ValueTemplate.tsx` renders them with the label muted, and nothing richer is possible because a template is not markup.
 
 Templates are stored per field (`display`), and a single mention or property block may carry its own override. `DISPLAY_PRESETS` supplies the buttons in `DisplayStyleDialog`; the field default is `{{label}} · {{value}}` for a block and `@{{card}} · {{value}}` for a mention chip, because a chip is a reference from somewhere else and a bare name would not say where to. The maximum length is 160 characters.
 
@@ -189,7 +189,7 @@ Templates duplicate. Using a board template copies its cards into a new board wi
 
 ## References
 
-A reference is derived, never stored. `packages/graph/src/references.ts` walks card content for `mention` nodes, reads the `cardId` from the node's attributes map, and adds card-valued fields, so `WorkspaceDocument.referencesFor(cardId)` answers "who points at this" without a relation store.
+A reference is derived, never stored. `packs/canvas/packages/graph/src/references.ts` walks card content for `mention` nodes, reads the `cardId` from the node's attributes map, and adds card-valued fields, so `WorkspaceDocument.referencesFor(cardId)` answers "who points at this" without a relation store.
 
 Edges are separate. An arrow between two cards carries a name and a path, no payload, and no reference row. That keeps "this mentions that" and "this is drawn next to that" from being the same fact.
 
@@ -221,9 +221,9 @@ Undo is therefore scoped to the surface that has focus, and it never reaches int
 | Field control set | `src/cards/PropertyField.tsx` |
 | Composite kinds | `src/field/compositeKinds.tsx` |
 | Field kind registry | `src/field/fieldKindRegistry.tsx` |
-| Templates and presets | `packages/graph/src/template.ts` |
-| Value formatting | `packages/graph/src/property.ts` |
-| Reference index | `packages/graph/src/references.ts` |
+| Templates and presets | `packs/canvas/packages/graph/src/template.ts` |
+| Value formatting | `packs/canvas/packages/graph/src/property.ts` |
+| Reference index | `packs/canvas/packages/graph/src/references.ts` |
 
 
 ## What covers this
@@ -238,7 +238,7 @@ Undo is therefore scoped to the surface that has focus, and it never reaches int
 | Composite kinds | `src/field/compositeKinds.test.tsx` |
 | Card panel tabs and editing | `src/cards/CardPanel.test.tsx` |
 | Card gestures and the title gesture | `src/cards/NodeCard.test.tsx` |
-| Display templates | `packages/graph/src/template.test.ts` |
-| Value formatting | `packages/graph/src/property.test.ts` |
+| Display templates | `packs/canvas/packages/graph/src/template.test.ts` |
+| Value formatting | `packs/canvas/packages/graph/src/property.test.ts` |
 
 The procedure for adding a node, a mark, a field renderer or a command is in [change-the-editor.md](../how-to/change-the-editor.md).
