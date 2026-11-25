@@ -7,9 +7,9 @@ import { defineConfig } from "vite";
 /**
  * Builds Budget's renderer and the pack prelude into `packs/budget/.dev/pack`.
  *
- * The renderer under `pack/src/renderer/` is the pack's own source: the frozen
- * Electron shell in `legacy/budget/` keeps its last copy and is never an input
- * here. Both the renderer and the prelude are entries of one build: Rollup emits
+ * The renderer under `pack/src/renderer/` is the one source: the frozen Electron
+ * shell in `legacy/budget/` builds this same source and keeps the last artifact.
+ * Both the renderer and the prelude are entries of one build: Rollup emits
  * `prelude.js` beside Vite's hashed assets, and `scripts/budget-pack.mjs` puts
  * that script in front of the app script in the generated page.
  *

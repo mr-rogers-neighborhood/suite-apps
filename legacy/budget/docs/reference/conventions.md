@@ -31,7 +31,7 @@ Zustand; transient view state may live in React. Never keep a second copy.
 
 Folder by feature, not by file type: `packs/budget/packages/core/src/{loro,plan,rules,import,file,reports,templates}`,
 `src/{main,preload}`, and
-`src/renderer/src/{app,launcher,plan,accounts,payees,rules,schedules,import,reports,command,components,charts,store,platform,theme}`.
+`packs/budget/pack/src/renderer/{app,launcher,plan,accounts,payees,rules,schedules,import,reports,command,components,charts,store,platform,theme}`.
 
 Each feature folder exposes one `index.ts` and nothing else as public surface. No barrel files that
 re-export everything. The facade (`BudgetDocument`) and the folder index are the API.

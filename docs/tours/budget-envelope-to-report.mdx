@@ -34,7 +34,7 @@ which is why the rest of the app can add amounts without its own rounding rule.
 Formatting divides by the scale only at the display boundary; storage stays an
 integer.
 
-## legacy/budget/src/renderer/src/accounts/TransactionDialog.tsx#TransactionDialog
+## packs/budget/pack/src/renderer/accounts/TransactionDialog.tsx#TransactionDialog
 
 The dialog owns the draft, not the record: it seeds from the snapshot, parses the
 amount through `parseMoney`, and writes through the replica only on submit. A
@@ -83,7 +83,7 @@ so an overspent envelope closes at the boundary instead of borrowing. Ready to
 Assign is the on-budget balance minus what is already in envelopes. The Budget
 core module covers the month fold.
 
-## legacy/budget/src/renderer/src/plan/PlanView.tsx#PlanView
+## packs/budget/pack/src/renderer/plan/PlanView.tsx#PlanView
 
 The plan view renders the month state and sends actions back through the
 replica. Auto-assign builds its delta map in core, the component applies it, and
@@ -96,7 +96,7 @@ The report is a projection over month state, one row per category, so assigned,
 activity and available are the plan's numbers and cannot drift. The Budget
 reports module covers the report series.
 
-## legacy/budget/src/renderer/src/reports/ReportsView.tsx#ReportsView
+## packs/budget/pack/src/renderer/reports/ReportsView.tsx#ReportsView
 
 Every tab rebuilds its figures from the current snapshot. The range and the
 selected tab are React state; dashboard widgets are document records, but the

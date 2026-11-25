@@ -106,15 +106,15 @@ Machine-checked on every change:
 - [x] Contrast in every theme and both modes, in `@suite/theme`.
 - [x] The register's cleared and split-expand controls keep focus after they act; a row opens the
   editor with Enter or Space while a control inside it does not; each cleared control names its
-  own row ([Register.test.tsx](../../src/renderer/src/accounts/Register.test.tsx)).
+  own row ([Register.test.tsx](../../../../packs/budget/pack/src/renderer/accounts/Register.test.tsx)).
 - [x] Enter in an assigned amount commits and moves to the next envelope, and Escape restores the
   previous amount instead of assigning the cancelled text
-  ([PlanView.test.tsx](../../src/renderer/src/plan/PlanView.test.tsx)).
+  ([PlanView.test.tsx](../../../../packs/budget/pack/src/renderer/plan/PlanView.test.tsx)).
 - [x] A group control's expanded state matches its action, and row actions name the envelope they act
-  on ([PlanView.test.tsx](../../src/renderer/src/plan/PlanView.test.tsx)).
+  on ([PlanView.test.tsx](../../../../packs/budget/pack/src/renderer/plan/PlanView.test.tsx)).
 - [x] The report range has a label, a tab exposes whether it is selected, a chart has a name and a
   data table, and Budget vs actual is a real table
-  ([ReportsView.test.tsx](../../src/renderer/src/reports/ReportsView.test.tsx)).
+  ([ReportsView.test.tsx](../../../../packs/budget/pack/src/renderer/reports/ReportsView.test.tsx)).
 - [x] Overspent, Funded, Left and Reconciled are words, not colour alone.
 - [x] Storybook's a11y panel reports violations in the workshop; it does not fail the build.
 
