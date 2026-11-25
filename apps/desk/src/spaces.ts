@@ -139,7 +139,7 @@ export class SpaceStore {
   state(): SpaceState {
     const parsed = spacesSchema.safeParse(this.#doc.toJSON());
     if (!parsed.success) {
-      console.warn("[shell] space document does not match its schema", parsed.error.issues);
+      console.warn("[desk] space document does not match its schema", parsed.error.issues);
       return { tabs: [], activeTabId: null };
     }
 
@@ -316,7 +316,7 @@ async function quarantine(path: string, reason: string, error?: unknown): Promis
     if ((renameError as NodeJS.ErrnoException).code === "ENOENT") return;
     throw renameError;
   }
-  console.warn(`[shell] space document quarantined at ${backup}: ${reason}`, error);
+  console.warn(`[desk] space document quarantined at ${backup}: ${reason}`, error);
 }
 
 function freshDocument(): LoroDoc {

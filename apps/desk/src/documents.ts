@@ -173,7 +173,7 @@ function fsCode(error: unknown): string | undefined {
 }
 
 function logged(action: string, error: unknown): Error {
-  console.warn(`[shell] ${action}`, error);
+  console.warn(`[desk] ${action}`, error);
   return new Error(action);
 }
 
@@ -898,7 +898,7 @@ export class DocumentStore {
     const where = moved
       ? `It was moved to ${exportPath} so nothing is lost.`
       : `It is still at ${exportPath}.`;
-    console.warn(`[shell] document quarantined at ${quarantined}: ${reason}`);
+    console.warn(`[desk] document quarantined at ${quarantined}: ${reason}`);
     throw new DocumentRefusal(
       "corrupt",
       `This document could not be read because ${reason}. ${where}`,
@@ -937,7 +937,7 @@ export class DocumentStore {
     for (const entry of entries) {
       if (!entry.startsWith(`${name}${TEMPORARY_INFIX}`)) continue;
       await rm(join(directory, entry), { force: true }).catch((error: unknown) => {
-        console.warn("[shell] could not discard an unfinished document write", error);
+        console.warn("[desk] could not discard an unfinished document write", error);
       });
     }
     const exists = await lstat(file).then(
@@ -951,7 +951,7 @@ export class DocumentStore {
     const backup = `${file}${BACKUP_SUFFIX}`;
     try {
       await rename(backup, file);
-      console.warn(`[shell] restored a document from its previous copy at ${file}`);
+      console.warn(`[desk] restored a document from its previous copy at ${file}`);
     } catch (error) {
       if (fsCode(error) !== "ENOENT") throw error;
     }

@@ -188,7 +188,7 @@ export class RecentsStore {
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== "ENOENT") {
         await rename(file, `${file}.corrupt-${Date.now()}`).catch(() => undefined);
-        console.warn("[shell] the recent list could not be read; starting empty", error);
+        console.warn("[desk] the recent list could not be read; starting empty", error);
       }
     }
     return new RecentsStore(

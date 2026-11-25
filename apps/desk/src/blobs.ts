@@ -87,7 +87,7 @@ function checksum(bytes: Uint8Array): string {
 }
 
 function logged(action: string, error: unknown): Error {
-  console.warn(`[shell] ${action}`, error);
+  console.warn(`[desk] ${action}`, error);
   return new BlobError("failed", action, { cause: error });
 }
 

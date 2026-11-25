@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -9,6 +9,9 @@ import {
   MANIFEST_FILE,
   aggregateDate,
   aggregateReleaseBody,
+  channelTable,
+  channelsBlock,
+  readmeChannelsDrift,
   aggregateReleaseCommands,
   aggregateSection,
   aggregateTag,
@@ -36,7 +39,9 @@ import {
   maturityLabel,
   parseArgs,
   planTag,
-  preReleaseLinks,
+  README_FILE,
+  ROOT,
+  newestPages,
   pruneCandidates,
   publishAction,
   publishedCheck,
@@ -976,18 +981,55 @@ describe("channel releases", () => {
     assert.ok(!publish.includes("--latest"));
   });
 
-  it("links the newest pre-release releases from the stable body", () => {
-    const links = preReleaseLinks([
+  it("names the newest published page of every channel, slop and stable included", () => {
+    const pages = newestPages([
       { tagName: "suite-preview-2026.11.22", isDraft: false },
       { tagName: "suite-preview-2026.11.23", isDraft: false },
       { tagName: "suite-nightly-2026.11.23", isDraft: false },
       { tagName: "suite-nightly-2026.11.24", isDraft: true },
+      { tagName: "suite-slop-2026.11.25-abcdef0", isDraft: false },
       { tagName: "suite-2026.11.23", isDraft: false },
     ]);
-    assert.deepEqual(links, [
-      { channel: "preview", tag: "suite-preview-2026.11.23" },
-      { channel: "nightly", tag: "suite-nightly-2026.11.23" },
-    ]);
+    assert.deepEqual(pages, {
+      slop: "suite-slop-2026.11.25-abcdef0",
+      nightly: "suite-nightly-2026.11.23",
+      preview: "suite-preview-2026.11.23",
+      stable: "suite-2026.11.23",
+    });
+  });
+
+  it("has no page for a channel that never published", () => {
+    assert.deepEqual(newestPages([]), {
+      slop: null,
+      nightly: null,
+      preview: null,
+      stable: null,
+    });
+  });
+
+  it("marks the current page and links the other three channels", () => {
+    const rows = channelTable({
+      channel: "nightly",
+      tag: "suite-nightly-2026.11.25",
+      pages: { nightly: "suite-nightly-2026.11.24", stable: "suite-2026.11.24" },
+      shellApp: APPS.find((app) => app.id === "desk"),
+    });
+    assert.deepEqual(rows[0], "| Channel | Newest page | Suite Desk |");
+    const slop = rows.find((row) => row.startsWith("| `slop`"));
+    assert.ok(slop.includes("not published yet"));
+    assert.ok(slop.includes("run.suite.slop.desk//slop"));
+    assert.ok(rows.find((row) => row.startsWith("| `nightly`")).includes("this page"));
+    assert.ok(rows.find((row) => row.startsWith("| `stable`")).includes("suite-2026.11.24"));
+    assert.equal(rows.filter((row) => row.includes("this page")).length, 1);
+  });
+
+  it("keeps the README's channel table in step with the generator", () => {
+    const readme = readFileSync(join(ROOT, README_FILE), "utf8");
+    assert.equal(readmeChannelsDrift(readme), null);
+    assert.ok(readme.includes(channelsBlock().split("\n")[2]));
+    const edited = readme.replace("run.suite.nightly.desk//nightly", "run.suite.nightly.shell//nightly");
+    assert.match(readmeChannelsDrift(edited), /out of date/u);
+    assert.match(readmeChannelsDrift("# no block here"), /no generated channels block/u);
   });
 
   it("prunes only the older published releases of one channel", () => {
@@ -1047,16 +1089,20 @@ describe("release notes name their channel", () => {
       tag: "suite-nightly-2026.11.23",
       channel: "nightly",
     });
-    assert.ok(body.includes("flatpak install --user suite run.suite.nightly.desk//nightly"));
-    assert.ok(body.includes("flatpak run run.suite.nightly.desk//nightly"));
-    assert.ok(!body.includes("flatpak install --user suite run.suite.desk"));
-    assert.ok(!body.includes("flatpak run run.suite.desk"));
-    assert.ok(!body.includes("run.suite.slop.desk"));
-    assert.ok(!body.includes("run.suite.preview.desk"));
+    // The install block names this channel only; the channel table beside it
+    // names all four on purpose, so every assertion reads the block.
+    const install = between(body, "```sh", "```");
+    assert.ok(install.includes("flatpak install --user suite run.suite.nightly.desk//nightly"));
+    assert.ok(install.includes("flatpak run run.suite.nightly.desk//nightly"));
+    assert.ok(!install.includes("flatpak install --user suite run.suite.desk"));
+    assert.ok(!install.includes("flatpak run run.suite.desk"));
+    assert.ok(!install.includes("run.suite.slop.desk"));
+    assert.ok(!install.includes("run.suite.preview.desk"));
 
     const stable = aggregateReleaseBody(entries, { date: "2026-11-23" });
-    assert.ok(stable.includes("flatpak install --user suite run.suite.desk\n"));
-    assert.ok(!stable.includes("run.suite.nightly.desk"));
+    const stableInstall = between(stable, "```sh", "```");
+    assert.ok(stableInstall.includes("flatpak install --user suite run.suite.desk\n"));
+    assert.ok(!stableInstall.includes("run.suite.nightly.desk"));
   });
 
   it("still says stable on a stable body", () => {

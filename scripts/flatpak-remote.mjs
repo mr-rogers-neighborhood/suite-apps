@@ -79,7 +79,7 @@ import {
   commitFileText,
   flatpakrepoUrl,
   foreignRefs,
-  hasPublishedRefs,
+  listingHasObjects,
   invalidationCommand,
   normalizeRemoteUrl,
   preservedRefs,
@@ -728,13 +728,25 @@ async function main() {
   let foreign = [];
   if (target === "s3" && !options.noMergePublished) {
     // Only a listing is read here: an empty one is a first publication, and the
-    // merge would have nothing to copy.
-    const listing = capture("aws", ["s3", "ls", `s3://${bucket}/refs/`, "--recursive"]);
+    // merge would have nothing to copy. Ask the API, not `aws s3 ls`, which
+    // exits 1 without output for a prefix a wiped bucket no longer has.
+    const listing = capture("aws", [
+      "s3api",
+      "list-objects-v2",
+      "--bucket",
+      bucket,
+      "--prefix",
+      "refs/",
+      "--max-keys",
+      "1",
+      "--output",
+      "json",
+    ]);
     if (
       shouldMergePublishedRefs({
         target,
         noMergePublished: options.noMergePublished,
-        bucketHasRefs: hasPublishedRefs(listing),
+        bucketHasRefs: listingHasObjects(listing),
       })
     ) {
       process.stdout.write("\n=== merge published refs ===\n");

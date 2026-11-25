@@ -1,0 +1,186 @@
+# One OCR boundary review, shared by nightly and release.
+#
+# Pull requests are intentionally not reviewed here: the review-only agent and
+# the gate own that surface. OCR runs when a build crosses a channel boundary,
+# where there is a human decision to inform and far fewer runs. That frequency
+# is what makes `effort: high` affordable; OCR's file selection, bundling,
+# plan-skip and prompt caching keep each run proportional to the diff.
+#
+# `nightly.yml` calls this after a green gate when it is not publishing.
+# `release.yml` calls it before approval for preview/stable (and for a nightly
+# publish). A manual dispatch runs one review for testing or a spot check.
+#
+# Advisory by default: `workflow_call` leaves `advisory: true`, so a provider
+# failure never blocks a release. A manual dispatch defaults it to false so a
+# test fails visibly. A reusable-workflow call job cannot set
+# `continue-on-error`; the input is the mechanism.
+name: ocr-boundary
+
+on:
+  workflow_call:
+    inputs:
+      channel:
+        description: Channel whose last tag starts the range.
+        required: true
+        type: string
+      effort:
+        description: Review effort preset.
+        required: false
+        type: string
+        default: high
+      budget:
+        description: Total input+output token cap for the run.
+        required: false
+        type: string
+        default: "5000000"
+      max_tokens:
+        description: Prompt ceiling per subtask.
+        required: false
+        type: string
+        default: "200000"
+      from:
+        description: Optional explicit base ref; empty derives it from the channel tag.
+        required: false
+        type: string
+        default: ""
+      advisory:
+        description: Never fail the caller; the evidence is best-effort.
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      DEEPRELAY_API_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      channel:
+        required: true
+        type: choice
+        default: nightly
+        options: [nightly, preview, stable]
+      effort:
+        required: true
+        type: choice
+        default: low
+        options: [low, medium, high]
+      budget:
+        required: true
+        type: string
+        default: "300000"
+      max_tokens:
+        required: true
+        type: string
+        default: "120000"
+      from:
+        description: Optional base ref for a manual test; empty derives it from the channel tag.
+        required: false
+        type: string
+        default: ""
+      advisory:
+        description: Report success even when the review fails. Off for a manual check.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ocr-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    name: ocr-${{ inputs.channel }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: ${{ inputs.advisory }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Install OCR
+        run: npm install -g @alibaba-group/open-code-review@1.14.3
+
+      - name: Configure DeepRelay
+        id: configure
+        env:
+          DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEEPRELAY_API_KEY}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=OCR skipped::DEEPRELAY_API_KEY is not set; no boundary review was produced."
+            echo "DEEPRELAY_API_KEY is not set; the advisory review is skipped." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          ocr config set provider deeprelay
+          ocr config set custom_providers.deeprelay.url https://api.deeprelay.ai/v1
+          ocr config set custom_providers.deeprelay.protocol openai
+          ocr config set custom_providers.deeprelay.model deeprelay/deepseek-v4.1-flash
+          ocr config set custom_providers.deeprelay.api_key_cmd 'printf "%s" "$DEEPRELAY_API_KEY"'
+          ocr llm test
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Review the channel range
+        if: steps.configure.outputs.configured == 'true'
+        env:
+          DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
+          CHANNEL: ${{ inputs.channel }}
+          EFFORT: ${{ inputs.effort }}
+          BUDGET: ${{ inputs.budget }}
+          MAX_TOKENS: ${{ inputs.max_tokens }}
+          FROM: ${{ inputs.from }}
+        run: |
+          set -euo pipefail
+          base="${FROM}"
+          if [ -z "${base}" ]; then
+            case "${CHANNEL}" in
+              stable)
+                base="$(git tag --list 'suite-*' --sort=-v:refname \
+                  | grep -vE -- '-(nightly|preview|slop)-' | head -1 || true)"
+                ;;
+              nightly)
+                base="$(git tag --list 'suite-nightly-*' --sort=-v:refname | head -1 || true)"
+                # A non-publishing nightly creates no tag; review the last day.
+                if [ -z "${base}" ]; then
+                  base="$(git rev-list -1 --before='24 hours ago' HEAD || true)"
+                fi
+                ;;
+              *)
+                base="$(git tag --list "suite-${CHANNEL}-*" --sort=-v:refname | head -1 || true)"
+                ;;
+            esac
+          fi
+          if [ -z "${base}" ]; then
+            echo "No base for ${CHANNEL}; nothing to compare. Skipping the advisory review." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$(git rev-parse "${base}^{commit}")" = "$(git rev-parse HEAD)" ]; then
+            echo "The ${CHANNEL} base is HEAD; there is no range to review." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "Reviewing ${base}..HEAD for the ${CHANNEL} boundary." | tee -a "$GITHUB_STEP_SUMMARY"
+          node .agents/skills/suite-review/scripts/review.mjs \
+            --from "${base}" --effort "${EFFORT}" --budget "${BUDGET}" \
+            --max-tokens "${MAX_TOKENS}" --output .dev/ocr/review.json
+
+      - name: Upload the review evidence
+        if: always() && hashFiles('.dev/ocr/review.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ocr-${{ inputs.channel }}-${{ github.run_id }}
+          path: .dev/ocr/review.json
+          retention-days: 30
+
+      - name: Report a failed advisory review
+        if: failure()
+        run: echo "::warning title=OCR review failed::The boundary review did not complete; the artifact may be missing."

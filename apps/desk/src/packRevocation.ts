@@ -299,7 +299,7 @@ export async function openRevocations(root: string): Promise<RevocationStore> {
 
   const stored = parseStore(text);
   if (stored === null) {
-    console.warn(`[shell] ${file} is not a revocation store; treating it as empty`);
+    console.warn(`[desk] ${file} is not a revocation store; treating it as empty`);
     return { version: REVOCATION_STORE_VERSION, revocations: [] };
   }
   return { version: REVOCATION_STORE_VERSION, revocations: stored };

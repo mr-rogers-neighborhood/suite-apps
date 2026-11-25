@@ -16,6 +16,10 @@ are in [Version ownership](../../docs/how-to/package-and-release.md#version-owne
   rolled-back index before a row is shown. The row then installs, updates, reinstalls or removes the
   version it displayed. The index, the pinned key and the verifier are the same ones the desktop
   host reads, so the phone and the desktop agree on what is offered.
+- **A pack can use its own files on Go.** The host serves the `files` capability with one scoped root
+  per publisher and pack under the app's data directory, relative paths, atomic writes, backups,
+  locks and a size cap, so a pack that imports, exports or attaches files works on the phone instead
+  of refusing.
 
 ### Changed
 
@@ -35,6 +39,10 @@ are in [Version ownership](../../docs/how-to/package-and-release.md#version-owne
 - **An archive could write files its manifest did not list.** Install now compares the archive's
   file set with the manifest, refuses extras and missing files, and writes only the files the
   manifest names.
+
+**Fresh catalogue.** The signed remote starts a new index sequence after the fresh-start wipe. An
+existing `run.suite.go` or old slop install must clear its app data (or be reinstalled) before it can
+trust the new index; packs and documents from the old install are not migrated.
 
 ## [0.1.0] - 2026-11-18
 

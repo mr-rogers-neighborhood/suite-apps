@@ -200,7 +200,7 @@ export class ReminderQueue {
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== "ENOENT") {
         await quarantine(file).catch(() => undefined);
-        console.warn("[shell] the reminder queue could not be read; starting empty", error);
+        console.warn("[desk] the reminder queue could not be read; starting empty", error);
       }
     }
     return new ReminderQueue(
@@ -480,7 +480,7 @@ export class ReminderScheduler {
       .catch(() => undefined)
       .then(work)
       .catch((error: unknown) => {
-        console.warn("[shell] the reminder scheduler failed", error);
+        console.warn("[desk] the reminder scheduler failed", error);
       });
   }
 

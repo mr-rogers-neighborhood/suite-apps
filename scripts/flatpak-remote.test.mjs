@@ -16,7 +16,7 @@ import {
   commitFileText,
   flatpakrepoUrl,
   foreignRefs,
-  hasPublishedRefs,
+  listingHasObjects,
   invalidationCommand,
   missingSummaryRefs,
   normalizeRemoteUrl,
@@ -91,16 +91,22 @@ describe("the S3 cache classes", () => {
     assert.equal(IMMUTABLE_CACHE_CONTROL, "public,max-age=31536000,immutable");
   });
 
-  it("marks only the summary and the .flatpakrepo as no-cache", () => {
-    for (const path of ["summary", "summary.sig", "suite.flatpakrepo", "/summary"]) {
+  it("marks the config, the summary and the .flatpakrepo as no-cache", () => {
+    for (const path of [
+      "config",
+      "summary",
+      "summary.sig",
+      "suite.flatpakrepo",
+      "/summary",
+    ]) {
       assert.equal(cacheControlFor(path), NO_CACHE_CONTROL, path);
     }
     assert.equal(NO_CACHE_CONTROL, "no-cache");
   });
 
   it("refuses a path whose cache class nobody chose", () => {
-    assert.equal(cacheControlFor("config"), null);
-    assert.match(cacheControlProblem("config"), /has no S3 cache class/u);
+    assert.equal(cacheControlFor("tombstones"), null);
+    assert.match(cacheControlProblem("tombstones"), /has no S3 cache class/u);
   });
 });
 
@@ -134,7 +140,7 @@ describe("the S3 upload commands", () => {
   const steps = s3UploadCommands({ repo, flatpakrepoPath, bucket });
 
   it("syncs the five immutable trees without deleting anything", () => {
-    assert.equal(steps.length, 10);
+    assert.equal(steps.length, 11);
     assert.deepEqual(steps[0].args.slice(0, 4), [
       "s3",
       "sync",
@@ -179,6 +185,7 @@ describe("the S3 upload commands", () => {
   it("copies the mutable files, including the summary index, with no-cache", () => {
     const copies = steps.slice(5).map((step) => step.args.slice(0, 4));
     assert.deepEqual(copies, [
+      ["s3", "cp", `${repo}/config`, `s3://${bucket}/config`],
       ["s3", "cp", `${repo}/summary`, `s3://${bucket}/summary`],
       ["s3", "cp", `${repo}/summary.sig`, `s3://${bucket}/summary.sig`],
       ["s3", "cp", `${repo}/summary.idx`, `s3://${bucket}/summary.idx`],
@@ -267,9 +274,23 @@ describe("merging the published refs before signing", () => {
 
 describe("when there is nothing to merge", () => {
   it("recognises an empty bucket ref listing", () => {
-    assert.equal(hasPublishedRefs(""), false);
-    assert.equal(hasPublishedRefs("\n   \n"), false);
-    assert.equal(hasPublishedRefs("2026-11-23 13:44:11   65 refs/heads/appstream/x86_64\n"), true);
+    assert.equal(listingHasObjects(""), false);
+    assert.equal(listingHasObjects('  '), false);
+    assert.equal(
+      listingHasObjects('{"KeyCount": 0, "MaxKeys": 1, "IsTruncated": false}'),
+      false,
+    );
+    assert.equal(
+      listingHasObjects(
+        '{"KeyCount": 1, "Contents": [{"Key": "refs/heads/appstream/x86_64"}]}',
+      ),
+      true,
+    );
+  });
+
+  it("refuses an unreadable listing instead of calling it empty", () => {
+    assert.throws(() => listingHasObjects("<html>Access Denied</html>"), /not JSON/u);
+    assert.throws(() => listingHasObjects('{"Contents": "nope"}'), /neither KeyCount/u);
   });
 
   it("skips the merge on a first publication", () => {
@@ -457,6 +478,7 @@ describe("the CloudFront invalidation", () => {
     ]);
     assert.deepEqual(step.args.slice(5), INVALIDATION_PATHS);
     assert.deepEqual(INVALIDATION_PATHS, [
+      "/config",
       "/summary",
       "/summary.sig",
       "/summary.idx",

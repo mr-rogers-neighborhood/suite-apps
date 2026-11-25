@@ -110,10 +110,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  review:
+    name: ocr-review-${{ inputs.channel }}
+    # Advisory evidence for the channel boundary: nightly -> preview asks "is it
+    # shaped right?" and preview -> stable asks "is it a release?". A person
+    # still decides; OCR supplies a high-effort review of the range since the
+    # channel's last tag. It runs before approval so the approver can read it.
+    #
+    # Keep this out of `publish`: that job holds the signing keys and the
+    # release upload. The boundary workflow has `contents: read` and the model
+    # secret only. Its `advisory` default keeps a DeepRelay outage from blocking
+    # a signed release.
+    #
+    # Nightly publishes through this workflow call; a non-publishing nightly
+    # calls the same workflow from nightly.yml.
+    if: inputs.publish
+    uses: ./.github/workflows/ocr-boundary.yml
+    with:
+      channel: ${{ inputs.channel }}
+      effort: high
+      budget: "5000000"
+      max_tokens: "200000"
+    secrets:
+      DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
+
   approval:
     name: approve-${{ inputs.channel }}
     # A schedule cannot wait for a reviewer. `preview` and `stable` can, and do.
-    if: inputs.channel != 'nightly'
+    # Approval waits for the advisory review so the report is available first;
+    # the boundary workflow's `advisory` default keeps a provider failure from
+    # blocking it, and `!cancelled()` keeps a skipped review from stranding the
+    # job.
+    needs: review
+    # `!cancelled()` is load-bearing: `review` is skipped for a rehearsal
+    # (`publish: false`), and a skipped dependency would otherwise skip
+    # approval and strand the publish job. It is not `always()`: a cancelled run
+    # must not queue an approval deployment for an operator who already stopped.
+    if: (!cancelled()) && inputs.channel != 'nightly'
     runs-on: ubuntu-latest
     environment: approval
     steps:
@@ -123,7 +156,10 @@ jobs:
   publish:
     name: publish-${{ inputs.channel }}
     needs: approval
-    if: always() && (inputs.channel == 'nightly' || needs.approval.result == 'success')
+    # `!cancelled()`, not `always()`: this job holds the signing keys, so a
+    # cancelled run must not start it after the operator stopped. A nightly has
+    # no approval job, so the channel check is what admits it.
+    if: (!cancelled()) && (inputs.channel == 'nightly' || needs.approval.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: release

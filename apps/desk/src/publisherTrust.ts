@@ -197,7 +197,7 @@ export async function openPublisherTrust(root: string): Promise<PublisherTrustSt
   const stored = parseStore(text);
   if (stored === null) {
     console.warn(
-      `[shell] ${file} is not a publisher trust store; trusting the first-party key only`,
+      `[desk] ${file} is not a publisher trust store; trusting the first-party key only`,
     );
     return { version: TRUST_STORE_VERSION, publishers: [preinstalled] };
   }

@@ -104,6 +104,7 @@ export const STATIC_DELTA_ARGUMENTS = [
  * client on the previous ref set or fails it outright.
  */
 export const MUTABLE_FILES = [
+  "config",
   "summary",
   "summary.sig",
   "summary.idx",
@@ -113,6 +114,7 @@ export const MUTABLE_FILES = [
 
 /** The only CloudFront paths a publication invalidates, in this order. */
 export const INVALIDATION_PATHS = [
+  `/config`,
   `/summary`,
   `/summary.sig`,
   `/summary.idx`,
@@ -308,6 +310,17 @@ export function s3UploadCommands({ repo, flatpakrepoPath, bucket }) {
       cache("delta-indexes/"),
       "--no-progress",
     ]),
+    // Every OSTree client fetches `config` before anything else; a bucket that
+    // never received it answers 403 and the remote cannot be installed from,
+    // however correct the summary beside it is.
+    aws([
+      "s3",
+      "cp",
+      `${repo}/config`,
+      s3Url(bucket, "config"),
+      "--cache-control",
+      cache("config"),
+    ]),
     aws([
       "s3",
       "cp",
@@ -417,11 +430,28 @@ export function restoreRefCommands({ repo, builtRefs }) {
   }));
 }
 
-/** True when the bucket's ref listing names at least one ref. */
-export function hasPublishedRefs(listing) {
-  return String(listing ?? "")
-    .split(/\r?\n/u)
-    .some((line) => line.trim().length > 0);
+/**
+ * True when `aws s3api list-objects-v2` reports at least one object.
+ *
+ * `aws s3 ls` is not the question to ask: with a prefix that holds no objects
+ * it exits 1 and prints nothing, which is exactly the state a wiped bucket has,
+ * so a first publication would read as a failed command. The S3 API answers
+ * with 200 and `KeyCount: 0`. Unreadable output is an error rather than an
+ * empty bucket, because silently skipping the merge would drop every other
+ * channel from the summary.
+ */
+export function listingHasObjects(json) {
+  const text = String(json ?? "").trim();
+  if (text.length === 0) return false;
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`the S3 listing is not JSON: ${text.slice(0, 200)}`);
+  }
+  if (typeof parsed.KeyCount === "number") return parsed.KeyCount > 0;
+  if (Array.isArray(parsed.Contents)) return parsed.Contents.length > 0;
+  throw new Error("the S3 listing names neither KeyCount nor Contents");
 }
 
 /**

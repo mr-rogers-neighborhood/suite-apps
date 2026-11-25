@@ -220,6 +220,26 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  review:
+    name: ocr-review-nightly
+    needs: [published, gate]
+    # Non-publishing nights only. A publishing night runs the same boundary
+    # workflow from release.yml. The boundary workflow falls back to the last
+    # 24 hours when no nightly tag exists, so a non-publishing night still has
+    # a range to review.
+    if: >-
+      vars.NIGHTLY_PUBLISH != 'true' &&
+      needs.published.outputs.published != 'true' &&
+      needs.gate.result == 'success'
+    uses: ./.github/workflows/ocr-boundary.yml
+    with:
+      channel: nightly
+      effort: high
+      budget: "5000000"
+      max_tokens: "200000"
+    secrets:
+      DEEPRELAY_API_KEY: ${{ secrets.DEEPRELAY_API_KEY }}
+
   # The publishing mode. It runs the whole release workflow, including its own
   # full gate, so the nightly proof and the artifact that ships are the same run.
   publish:

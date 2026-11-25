@@ -136,7 +136,8 @@ starts with an empty data root, and the old one is not copied or renamed.
 The Desk rename is a second fresh start. `run.suite.desk` and its slop, nightly and preview ids are a
 new application identity, not an update of `run.suite.shell`: an existing install does not update into
 them. The new id opens an empty data root, `~/.var/app/run.suite.shell` is ignored, and the owner may
-remove it. The old refs stay on the signed remote as history and are not rebuilt.
+remove it. The old refs are retired by a one-time fresh-start wipe of the signed remote and are not
+rebuilt.
 
 Data is keyed by id, so every channel has a separate tree. On Desk that tree is the Flatpak sandbox
 under `~/.var/app/<id>`; Go has its own app data. A frozen mini-app's pre-release build is the
