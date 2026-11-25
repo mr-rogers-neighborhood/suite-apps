@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Repository and pack structure specification
 
 Status: draft 0.1. Target layout and ownership. The product contract is [superapp.md](superapp.md);

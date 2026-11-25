@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Golden vector (S3.4)
 
 One signed pack manifest that a second implementation can verify with no shared code. The spec is

@@ -6,6 +6,7 @@
  */
 export default {
   id: "suite-in-one-sitting",
+  audience: "developer",
   title: "The suite in one sitting",
   summary: "One seam from the shared contract to the document layer, at four altitudes.",
   intro:

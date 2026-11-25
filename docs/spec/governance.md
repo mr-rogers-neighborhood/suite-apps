@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Governance, licensing and disclosure
 
 The [specification](superapp.md) is the contract. This page owns the decisions around it. It is

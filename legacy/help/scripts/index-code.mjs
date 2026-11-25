@@ -14,6 +14,12 @@
  *   public/data/modules/<slug>.json
  *   public/data/tours.json
  *   public/data/tour-membership.json
+ *   public/data/docs.json
+ *
+ * `docs.json` is the audience index: every published page under `docs/` with the
+ * section its frontmatter names. The reader filters its page tree by it and the
+ * explorer resolves a tour's `doc` target through it, so a page without an
+ * audience fails the index rather than landing in a default section.
  *
  * Prose notes come from `docs/modules/`; tours from `docs/tours/`.
  * The generator never overwrites either.
@@ -21,14 +27,16 @@
  * Usage: node legacy/help/scripts/index-code.mjs
  */
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, extname, join, posix, relative } from "node:path";
+import { dirname, extname, join, posix, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Project, ts } from "ts-morph";
 import { parse as parseYaml } from "yaml";
+import { docsSlug, isAudience, readAudience } from "../../../scripts/lib/audiences.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const outDir = join(root, "legacy", "help", "public", "data");
 const check = process.argv.includes("--check");
+const docsDir = join(root, "docs");
 const modulesDir = join(root, "docs/modules");
 const toursDir = join(root, "docs/tours");
 const modulesConfigPath = join(root, "docs/modules.json");
@@ -311,7 +319,12 @@ async function collectNotes(problems) {
   for (const file of moduleFiles) {
     if (!file.endsWith(".mdx")) continue;
     const source = relative(root, file);
-    const { data, body } = frontmatter(await readFile(file, "utf8"));
+    const sourceText = await readFile(file, "utf8");
+    const { data, body } = frontmatter(sourceText);
+    const declared = readAudience(sourceText);
+    if (declared.problem) {
+      problems.push({ level: "error", message: `${source}: ${declared.problem}` });
+    }
     const moduleId = typeof data.module === "string" ? data.module : undefined;
     if (!moduleId) {
       problems.push({ level: "warning", message: `${source}: frontmatter has no module id` });
@@ -366,7 +379,12 @@ async function collectNotes(problems) {
   for (const file of tourEntries) {
     if (!file.endsWith(".mdx")) continue;
     const source = relative(root, file);
-    const { data, body } = frontmatter(await readFile(file, "utf8"));
+    const sourceText = await readFile(file, "utf8");
+    const { data, body } = frontmatter(sourceText);
+    const declared = readAudience(sourceText);
+    if (declared.problem) {
+      problems.push({ level: "error", message: `${source}: ${declared.problem}` });
+    }
     const parsed = sections(body);
     const steps = [];
     for (const section of parsed.sections) {
@@ -415,6 +433,7 @@ async function collectNotes(problems) {
       source: "mdx",
       steps,
       file: source,
+      ...(declared.audience ? { audience: declared.audience } : {}),
     });
   }
 
@@ -431,6 +450,31 @@ async function walkFiles(dir) {
     else out.push(path);
   }
   return out.sort();
+}
+
+/**
+ * Every published handbook page, with the section its frontmatter names.
+ *
+ * `sync-docs` publishes `.md` only, so only those pages appear here. Modules and
+ * tours are explorer prose; `collectNotes` checks their audience in place.
+ */
+async function collectDocsPages(problems) {
+  const pages = [];
+  for (const file of await walkFiles(docsDir)) {
+    if (!file.endsWith(".md")) continue;
+    const path = relative(root, file).split(sep).join("/");
+    const result = readAudience(await readFile(file, "utf8"));
+    if (result.problem) {
+      problems.push({ level: "error", message: `${path}: ${result.problem}` });
+      continue;
+    }
+    pages.push({
+      path,
+      slug: docsSlug(relative(docsDir, file).split(sep).join("/")),
+      audience: result.audience,
+    });
+  }
+  return pages;
 }
 
 function targetProblem(target, { nodeIds, moduleIds, tourIds }) {
@@ -497,6 +541,12 @@ async function collectTours(problems, scope) {
       problems.push({ level: "warning", message: `${source}: tour has no default export` });
       continue;
     }
+    if (!isAudience(tour.audience)) {
+      problems.push({
+        level: "error",
+        message: `${source}: composed tour must declare audience: user | developer`,
+      });
+    }
     const id = typeof tour.id === "string" ? tour.id : posix.basename(file, ".tour.mjs");
     if (scope.tourIds.has(id)) {
       problems.push({ level: "warning", message: `${source}: tour id ${id} is already used` });
@@ -557,6 +607,7 @@ async function collectTours(problems, scope) {
       source: "composed",
       steps,
       file: source,
+      ...(isAudience(tour.audience) ? { audience: tour.audience } : {}),
     });
   }
 
@@ -611,10 +662,11 @@ function isTestFile(file) {
 
 async function main() {
   const problems = [];
-  const [files, packages, notes] = await Promise.all([
+  const [files, packages, notes, docsPages] = await Promise.all([
     collectFiles(),
     collectPackages(),
     collectNotes(problems),
+    collectDocsPages(problems),
   ]);
   const config = await readJson(modulesConfigPath);
   const explicitModules = new Map((config?.modules ?? []).map((module) => [module.id, module]));
@@ -1161,6 +1213,14 @@ async function main() {
     ),
   );
   output.set("tour-membership.json", JSON.stringify(membership));
+  output.set(
+    "docs.json",
+    JSON.stringify(
+      { version: 1, pages: docsPages.sort((a, b) => a.path.localeCompare(b.path)) },
+      null,
+      2,
+    ),
+  );
 
   if (check) {
     const stale = [];
@@ -1207,7 +1267,7 @@ async function main() {
   }
 
   process.stdout.write(
-    `indexed ${files.length} files, ${search.filter((entry) => entry.kind !== "file" && entry.kind !== "module" && entry.kind !== "tour").length} symbols, ${modules.length} modules, ${tours.length} tours\n`,
+    `indexed ${files.length} files, ${search.filter((entry) => entry.kind !== "file" && entry.kind !== "module" && entry.kind !== "tour").length} symbols, ${modules.length} modules, ${tours.length} tours, ${docsPages.length} docs pages\n`,
   );
 }
 

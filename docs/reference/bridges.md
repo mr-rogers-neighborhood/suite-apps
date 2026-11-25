@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # The bridges: what a host has to provide
 
 Each app's renderer reaches the machine through exactly one global object installed by its Electron

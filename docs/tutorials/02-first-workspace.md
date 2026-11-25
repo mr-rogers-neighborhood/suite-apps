@@ -1,3 +1,7 @@
+---
+audience: user
+---
+
 # 2. Make a first workspace
 
 This tutorial uses Canvas, the most developed app in the suite. It ends with a workspace containing a

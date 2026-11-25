@@ -6,14 +6,16 @@ import type {
   Tour,
   TourMembership,
 } from "./explorer-types";
+import type { DocsPage } from "./handbook-pages";
 
-/** The five generated files the explorer opens with. */
+/** The six generated files the explorer opens with. */
 export const BASE_DATA_FILES = [
   "tree.json",
   "modules.json",
   "search.json",
   "tours.json",
   "tour-membership.json",
+  "docs.json",
 ] as const;
 
 /** The smallest fetch shape the loader needs, so a test supplies no server. */
@@ -38,12 +40,20 @@ export async function readJson<T>(fetcher: DataFetch, url: string): Promise<T> {
  * which file to regenerate.
  */
 export async function loadBaseData(fetcher: DataFetch): Promise<BaseData> {
-  const [tree, modules, search, tours, membership] = await Promise.all([
+  const [tree, modules, search, tours, membership, docs] = await Promise.all([
     readJson<FolderNode>(fetcher, "/data/tree.json"),
     readJson<ModuleSummary[]>(fetcher, "/data/modules.json"),
     readJson<SearchEntry[]>(fetcher, "/data/search.json"),
     readJson<Tour[]>(fetcher, "/data/tours.json"),
     readJson<TourMembership>(fetcher, "/data/tour-membership.json"),
+    readJson<{ pages?: DocsPage[] } | DocsPage[]>(fetcher, "/data/docs.json"),
   ]);
-  return { tree, modules, search, tours, membership };
+  return {
+    tree,
+    modules,
+    search,
+    tours,
+    membership,
+    docs: Array.isArray(docs) ? docs : (docs.pages ?? []),
+  };
 }

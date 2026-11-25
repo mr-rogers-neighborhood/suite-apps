@@ -10,7 +10,7 @@ import { DetailPane } from "@/explorer/detail";
 import { Note } from "@/explorer/note";
 import { ExplorerSidebar } from "@/explorer/sidebar";
 import { loadBaseData } from "@/lib/explorer-data";
-import { handbookPathForDocsFile, readExplorerUrl } from "@/lib/explorer-routes";
+import { docsPageUrl, readExplorerUrl } from "@/lib/explorer-routes";
 import type {
   BaseData,
   ModuleData,
@@ -21,6 +21,7 @@ import type {
   TourTarget,
   View,
 } from "@/lib/explorer-types";
+import { SectionSwitch } from "@/sections";
 
 function targetNodeId(target: TourTarget): string | null {
   if (
@@ -323,7 +324,8 @@ export function Explorer() {
       }
       if (step?.kind === "node" && step.target.kind === "doc") {
         setPlaying(false);
-        navigate(handbookPathForDocsFile(step.target.path));
+        const href = docsPageUrl(data?.docs ?? [], step.target.path);
+        if (href !== undefined) navigate(href);
         return;
       }
       setTourIndex(next);
@@ -334,7 +336,7 @@ export function Explorer() {
       setView("tours");
       setSidebarOpen(false);
     },
-    [navigate, tour],
+    [navigate, tour, data],
   );
 
   const selectTour = useCallback((id: string) => {
@@ -572,6 +574,7 @@ export function Explorer() {
           >
             Tours
           </Link>
+          <SectionSwitch audience="developer" />
           <a
             href="https://github.com/mrrnbhd/suite-apps"
             target="_blank"

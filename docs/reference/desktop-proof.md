@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Desktop Proof of Changes
 
 Every desktop Electron app owns one Playwright proof scenario tagged `@proof` that opens a real

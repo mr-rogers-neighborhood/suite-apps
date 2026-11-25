@@ -26,8 +26,9 @@ Nothing generated belongs here: `node scripts/pack-shape.mjs` fails the gate if 
 
 The archive carries both halves of Help's content:
 
-- `data/*.json` — the generated tree, modules, search, tours, tour membership, handbook search and
-  one file per module, exactly what `pnpm docs:index` writes.
+- `data/*.json` — the generated tree, modules, search, tours, tour membership, `docs.json` (the
+  audience index behind the two sections), handbook search and one file per module, exactly what
+  `pnpm docs:index` writes.
 - `assets/*.js` — the compiled handbook pages and the renderer, including the text of every page
   inside `docs/`.
 

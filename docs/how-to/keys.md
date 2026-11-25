@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Manage signing keys
 
 Four keys sign things the Suite ships, and no private half belongs in this repository. Each one

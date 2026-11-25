@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Glossary
 
 The words this repository uses in more than one app. Each app's own glossary has the terms that

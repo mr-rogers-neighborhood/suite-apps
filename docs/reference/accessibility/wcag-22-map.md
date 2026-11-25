@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # WCAG 2.2 criterion map
 
 Every success criterion in WCAG 2.2, and what this project does about it.

@@ -2,6 +2,8 @@ import { loader } from "fumadocs-core/source";
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
 import { defineDocs } from "fumadocs-mdx/macro";
 
+import { SECTION_BASES } from "@/lib/handbook-pages";
+
 /**
  * The handbook source.
  *
@@ -9,6 +11,11 @@ import { defineDocs } from "fumadocs-mdx/macro";
  * frontmatter and `_meta.json` files Fumadocs reads. The macro is compiled by
  * `fumadocs-mdx/vite`, so the page tree and the MDX bodies are baked into the
  * static bundle: no server, no request for content.
+ *
+ * There is one source and two loaders over it. `baseUrl` is the only difference:
+ * the User Handbook opens under `/handbook`, the Developer Documentation under
+ * `/developer`. The generated `/data/docs.json` says which page belongs where, so
+ * neither loader keeps a list of its own.
  */
 const docs = defineDocs({
   // Relative to the renderer root (`src/renderer`); the generated tree lives at the app root.
@@ -20,7 +27,7 @@ const docs = defineDocs({
   meta: { schema: metaSchema },
 });
 
-export const source = loader({
-  baseUrl: "/handbook",
-  source: docs.toFumadocsSource(),
-});
+export const sources = {
+  user: loader({ baseUrl: SECTION_BASES.user, source: docs.toFumadocsSource() }),
+  developer: loader({ baseUrl: SECTION_BASES.developer, source: docs.toFumadocsSource() }),
+};

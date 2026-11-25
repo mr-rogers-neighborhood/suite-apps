@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Agent skills
 
 Agent skills are the repository's authored procedures for coding agents: short playbooks that load

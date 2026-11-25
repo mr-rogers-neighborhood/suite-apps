@@ -1,3 +1,5 @@
+import type { Audience, DocsPage } from "./handbook-pages";
+
 export type View = "browser" | "modules" | "tours";
 
 export type SearchEntry = {
@@ -105,6 +107,8 @@ export type Tour = {
   reviewed: boolean;
   source: TourSource;
   steps: TourStep[];
+  /** The section the tour's frontmatter names; the explorer is developer prose. */
+  audience?: Audience;
 };
 
 export type TourMembershipEntry = {
@@ -142,4 +146,6 @@ export type BaseData = {
   search: SearchEntry[];
   tours: Tour[];
   membership: TourMembership;
+  /** The docs tree's audience index, so a tour's `doc` target opens in its section. */
+  docs: DocsPage[];
 };

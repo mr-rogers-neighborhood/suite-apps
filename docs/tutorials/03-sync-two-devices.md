@@ -1,3 +1,7 @@
+---
+audience: user
+---
+
 # 3. Sync two devices
 
 The sync relay is run by a person, not by the project. This tutorial runs one locally and connects

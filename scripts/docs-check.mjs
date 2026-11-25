@@ -9,6 +9,8 @@
  *   5. A section page that the section index does not list.
  *   6. A retired phrase: the documentation site that does not exist, a duplicated
  *      developer note, the pre-monorepo sibling workflow, and facts this pass fixed.
+ *   7. A page under `docs/` with no `audience: user | developer` frontmatter, or
+ *      one that names a section that does not exist.
  *
  * It does not check prose style. It walks `docs/`, every app's `docs/`, and the
  * root pages, and never rewrites anything.
@@ -18,6 +20,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { audienceProblem } from "./lib/audiences.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const docs = join(root, "docs");
@@ -85,6 +89,18 @@ function walk(dir) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) found.push(...walk(path));
     else if (entry.name.endsWith(".md")) found.push(path);
+  }
+  return found;
+}
+
+/** The pages that declare a section: the published Markdown and the prose MDX. */
+function walkAudience(dir) {
+  if (!existsSync(dir)) return [];
+  const found = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...walkAudience(path));
+    else if (entry.name.endsWith(".md") || entry.name.endsWith(".mdx")) found.push(path);
   }
   return found;
 }
@@ -207,6 +223,11 @@ for (const page of pages) {
   }
 }
 
+for (const page of walkAudience(docs)) {
+  const problem = audienceProblem(readFileSync(page, "utf8"));
+  if (problem !== null) problems.push(`${rel(page)}: ${problem}.`);
+}
+
 const docsIndex = readFileSync(join(docs, "README.md"), "utf8");
 for (const section of SECTIONS) {
   const indexPath = join(docs, section, "index.md");
@@ -234,5 +255,6 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `docs-check: ${pages.length} pages, no broken links, anchors, paths or retired phrases.`,
+  `docs-check: ${pages.length} pages, ${walkAudience(docs).length} with an audience, ` +
+    "no broken links, anchors, paths, retired phrases or unplaced pages.",
 );

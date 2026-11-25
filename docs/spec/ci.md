@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # CI specification
 
 Status: draft 0.1. Phases 1 and 2 are live: Actions is enabled, `.github/workflows/ci.yml` maps a

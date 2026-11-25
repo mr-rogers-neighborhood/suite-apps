@@ -59,7 +59,9 @@ async function captureProofScreenshot(
   });
 }
 
-test("opens the explorer index and navigates to a handbook page", { tag: "@proof" }, async () => {
+test("opens the explorer, crosses to the handbook and reads a page", {
+  tag: "@proof",
+}, async () => {
   const testInfo = test.info();
   const userData = await mkdtemp(join(tmpdir(), "suite-help-proof-"));
   const proofDir = process.env.SUITE_PROOF_DIR ?? join(process.cwd(), ".dev", "proof");
@@ -80,13 +82,19 @@ test("opens the explorer index and navigates to a handbook page", { tag: "@proof
 
   try {
     await test.step("Open the indexed code explorer", async () => {
-      await expect(page.getByRole("link", { name: "Handbook" })).toBeVisible();
+      await expect(page.getByRole("link", { name: /View the user handbook/ })).toBeVisible();
       await expect(page.getByRole("button", { name: "Modules" })).toBeVisible();
       await captureProofScreenshot(page, proofDir, "01-explorer.png", testInfo);
     });
 
-    await test.step("Search the handbook and open Run the gate", async () => {
-      await page.getByRole("link", { name: "Handbook" }).click();
+    await test.step("Switch to the user handbook", async () => {
+      await page.getByRole("link", { name: /View the user handbook/ }).click();
+      await expect(page.getByRole("heading", { name: "User handbook", level: 1 })).toBeVisible();
+      await captureProofScreenshot(page, proofDir, "02-user-handbook.png", testInfo);
+    });
+
+    await test.step("Switch back and search the developer documentation for Run the gate", async () => {
+      await page.getByRole("link", { name: /Switch to the developer documentation/ }).click();
       await page.getByLabel("Search the handbook").fill("Run the gate");
       await page
         .getByRole("link", { name: /Run the gate/ })
@@ -95,7 +103,7 @@ test("opens the explorer index and navigates to a handbook page", { tag: "@proof
 
       await expect(page.getByRole("heading", { name: "Run the gate", level: 1 })).toBeVisible();
 
-      await captureProofScreenshot(page, proofDir, "02-handbook-article.png", testInfo);
+      await captureProofScreenshot(page, proofDir, "03-handbook-article.png", testInfo);
     });
   } finally {
     const tracePath = join(proofDir, "trace.zip");

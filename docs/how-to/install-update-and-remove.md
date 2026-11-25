@@ -1,3 +1,7 @@
+---
+audience: user
+---
+
 # Install, update and remove apps
 
 Suite Desk is the desktop host and the way in. [Install the host](../../hosts/desk/README.md#install-as-a-flatpak)

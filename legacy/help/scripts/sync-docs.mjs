@@ -11,8 +11,8 @@
  *   2. A missing `title` comes from the page's `# ` heading, which is then
  *      removed from the body so the page does not render two H1s. A missing
  *      `description` comes from the first prose paragraph.
- *   3. A link between pages becomes its `/handbook/...` route, so it stays inside
- *      the app. A relative link that leaves `docs/` points at GitHub instead,
+ *   3. A link between pages becomes its section route, so it stays inside the
+ *      app. A relative link that leaves `docs/` points at GitHub instead,
  *      because the site has no page for it.
  *   4. HTML comments are dropped; they carry no published meaning.
  *   5. `<br>` is the one HTML tag the docs use in prose, and is preserved. Other
@@ -21,6 +21,11 @@
  * The sidebar is generated as `_meta.json` per directory, because that is what
  * Fumadocs reads: the sections in their written order, a section's index page
  * first, and every other page in file order.
+ *
+ * Every page must declare `audience: user | developer`. A missing or unknown
+ * value stops the sync: the reader has two sections and no default one, so a page
+ * that does not choose is a page with no route. A link between pages is written
+ * to the target's section.
  *
  * The output is a pure function of `docs/`: the target is deleted first, entries
  * are walked in sorted order, and nothing is read from the previous run.
@@ -31,6 +36,7 @@ import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promi
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { readAudience, sectionPath } from "../../../scripts/lib/audiences.mjs";
 import { rewriteLinks } from "./lib/docs-links.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -256,6 +262,26 @@ const { files, dirs } = await walk("");
 const fileSet = new Set(files);
 const dirSet = new Set(dirs);
 
+/**
+ * The section each page declares, read before anything is written.
+ *
+ * `sync-docs` is the adapter between plain Markdown and the reader, so this is
+ * the place a page without an `audience` stops: there is no default section to
+ * fall back to.
+ */
+const audiences = new Map();
+for (const rel of files) {
+  const source = await readFile(join(sourceDir, rel), "utf8");
+  const { audience, problem } = readAudience(source);
+  if (audience === undefined) {
+    throw new Error(
+      `docs/${rel}: ${problem}. Every page declares ` +
+        "`audience: user` or `audience: developer` in its frontmatter.",
+    );
+  }
+  audiences.set(rel, audience);
+}
+
 await rm(contentDir, { recursive: true, force: true });
 await mkdir(contentDir, { recursive: true });
 
@@ -274,7 +300,7 @@ function searchText(page) {
     .slice(0, 6000);
 }
 
-function searchEntry(page, rel) {
+function searchEntry(page, rel, audience) {
   const frontmatter = /^---\n([\s\S]*?)\n---/u.exec(page)?.[1] ?? "";
   const title = /^title\s*:\s*(.+)$/mu
     .exec(frontmatter)?.[1]
@@ -285,12 +311,8 @@ function searchEntry(page, rel) {
       .exec(frontmatter)?.[1]
       ?.trim()
       .replaceAll(/^["']|["']$/g, "") ?? "";
-  const slug = targetPath(rel)
-    .replace(/\.mdx$/u, "")
-    .replace(/(^|\/)index$/u, "")
-    .replace(/\/$/u, "");
   return {
-    url: slug === "" ? "/handbook" : `/handbook/${slug}`,
+    url: sectionPath(audience, rel),
     title: title ?? humanize(rel),
     description,
     text: searchText(page),
@@ -301,11 +323,12 @@ const searchEntries = [];
 
 for (const rel of files) {
   const source = await readFile(join(sourceDir, rel), "utf8");
-  const page = rewriteLinks(convertPage(source, rel), rel, fileSet, dirSet);
+  const audience = audiences.get(rel);
+  const page = rewriteLinks(convertPage(source, rel), rel, fileSet, dirSet, audiences);
   const target = join(contentDir, targetPath(rel));
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, page, "utf8");
-  searchEntries.push(searchEntry(page, rel));
+  searchEntries.push(searchEntry(page, rel, audience));
 }
 
 await mkdir(dataDir, { recursive: true });
@@ -329,7 +352,7 @@ async function writeMeta() {
   const rootPages = ["index", ...SECTION_ORDER.filter((name) => dirSet.has(name))];
   await writeFile(
     join(contentDir, "_meta.json"),
-    `${JSON.stringify({ title: "Developer documentation", pages: rootPages }, null, 2)}\n`,
+    `${JSON.stringify({ title: "Documentation", pages: rootPages }, null, 2)}\n`,
     "utf8",
   );
 

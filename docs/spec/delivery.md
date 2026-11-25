@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Delivery specification
 
 Status: draft 0.1. Target for packaging, channels and release. Today's state is in

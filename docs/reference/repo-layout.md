@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Repository layout
 
 One pnpm workspace at the root. Hosts under `hosts/`, the frozen apps and their shells under

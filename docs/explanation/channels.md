@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Channels
 
 A channel is a product promise. The build on a card is not only newer or older: its channel says what

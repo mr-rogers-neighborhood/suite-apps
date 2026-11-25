@@ -33,20 +33,12 @@ export function readExplorerUrl(search: string): UrlState {
 }
 
 /**
- * The handbook URL for one page under `docs/`.
+ * The section route for a tour's `doc` target.
  *
- * The sync step turns `README.md` into a folder index and `foo.md` into `foo`,
- * so the explorer's `doc` tour target uses the same mapping rather than a second
- * convention.
+ * The audience comes from the generated index; this module does not keep a second
+ * list. Re-exported here so the explorer imports one route helper, not two.
  */
-export function handbookPathForDocsFile(path: string): string {
-  const relative = path.replace(/^docs\/?/u, "").replace(/\.mdx?$/iu, "");
-  const slug = relative
-    .replace(/(^|\/)README$/iu, "$1index")
-    .replace(/(^|\/)index$/iu, "$1")
-    .replace(/\/+$/u, "");
-  return slug === "" ? "/handbook" : `/handbook/${slug}`;
-}
+export { docsPageUrl } from "./handbook-pages";
 
 /** The explorer query string for one view, without the route. */
 export function explorerHref(params: {

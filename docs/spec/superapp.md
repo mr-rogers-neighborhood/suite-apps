@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Suite superapp and pack specification
 
 Version 0.1 · Draft · [Orientation](README.md) · [Manifest schema](manifest.schema.json) ·

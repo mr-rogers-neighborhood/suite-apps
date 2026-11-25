@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Menu bar
 
 `@suite/ui/MenuBar` is the shared top bar. Its rule is a contract between the host and the active app:

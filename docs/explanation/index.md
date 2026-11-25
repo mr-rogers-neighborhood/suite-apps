@@ -1,3 +1,7 @@
+---
+audience: user
+---
+
 # Explanation
 
 Why the product and the code are shaped this way. These pages give reasons, not steps.

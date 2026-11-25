@@ -1,3 +1,7 @@
+---
+audience: user
+---
+
 # 1. Install the desktop apps
 
 Suite Desk is the desktop host and the way in: install it once, then install packs from its
