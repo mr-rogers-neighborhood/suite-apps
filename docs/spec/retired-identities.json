@@ -1,0 +1,69 @@
+{
+  "$comment": "Reviewed exceptions to the retired-identity guard in scripts/docs-check.mjs. Each entry names one retired identity, the pattern that finds it, and the tracked files allowed to mention it, with the reason review accepted. Add a path only for history, a no-migration note, or a frozen app's own name; a live page that points a reader at a retired name does not belong here.",
+  "retired": [
+    {
+      "name": "apps/shell",
+      "pattern": "\\bapps/shell\\b",
+      "why": "the desktop app lives at hosts/desk; the old directory is history",
+      "allowed": {
+        "docs/reference/decisions.md": "Tier 1 names the old directory as history (#335)"
+      }
+    },
+    {
+      "name": "@suite/shell",
+      "pattern": "@suite/shell(?![-\\w])",
+      "why": "the desktop package is @suite/desk; the old name is history",
+      "allowed": {
+        "docs/reference/decisions.md": "Tier 1 names the old package as history (#335)"
+      }
+    },
+    {
+      "name": "run.suite.shell",
+      "pattern": "\\brun\\.suite\\.shell(?![-.\\w])",
+      "why": "the desktop Flatpak is run.suite.desk; the old id is not an install path",
+      "allowed": {
+        "docs/explanation/channels.md": "the fresh-start note explains that the old id does not update",
+        "docs/reference/decisions.md": "the Tier 1 and Tier 2 history names the old id",
+        "docs/spec/delivery.md": "the delivery contract records the no-migration rule",
+        "hosts/desk/CHANGELOG.md": "historical changelog entries",
+        "hosts/desk/README.md": "the explicit no-migration note",
+        "hosts/desk/electron-builder.yml": "the packaging comment records the no-migration rule",
+        "scripts/lib/deskChannel.mjs": "the channel helper's comment records the no-migration rule"
+      }
+    },
+    {
+      "name": "SUITE_SHELL_VERSION",
+      "pattern": "\\bSUITE_SHELL_VERSION\\b",
+      "why": "the environment variable belongs to the frozen Canvas shell, not to a new app",
+      "allowed": {
+        "legacy/canvas/desktop/scripts/shell.mjs": "Canvas's frozen shell sets its own version variable",
+        "legacy/canvas/desktop/src/preload/index.cjs": "Canvas's preload reads the frozen shell variable",
+        "legacy/canvas/e2e/scripts/desktop.ts": "Canvas's e2e launcher sets the frozen shell variable",
+        "legacy/canvas/e2e/tests/desktop/proof.spec.ts": "Canvas's proof sets the frozen shell variable"
+      }
+    },
+    {
+      "name": "per-app release tag",
+      "pattern": "\\b(?:canvas|planner|budget|desk|go|help|sync|start|shell)-v(?:\\d[\\w.+-]*|<version>)",
+      "why": "per-app tags are retired; a release tag names the rolling suite (R4.3)",
+      "allowed": {
+        "AGENTS.md": "release history: the sync tarballs are retired",
+        "docs/how-to/package-and-release.md": "release history: the sync tarballs are retired",
+        "docs/modules/config-scripts.mdx": "module note: the relay tarball is retired history",
+        "docs/reference/decisions.md": "release history: the tarball stays downloadable",
+        "docs/reference/packaging-channels.md": "release history: the tarball releases are retired",
+        "docs/tours/release-sign-and-publish.mdx": "tour: the tarball releases are retired history",
+        "hosts/go/CHANGELOG.md": "historical changelog: Go's old tag convention",
+        "legacy/budget/CHANGELOG.md": "historical changelog: Budget's old tag convention",
+        "legacy/canvas/CHANGELOG.md": "historical changelog: Canvas's old tag convention",
+        "legacy/canvas/docs/how-to/release.md": "the frozen Canvas app's own release instruction",
+        "legacy/canvas/scripts/docs-check.mjs": "the frozen Canvas app's own check of that instruction",
+        "legacy/planner/CHANGELOG.md": "historical changelog: Planner's old tag convention",
+        "scripts/delivery-signals.test.mjs": "test fixtures for parsing the retired tag forms",
+        "scripts/release.mjs": "the retirement note for the relay tarball",
+        "services/relay/CHANGELOG.md": "historical changelog: the relay's old tag convention",
+        "services/relay/docs/how-to/relay.md": "release history: the tarball releases are retired"
+      }
+    }
+  ]
+}

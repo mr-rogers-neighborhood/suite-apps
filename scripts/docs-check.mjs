@@ -11,12 +11,17 @@
  *      developer note, the pre-monorepo sibling workflow, and facts this pass fixed.
  *   7. A page under `docs/` with no `audience: user | developer` frontmatter, or
  *      one that names a section that does not exist.
+ *   8. A retired identity (the old desktop directory, package or Flatpak id, the
+ *      frozen Canvas shell variable, or a per-app release tag) in a tracked or
+ *      newly added text file that the reviewed allowlist does not name.
  *
- * It does not check prose style. It walks `docs/`, every app's `docs/`, and the
- * root pages, and never rewrites anything.
+ * It does not check prose style. It walks `docs/`, every app's `docs/` and the
+ * root pages, reads every tracked text file for retired identities, and never
+ * rewrites anything.
  *
  * Usage: node scripts/docs-check.mjs
  */
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,6 +80,11 @@ const REPLACED_REPO =
 /** Inline code is checked only when it looks like a path from a known repository root. */
 const REPO_PATH = /^(?:[\w.@+-]+\/)+[\w.@+.-]+\.[A-Za-z0-9]{1,8}$/;
 const REPO_PATH_ROOTS = /^(docs|packages|scripts|packaging|hosts|legacy|packs|services)\//;
+
+/** The reviewed allowlist, so a retired name is excused by a path, not by a regex here. */
+const RETIRED_ALLOWLIST = "docs/spec/retired-identities.json";
+const RETIRED = JSON.parse(readFileSync(join(root, RETIRED_ALLOWLIST), "utf8")).retired;
+const RETIRED_TEXT = /\.(?:mdx?|mjs|cjs|jsx?|tsx?|json|ya?ml)$/u;
 
 const problems = [];
 
@@ -154,6 +164,29 @@ function lineAt(text, index) {
   return text.slice(0, index).split("\n").length;
 }
 
+/**
+ * Tracked text plus new files that are not ignored.
+ *
+ * A page added in the same change has to be checked before it is committed, and
+ * an ignored build tree has to stay out, so `--cached --others --exclude-standard`
+ * is the file set the guard reads.
+ */
+function trackedTextFiles() {
+  return execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+    { cwd: root, encoding: "utf8" },
+  )
+    .split("\0")
+    .filter(
+      (path) =>
+        path.length > 0 &&
+        path !== RETIRED_ALLOWLIST &&
+        RETIRED_TEXT.test(path) &&
+        existsSync(join(root, path)),
+    );
+}
+
 const pages = [
   ...ROOT_PAGES.map((name) => join(root, name)).filter((path) => existsSync(path)),
   ...walk(docs),
@@ -223,6 +256,19 @@ for (const page of pages) {
   }
 }
 
+for (const path of trackedTextFiles()) {
+  const text = readFileSync(join(root, path), "utf8");
+  for (const identity of RETIRED) {
+    if (identity.allowed[path] !== undefined) continue;
+    for (const match of text.matchAll(new RegExp(identity.pattern, "gu"))) {
+      problems.push(
+        `${path}:${lineAt(text, match.index)}: retired identity \`${match[0]}\` ` +
+          `(${identity.name}): ${identity.why}.`,
+      );
+    }
+  }
+}
+
 for (const page of walkAudience(docs)) {
   const problem = audienceProblem(readFileSync(page, "utf8"));
   if (problem !== null) problems.push(`${rel(page)}: ${problem}.`);
@@ -256,5 +302,5 @@ if (problems.length > 0) {
 
 console.log(
   `docs-check: ${pages.length} pages, ${walkAudience(docs).length} with an audience, ` +
-    "no broken links, anchors, paths, retired phrases or unplaced pages.",
+    "no broken links, anchors, paths, retired phrases, retired identities or unplaced pages.",
 );
