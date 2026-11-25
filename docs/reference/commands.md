@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Commands
 
 The toolchain is pinned in `package.json`: the Node engine and the pnpm version. `mise exec --` makes

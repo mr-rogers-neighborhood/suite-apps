@@ -1,3 +1,7 @@
+---
+audience: user
+---
+
 # The mini-app model
 
 Suite's host model — one container that opens packaged apps — follows the W3C MiniApp model that

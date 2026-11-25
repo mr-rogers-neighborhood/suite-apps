@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Suite Help
 
 The documentation app: the code explorer and the handbook in one offline Electron window.

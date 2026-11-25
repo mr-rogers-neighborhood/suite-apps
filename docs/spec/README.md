@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Suite superapp specification
 
 Status: **draft 0.1**. The normative text is [superapp.md](superapp.md); the machine-readable manifest

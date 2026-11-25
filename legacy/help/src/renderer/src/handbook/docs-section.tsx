@@ -1,28 +1,72 @@
-import type { Node, Root } from "fumadocs-core/page-tree";
+import type { Node } from "fumadocs-core/page-tree";
 import { ChevronRight, ExternalLink, GitBranch, Search, X } from "lucide-react";
 import { type ComponentPropsWithoutRef, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router";
-
+import { Link, Navigate, useLocation } from "react-router";
+import {
+  type Audience,
+  type DocsPage,
+  filterPageTree,
+  otherAudience,
+  SECTION_BASES,
+  SECTION_INTROS,
+  SECTION_TITLES,
+  urlsForAudience,
+} from "@/lib/handbook-pages";
 import { filterHandbookSearch, type HandbookSearchEntry } from "@/lib/handbook-search";
-import { source } from "@/lib/source";
+import { sources } from "@/lib/source";
+import { SectionSwitch } from "@/sections";
 
-/** The shell every handbook page shares: header, page tree, article, contents. */
-export function HandbookPage() {
+/**
+ * One section of the docs, rendered from the one tree.
+ *
+ * The route a page opens at comes from its frontmatter audience: `/handbook` for
+ * the User Handbook, `/developer` for the Developer Documentation. The generated
+ * `/data/docs.json` is the list of pages and their sections, so the sidebar and
+ * the search only show the readers of one section their own pages. A link that
+ * arrives in the wrong section follows the page to its own one instead of showing
+ * a missing page.
+ */
+export function DocsSection({ audience }: { audience: Audience }) {
   const location = useLocation();
+  const base = SECTION_BASES[audience];
+  const source = sources[audience];
   const slugs = location.pathname
-    .replace(/^\/handbook\/?/u, "")
+    .slice(base.length)
     .split("/")
     .filter((segment) => segment.length > 0);
   const page = source.getPage(slugs);
-  const tree = source.getPageTree();
+  const docs = useDocsPages();
   const searchIndex = useHandbookSearch();
   const [query, setQuery] = useState("");
   const [navigatorOpen, setNavigatorOpen] = useState(false);
-  const results = useMemo(() => filterHandbookSearch(searchIndex, query), [query, searchIndex]);
+  const allowed = useMemo(
+    () => (docs.pages === null ? null : urlsForAudience(docs.pages, audience)),
+    [docs.pages, audience],
+  );
+  const tree = useMemo(
+    () => (allowed === null ? [] : filterPageTree(source.getPageTree().children, allowed)),
+    [source, allowed],
+  );
+  const results = useMemo(
+    () =>
+      filterHandbookSearch(searchIndex, query).filter(
+        (entry) => allowed === null || allowed.has(entry.url),
+      ),
+    [query, searchIndex, allowed],
+  );
+  const isSectionRoot = slugs.length === 0;
+  const belongsHere = page !== undefined && allowed?.has(page.url) === true;
 
   useEffect(() => {
     setNavigatorOpen(false);
   }, []);
+
+  // A page from the other section keeps its old link: send the reader to where it
+  // lives now, at the same slug.
+  if (!isSectionRoot && page !== undefined && allowed !== null && !allowed.has(page.url)) {
+    const slug = page.url.slice(base.length);
+    return <Navigate to={`${SECTION_BASES[otherAudience(audience)]}${slug}`} replace />;
+  }
 
   return (
     <div className="min-h-dvh bg-fd-background text-fd-foreground">
@@ -54,17 +98,12 @@ export function HandbookPage() {
             Explorer
           </Link>
           <Link
-            to="/handbook"
-            className="rounded-lg bg-fd-accent px-2 py-1.5 font-medium text-fd-accent-foreground"
-          >
-            Handbook
-          </Link>
-          <Link
             to="/explore?view=tours"
             className="rounded-lg px-2 py-1.5 hover:bg-fd-accent hover:text-fd-foreground"
           >
             Tours
           </Link>
+          <SectionSwitch audience={audience} />
           <a
             href="https://github.com/mrrnbhd/suite-apps"
             target="_blank"
@@ -95,6 +134,9 @@ export function HandbookPage() {
               : "sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 overflow-y-auto border-r border-fd-border p-3 md:block"
           }
         >
+          <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-widest text-fd-muted-foreground">
+            {SECTION_TITLES[audience]}
+          </p>
           <label className="flex items-center gap-2 rounded-lg border border-fd-border px-2 py-1.5">
             <Search className="size-3.5 shrink-0 text-fd-muted-foreground" />
             <input
@@ -121,20 +163,30 @@ export function HandbookPage() {
             <SearchResults entries={results} onNavigate={() => setQuery("")} />
           ) : (
             <nav className="mt-3 text-[13px]">
-              <TreeChildren nodes={tree.children} pathname={location.pathname} />
+              <TreeChildren nodes={tree} pathname={location.pathname} />
             </nav>
           )}
         </aside>
 
         <main id="handbook-main" className="min-w-0 flex-1">
-          {page ? <HandbookArticle page={page} /> : <MissingPage />}
+          {docs.error !== null ? (
+            <DocsError message={docs.error} />
+          ) : docs.pages === null ? (
+            <p className="p-10 text-sm text-fd-muted-foreground">Loading the handbook…</p>
+          ) : belongsHere && page !== undefined ? (
+            <DocsArticle page={page} audience={audience} />
+          ) : isSectionRoot ? (
+            <SectionLanding audience={audience} nodes={tree} />
+          ) : (
+            <MissingPage audience={audience} />
+          )}
         </main>
 
         <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 overflow-y-auto border-l border-fd-border p-4 xl:block">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-fd-muted-foreground">
             On this page
           </p>
-          {page && page.data.toc.length > 0 ? (
+          {page && allowed?.has(page.url) && page.data.toc.length > 0 ? (
             <ul className="mt-2 space-y-1.5 text-xs">
               {page.data.toc
                 .filter((item) => item.depth <= 3)
@@ -172,6 +224,33 @@ function MenuIcon() {
       />
     </svg>
   );
+}
+
+/** The generated audience index: which page opens in which section. */
+function useDocsPages(): { pages: readonly DocsPage[] | null; error: string | null } {
+  const [pages, setPages] = useState<readonly DocsPage[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/data/docs.json")
+      .then((response) => {
+        if (!response.ok) throw new Error(`/data/docs.json returned ${response.status}`);
+        return response.json() as Promise<{ pages?: DocsPage[] }>;
+      })
+      .then((body) => {
+        if (cancelled) return;
+        setPages(body.pages ?? []);
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) {
+          setError(reason instanceof Error ? reason.message : String(reason));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return { pages, error };
 }
 
 function useHandbookSearch(): readonly HandbookSearchEntry[] {
@@ -289,12 +368,79 @@ function PageLink({ item, pathname }: { item: Extract<Node, { type: "page" }>; p
   );
 }
 
-function HandbookArticle({ page }: { page: NonNullable<ReturnType<typeof source.getPage>> }) {
+/**
+ * The section's entry page, when the docs tree root belongs to the other one.
+ *
+ * The developer documentation opens on `docs/README.md`; the user handbook has no
+ * root page, so it opens on a list of the sections it does have. Nothing here is
+ * new prose: every title and description comes from the page tree.
+ */
+function SectionLanding({ audience, nodes }: { audience: Audience; nodes: readonly Node[] }) {
+  const entries: { url: string; name: ReactNode; description?: ReactNode }[] = [];
+  for (const node of nodes) {
+    if (node.type === "page") {
+      entries.push({ url: node.url, name: node.name, description: node.description });
+      continue;
+    }
+    if (node.type !== "folder") continue;
+    if (node.index) {
+      entries.push({
+        url: node.index.url,
+        name: node.index.name,
+        description: node.index.description,
+      });
+      continue;
+    }
+    const first = node.children.find((child) => child.type === "page");
+    if (first !== undefined && first.type === "page") {
+      entries.push({ url: first.url, name: node.name });
+    }
+  }
+
+  return (
+    <article className="mx-auto max-w-3xl px-6 py-8">
+      <header className="space-y-3 border-b border-fd-border pb-6">
+        <p className="text-xs uppercase tracking-widest text-fd-muted-foreground">
+          {SECTION_TITLES[audience]}
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{SECTION_TITLES[audience]}</h1>
+        <p className="text-sm leading-6 text-fd-muted-foreground">{SECTION_INTROS[audience]}</p>
+      </header>
+      <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+        {entries.map((entry) => (
+          <li key={entry.url}>
+            <Link
+              to={entry.url}
+              className="block h-full rounded-lg border border-fd-border p-4 hover:bg-fd-accent"
+            >
+              <span className="text-sm font-semibold">{entry.name}</span>
+              {entry.description ? (
+                <span className="mt-1 block text-xs leading-5 text-fd-muted-foreground">
+                  {entry.description}
+                </span>
+              ) : null}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </article>
+  );
+}
+
+function DocsArticle({
+  page,
+  audience,
+}: {
+  page: NonNullable<ReturnType<(typeof sources)[Audience]["getPage"]>>;
+  audience: Audience;
+}) {
   const Body = page.data.body;
   return (
     <article className="mx-auto max-w-3xl px-6 py-8">
       <header className="space-y-3 border-b border-fd-border pb-6">
-        <p className="text-xs uppercase tracking-widest text-fd-muted-foreground">Handbook</p>
+        <p className="text-xs uppercase tracking-widest text-fd-muted-foreground">
+          {SECTION_TITLES[audience]}
+        </p>
         <h1 className="text-3xl font-bold tracking-tight">{page.data.title}</h1>
         {page.data.description ? (
           <p className="text-sm leading-6 text-fd-muted-foreground">{page.data.description}</p>
@@ -349,7 +495,21 @@ const mdxComponents = {
   a: MdxLink,
 };
 
-function MissingPage(): ReactNode {
+function DocsError({ message }: { message: string }) {
+  return (
+    <div className="mx-auto max-w-2xl space-y-3 p-10">
+      <h1 className="text-2xl font-semibold">The documentation index could not be loaded</h1>
+      <p className="text-sm text-fd-muted-foreground">
+        {message}. Run <code className="rounded bg-fd-muted px-1 py-0.5">pnpm docs:index</code> and{" "}
+        <code className="rounded bg-fd-muted px-1 py-0.5">pnpm docs:build</code> to regenerate the
+        handbook from <code>docs/</code>.
+      </p>
+    </div>
+  );
+}
+
+function MissingPage({ audience }: { audience: Audience }) {
+  const other = otherAudience(audience);
   return (
     <div className="mx-auto max-w-2xl space-y-3 p-10">
       <h1 className="text-2xl font-semibold">This handbook page does not exist</h1>
@@ -358,11 +518,15 @@ function MissingPage(): ReactNode {
         <code className="rounded bg-fd-muted px-1 py-0.5">pnpm docs:build</code> to regenerate the
         handbook from <code>docs/</code>.
       </p>
-      <Link to="/handbook" className="text-sm underline underline-offset-2">
-        Go to the handbook
-      </Link>
+      <p className="text-sm">
+        <Link to={SECTION_BASES[audience]} className="underline underline-offset-2">
+          {SECTION_TITLES[audience]}
+        </Link>
+        {" · "}
+        <Link to={SECTION_BASES[other]} className="underline underline-offset-2">
+          {SECTION_TITLES[other]}
+        </Link>
+      </p>
     </div>
   );
 }
-
-export type HandbookTree = Root;

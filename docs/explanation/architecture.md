@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Architecture
 
 Suite is one repository of apps. They share packages, a gate and a release process, but they do not

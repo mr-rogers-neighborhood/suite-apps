@@ -13,8 +13,29 @@ after a person reviews or rewrites it and adds `reviewed: human` to the module o
 Until then it is generated, whether a person or an agent wrote it.
 
 **Handbook.** The notes archive under `docs/` rendered with the Fumadocs look. The source paths stay
-where they are; the app labels the section _Handbook_. A link between two pages is rewritten to its
-`/handbook/...` route, so it keeps the reader in the app; a link that leaves `docs/` opens GitHub.
+where they are, and each page shows its own section title. A link between two pages is rewritten to
+its section route, so it keeps the reader in the app; a link that leaves `docs/` opens GitHub.
+
+**Two sections.** The same tree is published as the **User Handbook** at `/handbook` and the
+**Developer Documentation** at `/developer`. A page chooses its section in `docs/` frontmatter:
+
+```yaml
+---
+audience: user
+---
+```
+
+`audience: user | developer` is required on every page under `docs/`; a missing or unknown value
+fails `docs-check`, `docs:index:check` and `sync`, because there is no default section. The index
+writes the choice into `public/data/docs.json`, and the reader filters the page tree and the search
+by it. The Spec (`docs/spec/`) is part of the Developer Documentation, not a third section.
+
+The switch between sections sits in both headers — the reader's and the explorer's — as "Not a
+developer? View the user handbook" on a developer page and "Developer? Switch to the developer
+documentation" on a user page. Help opens on the user handbook at `/`; the code explorer at
+`/explore` is the developer side of the same app. A link to a page in the other section is written
+to that page's own route, and an old `/handbook/...` link to a developer page follows the page to
+`/developer/...`.
 
 ## Commands
 
@@ -47,19 +68,20 @@ two-build reproducibility check.
 
 ## What is where
 
-| Path                                 | Purpose                                                                                                                                              |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/main/`                          | Electron main: window policy and the `suite-help://app/` protocol.                                                                                   |
-| `src/preload/`                       | The one `contextBridge` fact the renderer reads.                                                                                                     |
-| `src/renderer/src/explorer/`         | The three-mode explorer, tree, detail pane, search and code view.                                                                                    |
-| `src/renderer/src/handbook/`         | The handbook layout, page tree, contents and MDX components.                                                                                         |
-| `src/renderer/src/lib/source.ts`     | Fumadocs headless source: the generated docs tree and MDX bodies.                                                                                    |
-| `src/renderer/src/theme.ts`          | `@suite/theme` preset and mode resolution, the `suite.theme` store, and the `data-theme-mode` attributes Fumadocs and Shiki follow.                  |
-| `src/renderer/src/theme-control.tsx` | The preset and brightness selects in both navigator footers.                                                                                         |
-| `scripts/index-code.mjs`             | TypeScript compiler index: files, declarations, imports, tests, modules.                                                                             |
-| `scripts/sync-docs.mjs`              | Mirrors `docs/` into `.generated/docs/` and writes the offline search index.                                                                         |
-| `public/data/`                       | Generated `tree.json`, `search.json`, `modules.json`, `modules/*.json`, `tours.json`, `tour-membership.json`, `handbook-search.json`. Not committed. |
-| `.generated/docs/`                   | Generated handbook content for the Fumadocs source. Not committed.                                                                                   |
+| Path                                     | Purpose                                                                                                                                                           |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/`                              | Electron main: window policy and the `suite-help://app/` protocol.                                                                                                |
+| `src/preload/`                           | The one `contextBridge` fact the renderer reads.                                                                                                                  |
+| `src/renderer/src/explorer/`             | The three-mode explorer, tree, detail pane, search and code view.                                                                                                 |
+| `src/renderer/src/handbook/`             | The docs reader, its page tree, contents and MDX components; both sections mount it.                                                                              |
+| `src/renderer/src/lib/source.ts`         | Fumadocs headless source: one generated docs tree, two loaders (`/handbook`, `/developer`).                                                                       |
+| `src/renderer/src/lib/handbook-pages.ts` | The audience index: section routes, the filter over the page tree, and a tour's `doc` target.                                                                     |
+| `src/renderer/src/theme.ts`              | `@suite/theme` preset and mode resolution, the `suite.theme` store, and the `data-theme-mode` attributes Fumadocs and Shiki follow.                               |
+| `src/renderer/src/theme-control.tsx`     | The preset and brightness selects in both navigator footers.                                                                                                      |
+| `scripts/index-code.mjs`                 | TypeScript compiler index: files, declarations, imports, tests, modules.                                                                                          |
+| `scripts/sync-docs.mjs`                  | Mirrors `docs/` into `.generated/docs/` and writes the offline search index.                                                                                      |
+| `public/data/`                           | Generated `tree.json`, `search.json`, `modules.json`, `modules/*.json`, `tours.json`, `tour-membership.json`, `docs.json`, `handbook-search.json`. Not committed. |
+| `.generated/docs/`                       | Generated handbook content for the Fumadocs source. Not committed.                                                                                                |
 
 Nothing under `public/data/` or `.generated/docs/` is edited by hand: `docs:index` and `docs:build`
 write them from the code and `docs/`.

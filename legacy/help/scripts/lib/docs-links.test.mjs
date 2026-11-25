@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { handbookPathForDocsFile, rewriteHref, rewriteLinks } from "./docs-links.mjs";
+import { sectionPath } from "../../../../scripts/lib/audiences.mjs";
+import { rewriteHref, rewriteLinks } from "./docs-links.mjs";
 
 const files = new Set([
   "README.md",
@@ -13,36 +14,56 @@ const files = new Set([
   "tutorials/index.md",
 ]);
 const dirs = new Set(["how-to", "reference", "tutorials"]);
-const rewrite = (href, rel) => rewriteHref(href, rel, files, dirs);
+/** The section each published page declares, as `sync-docs` reads it. */
+const audiences = new Map([
+  ["README.md", "developer"],
+  ["how-to/index.md", "user"],
+  ["how-to/keys.md", "developer"],
+  ["reference/README.md", "developer"],
+  ["reference/index.md", "developer"],
+  ["reference/decisions.md", "developer"],
+  ["reference/packaging-channels.md", "developer"],
+  ["tutorials/index.md", "user"],
+]);
+const rewrite = (href, rel) => rewriteHref(href, rel, files, dirs, audiences);
 
-describe("handbookPathForDocsFile", () => {
+describe("sectionPath", () => {
   it("folds README and index pages to their folder route", () => {
-    expect(handbookPathForDocsFile("README.md")).toBe("/handbook");
-    expect(handbookPathForDocsFile("reference/README.md")).toBe("/handbook/reference");
-    expect(handbookPathForDocsFile("reference/index.md")).toBe("/handbook/reference");
+    expect(sectionPath("user", "README.md")).toBe("/handbook");
+    expect(sectionPath("developer", "reference/README.md")).toBe("/developer/reference");
+    expect(sectionPath("developer", "reference/index.md")).toBe("/developer/reference");
   });
 
   it("keeps an ordinary page and its fragment", () => {
-    expect(handbookPathForDocsFile("reference/decisions.md")).toBe("/handbook/reference/decisions");
-    expect(handbookPathForDocsFile("reference/decisions.md", "#desktop-host")).toBe(
-      "/handbook/reference/decisions#desktop-host",
+    expect(sectionPath("developer", "reference/decisions.md")).toBe(
+      "/developer/reference/decisions",
+    );
+    expect(sectionPath("developer", "reference/decisions.md", "#desktop-host")).toBe(
+      "/developer/reference/decisions#desktop-host",
     );
   });
 });
 
 describe("rewriteHref", () => {
-  it("points a folder index at the handbook, not the retired /docs route", () => {
+  it("sends a folder index to its own section, not the retired /docs route", () => {
     expect(rewrite("tutorials/index.md", "README.md")).toBe("/handbook/tutorials");
-    expect(rewrite("reference/README.md", "README.md")).toBe("/handbook/reference");
+    expect(rewrite("reference/README.md", "README.md")).toBe("/developer/reference");
   });
 
   it("resolves a relative page link from the page that wrote it", () => {
     expect(rewrite("../reference/decisions.md#desktop-host", "reference/ideas.md")).toBe(
-      "/handbook/reference/decisions#desktop-host",
+      "/developer/reference/decisions#desktop-host",
     );
     expect(rewrite("packaging-channels.md#signing", "reference/keys.md")).toBe(
-      "/handbook/reference/packaging-channels#signing",
+      "/developer/reference/packaging-channels#signing",
     );
+  });
+
+  it("keeps a cross-section link in the app, at the target's section", () => {
+    expect(rewrite("../reference/decisions.md", "how-to/index.md")).toBe(
+      "/developer/reference/decisions",
+    );
+    expect(rewrite("../tutorials/index.md", "reference/decisions.md")).toBe("/handbook/tutorials");
   });
 
   it("sends a link that leaves docs/ to GitHub", () => {
@@ -71,13 +92,20 @@ describe("rewriteHref", () => {
   it("does not invent a route for a page that was not generated", () => {
     expect(rewrite("missing.md", "README.md")).toBe("missing.md");
   });
+
+  it("does not guess a section when the target has no audience", () => {
+    expect(rewriteHref("reference/decisions.md", "README.md", files, dirs, new Map())).toBe(
+      "reference/decisions.md",
+    );
+    expect(rewriteHref("reference", "README.md", files, dirs, new Map())).toBe("reference");
+  });
 });
 
 describe("rewriteLinks", () => {
   it("rewrites a link whose label wraps across lines", () => {
     const body = "[Packaging\nchannels](../reference/packaging-channels.md#signing) owns it.";
-    expect(rewriteLinks(body, "how-to/keys.md", files, dirs)).toBe(
-      "[Packaging\nchannels](/handbook/reference/packaging-channels#signing) owns it.",
+    expect(rewriteLinks(body, "how-to/keys.md", files, dirs, audiences)).toBe(
+      "[Packaging\nchannels](/developer/reference/packaging-channels#signing) owns it.",
     );
   });
 
@@ -91,7 +119,7 @@ describe("rewriteLinks", () => {
       "",
       "![diagram](./diagram.png) and [real](../reference/decisions.md).",
     ].join("\n");
-    expect(rewriteLinks(body, "how-to/keys.md", files, dirs)).toBe(
+    expect(rewriteLinks(body, "how-to/keys.md", files, dirs, audiences)).toBe(
       [
         "`[x](../reference/decisions.md)` stays literal.",
         "",
@@ -99,7 +127,7 @@ describe("rewriteLinks", () => {
         "[x](../reference/decisions.md)",
         "```",
         "",
-        "![diagram](./diagram.png) and [real](/handbook/reference/decisions).",
+        "![diagram](./diagram.png) and [real](/developer/reference/decisions).",
       ].join("\n"),
     );
   });
@@ -111,6 +139,7 @@ describe("rewriteLinks", () => {
         "how-to/keys.md",
         files,
         dirs,
+        audiences,
       ),
     ).toBe(
       "[`RELEASES.md`](https://github.com/mrrnbhd/suite-apps/blob/main/RELEASES.md) is the mirror.",

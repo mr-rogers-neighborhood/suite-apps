@@ -1,3 +1,7 @@
+---
+audience: user
+---
+
 # What Suite is
 
 Suite is a host that installs and runs local-first apps as packs, and sync you run yourself.

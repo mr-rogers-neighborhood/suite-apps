@@ -118,6 +118,7 @@ export const baseData: BaseData = {
   membership: {
     [FILE_ID]: [{ tourId: "start", title: "Start here", step: 0 }],
   } satisfies TourMembership,
+  docs: [{ path: "docs/README.md", slug: "", audience: "developer" }],
 };
 
 export const moduleData: ModuleData = {
@@ -163,6 +164,7 @@ export const responses: ReadonlyMap<string, unknown> = new Map<string, unknown>(
   ["/data/search.json", baseData.search],
   ["/data/tours.json", baseData.tours],
   ["/data/tour-membership.json", baseData.membership],
+  ["/data/docs.json", { version: 1, pages: baseData.docs }],
   ["/data/handbook-search.json", []],
   [`/data/modules/${moduleSummary.slug}.json`, moduleData],
 ]);

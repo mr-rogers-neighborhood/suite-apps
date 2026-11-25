@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Pack authoring
 
 How to lay out a pack source directory and prove it. The rule is

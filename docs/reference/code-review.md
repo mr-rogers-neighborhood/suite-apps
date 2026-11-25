@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Code review
 
 Open Code Review (`ocr`) is the default review engine. It runs **native** OCR — deterministic file

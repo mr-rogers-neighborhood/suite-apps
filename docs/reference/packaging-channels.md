@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Packaging channels
 
 Linux desktop apps in the suite ship as Flatpaks. Suite Go ships as a release-signed Android APK on

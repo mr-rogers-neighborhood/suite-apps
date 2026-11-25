@@ -1,3 +1,7 @@
+---
+audience: user
+---
+
 # Local-first
 
 Local-first software treats the copy on your device as the primary copy. Servers may exist, but they

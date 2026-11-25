@@ -26,6 +26,7 @@ function payload(overrides = {}) {
     "data/tours.json": encoder.encode("[]"),
     "data/tour-membership.json": encoder.encode("{}"),
     "data/handbook-search.json": encoder.encode("[]"),
+    "data/docs.json": encoder.encode('{"version":1,"pages":[]}'),
     "data/modules/apps__help.json": encoder.encode("{}"),
     "assets/index-abc.js": encoder.encode("export {};"),
     ...overrides,

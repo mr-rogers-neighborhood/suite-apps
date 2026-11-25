@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Package and release
 
 The suite has one repository and two artifact forms: Flatpaks for Linux desktop apps — the relay is

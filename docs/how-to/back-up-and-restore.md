@@ -1,3 +1,7 @@
+---
+audience: user
+---
+
 # Back up and restore a document
 
 A Suite document is a file. Closing the app and copying the file is a complete backup. The apps also

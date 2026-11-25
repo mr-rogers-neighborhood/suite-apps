@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Suite documentation
 
 The cross-cutting documentation for the Suite: the host, the apps, the sync server, and the

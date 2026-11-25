@@ -1,3 +1,7 @@
+---
+audience: developer
+---
+
 # Platform support specification
 
 Status: draft 0.1. Target matrix. Today Linux Flatpak and Android APK are the only public forms; the

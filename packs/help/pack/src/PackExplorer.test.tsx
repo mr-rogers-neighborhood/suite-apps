@@ -12,7 +12,7 @@ import { baseData, responses } from "./test/fixtures";
  *
  * The host serves the built page from `suite-pack://<container>.help/index.html`; Help's pack entry
  * chooses `HashRouter` so every view is a hash change inside that one file. This test is that
- * entry's routing proof: the explorer loads its five data files, and Browser, Modules and Tours all
+ * entry's routing proof: the explorer loads its six data files, and Browser, Modules and Tours all
  * open without a repository checkout or a server.
  */
 function jsonResponse(body: unknown): Response {
@@ -23,7 +23,8 @@ function jsonResponse(body: unknown): Response {
   } as Response;
 }
 
-function renderPack() {
+function renderPack(hash = "#/explore") {
+  window.history.replaceState(null, "", hash);
   return render(
     <StrictMode>
       <HashRouter>
@@ -36,8 +37,8 @@ function renderPack() {
 }
 
 beforeEach(() => {
-  // The host opens `suite-pack://<container>.help/index.html` with no hash. HashRouter starts at
-  // `/`, the app redirects to `/explore`, and the address bar gains the hash from there.
+  // The host opens `suite-pack://<container>.help/index.html`; each test names the route it
+  // exercises. A pack with no hash opens the user handbook, which the last test covers.
   window.history.replaceState(null, "", "/");
   vi.stubGlobal(
     "fetch",
@@ -58,6 +59,16 @@ afterEach(() => {
 });
 
 describe("Help as a pack", () => {
+  it("opens the user handbook by default, with the switch to the developer docs", async () => {
+    renderPack("/");
+
+    expect(await screen.findByRole("heading", { name: "User handbook", level: 1 })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /Switch to the developer documentation/u }),
+    ).toBeTruthy();
+    expect(window.location.hash.startsWith("#/handbook")).toBe(true);
+  });
+
   it("opens on the tours index from the bundled data", async () => {
     renderPack();
 

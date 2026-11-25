@@ -108,6 +108,7 @@ const REQUIRED_CORPUS = [
   "data/tours.json",
   "data/tour-membership.json",
   "data/handbook-search.json",
+  "data/docs.json",
 ];
 
 export function checkPayload(files) {

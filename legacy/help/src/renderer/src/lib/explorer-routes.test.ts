@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DataFetch } from "./explorer-data";
 import { loadBaseData } from "./explorer-data";
-import { handbookPathForDocsFile, readExplorerUrl } from "./explorer-routes";
+import { docsPageUrl, readExplorerUrl } from "./explorer-routes";
 
 const tree = {
   type: "folder" as const,
@@ -22,7 +22,7 @@ const mockFetch: DataFetch = async (url) => {
 };
 
 describe("loadBaseData", () => {
-  it("loads the five generated files into one explorer state", async () => {
+  it("loads the six generated files into one explorer state", async () => {
     const seen: string[] = [];
     const data = await loadBaseData(async (url) => {
       seen.push(url);
@@ -34,10 +34,12 @@ describe("loadBaseData", () => {
       "/data/search.json",
       "/data/tours.json",
       "/data/tour-membership.json",
+      "/data/docs.json",
     ]);
     expect(data.tree).toEqual(tree);
     expect(data.modules).toEqual([]);
     expect(data.membership).toEqual({});
+    expect(data.docs).toEqual([]);
   });
 
   it("names the file that failed rather than rendering an empty explorer", async () => {
@@ -75,14 +77,26 @@ describe("readExplorerUrl", () => {
   });
 });
 
-describe("handbookPathForDocsFile", () => {
-  it("maps README, index and ordinary pages to the same slugs sync-docs writes", () => {
-    expect(handbookPathForDocsFile("docs/README.md")).toBe("/handbook");
-    expect(handbookPathForDocsFile("docs/reference/README.md")).toBe("/handbook/reference");
-    expect(handbookPathForDocsFile("docs/reference/index.md")).toBe("/handbook/reference");
-    expect(handbookPathForDocsFile("docs/reference/commands.md")).toBe(
-      "/handbook/reference/commands",
+describe("docsPageUrl", () => {
+  const docs = [
+    { path: "docs/README.md", slug: "", audience: "developer" as const },
+    { path: "docs/how-to/keys.md", slug: "how-to/keys", audience: "developer" as const },
+    {
+      path: "docs/tutorials/01-install.md",
+      slug: "tutorials/01-install",
+      audience: "user" as const,
+    },
+  ];
+
+  it("opens each page in the section its frontmatter names", () => {
+    expect(docsPageUrl(docs, "docs/README.md")).toBe("/developer");
+    expect(docsPageUrl(docs, "docs/how-to/keys.md")).toBe("/developer/how-to/keys");
+    expect(docsPageUrl(docs, "docs/tutorials/01-install.md")).toBe(
+      "/handbook/tutorials/01-install",
     );
-    expect(handbookPathForDocsFile("docs/modules/help.mdx")).toBe("/handbook/modules/help");
+  });
+
+  it("does not invent a route for a page outside the index", () => {
+    expect(docsPageUrl(docs, "docs/spec/missing.md")).toBeUndefined();
   });
 });
