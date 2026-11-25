@@ -99,7 +99,9 @@ const pair = await (async () => {
 async function signedManifest(
   html: string,
   capabilities: PackManifest["capabilities"] = ["documents"],
-  overrides: Partial<Pick<PackManifest, "id" | "name" | "version" | "ring" | "minHost">> = {},
+  overrides: Partial<
+    Pick<PackManifest, "id" | "name" | "version" | "ring" | "minHost" | "network">
+  > = {},
   extraFiles: Record<string, Uint8Array> = {},
 ): Promise<{ manifest: PackManifest; files: Record<string, Uint8Array> }> {
   const files = { "index.html": encoder.encode(html), ...extraFiles };
@@ -233,10 +235,20 @@ describe("the network rule, through the pack store", () => {
     expect([...disk.keys()].some((key) => key.includes("packs/"))).toBe(false);
   });
 
-  it("installs an unsealed pack that declares the capability", async () => {
+  it("installs an unsealed pack that declares the capability and its origins", async () => {
+    resetDisk();
+    const { manifest, files } = await signedManifest(unsealed, ["documents", "network"], {
+      network: { allow: ["https://example.com"] },
+    });
+    expect(await store().install(packArchive(manifest, files))).toMatchObject({ ok: true });
+  });
+
+  it("refuses a network pack that names no origins (S4.4)", async () => {
     resetDisk();
     const { manifest, files } = await signedManifest(unsealed, ["documents", "network"]);
-    expect(await store().install(packArchive(manifest, files))).toMatchObject({ ok: true });
+    const outcome = await store().install(packArchive(manifest, files));
+    expect(outcome).toMatchObject({ ok: false, reason: "policy" });
+    expect(outcome.ok ? "" : outcome.message).toContain("network.allow");
   });
 
   it("does not offer a pack already on disk that fails the rule", async () => {

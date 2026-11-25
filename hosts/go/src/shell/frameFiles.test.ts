@@ -152,6 +152,14 @@ function host(): ModuleHost {
       cancel: async () => undefined,
       cancelAll: async () => undefined,
     },
+    identity: {
+      pack: async () => {
+        throw new Error("unused");
+      },
+      sign: async () => {
+        throw new Error("unused");
+      },
+    },
     theme: { scheme: "light", density: "comfortable", cssVariables: {} },
   };
 }

@@ -21,4 +21,12 @@ The rules that shape Go.
 - Sync is an event, not a background service. The seam is designed; no transport ships.
 - Waking a sleeping device is reserved, not built. Collaboration is a session.
 - A reference is data. A schema bump is a migration.
+- A pack's identity is derived per `(publisher id, pack id)` under `suite/pack-identity/v1`, never the
+  device key. A pack gets the public half and a sign call scoped to its own data; relay frames, role
+  records and membership changes are refused before Ed25519.
+- Consent is one record keyed by `(publisher, pack, version, capability)`. A denial is remembered and
+  only the person clears it from Settings → Apps. A `network` pack carries a non-empty exact-origin
+  allowlist; an empty one is a refusal, not unlimited access.
+- Document bytes cross the frame as `Uint8Array` with a bound, not base64. File payloads keep their own
+  encoding; the document path must not grow a string form for the container to inspect.
 - One app hosts the three domains, with the domain boundaries as hard as they are on the desktop.

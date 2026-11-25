@@ -10,6 +10,9 @@ describe("SettingsSheet", () => {
           open={false}
           choice={{ preset: "suite", mode: "system" }}
           onChange={vi.fn()}
+          apps={[]}
+          onRemoveApp={vi.fn()}
+          onReask={vi.fn()}
           onClose={vi.fn()}
         />,
       ),
@@ -22,6 +25,9 @@ describe("SettingsSheet", () => {
         open
         choice={{ preset: "suite", mode: "system" }}
         onChange={vi.fn()}
+        apps={[]}
+        onRemoveApp={vi.fn()}
+        onReask={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -46,10 +52,54 @@ describe("SettingsSheet", () => {
         open
         choice={{ preset: "warm", mode: "dark" }}
         onChange={vi.fn()}
+        apps={[]}
+        onRemoveApp={vi.fn()}
+        onReask={vi.fn()}
         onClose={vi.fn()}
       />,
     );
     expect(html).toContain('<select aria-label="Theme"');
     expect(html).toContain('<option value="warm" selected="">Warm</option>');
+  });
+
+  it("lists an installed app, its remembered refusal and a deliberate re-ask", () => {
+    const html = renderToString(
+      <SettingsSheet
+        open
+        choice={{ preset: "suite", mode: "system" }}
+        onChange={vi.fn()}
+        apps={[
+          {
+            id: "planner",
+            name: "Planner",
+            version: "2.0.0",
+            publisher: "suite",
+            sizeBytes: 2400,
+            installedAt: Date.UTC(2026, 10, 25),
+            permissions: [
+              {
+                capability: "recents",
+                tier: "first-use",
+                answer: "denied",
+                reason: "read the host's recent-files list",
+                answeredAt: 1,
+              },
+            ],
+          },
+        ]}
+        onRemoveApp={vi.fn()}
+        onReask={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain("Planner");
+    expect(html).toContain("v<!-- -->2.0.0");
+    expect(html).toContain("by <!-- -->suite");
+    expect(html).toContain("2 KB");
+    expect(html).toContain("2026-11-25");
+    expect(html).toContain("recents<!-- -->: <!-- -->denied");
+    expect(html).toContain("Ask again");
+    expect(html).toContain("Remove <!-- -->Planner");
   });
 });

@@ -4,6 +4,7 @@ import {
   checkNetworkPolicy,
   comparePackVersions,
   DEFAULT_PACK_RING,
+  networkAllowlist,
   type PackCapability,
   type PackManifest,
   type PackRing,
@@ -93,7 +94,13 @@ export const HOST_VERSION = 1;
  * (`HOST_CAPABILITIES` in `hosts/desk/src/packs.ts`) because the two hosts serve different
  * surfaces; they agree on the manifests and on the refusal, not on this set.
  */
-export const GO_HOST_CAPABILITIES = GO_HOST.capabilities;
+export const GO_HOST_CAPABILITIES: readonly PackCapability[] = [
+  ...GO_HOST.capabilities,
+  // The shared declaration has not caught up yet, but this build serves the
+  // per-pack identity. Keeping the addition here means a pack declaring it is
+  // installable without editing `@suite/pack` from the Go lane.
+  "identity.pack",
+];
 
 export interface InstalledPack {
   readonly manifest: PackManifest;
@@ -359,7 +366,10 @@ export interface PackStore {
  * cannot be checked, which is the state this rule exists to end.
  */
 async function packHonoursNetworkPolicy(dir: string, manifest: PackManifest): Promise<boolean> {
-  if (packAllows(manifest, "network")) return true;
+  // S4.4: declaring `network` is not permission to reach anything. A pack with
+  // no exact-origin list is refused on load as well as at install, because it
+  // may have been installed by an older build.
+  if (packAllows(manifest, "network")) return networkAllowlist(manifest).length > 0;
   try {
     const html = await readTextFile(`${dir}/${manifest.entry}`);
     return packDocumentSealsNetwork(html);

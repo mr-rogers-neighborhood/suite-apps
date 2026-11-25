@@ -7,6 +7,7 @@ function entry(overrides: Partial<CatalogueEntry> = {}): CatalogueEntry {
   return {
     id: "probe",
     name: "Probe",
+    order: 0,
     description: "A small app",
     version: "2.0.0",
     capabilities: ["documents", "notifications"],

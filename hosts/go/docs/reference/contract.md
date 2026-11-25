@@ -56,6 +56,7 @@ nobody can reproduce.
 | `documents`     | list, create, open, save, remove                                                          | Never returns a parsed document. Bytes, a name, a title, a timestamp                                      |
 | `files`         | list, stat, mkdir, read, write, rename, remove, backup, lock; pickOpen, exportFile, share | Relative paths only, inside the pack's own root; a link, a device, an absolute path or a climb is refused |
 | `storage`       | get, set, delete, keys                                                                    | Already namespaced per module, so one module cannot read another's key                                    |
+| `identity`      | `pack()`, `sign("pack-data", bytes)`                                                      | Only the public half and a derived signature; never the device key, a relay frame or a role record        |
 | `navigation`    | `setTitle`, `close`                                                                       | Not a general stack: leaving a module returns to home, always                                             |
 | `theme`         | scheme, density, CSS variables                                                            | Names no colour and no spacing value                                                                      |
 | `notifications` | permission, request, schedule, cancel                                                     | Carries a title and a time, stores nothing, and restarts nothing                                          |
@@ -66,10 +67,25 @@ through `ModuleHost` today, and it is not a claim that sync works on mobile. It 
 boundary can be reviewed before an implementation exists; [the sync capability](../../../../services/relay/docs/reference/sync-capability.md)
 states the operations, states and failure shape a future host would have to honour.
 
+### Identity and consent are host services, not pack state
+
+`identity.pack` is a per-pack key derived from the host's device key over
+`(publisher id, pack id)` under `suite/pack-identity/v1`. A mounted module receives only the public
+half plus a host-mediated sign call; the derived secret stays in the host. The sign guard accepts
+`pack-data` and refuses a relay frame, a role record and a membership change (S4.7). The derivation
+is shared with the desktop host, so one identity works on both.
+
+A pack that declares a capability does not get it for free. `hosts/go/src/host/consent.ts` keeps one
+record keyed by `(publisher, pack, version, capability)`, at the spec's tier: install, first use,
+every use or a thirty-day token. A remembered denial is an entry, not a missing row, and is shown in
+Settings → Apps. An update with a new capability has no answer and pauses on a fresh question. A pack
+that declares `network` also carries a non-empty exact-origin `network.allow`; the host refuses the
+pack rather than reading an empty list as permission to reach anything (S4.4).
+
 Two consequences follow from the document refusal, and both are load-bearing:
 
-1. **A recents entry's title comes from the module**, supplied when it saves. A base64 Loro snapshot has
-   no human name in it, and a container that learned to read one would have learned a domain.
+1. **A recents entry's title comes from the module**, supplied when it saves. An opaque Loro snapshot
+   has no human name in it, and a container that learned to read one would have learned a domain.
 2. **The container cannot tell a `.planner` from a `.budget`**, which is exactly why adding the second
    domain will not require touching it.
 
@@ -87,6 +103,10 @@ Two things make that safe rather than sloppy:
 - **A request that is never answered is rejected** after ten seconds, not left hanging. That matters more
   than it sounds: because the chain is serial, one unanswered request used to stall every later one —
   including a debounced save — and a reply is dropped whenever the frame's window is already gone.
+- **Document bytes stay bytes.** A `documents.create`, `open` or `save` carries a `Uint8Array` through
+  structured clone, bounded on both sides by `MAX_FRAME_BYTES` (#149). An older pack that still sends a
+  base64 `payload` is refused with a sentence, not decoded as if a string were bytes. Non-document file
+  payloads keep their own format; this rule is about the document path only.
 
 The sync protocol has a full session type of its own, with projections and the epoch rule stated once, in
 [suite-sync's protocol note](../../../../services/relay/docs/protocol-sessions.md).

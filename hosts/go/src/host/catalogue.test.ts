@@ -224,10 +224,12 @@ describe("loading a catalogue index", () => {
 
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
+    // The index's own order is the shelf's order; sorting by name would replace
+    // the publisher's declaration with the alphabet.
     expect(loaded.entries.map((row) => [row.id, row.version, row.action])).toEqual([
-      ["fresh", "1.0.0", "install"],
-      ["other", "1.0.0", "reinstall"],
       ["probe", "2.0.0", "update"],
+      ["other", "1.0.0", "reinstall"],
+      ["fresh", "1.0.0", "install"],
     ]);
     expect(loaded.entries.find((row) => row.id === "probe")?.installedVersion).toBe("1.0.0");
   });

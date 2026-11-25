@@ -14,6 +14,7 @@ import {
 } from "@suite/pack";
 import { GO_HOST } from "@suite/pack/platforms";
 import {
+  GO_HOST_CAPABILITIES,
   type InstallFailureReason,
   type InstallOutcome,
   MAX_ARCHIVE_BYTES,
@@ -45,6 +46,9 @@ const INDEX_HEAD_VERSION = 1;
 const INDEX_TIMEOUT_MS = 15_000;
 const ARCHIVE_TIMEOUT_MS = 60_000;
 
+/** Go's declaration for a platform check, including the capabilities this build serves. */
+const CATALOGUE_HOST = { ...GO_HOST, capabilities: GO_HOST_CAPABILITIES };
+
 /** A request function, injected so tests never touch the network. */
 export type CatalogueFetch = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -61,6 +65,13 @@ export type CatalogueAction = "install" | "update" | "reinstall" | "current";
 export interface CatalogueEntry {
   readonly id: string;
   readonly name: string;
+  /**
+   * The position the verified index gave this pack.
+   *
+   * The index is the one ordered declaration the host has, so Home can show a
+   * shadow shelf in the publisher's order without a domain id in the shell.
+   */
+  readonly order: number;
   readonly description: string | null;
   readonly version: string;
   readonly capabilities: readonly PackCapability[];
@@ -255,28 +266,28 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
 
     offered = newest;
 
-    const entries = [...newest.values()]
-      .map((entry): CatalogueEntry => {
-        const pack = installed.get(entry.id);
-        const installedVersion = pack?.manifest.version ?? null;
-        return {
-          id: entry.id,
-          name: entry.name,
-          description: entry.description ?? null,
-          version: entry.version,
-          capabilities: entry.capabilities,
-          platform: cataloguePlatform(entry.platforms, entry.capabilities),
-          sizeBytes: entry.archive.size,
-          sha256: entry.archive.sha256,
-          url: entry.archive.url,
-          publisher: entry.publisher,
-          installedVersion,
-          action: actionFor(installedVersion, entry.version),
-        };
-      })
-      .sort(
-        (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
-      );
+    // The index's own order is the shelf's order. Sorting by name here would
+    // replace the publisher's declaration with an accident of the alphabet, and
+    // a host-owned order table would be the container learning a domain.
+    const entries = [...newest.values()].map((entry, order): CatalogueEntry => {
+      const pack = installed.get(entry.id);
+      const installedVersion = pack?.manifest.version ?? null;
+      return {
+        id: entry.id,
+        name: entry.name,
+        order,
+        description: entry.description ?? null,
+        version: entry.version,
+        capabilities: entry.capabilities,
+        platform: cataloguePlatform(entry.platforms, entry.capabilities),
+        sizeBytes: entry.archive.size,
+        sha256: entry.archive.sha256,
+        url: entry.archive.url,
+        publisher: entry.publisher,
+        installedVersion,
+        action: actionFor(installedVersion, entry.version),
+      };
+    });
 
     return { ok: true, entries, sequence: parsed.value.sequence, digest: verified.digest };
   };
@@ -309,7 +320,7 @@ export function createCatalogue(options: CatalogueOptions): Catalogue {
         ...(entry.platforms === undefined ? {} : { platforms: entry.platforms }),
         capabilities: entry.capabilities,
       },
-      GO_HOST,
+      CATALOGUE_HOST,
     );
     if (fit.state === "unavailable") {
       return {
@@ -393,7 +404,7 @@ function cataloguePlatform(
       ...(platforms === undefined ? {} : { platforms }),
       capabilities,
     },
-    GO_HOST,
+    CATALOGUE_HOST,
   );
   if (fit.state === "unknown") {
     return {
@@ -426,6 +437,8 @@ function entryToCatalogue(entry: PackIndexEntry): CatalogueEntry {
   return {
     id: entry.id,
     name: entry.name,
+    // A single install result has no shelf position; the next load assigns one.
+    order: 0,
     description: entry.description ?? null,
     version: entry.version,
     capabilities: entry.capabilities,

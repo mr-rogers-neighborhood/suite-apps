@@ -3,7 +3,9 @@
  * Build and sign a domain pack.
  *
  *   node scripts/pack.mjs --dir path/to/built --id canvas --name Canvas \
- *     --version 0.1.0 --entry index.js --key <private-key-base64> --out Canvas.pack
+ *     --version 0.1.0 --entry index.js --key <private-key-base64> --out Canvas.pack \
+ *     [--publisher-key <base64> [--publisher-id <id>]] \
+ *     [--network https://example.com,wss://relay.example.com]
  *
  * The private key is never in this repository. `pnpm pack:keygen` prints a pair once;
  * the public half goes into `SUITE_PACK_PUBLIC_KEY` in `packages/pack/src/pinnedKey.ts`
@@ -36,6 +38,14 @@ const out = arg("out") ?? `${id}.pack`;
 const contractVersion = Number(arg("contract") ?? 1);
 const minimumHostVersion = arg("min-host");
 const independent = args.includes("--independent");
+/** `--publisher-key <base64> [--publisher-id <id>]` carries who published the pack. */
+const publisherKey = arg("publisher-key");
+const publisherId = arg("publisher-id");
+/** `--network https://one.example,wss://two.example` is the exact-origin allowlist (S4.4). */
+const networkAllow = (arg("network") ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 /**
  * Always `isolated`: ADR-0003 withdrew the shared hosting mode, and the contract refuses it. The
  * `--isolated` flag is still accepted so older build invocations do not fail confusingly.
@@ -86,12 +96,18 @@ const core = {
   id,
   name,
   version,
+  ...(publisherKey === undefined
+    ? {}
+    : {
+        publisher: { ...(publisherId === undefined ? {} : { id: publisherId }), key: publisherKey },
+      }),
   entry,
   contractVersion,
   ...(minimumHostVersion === undefined ? {} : { minimumHostVersion: Number(minimumHostVersion) }),
   independent,
   isolation,
   capabilities,
+  ...(networkAllow.length === 0 ? {} : { network: { allow: networkAllow } }),
   files: manifestFiles,
 };
 

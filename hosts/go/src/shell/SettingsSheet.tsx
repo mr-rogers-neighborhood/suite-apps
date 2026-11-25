@@ -1,24 +1,53 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import type { ConsentView } from "../host/consent.js";
 import { type GoThemeChoice, type ThemeSource, themeOptions } from "../host/theme.js";
+import { formatBytes } from "./Catalogue.js";
+
+/**
+ * One installed app, as Settings → Apps shows it.
+ *
+ * The host renders this from the manifest it installed and the consent record it
+ * keeps. It is not the pack drawing into the host: name, version, publisher,
+ * size, date and answers are all host facts.
+ */
+export interface SettingsApp {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  readonly publisher: string;
+  readonly sizeBytes: number;
+  readonly installedAt: number;
+  readonly permissions: readonly ConsentView[];
+}
 
 /**
  * Settings on the phone.
  *
- * The two controls the host owns: how bright to draw, and which palette family. Suite is
- * first and the default, so a person who never opens this sheet sees what they saw before.
- * A pack has no equivalent control; it renders with the tokens this host resolves.
+ * Theme stays as it is. Apps is the host's own list: what is installed, what it
+ * was granted or refused, and one confirmation to remove it. Removing closes its
+ * tabs in the shell and leaves its documents alone, because the container never
+ * owned them.
  */
 export function SettingsSheet({
   open,
   choice,
   onChange,
+  apps,
+  onRemoveApp,
+  onReask,
   onClose,
 }: {
   readonly open: boolean;
   readonly choice: GoThemeChoice;
   readonly onChange: (choice: GoThemeChoice) => void;
+  readonly apps: readonly SettingsApp[];
+  readonly onRemoveApp: (id: string) => void;
+  /** Clear one remembered answer and ask again, from the app's own row. */
+  readonly onReask: (app: SettingsApp, permission: ConsentView) => void;
   readonly onClose: () => void;
 }) {
+  const [confirming, setConfirming] = useState<string | null>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -45,7 +74,7 @@ export function SettingsSheet({
         role="dialog"
         aria-modal="true"
         aria-label="Settings"
-        className="relative z-10 flex max-h-[85vh] flex-col gap-4 rounded-t-2xl border-t border-[var(--hairline)] bg-[var(--canvas)] p-5 shadow-2xl"
+        className="relative z-10 flex max-h-[85vh] flex-col gap-4 overflow-y-auto rounded-t-2xl border-t border-[var(--hairline)] bg-[var(--canvas)] p-5 shadow-2xl"
       >
         <div className="mx-auto h-1 w-10 rounded-full bg-[var(--hairline)]" aria-hidden="true" />
 
@@ -91,6 +120,89 @@ export function SettingsSheet({
           </select>
         </label>
 
+        <section aria-labelledby="settings-apps" className="flex flex-col gap-2">
+          <h3 id="settings-apps" className="text-[13px] font-medium text-[var(--ink-muted)]">
+            Apps
+          </h3>
+          {apps.length === 0 ? (
+            <p className="text-[14px] text-[var(--ink-muted)]">
+              No app is installed yet. Browse the catalogue on Home.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {apps.map((app) => (
+                <li key={app.id} className="settings-app">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-[16px] font-medium text-[var(--ink)]">{app.name}</span>
+                    <span className="text-[13px] text-[var(--ink-muted)]">v{app.version}</span>
+                    <span className="text-[13px] text-[var(--ink-muted)]">by {app.publisher}</span>
+                    <span className="text-[13px] text-[var(--ink-muted)]">
+                      {formatBytes(app.sizeBytes)} · installed {formatDate(app.installedAt)}
+                    </span>
+                  </div>
+
+                  {app.permissions.length === 0 ? null : (
+                    <ul className="mt-1 flex flex-col gap-1" aria-label={`${app.name} permissions`}>
+                      {app.permissions.map((permission) => (
+                        <li
+                          key={permission.capability}
+                          className="flex flex-wrap items-center gap-2 text-[13px] text-[var(--ink-muted)]"
+                        >
+                          <span>
+                            {permission.capability}: {permission.answer}
+                          </span>
+                          {permission.answer === "granted" ? null : (
+                            <button
+                              type="button"
+                              className="touch settings-app-reask text-[13px] underline"
+                              onClick={() => onReask(app, permission)}
+                            >
+                              Ask again
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {confirming === app.id ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className="min-w-0 flex-1 text-[14px] text-[var(--ink)]">
+                        Remove {app.name}? Its tabs close and its documents stay on this device.
+                      </p>
+                      <button
+                        type="button"
+                        className="touch rounded-xl border border-[var(--hairline)] px-4 text-[15px] font-medium text-[var(--ink)]"
+                        onClick={() => setConfirming(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="touch rounded-xl bg-[var(--accent)] px-4 text-[15px] font-medium text-[var(--on-accent)]"
+                        onClick={() => {
+                          setConfirming(null);
+                          onRemoveApp(app.id);
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="touch mt-2 rounded-xl border border-[var(--hairline)] px-4 text-[15px] font-medium text-[var(--ink)]"
+                      onClick={() => setConfirming(app.id)}
+                    >
+                      Remove {app.name}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <button
           type="button"
           className="touch rounded-xl bg-[var(--accent)] px-5 text-[15px] font-medium text-[var(--on-accent)] focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:outline-none"
@@ -101,4 +213,10 @@ export function SettingsSheet({
       </div>
     </div>
   );
+}
+
+function formatDate(at: number): string {
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return date.toISOString().slice(0, 10);
 }

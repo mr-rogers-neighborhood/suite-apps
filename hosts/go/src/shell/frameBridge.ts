@@ -8,8 +8,15 @@ import type {
   PackCapability,
   PackManifest,
 } from "@suite/go";
-import { FRAME_PROTOCOL, isFrameEnvelope } from "@suite/go";
+import {
+  FRAME_PROTOCOL,
+  isFrameEnvelope,
+  isWithinFrameBytes,
+  MAX_FRAME_BYTES,
+  type PackRecordPurpose,
+} from "@suite/go";
 import { FileStoreError } from "@suite/pack-host/files/core";
+import { CAPABILITY_DENIALS } from "../host/consent.js";
 
 /**
  * The shell's half of the frame bridge.
@@ -56,6 +63,8 @@ const REQUIRED_CAPABILITY: Readonly<Record<FrameRequest["method"], PackCapabilit
   "documents.open": "documents",
   "documents.save": "documents",
   "documents.remove": "documents",
+  "identity.pack": "identity.pack",
+  "identity.sign": "identity.pack",
   "storage.get": "storage",
   "storage.set": "storage",
   "storage.delete": "storage",
@@ -92,13 +101,21 @@ export interface FrameBridgeOptions {
    */
   readonly files: FileService;
   readonly theme: () => FrameTheme;
+  /**
+   * Ask the person at the tier the capability names (S4.2).
+   *
+   * The bridge is the enforcement point because it is where data would actually
+   * move. Omitting the gate is a shell with no consent record; production always
+   * supplies one.
+   */
+  readonly consent?: (capability: PackCapability) => Promise<boolean>;
   /** Where replies go. The iframe's `contentWindow`. */
   readonly target: () => Window | null;
 }
 
 export interface FrameServer {
   /** Answer one request. Split from the transport so a test can drive the bridge directly. */
-  answer(request: FrameRequest, payload?: string): Promise<FrameAnswer>;
+  answer(request: FrameRequest, payload?: string, bytes?: Uint8Array): Promise<FrameAnswer>;
   /** Release every lock this frame took. Called when the frame is destroyed. */
   dispose(): void;
 }
@@ -112,8 +129,19 @@ export function createFrameServer(options: FrameBridgeOptions): FrameServer {
   const answer = async (
     request: FrameRequest,
     payload: string | undefined,
+    bytes: Uint8Array | undefined,
   ): Promise<FrameAnswer> => {
     const { host } = options;
+
+    // The bound is checked before a branch can allocate from the message. A
+    // document now arrives as bytes, so an unbounded one would be an unbounded
+    // copy in the shell as well as in the frame.
+    if (bytes !== undefined && !isWithinFrameBytes(bytes)) {
+      return {
+        ok: false,
+        message: `that payload is ${bytes.byteLength} bytes; the frame bridge carries at most ${MAX_FRAME_BYTES}`,
+      };
+    }
 
     // Deny by default, checked per request rather than at install: the request is where the data
     // would actually move, and a check at install protects nobody.
@@ -127,6 +155,16 @@ export function createFrameServer(options: FrameBridgeOptions): FrameServer {
         return {
           ok: false,
           message: `${manifest.name} ${manifest.version} asked for "${required}" but does not declare it.`,
+        };
+      }
+      // S4.2: a declared capability is not consent. The record answers at its
+      // tier, and a remembered denial is returned without asking again.
+      if (options.consent !== undefined && !(await options.consent(required))) {
+        return {
+          ok: false,
+          message:
+            CAPABILITY_DENIALS[required] ??
+            `${required} is off for ${manifest.name}; ask again in Settings → Apps.`,
         };
       }
     }
@@ -152,24 +190,32 @@ export function createFrameServer(options: FrameBridgeOptions): FrameServer {
             moduleId: host.moduleId,
             name: request.name,
           });
-          return {
-            ok: true,
-            value: { ...created, bytes: toBase64(created.bytes) },
-          };
+          // Bytes stay bytes. Structured clone carries a Uint8Array directly,
+          // so there is no string form of a document here to inspect (#149).
+          return { ok: true, value: { ...created, bytes: created.bytes } };
         }
 
         case "documents.open": {
           const opened = await host.documents.open(request.id);
           if (!opened) return { ok: true, value: null };
-          return { ok: true, value: { ...opened, bytes: toBase64(opened.bytes) } };
+          return { ok: true, value: { ...opened, bytes: opened.bytes } };
         }
 
         case "documents.save": {
-          if (payload === undefined) {
-            return { ok: false, message: "documents.save needs a payload" };
+          // A pack built before #149 still sends base64 in `payload`. Refuse it
+          // with a sentence rather than decoding a string as if it were bytes.
+          if (payload !== undefined && bytes === undefined) {
+            return {
+              ok: false,
+              message:
+                "documents.save no longer accepts base64; send the document as Uint8Array bytes (#149)",
+            };
+          }
+          if (bytes === undefined) {
+            return { ok: false, message: "documents.save needs document bytes" };
           }
           const saved = await host.documents.save(request.id, {
-            bytes: fromBase64(payload),
+            bytes,
             ...(request.title === undefined ? {} : { title: request.title }),
           });
           return { ok: true, value: saved };
@@ -178,6 +224,17 @@ export function createFrameServer(options: FrameBridgeOptions): FrameServer {
         case "documents.remove":
           await host.documents.remove(request.id);
           return { ok: true, value: null };
+
+        case "identity.pack":
+          return { ok: true, value: await host.identity.pack() };
+
+        case "identity.sign": {
+          if (bytes === undefined) {
+            return { ok: false, message: "identity.sign needs bytes" };
+          }
+          const signature = await host.identity.sign(request.purpose as PackRecordPurpose, bytes);
+          return { ok: true, value: { signature } };
+        }
 
         case "storage.get":
           return { ok: true, value: await host.storage.get(request.key) };
@@ -342,7 +399,7 @@ export function createFrameServer(options: FrameBridgeOptions): FrameServer {
   };
 
   return {
-    answer: (request, payload) => answer(request, payload),
+    answer: (request, payload, bytes) => answer(request, payload, bytes),
     dispose() {
       for (const [, lock] of locks) void lock.release().catch(() => undefined);
       locks.clear();
@@ -360,7 +417,7 @@ export function serveFrame(options: FrameBridgeOptions): () => void {
     // cannot borrow this pack's store by posting here.
     if (window === null || event.source !== window) return;
     const envelope = event.data;
-    const reply = await server.answer(envelope.request, envelope.payload);
+    const reply = await server.answer(envelope.request, envelope.payload, envelope.bytes);
     window.postMessage({ ...reply, protocol: FRAME_PROTOCOL, id: envelope.id }, "*");
   };
 
