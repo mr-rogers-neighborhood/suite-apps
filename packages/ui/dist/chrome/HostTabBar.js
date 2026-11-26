@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { cx } from "../cx.js";
 import { MenuBar } from "../menu/MenuBar.js";
 import { FOCUS_RING, MOTION } from "../tokens.js";
-export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onNewTab, mark, onHome, homeLabel = "Home", sync, controls, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId = "host-tab-bar", }) {
+export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onNewTab, mark, onHome, homeLabel = "Home", sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId = "host-tab-bar", }) {
     const tabButtons = useRef(new Map());
     const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId);
     function moveTo(index) {
@@ -65,6 +65,6 @@ export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onNe
                                     onClose(tab.id);
                                 }, className: cx("mr-1 flex h-5 w-5 items-center justify-center rounded-sm text-[var(--ink-faint)] opacity-0 hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)] focus-visible:opacity-100 group-hover/tab:opacity-100 [@media(pointer:coarse)]:opacity-100", MOTION, FOCUS_RING), children: _jsx("span", { "aria-hidden": "true", children: "\u00d7" }) }))] }, tab.id));
                 }) })), onNewTab === undefined ? null : (_jsx("button", { type: "button", "aria-label": "New tab", title: "New tab", onClick: onNewTab, className: cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[length:var(--text-body,13px)] text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: _jsx("span", { "aria-hidden": "true", children: "+" }) }))] }));
-    return (_jsx(MenuBar, { "data-testid": testId, "aria-label": "Suite", ...(mark === undefined ? {} : { mark }), ...(onHome === undefined ? {} : { onNavigateHome: onHome, homeAriaLabel: homeLabel }), navigation: navigation, ...(onOpenSearch === undefined ? {} : { onOpenSearch }), ...(searchPlaceholder === undefined ? {} : { searchPlaceholder }), ...(searchShortcut === undefined ? {} : { searchShortcut }), ...(sync === undefined ? {} : { sync }), ...(controls === undefined ? {} : { controls }) }));
+    return (_jsx(MenuBar, { "data-testid": testId, "aria-label": "Suite", ...(mark === undefined ? {} : { mark }), ...(onHome === undefined ? {} : { onNavigateHome: onHome, homeAriaLabel: homeLabel }), navigation: navigation, ...(search === undefined ? {} : { search }), ...(onOpenSearch === undefined ? {} : { onOpenSearch }), ...(searchPlaceholder === undefined ? {} : { searchPlaceholder }), ...(searchShortcut === undefined ? {} : { searchShortcut }), ...(sync === undefined ? {} : { sync }), ...(controls === undefined ? {} : { controls }) }));
 }
 //# sourceMappingURL=HostTabBar.js.map

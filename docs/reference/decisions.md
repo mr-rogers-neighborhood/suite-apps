@@ -158,6 +158,9 @@ Recorded 2026-11-25.
   that word for host state.
 - The host owns the chrome and renders pack-declared contributions (commands, menus, toolbar,
   status, widgets). A pack draws only its content; it never renders into host DOM.
+- Host-only chrome is the `@suite/ui/chrome` subpath (`HostTabBar`, `NewTabPicker`). A pack imports
+  the pack-safe `@suite/ui` entry; Desk and Go import the subpath. The package exports make the
+  boundary visible in review, and `src/chrome/boundary.test.ts` fails if a pack crosses it.
 - Signed packs are the release rule. The spike loads directory packs for development and must not
   ship as a release path.
 - A host agent is not built now. The host installs packs into its own data directory and leaves

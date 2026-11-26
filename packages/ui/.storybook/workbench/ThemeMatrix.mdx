@@ -1,0 +1,74 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+import index from "../stories.index.json";
+
+export const matrix = index.stories.filter(
+  (story) => story.title.startsWith("Packs/") && story.name !== "Default",
+);
+
+export const label = (tag) => tag.slice(tag.indexOf(":") + 1);
+
+<Meta title="Workbench/Theme matrix" />
+
+# Theme matrix
+
+Every pack surface is one story per preset and mode. The matrix is the set of stories, not a
+single grid, because a host paints the tokens on `:root` and a pack's `@theme` aliases are
+computed there. A wrapper that overrides the tokens below the root does not reach those aliases;
+the first matrix build proved it with Planner's `text-faint`.
+
+Use the **theme**, **mode** and **density** toolbar globals to compare a surface. The story's own
+globals pin the combination, so every cell is also a separate axe test.
+
+## Surfaces
+
+<table>
+  <thead>
+    <tr>
+      <th>Pack</th>
+      <th>Surface</th>
+      <th>Presets and modes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Canvas</td>
+      <td>Board miniature</td>
+      <td>Suite, Solarized, Warm · light, dark</td>
+    </tr>
+    <tr>
+      <td>Planner</td>
+      <td>Capacity meter</td>
+      <td>Suite, Solarized, Warm · light, dark</td>
+    </tr>
+    <tr>
+      <td>Budget</td>
+      <td>Month header</td>
+      <td>Suite, Solarized, Warm · light, dark; compact, cozy, comfortable</td>
+    </tr>
+    <tr>
+      <td>Help</td>
+      <td>Handbook note</td>
+      <td>Suite, Solarized, Warm · light, dark</td>
+    </tr>
+  </tbody>
+</table>
+
+## Stories
+
+{matrix.map((story) => (
+  <p key={story.id}>
+    <a href={`?path=/story/${story.id}`}>{story.title} — {story.name}</a>
+    {" · "}
+    <code>{label(story.tags.find((tag) => tag.startsWith("pack:")))}</code>
+  </p>
+))}
+
+## What the first pass found
+
+- The per-cell wrapper could not repaint a pack alias, because the alias is computed at `:root`.
+  The host's root-level application is the correct model, and the story globals mirror it.
+- The pack surfaces compile against their own `@theme` aliases; the workbench imports each
+  pack's stylesheet with the slice. Canvas, Planner and Help each bring a Tailwind sheet, so the
+  workbench is measuring the real build cost rather than a mock.
+- The next pass is the theme fix: each pack should read the host's tokens rather than its
+  `prefers-color-scheme` fallback. The matrix is the proof of which one still does.

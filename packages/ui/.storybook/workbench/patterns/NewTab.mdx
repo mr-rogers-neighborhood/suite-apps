@@ -1,0 +1,53 @@
+import { Canvas, Meta } from "@storybook/addon-docs/blocks";
+import * as NewTabStories from "../../../src/chrome/NewTabPicker.stories";
+
+<Meta title="Workbench/Patterns/New tab" />
+
+# New tab
+
+The picker is how a person opens a pack or a Screen, or starts a new one. It replaces the old Home
+screen as the default action of `+`; a person can still choose a Screen or a pack as Home.
+
+## When to use it
+
+- A `+`, a keyboard shortcut, or a host's new-tab gesture.
+- Returning to a recent pack or Screen.
+- Starting a Screen before any pack has been opened.
+
+Do not use it as a settings page or a catalogue. Settings has its own tab; installing and removing
+packs belongs there.
+
+## Anatomy
+
+1. **Search** — the only input, focused on open.
+2. **Recents** — the last packs and Screens, most recent first.
+3. **Packs** — installed packs with their own mark.
+4. **Screens** — the person's compositions, plus **New Screen**.
+5. **Settings** — the escape hatch for the app's non-content surfaces.
+
+## Keyboard
+
+- `Ctrl/Cmd+K` or `+` opens the picker.
+- `ArrowUp` / `ArrowDown` move the active row; `Enter` opens it.
+- `Escape` closes the picker and returns focus to the opener.
+- Typing filters every section; a section with no match is hidden.
+
+## Copy
+
+- Placeholder: **Search apps, screens and commands**.
+- Empty: **Nothing matched “…”** with the query named; do not say “No results”.
+- New Screen: **New Screen**; a Screen is a tab, not a workspace.
+- Pack unavailable: `This build cannot open <name>`; do not hide it silently.
+
+## Accessibility
+
+The current picker is a list of buttons with one search input, not yet a full ARIA combobox. Until
+it becomes one, the search input must keep its label, the active row must be reachable with the
+arrow keys, and the section headings must be real headings. The story's axe pass is the check; a
+keyboard-only pass is still required before this pattern is called ready.
+
+## Stories
+
+<Canvas of={NewTabStories.Default} />
+<Canvas of={NewTabStories.NoMatches} />
+<Canvas of={NewTabStories.FirstRun} />

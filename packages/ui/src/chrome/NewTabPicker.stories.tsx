@@ -5,6 +5,7 @@ import { NewTabPicker } from "./NewTabPicker.js";
 const meta = {
   title: "Components/NewTabPicker",
   component: NewTabPicker,
+  tags: ["pack:suite", "layer:host", "status:experimental"],
   args: {
     open: true,
     packs: [

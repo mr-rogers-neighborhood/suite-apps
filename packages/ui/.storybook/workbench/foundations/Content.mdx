@@ -1,0 +1,54 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Workbench/Foundations/Content" />
+
+# Content
+
+The system owns the words a person sees when the product is working, waiting or refusing. A pack
+owns its domain nouns; it does not invent a second voice for buttons, errors or empty states.
+
+## Voice
+
+- **Plain.** Say the thing. “Sync is off” beats “Synchronisation has not been initialised”.
+- **Specific.** Name the object and the action. “Delete this Screen?” not “Are you sure?”.
+- **Calm.** A failure is a fact and a next step, not an apology and not blame.
+- **Sentence case.** Buttons, labels, headings and menu items. Product names keep their spelling.
+- **No architecture.** “Pack”, “document” and “relay” are developer words unless the person is
+  already in a developer surface; use “app”, “file” and “sync”.
+
+## Buttons
+
+- Start with a verb: **Create Screen**, **Start sync**, **Remove pack**.
+- A destructive action names its object: **Delete “Week 48”**, not **Delete**.
+- One primary action per surface. Secondary actions are quiet; a third action belongs in a menu.
+
+## Errors
+
+Say what happened, why if it is knowable, and what to do next. Keep the code out of the sentence.
+
+```text
+Good:  The relay stopped after three restarts. Start it again, or open Settings → Sync.
+Bad:   Error 0x80004005.
+```
+
+Do not promise a retry that the product does not perform.
+
+## Empty states
+
+An empty state says what belongs here and offers one action. It does not explain the architecture.
+
+```text
+Good:  No Screens yet. Create one to group the apps you use together.
+Bad:   The Screen document has no widget placements.
+```
+
+## Destructive actions
+
+Name the thing, say what is removed, and keep the confirmation button specific. Undo is better than
+a confirmation when the operation is reversible.
+
+## Where this shows up
+
+- `Workbench/Patterns/New tab` has the picker's copy.
+- A pack's launcher, dialogs and empty states use the same rules.
+- The host owns the words for chrome; a pack owns the words for its content.

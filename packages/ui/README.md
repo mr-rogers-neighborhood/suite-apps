@@ -80,6 +80,8 @@ duration is a `var(--token)`, never a hex, `bg-black`, `rounded-2xl`, `shadow-lg
 | `AppMark` | An app's glyph on a themed tile, in `currentColor`. |
 | `MenuBar` | The cross-app top bar in seven named zones. Takes nodes; owns no app's state. |
 | `SyncPill` | Sync state as one control: `synced`, `syncing`, `offline`, `conflict`, … |
+| `HostTabBar` | The host's tab strip, built on `MenuBar`. Import it from `@suite/ui/chrome`. |
+| `NewTabPicker` | The searchable new-tab picker. Import it from `@suite/ui/chrome`. |
 | `PrivacyLine` | The one privacy sentence, said the same way everywhere. |
 | `menuKeys` | WAI-ARIA keyboard helpers for a `menubar` and its nested menus. |
 | `cx`, `FOCUS_RING`, `MOTION` | The class helpers a pack needs to compose its own control. |
@@ -128,21 +130,59 @@ pattern: one roving tab stop, arrows move selection and focus (wrapping), Home/E
 and Enter calls `onActivate`. Every colour, radius, shadow and duration is a `var(--token)` from
 `@suite/theme`; no shell names an app, a route or a domain type.
 
+## Host chrome
+
+`HostTabBar` and `NewTabPicker` draw the window a host owns. They live at the `@suite/ui/chrome`
+subpath, not in the pack-safe entry: a pack imports `@suite/ui` and never reaches host chrome by
+accident. Desk and Go import `@suite/ui/chrome`.
+
+The split is also a review rule. A pack that draws a tab strip would put a second bar inside the
+host's; a pack that offers a picker would duplicate the host's launcher. Pack content belongs in
+`AppShell`, `ListView`, `DetailView` and the primitives.
+
 ## Storybook and axe
 
 Stories live beside the component (`src/**/*.stories.tsx`). The preview paints the host's colour
 record and scale record on the story document, so a story is measured under the same tokens a pack
-gets. The toolbar switches **preset** (Suite, Solarized, Warm) and **mode** (light, dark); that is
-the second-theme proof — the surface changes without a component changing.
+gets. The toolbar switches **preset** (Suite, Solarized, Warm), **mode** (light, dark) and
+**density** (compact, cozy, comfortable); that is the second-theme proof — the surface changes
+without a component changing.
 
 `a11y: { test: "error" }` makes every story an axe test. A new violation fails the story rather
 than waiting for someone to open the accessibility panel.
+
+### The workbench
+
+The package's Storybook is the one workbench. It holds the primitives, the host chrome, the
+patterns and one surface per pack:
+
+```sh
+mise exec -- pnpm --filter @suite/ui storybook
+```
+
+- `Workbench/Library` is the generated catalog. Story tags (`pack:`, `layer:`, `status:`) are the
+  index; `scripts/index-stories.mjs` writes `stories.index.json`, and `check` fails if it is stale.
+- `Workbench/Host shell` mounts the real `HostTabBar`, `NewTabPicker` and `SyncPill` with fixture
+  tabs. `Workbench/Patterns/New tab` and `Workbench/Foundations/Content` are the first pattern and
+  content pages.
+- `Workbench/Theme matrix` links the four pack surfaces across every preset and mode; the pack
+  stories live in `packs/*/workbench` and import the pack's own stylesheet.
+- The Storybook MCP server is at `http://localhost:6007/mcp` while Storybook runs. It serves
+  `docs-list`, `docs-show` and `test-run`; the component manifest is on, so an agent can read real
+  props instead of guessing.
+- `capture:workbench` writes local screenshots of the pack matrix under `.artifacts/workbench/`.
+  There is no hosted visual service in the required path.
+
+The owner starts Storybook; the repository's headless rule applies to agents. Read
+[`packages/ui/AGENTS.md`](AGENTS.md) and the
+[`storybook-workbench` skill](../../.agents/skills/storybook-workbench/SKILL.md) before adding a
+story.
 
 ```sh
 pnpm --filter @suite/ui test           # jsdom unit tests, including the token-literal guard
 pnpm --filter @suite/ui test:stories   # every story in headless Chromium, with axe
 pnpm --filter @suite/ui build-storybook
-pnpm --filter @suite/ui check          # build, typecheck, both test runs, storybook build
+pnpm --filter @suite/ui check          # build, typecheck, both test runs, index check, storybook build
 ```
 
 ## Migrating a pack

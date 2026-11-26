@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import wasm from "vite-plugin-wasm";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
@@ -17,7 +18,12 @@ const root = path.dirname(fileURLToPath(import.meta.url));
  */
 export default defineConfig({
   root,
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), wasm()],
+  optimizeDeps: {
+    // Loro ships a wasm-bindgen entry; pre-bundling it breaks the wasm URL on the pack
+    // workbench stories.
+    exclude: ["loro-crdt"],
+  },
   resolve: {
     alias: {
       "@suite/theme": path.join(root, "../theme/src/index.ts"),

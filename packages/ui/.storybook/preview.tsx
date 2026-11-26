@@ -4,6 +4,8 @@ import {
   applyTheme,
   DEFAULT_DENSITY,
   defaultTheme,
+  DENSITIES,
+  type Density,
   isThemeMode,
   presetById,
   type ThemeMode,
@@ -23,13 +25,17 @@ const withTokens: Decorator = (Story, context) => {
   const preset = typeof context.globals.theme === "string" ? context.globals.theme : "suite";
   const rawMode = context.globals.mode;
   const mode: ThemeMode = isThemeMode(rawMode) ? rawMode : "light";
+  const rawDensity = context.globals.density;
+  const density: Density = DENSITIES.includes(rawDensity as Density)
+    ? (rawDensity as Density)
+    : DEFAULT_DENSITY;
 
   useLayoutEffect(() => {
     const root = document.documentElement;
     applyTheme(presetById(preset) ?? defaultTheme(), mode, root);
-    applyScale(DEFAULT_DENSITY, root);
+    applyScale(density, root);
     root.classList.toggle("dark", mode === "dark");
-  }, [preset, mode]);
+  }, [preset, mode, density]);
 
   return (
     <div className="min-h-screen bg-[var(--canvas)] p-8 text-[var(--ink)]">
@@ -40,7 +46,7 @@ const withTokens: Decorator = (Story, context) => {
 
 const preview: Preview = {
   decorators: [withTokens],
-  initialGlobals: { theme: "suite", mode: "light" },
+  initialGlobals: { theme: "suite", mode: "light", density: DEFAULT_DENSITY },
   globalTypes: {
     theme: {
       description: "Theme preset",
@@ -61,6 +67,18 @@ const preview: Preview = {
         items: [
           { value: "light", title: "Light" },
           { value: "dark", title: "Dark" },
+        ],
+        dynamicTitle: true,
+      },
+    },
+    density: {
+      description: "Control density",
+      toolbar: {
+        icon: "ruler",
+        items: [
+          { value: "compact", title: "Compact" },
+          { value: "cozy", title: "Cozy" },
+          { value: "comfortable", title: "Comfortable" },
         ],
         dynamicTitle: true,
       },

@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./chrome": {
+      "types": "./dist/chrome/index.d.ts",
+      "import": "./dist/chrome/index.js",
+      "default": "./dist/chrome/index.js"
     }
   },
   "files": [
@@ -19,11 +24,15 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "build-storybook": "storybook build",
-    "check": "pnpm build && pnpm typecheck && pnpm test && pnpm test:stories && pnpm build-storybook",
+    "build-storybook": "pnpm index:stories && storybook build",
+    "check": "pnpm build && pnpm typecheck && pnpm test && pnpm test:stories && pnpm index:stories:check && pnpm build-storybook",
     "check:full": "pnpm check",
-    "storybook": "storybook dev -p 6007",
-    "test": "vitest run",
+    "capture:workbench": "node scripts/capture-workbench.mjs",
+    "index:stories": "node scripts/index-stories.mjs",
+    "index:stories:check": "node scripts/index-stories.mjs --check",
+    "pretest:stories": "node scripts/clear-storybook-cache.mjs",
+    "storybook": "pnpm index:stories && storybook dev -p 6007",
+    "test": "vitest run --project unit",
     "test:stories": "vitest run --config vitest.stories.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -35,10 +44,11 @@
     "@radix-ui/react-dialog": "^1.3.1"
   },
   "devDependencies": {
-    "@storybook/addon-a11y": "10.6.2",
-    "@storybook/addon-docs": "10.6.2",
-    "@storybook/addon-vitest": "10.6.2",
-    "@storybook/react-vite": "10.6.2",
+    "@storybook/addon-a11y": "10.6.9",
+    "@storybook/addon-docs": "10.6.9",
+    "@storybook/addon-mcp": "10.6.9",
+    "@storybook/addon-vitest": "10.6.9",
+    "@storybook/react-vite": "10.6.9",
     "@suite/theme": "workspace:*",
     "@tailwindcss/vite": "^4.3.4",
     "@testing-library/dom": "^10.4.1",
@@ -54,9 +64,11 @@
     "playwright": "1.65.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "storybook": "10.6.2",
+    "storybook": "10.6.9",
+    "storybook-addon-mock-date": "3.2.2",
     "typescript": "~5.9.3",
     "vite": "^8.3.4",
+    "vite-plugin-wasm": "^3.6.0",
     "vitest": "5.1.0"
   },
   "repository": {

@@ -1,0 +1,1302 @@
+{
+  "schema": 1,
+  "stories": [
+    {
+      "id": "components-appmark--large",
+      "title": "Components/AppMark",
+      "name": "Large",
+      "importPath": "src/AppMark.stories.tsx",
+      "module": "packages/ui/src/AppMark.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-appmark--medium",
+      "title": "Components/AppMark",
+      "name": "Medium",
+      "importPath": "src/AppMark.stories.tsx",
+      "module": "packages/ui/src/AppMark.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-appmark--named",
+      "title": "Components/AppMark",
+      "name": "Named",
+      "importPath": "src/AppMark.stories.tsx",
+      "module": "packages/ui/src/AppMark.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-appmark--small",
+      "title": "Components/AppMark",
+      "name": "Small",
+      "importPath": "src/AppMark.stories.tsx",
+      "module": "packages/ui/src/AppMark.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-appshell--complete",
+      "title": "Components/AppShell",
+      "name": "Complete",
+      "importPath": "src/AppShell.stories.tsx",
+      "module": "packages/ui/src/AppShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-appshell--default",
+      "title": "Components/AppShell",
+      "name": "Default",
+      "importPath": "src/AppShell.stories.tsx",
+      "module": "packages/ui/src/AppShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-appshell--with-actions",
+      "title": "Components/AppShell",
+      "name": "With Actions",
+      "importPath": "src/AppShell.stories.tsx",
+      "module": "packages/ui/src/AppShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-appshell--with-caller-bar",
+      "title": "Components/AppShell",
+      "name": "With Caller Bar",
+      "importPath": "src/AppShell.stories.tsx",
+      "module": "packages/ui/src/AppShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-appshell--with-leading-action",
+      "title": "Components/AppShell",
+      "name": "With Leading Action",
+      "importPath": "src/AppShell.stories.tsx",
+      "module": "packages/ui/src/AppShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-appshell--with-navigation",
+      "title": "Components/AppShell",
+      "name": "With Navigation",
+      "importPath": "src/AppShell.stories.tsx",
+      "module": "packages/ui/src/AppShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-button--danger",
+      "title": "Components/Button",
+      "name": "Danger",
+      "importPath": "src/Button.stories.tsx",
+      "module": "packages/ui/src/Button.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-button--disabled",
+      "title": "Components/Button",
+      "name": "Disabled",
+      "importPath": "src/Button.stories.tsx",
+      "module": "packages/ui/src/Button.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-button--ghost",
+      "title": "Components/Button",
+      "name": "Ghost",
+      "importPath": "src/Button.stories.tsx",
+      "module": "packages/ui/src/Button.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-button--primary",
+      "title": "Components/Button",
+      "name": "Primary",
+      "importPath": "src/Button.stories.tsx",
+      "module": "packages/ui/src/Button.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-button--secondary",
+      "title": "Components/Button",
+      "name": "Secondary",
+      "importPath": "src/Button.stories.tsx",
+      "module": "packages/ui/src/Button.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-button--small",
+      "title": "Components/Button",
+      "name": "Small",
+      "importPath": "src/Button.stories.tsx",
+      "module": "packages/ui/src/Button.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-button--with-icon",
+      "title": "Components/Button",
+      "name": "With Icon",
+      "importPath": "src/Button.stories.tsx",
+      "module": "packages/ui/src/Button.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-detailview--default",
+      "title": "Components/DetailView",
+      "name": "Default",
+      "importPath": "src/DetailView.stories.tsx",
+      "module": "packages/ui/src/DetailView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-detailview--with-actions",
+      "title": "Components/DetailView",
+      "name": "With Actions",
+      "importPath": "src/DetailView.stories.tsx",
+      "module": "packages/ui/src/DetailView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-detailview--with-footer",
+      "title": "Components/DetailView",
+      "name": "With Footer",
+      "importPath": "src/DetailView.stories.tsx",
+      "module": "packages/ui/src/DetailView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-detailview--with-subtitle",
+      "title": "Components/DetailView",
+      "name": "With Subtitle",
+      "importPath": "src/DetailView.stories.tsx",
+      "module": "packages/ui/src/DetailView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-emptystate--default",
+      "title": "Components/EmptyState",
+      "name": "Default",
+      "importPath": "src/EmptyState.stories.tsx",
+      "module": "packages/ui/src/EmptyState.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-emptystate--title-only",
+      "title": "Components/EmptyState",
+      "name": "Title Only",
+      "importPath": "src/EmptyState.stories.tsx",
+      "module": "packages/ui/src/EmptyState.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-emptystate--with-action",
+      "title": "Components/EmptyState",
+      "name": "With Action",
+      "importPath": "src/EmptyState.stories.tsx",
+      "module": "packages/ui/src/EmptyState.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-field--default",
+      "title": "Components/Field",
+      "name": "Default",
+      "importPath": "src/Field.stories.tsx",
+      "module": "packages/ui/src/Field.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-field--disabled",
+      "title": "Components/Field",
+      "name": "Disabled",
+      "importPath": "src/Field.stories.tsx",
+      "module": "packages/ui/src/Field.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-field--with-action",
+      "title": "Components/Field",
+      "name": "With Action",
+      "importPath": "src/Field.stories.tsx",
+      "module": "packages/ui/src/Field.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-field--with-error",
+      "title": "Components/Field",
+      "name": "With Error",
+      "importPath": "src/Field.stories.tsx",
+      "module": "packages/ui/src/Field.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-field--with-hint",
+      "title": "Components/Field",
+      "name": "With Hint",
+      "importPath": "src/Field.stories.tsx",
+      "module": "packages/ui/src/Field.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-field--with-select",
+      "title": "Components/Field",
+      "name": "With Select",
+      "importPath": "src/Field.stories.tsx",
+      "module": "packages/ui/src/Field.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-field--with-trailing",
+      "title": "Components/Field",
+      "name": "With Trailing",
+      "importPath": "src/Field.stories.tsx",
+      "module": "packages/ui/src/Field.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-hosttabbar--default",
+      "title": "Components/HostTabBar",
+      "name": "Default",
+      "importPath": "src/chrome/HostTabBar.stories.tsx",
+      "module": "packages/ui/src/chrome/HostTabBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-hosttabbar--first-run",
+      "title": "Components/HostTabBar",
+      "name": "First Run",
+      "importPath": "src/chrome/HostTabBar.stories.tsx",
+      "module": "packages/ui/src/chrome/HostTabBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-hosttabbar--many-tabs",
+      "title": "Components/HostTabBar",
+      "name": "Many Tabs",
+      "importPath": "src/chrome/HostTabBar.stories.tsx",
+      "module": "packages/ui/src/chrome/HostTabBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-hosttabbar--unavailable",
+      "title": "Components/HostTabBar",
+      "name": "Unavailable",
+      "importPath": "src/chrome/HostTabBar.stories.tsx",
+      "module": "packages/ui/src/chrome/HostTabBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-iconbutton--disabled",
+      "title": "Components/IconButton",
+      "name": "Disabled",
+      "importPath": "src/IconButton.stories.tsx",
+      "module": "packages/ui/src/IconButton.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-iconbutton--medium",
+      "title": "Components/IconButton",
+      "name": "Medium",
+      "importPath": "src/IconButton.stories.tsx",
+      "module": "packages/ui/src/IconButton.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-iconbutton--plain",
+      "title": "Components/IconButton",
+      "name": "Plain",
+      "importPath": "src/IconButton.stories.tsx",
+      "module": "packages/ui/src/IconButton.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-iconbutton--quiet",
+      "title": "Components/IconButton",
+      "name": "Quiet",
+      "importPath": "src/IconButton.stories.tsx",
+      "module": "packages/ui/src/IconButton.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-importmenu--disabled",
+      "title": "Components/ImportMenu",
+      "name": "Disabled",
+      "importPath": "src/ImportMenu.stories.tsx",
+      "module": "packages/ui/src/ImportMenu.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-importmenu--disclosure",
+      "title": "Components/ImportMenu",
+      "name": "Disclosure",
+      "importPath": "src/ImportMenu.stories.tsx",
+      "module": "packages/ui/src/ImportMenu.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-importmenu--single-path",
+      "title": "Components/ImportMenu",
+      "name": "Single Path",
+      "importPath": "src/ImportMenu.stories.tsx",
+      "module": "packages/ui/src/ImportMenu.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-launch--default",
+      "title": "Components/Launch",
+      "name": "Default",
+      "importPath": "src/Launch.stories.tsx",
+      "module": "packages/ui/src/Launch.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-launch--empty",
+      "title": "Components/Launch",
+      "name": "Empty",
+      "importPath": "src/Launch.stories.tsx",
+      "module": "packages/ui/src/Launch.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-launch--with-notice",
+      "title": "Components/Launch",
+      "name": "With Notice",
+      "importPath": "src/Launch.stories.tsx",
+      "module": "packages/ui/src/Launch.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-listview--custom-empty",
+      "title": "Components/ListView",
+      "name": "Custom Empty",
+      "importPath": "src/ListView.stories.tsx",
+      "module": "packages/ui/src/ListView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-listview--default",
+      "title": "Components/ListView",
+      "name": "Default",
+      "importPath": "src/ListView.stories.tsx",
+      "module": "packages/ui/src/ListView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-listview--empty",
+      "title": "Components/ListView",
+      "name": "Empty",
+      "importPath": "src/ListView.stories.tsx",
+      "module": "packages/ui/src/ListView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-listview--nothing-selected",
+      "title": "Components/ListView",
+      "name": "Nothing Selected",
+      "importPath": "src/ListView.stories.tsx",
+      "module": "packages/ui/src/ListView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-listview--with-disabled-row",
+      "title": "Components/ListView",
+      "name": "With Disabled Row",
+      "importPath": "src/ListView.stories.tsx",
+      "module": "packages/ui/src/ListView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-listview--with-sections",
+      "title": "Components/ListView",
+      "name": "With Sections",
+      "importPath": "src/ListView.stories.tsx",
+      "module": "packages/ui/src/ListView.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-menubar--default",
+      "title": "Components/MenuBar",
+      "name": "Default",
+      "importPath": "src/menu/MenuBar.stories.tsx",
+      "module": "packages/ui/src/menu/MenuBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-menubar--with-navigation",
+      "title": "Components/MenuBar",
+      "name": "With Navigation",
+      "importPath": "src/menu/MenuBar.stories.tsx",
+      "module": "packages/ui/src/menu/MenuBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-modal--closed",
+      "title": "Components/Modal",
+      "name": "Closed",
+      "importPath": "src/Modal.stories.tsx",
+      "module": "packages/ui/src/Modal.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-modal--framed",
+      "title": "Components/Modal",
+      "name": "Framed",
+      "importPath": "src/Modal.stories.tsx",
+      "module": "packages/ui/src/Modal.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-modal--open",
+      "title": "Components/Modal",
+      "name": "Open",
+      "importPath": "src/Modal.stories.tsx",
+      "module": "packages/ui/src/Modal.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-modal--small",
+      "title": "Components/Modal",
+      "name": "Small",
+      "importPath": "src/Modal.stories.tsx",
+      "module": "packages/ui/src/Modal.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-newtabpicker--default",
+      "title": "Components/NewTabPicker",
+      "name": "Default",
+      "importPath": "src/chrome/NewTabPicker.stories.tsx",
+      "module": "packages/ui/src/chrome/NewTabPicker.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-newtabpicker--first-run",
+      "title": "Components/NewTabPicker",
+      "name": "First Run",
+      "importPath": "src/chrome/NewTabPicker.stories.tsx",
+      "module": "packages/ui/src/chrome/NewTabPicker.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-newtabpicker--no-matches",
+      "title": "Components/NewTabPicker",
+      "name": "No Matches",
+      "importPath": "src/chrome/NewTabPicker.stories.tsx",
+      "module": "packages/ui/src/chrome/NewTabPicker.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-newtabpicker--unavailable-pack",
+      "title": "Components/NewTabPicker",
+      "name": "Unavailable Pack",
+      "importPath": "src/chrome/NewTabPicker.stories.tsx",
+      "module": "packages/ui/src/chrome/NewTabPicker.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-privacyline--default",
+      "title": "Components/PrivacyLine",
+      "name": "Default",
+      "importPath": "src/PrivacyLine.stories.tsx",
+      "module": "packages/ui/src/PrivacyLine.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-privacyline--with-location",
+      "title": "Components/PrivacyLine",
+      "name": "With Location",
+      "importPath": "src/PrivacyLine.stories.tsx",
+      "module": "packages/ui/src/PrivacyLine.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-syncpill--conflict",
+      "title": "Components/SyncPill",
+      "name": "Conflict",
+      "importPath": "src/menu/SyncPill.stories.tsx",
+      "module": "packages/ui/src/menu/SyncPill.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-syncpill--offline",
+      "title": "Components/SyncPill",
+      "name": "Offline",
+      "importPath": "src/menu/SyncPill.stories.tsx",
+      "module": "packages/ui/src/menu/SyncPill.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-syncpill--synced",
+      "title": "Components/SyncPill",
+      "name": "Synced",
+      "importPath": "src/menu/SyncPill.stories.tsx",
+      "module": "packages/ui/src/menu/SyncPill.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-syncpill--syncing",
+      "title": "Components/SyncPill",
+      "name": "Syncing",
+      "importPath": "src/menu/SyncPill.stories.tsx",
+      "module": "packages/ui/src/menu/SyncPill.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-textinput--default",
+      "title": "Components/TextInput",
+      "name": "Default",
+      "importPath": "src/TextInput.stories.tsx",
+      "module": "packages/ui/src/TextInput.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-textinput--disabled",
+      "title": "Components/TextInput",
+      "name": "Disabled",
+      "importPath": "src/TextInput.stories.tsx",
+      "module": "packages/ui/src/TextInput.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-textinput--invalid",
+      "title": "Components/TextInput",
+      "name": "Invalid",
+      "importPath": "src/TextInput.stories.tsx",
+      "module": "packages/ui/src/TextInput.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-toast--error",
+      "title": "Components/Toast",
+      "name": "Error",
+      "importPath": "src/Toast.stories.tsx",
+      "module": "packages/ui/src/Toast.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "components-toast--info",
+      "title": "Components/Toast",
+      "name": "Info",
+      "importPath": "src/Toast.stories.tsx",
+      "module": "packages/ui/src/Toast.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--comfortable",
+      "title": "Packs/Budget/Month header",
+      "name": "Comfortable",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--compact",
+      "title": "Packs/Budget/Month header",
+      "name": "Compact",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--cozy",
+      "title": "Packs/Budget/Month header",
+      "name": "Cozy",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--default",
+      "title": "Packs/Budget/Month header",
+      "name": "Default",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--solarized-dark",
+      "title": "Packs/Budget/Month header",
+      "name": "Solarized Dark",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--solarized-light",
+      "title": "Packs/Budget/Month header",
+      "name": "Solarized Light",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--suite-dark",
+      "title": "Packs/Budget/Month header",
+      "name": "Suite Dark",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--suite-light",
+      "title": "Packs/Budget/Month header",
+      "name": "Suite Light",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--warm-dark",
+      "title": "Packs/Budget/Month header",
+      "name": "Warm Dark",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--warm-light",
+      "title": "Packs/Budget/Month header",
+      "name": "Warm Light",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--default",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Default",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--solarized-dark",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Solarized Dark",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--solarized-light",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Solarized Light",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--suite-dark",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Suite Dark",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--suite-light",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Suite Light",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--warm-dark",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Warm Dark",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--warm-light",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Warm Light",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--default",
+      "title": "Packs/Help/Handbook note",
+      "name": "Default",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--solarized-dark",
+      "title": "Packs/Help/Handbook note",
+      "name": "Solarized Dark",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--solarized-light",
+      "title": "Packs/Help/Handbook note",
+      "name": "Solarized Light",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--suite-dark",
+      "title": "Packs/Help/Handbook note",
+      "name": "Suite Dark",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--suite-light",
+      "title": "Packs/Help/Handbook note",
+      "name": "Suite Light",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--warm-dark",
+      "title": "Packs/Help/Handbook note",
+      "name": "Warm Dark",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--warm-light",
+      "title": "Packs/Help/Handbook note",
+      "name": "Warm Light",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--default",
+      "title": "Packs/Planner/Capacity",
+      "name": "Default",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--solarized-dark",
+      "title": "Packs/Planner/Capacity",
+      "name": "Solarized Dark",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--solarized-light",
+      "title": "Packs/Planner/Capacity",
+      "name": "Solarized Light",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--suite-dark",
+      "title": "Packs/Planner/Capacity",
+      "name": "Suite Dark",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--suite-light",
+      "title": "Packs/Planner/Capacity",
+      "name": "Suite Light",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--warm-dark",
+      "title": "Packs/Planner/Capacity",
+      "name": "Warm Dark",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--warm-light",
+      "title": "Packs/Planner/Capacity",
+      "name": "Warm Light",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-host-shell--default",
+      "title": "Workbench/Host shell",
+      "name": "Default",
+      "importPath": ".storybook/workbench/HostShell.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/HostShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "workbench-host-shell--first-run",
+      "title": "Workbench/Host shell",
+      "name": "First Run",
+      "importPath": ".storybook/workbench/HostShell.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/HostShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-host-shell--many-tabs",
+      "title": "Workbench/Host shell",
+      "name": "Many Tabs",
+      "importPath": ".storybook/workbench/HostShell.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/HostShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-host-shell--picker-open",
+      "title": "Workbench/Host shell",
+      "name": "Picker Open",
+      "importPath": ".storybook/workbench/HostShell.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/HostShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-host-shell--sync-refused",
+      "title": "Workbench/Host shell",
+      "name": "Sync Refused",
+      "importPath": ".storybook/workbench/HostShell.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/HostShell.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental"
+      ]
+    }
+  ]
+}
