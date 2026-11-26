@@ -320,8 +320,18 @@ export interface Lifecycle {
   onFlush(listener: () => void | Promise<void>): Disposable;
 }
 
+/**
+ * Why a pack's view was opened.
+ *
+ * `document` is the host naming one of the pack's documents: open that id. `create` is the host
+ * asking for a new one: make it, open it, and ask for any settings first if the pack needs them.
+ * `launcher` means the host made no choice, and is what a pack that cannot honour the other two
+ * kinds falls back to. `deep-link` and `file` are the routes a person can take from outside.
+ */
 export type PackLaunchContext =
   | { readonly kind: "launcher" }
+  | { readonly kind: "document"; readonly documentId: string }
+  | { readonly kind: "create" }
   | { readonly kind: "deep-link"; readonly url: string }
   | { readonly kind: "file"; readonly file: FileHandle };
 
