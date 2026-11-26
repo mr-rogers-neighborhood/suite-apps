@@ -32,7 +32,6 @@ import { countRender } from "./dev/perf";
 import { openMediaPickerOnBoard } from "./editor/mediaPicker";
 import { useBootGate } from "./hooks/useBootGate";
 import { LIBRARY_SEARCH_FOCUS_EVENT } from "./hooks/useLibrarySearch";
-import { WorkspaceLauncher } from "./launcher/WorkspaceLauncher";
 import { isStandalone } from "./session/mode";
 import { getSession, type ShareSession } from "./session/session";
 import { useProjectionStore } from "./store/projectionStore";
@@ -55,7 +54,7 @@ export default function App() {
 
   const session = getSession();
   const workspaceId = session.workspaceId;
-  if (!workspaceId) return <WorkspaceLauncher />;
+  if (!workspaceId) return null;
 
   return (
     <ReactFlowProvider>

@@ -1,5 +1,6 @@
 import type { ColorScheme, ThemeDensity, ThemeTokens } from "@suite/go";
 import {
+  applyScale,
   applyTheme,
   colorSchemeFor,
   cssVariables,
@@ -147,6 +148,7 @@ export function paintTheme(choice: GoThemeChoice = readThemeChoice()): ThemeToke
   applyTheme(preset, mode, document.documentElement);
   document.documentElement.classList.toggle("dark", mode === "dark");
   applyDensity(readDensity());
+  announceTheme();
   return tokensFor(choice, preferredMode() === "dark", readDensity());
 }
 
@@ -174,6 +176,16 @@ export function readDensity(): ThemeDensity {
 }
 
 export function applyDensity(density: ThemeDensity): void {
-  document.documentElement.dataset.density = density;
+  if (typeof document !== "undefined") {
+    document.documentElement.dataset.density = density;
+    applyScale(density, document.documentElement);
+  }
   storage()?.setItem(DENSITY_KEY, density);
+  announceTheme();
+}
+
+/** Tell an open pack iframe to copy the painted tokens again. */
+function announceTheme(): void {
+  if (typeof globalThis.dispatchEvent !== "function" || typeof Event !== "function") return;
+  globalThis.dispatchEvent(new Event("suite:theme"));
 }

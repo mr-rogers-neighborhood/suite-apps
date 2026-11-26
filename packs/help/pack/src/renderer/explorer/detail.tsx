@@ -543,12 +543,12 @@ function ModuleDetail({
               <span className="min-w-0 flex-1 truncate font-mono text-xs">{file.id}</span>
               <span className="text-xs text-fd-muted-foreground">{file.symbols.length} sym</span>
               {file.tests.length > 0 ? (
-                <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-500">
+                <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] text-success">
                   {file.tests.length} test
                 </span>
               ) : null}
               {file.note ? (
-                <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-500">
+                <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[10px] text-warning">
                   note
                 </span>
               ) : null}

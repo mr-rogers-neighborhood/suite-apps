@@ -1204,6 +1204,42 @@
       ]
     },
     {
+      "id": "packs-canvas-board-miniature--comfortable",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Comfortable",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--compact",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Compact",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--cozy",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Cozy",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
       "id": "packs-canvas-board-miniature--default",
       "title": "Packs/Canvas/Board miniature",
       "name": "Default",
@@ -1312,6 +1348,42 @@
       ]
     },
     {
+      "id": "packs-help-handbook-note--comfortable",
+      "title": "Packs/Help/Handbook note",
+      "name": "Comfortable",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--compact",
+      "title": "Packs/Help/Handbook note",
+      "name": "Compact",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--cozy",
+      "title": "Packs/Help/Handbook note",
+      "name": "Cozy",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
       "id": "packs-help-handbook-note--default",
       "title": "Packs/Help/Handbook note",
       "name": "Default",
@@ -1411,6 +1483,42 @@
       "id": "packs-planner-capacity--catppuccin-light",
       "title": "Packs/Planner/Capacity",
       "name": "Catppuccin Light",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--comfortable",
+      "title": "Packs/Planner/Capacity",
+      "name": "Comfortable",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--compact",
+      "title": "Packs/Planner/Capacity",
+      "name": "Compact",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--cozy",
+      "title": "Packs/Planner/Capacity",
+      "name": "Cozy",
       "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
       "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
       "tags": [

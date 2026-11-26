@@ -412,9 +412,11 @@ The rules that shape the Suite host.
 - A link opens or focuses the pack's tab and loads the pack's current installed entry. The chrome's
   own link opening is unchanged, and a pack still needs `network` to hand a link to the OS browser.
 - The host stores a launch context per tab and derives the tab from the sender. A pack calls
-  `window.suite.launch()` and receives `{ kind: "launcher" }` for an ordinary open or
-  `{ kind: "deep-link", url }` for a link; it never parses a launch out of a URL and never names
-  another tab.
+  `window.suite.launch()` and receives `{ kind: "document", documentId }`, `{ kind: "create" }`,
+  `{ kind: "launcher" }` or `{ kind: "deep-link", url }`; it never parses a launch out of a URL and
+  never names another tab. A pack with documents is never opened on a start page: an ordinary open
+  resolves to the most recent document, then any document, then a new one. The pack's own launcher
+  pages and prompts were removed; the host picker owns that choice.
 - Unsigned directory packs are an explicit development path: `SUITE_DESK_DEV_PACKS=1` in an
   unpackaged checkout. The switch is ignored in a packaged build. In that mode a development pack wins
   a collision with an installed pack of the same id, because the person is iterating on the directory;

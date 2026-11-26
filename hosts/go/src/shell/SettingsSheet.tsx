@@ -1,6 +1,7 @@
+import type { ThemeDensity } from "@suite/go";
 import { useEffect, useState } from "react";
 import type { ConsentView } from "../host/consent.js";
-import { type GoThemeChoice, type ThemeSource, themeOptions } from "../host/theme.js";
+import { DENSITIES, type GoThemeChoice, type ThemeSource, themeOptions } from "../host/theme.js";
 import { formatBytes } from "./Catalogue.js";
 
 /**
@@ -31,7 +32,9 @@ export interface SettingsApp {
 export function SettingsSheet({
   open,
   choice,
+  density,
   onChange,
+  onDensityChange,
   apps,
   onRemoveApp,
   onReask,
@@ -39,7 +42,9 @@ export function SettingsSheet({
 }: {
   readonly open: boolean;
   readonly choice: GoThemeChoice;
+  readonly density: ThemeDensity;
   readonly onChange: (choice: GoThemeChoice) => void;
+  readonly onDensityChange: (density: ThemeDensity) => void;
   readonly apps: readonly SettingsApp[];
   readonly onRemoveApp: (id: string) => void;
   /** Clear one remembered answer and ask again, from the app's own row. */
@@ -115,6 +120,22 @@ export function SettingsSheet({
             {themeOptions().map((theme) => (
               <option key={theme.id} value={theme.id}>
                 {theme.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1.5 text-[13px] font-medium text-[var(--ink-muted)]">
+          <span>Density</span>
+          <select
+            aria-label="Density"
+            className="touch w-full rounded-xl border border-[var(--hairline)] bg-[var(--surface-sunk)] px-3 text-[16px] text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:outline-none"
+            value={density}
+            onChange={(event) => onDensityChange(event.target.value as ThemeDensity)}
+          >
+            {DENSITIES.map((value) => (
+              <option key={value} value={value}>
+                {value === "compact" ? "Compact" : value === "cozy" ? "Cozy" : "Comfortable"}
               </option>
             ))}
           </select>

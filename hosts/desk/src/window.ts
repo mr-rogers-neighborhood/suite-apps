@@ -162,6 +162,7 @@ export class ShellWindow {
     this.#theme = options.theme;
     this.#firstRun = options.firstRun ?? false;
     this.#relay = options.relay ?? this.#relay;
+    const canvas = options.theme.values["--canvas"] ?? "#1b1917";
 
     this.window = new BaseWindow({
       width: 1280,
@@ -170,7 +171,7 @@ export class ShellWindow {
       minHeight: 520,
       show: false,
       title: "Suite Desk",
-      backgroundColor: "#0b0d12",
+      backgroundColor: canvas,
     });
 
     this.#chrome = new WebContentsView({
@@ -183,7 +184,7 @@ export class ShellWindow {
         spellcheck: false,
       },
     });
-    this.#chrome.setBackgroundColor("#0b0d12");
+    this.#chrome.setBackgroundColor(canvas);
     this.window.contentView.addChildView(this.#chrome);
     this.window.on("resize", () => this.#layout());
     this.window.on("closed", () => {
@@ -310,6 +311,26 @@ export class ShellWindow {
     if (pack === undefined) {
       this.#notice = `No pack named ${packId} is installed.`;
       this.broadcast();
+      return;
+    }
+
+    // A document pack is never opened on its own start page: the host owns the picker.
+    // An ordinary open is the most recent document, then any document, then a new one.
+    if (launch.kind === "launcher" && (pack.documents?.length ?? 0) > 0) {
+      const recent = this.#recentRows()
+        .filter((row) => row.packId === packId)
+        .sort((left, right) => right.openedAt - left.openedAt)[0];
+      if (recent !== undefined) {
+        await this.openDocument(packId, recent.documentId);
+        return;
+      }
+      const documents = await this.#listDocuments(packId).catch(() => []);
+      const first = documents[0];
+      if (first !== undefined) {
+        await this.openDocument(packId, first.id);
+        return;
+      }
+      await this.newDocument(packId);
       return;
     }
 
@@ -705,6 +726,10 @@ export class ShellWindow {
 
   setTheme(theme: ThemeView): void {
     this.#theme = theme;
+    const canvas = theme.values["--canvas"] ?? "#1b1917";
+    this.window.setBackgroundColor(canvas);
+    this.#chrome.setBackgroundColor(canvas);
+    for (const view of this.#views.values()) view.setBackgroundColor(canvas);
     this.broadcast();
     // A theme is host state, so every open pack moves with it instead of waiting for a
     // reload. The chrome is repainted by the broadcast above.
@@ -828,7 +853,7 @@ export class ShellWindow {
       },
     });
     const webContentsId = view.webContents.id;
-    view.setBackgroundColor("#0b0d12");
+    view.setBackgroundColor(this.#theme.values["--canvas"] ?? "#1b1917");
     this.window.contentView.addChildView(view);
     this.#views.set(tab.id, view);
     setPackSender(webContentsId, {

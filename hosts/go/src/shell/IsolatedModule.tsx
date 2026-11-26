@@ -4,7 +4,8 @@ import {
   type PackManifest,
   requestFrameFlush,
 } from "@suite/go";
-import { useEffect, useMemo, useRef } from "react";
+import { scaleVariables } from "@suite/theme";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { createPackFiles, packFilesScopeOf, releasePackFileLocks } from "../host/packFiles.js";
 import { resolveTheme } from "../host/theme.js";
 import { serveFrame } from "./frameBridge.js";
@@ -58,6 +59,38 @@ export function IsolatedModule({
    * and the shell would wait out the timeout on a module the person closed immediately.
    */
   const loaded = useRef(false);
+
+  /**
+   * Copy the host's painted tokens into the pack document.
+   *
+   * The frame is same-origin on purpose, so this is the one place a pack gets the
+   * preset, mode and density without asking. Packs still read the values as
+   * ordinary custom properties; they never import the theme package.
+   */
+  const paintFrame = useCallback(() => {
+    const doc = frame.current?.contentDocument;
+    if (!doc) return;
+    const source = getComputedStyle(document.documentElement);
+    const root = doc.documentElement;
+    const tokens = resolveTheme();
+    const names = [
+      ...Object.keys(tokens.cssVariables),
+      ...Object.keys(scaleVariables(tokens.density)),
+    ];
+    for (const name of names) {
+      const value = source.getPropertyValue(name);
+      if (value.length > 0) root.style.setProperty(name, value);
+    }
+    root.dataset.themeMode = tokens.scheme === "dark" ? "dark" : "light";
+    root.dataset.density = tokens.density;
+    root.style.colorScheme = tokens.scheme;
+    root.classList.toggle("dark", tokens.scheme === "dark");
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("suite:theme", paintFrame);
+    return () => window.removeEventListener("suite:theme", paintFrame);
+  }, [paintFrame]);
   /**
    * The pack's file store, built from the manifest this frame was mounted with.
    *
@@ -118,6 +151,7 @@ export function IsolatedModule({
           data-suite-frame={host.moduleId}
           onLoad={() => {
             loaded.current = true;
+            paintFrame();
           }}
         />
       </div>

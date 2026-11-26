@@ -19,36 +19,36 @@
  */
 :root {
   color-scheme: light;
-  --canvas: #f5f5f7;
-  --surface: #ffffff;
-  --surface-sunk: #eef0f2;
+  --canvas: #f6f4f1;
+  --surface: #fcfbf9;
+  --surface-sunk: #eeebe6;
   --surface-strong: #ffffff;
-  --accent: #1f6feb;
-  --accent-strong: #0069d9;
-  --danger: #b42318;
-  --success: #0c7a41;
-  --warning: #965a00;
-  --ink: #16161a;
-  --ink-muted: #5c5c66;
-  --ink-faint: #6b6b73;
-  --hairline: #e3e3e6;
-  --border-strong: #878787;
-  --focus: #1f6feb;
-  --on-accent: #ffffff;
-  --on-danger: #ffffff;
-  --on-success: #ffffff;
-  --on-warning: #ffffff;
-  --hue-slate: #64748b;
-  --hue-blue: #3b82f6;
-  --hue-green: #047857;
-  --hue-amber: #b45309;
-  --hue-rose: #be123c;
-  --hue-violet: #8b5cf6;
-  --chart-1: #2563eb;
-  --chart-2: #0c7a41;
-  --chart-3: #965a00;
-  --chart-4: #7c3aed;
-  --chart-5: #be123c;
+  --accent: #1f1e1c;
+  --accent-strong: #000000;
+  --danger: #a83228;
+  --success: #3f6b3a;
+  --warning: #8a5a12;
+  --ink: #1c1a18;
+  --ink-muted: #5f5a54;
+  --ink-faint: #6d675f;
+  --hairline: #e6e1da;
+  --border-strong: #8c857c;
+  --focus: #1c1a18;
+  --on-accent: #fcfbf9;
+  --on-danger: #fffdf9;
+  --on-success: #fffdf9;
+  --on-warning: #fffdf9;
+  --hue-slate: #6b6660;
+  --hue-blue: #2f6f9f;
+  --hue-green: #3f6b3a;
+  --hue-amber: #8a5a12;
+  --hue-rose: #a33a4e;
+  --hue-violet: #6b5490;
+  --chart-1: #1f1e1c;
+  --chart-2: #3f6b3a;
+  --chart-3: #8a5a12;
+  --chart-4: #6b5490;
+  --chart-5: #a33a4e;
 }
 
 /*
@@ -59,36 +59,36 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme-mode]) {
     color-scheme: dark;
-    --canvas: #16161a;
-    --surface: #1d1d22;
-    --surface-sunk: #111114;
-    --surface-strong: #232326;
-    --accent: #6ea8fe;
-    --accent-strong: #93c0ff;
-    --danger: #f19a92;
-    --success: #5fd39b;
-    --warning: #e8b465;
-    --ink: #f2f2f4;
-    --ink-muted: #a0a0ab;
-    --ink-faint: #8b8b96;
-    --hairline: #2b2b33;
-    --border-strong: #6d6d6d;
-    --focus: #6ea8fe;
-    --on-accent: #16161a;
-    --on-danger: #16161a;
-    --on-success: #16161a;
-    --on-warning: #16161a;
-    --hue-slate: #94a3b8;
-    --hue-blue: #60a5fa;
-    --hue-green: #34d399;
-    --hue-amber: #fbbf24;
-    --hue-rose: #fb7185;
-    --hue-violet: #a78bfa;
-    --chart-1: #60a5fa;
-    --chart-2: #34d399;
-    --chart-3: #fbbf24;
-    --chart-4: #a78bfa;
-    --chart-5: #fb7185;
+    --canvas: #1b1917;
+    --surface: #24211e;
+    --surface-sunk: #12100e;
+    --surface-strong: #2c2824;
+    --accent: #f3efe9;
+    --accent-strong: #ffffff;
+    --danger: #f0a19a;
+    --success: #9ccf9e;
+    --warning: #e8c27a;
+    --ink: #f3efe9;
+    --ink-muted: #b7afa5;
+    --ink-faint: #9c9388;
+    --hairline: #36312b;
+    --border-strong: #8a8072;
+    --focus: #f3efe9;
+    --on-accent: #1b1917;
+    --on-danger: #171411;
+    --on-success: #171411;
+    --on-warning: #171411;
+    --hue-slate: #a79d8f;
+    --hue-blue: #8db8d9;
+    --hue-green: #9ccf9e;
+    --hue-amber: #e8b87a;
+    --hue-rose: #e7a0a6;
+    --hue-violet: #c0a6e0;
+    --chart-1: #f3efe9;
+    --chart-2: #9ccf9e;
+    --chart-3: #e8b87a;
+    --chart-4: #c0a6e0;
+    --chart-5: #e7a0a6;
   }
 }
 
@@ -121,6 +121,9 @@
   --color-fd-accent-foreground: var(--ink);
   --color-fd-ring: var(--focus);
   --color-fd-overlay: rgb(0 0 0 / 0.2);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
 }
 
 /* Fumadocs components ask `dark:`; the resolved mode lives on the document root. */

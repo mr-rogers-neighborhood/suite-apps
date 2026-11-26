@@ -119,7 +119,7 @@ function renderInlineChild(child: unknown, key: string, ctx: FaceContext): React
       return (
         <span
           key={key}
-          className="mention-chip inline-flex items-center gap-0.5 rounded px-1 text-[12px] bg-[var(--accent-tint,#e0e7ff)] text-[var(--accent,#4338ca)]"
+          className="mention-chip inline-flex items-center gap-0.5 rounded px-1 text-[12px] bg-[var(--accent-tint)] text-[var(--accent)]"
         >
           @{label}
         </span>
@@ -383,7 +383,7 @@ function renderBlock(block: unknown, key: string, ctx: FaceContext): ReactNode {
     return (
       <div
         key={key}
-        className="tour-step-chip my-1 rounded border border-[var(--accent,#4338ca)]/20 bg-[var(--accent-tint,#e0e7ff)] px-2 py-0.5 text-xs font-medium text-[var(--accent,#4338ca)]"
+        className="tour-step-chip my-1 rounded border border-[var(--accent)]/20 bg-[var(--accent-tint)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]"
       >
         📍 {label}
       </div>

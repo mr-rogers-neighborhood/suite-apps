@@ -35,23 +35,24 @@ describe("Budget as a pack", () => {
       documents,
       files,
       info: async () => ({ platform: "linux" }),
+      launch: async () => ({ kind: "create" }),
     };
     await import("./prelude");
 
     render(<App />);
-    expect(await screen.findByText("No budgets yet")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /new budget/i }));
+    // The host asked for a new document, so the pack opens its create dialog and
+    // never draws a launcher.
     fireEvent.click(await screen.findByRole("button", { name: /create budget/i }));
 
-    // The budget view replaced the launcher: the name is in the menu bar, the
-    // plan is drawn, and no error modal was raised.
+    const hostBridge = (globalThis as { suiteBudget?: BudgetBridge }).suiteBudget;
+    if (hostBridge === undefined) throw new Error("the prelude did not install the bridge");
+
     await waitFor(() => expect(screen.getAllByText("My Budget").length).toBeGreaterThan(0));
     expect(screen.queryByText("Something went wrong")).toBeNull();
     expect(documents.files.size).toBe(1);
 
-    const bridge = (globalThis as { suiteBudget?: BudgetBridge }).suiteBudget;
-    if (bridge === undefined) throw new Error("the prelude did not install the bridge");
+    const bridge = hostBridge;
 
     // Edit: a real CRDT update from Budget's own document layer, committed the
     // way the renderer commits one, then written at the flush boundary.

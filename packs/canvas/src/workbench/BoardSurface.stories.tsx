@@ -57,3 +57,8 @@ export const SolarizedLight: Story = { globals: { theme: "solarized", mode: "lig
 export const SolarizedDark: Story = { globals: { theme: "solarized", mode: "dark" } };
 export const WarmLight: Story = { globals: { theme: "warm", mode: "light" } };
 export const WarmDark: Story = { globals: { theme: "warm", mode: "dark" } };
+
+// Density is the second axis: the surface reads the same tokens, with more or less room.
+export const Compact: Story = { globals: { density: "compact" } };
+export const Cozy: Story = { globals: { density: "cozy" } };
+export const Comfortable: Story = { globals: { density: "comfortable" } };

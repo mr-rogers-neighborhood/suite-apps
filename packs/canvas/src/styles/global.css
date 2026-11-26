@@ -25,7 +25,7 @@
   /* Shared roles (@suite/theme). These are the source; a theme overwrites them at runtime
      and Canvas's own names below follow, so there is one value per colour rather than two
      that can drift. */
-  --canvas: #f5f5f7;
+  --canvas: #f6f4f1;
   --canvas-bg: var(--canvas);
   /* The column the canvas widget stack occupies (purpose, gesture, zoom). Any
      surface anchored to the bottom-left corner starts to its right; keep in step
@@ -50,8 +50,9 @@
   /* Roles the paint system names (ADR-0051). They were referenced with literal
      fallbacks before, which is the shell owning a palette ADR-0046 forbids. */
   --surface-strong: #ffffff;
-  --accent: #0a84ff;
-  --accent-strong: #0069d9;
+  --accent: #1f1e1c;
+  --accent-strong: #000000;
+  --accent-tint: color-mix(in srgb, var(--accent) 14%, transparent);
   --danger: #d33;
   --success: #0f8a4a;
   --warning: #b26a00;
@@ -130,7 +131,7 @@
   --value-ink: var(--value-place-ink);
 }
 
-.dark {
+.dark:not([data-theme-mode]) {
   color-scheme: dark;
   --surface: #232326;
   --surface-translucent: rgba(28, 28, 30, 0.72);

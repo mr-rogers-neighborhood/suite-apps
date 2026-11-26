@@ -167,10 +167,6 @@
    spells that value `--canvas-bg`. Without the alias a `canvas` surface would
    reference an undefined variable, which drops the declaration instead of
    falling back. */
-:root {
-  --canvas: var(--canvas-bg);
-}
-
 /* A section frame that names a style paints itself. Everything below is paint:
    the frame's hit area stays rectangular, its silhouette never changes section
    membership or stacking (ADR-0051 §7). */

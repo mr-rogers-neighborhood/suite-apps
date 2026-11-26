@@ -99,7 +99,7 @@ export function CaptureBar({ target }: { target: CaptureTarget }) {
         <button
           type="submit"
           aria-label="Add task"
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent transition-colors touch hover:bg-accent hover:text-white"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent transition-colors touch hover:bg-accent hover:text-[var(--on-accent)]"
         >
           <CornerDownLeft size={13} />
         </button>

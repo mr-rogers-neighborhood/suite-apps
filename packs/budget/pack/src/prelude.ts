@@ -13,6 +13,22 @@ const pack = createBudgetPack({ host: suite ?? {} });
 
 Object.assign(globalThis, { suiteBudget: pack.bridge });
 
+// The host tells a document app which document to open, or that this tab is a
+// create request. Budget keeps the promise for the renderer; the prelude is the
+// only place that sees the raw `window.suite` before React mounts.
+const launch = (
+  suite as
+    | {
+        readonly launch?: () => Promise<{
+          readonly kind: string;
+          readonly documentId?: string;
+          readonly url?: string;
+        }>;
+      }
+    | undefined
+)?.launch?.();
+if (launch !== undefined) Object.assign(globalThis, { __suiteBudgetLaunch: launch });
+
 /**
  * A device assertion handle, in the same spirit as the shell's dev globals.
  *
