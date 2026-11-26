@@ -59,7 +59,7 @@ async function captureProofScreenshot(
   });
 }
 
-test("opens the explorer, crosses to the handbook and reads a page", {
+test("opens the handbook at the root, opens the explorer and reads a page", {
   tag: "@proof",
 }, async () => {
   const testInfo = test.info();
@@ -81,27 +81,29 @@ test("opens the explorer, crosses to the handbook and reads a page", {
   await page.context().tracing.start({ screenshots: true, snapshots: true });
 
   try {
-    await test.step("Open the indexed code explorer", async () => {
-      await expect(page.getByRole("link", { name: /View the user handbook/ })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Modules" })).toBeVisible();
-      await captureProofScreenshot(page, proofDir, "01-explorer.png", testInfo);
-    });
-
-    await test.step("Switch to the user handbook", async () => {
-      await page.getByRole("link", { name: /View the user handbook/ }).click();
+    await test.step("Open the handbook at the root", async () => {
+      // Help is a reader first: `/` lands on the user handbook, not the explorer.
       await expect(page.getByRole("heading", { name: "User handbook", level: 1 })).toBeVisible();
-      await captureProofScreenshot(page, proofDir, "02-user-handbook.png", testInfo);
+      await expect(page.getByRole("complementary", { name: "Handbook contents" })).toBeVisible();
+      await captureProofScreenshot(page, proofDir, "01-handbook-root.png", testInfo);
     });
 
-    await test.step("Switch back and search the developer documentation for Run the gate", async () => {
-      await page.getByRole("link", { name: /Switch to the developer documentation/ }).click();
-      await page.getByLabel("Search the handbook").fill("Run the gate");
+    await test.step("Open the indexed code explorer", async () => {
+      await page.getByRole("link", { name: "Explorer", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Modules" })).toBeVisible();
+      await expect(page.getByRole("link", { name: /View the user handbook/ })).toBeVisible();
+      await captureProofScreenshot(page, proofDir, "02-explorer.png", testInfo);
+    });
+
+    await test.step("Search the user handbook and read the Local-first page", async () => {
+      await page.getByRole("link", { name: /View the user handbook/ }).click();
+      await page.getByLabel("Search the handbook").fill("Local-first");
       await page
-        .getByRole("link", { name: /Run the gate/ })
+        .getByRole("link", { name: /Local-first/ })
         .first()
         .click();
 
-      await expect(page.getByRole("heading", { name: "Run the gate", level: 1 })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Local-first", level: 1 })).toBeVisible();
 
       await captureProofScreenshot(page, proofDir, "03-handbook-article.png", testInfo);
     });

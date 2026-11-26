@@ -31,8 +31,10 @@ run wrote; `--json` prints the structured result. The command writes
 3. **The primary path.** It runs the pack's own suite that mounts the pack the way the host does:
    Budget, Planner and Canvas open/create, edit, save, export and re-import; Help opens the explorer,
    searches the handbook and renders an article.
-4. **The phone smoke.** It runs the pack's phone-layout tests. Those are jsdom tests: they prove the
-   layout and the named controls, not a 44px measurement or a TalkBack pass on a device.
+4. **The phone smoke.** It runs each pack's automated phone-layout tests where they exist. Those
+   are jsdom tests: they prove the layout and the named controls, not a 44px measurement or a
+   TalkBack pass on a device. Canvas has no automated phone-layout test, so its matrix row says so
+   rather than claiming a pass.
 
 A clean root after removal means no pack version and no failed scan; the host keeps
 `<root>/<id>/publisher.json` as the identity record, which is by design and is ignored when the id
@@ -84,7 +86,7 @@ carries its whole payload, not only an entry page.
 | Primary path | [`packs/planner/pack/src/PackRender.test.tsx`](../../packs/planner/pack/src/PackRender.test.tsx): the pack boots from the host, writes a task and a day page, then re-imports its own export |
 | Export/import | The pack writes a `.planner` workspace file and re-imports the same content |
 | Phone smoke | `Shell`, `DayView`, `InboxView`, `TaskDetail` and `WeekView` tests under [`packs/planner/pack/src/renderer/`](../../packs/planner/pack/src/renderer/): drawer, thumb targets and controls that stay visible at phone width |
-| Intentionally absent | Sync is still a host gap on mobile, so the pack's sync stays in the frozen desktop app; `relay` and `commands` are optional, so a host without them still installs |
+| Intentionally absent | No bundled relay server: sync runs in the pack over the host's relay, with keys, contacts and cursors in the pack's own files, and a host without relay reports it refused. `relay` and `commands` are optional, so a host without them still installs |
 | #358 still owns | Install the release archive, launch it, capture and edit a task, open the Command Surface, export and re-import, accept or deny a reminder, and do the 44px/TalkBack pass |
 
 ### Canvas
@@ -98,7 +100,7 @@ carries its whole payload, not only an entry page.
 | Primary path | [`packs/canvas/pack/src/PackRender.test.tsx`](../../packs/canvas/pack/src/PackRender.test.tsx): a board opens from the host envelope, an edit reaches the document, the `.canvas` export re-imports with the same card |
 | Export/import | The whole canvas export envelope, images included, crosses the host unchanged |
 | Phone smoke | No automated phone test; the mobile layout is CSS-only and needs the #358 pass |
-| Intentionally absent | No relay service, so collaboration is unavailable in the pack; `relay` is optional and the pack shows the local-only state; no automated phone-layout test |
+| Intentionally absent | No bundled relay server: collaboration runs in the pack over the host's relay, and a host without relay shows the local-only state. `relay` is optional; there is no automated phone-layout test |
 | #358 still owns | Install the release archive, launch it, create a board and card, add an image, export and re-import, and test the CSS-only phone layout on a real device |
 
 ### Help
@@ -127,7 +129,7 @@ not open a window. The shell builds are required; `--no-build` only works after 
 | `budget` | passed | Creates a budget, assigns $100 to Rent / Mortgage and updates the sheet |
 | `planner` | passed | Opens a planner document, captures a task and shows it on the day plan |
 | `canvas` | passed | Creates a `.canvas` document, adds a card and renders it |
-| `help` | failed | The frozen shell's spec starts at the explorer, but the shared renderer now opens the user handbook at `/`; the pack's own explorer and handbook tests pass. The shell proof is stale, not the pack |
+| `help` | passed | Opens the user handbook at the root, opens the code explorer, searches the user handbook and reads `Local-first` |
 
 The pass rows prove the shared renderer source in a real Electron process. They do not prove the
 installed archive: only the pack's own suite and a person's window pass do that.
@@ -140,4 +142,4 @@ installed archive: only the pack's own suite and a person's window pass do that.
 - A real phone: 44px targets, TalkBack reading order, and the absence of hover-only controls.
 - Canvas's mobile layout: the CSS exists, but there is no automated phone-layout test, so a person
   must do the device pass.
-- Help's manual handbook read and the stale shell proof above.
+- Help's manual handbook read.
