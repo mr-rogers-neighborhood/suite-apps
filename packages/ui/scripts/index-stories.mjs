@@ -75,7 +75,12 @@ async function build() {
     const csf = await readCsf(file, { makeTitle: (title) => title });
     csf.parse();
     const title = csf.meta?.title;
-    if (typeof title !== "string") continue;
+    if (typeof title !== "string") {
+      console.warn(
+        `${relative(app, file)} has no meta.title; its stories are not in the catalog.`,
+      );
+      continue;
+    }
 
     for (const story of csf.stories) {
       const tags = uniq([...(csf.meta?.tags ?? []), ...(story.tags ?? [])]);
