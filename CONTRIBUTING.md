@@ -31,8 +31,8 @@ mise exec -- node scripts/gate.mjs --only desk  # one row
 mise exec -- node scripts/gate.mjs --no-e2e     # skip the row's e2e suite
 ```
 
-`--only` takes a row name from [AGENTS.md](AGENTS.md): `canvas`, `planner`, `budget`, `go`, `sync`,
-`help`, `desk` or `ui`. `--fresh` proves the commit rather than the working tree. The gate runs a row's e2e
+`--only` takes a gate row name from `scripts/lib/pipeline.mjs`: `canvas`, `planner`, `budget`, `go`,
+`sync`, `help`, `desk` or `ui`. `--fresh` proves the commit rather than the working tree. The gate runs a row's e2e
 suite after its checks, under `xvfb-run` when there is no display; no row marks one today. Read
 [Commands](docs/reference/commands.md) before running a heavy check.
 

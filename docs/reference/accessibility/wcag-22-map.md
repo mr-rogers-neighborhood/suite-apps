@@ -27,7 +27,7 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 
 ## Machine checks by app
 
-| App | Gated check | Not gated |
+| App | Automated check | Not gated |
 | --- | --- | --- |
 | Canvas | `@suite/theme` contrast (suite-level, not gated); axe over the Storybook stories | Running-window contrast, focus order and screen-reader output |
 | Planner | lint, types, unit tests, shape, knip and build (gated); `@suite/theme` contrast (suite-level, not gated) | No axe in the gate; no manual pass recorded |
@@ -37,8 +37,9 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 The `@suite/theme` contrast test is one suite-level check, not one per app: it lives in
 `packages/theme/src/presets.test.ts` and passes when run with
 `mise exec -- pnpm --filter @suite/theme test`. No gate row runs it today, so a palette regression
-would not fail the build. A **Gated** row is a check that fails the build; it is not a claim that every app runs every check named in it. A **Partial** row is gated in
-the app named in its How column and manual elsewhere. Desk, Help and Go have no accessibility statement
+would not fail the build. A **Gated** row is a check that fails the build; it is not a claim that
+every app runs every check named in it. A **Partial** row is gated in the app named in its How
+column and manual elsewhere. Desk, Help and Go have no accessibility statement
 and this table makes no claim about them; the root [ACCESSIBILITY.md](../../../ACCESSIBILITY.md) owns
 the target and summary, and Canvas, Planner, Budget and Sync each keep a statement that owns its
 detail.
