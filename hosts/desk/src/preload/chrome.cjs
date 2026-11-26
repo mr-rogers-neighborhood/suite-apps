@@ -15,6 +15,11 @@ contextBridge.exposeInMainWorld("suiteShell", {
   activateTab: (tabId) => ipcRenderer.invoke("suite:shell:activate-tab", tabId),
   closeTab: (tabId) => ipcRenderer.invoke("suite:shell:close-tab", tabId),
   newTab: () => ipcRenderer.invoke("suite:shell:new-tab"),
+  home: () => ipcRenderer.invoke("suite:shell:home"),
+  picker: () => ipcRenderer.invoke("suite:shell:picker"),
+  openDocument: (packId, documentId) =>
+    ipcRenderer.invoke("suite:shell:open-document", packId, documentId),
+  newDocument: (packId) => ipcRenderer.invoke("suite:shell:new-document", packId),
   reloadTab: (tabId) => ipcRenderer.invoke("suite:shell:reload-tab", tabId),
   openExternal: (url) => ipcRenderer.invoke("suite:shell:open-external", url),
   installPack: () => ipcRenderer.invoke("suite:shell:install-pack"),
@@ -58,5 +63,8 @@ contextBridge.exposeInMainWorld("suiteShell", {
   commandClearRecents: () => ipcRenderer.invoke("suite:shell:command-clear-recents"),
   onState: (listener) => {
     ipcRenderer.on("suite:shell:state-changed", (_event, state) => listener(state));
+  },
+  onPick: (listener) => {
+    ipcRenderer.on("suite:shell:pick", () => listener());
   },
 });
