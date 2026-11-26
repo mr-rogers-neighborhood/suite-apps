@@ -11,6 +11,12 @@
       "development": "./src/index.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./relay": {
+      "types": "./dist/relay.d.ts",
+      "development": "./src/relay.ts",
+      "import": "./dist/relay.js",
+      "default": "./dist/relay.js"
     }
   },
   "files": [

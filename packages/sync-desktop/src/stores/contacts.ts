@@ -1,6 +1,3 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import {
   addContact as addToBook,
   contactsFileSchema,
@@ -10,20 +7,22 @@ import {
   type SyncContact,
 } from "@suite/sync";
 
+import { decodeStoreText, encodeStoreText, SYNC_STORE_ROOT, type SyncStoreFiles } from "./port.js";
+
 /**
- * The people an installation knows, kept beside the workspace in that app's data directory.
+ * The people an installation knows, kept beside the workspace in that app's root.
  *
  * A contacts file is app data, not a document field and not a relay record: it never travels
- * with the workspace file and the relay never sees it. It is mode 0600 and written with the
- * same temp-file rename as every other file the shell keeps, so a crash leaves either the old
- * list or the new one.
+ * with the workspace file and the relay never sees it. The port writes it with the same
+ * temporary-file rule as every other file, so a crash leaves either the old list or the new
+ * one.
  *
- * The file stays per app even though the mechanics are shared: the app passes its own
- * directory, so Canvas and Planner can each make their own trust decision. Nothing here
- * decides whether an invitation is acceptable — `resolveFriendInvite` stays in the app.
+ * The file stays per app even though the mechanics are shared: the app passes its own root, so
+ * Canvas and Planner can each make their own trust decision. Nothing here decides whether an
+ * invitation is acceptable — `resolveFriendInvite` stays in the app.
  *
- * A file this build cannot read is treated as empty rather than crashing the app. The
- * original is left alone, so a newer build can still recover it.
+ * A file this build cannot read is treated as empty rather than crashing the app. The original
+ * is left alone, so a newer build can still recover it.
  */
 export interface ContactsStore {
   load(): Promise<readonly SyncContact[]>;
@@ -36,23 +35,22 @@ export interface ContactsStore {
   ): Promise<readonly SyncContact[]>;
 }
 
-export function createContactsStore({ dataDir }: { readonly dataDir: string }): ContactsStore {
-  const directory = join(dataDir, "sync");
-  const target = join(directory, "contacts.json");
+export function createContactsStore(files: SyncStoreFiles): ContactsStore {
+  const target = `${SYNC_STORE_ROOT}/contacts.json`;
 
   async function saveContacts(contacts: readonly SyncContact[]): Promise<void> {
-    await mkdir(directory, { recursive: true });
-    const temporary = `${target}.tmp`;
-    await writeFile(temporary, `${JSON.stringify({ version: 1, contacts }, null, 2)}\n`, {
-      mode: 0o600,
-    });
-    await rename(temporary, target);
+    await files.write(
+      target,
+      encodeStoreText(`${JSON.stringify({ version: 1, contacts }, null, 2)}\n`),
+    );
   }
 
   return {
     async load() {
+      const bytes = await files.read(target);
+      if (bytes === null) return [];
       try {
-        const parsed = contactsFileSchema.safeParse(JSON.parse(await readFile(target, "utf8")));
+        const parsed = contactsFileSchema.safeParse(JSON.parse(decodeStoreText(bytes)));
         return parsed.success ? parsed.data.contacts : [];
       } catch {
         return [];
