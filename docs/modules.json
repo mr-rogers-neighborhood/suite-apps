@@ -5,9 +5,15 @@
       "id": "packs/planner/pack/src/renderer",
       "title": "Planner renderer",
       "parentId": "legacy/planner"
+    },
+    {
+      "id": "packs/budget/pack/src/renderer",
+      "title": "Budget renderer",
+      "parentId": "legacy/budget"
     }
   ],
   "assign": {
-    "packs/planner/pack/src/renderer": "packs/planner/pack/src/renderer"
+    "packs/planner/pack/src/renderer": "packs/planner/pack/src/renderer",
+    "packs/budget/pack/src/renderer": "packs/budget/pack/src/renderer"
   }
 }

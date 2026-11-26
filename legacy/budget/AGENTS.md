@@ -17,14 +17,14 @@ Read [docs/reference/conventions.md](docs/reference/conventions.md) before writi
 
 ## Repo map
 
-| Path                          | Purpose                                                                      |
-| ----------------------------- | ---------------------------------------------------------------------------- |
-| `src/main`                    | Document authority, library, atomic file store, backups, recovery, IPC, menu |
-| `src/preload`                 | The allowlisted `contextBridge` surface                                      |
-| `src/renderer/src`            | React app: launcher, plan, accounts, reports, rules, schedules, payees       |
-| `packs/budget/packages/core`  | Schema, document layer, pure projections, importers, exports, reports        |
-| `docs/reference`              | Architecture, conventions, data model, interface                             |
-| `docs/reference/decisions.md` | The rules that shape Budget                                                  |
+| Path                             | Purpose                                                                      |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| `src/main`                       | Document authority, library, atomic file store, backups, recovery, IPC, menu |
+| `src/preload`                    | The allowlisted `contextBridge` surface                                      |
+| `packs/budget/pack/src/renderer` | React app: launcher, plan, accounts, reports, rules, schedules, payees       |
+| `packs/budget/packages/core`     | Schema, document layer, pure projections, importers, exports, reports        |
+| `docs/reference`                 | Architecture, conventions, data model, interface                             |
+| `docs/reference/decisions.md`    | The rules that shape Budget                                                  |
 
 ## Commands
 

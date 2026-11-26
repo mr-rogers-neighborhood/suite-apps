@@ -1,6 +1,6 @@
 ---
 audience: developer
-module: legacy/budget/src/renderer
+module: packs/budget/pack/src/renderer
 title: Budget renderer
 summary: "The replica, the forms and the plan and report surfaces over a budget snapshot."
 ---
@@ -21,7 +21,7 @@ on render, while only a dashboard's widget arrangement is stored. That is why a
 closed budget clears its undo history with the replica and nothing else needs to
 be reset.
 
-## legacy/budget/src/renderer/src/accounts/TransactionDialog.tsx#TransactionDialog
+## packs/budget/pack/src/renderer/accounts/TransactionDialog.tsx#TransactionDialog
 
 The dialog is a form over a record, not a second record. It seeds local state
 from the snapshot when it opens, converts the typed amount with `parseMoney`,
@@ -33,7 +33,7 @@ A reconciled transaction is locked, and a split parent is edited as a set of
 children. The dialog keeps those rules at the point of entry, so an edit that
 the document would refuse is not offered as a control that silently fails.
 
-## legacy/budget/src/renderer/src/reports/ReportsView.tsx#ReportsView
+## packs/budget/pack/src/renderer/reports/ReportsView.tsx#ReportsView
 
 The reports view owns the selected tab and the range; it owns no totals. Each
 panel calls a core series over the current snapshot, and the dashboard calls the
@@ -45,7 +45,7 @@ not. Adding, moving or removing a widget is a typed document write, and the next
 snapshot rebuilds every figure from the ledger. A report that cached its numbers
 would be the second source of truth this view is written to avoid.
 
-## legacy/budget/src/renderer/src/plan/TargetDialog.tsx#TargetDialog
+## packs/budget/pack/src/renderer/plan/TargetDialog.tsx#TargetDialog
 
 The dialog is where a debt target becomes a date and a payment. For a debt
 payoff it reads the linked account's balance from the current ledger and the
@@ -60,7 +60,7 @@ payment that cannot cover the month's interest, or a balance that would outlast
 schedule. Saving still writes only the record the schema holds: kind, amount,
 due month and account.
 
-## legacy/budget/src/renderer/src/schedules/ScheduleAutoEnterNotice.tsx#ScheduleAutoEnterNotice
+## packs/budget/pack/src/renderer/schedules/ScheduleAutoEnterNotice.tsx#ScheduleAutoEnterNotice
 
 The checkbox is a field on the schedule dialog: it seeds from `record.autoEnter`,
 defaults off for a new schedule, and writes the same boolean through

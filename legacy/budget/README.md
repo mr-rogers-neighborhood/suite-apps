@@ -104,9 +104,9 @@ projections compute the month, targets, rules, reports, and imports.
 
 | Path                          | What lives there                                                                    |
 | ----------------------------- | ----------------------------------------------------------------------------------- |
-| `src`                         | Electron main, preload bridge, React renderer, Storybook, Playwright                |
+| `src`                         | Electron main, preload bridge, Storybook and Playwright; the renderer is the pack's |
 | `packs/budget/packages/core`  | Schema, `BudgetDocument`, month math, rules, importers, exports, reports, templates |
-| `../../packs/budget`          | The signed pack: its own renderer copy, prelude, manifest and build                 |
+| `../../packs/budget`          | The signed pack: renderer source, prelude, manifest and build                       |
 | `docs/reference`              | Architecture, conventions, data model, interface                                    |
 | `docs/reference/decisions.md` | The rules that shape Budget                                                         |
 
@@ -115,9 +115,10 @@ Read [AGENTS.md](AGENTS.md) before contributing (human or agent), and
 
 ## As a desktop pack
 
-`packs/budget` builds Budget as a signed `.suitepack`. The pack owns its renderer copy under
-`packs/budget/pack/src/renderer`; this frozen app keeps the last copy and is not an input to the
-build. Install **Suite Budget** from the Desk catalogue, or build the archive yourself:
+`packs/budget` builds Budget as a signed `.suitepack`. The pack owns the renderer source under
+`packs/budget/pack/src/renderer`; this frozen shell builds that same source and keeps the last
+artifact, so there is no second copy. Install **Suite Budget** from the Desk catalogue, or build the
+archive yourself:
 
 ```sh
 pnpm budget:pack                 # renderer + prelude + signature
