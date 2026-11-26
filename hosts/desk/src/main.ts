@@ -25,7 +25,6 @@ import {
   loadCatalogue,
 } from "./catalogue.js";
 import { CommandBroker, type HostCommand } from "./commandBroker.js";
-import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { invokeProvider, registerCommandChannels } from "./commandInvocation.js";
 import { CommandRecency, ScopeRowsCache } from "./commandSurface.js";
 import {
@@ -38,6 +37,7 @@ import {
   type ConsentRequest,
   consentTierFor,
 } from "./consent.js";
+import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { LAUNCHER_CONTEXT, suiteLinkFromArgv } from "./deepLink.js";
 import { DocumentMigrations, findDocument } from "./documentMigrations.js";
 import { DocumentStore, declaredDocumentSchemaVersion } from "./documents.js";

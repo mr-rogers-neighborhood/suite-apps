@@ -1,7 +1,7 @@
 import { SyncPill } from "@suite/ui";
 import { HostTabBar, NewTabPicker } from "@suite/ui/chrome";
-import { createRoot } from "react-dom/client";
 import { useCallback, useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
 import type { PickerData } from "../../shared.js";
 import { type HostBarSnapshot, syncPresentation, toHostTabs } from "./state.js";
 import "./tab-bar.css";
@@ -96,87 +96,87 @@ function TabBar({
 
   return (
     <>
-    <HostTabBar
-      tabs={toHostTabs(snapshot.tabs)}
-      activeTabId={snapshot.activeTabId}
-      onActivate={actions.activate}
-      onClose={actions.close}
-      onNewTab={actions.newTab}
-      mark={
-        <span className="flex min-h-6 items-center gap-2">
-          <span className="brand-mark" aria-hidden="true" />
-          <span>Suite</span>
-        </span>
-      }
-      onHome={actions.home}
-      homeLabel="Home"
-      search={
-        <button
-          type="button"
-          data-testid="command-bar"
-          data-handbook-region="command-bar"
-          aria-label={`${SEARCH_PLACEHOLDER} ${SEARCH_SHORTCUT}`}
-          aria-haspopup="dialog"
-          aria-controls="command-surface"
-          aria-expanded={snapshot.commandOpen}
-          aria-keyshortcuts="Meta+K Control+K"
-          title={`${SEARCH_PLACEHOLDER} (${SEARCH_SHORTCUT})`}
-          onClick={actions.openCommands}
-          className="flex h-7 w-56 shrink-0 items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas)]"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            className="h-3.5 w-3.5 shrink-0 opacity-70"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <circle cx="7" cy="7" r="4.5" />
-            <path d="m10.5 10.5 3 3" />
-          </svg>
-          <span className="min-w-0 flex-1 truncate text-left">
-            {SEARCH_PLACEHOLDER}{" "}
-            <kbd className="rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
-              {SEARCH_SHORTCUT}
-            </kbd>
+      <HostTabBar
+        tabs={toHostTabs(snapshot.tabs)}
+        activeTabId={snapshot.activeTabId}
+        onActivate={actions.activate}
+        onClose={actions.close}
+        onNewTab={actions.newTab}
+        mark={
+          <span className="flex min-h-6 items-center gap-2">
+            <span className="brand-mark" aria-hidden="true" />
+            <span>Suite</span>
           </span>
-        </button>
-      }
-      sync={
-        <SyncPill
-          situation={sync.situation}
-          label={sync.label}
-          tooltip={sync.tooltip}
-          aria-expanded={snapshot.syncOpen}
-          aria-controls="sync-panel"
-          onClick={actions.toggleSync}
-        />
-      }
-    />
-    <NewTabPicker
-      open={pickOpen}
-      packs={packs}
-      screens={(picker?.screens ?? []).map((screen) => ({
-        id: screen.id,
-        name: screen.name,
-      }))}
-      openDocuments={picker?.openDocuments ?? []}
-      onClose={() => setPickOpen(false)}
-      onOpenPack={actions.picker.openPack}
-      onOpenDocument={actions.picker.openDocument}
-      onNewDocument={actions.picker.newDocument}
-      onOpenScreen={actions.picker.openScreen}
-      onNewScreen={() => {
-        setPickOpen(false);
-        actions.picker.newScreen();
-      }}
-      onOpenSettings={() => {
-        setPickOpen(false);
-        // Settings has no surface yet; Home is where appearance and the catalogue live today.
-        actions.home();
-      }}
-    />
+        }
+        onHome={actions.home}
+        homeLabel="Home"
+        search={
+          <button
+            type="button"
+            data-testid="command-bar"
+            data-handbook-region="command-bar"
+            aria-label={`${SEARCH_PLACEHOLDER} ${SEARCH_SHORTCUT}`}
+            aria-haspopup="dialog"
+            aria-controls="command-surface"
+            aria-expanded={snapshot.commandOpen}
+            aria-keyshortcuts="Meta+K Control+K"
+            title={`${SEARCH_PLACEHOLDER} (${SEARCH_SHORTCUT})`}
+            onClick={actions.openCommands}
+            className="flex h-7 w-56 shrink-0 items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas)]"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              className="h-3.5 w-3.5 shrink-0 opacity-70"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <circle cx="7" cy="7" r="4.5" />
+              <path d="m10.5 10.5 3 3" />
+            </svg>
+            <span className="min-w-0 flex-1 truncate text-left">
+              {SEARCH_PLACEHOLDER}{" "}
+              <kbd className="rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
+                {SEARCH_SHORTCUT}
+              </kbd>
+            </span>
+          </button>
+        }
+        sync={
+          <SyncPill
+            situation={sync.situation}
+            label={sync.label}
+            tooltip={sync.tooltip}
+            aria-expanded={snapshot.syncOpen}
+            aria-controls="sync-panel"
+            onClick={actions.toggleSync}
+          />
+        }
+      />
+      <NewTabPicker
+        open={pickOpen}
+        packs={packs}
+        screens={(picker?.screens ?? []).map((screen) => ({
+          id: screen.id,
+          name: screen.name,
+        }))}
+        openDocuments={picker?.openDocuments ?? []}
+        onClose={() => setPickOpen(false)}
+        onOpenPack={actions.picker.openPack}
+        onOpenDocument={actions.picker.openDocument}
+        onNewDocument={actions.picker.newDocument}
+        onOpenScreen={actions.picker.openScreen}
+        onNewScreen={() => {
+          setPickOpen(false);
+          actions.picker.newScreen();
+        }}
+        onOpenSettings={() => {
+          setPickOpen(false);
+          // Settings has no surface yet; Home is where appearance and the catalogue live today.
+          actions.home();
+        }}
+      />
     </>
   );
 }
