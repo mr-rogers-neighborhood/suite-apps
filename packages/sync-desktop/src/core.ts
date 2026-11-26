@@ -48,14 +48,19 @@ export class RelayPinError extends Error {
 }
 
 /**
- * A pin refusal from either side of the bridge.
+ * A final refusal from either side of the bridge.
  *
- * The Node socket throws `@suite/sync/node`'s class; the pack's relay adapter throws its own.
- * Both name themselves `RelayPinError`, so the lifecycle can answer a certificate mismatch
- * as a refusal rather than as an asleep host without importing either implementation.
+ * The Node socket throws `@suite/sync/node`'s class, and a pack's adapter throws either its own
+ * `RelayPinError` or a subclass. The names are the portable part: a bundle cannot share a class
+ * identity across an alias, and Planner's capability refusal deliberately extends its pin error
+ * so the lifecycle stops rather than retrying. Both names are accepted, and the reason reaches
+ * the person.
  */
 function isPinRefusal(error: unknown): error is Error {
-  return error instanceof Error && error.name === "RelayPinError";
+  return (
+    error instanceof Error &&
+    (error.name === "RelayPinError" || error.name === "RelayCapabilityRefused")
+  );
 }
 
 /** How the core opens a socket: the caller supplies the implementation and its pin. */
