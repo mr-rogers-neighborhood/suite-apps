@@ -1,4 +1,4 @@
-import type { DocumentSummary } from "@suite/pack-runtime";
+import type { DocumentSummary, PackLaunchContext } from "@suite/pack-runtime";
 import {
   type PackBridgeHost,
   PackFilePickerError,
@@ -73,7 +73,9 @@ const SOURCE_FILTERS = [
  * at all; calling a budget method without it throws the sentence a person sees
  * in the app's error modal.
  */
-export type BudgetPackHost = PackBridgeHost;
+export interface BudgetPackHost extends PackBridgeHost {
+  readonly launch?: (() => Promise<PackLaunchContext>) | undefined;
+}
 
 export interface BudgetPackOptions {
   readonly host: BudgetPackHost;

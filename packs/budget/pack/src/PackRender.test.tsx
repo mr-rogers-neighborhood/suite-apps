@@ -1,6 +1,6 @@
 import { type BudgetBridge, BudgetDocument, decodeBudgetFile } from "@suite/budget-core";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./renderer/App";
 import { memoryDocuments, memoryFiles } from "./test/fakeHost";
 
@@ -16,15 +16,22 @@ import { memoryDocuments, memoryFiles } from "./test/fakeHost";
  * a window is not launched here.
  */
 describe("Budget as a pack", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
   afterEach(() => {
+    cleanup();
     const global = globalThis as {
       __suiteBudgetPack?: { dispose(): void };
       suite?: unknown;
       suiteBudget?: unknown;
+      __suiteBudgetLaunch?: unknown;
     };
     global.__suiteBudgetPack?.dispose();
     delete global.__suiteBudgetPack;
     delete global.suiteBudget;
+    delete global.__suiteBudgetLaunch;
     delete global.suite;
   });
 
@@ -85,5 +92,63 @@ describe("Budget as a pack", () => {
     expect(documents.files.size).toBe(2);
 
     await waitFor(() => expect(screen.queryByText("Something went wrong")).toBeNull());
+  });
+
+  it("honours launch context kind 'create' on boot", async () => {
+    const documents = memoryDocuments();
+    const files = memoryFiles();
+    (globalThis as { suite?: unknown }).suite = {
+      documents,
+      files,
+      info: async () => ({ platform: "linux" }),
+      launch: async () => ({ kind: "create" }),
+    };
+    await import("./prelude");
+
+    render(<App />);
+
+    // 'create' opens the New budget dialog so settings are collected
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /create budget/i })).toBeInTheDocument();
+  });
+
+  it("honours launch context kind 'document' on boot", async () => {
+    const doc = BudgetDocument.create({ name: "Custom Budget", currency: "USD", now: new Date() });
+    const documents = memoryDocuments({
+      "budget-doc": doc.snapshot(),
+    });
+    const files = memoryFiles();
+    (globalThis as { suite?: unknown }).suite = {
+      documents,
+      files,
+      info: async () => ({ platform: "linux" }),
+      launch: async () => ({ kind: "document", documentId: "budget-doc" }),
+    };
+    await import("./prelude");
+
+    render(<App />);
+
+    // The named budget opens directly
+    await waitFor(() => expect(screen.getAllByText("Custom Budget").length).toBeGreaterThan(0));
+    expect(screen.queryByText("Something went wrong")).toBeNull();
+  });
+
+  it("falls back to launcher with a sentence on unknown document id", async () => {
+    const documents = memoryDocuments();
+    const files = memoryFiles();
+    (globalThis as { suite?: unknown }).suite = {
+      documents,
+      files,
+      info: async () => ({ platform: "linux" }),
+      launch: async () => ({ kind: "document", documentId: "unknown-budget" }),
+    };
+    await import("./prelude");
+
+    render(<App />);
+
+    // Falls back to the launcher and shows the error sentence
+    expect(await screen.findByText("No budgets yet")).toBeInTheDocument();
+    expect(await screen.findByText("That budget is no longer in the library.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Something went wrong" })).toBeInTheDocument();
   });
 });

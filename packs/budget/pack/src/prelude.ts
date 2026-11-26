@@ -13,6 +13,10 @@ const pack = createBudgetPack({ host: suite ?? {} });
 
 Object.assign(globalThis, { suiteBudget: pack.bridge });
 
+if (suite?.launch !== undefined) {
+  Object.assign(globalThis, { __suiteBudgetLaunch: suite.launch() });
+}
+
 /**
  * A device assertion handle, in the same spirit as the shell's dev globals.
  *

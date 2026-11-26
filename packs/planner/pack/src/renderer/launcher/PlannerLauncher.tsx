@@ -18,10 +18,20 @@ import { getBridge, type RecentDocumentRow } from "../platform/bridge";
  * When the host declares `recents`, the other documents it has recorded show here as well. The
  * list is the host's metadata; opening one asks the host for that document by id, never a path.
  */
-export function PlannerLauncher({ onBegin }: { onBegin: () => void }) {
+export function PlannerLauncher({
+  onBegin,
+  initialError,
+}: {
+  onBegin: () => void;
+  initialError?: string | null;
+}) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [recents, setRecents] = useState<readonly RecentDocumentRow[]>([]);
+
+  useEffect(() => {
+    if (initialError !== undefined) setError(initialError);
+  }, [initialError]);
 
   useEffect(() => {
     const bridge = getBridge();

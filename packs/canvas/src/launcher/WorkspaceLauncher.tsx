@@ -73,9 +73,13 @@ const DeleteWorkspaceDialog = lazy(async () => {
   return { default: module.DeleteWorkspaceDialog };
 });
 
-export function WorkspaceLauncher() {
+export function WorkspaceLauncher({ initialError }: { initialError?: string | null } = {}) {
   const [recents, setRecents] = useState<RecentEntry[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
+
+  useEffect(() => {
+    if (initialError !== undefined) setError(initialError);
+  }, [initialError]);
   const [notice, setNotice] = useState<string | null>(null);
   /**
    * What the screen is doing, in a sentence. A boolean left the reader to guess

@@ -16,9 +16,14 @@ const suite = (globalThis as { suite?: CanvasPackHost }).suite;
 const pack = createCanvasPack({
   host: suite ?? {},
   storeAttachment: storeLocalAttachment,
+  ...(suite?.reload !== undefined ? { reload: suite.reload } : {}),
 });
 
 Object.assign(globalThis, { suiteDesktop: pack.bridge });
+
+if (suite?.launch !== undefined) {
+  Object.assign(globalThis, { __suiteCanvasLaunch: suite.launch() });
+}
 
 /**
  * A device assertion handle, in the same spirit as the shell's dev globals.

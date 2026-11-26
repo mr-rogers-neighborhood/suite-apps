@@ -9,6 +9,7 @@ import {
 import type {
   FilesService,
   ImportedFolder,
+  PackLaunchContext,
   RecentDocument,
   RecentsService,
   RelayService,
@@ -74,9 +75,11 @@ const CANVAS_FILTERS = [{ name: "Suite Canvas", extensions: ["canvas", "suite", 
 
 /** The host services this pack uses. */
 export interface CanvasPackHost extends PackBridgeHost {
+  readonly launch?: (() => Promise<PackLaunchContext>) | undefined;
   readonly recents?: RecentsService | undefined;
   /** The opaque-frame relay the host supervises, when the manifest declared `relay`. */
   readonly relay?: RelayService | undefined;
+  readonly reload?: (() => void) | undefined;
 }
 
 export interface CanvasPackOptions {

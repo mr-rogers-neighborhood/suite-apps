@@ -6,7 +6,7 @@ import {
   WorkspaceDocument,
 } from "@suite/planner-core";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./renderer/App";
 import { bootDocument } from "./renderer/store/snapshotStore";
 import { useUiStore } from "./renderer/store/uiStore";
@@ -23,6 +23,7 @@ import { memoryDocuments, memoryFiles } from "./test/fakeHost";
  */
 describe("Planner as a pack", () => {
   beforeEach(() => {
+    vi.resetModules();
     useUiStore.setState({
       view: "today",
       selectedDate: todayKey(),
@@ -37,10 +38,12 @@ describe("Planner as a pack", () => {
       __suitePlannerPack?: { dispose(): void };
       suite?: unknown;
       suitePlanner?: unknown;
+      __suitePlannerLaunch?: unknown;
     };
     global.__suitePlannerPack?.dispose();
     delete global.__suitePlannerPack;
     delete global.suitePlanner;
+    delete global.__suitePlannerLaunch;
     delete global.suite;
   });
 
@@ -108,5 +111,65 @@ describe("Planner as a pack", () => {
       expect(screen.getByLabelText(/Intention for/u)).toHaveValue("Ship the pack"),
     );
     expect(screen.queryByText("Something went wrong")).toBeNull();
+  });
+
+  it("honours launch context kind 'create' on boot", async () => {
+    const documents = memoryDocuments();
+    const files = memoryFiles();
+    (globalThis as { suite?: unknown }).suite = {
+      documents,
+      files,
+      info: async () => ({ platform: "linux" }),
+      launch: async () => ({ kind: "create" }),
+    };
+    await import("./prelude");
+
+    const { replica, created } = await bootDocument();
+    render(<App replica={replica} created={created} />);
+
+    expect(await screen.findByLabelText("Capture a task")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /new planner/i })).toBeNull();
+  });
+
+  it("honours launch context kind 'document' on boot", async () => {
+    const existing = WorkspaceDocument.create();
+    existing.updateDay(todayKey(), { intention: "Custom Document Intention" });
+    const documents = memoryDocuments({
+      "custom-doc": existing.snapshot(),
+    });
+    const files = memoryFiles();
+    (globalThis as { suite?: unknown }).suite = {
+      documents,
+      files,
+      info: async () => ({ platform: "linux" }),
+      launch: async () => ({ kind: "document", documentId: "custom-doc" }),
+    };
+    await import("./prelude");
+
+    const { replica, created } = await bootDocument();
+    render(<App replica={replica} created={created} />);
+
+    expect(await screen.findByDisplayValue("Custom Document Intention")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /new planner/i })).toBeNull();
+  });
+
+  it("falls back to launcher with a sentence on unknown document id", async () => {
+    const documents = memoryDocuments();
+    const files = memoryFiles();
+    (globalThis as { suite?: unknown }).suite = {
+      documents,
+      files,
+      info: async () => ({ platform: "linux" }),
+      launch: async () => ({ kind: "document", documentId: "nonexistent-doc" }),
+    };
+    await import("./prelude");
+
+    const { replica, created } = await bootDocument();
+    render(<App replica={replica} created={created} />);
+
+    expect(await screen.findByRole("button", { name: /new planner/i })).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That planner is no longer in this app's documents.",
+    );
   });
 });

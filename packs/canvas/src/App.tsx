@@ -1,5 +1,25 @@
+import { STARTER_TEMPLATES } from "@suite/graph";
+import type { PackLaunchContext } from "@suite/pack-runtime";
 import { ReactFlowProvider, useOnViewportChange, useReactFlow } from "@xyflow/react";
+import { LoroDoc } from "loro-crdt";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { desktopBridge } from "./host/bridge";
+import {
+  DEFAULT_STARTER_TEMPLATE_ID,
+  rememberChosenTemplate,
+  starterTemplateById,
+} from "./launcher/starterTemplates";
+import {
+  DEFAULT_WORKSPACE_NAME,
+  rememberWorkspaceName,
+} from "./session/workspaceName";
+import {
+  navigateTo,
+  newWorkspaceId,
+  readRecentWorkspaces,
+  rememberWorkspace,
+  workspaceUrl,
+} from "./session/workspaceTransfer";
 import { shellPaletteItems } from "./app/palette";
 import { StaleBuildNotice } from "./app/StaleBuildNotice";
 import { useBoardDerivations } from "./app/useBoardDerivations";
@@ -55,7 +75,106 @@ export default function App() {
 
   const session = getSession();
   const workspaceId = session.workspaceId;
-  if (!workspaceId) return <WorkspaceLauncher />;
+  const [launchError, setLaunchError] = useState<string | null>(null);
+  const bootHandled = useRef(false);
+
+  useEffect(() => {
+    // The boot effect must run once and must not fight an already-open document.
+    if (workspaceId || bootHandled.current) return;
+    bootHandled.current = true;
+
+    const launch = (
+      globalThis as {
+        __suiteCanvasLaunch?: Promise<PackLaunchContext>;
+        suite?: { launch?(): Promise<PackLaunchContext> };
+      }
+    ).__suiteCanvasLaunch ?? (globalThis as { suite?: { launch?(): Promise<PackLaunchContext> } }).suite?.launch?.();
+
+    if (launch === undefined) return;
+
+    void launch
+      .then(async (context) => {
+        if (context.kind === "launcher") {
+          return;
+        }
+        if (context.kind === "create") {
+          const newId = newWorkspaceId();
+          const chosen = starterTemplateById(STARTER_TEMPLATES, DEFAULT_STARTER_TEMPLATE_ID);
+          if (chosen !== undefined) rememberChosenTemplate(newId, chosen);
+          const title = chosen?.name ?? DEFAULT_WORKSPACE_NAME;
+          rememberWorkspace({ id: newId, title });
+          if (chosen !== undefined) rememberWorkspaceName(newId, title);
+
+          const bridge = desktopBridge();
+          if (bridge !== null) {
+            try {
+              const made = await bridge.createDocument({
+                workspaceId: newId,
+                title,
+                snapshot: new LoroDoc().export({ mode: "snapshot" }),
+                manifest: { boards: 0, cards: 0, types: 0, tags: 0 },
+              });
+              if (!made.ok) {
+                setLaunchError(`Could not create that canvas: ${made.reason}`);
+                return;
+              }
+            } catch (cause) {
+              setLaunchError(cause instanceof Error ? cause.message : "Could not create that canvas.");
+              return;
+            }
+          }
+          rememberWorkspace({ id: newId, title });
+          navigateTo(workspaceUrl(newId));
+          return;
+        }
+        if (context.kind === "document" && typeof context.documentId === "string") {
+          const docId = context.documentId;
+          let exists = false;
+          const bridge = desktopBridge();
+          if (bridge !== null) {
+            try {
+              const recents = await bridge.recentFiles();
+              exists = recents.some((f) => f.path === docId);
+            } catch {
+              exists = false;
+            }
+          }
+          if (!exists) {
+            const suite = (globalThis as {
+              suite?: { documents?: { open(id: string): Promise<{ bytes: Uint8Array } | null> } };
+            }).suite;
+            if (suite?.documents !== undefined) {
+              try {
+                const record = await suite.documents.open(docId);
+                exists = record !== null && record.bytes.byteLength > 0;
+              } catch {
+                exists = false;
+              }
+            } else {
+              const recents = readRecentWorkspaces();
+              exists = recents.some((entry) => entry.id === docId);
+            }
+          }
+
+          if (!exists) {
+            setLaunchError("That canvas is no longer in this pack's document store.");
+            return;
+          }
+
+          rememberWorkspace({ id: docId });
+          navigateTo(workspaceUrl(docId));
+          return;
+        }
+        if (context.kind !== "deep-link" && context.kind !== "file") {
+          setLaunchError("This launch context is not supported.");
+        }
+      })
+      .catch((cause) => {
+        setLaunchError(cause instanceof Error ? cause.message : "Could not open that canvas.");
+      });
+  }, [workspaceId]);
+
+  if (!workspaceId) return <WorkspaceLauncher initialError={launchError} />;
 
   return (
     <ReactFlowProvider>

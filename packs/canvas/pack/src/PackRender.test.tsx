@@ -7,7 +7,7 @@ import {
   type WorkspaceFileManifest,
 } from "@suite/graph";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { desktopBridge } from "../../src/host/bridge";
 import { memoryDocuments, memoryFiles, textOf } from "./test/fakeHost";
 
@@ -46,17 +46,31 @@ function cardTitle(workspace: WorkspaceDocument, index = 0): string {
   return card === undefined ? "" : workspace.cardTitle(card.id);
 }
 
-afterEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  const { configureSession, standaloneSession, getSession } = await import(
+    "../../src/session/session"
+  );
+  configureSession({ ...standaloneSession(getSession()), workspaceId: null, roomId: null });
+});
+
+afterEach(async () => {
   cleanup();
   const scope = globalThis as {
     __suiteCanvasPack?: { dispose(): void };
     suite?: unknown;
     suiteDesktop?: unknown;
+    __suiteCanvasLaunch?: unknown;
   };
   scope.__suiteCanvasPack?.dispose();
   delete scope.__suiteCanvasPack;
   delete scope.suiteDesktop;
+  delete scope.__suiteCanvasLaunch;
   delete scope.suite;
+  const { configureSession, standaloneSession, getSession } = await import(
+    "../../src/session/session"
+  );
+  configureSession({ ...standaloneSession(getSession()), workspaceId: null, roomId: null });
 });
 
 describe("Canvas as a pack", () => {
@@ -148,5 +162,104 @@ describe("Canvas as a pack", () => {
     const dev = (globalThis as { __suiteCanvasPack?: { documentId(): string | null } })
       .__suiteCanvasPack;
     expect(dev?.documentId()).toBe(importedId);
+  });
+
+  it("honours launch context kind 'document' on boot", async () => {
+    const workspace = new WorkspaceDocument();
+    workspace.createBoard({ name: "Doc board" });
+    workspace.renameWorkspace("Custom Workspace");
+
+    const DOC_ID = "33333333-3333-4333-8333-333333333333";
+    const documents = memoryDocuments({
+      [DOC_ID]: new TextEncoder().encode(
+        JSON.stringify(
+          buildWorkspaceFile({
+            workspaceId: DOC_ID,
+            snapshot: new Uint8Array(workspace.exportSnapshot()),
+            manifest: counts(workspace),
+          }),
+        ),
+      ),
+    });
+    const files = memoryFiles();
+    Object.assign(globalThis, {
+      suite: {
+        documents,
+        files,
+        info: async () => ({ platform: "linux" }),
+        launch: async () => ({ kind: "document", documentId: DOC_ID }),
+        reload: () => {},
+      },
+    });
+
+    await import("./prelude");
+    const workspaceTransfer = await import("../../src/session/workspaceTransfer");
+    const navigateSpy = vi.spyOn(workspaceTransfer, "navigateTo").mockImplementation(() => {});
+
+    const { default: App } = await import("../../src/App");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(navigateSpy).toHaveBeenCalledWith(workspaceTransfer.workspaceUrl(DOC_ID));
+    });
+  });
+
+  it("honours launch context kind 'create' on boot", async () => {
+    const documents = memoryDocuments();
+    const files = memoryFiles();
+    Object.assign(globalThis, {
+      suite: {
+        documents,
+        files,
+        info: async () => ({ platform: "linux" }),
+        launch: async () => ({ kind: "create" }),
+        reload: () => {},
+      },
+    });
+
+    await import("./prelude");
+    const workspaceTransfer = await import("../../src/session/workspaceTransfer");
+    const navigateSpy = vi.spyOn(workspaceTransfer, "navigateTo").mockImplementation(() => {});
+
+    const { default: App } = await import("../../src/App");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(documents.files.size).toBe(1);
+    });
+    const createdId = [...documents.files.keys()][0];
+    expect(createdId).toBeDefined();
+    expect(navigateSpy).toHaveBeenCalledWith(workspaceTransfer.workspaceUrl(createdId!));
+  });
+
+  it("falls back to launcher with a sentence on unknown document id", async () => {
+    const documents = memoryDocuments();
+    const files = memoryFiles();
+    Object.assign(globalThis, {
+      suite: {
+        documents,
+        files,
+        info: async () => ({ platform: "linux" }),
+        launch: async () => ({ kind: "document", documentId: "unknown-canvas-id" }),
+        reload: () => {},
+      },
+    });
+
+    await import("./prelude");
+    const workspaceTransfer = await import("../../src/session/workspaceTransfer");
+    const navigateSpy = vi.spyOn(workspaceTransfer, "navigateTo").mockImplementation(() => {});
+
+    const { default: App } = await import("../../src/App");
+    render(<App />);
+
+    expect(
+      await screen.findByText(
+        "That canvas is no longer in this pack's document store.",
+        {},
+        { timeout: 10_000 },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 });

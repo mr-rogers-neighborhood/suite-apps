@@ -1,4 +1,5 @@
 import type { CreateBudgetInput, LibraryEntry, OpenBudgetInfo } from "@suite/budget-core";
+import type { PackLaunchContext } from "@suite/pack-runtime";
 import { Button } from "@suite/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Shell } from "./app/Shell";
@@ -20,6 +21,7 @@ export function App() {
 
   const replicaRef = useRef<DocumentReplica | null>(null);
   const openRef = useRef<OpenBudgetInfo | null>(null);
+  const bootHandled = useRef(false);
 
   const refreshLibrary = useCallback(async () => {
     try {
@@ -88,6 +90,44 @@ export function App() {
     },
     [refreshLibrary],
   );
+
+  useEffect(() => {
+    if (bootHandled.current) return;
+    bootHandled.current = true;
+
+    const launch = (
+      globalThis as {
+        __suiteBudgetLaunch?: Promise<PackLaunchContext>;
+        suite?: { launch?(): Promise<PackLaunchContext> };
+      }
+    ).__suiteBudgetLaunch ?? (globalThis as { suite?: { launch?(): Promise<PackLaunchContext> } }).suite?.launch?.();
+
+    if (launch === undefined) return;
+
+    void launch
+      .then(async (context) => {
+        // The boot effect must run once and must not fight an already-open document.
+        if (openRef.current !== null || replicaRef.current !== null) return;
+
+        if (context.kind === "launcher") {
+          return;
+        }
+        if (context.kind === "create") {
+          useUiStore.getState().setNewBudgetOpen(true);
+          return;
+        }
+        if (context.kind === "document" && typeof context.documentId === "string") {
+          await openBudget(context.documentId);
+          return;
+        }
+        if (context.kind !== "deep-link" && context.kind !== "file") {
+          setError("This launch context is not supported.");
+        }
+      })
+      .catch((cause) => {
+        setError(cause instanceof Error ? cause.message : "Could not open that budget.");
+      });
+  }, [openBudget]);
 
   const closeBudget = useCallback(async () => {
     try {
