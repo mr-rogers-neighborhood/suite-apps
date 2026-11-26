@@ -65,14 +65,14 @@ export function hostWidget(registryId: string): HostWidget | undefined {
   return DESK_HOST_WIDGETS.find((widget) => widget.registryId === registryId);
 }
 
-/** The Screen a new data root starts with: Home, with the host app grid filling the row. */
+/** The Screen a new data root starts with: an empty Home, ready for the person's widgets. */
 export function defaultHomeScreen(): Screen {
   return {
     format: SUITE_SCREEN_FORMAT,
     version: SUITE_SCREEN_VERSION,
     id: HOME_SCREEN_ID,
     name: HOME_SCREEN_NAME,
-    widgets: [{ registryId: DESK_APPS_WIDGET, size: "full" }],
+    widgets: [],
   };
 }
 
@@ -302,6 +302,7 @@ export interface HomeOpen {
  * gains Home at the front.
  */
 export async function openHomeScreen(screens: ScreenSet, spaces: SpaceStore): Promise<HomeOpen> {
+  await migrateHome(screens);
   const screen = screens.screen(screens.homeId);
   if (screen === null) throw new Error("the host has no Home Screen");
   const ensured = await spaces.ensureScreenTab({
@@ -315,4 +316,22 @@ export async function openHomeScreen(screens: ScreenSet, spaces: SpaceStore): Pr
     tabId: ensured.tab.id,
     opened: ensured.opened,
   };
+}
+
+/**
+ * Remove the old host app grid from Home.
+ *
+ * `desk.apps` was Home's launcher before the picker became the new-tab surface. A Screen that
+ * still carries it keeps every other widget; an old default Home becomes empty and the Suite
+ * mark and the picker carry the next action. The placement is removed from the document, not
+ * hidden in the view.
+ */
+export async function migrateHome(screens: ScreenSet): Promise<void> {
+  const screen = screens.screen(screens.homeId);
+  if (screen === null) return;
+  const legacy = screen.widgets.some(
+    (entry) => !isScreenRow(entry) && entry.registryId === DESK_APPS_WIDGET,
+  );
+  if (!legacy) return;
+  await screens.store(screen.id)?.remove(DESK_APPS_WIDGET);
 }

@@ -79,6 +79,7 @@ export class ShellWindow {
    */
   readonly #launchContexts = new Map<string, PackLaunchContext>();
   #theme: ThemeView;
+  #firstRun: boolean;
   #notice: string | null = null;
   #reminderStatus: string | null = null;
   #relay: RelayView = {
@@ -101,6 +102,7 @@ export class ShellWindow {
     readonly spaces: SpaceStore;
     readonly screens: ScreenSet;
     readonly theme: ThemeView;
+    readonly firstRun?: boolean;
     readonly relay?: RelayView;
     readonly containerId?: string;
     readonly onViewClosed?: (tabId: string) => void;
@@ -115,6 +117,7 @@ export class ShellWindow {
     this.#containerId = options.containerId ?? DEFAULT_CONTAINER_ID;
     this.#onViewClosed = options.onViewClosed;
     this.#theme = options.theme;
+    this.#firstRun = options.firstRun ?? false;
     this.#relay = options.relay ?? this.#relay;
 
     this.window = new BaseWindow({
@@ -187,6 +190,7 @@ export class ShellWindow {
       tabs: spaceState.tabs,
       activeTabId: spaceState.activeTabId,
       surface: shellSurface(spaceState),
+      firstRun: this.#firstRun,
       screens: this.#screenViews(spaceState),
       screenList: this.#screens.summaries().map((screen) => ({
         id: screen.id,
@@ -557,6 +561,12 @@ export class ShellWindow {
     // A theme is host state, so every open pack moves with it instead of waiting for a
     // reload. The chrome is repainted by the broadcast above.
     for (const [tabId, view] of this.#views) this.#paintPackTheme(tabId, view);
+  }
+
+  setFirstRun(firstRun: boolean): void {
+    if (this.#firstRun === firstRun) return;
+    this.#firstRun = firstRun;
+    this.broadcast();
   }
 
   /**

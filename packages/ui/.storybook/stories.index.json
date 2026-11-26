@@ -1408,6 +1408,79 @@
       ]
     },
     {
+      "id": "workbench-first-run--appearance-step",
+      "title": "Workbench/First run",
+      "name": "Appearance Step",
+      "importPath": ".storybook/workbench/FirstRun.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/FirstRun.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-first-run--choose-apps",
+      "title": "Workbench/First run",
+      "name": "Choose Apps",
+      "importPath": ".storybook/workbench/FirstRun.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/FirstRun.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-first-run--install-failed",
+      "title": "Workbench/First run",
+      "name": "Install Failed",
+      "importPath": ".storybook/workbench/FirstRun.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/FirstRun.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-first-run--installing",
+      "title": "Workbench/First run",
+      "name": "Installing",
+      "importPath": ".storybook/workbench/FirstRun.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/FirstRun.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-first-run--ready",
+      "title": "Workbench/First run",
+      "name": "Ready",
+      "importPath": ".storybook/workbench/FirstRun.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/FirstRun.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-first-run--selection-interaction",
+      "title": "Workbench/First run",
+      "name": "Selection Interaction",
+      "importPath": ".storybook/workbench/FirstRun.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/FirstRun.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:workbench",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
       "id": "workbench-host-shell--default",
       "title": "Workbench/Host shell",
       "name": "Default",

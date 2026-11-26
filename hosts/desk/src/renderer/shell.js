@@ -10,12 +10,13 @@
  * file, keeps no document state, and calls host actions that answer with the new state.
  */
 
-import { colorFor, mountTabBar } from "./tab-bar.js";
+import { colorFor, mountFirstRun, mountTabBar } from "./tab-bar.js";
 
 const api = globalThis.suiteShell;
 
 const elements = {
   hostBar: document.querySelector("#host-bar"),
+  firstRun: document.querySelector("#first-run"),
   screen: document.querySelector("#screen"),
   screenName: document.querySelector("#screen-name"),
   screenEyebrow: document.querySelector(".screen-title .eyebrow"),
@@ -85,6 +86,7 @@ let state = {
   tabs: [],
   activeTabId: null,
   surface: "launcher",
+  firstRun: false,
   screens: [],
   screenList: [],
   homeScreenId: "",
@@ -93,7 +95,7 @@ let state = {
   catalogue: [],
   catalogueSource: "",
   installedVersions: [],
-  theme: { preset: "suite", mode: "dark", values: {} },
+  theme: { preset: "suite", mode: "dark", density: "cozy", values: {}, scale: {} },
   notice: null,
   reminderStatus: null,
   relay: { ...EMPTY_RELAY },
@@ -103,6 +105,7 @@ let editing = false;
 let managingScreens = false;
 let syncOpen = false;
 let tabBar = null;
+let firstRunWizard = null;
 let shouldFocusSearch = true;
 let appsView = {
   packs: null,
@@ -504,8 +507,12 @@ function applyTheme() {
   root.style.colorScheme = state.theme.mode;
   root.dataset.theme = state.theme.preset;
   root.dataset.themeMode = state.theme.mode;
+  root.dataset.density = state.theme.density;
   root.classList.toggle("dark", state.theme.mode === "dark");
-  for (const [name, value] of Object.entries(state.theme.values)) {
+  for (const [name, value] of Object.entries({
+    ...state.theme.values,
+    ...state.theme.scale,
+  })) {
     root.style.setProperty(name, value);
   }
 }
@@ -559,12 +566,75 @@ function updateHostBar() {
   });
 }
 
+function firstRunPacks() {
+  return (state.catalogue ?? [])
+    .filter((entry) => entry.trusted)
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      ...(entry.description === null ? {} : { description: entry.description }),
+      version: entry.version,
+      status: "available",
+    }));
+}
+
+function firstRunTheme() {
+  const theme = state.theme ?? {};
+  return {
+    preset: theme.preset ?? "suite",
+    mode: theme.mode === "dark" ? "dark" : "light",
+    density: theme.density ?? "cozy",
+  };
+}
+
+/**
+ * The first-run wizard replaces the chrome until the host records completion.
+ *
+ * It owns the pack selection and the install rows; the host owns the catalogue, the theme and
+ * the installer. The wizard is mounted once and updated with the host's current snapshot.
+ */
+function updateFirstRun() {
+  const firstRun = state.firstRun === true;
+  if (elements.firstRun !== null) elements.firstRun.hidden = !firstRun;
+  if (elements.hostBar !== null) elements.hostBar.hidden = firstRun;
+  if (elements.screen !== null) elements.screen.hidden = firstRun;
+  if (elements.empty !== null) elements.empty.hidden = firstRun || state.surface !== "launcher";
+  if (elements.syncPanel !== null) elements.syncPanel.hidden = firstRun || !syncOpen;
+  if (elements.commandSurface !== null) {
+    elements.commandSurface.hidden = firstRun || !commandOpen;
+  }
+  if (!firstRun) {
+    if (firstRunWizard !== null) {
+      firstRunWizard.unmount();
+      firstRunWizard = null;
+    }
+    return;
+  }
+  if (elements.firstRun === null) return;
+  if (firstRunWizard === null) {
+    firstRunWizard = mountFirstRun(elements.firstRun, {
+      packs: [],
+      theme: firstRunTheme(),
+      onThemeChange: (theme) => run(api.setTheme(theme)),
+      onInstall: async (id) => {
+        const result = await api.installFirstRunPack(id);
+        return {
+          id,
+          ok: result?.ok === true,
+          detail: typeof result?.detail === "string" ? result.detail : "The install was refused.",
+        };
+      },
+      onComplete: () => run(api.completeFirstRun()),
+    });
+  }
+  firstRunWizard.update(firstRunPacks(), firstRunTheme());
+}
+
 function matchesQuery(name, id, description) {
   const needle = query.trim().toLowerCase();
   if (needle.length === 0) return true;
   return `${name} ${id} ${description ?? ""}`.toLowerCase().includes(needle);
 }
-
 function actionButton(label, onClick, className) {
   const button = element("button", className ? `action ${className}` : "action", label);
   button.type = "button";
@@ -1125,7 +1195,40 @@ function renderWidgets(view) {
     );
   });
   if (view.widgets.length === 0) {
-    fragment.append(element("p", "empty", "This Screen has no widgets. Choose Edit to add one."));
+    if (view.id === state.homeScreenId) {
+      const empty = element("section", "home-empty");
+      empty.setAttribute("aria-label", "Empty Home");
+      empty.append(element("p", "eyebrow", "Home"));
+      empty.append(element("h2", "", "A clean start."));
+      empty.append(
+        element(
+          "p",
+          "lede",
+          "Your apps are installed. Open one to make a document, or add a new widget.",
+        ),
+      );
+      const actions = element("div", "home-empty-actions");
+      actions.append(
+        actionButton(
+          "Open a pack",
+          () => {
+            shouldFocusSearch = true;
+            run(api.newTab());
+          },
+          "action-primary",
+        ),
+      );
+      actions.append(
+        actionButton("Add a widget", () => {
+          editing = true;
+          paint();
+        }),
+      );
+      empty.append(actions);
+      fragment.append(empty);
+    } else {
+      fragment.append(element("p", "empty", "This Screen has no widgets. Choose Edit to add one."));
+    }
   }
   elements.widgets.replaceChildren(fragment);
 }
@@ -1356,6 +1459,7 @@ function paint() {
   renderSync();
   renderScreen();
   renderCommandSurface();
+  updateFirstRun();
 
   const active = state.tabs.find((tab) => tab.id === state.activeTabId);
   document.body.dataset.surface = state.surface;

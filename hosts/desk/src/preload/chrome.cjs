@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld("suiteShell", {
   installPack: () => ipcRenderer.invoke("suite:shell:install-pack"),
   installCataloguePack: (id, version) =>
     ipcRenderer.invoke("suite:shell:install-catalogue-pack", id, version),
+  installFirstRunPack: (id) => ipcRenderer.invoke("suite:shell:install-first-run-pack", id),
+  completeFirstRun: () => ipcRenderer.invoke("suite:shell:complete-first-run"),
+  setTheme: (choice) => ipcRenderer.invoke("suite:shell:set-theme", choice),
   reaskConsent: (packId, capability) =>
     ipcRenderer.invoke("suite:shell:reask-consent", packId, capability),
   importRevocation: () => ipcRenderer.invoke("suite:shell:import-revocation"),

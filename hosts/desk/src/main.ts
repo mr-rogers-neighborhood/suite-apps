@@ -5,6 +5,7 @@ import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/deskto
 import { isPublisherKeyTrusted, type PackDocument, SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isPackCapability, type PackCapability } from "@suite/pack/capabilities";
 import { SCREEN_FILE_EXTENSION, SCREEN_FILE_MAX_BYTES, SUITE_SCREEN_VERSION } from "@suite/screens";
+import { DENSITIES } from "@suite/theme";
 import {
   app,
   dialog,
@@ -61,6 +62,7 @@ import {
 } from "./installedPacks.js";
 import { type LibraryScope, LibraryWatch, revealDocument } from "./library.js";
 import { planUninstall } from "./lifecycle.js";
+import { completeOnboarding, isFirstRun } from "./onboarding.js";
 import { documentScopeLabel, documentsRootFor } from "./packIdentity.js";
 import {
   type DeviceKey,
@@ -122,6 +124,7 @@ import {
   type FileReadOptions,
   type FileRemoveOptions,
   type FileWriteOptions,
+  type FirstRunInstallResult,
   type InstalledVersionView,
   PACK_EVENT,
   PACK_IPC,
@@ -137,6 +140,7 @@ import { SpaceStore } from "./spaces.js";
 import {
   DEFAULT_THEME_CHOICE,
   type HostThemeChoice,
+  isHostThemeChoice,
   loadThemeChoice,
   presetFor,
   resolveThemeView,
@@ -193,6 +197,8 @@ let commandRecency: CommandRecency | null = null;
  * whenever the View menu changes it, so every pack opened later starts in the same theme.
  */
 let themeChoice: HostThemeChoice = DEFAULT_THEME_CHOICE;
+/** The first-run wizard replaces the chrome until this data root records completion. */
+let firstRun = true;
 /**
  * One document store per publisher. The first-party publisher keeps the
  * `documents/<container>/<pack>` layout; any other publisher has its own root,
@@ -309,6 +315,7 @@ async function bootstrap(): Promise<void> {
   // The theme is profile state, like the device key: one answer for every pack this host
   // opens, including a pack installed after the choice was made.
   themeChoice = await loadThemeChoice(dataRoot);
+  firstRun = await isFirstRun(dataRoot);
   nativeTheme.themeSource = themeChoice.mode;
   installApplicationMenu();
   // The device key is host data, not pack data. A missing file is a first run
@@ -862,6 +869,17 @@ function installApplicationMenu(): void {
     checked: themeChoice.preset === theme.id,
     click: () => void chooseTheme({ preset: theme.id }),
   }));
+  const densityLabels: Record<HostThemeChoice["density"], string> = {
+    compact: "Compact",
+    cozy: "Cozy",
+    comfortable: "Comfortable",
+  };
+  const densityItems: MenuItemConstructorOptions[] = DENSITIES.map((density) => ({
+    label: densityLabels[density],
+    type: "radio",
+    checked: themeChoice.density === density,
+    click: () => void chooseTheme({ density }),
+  }));
 
   const template: MenuItemConstructorOptions[] = [
     ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
@@ -875,6 +893,7 @@ function installApplicationMenu(): void {
         modeItem("system", "Follow the system"),
         { type: "separator" },
         { label: "Theme", submenu: presetItems },
+        { label: "Density", submenu: densityItems },
         { type: "separator" },
         { role: "reload" },
         { role: "toggleDevTools" },
@@ -891,8 +910,15 @@ async function chooseTheme(next: Partial<HostThemeChoice>): Promise<void> {
   const choice: HostThemeChoice = {
     preset: presetFor(next.preset ?? themeChoice.preset),
     mode: next.mode ?? themeChoice.mode,
+    density: next.density ?? themeChoice.density,
   };
-  if (choice.preset === themeChoice.preset && choice.mode === themeChoice.mode) return;
+  if (
+    choice.preset === themeChoice.preset &&
+    choice.mode === themeChoice.mode &&
+    choice.density === themeChoice.density
+  ) {
+    return;
+  }
   themeChoice = choice;
   nativeTheme.themeSource = choice.mode;
   installApplicationMenu();
@@ -917,6 +943,7 @@ function openWindow(): void {
     spaces: spaceStore,
     screens: screenStore,
     theme: themeView(),
+    firstRun,
     relay: currentRelayView(),
     onViewClosed: (tabId) => {
       files?.releaseOwner(tabId);
@@ -1063,6 +1090,17 @@ function registerIpc(): void {
   onChrome(CHROME_IPC.installCataloguePack, async (id, version) => {
     if (typeof id !== "string" || typeof version !== "string") return;
     await installPackFromCatalogue(id, version);
+  });
+  onChrome(CHROME_IPC.setTheme, async (choice) => {
+    if (!isHostThemeChoice(choice)) return;
+    await chooseTheme(choice);
+  });
+  onChrome(CHROME_IPC.installFirstRunPack, async (id) => {
+    if (typeof id !== "string") return { ok: false, detail: "No app was named." };
+    return installFirstRunPack(id);
+  });
+  onChrome(CHROME_IPC.completeFirstRun, async () => {
+    await completeFirstRun();
   });
   onChrome(CHROME_IPC.reaskConsent, async (id, capability) => {
     if (typeof id !== "string" || !isPackCapability(capability)) return;
@@ -1966,6 +2004,43 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
   } catch (error) {
     current.setNotice(installRefusal(error));
   }
+}
+
+/**
+ * Install one catalogue app from the first-run wizard.
+ *
+ * The wizard's explicit selection is the consent: the person saw the catalogue cards and chose
+ * the app, so the host verifies and installs without a second per-app dialog. The archive is
+ * still re-read and re-verified by the installer, and only a trusted catalogue entry is named.
+ */
+async function installFirstRunPack(id: string): Promise<FirstRunInstallResult> {
+  const entry = catalogue.find((candidate) => candidate.id === id && candidate.trusted);
+  if (entry === undefined) {
+    return { ok: false, detail: `No trusted ${id} is in the catalogue.` };
+  }
+  const previous = packs.find((pack) => pack.id === id) ?? null;
+  const action = catalogueActionFor(id, entry.version, previous);
+  try {
+    const installed = await installCataloguePack(
+      entry,
+      join(dataRootFor(), "packs"),
+      packTrustOptions(),
+      { replace: action === "reinstall" },
+    );
+    await recordInstallConsent(installed);
+    await refreshPacks();
+    publishPackData();
+    return { ok: true, detail: "Installed" };
+  } catch (error) {
+    return { ok: false, detail: installRefusal(error) };
+  }
+}
+
+/** Record that the person finished the first-run wizard and show the chrome. */
+async function completeFirstRun(): Promise<void> {
+  await completeOnboarding(dataRootFor());
+  firstRun = false;
+  window?.setFirstRun(false);
 }
 
 /**

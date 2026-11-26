@@ -7,6 +7,15 @@
  * import is visible in review.
  */
 export {
+  FirstRun,
+  type FirstRunInstall,
+  type FirstRunPack,
+  type FirstRunProps,
+  type FirstRunRow,
+  type FirstRunStep,
+  type FirstRunTheme,
+} from "./FirstRun.js";
+export {
   HostTabBar,
   type HostTab,
   type HostTabBarProps,

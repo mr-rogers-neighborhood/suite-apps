@@ -82,9 +82,18 @@ test("opens Home Screen, creates a Screen document, and switches to it", {
   await page.context().tracing.start({ screenshots: true, snapshots: true });
 
   try {
-    await test.step("Open the Home Screen document", async () => {
+    await test.step("Finish the first run", async () => {
+      await expect(page.getByRole("heading", { name: "Welcome to Suite." })).toBeVisible();
+      await captureProofScreenshot(page, proofDir, "00-first-run.png", testInfo);
+      await page.getByRole("button", { name: "Skip choosing for now" }).click();
+      await page.getByRole("button", { name: "Continue to Home" }).click();
+      await expect(page.locator("#first-run")).toBeHidden();
+    });
+
+    await test.step("Open the empty Home Screen", async () => {
       await expect(page.locator("#screen-name")).toHaveText("Home");
-      await expect(page.locator('[data-registry-id="desk.apps"]')).toBeVisible();
+      await expect(page.locator(".home-empty")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Open a pack" })).toBeVisible();
       await captureProofScreenshot(page, proofDir, "01-home-screen.png", testInfo);
     });
 

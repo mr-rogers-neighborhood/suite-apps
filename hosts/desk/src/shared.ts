@@ -8,6 +8,7 @@
 import type { SuiteWidgetFieldType, SuiteWidgetSize } from "@suite/contracts";
 import { PACK_CAPABILITIES, type PackCapability } from "@suite/pack/capabilities";
 import type { FileHandleInfo } from "@suite/pack-runtime";
+import type { Density } from "@suite/theme";
 
 export const CHROME_SCHEME = "suite-desk";
 export const CHROME_HOST = "app";
@@ -25,6 +26,9 @@ export const CHROME_IPC = {
   openExternal: "suite:shell:open-external",
   installPack: "suite:shell:install-pack",
   installCataloguePack: "suite:shell:install-catalogue-pack",
+  installFirstRunPack: "suite:shell:install-first-run-pack",
+  completeFirstRun: "suite:shell:complete-first-run",
+  setTheme: "suite:shell:set-theme",
   reaskConsent: "suite:shell:reask-consent",
   importRevocation: "suite:shell:import-revocation",
   rotatePublisher: "suite:shell:rotate-publisher",
@@ -376,7 +380,16 @@ export interface ThemeView {
   /** The resolved preset id, after any stored-id rename. */
   readonly preset: string;
   readonly mode: "light" | "dark";
+  readonly density: Density;
   readonly values: Readonly<Record<string, string>>;
+  /** The type, density, radius, elevation and motion record for this choice. */
+  readonly scale: Readonly<Record<string, string>>;
+}
+
+/** What a first-run install reports back to the wizard. */
+export interface FirstRunInstallResult {
+  readonly ok: boolean;
+  readonly detail: string;
 }
 
 /** What the relay is doing, in the words the tray used to show. */
@@ -405,6 +418,8 @@ export interface ShellState {
   readonly tabs: readonly ShellTab[];
   readonly activeTabId: string | null;
   readonly surface: ShellSurface;
+  /** The first-run wizard replaces the chrome until the host records completion. */
+  readonly firstRun: boolean;
   readonly screens: readonly ScreenView[];
   /** Every Screen on this device, for the manager. */
   readonly screenList: readonly ScreenSummaryView[];

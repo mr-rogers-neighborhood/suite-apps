@@ -51,6 +51,18 @@ body {
   height: var(--tabbar);
 }
 
+#first-run {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: block;
+  padding: 16px;
+}
+
+#first-run[hidden] {
+  display: none;
+}
+
 body {
   margin: 0;
   background: var(--canvas);
@@ -80,6 +92,25 @@ body {
   :focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
+  }
+
+  /* Element defaults for the vanilla Screen. The first-run island sets its own type with
+     utilities, which must win over these. */
+  h1 {
+    margin: 0;
+    max-width: 760px;
+    font-size: clamp(28px, 3.4vw, 40px);
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
   }
 }
 
@@ -137,14 +168,6 @@ body {
   font-weight: 650;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-h1 {
-  margin: 0;
-  max-width: 760px;
-  font-size: clamp(28px, 3.4vw, 40px);
-  line-height: 1.08;
-  letter-spacing: -0.035em;
 }
 
 .lede {
@@ -432,15 +455,6 @@ section {
   margin-bottom: 12px;
 }
 
-h2 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-
 .count {
   color: var(--ink-faint);
   font-size: 12px;
@@ -683,6 +697,35 @@ h2 {
 
 .empty-state h1 {
   font-size: clamp(28px, 3.4vw, 40px);
+}
+
+.home-empty {
+  max-width: 720px;
+  margin: 48px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-empty h2 {
+  margin: 0;
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.home-empty .lede {
+  margin: 0;
+}
+
+.home-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 @media (max-width: 760px) {

@@ -1,5 +1,11 @@
 import { SyncPill } from "@suite/ui";
-import { HostTabBar } from "@suite/ui/chrome";
+import {
+  FirstRun,
+  type FirstRunInstall,
+  type FirstRunPack,
+  type FirstRunTheme,
+  HostTabBar,
+} from "@suite/ui/chrome";
 import { createRoot } from "react-dom/client";
 import { type HostBarSnapshot, syncPresentation, toHostTabs } from "./state.js";
 import "./tab-bar.css";
@@ -108,6 +114,40 @@ export function mountTabBar(container: HTMLElement, actions: TabBarActions): Tab
   return {
     update(snapshot) {
       root.render(<TabBar snapshot={snapshot} actions={actions} />);
+    },
+    unmount() {
+      root.unmount();
+    },
+  };
+}
+
+export interface FirstRunActions {
+  readonly packs: readonly FirstRunPack[];
+  readonly theme: FirstRunTheme;
+  readonly onThemeChange: (theme: FirstRunTheme) => void;
+  readonly onInstall: (id: string) => Promise<FirstRunInstall>;
+  readonly onComplete: () => void;
+}
+
+export interface FirstRunHandle {
+  update(packs: readonly FirstRunPack[], theme: FirstRunTheme): void;
+  unmount(): void;
+}
+
+/** Mount the first-run wizard once; the shell hands it the catalogue and the theme on paint. */
+export function mountFirstRun(container: HTMLElement, actions: FirstRunActions): FirstRunHandle {
+  const root = createRoot(container);
+  return {
+    update(packs, theme) {
+      root.render(
+        <FirstRun
+          packs={packs}
+          theme={theme}
+          onThemeChange={actions.onThemeChange}
+          onInstall={actions.onInstall}
+          onComplete={actions.onComplete}
+        />,
+      );
     },
     unmount() {
       root.unmount();

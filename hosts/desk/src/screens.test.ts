@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { isScreenRow, type ScreenEntry, screenEntryRegistryIds } from "@suite/screens";
 import { LoroDoc } from "loro-crdt";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { DESK_APPS_WIDGET, HOME_SCREEN_ID, HOME_SCREEN_NAME } from "./home.js";
+import { DESK_APPS_WIDGET, HOME_SCREEN_ID, HOME_SCREEN_NAME, migrateHome } from "./home.js";
 import { SCREENS_INDEX_FILENAME, ScreenSet, ScreenStore } from "./screens.js";
 
 let root: string;
@@ -29,7 +29,7 @@ afterEach(async () => {
 });
 
 describe("the Home screen", () => {
-  it("starts as Home with the host app grid", async () => {
+  it("starts as an empty Home", async () => {
     const store = await ScreenStore.open(path);
 
     expect(store.state()).toEqual({
@@ -37,8 +37,20 @@ describe("the Home screen", () => {
       version: 2,
       id: HOME_SCREEN_ID,
       name: HOME_SCREEN_NAME,
-      widgets: [{ registryId: DESK_APPS_WIDGET, size: "full" }],
+      widgets: [],
     });
+  });
+
+  it("migrates the old host app grid out of Home", async () => {
+    const set = await ScreenSet.open({
+      directory: join(root, "screens"),
+      indexFile: join(root, SCREENS_INDEX_FILENAME),
+    });
+    await set.store(HOME_SCREEN_ID)?.add({ registryId: DESK_APPS_WIDGET, size: "full" });
+
+    await migrateHome(set);
+
+    expect(set.screen(HOME_SCREEN_ID)?.widgets).toEqual([]);
   });
 
   it("does not write until something changes", async () => {
@@ -52,10 +64,7 @@ describe("the Home screen", () => {
     await first.resize("welcome.notes", "1x1");
 
     const second = await ScreenStore.open(path);
-    expect(second.state().widgets).toEqual([
-      { registryId: DESK_APPS_WIDGET, size: "full" },
-      { registryId: "welcome.notes", size: "1x1" },
-    ]);
+    expect(second.state().widgets).toEqual([{ registryId: "welcome.notes", size: "1x1" }]);
   });
 
   it("keeps a backup of the previous snapshot beside the document", async () => {
@@ -116,20 +125,12 @@ describe("editing a Screen", () => {
     await expect(store.add({ registryId: "welcome.notes", size: "2x1" })).resolves.toBe(false);
     await store.add({ registryId: "scratch.board", size: "1x1" });
 
-    expect(entryIds(store.state().widgets)).toEqual([
-      DESK_APPS_WIDGET,
-      "welcome.notes",
-      "scratch.board",
-    ]);
+    expect(entryIds(store.state().widgets)).toEqual(["welcome.notes", "scratch.board"]);
 
     await expect(store.moveBy("scratch.board", "earlier")).resolves.toBe(true);
-    expect(entryIds(store.state().widgets)).toEqual([
-      DESK_APPS_WIDGET,
-      "scratch.board",
-      "welcome.notes",
-    ]);
+    expect(entryIds(store.state().widgets)).toEqual(["scratch.board", "welcome.notes"]);
 
-    await expect(store.moveBy(DESK_APPS_WIDGET, "earlier")).resolves.toBe(false);
+    await expect(store.moveBy("missing.widget", "earlier")).resolves.toBe(false);
     await expect(store.moveBy("scratch.board", "later")).resolves.toBe(true);
     expect(entryId(store.state().widgets.at(-1))).toBe("scratch.board");
 
@@ -141,7 +142,7 @@ describe("editing a Screen", () => {
     ).toBe("full");
 
     await expect(store.remove("scratch.board")).resolves.toBe(true);
-    expect(entryIds(store.state().widgets)).toEqual([DESK_APPS_WIDGET, "welcome.notes"]);
+    expect(entryIds(store.state().widgets)).toEqual(["welcome.notes"]);
   });
 
   it("moves a placement with the keyboard's earlier and later actions", async () => {
@@ -150,18 +151,10 @@ describe("editing a Screen", () => {
     await store.add({ registryId: "scratch.board", size: "1x1" });
 
     await store.moveBy("welcome.notes", "later");
-    expect(entryIds(store.state().widgets)).toEqual([
-      DESK_APPS_WIDGET,
-      "scratch.board",
-      "welcome.notes",
-    ]);
+    expect(entryIds(store.state().widgets)).toEqual(["scratch.board", "welcome.notes"]);
 
     await store.moveBy("welcome.notes", "earlier");
-    expect(entryIds(store.state().widgets)).toEqual([
-      DESK_APPS_WIDGET,
-      "welcome.notes",
-      "scratch.board",
-    ]);
+    expect(entryIds(store.state().widgets)).toEqual(["welcome.notes", "scratch.board"]);
   });
 
   it("keeps an unknown widget and its unknown settings across a save", async () => {
@@ -262,9 +255,7 @@ describe("the Screens set", () => {
     const set = await screenSet();
     const work = await set.create("Work");
     await set.store(work)?.add({ registryId: "welcome.notes", size: "2x1" });
-    expect(set.screen(HOME_SCREEN_ID)?.widgets).toEqual([
-      { registryId: DESK_APPS_WIDGET, size: "full" },
-    ]);
+    expect(set.screen(HOME_SCREEN_ID)?.widgets).toEqual([]);
   });
 });
 
