@@ -15,6 +15,9 @@ import type { ComponentProps, ReactNode } from "react";
  * Below the `md` breakpoint (768px) the navigation stops being a side column and becomes a
  * full-width region above the content. That is a layout change only: no state, no disclosure
  * control, and no hidden navigation on a narrow window.
+ *
+ * The desktop column is `--shell-nav-width` (default `14rem`). A caller that lets a person
+ * resize its navigator sets that variable on the shell instead of forking the frame.
  */
 export interface AppShellProps extends Omit<ComponentProps<"div">, "title" | "children"> {
     /** The screen's title. Rendered as the page's one `<h1>`. */

@@ -113,6 +113,10 @@ frame rather than bending this one.
 </AppShell>
 ```
 
+The desktop navigation column is `--shell-nav-width` (default `14rem`). A pack that lets a person
+resize its rail sets that variable on the shell instead of forking the frame; Help's explorer does
+exactly that.
+
 `DetailView` takes the content region instead of `ListView` once a row is open. Its body is the
 scroll container; the footer stays visible while the body moves. The listbox owns only the keyboard
 pattern: one roving tab stop, arrows move selection and focus (wrapping), Home/End jump to the ends,
