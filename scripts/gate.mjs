@@ -231,7 +231,7 @@ const scripts =
         return {
           ok,
           detail: ok
-            ? "pack shape, pack, channel, affected, release, spec and gate tests"
+            ? "pack shape, pack, readiness, channel, affected, release, spec and gate tests"
             : `tests exit ${tests.status}, pack shape exit ${shape.status}`,
         };
       })();

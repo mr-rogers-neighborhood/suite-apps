@@ -107,3 +107,7 @@ no test, carries a generated directory, whose manifest version differs from the 
 whose manifest names a field or capability the schema does not define. When the convention changes,
 the required minimum changes in `scripts/pack-shape.mjs` and R2.2 explains it; no app is exempt
 because it is older.
+
+`node scripts/pack-readiness.mjs` is the on-demand proof that every pack builds, verifies, installs
+and does its primary job. It is not a gate row because it builds all four packs; [Pack
+readiness](pack-readiness.md) owns what it proves and what a person still has to do.

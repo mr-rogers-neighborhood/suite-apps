@@ -230,6 +230,9 @@ export async function bundlePack({
     ...(minimumHost === undefined ? {} : { minimumHostVersion: minimumHost }),
     publisher: { id: publisherId, key: actualPublicKey },
     capabilities: Array.isArray(source.capabilities) ? source.capabilities : [],
+    ...(source.optionalCapabilities === undefined
+      ? {}
+      : { optionalCapabilities: source.optionalCapabilities }),
     platforms,
     ...(source.documents === undefined ? {} : { documents: source.documents }),
     ...(source.contributions === undefined ? {} : { contributions: source.contributions }),
