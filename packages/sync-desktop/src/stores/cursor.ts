@@ -1,7 +1,4 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
-import type { SyncStorePaths } from "./relayConfig.js";
+import { decodeStoreText, encodeStoreText, SYNC_STORE_ROOT, type SyncStoreFiles } from "./port.js";
 
 /**
  * How far this device has caught up, as the relay numbered it.
@@ -32,14 +29,15 @@ export interface CursorStore {
   clear(): Promise<void>;
 }
 
-export function createCursorStore({ dataDir, workspaceId }: SyncStorePaths): CursorStore {
-  const directory = join(dataDir, "sync", "cursors");
-  const target = join(directory, `${workspaceId}.json`);
+export function createCursorStore(files: SyncStoreFiles, workspaceId: string): CursorStore {
+  const target = `${SYNC_STORE_ROOT}/cursors/${workspaceId}.json`;
 
   return {
     async load() {
+      const bytes = await files.read(target);
+      if (bytes === null) return null;
       try {
-        const parsed = JSON.parse(await readFile(target, "utf8")) as StoredCursor;
+        const parsed = JSON.parse(decodeStoreText(bytes)) as StoredCursor;
         if (
           typeof parsed.index !== "number" ||
           !Number.isInteger(parsed.index) ||
@@ -55,20 +53,14 @@ export function createCursorStore({ dataDir, workspaceId }: SyncStorePaths): Cur
 
     async save(index) {
       if (!Number.isInteger(index) || index < 0) return;
-      await mkdir(directory, { recursive: true });
-      const temporary = `${target}.tmp`;
-      // A cursor is small and its loss only costs a replayed frame, so a rename after every
-      // applied frame is cheap enough to keep it exact.
-      await writeFile(
-        temporary,
-        `${JSON.stringify({ version: 1, index } satisfies StoredCursor)}\n`,
-        { mode: 0o600 },
+      await files.write(
+        target,
+        encodeStoreText(`${JSON.stringify({ version: 1, index } satisfies StoredCursor)}\n`),
       );
-      await rename(temporary, target);
     },
 
     async clear() {
-      await rm(target, { force: true });
+      await files.remove(target);
     },
   };
 }

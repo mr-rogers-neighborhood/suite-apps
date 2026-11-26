@@ -17,6 +17,7 @@ function open(options: {
   contacts?: readonly unknown[];
   kit?: "made" | "declined" | null;
   friendLink?: string;
+  relayUrl?: string | null;
   sinceOpened?: {
     openedAt: string;
     updates: number;
@@ -33,6 +34,7 @@ function open(options: {
       friendCode,
       friendLink: options.friendLink ?? "",
       contacts: (options.contacts ?? []) as never,
+      relayUrl: options.relayUrl ?? null,
       kit: options.kit ?? null,
       sinceOpened: options.sinceOpened ?? null,
     },
@@ -114,6 +116,16 @@ describe("the sync dialog", () => {
     render(<SyncDialog open onClose={vi.fn()} />);
 
     expect(screen.getByTestId("sync-fingerprint-pinned")).toHaveTextContent("AB:CD:EF");
+  });
+
+  it("shows the relay address it is syncing through", () => {
+    open({
+      status: { state: "syncing", count: 1 },
+      members: [thisDevice],
+      relayUrl: "ws://127.0.0.1:8787/sync",
+    });
+
+    expect(screen.getByTestId("sync-relay-url")).toHaveTextContent("ws://127.0.0.1:8787/sync");
   });
 
   it("says only that it is waiting, and keeps saying it when reopened", () => {

@@ -20,6 +20,9 @@ const runtime = fileURLToPath(
 const sync = fileURLToPath(
   new URL("../../../services/relay/packages/protocol/src/index.ts", import.meta.url),
 );
+const syncDesktopRelay = fileURLToPath(
+  new URL("../../../packages/sync-desktop/src/relay.ts", import.meta.url),
+);
 const ui = fileURLToPath(new URL("../../../packages/ui/src/index.ts", import.meta.url));
 
 export default defineConfig({
@@ -40,6 +43,7 @@ export default defineConfig({
       { find: "@suite/import-obsidian", replacement: importer },
       { find: "@suite/pack-runtime", replacement: runtime },
       { find: "@suite/sync", replacement: sync },
+      { find: "@suite/sync-desktop/relay", replacement: syncDesktopRelay },
       { find: "@suite/ui", replacement: ui },
     ],
     dedupe: ["react", "react-dom"],

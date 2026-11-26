@@ -1,6 +1,3 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import {
   type createDeviceIdentity,
   decodeBase64,
@@ -9,7 +6,7 @@ import {
   encodeKeyPackageBytes,
 } from "@suite/sync";
 
-import type { SyncStorePaths } from "./relayConfig.js";
+import { decodeStoreText, encodeStoreText, SYNC_STORE_ROOT, type SyncStoreFiles } from "./port.js";
 
 /**
  * The identity a device made in order to ask to join, kept until somebody answers.
@@ -47,15 +44,16 @@ export interface PendingStore {
   clear(): Promise<void>;
 }
 
-export function createPendingStore({ dataDir, workspaceId }: SyncStorePaths): PendingStore {
-  const directory = join(dataDir, "sync", "pending");
-  const target = join(directory, `${workspaceId}.json`);
+export function createPendingStore(files: SyncStoreFiles, workspaceId: string): PendingStore {
+  const target = `${SYNC_STORE_ROOT}/pending/${workspaceId}.json`;
 
   return {
     async load() {
+      const bytes = await files.read(target);
+      if (bytes === null) return null;
       let parsed: StoredPending;
       try {
-        parsed = JSON.parse(await readFile(target, "utf8")) as StoredPending;
+        parsed = JSON.parse(decodeStoreText(bytes)) as StoredPending;
       } catch {
         return null;
       }
@@ -69,13 +67,13 @@ export function createPendingStore({ dataDir, workspaceId }: SyncStorePaths): Pe
       if (typeof parsed.host !== "string" || parsed.host.length === 0) return null;
 
       try {
+        const keyPackage = decodeBase64(parsed.keyPackage);
+        if (keyPackage === null) return null;
         return {
           host: parsed.host,
           identity: {
             name: parsed.name,
-            keyPackage: decodeKeyPackageBytes(
-              new Uint8Array(Buffer.from(parsed.keyPackage, "base64")),
-            ),
+            keyPackage: decodeKeyPackageBytes(keyPackage),
             privateKeys: { initPrivateKey, hpkePrivateKey, signaturePrivateKey },
           },
         };
@@ -86,7 +84,6 @@ export function createPendingStore({ dataDir, workspaceId }: SyncStorePaths): Pe
     },
 
     async save(identity, host) {
-      await mkdir(directory, { recursive: true });
       const stored: StoredPending = {
         version: 1,
         name: identity.name,
@@ -98,16 +95,13 @@ export function createPendingStore({ dataDir, workspaceId }: SyncStorePaths): Pe
           signaturePrivateKey: encodeBase64(identity.privateKeys.signaturePrivateKey),
         },
       };
-
-      // Written through a temporary file: half a key package is not a key package, and a crash
-      // should leave the previous attempt intact rather than a file nothing can read.
-      const temporary = `${target}.tmp`;
-      await writeFile(temporary, `${JSON.stringify(stored, null, 2)}\n`, { mode: 0o600 });
-      await rename(temporary, target);
+      // The port writes through a temporary file: half a key package is not a key package, and
+      // a crash should leave the previous attempt intact rather than a file nothing can read.
+      await files.write(target, encodeStoreText(`${JSON.stringify(stored, null, 2)}\n`));
     },
 
     async clear() {
-      await rm(target, { force: true });
+      await files.remove(target);
     },
   };
 }

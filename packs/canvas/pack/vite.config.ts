@@ -67,6 +67,11 @@ export default defineConfig({
       "@suite/sync": fileURLToPath(
         new URL("../../../services/relay/packages/protocol/src/index.ts", import.meta.url),
       ),
+      // The renderer's lifecycle: the shared core with the host's relay socket. The package
+      // root would pull `@suite/sync/node` — and `node:crypto` — into the pack.
+      "@suite/sync-desktop/relay": fileURLToPath(
+        new URL("../../../packages/sync-desktop/src/relay.ts", import.meta.url),
+      ),
       "@suite/ui": fileURLToPath(new URL("../../../packages/ui/src/index.ts", import.meta.url)),
     },
     dedupe: ["react", "react-dom"],

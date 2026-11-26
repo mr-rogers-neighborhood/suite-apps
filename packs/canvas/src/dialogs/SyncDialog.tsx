@@ -269,6 +269,7 @@ export function SyncDialog({ open, onClose, defaultHost = LOCAL_HOST }: SyncDial
             members={sync?.members ?? []}
             deviceId={sync?.deviceId ?? ""}
             fingerprint={sync?.fingerprint ?? null}
+            relayUrl={sync?.relayUrl ?? null}
             link={link}
             busy={busy}
             offerKit={offerKit}

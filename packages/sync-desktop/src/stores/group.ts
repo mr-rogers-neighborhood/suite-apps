@@ -1,17 +1,14 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { type DeviceGroup, decodeGroup, encodeGroup } from "@suite/sync";
 
-import type { SyncStorePaths } from "./relayConfig.js";
+import { encodeStoreText, SYNC_STORE_ROOT, type SyncStoreFiles } from "./port.js";
 
 /**
  * A device's MLS group state, per workspace, on disk beside the workspace.
  *
  * Losing this file is losing the ability to read the workspace: the group secret it holds
- * cannot be derived again from anything else this app has. It is written through a temporary
- * file — a half-written group is not a group — and replaced by a rename so a crash leaves
- * the previous one intact.
+ * cannot be derived again from anything else this app has. The port writes it through a
+ * temporary file — a half-written group is not a group — and replaces by a rename so a crash
+ * leaves the previous one intact.
  */
 export interface GroupStore {
   load(): Promise<DeviceGroup | null>;
@@ -21,25 +18,23 @@ export interface GroupStore {
   markOwned(): Promise<void>;
 }
 
-export function createGroupStore({ dataDir, workspaceId }: SyncStorePaths): GroupStore {
-  const directory = join(dataDir, "sync", "groups");
-  const target = join(directory, `${workspaceId}.mls`);
-  const marker = join(directory, `${workspaceId}.owner`);
+export function createGroupStore(files: SyncStoreFiles, workspaceId: string): GroupStore {
+  const target = `${SYNC_STORE_ROOT}/groups/${workspaceId}.mls`;
+  const marker = `${SYNC_STORE_ROOT}/groups/${workspaceId}.owner`;
 
   return {
     async load() {
+      const bytes = await files.read(target);
+      if (bytes === null) return null;
       try {
-        return decodeGroup(new Uint8Array(await readFile(target)));
+        return decodeGroup(bytes);
       } catch {
         return null;
       }
     },
 
     async save(group) {
-      await mkdir(directory, { recursive: true });
-      const temporary = `${target}.tmp`;
-      await writeFile(temporary, encodeGroup(group), { mode: 0o600 });
-      await rename(temporary, target);
+      await files.write(target, encodeGroup(group));
     },
 
     /**
@@ -49,17 +44,11 @@ export function createGroupStore({ dataDir, workspaceId }: SyncStorePaths): Grou
      * forgotten, so the answer is written once at creation and read back from disk.
      */
     async isOwned() {
-      try {
-        await readFile(marker);
-        return true;
-      } catch {
-        return false;
-      }
+      return (await files.read(marker)) !== null;
     },
 
     async markOwned() {
-      await mkdir(directory, { recursive: true });
-      await writeFile(marker, "owned\n", { mode: 0o600 });
+      await files.write(marker, encodeStoreText("owned\n"));
     },
   };
 }

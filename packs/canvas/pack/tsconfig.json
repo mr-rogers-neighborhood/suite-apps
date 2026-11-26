@@ -9,6 +9,7 @@
       "@suite/import-obsidian": ["../packages/import-obsidian/src/index.ts"],
       "@suite/pack-runtime": ["../../../packages/pack-runtime/src/index.ts"],
       "@suite/sync": ["../../../services/relay/packages/protocol/src/index.ts"],
+      "@suite/sync-desktop/relay": ["../../../packages/sync-desktop/src/relay.ts"],
       "@suite/ui": ["../../../packages/ui/src/index.ts"]
     }
   },

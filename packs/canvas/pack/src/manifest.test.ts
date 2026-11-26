@@ -11,12 +11,13 @@ import manifestText from "../manifest.json?raw";
  * signs.
  *
  * The capability list is asserted too: it is what this pack actually uses, not every service the
- * vocabulary offers. Sync is deliberately absent — there is no host relay service, and the pack
- * carries no transport of its own.
+ * vocabulary offers. `relay` is the host's opaque-frame service: the pack holds the keys and
+ * seals its own frames, and never receives a general socket.
  */
 const manifest = JSON.parse(manifestText) as {
   readonly version: string;
   readonly capabilities: readonly string[];
+  readonly optionalCapabilities?: readonly string[];
   readonly platforms?: readonly string[];
   readonly documents?: readonly {
     readonly id: string;
@@ -40,15 +41,20 @@ describe("Canvas's declared document", () => {
 
   it("asks the host only for what it uses", () => {
     // `documents` holds the workspace and its reveal/watch surface; `files` is the picker export,
-    // import and folder import; `recents` is the host's recent list. The pack asks for no path and
-    // no filesystem of its own, and sync is still a host gap rather than a capability to claim.
+    // import, folder import and the pack's sync keys; `recents` is the host's recent list.
     expect(manifest.capabilities).toEqual(["documents", "files", "recents"]);
   });
 
+  it("declares the host relay as optional, so a host without one still installs", () => {
+    // `relay` is the one pinned socket the host opens for opaque sync frames. Sync is optional
+    // (S7.1): a host that does not serve the relay shows the local-only state, and the pack is
+    // still installable on the phone, where the relay is not served yet.
+    expect(manifest.optionalCapabilities).toEqual(["relay"]);
+  });
+
   it("declares the hosts it is built for", () => {
-    // The pack is one manifest for both hosts. The mobile host does not serve `files` yet (#382),
-    // so its catalogue refuses the install until the bridge lands; the declaration is what lets
-    // the tile and the refusal be accurate in the meantime.
+    // The pack is one manifest for both hosts. Mobile layout is this pack's own job (#387); a
+    // host that does not serve `relay` shows the local-only state rather than a refused door.
     expect(manifest.platforms).toEqual(["desktop", "mobile"]);
   });
 });
