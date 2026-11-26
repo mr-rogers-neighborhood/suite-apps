@@ -1,0 +1,78 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Workbench/UI inspirations" />
+
+# UI inspirations
+
+Three references guide the look. They are inputs, not templates: borrow the property, never the
+brand, copy, icons or exact layout.
+
+<table>
+  <thead>
+    <tr>
+      <th>Reference</th>
+      <th>What we take</th>
+      <th>What we leave</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <a href="https://www.sunsama.com/" target="_blank" rel="noreferrer">
+          Sunsama
+        </a>
+      </td>
+      <td>
+        Warm paper canvas, quiet chrome, one accent, calm daily-planning density, small labels
+        beside generous whitespace, soft pastel time blocks, and the app framed as a card on a warm
+        field.
+      </td>
+      <td>SaaS/account onboarding, the calendar-first layout, and productivity ceremony.</td>
+    </tr>
+    <tr>
+      <td>
+        <a href="https://www.fumadocs.dev/docs" target="_blank" rel="noreferrer">
+          Fumadocs
+        </a>
+      </td>
+      <td>
+        Editorial display type with one warm accent, a strong type scale, high-contrast dark
+        surfaces, monospace for commands and metadata, and documentation navigation that stays out
+        of the prose.
+      </td>
+      <td>
+        Its docs-specific sidebar and table of contents as a host layout, and its marketing
+        near-black as our default canvas.
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <a href="https://heptabase.com/" target="_blank" rel="noreferrer">
+          Heptabase
+        </a>
+      </td>
+      <td>
+        Large centred statements, a monochrome shell with warm imagery, segmented controls, cards
+        with context panels, and a spatial canvas treated as a place rather than a page.
+      </td>
+      <td>Infinite canvas as the default surface, and knowledge-graph complexity for simple tasks.</td>
+    </tr>
+  </tbody>
+</table>
+
+## The mix we want
+
+- A warm neutral canvas, one accent, and no rainbow chrome.
+- Display type for the one thing that matters; 11–13px utility labels for everything else.
+- Surfaces as layers: canvas → surface → sunk, one hairline, one shadow.
+- Density changes room, never type.
+- Motion quiet and short; content first, chrome recedes until needed.
+
+## How to use them
+
+- Name the reference and the property in a proposal: “Sunsama’s day-column rhythm”, not “make it
+  Sunsama”.
+- Add the pattern to the workbench with the real tokens and a story. Keep it
+  `status:experimental` until axe is green and a screenshot exists, then tag it `status:ready`.
+- When references conflict, the Suite rule wins: local-first, no account, no telemetry, data in a
+  file the person owns.
