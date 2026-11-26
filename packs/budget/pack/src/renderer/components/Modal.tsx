@@ -10,6 +10,7 @@ export type ModalProps = {
   children: ReactNode;
   footer?: ReactNode;
   width?: "sm" | "md" | "lg" | "xl";
+  className?: string;
 };
 
 /**
@@ -28,6 +29,7 @@ export function Modal({
   children,
   footer,
   width = "md",
+  className,
 }: ModalProps) {
   return (
     <SharedModal
@@ -35,6 +37,9 @@ export function Modal({
       onClose={() => onOpenChange(false)}
       label={title}
       size={width}
+      // The dynamic viewport keeps the panel on screen when a phone keyboard opens.
+      // The body still scrolls; only the frame's height changes below `md`.
+      className={`max-md:max-h-[calc(100dvh-1rem)] ${className ?? ""}`}
       header={
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
@@ -52,7 +57,11 @@ export function Modal({
       {...(description === undefined ? {} : { description })}
       {...(footer === undefined
         ? {}
-        : { footer: <div className="flex items-center justify-end gap-2">{footer}</div> })}
+        : {
+            footer: (
+              <div className="flex flex-wrap items-center justify-end gap-2">{footer}</div>
+            ),
+          })}
     >
       {children}
     </SharedModal>

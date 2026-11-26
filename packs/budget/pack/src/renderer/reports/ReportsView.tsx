@@ -58,8 +58,8 @@ export function ReportsView() {
   const month = useUiStore((state) => state.month);
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex items-center gap-2">
+    <div className="p-4 md:p-6">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <div>
           <h1 className="text-[16px] font-semibold text-ink">Reports</h1>
           <p className="mt-0.5 text-[11px] text-faint">
@@ -116,7 +116,7 @@ function NetWorth({ months, money }: { months: string[]; money: (value: number) 
   const first = points[0]?.valueMinor ?? 0;
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label="Net worth" value={money(latest)} hint={`${points.length} month window`} />
         <Stat label="Change" value={money(latest - first)} hint="Across this range" />
         <Stat
@@ -178,7 +178,7 @@ function IncomeExpense({ months, money }: { months: string[]; money: (value: num
   const expense = series.reduce((sum, point) => sum + point.expenseMinor, 0);
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label="Income" value={money(income)} />
         <Stat label="Expense" value={money(expense)} />
         <Stat label="Net" value={money(income - expense)} />
@@ -212,7 +212,7 @@ function CashFlow({ months, money }: { months: string[]; money: (value: number) 
   const latest = series[series.length - 1]?.balanceMinor ?? 0;
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Stat label="On-budget balance" value={money(latest)} hint="End of the latest month" />
         <Stat
           label="Months shown"
@@ -242,13 +242,13 @@ function BudgetActual({ month, money }: { month: string; money: (value: number) 
   const activity = rows.reduce((sum, row) => sum + row.activityMinor, 0);
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label="Month" value={monthLabel(month)} />
         <Stat label="Assigned" value={money(assigned)} />
         <Stat label="Activity" value={money(activity)} />
       </div>
-      <div className="overflow-hidden rounded-xl border border-line bg-panel">
-        <table className="w-full border-collapse text-[12px]">
+      <div className="overflow-x-auto rounded-xl border border-line bg-panel">
+        <table className="w-full min-w-[440px] border-collapse text-[12px]">
           <caption className="sr-only">Budget vs actual</caption>
           <thead>
             <tr className="border-b border-line bg-panel/60 text-[10px] font-semibold uppercase tracking-wider text-faint">
@@ -303,7 +303,7 @@ function AgeOfMoney({ months }: { months: string[] }) {
     .map((point) => ({ label: monthLabel(point.month).slice(0, 3), value: point.days ?? 0 }));
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Stat
           label="Age of money"
           value={report.averageDays === null ? "—" : `${report.averageDays} days`}
@@ -357,7 +357,7 @@ function DashboardGrid() {
 
   return (
     <div>
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="text-[13px] font-semibold text-ink">{dashboard.name}</h2>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
@@ -439,7 +439,7 @@ function WidgetCard({
 
   return (
     <section className="rounded-xl border border-line bg-panel p-4">
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <h3 className="text-[12px] font-semibold uppercase tracking-wider text-faint">
           {widget.kind.replaceAll("_", " ")}
         </h3>

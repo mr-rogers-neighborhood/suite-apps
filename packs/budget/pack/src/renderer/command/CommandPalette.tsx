@@ -284,10 +284,12 @@ export function CommandPalette({ onCloseBudget }: { onCloseBudget: () => void })
               }`}
             >
               <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{item.label}</span>
-              <span className="shrink-0 text-[10px] uppercase tracking-wider text-faint">
+              <span className="hidden shrink-0 text-[10px] uppercase tracking-wider text-faint sm:inline">
                 {item.group}
               </span>
-              <span className="max-w-52 truncate text-[11px] text-faint">{item.hint}</span>
+              <span className="hidden max-w-52 truncate text-[11px] text-faint sm:inline">
+                {item.hint}
+              </span>
             </button>
           </li>
         ))}

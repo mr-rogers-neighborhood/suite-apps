@@ -46,8 +46,8 @@ export function SchedulesView() {
   });
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex items-center gap-2">
+    <div className="p-4 md:p-6">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <div>
           <h1 className="text-[16px] font-semibold text-ink">Schedules</h1>
           <p className="mt-0.5 text-[11px] text-faint">
@@ -56,7 +56,7 @@ export function SchedulesView() {
             waits for you to enter it here.
           </p>
         </div>
-        <Button size="sm" variant="primary" className="ml-auto" onClick={() => setEditing("new")}>
+        <Button size="sm" variant="primary" className="md:ml-auto" onClick={() => setEditing("new")}>
           <Plus size={13} />
           Add schedule
         </Button>
@@ -71,18 +71,18 @@ export function SchedulesView() {
             {upcoming.map((entry) => (
               <div
                 key={`${entry.schedule.id}-${entry.date}`}
-                className="flex items-center gap-3 border-b border-line/50 px-4 py-2 text-[12px] last:border-0"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line/50 px-4 py-2 text-[12px] last:border-0"
               >
-                <span className="w-24 text-faint">{entry.date}</span>
+                <span className="text-faint">{entry.date}</span>
                 <span className="min-w-0 flex-1 truncate text-ink">
                   {entry.schedule.payeeName || "Scheduled entry"}
                 </span>
                 <span className="text-muted">{accountName(entry.schedule.accountId)}</span>
-                <span className="w-28 truncate text-muted">
+                <span className="truncate text-muted">
                   {categoryName(entry.schedule.categoryId)}
                 </span>
                 <span
-                  className={`tnum w-24 text-right ${
+                  className={`tnum text-right ${
                     entry.schedule.amountMinor < 0 ? "text-muted" : "text-positive"
                   }`}
                 >
@@ -123,8 +123,8 @@ export function SchedulesView() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-line bg-panel">
-          <div className="grid grid-cols-[110px_1.3fr_1fr_1fr_110px_120px_60px] border-b border-line bg-panel/60 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
+          <div className="grid min-w-[720px] grid-cols-[110px_1.3fr_1fr_1fr_110px_120px_60px] border-b border-line bg-panel/60 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
             <span>Next</span>
             <span>Payee</span>
             <span>Account</span>
@@ -136,7 +136,7 @@ export function SchedulesView() {
           {snapshot.schedules.map((schedule) => (
             <div
               key={schedule.id}
-              className="grid grid-cols-[110px_1.3fr_1fr_1fr_110px_120px_60px] items-center border-b border-line/50 px-4 py-2 text-[12px] last:border-0 hover:bg-raised/40"
+              className="grid min-w-[720px] grid-cols-[110px_1.3fr_1fr_1fr_110px_120px_60px] items-center border-b border-line/50 px-4 py-2 text-[12px] last:border-0 hover:bg-raised/40"
             >
               <span className="text-faint">{schedule.nextDate}</span>
               <button
@@ -313,7 +313,7 @@ function ScheduleDialog({
       }
     >
       <div className="grid gap-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Account">
             <select
               value={accountId}
@@ -331,7 +331,7 @@ function ScheduleDialog({
             <TextInput value={payeeName} onChange={(event) => setPayeeName(event.target.value)} />
           </Field>
         </div>
-        <div className="grid grid-cols-[1fr_120px_140px] gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_120px_140px]">
           <Field label="Category">
             <CategoryPicker
               value={categoryId}
@@ -360,7 +360,7 @@ function ScheduleDialog({
             />
           </Field>
         </div>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Repeats">
             <select
               value={frequency}

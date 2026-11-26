@@ -360,7 +360,7 @@ export function ImportWizard() {
 
       {step === "map" ? (
         <div className="grid gap-4">
-          <div className="flex items-center gap-3 rounded-lg border border-line bg-canvas/40 px-3 py-2 text-[12px]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line bg-canvas/40 px-3 py-2 text-[12px]">
             <span className="font-medium text-ink">{name}</span>
             <span className="text-faint">{format.toUpperCase()}</span>
             <label className="ml-auto flex items-center gap-2 text-muted">
@@ -381,7 +381,7 @@ export function ImportWizard() {
 
           {format === "csv" ? (
             <div className="grid gap-3">
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                 <Field label="Delimiter">
                   <TextInput
                     value={mapping.delimiter}
@@ -452,7 +452,7 @@ export function ImportWizard() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <ColumnSelect
                   label="Date"
                   value={mapping.dateColumn}
@@ -546,8 +546,8 @@ export function ImportWizard() {
               Create missing categories
             </label>
           </div>
-          <div className="scroll max-h-[45vh] overflow-y-auto rounded-lg border border-line">
-            <table className="w-full text-[12px]">
+          <div className="scroll max-h-[45vh] overflow-auto rounded-lg border border-line">
+            <table className="w-full min-w-[560px] text-[12px]">
               <thead className="sticky top-0 bg-panel">
                 <tr className="text-left text-[10px] uppercase tracking-wider text-faint">
                   <th className="px-3 py-1.5">Import</th>
@@ -646,7 +646,7 @@ function ColumnSelect({
 function Preview({ batch, money }: { batch: ImportBatch; money: (value: number) => string }) {
   return (
     <div className="max-h-64 overflow-y-auto rounded-lg border border-line">
-      <table className="w-full text-[12px]">
+      <table className="w-full min-w-[560px] text-[12px]">
         <thead className="bg-panel">
           <tr className="text-left text-[10px] uppercase tracking-wider text-faint">
             <th className="px-3 py-1.5">Date</th>

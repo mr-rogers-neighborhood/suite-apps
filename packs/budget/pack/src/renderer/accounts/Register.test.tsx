@@ -148,6 +148,22 @@ describe("register row", () => {
     expect(fixture.doc.getTransaction(fixture.transaction.id)?.cleared).toBe("cleared");
   });
 
+  it("should label the amount and balance cells the phone card repeats without a header", () => {
+    const fixture = setup();
+    replica = fixture.replica;
+
+    render(
+      <WorkspaceContext.Provider value={fixture.replica}>
+        <Register account={fixture.account} />
+      </WorkspaceContext.Provider>,
+    );
+
+    // The four-column header is hidden below `md`; the card carries its own labels.
+    expect(screen.getAllByText("Out")[0]).toHaveClass("md:hidden");
+    expect(screen.getAllByText("Bal")[0]).toHaveClass("md:hidden");
+    expect(screen.getByText("Outflow").parentElement).toHaveClass("hidden", "md:grid");
+  });
+
   it("should keep focus on the expand control after a row action", () => {
     const fixture = setup();
     replica = fixture.replica;

@@ -66,7 +66,7 @@ export function BudgetLauncher({
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-canvas px-6 py-10">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-canvas px-4 py-8 md:px-6 md:py-10">
         <Launch
           mark={<BudgetMark size="md" />}
           title="Suite Budget"

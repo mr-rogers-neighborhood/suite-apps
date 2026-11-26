@@ -1,11 +1,26 @@
-import { Button, IconButton, MenuBar } from "@suite/ui";
-import { Command, Plus, Redo2, Undo2, Upload } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Button, IconButton, MenuBar, PrivacyLine } from "@suite/ui";
+import {
+  BarChart3,
+  CalendarClock,
+  Command,
+  Download,
+  LayoutGrid,
+  ListFilter,
+  MoreHorizontal,
+  Plus,
+  Redo2,
+  Tags,
+  Undo2,
+  Upload,
+  Wallet,
+} from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 import { AccountDialog } from "../accounts/AccountDialog";
 import { AccountsView } from "../accounts/AccountsView";
 import { ReconcileDialog } from "../accounts/ReconcileDialog";
 import { TransactionDialog } from "../accounts/TransactionDialog";
 import { CommandPalette } from "../command/CommandPalette";
+import { Modal } from "../components/Modal";
 import { ImportWizard } from "../import/ImportWizard";
 import { PayeesView } from "../payees/PayeesView";
 import { MoveMoneyDialog } from "../plan/MoveMoneyDialog";
@@ -17,7 +32,7 @@ import { RulesView } from "../rules/RulesView";
 import { ScheduleAutoEnterNotice } from "../schedules/ScheduleAutoEnterNotice";
 import { SchedulesView } from "../schedules/SchedulesView";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
-import { useUiStore } from "../store/uiStore";
+import { useUiStore, type View } from "../store/uiStore";
 import { BudgetMark } from "./BudgetMark";
 import { Sidebar } from "./Sidebar";
 import { ViewMenu } from "./ViewMenu";
@@ -54,7 +69,7 @@ export function Shell({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-canvas text-ink">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-canvas text-ink md:flex-row">
       <Sidebar
         onCloseBudget={onCloseBudget}
         onExportBudget={onExportBudget}
@@ -150,6 +165,15 @@ export function Shell({
           {view === "schedules" ? <SchedulesView /> : null}
           {view === "payees" ? <PayeesView /> : null}
         </main>
+
+        <MobileNav
+          view={view}
+          onSelect={setView}
+          onImport={() => setImportOpen(true)}
+          onExportBudget={onExportBudget}
+          onExportRecords={onExportRecords}
+          onCloseBudget={onCloseBudget}
+        />
       </div>
 
       <AccountDialog />
@@ -160,6 +184,171 @@ export function Shell({
       <ImportWizard />
       <CommandPalette onCloseBudget={onCloseBudget} />
     </div>
+  );
+}
+
+/**
+ * The phone's primary navigation.
+ *
+ * The desktop rail is hidden below `md`; this bar covers the four places a person
+ * moves between on a phone and puts the lower-frequency tools, import and export
+ * behind one sheet, so the register keeps the width it needs.
+ */
+function MobileNav({
+  view,
+  onSelect,
+  onImport,
+  onExportBudget,
+  onExportRecords,
+  onCloseBudget,
+}: {
+  view: View;
+  onSelect: (view: View) => void;
+  onImport: () => void;
+  onExportBudget: () => void;
+  onExportRecords: (format: "json" | "csv" | "qif") => void;
+  onCloseBudget: () => void;
+}) {
+  const [toolsOpen, setToolsOpen] = useState(false);
+
+  const go = (next: View): void => {
+    onSelect(next);
+    setToolsOpen(false);
+  };
+
+  return (
+    <>
+      <nav
+        aria-label="Primary"
+        data-testid="mobile-nav"
+        className="grid shrink-0 grid-cols-4 border-t border-line bg-panel pb-[env(safe-area-inset-bottom)] md:hidden"
+      >
+        <MobileTab
+          active={view === "plan"}
+          icon={<LayoutGrid size={18} />}
+          label="Plan"
+          onClick={() => onSelect("plan")}
+        />
+        <MobileTab
+          active={view === "accounts"}
+          icon={<Wallet size={18} />}
+          label="Accounts"
+          onClick={() => onSelect("accounts")}
+        />
+        <MobileTab
+          active={view === "reports"}
+          icon={<BarChart3 size={18} />}
+          label="Reports"
+          onClick={() => onSelect("reports")}
+        />
+        <MobileTab
+          active={view === "rules" || view === "schedules" || view === "payees"}
+          icon={<MoreHorizontal size={18} />}
+          label="Tools"
+          onClick={() => setToolsOpen(true)}
+        />
+      </nav>
+
+      <Modal
+        open={toolsOpen}
+        onOpenChange={setToolsOpen}
+        title="Tools"
+        footer={
+          <Button
+            onClick={() => {
+              onCloseBudget();
+              setToolsOpen(false);
+            }}
+          >
+            All budgets
+          </Button>
+        }
+      >
+        <div className="grid gap-2">
+          <Button className="justify-start" onClick={() => go("schedules")}>
+            <CalendarClock size={14} />
+            Schedules
+          </Button>
+          <Button className="justify-start" onClick={() => go("payees")}>
+            <Tags size={14} />
+            Payees
+          </Button>
+          <Button className="justify-start" onClick={() => go("rules")}>
+            <ListFilter size={14} />
+            Rules
+          </Button>
+          <Button
+            className="justify-start"
+            onClick={() => {
+              onImport();
+              setToolsOpen(false);
+            }}
+          >
+            <Upload size={14} />
+            Import
+          </Button>
+          <Button
+            className="justify-start"
+            onClick={() => {
+              onExportBudget();
+              setToolsOpen(false);
+            }}
+          >
+            <Download size={14} />
+            Export budget
+          </Button>
+          <Button
+            className="justify-start"
+            onClick={() => {
+              onExportRecords("csv");
+              setToolsOpen(false);
+            }}
+          >
+            <Download size={14} />
+            Transactions (CSV)
+          </Button>
+          <Button
+            className="justify-start"
+            onClick={() => {
+              onExportRecords("qif");
+              setToolsOpen(false);
+            }}
+          >
+            <Download size={14} />
+            Transactions (QIF)
+          </Button>
+          <PrivacyLine className="mt-1" />
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function MobileTab({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={
+        active
+          ? "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-ink"
+          : "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] text-muted transition-colors hover:text-ink"
+      }
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }
 

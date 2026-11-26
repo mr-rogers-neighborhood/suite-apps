@@ -49,7 +49,7 @@ export function CategoryGroup({
 
   return (
     <div className={group.group.hidden ? "opacity-50" : ""}>
-      <div className="group flex items-center gap-2 border-t border-line bg-panel/60 px-6 py-1.5">
+      <div className="group flex flex-wrap items-center gap-2 border-t border-line bg-panel/60 px-4 py-1.5 md:px-6">
         <button
           type="button"
           onClick={onToggle}
@@ -62,14 +62,21 @@ export function CategoryGroup({
           />
           <span className="truncate text-[12px] font-semibold text-muted">{group.group.name}</span>
         </button>
-        <span className="tnum w-[120px] px-2 text-right text-[12px] text-faint">
+        <span className="flex w-full flex-wrap items-center gap-x-3 gap-y-0.5 pl-5 text-[11px] text-faint md:hidden">
+          <span>Assigned {money(group.assignedMinor)}</span>
+          <span>Activity {money(group.activityMinor)}</span>
+          <span className={group.availableMinor < 0 ? "text-negative" : undefined}>
+            Available {money(group.availableMinor)}
+          </span>
+        </span>
+        <span className="tnum hidden w-[120px] px-2 text-right text-[12px] text-faint md:inline">
           {money(group.assignedMinor)}
         </span>
-        <span className="tnum w-[120px] px-2 text-right text-[12px] text-faint">
+        <span className="tnum hidden w-[120px] px-2 text-right text-[12px] text-faint md:inline">
           {money(group.activityMinor)}
         </span>
         <span
-          className={`tnum w-[140px] px-2 text-right text-[12px] ${
+          className={`tnum hidden w-[140px] px-2 text-right text-[12px] md:inline ${
             group.availableMinor < 0 ? "text-negative" : "text-faint"
           }`}
         >
@@ -129,7 +136,7 @@ export function CategoryGroup({
           <button
             type="button"
             onClick={() => onAddCategory(group.group.id)}
-            className="flex w-full items-center gap-1.5 border-t border-line/40 px-9 py-1.5 text-left text-[11px] text-faint hover:bg-raised/50 hover:text-muted"
+            className="flex w-full items-center gap-1.5 border-t border-line/40 px-4 py-1.5 text-left text-[11px] text-faint hover:bg-raised/50 hover:text-muted md:px-9"
           >
             <Plus size={12} />
             Add category

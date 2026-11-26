@@ -17,6 +17,8 @@ describe("Modal", () => {
       </Modal>,
     );
     const dialog = screen.getByRole("dialog", { name: "Merge payees" });
+    // A phone keyboard changes the visual viewport; the frame follows it below `md`.
+    expect(dialog).toHaveClass("max-md:max-h-[calc(100dvh-1rem)]");
     expect(dialog).toHaveAccessibleDescription(
       "Every transaction on the first payee moves to the second.",
     );

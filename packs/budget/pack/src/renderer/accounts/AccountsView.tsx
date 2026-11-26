@@ -21,7 +21,7 @@ export function AccountsView() {
 
   if (!account) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {snapshot.accounts.length === 0 ? (
           <EmptyState
             title="No accounts yet"
@@ -35,7 +35,7 @@ export function AccountsView() {
           />
         ) : (
           <>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h1 className="text-[15px] font-semibold text-ink">Accounts</h1>
               <Button size="sm" onClick={() => setAccountDialog(true)}>
                 <Plus size={13} />
@@ -84,7 +84,7 @@ export function AccountsView() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-start gap-4 border-b border-line px-6 py-4">
+      <header className="flex flex-col gap-2 border-b border-line px-4 py-3 md:flex-row md:items-start md:gap-4 md:px-6 md:py-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="truncate text-[16px] font-semibold text-ink">{account.name}</h1>
@@ -100,7 +100,7 @@ export function AccountsView() {
           </p>
         </div>
         <p
-          className={`tnum ml-auto text-[22px] font-semibold ${
+          className={`tnum text-[22px] font-semibold md:ml-auto ${
             balance < 0 ? "text-negative" : "text-ink"
           }`}
         >
@@ -108,7 +108,7 @@ export function AccountsView() {
         </p>
       </header>
 
-      <div className="flex items-center gap-2 border-b border-line px-6 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2 md:px-6">
         <Button
           size="sm"
           variant="primary"
@@ -133,7 +133,7 @@ export function AccountsView() {
           <Pencil size={13} />
           Edit account
         </Button>
-        <p className="ml-auto flex items-center gap-1.5 text-[11px] text-faint">
+        <p className="hidden items-center gap-1.5 text-[11px] text-faint md:ml-auto md:flex">
           <CircleDollarSign size={13} />
           {account.onBudget ? "Counts toward Ready to Assign" : "Net worth only"}
         </p>
