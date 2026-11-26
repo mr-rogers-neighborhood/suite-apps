@@ -1025,3 +1025,251 @@ h2 {
   border-color: var(--hue-amber);
   color: var(--hue-amber);
 }
+
+/* Command Surface (#225). One host-owned overlay; a pack never draws in it. */
+
+.command-toggle {
+  flex: 0 0 auto;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-muted);
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.command-toggle:hover,
+.command-toggle[aria-expanded="true"] {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+
+.command-surface {
+  position: fixed;
+  inset: 56px 0 0;
+  z-index: 40;
+  display: grid;
+  place-items: start center;
+  padding: 32px 16px;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.command-surface[hidden] {
+  display: none;
+}
+
+.command-box {
+  width: min(760px, 100%);
+  max-height: min(72vh, 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 35%);
+  overflow: auto;
+}
+
+.command-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.command-head .eyebrow {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+.command-head h1 {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 20px;
+}
+
+.command-modes {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+}
+
+.command-mode {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-muted);
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.command-mode[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.command-close {
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.command-apps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.command-field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.command-field select {
+  min-width: 180px;
+  padding: 6px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+
+.command-input input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.command-input input:focus {
+  outline: 2px solid var(--ink-faint);
+  outline-offset: 1px;
+}
+
+.command-results,
+.command-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.command-result {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.command-result[aria-selected="true"] {
+  border-color: var(--hairline);
+  background: var(--bg);
+}
+
+.command-result-source {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.command-result-subtitle {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.command-result-placeholder {
+  cursor: default;
+  color: var(--ink-muted);
+}
+
+.command-scope-panel {
+  display: grid;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--hairline);
+}
+
+.command-scope-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.command-scope-head h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.command-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  padding: 6px 10px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.command-item:hover {
+  border-color: var(--hairline);
+  background: var(--bg);
+}
+
+.command-item-done {
+  text-decoration: line-through;
+  color: var(--ink-muted);
+}
+
+.command-item-detail {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.command-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.command-foot span {
+  flex: 1 1 auto;
+}

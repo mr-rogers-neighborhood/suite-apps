@@ -54,7 +54,15 @@ export const DESK_HOST = {
   id: "desk",
   name: "Suite Desk",
   kind: "desktop",
-  capabilities: ["documents", "files", "identity.pack", "network", "notifications", "recents"],
+  capabilities: [
+    "documents",
+    "files",
+    "identity.pack",
+    "network",
+    "notifications",
+    "recents",
+    "commands",
+  ],
 } as const satisfies HostDeclaration;
 
 /**

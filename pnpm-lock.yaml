@@ -955,6 +955,10 @@ importers:
         version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/pack-runtime:
+    dependencies:
+      '@suite/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       '@biomejs/biome':
         specifier: 2.6.4

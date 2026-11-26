@@ -1,3 +1,5 @@
+import type { CommandProviderRequest, CommandProviderResponse } from "@suite/contracts/commands";
+
 /**
  * The services a pack sees.
  *
@@ -132,6 +134,19 @@ export interface CommandRegistration {
 export interface CommandsService {
   register(command: CommandRegistration): Disposable;
   execute(id: string): Promise<void>;
+  /**
+   * Bind a provider entry the manifest lists under `contributions.providers`.
+   *
+   * The host invokes only a declared entry, over the scoped command channel,
+   * and hands it a request with no document bytes. Returning a malformed answer
+   * is refused by the host rather than painted.
+   */
+  provide(
+    entry: string,
+    handler: (
+      request: CommandProviderRequest,
+    ) => CommandProviderResponse | Promise<CommandProviderResponse>,
+  ): Disposable;
 }
 
 /**

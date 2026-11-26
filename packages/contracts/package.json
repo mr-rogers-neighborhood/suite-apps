@@ -18,6 +18,12 @@
       "import": "./dist/appManifest.js",
       "default": "./dist/appManifest.js"
     },
+    "./commands": {
+      "types": "./dist/commands.d.ts",
+      "development": "./src/commands.ts",
+      "import": "./dist/commands.js",
+      "default": "./dist/commands.js"
+    },
     "./deployment": {
       "types": "./dist/deployment.d.ts",
       "development": "./src/deployment.ts",

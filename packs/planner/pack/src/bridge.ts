@@ -1,4 +1,5 @@
 import type {
+  CommandsService,
   PackLaunchContext,
   ProjectionsService,
   RecentDocument,
@@ -28,6 +29,12 @@ import {
   type WorkspaceInfo,
 } from "@suite/planner-core";
 import { projectReminders, REMINDER_PACK_ID, REMINDER_PROJECTION } from "./projection";
+import {
+  handlePlannerCommand,
+  handlePlannerScope,
+  PLANNER_COMMANDS_ENTRY,
+  PLANNER_SCOPES_ENTRY,
+} from "./provider";
 import { createPlannerSync, type PlannerSync } from "./sync/service";
 
 /**
@@ -78,6 +85,8 @@ export interface PlannerPackHost extends PackBridgeHost {
   readonly onDeepLink?: ((listener: (url: string) => void) => () => void) | undefined;
   /** The declared-projection seam. The host calls the entry the manifest names. */
   readonly projections?: ProjectionsService | undefined;
+  /** The declarative command-channel seam (#226). */
+  readonly commands?: CommandsService | undefined;
   /** The host's recent list, when `recents` is declared. */
   readonly recents?: RecentsService | undefined;
   /** The host's opaque relay transport, when `relay` is declared. */
@@ -159,6 +168,44 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
       host.projections.register(REMINDER_PROJECTION, async (projected) => {
         const bytes = await projected.read();
         return projectReminders(bytes, { packId, now: clock() });
+      }),
+    );
+  }
+
+  // The manifest declares a commands entry and a scopes entry. The host invokes
+  // only those entries over the separate command channel; a capture writes the
+  // pack's own document through its own layer and is flushed before the answer.
+  if (host.commands !== undefined) {
+    runtime.addCleanup(
+      host.commands.provide(PLANNER_COMMANDS_ENTRY, async (request) => {
+        if (request.kind !== "commands") {
+          return { ok: false, message: "Planner's commands entry answers command calls." };
+        }
+        await ensure();
+        const target = runtime.current();
+        if (target === null) return { ok: false, message: "No workspace is open." };
+        const response = handlePlannerCommand(target.doc, request, { now: clock });
+        if (response.ok) {
+          runtime.markDirty();
+          await flush();
+        }
+        return response;
+      }),
+    );
+    runtime.addCleanup(
+      host.commands.provide(PLANNER_SCOPES_ENTRY, async (request) => {
+        if (request.kind !== "scopes") {
+          return { ok: false, message: "Planner's scopes entry answers scope calls." };
+        }
+        await ensure();
+        const target = runtime.current();
+        if (target === null) return { ok: false, message: "No workspace is open." };
+        const response = handlePlannerScope(target.doc, request, { now: clock });
+        if (response.ok && request.call === "capture") {
+          runtime.markDirty();
+          await flush();
+        }
+        return response;
       }),
     );
   }

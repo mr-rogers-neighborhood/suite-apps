@@ -1,19 +1,18 @@
+import type { PackCommandContribution, PackProviderContribution } from "@suite/contracts/commands";
+
+export type { PackCommandContribution, PackProviderContribution } from "@suite/contracts/commands";
+
 /**
  * What a pack offers the host's chrome.
  *
  * A contribution is data. The host validates it, renders it in its own menu,
  * toolbar or palette, and sends the command id back to the pack when a person
  * invokes it. A pack never renders into host DOM.
+ *
+ * `providers` is the one block the Command Surface added (#224): each entry
+ * names a kind, the pack-side entry the host invokes, and the scopes it serves.
+ * A provider the manifest does not list is refused, not called.
  */
-export interface PackCommandContribution {
-  /** Stable command id. The host routes invocations by this value. */
-  readonly id: string;
-  readonly title: string;
-  readonly category?: string;
-  /** Electron-style accelerator, for example `CmdOrCtrl+Shift+K`. */
-  readonly keybinding?: string;
-}
-
 export interface PackMenuContribution {
   /** `app`, `file`, `edit`, `view`, `window`, `help`, or a pack-defined menu. */
   readonly menu: string;
@@ -29,6 +28,8 @@ export interface PackMenuContribution {
 
 export interface PackContributions {
   readonly commands?: readonly PackCommandContribution[];
+  /** The command, search and scope providers this pack answers calls through. */
+  readonly providers?: readonly PackProviderContribution[];
   readonly menus?: readonly PackMenuContribution[];
   /** File extensions the host may route to this pack, for example `.canvas`. */
   readonly fileExtensions?: readonly string[];

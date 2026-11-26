@@ -42,6 +42,20 @@ contextBridge.exposeInMainWorld("suiteShell", {
   importScreen: () => ipcRenderer.invoke("suite:shell:import-screen"),
   relayStart: () => ipcRenderer.invoke("suite:shell:relay-start"),
   relayStop: () => ipcRenderer.invoke("suite:shell:relay-stop"),
+  commandList: (query, mode, packId, scope) =>
+    ipcRenderer.invoke("suite:shell:command-list", query, mode, packId, scope),
+  commandInvoke: (commandId, scope, args) =>
+    ipcRenderer.invoke("suite:shell:command-invoke", commandId, scope, args),
+  commandScopes: (packId) => ipcRenderer.invoke("suite:shell:command-scopes", packId),
+  commandItems: (packId, scopeId, limit) =>
+    ipcRenderer.invoke("suite:shell:command-items", packId, scopeId, limit),
+  commandCapture: (packId, scopeId, values) =>
+    ipcRenderer.invoke("suite:shell:command-capture", packId, scopeId, values),
+  commandOpen: (packId, scopeId, itemId) =>
+    ipcRenderer.invoke("suite:shell:command-open", packId, scopeId, itemId),
+  commandSearch: (query, scope) => ipcRenderer.invoke("suite:shell:command-search", query, scope),
+  commandOpenLink: (link) => ipcRenderer.invoke("suite:shell:command-open-link", link),
+  commandClearRecents: () => ipcRenderer.invoke("suite:shell:command-clear-recents"),
   onState: (listener) => {
     ipcRenderer.on("suite:shell:state-changed", (_event, state) => listener(state));
   },

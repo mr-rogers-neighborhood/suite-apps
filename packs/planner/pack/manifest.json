@@ -6,7 +6,7 @@
   "entry": "index.html",
   "contractVersion": 1,
   "capabilities": ["documents", "files", "notifications", "recents"],
-  "optionalCapabilities": ["relay"],
+  "optionalCapabilities": ["relay", "commands"],
   "platforms": ["desktop", "mobile"],
   "documents": [
     {
@@ -16,5 +16,37 @@
       "mode": "multi",
       "projection": "reminders"
     }
-  ]
+  ],
+  "contributions": {
+    "commands": [
+      {
+        "id": "planner.quick-task",
+        "title": "Quick task",
+        "subtitle": "Capture into Planner",
+        "keywords": ["task", "todo", "capture", "add"],
+        "scope": "global",
+        "provider": "commands"
+      },
+      {
+        "id": "planner.today",
+        "title": "Open Today",
+        "subtitle": "Planner",
+        "keywords": ["today", "day", "plan"],
+        "scope": "global",
+        "provider": "commands"
+      },
+      {
+        "id": "planner.inbox",
+        "title": "Open Inbox",
+        "subtitle": "Planner",
+        "keywords": ["inbox", "unscheduled", "tasks"],
+        "scope": "global",
+        "provider": "commands"
+      }
+    ],
+    "providers": [
+      { "kind": "commands", "entry": "commands", "scopes": ["global"] },
+      { "kind": "scopes", "entry": "scopes", "scopes": ["today", "inbox"] }
+    ]
+  }
 }

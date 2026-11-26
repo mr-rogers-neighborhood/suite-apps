@@ -41,6 +41,36 @@ let changeListeners = 0;
 // another renderer cannot borrow a handler by naming this pack's entry.
 const projections = new Map();
 
+// Command Surface providers (#226). The manifest declares an entry; the pack
+// binds it here. The host calls only a declared entry over the separate command
+// channel, and neither side puts a document, a path or a handle in the request.
+const providers = new Map();
+
+ipcRenderer.on("suite:command:invoke", (_event, request) => {
+  const handler = providers.get(request.entry);
+  if (typeof handler !== "function") {
+    void ipcRenderer.invoke(
+      "suite:command:failed",
+      request.requestId,
+      `no provider is bound to ${request.entry}`,
+    );
+    return;
+  }
+  const dispatch = async () => {
+    try {
+      const value = await handler(request.request);
+      await ipcRenderer.invoke("suite:command:done", request.requestId, value);
+    } catch (error) {
+      await ipcRenderer.invoke(
+        "suite:command:failed",
+        request.requestId,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  };
+  void dispatch();
+});
+
 // Relay connections in this renderer, keyed by the host's token. Frames can
 // arrive before `connect()` resolves and before the pack binds a listener, so an
 // unknown token is buffered briefly rather than dropped.
@@ -307,6 +337,22 @@ contextBridge.exposeInMainWorld("suite", {
     const handler = (_event, url) => listener(url);
     ipcRenderer.on("suite:pack:deep-link", handler);
     return () => ipcRenderer.removeListener("suite:pack:deep-link", handler);
+  },
+  // A declared provider entry. The host invokes only an entry the manifest lists
+  // under `contributions.providers`; the pack answers with display metadata and
+  // an optional suite:// link. No document bytes cross this channel.
+  commands: {
+    provide: (entry, handler) => {
+      if (typeof entry !== "string" || typeof handler !== "function") {
+        throw new Error("a provider needs an entry name and a handler");
+      }
+      providers.set(entry, handler);
+      ipcRenderer.send("suite:command:register", entry);
+      return () => {
+        if (providers.get(entry) === handler) providers.delete(entry);
+        ipcRenderer.send("suite:command:unregister", entry);
+      };
+    },
   },
   // A declared projection entry. The host names the entry from the manifest and
   // supplies a handle scoped to the one document; the pack supplies display rows.

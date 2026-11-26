@@ -43,6 +43,15 @@ export const CHROME_IPC = {
   importScreen: "suite:shell:import-screen",
   relayStart: "suite:shell:relay-start",
   relayStop: "suite:shell:relay-stop",
+  commandList: "suite:shell:command-list",
+  commandInvoke: "suite:shell:command-invoke",
+  commandScopes: "suite:shell:command-scopes",
+  commandItems: "suite:shell:command-items",
+  commandCapture: "suite:shell:command-capture",
+  commandOpen: "suite:shell:command-open",
+  commandSearch: "suite:shell:command-search",
+  commandOpenLink: "suite:shell:command-open-link",
+  commandClearRecents: "suite:shell:command-clear-recents",
 } as const;
 
 /** Pushed, not invoked: the chrome redraws from the last state it received. */
@@ -103,6 +112,22 @@ export const PACK_PROJECTION = {
   read: "suite:projection:read",
   done: "suite:projection:done",
   failed: "suite:projection:failed",
+} as const;
+
+/**
+ * The scoped command channel (#226).
+ *
+ * It is separate from the document and file bridge: a request names a command
+ * or a scopes call and carries a record of strings, and a reply carries display
+ * metadata plus a `suite://` link. No document bytes, path or handle cross it.
+ * `register` tells the host the pack bound a declared provider entry.
+ */
+export const PACK_COMMAND = {
+  invoke: "suite:command:invoke",
+  register: "suite:command:register",
+  unregister: "suite:command:unregister",
+  done: "suite:command:done",
+  failed: "suite:command:failed",
 } as const;
 
 /** Main-process pushes a pack may listen for. */

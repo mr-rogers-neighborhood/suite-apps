@@ -44,6 +44,21 @@ const elements = {
   syncError: document.querySelector("#sync-error"),
   syncStart: document.querySelector("#sync-start"),
   syncStop: document.querySelector("#sync-stop"),
+  commandToggle: document.querySelector("#command-toggle"),
+  commandSurface: document.querySelector("#command-surface"),
+  commandClose: document.querySelector("#command-close"),
+  commandApp: document.querySelector("#command-app"),
+  commandScope: document.querySelector("#command-scope"),
+  commandQuery: document.querySelector("#command-query"),
+  commandNote: document.querySelector("#command-note"),
+  commandResults: document.querySelector("#command-results"),
+  commandScopePanel: document.querySelector("#command-scope-panel"),
+  commandScopeTitle: document.querySelector("#command-scope-title"),
+  commandScopeAge: document.querySelector("#command-scope-age"),
+  commandItems: document.querySelector("#command-items"),
+  commandClearRecents: document.querySelector("#command-clear-recents"),
+  commandHint: document.querySelector("#command-hint"),
+  commandModes: [...document.querySelectorAll(".command-mode")],
 };
 
 const SIZES = ["1x1", "2x1", "full"];
@@ -98,6 +113,347 @@ let appsView = {
   catalogueSource: null,
   search: null,
 };
+
+/**
+ * Command Surface state (#225).
+ *
+ * The page owns only what a person typed and which row is highlighted. The host
+ * owns discovery, consent, ranking and every provider call, so no pack code and
+ * no document state live here.
+ */
+let commandOpen = false;
+let commandMode = "command";
+let commandAppId = "*";
+let commandScopeId = "global";
+let commandListing = { commands: [], apps: [], recent: [], notice: null };
+let commandItemsView = null;
+let commandSearchView = null;
+let commandChosen = 0;
+let commandBusy = false;
+let commandMessage = null;
+
+function commandApp() {
+  return (
+    commandListing.apps.find((app) => (app.id ?? "") === commandAppId) ??
+    commandListing.apps[0] ??
+    null
+  );
+}
+
+function commandAppValue(app) {
+  return app.id ?? "";
+}
+
+function commandScopeChoices() {
+  const app = commandApp();
+  if (app === null || app.scopes.length === 0) return ["global"];
+  return app.scopes;
+}
+
+function commandMatchesApp(command) {
+  if (commandAppId === "*") return true;
+  if (commandAppId === "") return command.source === "host";
+  return command.packId === commandAppId;
+}
+
+function visibleCommands() {
+  return commandListing.commands.filter(commandMatchesApp);
+}
+
+function visibleHits() {
+  return commandSearchView?.hits ?? [];
+}
+
+function selectedCount() {
+  if (commandMode === "search") return visibleHits().length;
+  if (commandMode === "command") return visibleCommands().length;
+  return 0;
+}
+
+function showCommandMessage(message) {
+  commandMessage = message;
+  elements.commandNote.hidden = message === null || message === undefined || message === "";
+  elements.commandNote.textContent = message ?? "";
+}
+
+function renderCommandApps() {
+  const fragment = document.createDocumentFragment();
+  const all = element("option", "", "All apps");
+  all.value = "*";
+  fragment.append(all);
+  for (const app of commandListing.apps) {
+    const option = element("option", "", app.name);
+    option.value = commandAppValue(app);
+    fragment.append(option);
+  }
+  elements.commandApp.replaceChildren(fragment);
+  elements.commandApp.value = commandAppId;
+
+  const scopes = commandScopeChoices();
+  if (!scopes.includes(commandScopeId)) commandScopeId = scopes[0] ?? "global";
+  const scopeFragment = document.createDocumentFragment();
+  for (const scope of scopes) {
+    const option = element("option", "", scope);
+    option.value = scope;
+    scopeFragment.append(option);
+  }
+  elements.commandScope.replaceChildren(scopeFragment);
+  elements.commandScope.value = commandScopeId;
+  elements.commandScope.disabled = commandAppId === "*" || commandAppId === "";
+}
+
+function renderCommandResults() {
+  elements.commandResults.replaceChildren();
+  commandChosen = Math.min(commandChosen, Math.max(0, selectedCount() - 1));
+
+  if (commandMode === "search") {
+    const hits = visibleHits();
+    if (hits.length === 0) {
+      elements.commandResults.append(
+        element("p", "empty", "No search results yet. Keep typing, or open the app to search it."),
+      );
+      return;
+    }
+    hits.forEach((hit, index) => {
+      const row = element("button", "command-result");
+      row.type = "button";
+      row.setAttribute("role", "option");
+      row.setAttribute("aria-selected", String(index === commandChosen));
+      row.append(
+        element("span", "", hit.title),
+        element("span", "command-result-subtitle", hit.subtitle ?? ""),
+        element("span", "command-result-source", hit.packName),
+      );
+      row.addEventListener("click", () => {
+        commandChosen = index;
+        void invokeSelectedCommand();
+      });
+      elements.commandResults.append(row);
+    });
+    return;
+  }
+
+  if (commandMode === "capture") {
+    elements.commandResults.append(
+      element(
+        "p",
+        "empty",
+        commandAppId === "*" || commandAppId === ""
+          ? "Choose an app and a scope, then type what to capture."
+          : "Type what to capture, then press Enter.",
+      ),
+    );
+    return;
+  }
+
+  const commands = visibleCommands();
+  if (commands.length === 0) {
+    elements.commandResults.append(
+      element("p", "empty", `No command matches “${elements.commandQuery.value.trim()}”.`),
+    );
+    return;
+  }
+  commands.forEach((command, index) => {
+    const row = element("button", "command-result");
+    row.type = "button";
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", String(index === commandChosen));
+    row.append(
+      element("span", "", command.title),
+      element("span", "command-result-subtitle", command.subtitle ?? ""),
+      element("span", "command-result-source", command.packName),
+    );
+    row.addEventListener("click", () => {
+      commandChosen = index;
+      void invokeSelectedCommand();
+    });
+    elements.commandResults.append(row);
+  });
+}
+
+function renderCommandScopePanel() {
+  const visible = commandMode === "capture" && commandAppId !== "*" && commandAppId !== "";
+  elements.commandScopePanel.hidden = !visible;
+  if (!visible) return;
+
+  const app = commandApp();
+  elements.commandScopeTitle.textContent = `${app?.name ?? commandAppId} · ${commandScopeId}`;
+  elements.commandItems.replaceChildren();
+  const view = commandItemsView;
+  if (view === null) {
+    elements.commandScopeAge.textContent = "Not loaded";
+    elements.commandItems.append(
+      element("li", "empty", "Choose the app's scope to load its rows."),
+    );
+    return;
+  }
+
+  if (view.ageMs === null) {
+    elements.commandScopeAge.textContent = view.placeholder ? "Placeholder" : "Live";
+  } else if (view.stale) {
+    elements.commandScopeAge.textContent = `${Math.max(0, Math.round(view.ageMs / 1000))}s old`;
+  } else {
+    elements.commandScopeAge.textContent = "Live";
+  }
+
+  if (view.message !== null && view.message !== undefined) {
+    elements.commandItems.append(
+      element("li", view.stale ? "card-warning" : "widget-muted", view.message),
+    );
+  }
+  for (const item of view.items ?? []) {
+    const row = element("li");
+    const button = element(
+      "button",
+      item.done ? "command-item command-item-done" : "command-item",
+      item.title,
+    );
+    button.type = "button";
+    button.addEventListener("click", () => {
+      void runCommandAction(async () => {
+        const outcome = await api.commandOpen(commandAppId, commandScopeId, item.id);
+        showCommandMessage(outcome?.message ?? "The host did not answer.");
+        await refreshCommandSurface();
+      });
+    });
+    if (item.detail) button.append(element("span", "command-item-detail", item.detail));
+    row.append(button);
+    elements.commandItems.append(row);
+  }
+}
+
+function renderCommandSurface() {
+  elements.commandSurface.hidden = !commandOpen;
+  elements.commandToggle.setAttribute("aria-expanded", String(commandOpen));
+  if (!commandOpen) return;
+
+  for (const button of elements.commandModes) {
+    button.setAttribute("aria-pressed", String(button.dataset.mode === commandMode));
+  }
+  elements.commandQuery.placeholder =
+    commandMode === "capture"
+      ? "What do you want to capture?"
+      : commandMode === "search"
+        ? "Search installed apps…"
+        : "Type a command name…";
+  elements.commandHint.textContent =
+    commandMode === "capture"
+      ? "Enter to capture · ↑↓ to choose a scope · Esc to close"
+      : commandMode === "search"
+        ? "Enter to open a result · Esc to close"
+        : "↑↓ to choose · Enter to run · Esc to close";
+  elements.commandClearRecents.disabled = commandListing.recent.length === 0;
+
+  renderCommandApps();
+  renderCommandResults();
+  renderCommandScopePanel();
+  showCommandMessage(commandMessage ?? commandListing.notice);
+}
+
+async function runCommandAction(action) {
+  if (commandBusy) return;
+  commandBusy = true;
+  try {
+    await action();
+  } catch (error) {
+    showCommandMessage(error instanceof Error ? error.message : "The host refused that action.");
+  } finally {
+    commandBusy = false;
+  }
+}
+
+async function refreshCommandSurface() {
+  if (!commandOpen) return;
+  await runCommandAction(async () => {
+    const listing = await api.commandList(
+      elements.commandQuery.value,
+      commandMode,
+      commandAppId === "*" ? null : commandAppId,
+      commandScopeId,
+    );
+    if (listing) commandListing = listing;
+
+    const values = commandListing.apps.map(commandAppValue);
+    if (!values.includes(commandAppId)) commandAppId = "*";
+    const scopes = commandScopeChoices();
+    if (!scopes.includes(commandScopeId)) commandScopeId = scopes[0] ?? "global";
+
+    if (commandMode === "search") {
+      commandSearchView = await api.commandSearch(elements.commandQuery.value, commandScopeId);
+    } else {
+      commandSearchView = null;
+    }
+    if (commandMode === "capture" && commandAppId !== "*" && commandAppId !== "") {
+      commandItemsView = await api.commandItems(commandAppId, commandScopeId, 20);
+    } else {
+      commandItemsView = null;
+    }
+    commandChosen = 0;
+    paint();
+  });
+}
+
+async function invokeSelectedCommand() {
+  if (commandMode === "search") {
+    const hit = visibleHits()[commandChosen];
+    if (hit === undefined) return;
+    await runCommandAction(async () => {
+      await api.commandOpenLink(hit.open);
+      showCommandMessage(`Opened ${hit.title}.`);
+    });
+    return;
+  }
+
+  if (commandMode === "capture") {
+    if (commandAppId === "*" || commandAppId === "") {
+      showCommandMessage("Choose an app and a scope first.");
+      return;
+    }
+    const text = elements.commandQuery.value.trim();
+    if (text.length === 0) {
+      showCommandMessage("Type what to capture first.");
+      return;
+    }
+    await runCommandAction(async () => {
+      const outcome = await api.commandCapture(commandAppId, commandScopeId, { title: text });
+      showCommandMessage(outcome?.message ?? "The host did not answer.");
+      if (outcome?.ok) elements.commandQuery.value = "";
+      await refreshCommandSurface();
+    });
+    return;
+  }
+
+  const command = visibleCommands()[commandChosen];
+  if (command === undefined) return;
+  const text = elements.commandQuery.value.trim();
+  const args = command.id === "planner.quick-task" && text.length > 0 ? { title: text } : {};
+  await runCommandAction(async () => {
+    const outcome = await api.commandInvoke(command.id, command.scope || "global", args);
+    showCommandMessage(outcome?.message ?? "The host did not answer.");
+    if (outcome?.ok && command.id === "planner.quick-task") elements.commandQuery.value = "";
+    await refreshCommandSurface();
+  });
+}
+
+function openCommandSurface() {
+  commandOpen = true;
+  commandMessage = null;
+  commandMode = "command";
+  commandChosen = 0;
+  elements.commandQuery.value = "";
+  const active = state.tabs.find((tab) => tab.id === state.activeTabId);
+  commandAppId = active !== undefined && active.kind === "pack" ? active.packId : "*";
+  commandScopeId = "global";
+  paint();
+  void refreshCommandSurface();
+  elements.commandQuery.focus();
+}
+
+function closeCommandSurface() {
+  commandOpen = false;
+  commandMessage = null;
+  paint();
+}
 
 function showNotice(message) {
   elements.notice.hidden = false;
@@ -1026,6 +1382,7 @@ function paint() {
   renderTabs();
   renderSync();
   renderScreen();
+  renderCommandSurface();
 
   const active = state.tabs.find((tab) => tab.id === state.activeTabId);
   document.body.dataset.surface = state.surface;
@@ -1048,6 +1405,65 @@ function bindChrome() {
   });
   elements.syncStart.addEventListener("click", () => runRelayAction(api.relayStart()));
   elements.syncStop.addEventListener("click", () => runRelayAction(api.relayStop()));
+
+  elements.commandToggle.addEventListener("click", () => {
+    if (commandOpen) closeCommandSurface();
+    else openCommandSurface();
+  });
+  elements.commandClose.addEventListener("click", closeCommandSurface);
+  elements.commandSurface.addEventListener("click", (event) => {
+    if (event.target === elements.commandSurface) closeCommandSurface();
+  });
+  for (const button of elements.commandModes) {
+    button.addEventListener("click", () => {
+      if (commandMode === button.dataset.mode) return;
+      commandMode = button.dataset.mode;
+      commandChosen = 0;
+      commandMessage = null;
+      paint();
+      void refreshCommandSurface();
+    });
+  }
+  elements.commandApp.addEventListener("change", () => {
+    commandAppId = elements.commandApp.value;
+    commandScopeId = commandScopeChoices()[0] ?? "global";
+    commandChosen = 0;
+    paint();
+    void refreshCommandSurface();
+  });
+  elements.commandScope.addEventListener("change", () => {
+    commandScopeId = elements.commandScope.value;
+    commandChosen = 0;
+    paint();
+    void refreshCommandSurface();
+  });
+  elements.commandQuery.addEventListener("input", () => {
+    void refreshCommandSurface();
+  });
+  elements.commandQuery.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const count = selectedCount();
+      if (count === 0) return;
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      commandChosen = (commandChosen + step + count) % count;
+      renderCommandResults();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      void invokeSelectedCommand();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeCommandSurface();
+    }
+  });
+  elements.commandClearRecents.addEventListener("click", () => {
+    void runCommandAction(async () => {
+      const listing = await api.commandClearRecents();
+      if (listing) commandListing = listing;
+      commandChosen = 0;
+      paint();
+    });
+  });
 
   elements.editToggle.addEventListener("click", () => {
     editing = !editing;
@@ -1077,6 +1493,11 @@ function bindChrome() {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && commandOpen) {
+      event.preventDefault();
+      closeCommandSurface();
+      return;
+    }
     const command = event.ctrlKey || event.metaKey;
     if (!command) return;
 
@@ -1088,8 +1509,8 @@ function bindChrome() {
       run(api.closeTab(state.activeTabId));
     } else if (event.key.toLowerCase() === "k") {
       event.preventDefault();
-      shouldFocusSearch = true;
-      updateFocus();
+      if (commandOpen) closeCommandSurface();
+      else openCommandSurface();
     }
   });
 }

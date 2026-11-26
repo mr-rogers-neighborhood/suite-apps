@@ -69,7 +69,7 @@ also owns the overrides, patches and build permissions the apps need.
 | `@suite/go-app` | `hosts/go` | Go container |
 | `@suite/go` | `hosts/go/packages/go` | Go module contract |
 | `@suite/desk` | `hosts/desk` | Desktop host |
-| `@suite/contracts` | `packages/contracts` | Shared app and deployment contracts |
+| `@suite/contracts` | `packages/contracts` | Shared app, deployment and Command Surface contracts |
 | `@suite/files` | `packages/files` | Shared file envelopes |
 | `@suite/document-runtime` | `packages/document-runtime` | Shared document replica and atomic store |
 | `@suite/sync-desktop` | `packages/sync-desktop` | Shared sync mechanics for Canvas and Planner |
@@ -80,6 +80,12 @@ also owns the overrides, patches and build permissions the apps need.
 | `@suite/pack` | `packages/pack` | Pack manifest, capabilities, contributions and signature |
 | `@suite/pack-runtime` | `packages/pack-runtime` | Pack-side service types |
 | `@suite/pack-host` | `packages/pack-host` | Scoped pack file store, locks and backups |
+
+The Command Surface vocabulary is in `packages/contracts/src/commands.ts`: the provider declaration
+(`{kind, entry, scopes?}`), the command entry, and the request/response shapes. `@suite/pack` parses
+the manifest half; `hosts/desk/src/commandSurface.ts` and `commandBroker.ts` own discovery, ranking,
+consent and the session caches; `hosts/desk/src/commandInvocation.ts` is the separate scoped channel;
+and `packs/planner/pack/src/provider.ts` is the first provider. Go's half is still #227.
 
 ## App-private and shared
 
