@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -461,12 +462,64 @@ describe("the draft phase", () => {
     );
   });
 
-  it("resolves a targetCommitish, and a vanished tag becomes a null commit", () => {
-    assert.match(resolveTargetCommit("HEAD"), /^[0-9a-f]{40}$/u);
-    const absent = "1".repeat(40);
-    assert.equal(resolveTargetCommit(absent), absent, "a full SHA needs no local object");
-    assert.equal(resolveTargetCommit("suite-no-such-tag-532f3461"), null);
-    assert.equal(resolveTargetCommit(""), null);
+  it("resolves a targetCommitish in a repository, and null when there is no repository", () => {
+    // The gate's `--fresh` run exports HEAD with `git archive`, so the tree the
+    // tests run in has no `.git`. The fixture must be its own repository, or
+    // `HEAD` resolves to "no such commit" on exactly the run this proves.
+    const repo = mkdtempSync(join(tmpdir(), "suite-release-target-"));
+    const empty = mkdtempSync(join(tmpdir(), "suite-release-empty-"));
+    // Git exports GIT_DIR from a hook. A fixture repository must discover its
+    // own, or `git init` here would write into the caller's checkout.
+    const env = { ...process.env };
+    for (const key of [
+      "GIT_DIR",
+      "GIT_WORK_TREE",
+      "GIT_INDEX_FILE",
+      "GIT_OBJECT_DIRECTORY",
+      "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+      "GIT_COMMON_DIR",
+      "GIT_NAMESPACE",
+      "GIT_PREFIX",
+    ]) {
+      delete env[key];
+    }
+    const git = (args) => {
+      const result = spawnSync("git", args, { cwd: repo, encoding: "utf8", env });
+      assert.equal(result.status, 0, `git ${args.join(" ")}: ${result.stderr}`);
+      return result.stdout.trim();
+    };
+    try {
+      git(["init", "-q"]);
+      git([
+        "-c",
+        "user.name=Suite",
+        "-c",
+        "user.email=suite@example.com",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "target",
+      ]);
+      git(["tag", "suite-target-check"]);
+      const head = git(["rev-parse", "HEAD"]);
+
+      assert.equal(resolveTargetCommit("HEAD", repo), head);
+      assert.equal(resolveTargetCommit("suite-target-check", repo), head, "a tag resolves");
+
+      const absent = "1".repeat(40);
+      assert.equal(resolveTargetCommit(absent, repo), absent, "a full SHA needs no local object");
+      assert.equal(resolveTargetCommit("suite-no-such-tag-532f3461", repo), null);
+      assert.equal(resolveTargetCommit("", repo), null, "an empty target is not a name to resolve");
+      assert.equal(
+        resolveTargetCommit("HEAD", empty),
+        null,
+        "a directory that is not a repository reserves every name to null rather than throwing",
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(empty, { recursive: true, force: true });
+    }
   });
 
   it("re-targets an existing draft to HEAD instead of refusing the draft run", () => {

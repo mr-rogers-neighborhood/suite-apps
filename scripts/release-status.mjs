@@ -2095,8 +2095,16 @@ function run(command, args) {
   if (result.status !== 0) throw new Error(`${command} exited ${result.status}`);
 }
 
-function git(args) {
-  return spawnSync("git", args, { cwd: ROOT, encoding: "utf8", env: process.env });
+function git(args, repo = ROOT) {
+  const env = { ...process.env };
+  // A hook exports GIT_DIR/GIT_WORK_TREE for the checkout it runs in. An
+  // explicitly named repository must not inherit them, or `rev-parse` would read
+  // the hook's repository instead of the one it was asked about.
+  if (repo !== ROOT) {
+    delete env.GIT_DIR;
+    delete env.GIT_WORK_TREE;
+  }
+  return spawnSync("git", args, { cwd: repo, encoding: "utf8", env });
 }
 
 function read(path) {
@@ -2109,14 +2117,20 @@ function read(path) {
  * `targetCommitish` is usually a SHA, but a deleted tag or a moved branch name
  * is also possible. Resolving it here keeps the comparison in one place and
  * turns a vanished name into a refusal instead of an unknown that passes.
+ *
+ * `repo` is the directory git reads. It is a parameter because the gate's
+ * `--fresh` export is a `git archive` with no `.git`, and a test that asks the
+ * ambient tree would then read "no such commit" for every name. The release CLI
+ * passes nothing and reads the checkout it runs in; a tree that is not a
+ * repository resolves every name to null, which the caller refuses on.
  */
-export function resolveTargetCommit(target) {
+export function resolveTargetCommit(target, repo = ROOT) {
   if (typeof target !== "string" || target.length === 0) return null;
   // A full SHA needs no object to compare with HEAD; a shallow CI checkout may
   // not have the draft's tree, and treating that as a vanished target would
   // refuse the very run the check exists to protect.
   if (/^[0-9a-f]{40}$/iu.test(target)) return target.toLowerCase();
-  const result = git(["rev-parse", "-q", "--verify", `${target}^{commit}`]);
+  const result = git(["rev-parse", "-q", "--verify", `${target}^{commit}`], repo);
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
