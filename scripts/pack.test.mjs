@@ -114,6 +114,30 @@ describe("bundlePack", () => {
     assert.equal(built.sha256, await shaOf(readFileSync(outPath)));
   });
 
+  it("carries optional capabilities into the signed manifest", async () => {
+    const directory = sourcePack();
+    const source = JSON.parse(readFileSync(join(directory, "manifest.json"), "utf8"));
+    source.optionalCapabilities = ["commands"];
+    writeFileSync(join(directory, "manifest.json"), JSON.stringify(source));
+    const keys = await generatePackKeyPair();
+    const outPath = join(directory, "optional.suitepack");
+
+    const built = await bundlePack({
+      directory,
+      privateKeyBase64: keys.secretKeyBase64,
+      expectedPublicKeyBase64: keys.publicKeyBase64,
+      outPath,
+    });
+
+    // A host that lacks an optional capability still installs the pack; dropping
+    // the field would make the signed manifest claim the pack never uses it.
+    assert.deepEqual(built.manifest.optionalCapabilities, ["commands"]);
+    const archive = await readArchive(outPath);
+    const parsed = parsePackManifest(JSON.parse(decoder.decode(archive.manifestBytes)));
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) assert.deepEqual(parsed.value.optionalCapabilities, ["commands"]);
+  });
+
   it("refuses a source manifest that names another publisher key", async () => {
     const directory = sourcePack();
     const keys = await generatePackKeyPair();
