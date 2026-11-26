@@ -1,45 +1,79 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
  * Host chrome stays out of a pack.
  *
  * `HostTabBar` and `NewTabPicker` draw the window a host owns. A pack that imported them could
- * draw a second bar, or depend on a surface its host does not offer. The package exposes them at
- * `@suite/ui/chrome`; this guard makes the boundary real rather than a convention.
+ * draw a second bar, or depend on a surface its host does not offer. The root `@suite/ui` entry
+ * no longer exports them at all — the subpath is the only door — and this guard makes sure a pack
+ * never walks through it, in any import form.
  */
+const SKIP = new Set(["node_modules", ".dev", "dist", "storybook-static", ".git"]);
+
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
-      return ["node_modules", ".dev", "dist", "storybook-static"].includes(entry.name)
-        ? []
-        : sourceFiles(path);
+      return SKIP.has(entry.name) ? [] : sourceFiles(path);
     }
     return /\.(?:ts|tsx)$/u.test(entry.name) ? [path] : [];
   });
 }
 
-const HOST_ONLY = /\b(?:HostTabBar|NewTabPicker|HostTab|NewTabPack|NewTabScreen)\b/u;
+/** Find `packs/` by walking up, so the guard does not depend on the caller's cwd. */
+function packsDirectory(): string {
+  let directory = dirname(fileURLToPath(import.meta.url));
+  for (let step = 0; step < 8; step += 1) {
+    const candidate = join(directory, "packs");
+    if (existsSync(candidate)) return candidate;
+    directory = dirname(directory);
+  }
+  throw new Error("packs/ was not found above the ui package");
+}
+
+const CHROME_SUBPATH = /["']@suite\/ui\/chrome["']/u;
+const HOST_NAME =
+  /\b(?:HostTabBar|HostTab|HostTabKind|HostTabBarProps|NewTabPicker|NewTabPickerProps|NewTabPack|NewTabScreen|OpenDocumentRef)\b/u;
+const ROOT_IMPORT = /(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@suite\/ui["']/gu;
+
+/** Every way a pack source file could reach host chrome. */
+export function violationsIn(source: string): string[] {
+  const found: string[] = [];
+  if (CHROME_SUBPATH.test(source)) found.push("references @suite/ui/chrome");
+  for (const match of source.matchAll(ROOT_IMPORT)) {
+    if (HOST_NAME.test(match[1] ?? "")) {
+      found.push(`imports host chrome from @suite/ui: ${match[0].trim()}`);
+    }
+  }
+  return found;
+}
 
 describe("the pack surface", () => {
-  it("never imports host chrome from @suite/ui", () => {
-    const root = join(process.cwd(), "..", "..", "packs");
+  it("never reaches host chrome", () => {
+    const root = packsDirectory();
     const violations: string[] = [];
 
     for (const file of sourceFiles(root)) {
-      const source = readFileSync(file, "utf8");
-      const imports = source.matchAll(
-        /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@suite\/ui(?:\/chrome)?["']/gu,
-      );
-      for (const match of imports) {
-        if (HOST_ONLY.test(match[1] ?? "")) {
-          violations.push(`${file.replace(`${root}/`, "packs/")}: ${match[0].trim()}`);
-        }
+      for (const violation of violationsIn(readFileSync(file, "utf8"))) {
+        violations.push(`${file.replace(`${root}/`, "packs/")}: ${violation}`);
       }
     }
 
     expect(violations).toEqual([]);
+  });
+});
+
+describe("the boundary guard", () => {
+  it("sees every import form, not just a named import", () => {
+    expect(violationsIn('import { HostTabBar } from "@suite/ui";')).toHaveLength(1);
+    expect(violationsIn('import type { HostTab } from "@suite/ui";')).toHaveLength(1);
+    expect(violationsIn('export { NewTabPicker } from "@suite/ui";')).toHaveLength(1);
+    expect(violationsIn('import * as chrome from "@suite/ui/chrome";')).toHaveLength(1);
+    expect(violationsIn('const chrome = await import("@suite/ui/chrome");')).toHaveLength(1);
+    expect(violationsIn('export * from "@suite/ui/chrome";')).toHaveLength(1);
+    expect(violationsIn('import { AppShell, Button } from "@suite/ui";')).toHaveLength(0);
   });
 });
