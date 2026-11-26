@@ -34,10 +34,12 @@ export interface HostTabBarProps {
     readonly homeLabel?: string;
     readonly sync?: ReactNode;
     readonly controls?: ReactNode;
+    /** A host-owned search trigger, in the bar's search zone. */
+    readonly search?: ReactNode;
     readonly onOpenSearch?: () => void;
     readonly searchPlaceholder?: string;
     readonly searchShortcut?: string;
     readonly "data-testid"?: string;
 }
-export declare function HostTabBar({ tabs, activeTabId, onActivate, onClose, onNewTab, mark, onHome, homeLabel, sync, controls, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId, }: HostTabBarProps): ReactNode;
+export declare function HostTabBar({ tabs, activeTabId, onActivate, onClose, onNewTab, mark, onHome, homeLabel, sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId, }: HostTabBarProps): ReactNode;
 //# sourceMappingURL=HostTabBar.d.ts.map
