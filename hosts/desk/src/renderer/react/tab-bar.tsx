@@ -35,10 +35,14 @@ export interface PickerBridge {
 export interface TabBarActions {
   readonly activate: (id: string) => void;
   readonly close: (id: string) => void;
+  /** The host's context menu for one tab: Set as Home, Reload, Close. */
+  readonly tabMenu: (id: string) => void;
   /** A new tab is the picker: which surface, and which document inside it. */
   readonly newTab: () => void;
   readonly home: () => void;
   readonly picker: PickerBridge;
+  /** Open the host Settings surface, optionally on one section. */
+  readonly settings: (section?: string) => void;
   readonly openCommands: () => void;
   readonly toggleSync: () => void;
 }
@@ -108,6 +112,7 @@ function TabBar({
         activeTabId={snapshot.activeTabId}
         onActivate={actions.activate}
         onClose={actions.close}
+        onTabMenu={actions.tabMenu}
         onNewTab={actions.newTab}
         mark={
           <span className="flex min-h-6 items-center gap-2">
@@ -178,10 +183,9 @@ function TabBar({
           setPickOpen(false);
           actions.picker.newScreen();
         }}
-        onOpenSettings={() => {
+        onOpenSettings={(section) => {
           setPickOpen(false);
-          // Settings has no surface yet; Home is where appearance and the catalogue live today.
-          actions.home();
+          actions.settings(section);
         }}
       />
     </>

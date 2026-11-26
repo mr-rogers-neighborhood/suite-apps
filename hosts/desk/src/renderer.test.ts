@@ -53,6 +53,15 @@ describe("the Home composition", () => {
     expect(shell).not.toContain("screens.json");
   });
 
+  it("draws Settings over the same catalogue and calls the host's theme and Home actions", () => {
+    expect(shell).toContain("function renderSettings");
+    expect(shell).toContain("renderAppsWidget(elements.settingsApps)");
+    expect(shell).toContain("api.setTheme");
+    expect(shell).toContain("api.setHomeScreen");
+    expect(shell).toContain('settingsSection = "appearance"');
+    expect(shell).not.toContain("localStorage");
+  });
+
   it("draws a row in document order and leaves its children outside the edit controls", () => {
     expect(shell).toContain("function rowTile");
     expect(shell).toContain("widget-row-track");
