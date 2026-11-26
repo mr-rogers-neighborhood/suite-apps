@@ -1,4 +1,5 @@
-import type { HostTab, SyncSituation } from "@suite/ui";
+import type { SyncSituation } from "@suite/ui";
+import type { HostTab } from "@suite/ui/chrome";
 import { createElement } from "react";
 import type { RelayView, ShellTab } from "../../shared.js";
 

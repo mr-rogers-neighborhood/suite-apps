@@ -225,7 +225,9 @@ temporary file, flushes, renames and keeps a previous copy. A corrupt envelope i
 silently replaced by a fresh document.
 
 **S6.3** The pack owns its schema, migrations and projections. It declares them in the manifest:
-`documents: [{id, format, version, mode, migrations?, projection?}]`. The host invokes a declared
+`documents: [{id, format, version, name?, mode, migrations?, projection?}]`. `name` is the display
+noun a host uses in its picker ("Canvas" and "Canvases"); it is never a path or a document id, and a
+pack that declares none gets the host's neutral "document". The host invokes a declared
 migration or projection entry with a scoped document handle and keeps the backup. It never reads the
 migrated payload.
 

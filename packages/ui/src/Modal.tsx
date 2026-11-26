@@ -37,6 +37,11 @@ export interface ModalProps {
   /** `sm` fits a confirm; `md` a form; `lg` a wizard step; `xl` a wide import or table. */
   readonly size?: "sm" | "md" | "lg" | "xl";
   readonly className?: string;
+  /**
+   * Called before Escape closes. `preventDefault()` keeps the dialog open, which is how a caller
+   * with its own levels steps back one instead of dismissing.
+   */
+  readonly onEscapeKeyDown?: (event: globalThis.KeyboardEvent) => void;
 }
 
 const SIZES = {
@@ -56,6 +61,7 @@ export function Modal({
   children,
   size = "md",
   className,
+  onEscapeKeyDown,
 }: ModalProps) {
   // Radix restores focus on close, but capture the opener explicitly as well: a caller may
   // unmount the dialog in the same render that closes it, and the explicit target survives
@@ -81,6 +87,7 @@ export function Modal({
           // assistive technology; the description, when given, is Radix's to wire up.
           {...(description === undefined ? { "aria-describedby": undefined } : {})}
           aria-modal="true"
+          onEscapeKeyDown={onEscapeKeyDown}
           onOpenAutoFocus={() => {
             restoreTo.current =
               document.activeElement instanceof HTMLElement ? document.activeElement : null;

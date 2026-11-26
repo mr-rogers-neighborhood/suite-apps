@@ -33,6 +33,33 @@ describe("Modal", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("keeps the dialog open when the caller takes Escape", () => {
+    const onClose = vi.fn();
+    render(
+      <Modal
+        open
+        onClose={onClose}
+        label="Settings"
+        onEscapeKeyDown={(event) => event.preventDefault()}
+      >
+        <p>body</p>
+      </Modal>,
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("closes when the caller's Escape handler declines to take it", () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open onClose={onClose} label="Settings" onEscapeKeyDown={() => {}}>
+        <p>body</p>
+      </Modal>,
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("gives focus to the first control, not to the page behind it", () => {
     render(
       <Modal open onClose={() => {}} label="Settings">

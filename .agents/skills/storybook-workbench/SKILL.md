@@ -39,7 +39,7 @@ Never guess a prop that the docs do not name. A story name is not a prop name.
 
 - Title paths: `Components/<Name>` for primitives, `Workbench/<Name>` for host frames, patterns
   and catalog pages, `Packs/<pack>/<Surface>` for a pack slice.
-- Tags: `pack:suite|canvas|planner|budget|help`, `layer:primitive|host|pattern|surface`, and
+- Tags: `pack:suite|canvas|planner|budget|help`, `layer:primitive|host|workbench|pattern|surface`, and
   `status:experimental|ready|deprecated`. The catalog index reads these; do not invent new facets
   without updating `stories.index.json`.
 - The preview applies the `theme` (Suite/Solarized/Warm), `mode` (light/dark) and `density`

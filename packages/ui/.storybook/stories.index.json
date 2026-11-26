@@ -698,6 +698,18 @@
       ]
     },
     {
+      "id": "components-newtabpicker--empty-pack",
+      "title": "Components/NewTabPicker",
+      "name": "Empty Pack",
+      "importPath": "src/chrome/NewTabPicker.stories.tsx",
+      "module": "packages/ui/src/chrome/NewTabPicker.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
       "id": "components-newtabpicker--first-run",
       "title": "Components/NewTabPicker",
       "name": "First Run",
@@ -719,6 +731,44 @@
         "pack:suite",
         "layer:host",
         "status:experimental"
+      ]
+    },
+    {
+      "id": "components-newtabpicker--pack-without-documents",
+      "title": "Components/NewTabPicker",
+      "name": "Pack Without Documents",
+      "importPath": "src/chrome/NewTabPicker.stories.tsx",
+      "module": "packages/ui/src/chrome/NewTabPicker.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-newtabpicker--recent-document",
+      "title": "Components/NewTabPicker",
+      "name": "Recent Document",
+      "importPath": "src/chrome/NewTabPicker.stories.tsx",
+      "module": "packages/ui/src/chrome/NewTabPicker.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-newtabpicker--second-level",
+      "title": "Components/NewTabPicker",
+      "name": "Second Level",
+      "importPath": "src/chrome/NewTabPicker.stories.tsx",
+      "module": "packages/ui/src/chrome/NewTabPicker.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental",
+        "play-fn"
       ]
     },
     {
@@ -1296,6 +1346,84 @@
         "pack:suite",
         "layer:workbench",
         "status:experimental"
+      ]
+    },
+    {
+      "id": "workbench-patterns-new-tab--default",
+      "title": "Workbench/Patterns/New tab",
+      "name": "Default",
+      "importPath": ".storybook/workbench/patterns/NewTab.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/patterns/NewTab.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:pattern",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "workbench-patterns-new-tab--empty-pack",
+      "title": "Workbench/Patterns/New tab",
+      "name": "Empty Pack",
+      "importPath": ".storybook/workbench/patterns/NewTab.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/patterns/NewTab.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:pattern",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "workbench-patterns-new-tab--first-run",
+      "title": "Workbench/Patterns/New tab",
+      "name": "First Run",
+      "importPath": ".storybook/workbench/patterns/NewTab.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/patterns/NewTab.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:pattern",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "workbench-patterns-new-tab--keyboard-only",
+      "title": "Workbench/Patterns/New tab",
+      "name": "Keyboard Only",
+      "importPath": ".storybook/workbench/patterns/NewTab.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/patterns/NewTab.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:pattern",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "workbench-patterns-new-tab--open-document-skipped",
+      "title": "Workbench/Patterns/New tab",
+      "name": "Open Document Skipped",
+      "importPath": ".storybook/workbench/patterns/NewTab.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/patterns/NewTab.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:pattern",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "workbench-patterns-new-tab--second-level",
+      "title": "Workbench/Patterns/New tab",
+      "name": "Second Level",
+      "importPath": ".storybook/workbench/patterns/NewTab.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/patterns/NewTab.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:pattern",
+        "status:experimental",
+        "play-fn"
       ]
     }
   ]

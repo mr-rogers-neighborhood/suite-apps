@@ -161,6 +161,10 @@ Recorded 2026-11-25.
 - Host-only chrome is the `@suite/ui/chrome` subpath (`HostTabBar`, `NewTabPicker`). A pack imports
   the pack-safe `@suite/ui` entry; Desk and Go import the subpath. The package exports make the
   boundary visible in review, and `src/chrome/boundary.test.ts` fails if a pack crosses it.
+- A new tab asks two questions: which surface, then which document. The picker lists the five most
+  recent documents first and opens a pack's second level when it declares documents; a pack that
+  declares none opens directly. The word for a document is the pack's (`name.singular` /
+  `name.plural` in its manifest), not the host's.
 - Signed packs are the release rule. The spike loads directory packs for development and must not
   ship as a release path.
 - A host agent is not built now. The host installs packs into its own data directory and leaves

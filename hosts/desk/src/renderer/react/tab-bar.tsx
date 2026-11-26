@@ -1,4 +1,5 @@
-import { HostTabBar, SyncPill } from "@suite/ui";
+import { SyncPill } from "@suite/ui";
+import { HostTabBar } from "@suite/ui/chrome";
 import { createRoot } from "react-dom/client";
 import { type HostBarSnapshot, syncPresentation, toHostTabs } from "./state.js";
 import "./tab-bar.css";

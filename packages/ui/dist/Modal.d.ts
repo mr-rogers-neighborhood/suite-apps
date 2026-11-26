@@ -33,6 +33,11 @@ export interface ModalProps {
     /** `sm` fits a confirm; `md` a form; `lg` a wizard step; `xl` a wide import or table. */
     readonly size?: "sm" | "md" | "lg" | "xl";
     readonly className?: string;
+    /**
+     * Called before Escape closes. `preventDefault()` keeps the dialog open, which is how a caller
+     * with its own levels steps back one instead of dismissing.
+     */
+    readonly onEscapeKeyDown?: (event: globalThis.KeyboardEvent) => void;
 }
-export declare function Modal({ open, onClose, label, header, description, footer, children, size, className, }: ModalProps): import("react").JSX.Element;
+export declare function Modal({ open, onClose, label, header, description, footer, children, size, className, onEscapeKeyDown, }: ModalProps): import("react").JSX.Element;
 //# sourceMappingURL=Modal.d.ts.map

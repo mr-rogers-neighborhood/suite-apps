@@ -81,7 +81,7 @@ duration is a `var(--token)`, never a hex, `bg-black`, `rounded-2xl`, `shadow-lg
 | `MenuBar` | The cross-app top bar in seven named zones. Takes nodes; owns no app's state. |
 | `SyncPill` | Sync state as one control: `synced`, `syncing`, `offline`, `conflict`, … |
 | `HostTabBar` | The host's tab strip, built on `MenuBar`. Import it from `@suite/ui/chrome`. |
-| `NewTabPicker` | The searchable new-tab picker. Import it from `@suite/ui/chrome`. |
+| `NewTabPicker` | The two-level new-tab picker: packs, their documents, Screens and host actions. Import it from `@suite/ui/chrome`. |
 | `PrivacyLine` | The one privacy sentence, said the same way everywhere. |
 | `menuKeys` | WAI-ARIA keyboard helpers for a `menubar` and its nested menus. |
 | `cx`, `FOCUS_RING`, `MOTION` | The class helpers a pack needs to compose its own control. |
