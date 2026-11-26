@@ -272,15 +272,23 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
             FOCUS_RING,
           )}
         >
-          <span aria-hidden="true" className="command-bar__glyph opacity-70">
-            {"\u2315"}
-          </span>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            className="command-bar__glyph h-3.5 w-3.5 shrink-0 opacity-70"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
+            <circle cx="7" cy="7" r="4.5" />
+            <path d="m10.5 10.5 3 3" />
+          </svg>
           <span className="command-bar__label min-w-0 flex-1 truncate text-left">
-            {searchPlaceholder}
+            {searchPlaceholder}{" "}
+            <kbd className="command-bar__key rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
+              {searchShortcut}
+            </kbd>
           </span>
-          <kbd className="command-bar__key rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
-            {searchShortcut}
-          </kbd>
         </button>
       ) : null}
 
