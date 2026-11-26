@@ -118,14 +118,19 @@ host.
 
 ## Installing, updating and removing a pack
 
-Home's `desk.apps` widget shows installed packs and the catalogue together. The catalogue has two
-sources, and the widget names the one in use. The local directory is `.suitepack` files under
-`<dataRoot>/catalogue` (or `SUITE_DESK_CATALOGUE`). The published index is
+The catalogue has two sources, and the Apps widget names the one in use. The local directory is
+`.suitepack` files under `<dataRoot>/catalogue` (or `SUITE_DESK_CATALOGUE`). The published index is
 `https://flatpak.suite.run/index.json` (or `SUITE_DESK_INDEX`), fetched at launch and verified
 against the operator key pinned in `packages/pack/src/pinnedKey.ts`, which both hosts import. The
 pin is a compile-time constant, never a value the index supplies. An index entry is listed only
-after the index verified;
-the archive it names is still read and verified before it is listed, and again before install.
+after the index verified; the archive it names is still read and verified before it is listed, and
+again before install.
+
+The catalogue lives in the host's **Apps** widget: add it to any Screen from **Edit**. A trusted
+entry offers **Install**, **Update** or **Reinstall** as its state requires; a refused entry stays
+visible with the sentence that explains it and cannot be installed. A `.suitepack` file can also be
+opened on its own. Removing a pack leaves its documents and files on disk until the person removes
+them.
 
 The index refusals are named, not silent: an index changed after signing, an unsigned index, an
 index signed by an operator key this host does not pin, an expired index, a lower `sequence` than
@@ -291,12 +296,19 @@ its tabs read as pack tabs. Old tabs are not dropped or rewritten on read.
 
 ## Home and Screens
 
-Home is the host's own Screen, `desk-home`, stored at `<dataRoot>/screens/desk-home.loro`. It is
-created and opened before any pack view exists, its tab is first in the strip, and it is the active
-tab on a first run. The brand and the `+` button open Home again, so closing it is safe. A restored
-space document keeps its active tab; Home is still added at the front.
+Home is the host's own Screen, `desk-home`, stored at `<dataRoot>/screens/desk-home.loro`. It is a
+role, not a permanent tab: launch restores the saved session, and the brand and the `+` button open
+Home again, so closing its tab is safe. A fresh data root shows the first-run wizard instead; its
+last step opens Home. A Home that has never been edited is empty and offers **Open** (the first
+installed app, preferring Canvas), **Create a document** and **Choose an app**.
 
-The composition is the same content area the launcher used to fill:
+The first-run wizard is host chrome from `@suite/ui/chrome`. It selects every trusted catalogue app
+by default, chooses palette, brightness and density, and installs the selection concurrently through
+the same verified installer the catalogue uses. Its choice is the install consent, so it asks once
+rather than once per app. Completion is recorded at `<dataRoot>/onboarding.json`; a missing,
+unreadable or older record repeats the wizard. **Skip choosing for now** goes straight to Home.
+
+The composition is the same content area the launcher used to fill. A composed Home looks like this:
 
 ```json
 {
@@ -305,7 +317,6 @@ The composition is the same content area the launcher used to fill:
   "id": "desk-home",
   "name": "Home",
   "widgets": [
-    { "registryId": "desk.apps", "size": "full" },
     {
       "kind": "row",
       "size": "full",
@@ -325,10 +336,12 @@ hidden, which exposes the chrome's composition; switching to a pack tab shows th
 hides the composition. Closing the last tab shows an empty state with one way back to Home, not a
 second copy of the pack grid.
 
-`desk.apps` is a **host widget**, not a `SuiteWidget` descriptor: it lives in a host table keyed by
-registry id and has no capture action or app behind it. It draws the installed-pack grid, the search
-field, the local catalogue and **Add pack…** — the launcher's content, now inside Home. Host widgets
-are resolved first, so an installed pack cannot shadow `desk.apps`.
+`desk.apps` is an optional **host widget**, not a `SuiteWidget` descriptor: it lives in a host table
+keyed by registry id and has no capture action or app behind it. It draws the installed-pack grid,
+the search field, the local catalogue and **Add pack…**. A new Home does not include it, and launch
+removes the old default placement from Home, because the picker and the catalogue are host surfaces
+rather than a widget the person has to dismiss. It can still be added to any Screen from **Edit**.
+Host widgets are resolved first, so an installed pack cannot shadow `desk.apps`.
 
 App widgets come from `widgets` in each installed pack manifest, resolved through
 `@suite/screens`'s registry as `<pack id>.<widget id>`. The host draws the declared title, fields and

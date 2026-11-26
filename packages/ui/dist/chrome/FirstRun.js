@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../Button.js";
 import { cx } from "../cx.js";
 import { PackCard } from "./PackCard.js";
@@ -47,11 +47,23 @@ function InstallList({ packs, rows, }) {
 }
 export function FirstRun({ packs, theme, onThemeChange, onInstall, onComplete, initialStep = "apps", initialSelected, initialRows, }) {
     const [step, setStep] = useState(initialStep);
-    const [selected, setSelected] = useState(() => new Set(initialSelected ?? packs.map((pack) => pack.id)));
+    const [selected, setSelected] = useState(() => new Set(initialSelected ?? []));
+    /**
+     * The host can mount the wizard before its catalogue scan answers, so the pack list may
+     * arrive on a later paint. Until the person touches the selection, every pack that appears
+     * is chosen; a card they clicked stays their answer.
+     */
+    const [followPacks, setFollowPacks] = useState(initialSelected === undefined);
     const [rows, setRows] = useState(initialRows ?? []);
     const [busy, setBusy] = useState(false);
+    useEffect(() => {
+        if (!followPacks)
+            return;
+        setSelected(new Set(packs.map((pack) => pack.id)));
+    }, [followPacks, packs]);
     const chosen = packs.filter((pack) => selected.has(pack.id));
     function toggle(id) {
+        setFollowPacks(false);
         setSelected((current) => {
             const next = new Set(current);
             if (next.has(id))
@@ -99,6 +111,7 @@ export function FirstRun({ packs, theme, onThemeChange, onInstall, onComplete, i
     }
     const finished = rows.length > 0 && rows.every((row) => row.state === "installed");
     return (_jsxs("div", { className: "mx-auto flex h-[720px] w-full max-w-[1240px] flex-col overflow-hidden rounded-xl border border-[var(--hairline)] bg-[var(--canvas)] text-[var(--ink)] shadow-[var(--shadow-xl)]", children: [_jsxs("div", { className: "flex items-center justify-between border-b border-[var(--hairline)] px-6 py-4", children: [_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("span", { "aria-hidden": "true", className: "flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent)]", children: _jsx("span", { className: "h-2.5 w-2.5 rotate-45 bg-[var(--on-accent)]" }) }), _jsx("span", { className: "text-[length:var(--text-title,15px)]", children: "Suite" })] }), _jsx(StepRail, { step: step })] }), _jsxs("main", { className: "min-h-0 flex-1 overflow-auto px-8 py-8", children: [step === "apps" ? (_jsxs("div", { className: "mx-auto max-w-[760px]", children: [_jsx("h1", { className: "text-[length:var(--text-display,34px)]", children: "Welcome to Suite." }), _jsx("p", { className: "mt-3 max-w-[62ch] text-[length:var(--text-body,13px)] leading-relaxed text-[var(--ink-muted)]", children: "Suite is a home for small apps that keep their files on your device. Choose the ones you want now; you can add or remove them later." }), _jsx("div", { className: "mt-6 grid gap-2 sm:grid-cols-2", children: packs.map((pack) => (_jsx(PackCard, { name: pack.name, ...(pack.description === undefined ? {} : { description: pack.description }), status: pack.status ?? "available", ...(pack.version === undefined ? {} : { version: pack.version }), selected: selected.has(pack.id), onSelect: () => toggle(pack.id) }, pack.id))) }), _jsxs("div", { className: "mt-6 flex flex-wrap items-center gap-2", children: [_jsx(Button, { variant: "primary", onClick: () => setStep("appearance"), children: "Continue" }), _jsx(Button, { variant: "ghost", onClick: () => {
+                                            setFollowPacks(false);
                                             setSelected(new Set());
                                             setStep("appearance");
                                         }, children: "Skip choosing for now" }), _jsx("span", { className: "text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: chosen.length === 0 ? "No apps selected" : `${chosen.length} selected` })] })] })) : null, step === "appearance" ? (_jsxs("div", { className: "mx-auto max-w-[860px]", children: [_jsx("h1", { className: "text-[length:var(--text-display,34px)]", children: "Make it yours." }), _jsx("p", { className: "mt-3 max-w-[62ch] text-[length:var(--text-body,13px)] leading-relaxed text-[var(--ink-muted)]", children: "Pick a palette, a brightness and how much room controls get. The apps follow the host, so this choice is the one every app opens in." }), _jsx("div", { className: "mt-6", children: _jsx(Appearance, { theme: theme, onThemeChange: onThemeChange }) }), _jsxs("div", { className: "mt-6 flex flex-wrap gap-2", children: [_jsx(Button, { variant: "primary", onClick: startInstall, children: chosen.length === 0

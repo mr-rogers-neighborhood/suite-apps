@@ -44,7 +44,7 @@ import { DocumentMigrations, findDocument } from "./documentMigrations.js";
 import { DocumentStore, declaredDocumentSchemaVersion } from "./documents.js";
 import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
-import { openHomeScreen } from "./home.js";
+import { migrateHome } from "./home.js";
 import { catalogueIndexUrlFor, loadCatalogueIndex } from "./indexTrust.js";
 import {
   checkPackArchive,
@@ -366,14 +366,14 @@ async function bootstrap(): Promise<void> {
   await refreshPacks();
   await migrateLegacyConsentRecords();
   spaceStore = await SpaceStore.open(join(dataRoot, "spaces.loro"));
-  // The host's own Screens. Home is created here and opened before any pack view
-  // exists, so the first window a person sees is the host's composition rather
-  // than an empty launcher.
+  // The host's own Screens. Home is a role, so launch does not force a Home tab: a restored
+  // session keeps the tabs it saved, and a fresh data root shows the first-run wizard instead.
+  // Opening Home is the Suite mark, the picker, or the wizard's last step.
   screenStore = await ScreenSet.open({
     directory: join(dataRoot, "screens"),
     indexFile: join(dataRoot, SCREENS_INDEX_FILENAME),
   });
-  await openHomeScreen(screenStore, spaceStore);
+  await migrateHome(screenStore);
   // One store per (container, pack) under the publisher's root. This is host
   // data, deliberately separate from the pack's code root.
   const fileService = new PackFilesService(join(dataRoot, "files"));
@@ -2073,8 +2073,11 @@ async function installFirstRunPack(id: string): Promise<FirstRunInstallResult> {
 /** Record that the person finished the first-run wizard and show the chrome. */
 async function completeFirstRun(): Promise<void> {
   await completeOnboarding(dataRootFor());
-  firstRun = false;
+  // The wizard covers the chrome, so Home can be opened behind it; the completion paint
+  // then reveals an empty Home instead of the launcher in the same frame.
+  await window?.openHome().catch(() => undefined);
   window?.setFirstRun(false);
+  firstRun = false;
 }
 
 /**

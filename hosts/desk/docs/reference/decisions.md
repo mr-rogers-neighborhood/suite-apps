@@ -217,14 +217,15 @@ The rules that shape the Suite host.
 - The host renders pack-declared contributions: commands, menus, toolbar items, status items,
   keybindings and widgets. Contributions are data, not DOM. The host validates and renders them.
 - A pack owns only its content. It never renders into host chrome, and the host never imports pack UI.
-- Theme is host state, not pack state. Suite Desk owns the preset and brightness on desktop (Suite
-  Go owns them on mobile), stores the pair at `<dataRoot>/theme.json`, and paints every pack view with
-  the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A pack has no
-  picker and no stored choice; a change repaints open views through `ShellWindow.setTheme` and a pack
-  installed later starts in the same theme. The two controls are in the **View** menu: light, dark or
-  follow-the-system, and Suite, Warm or Solarized. `logseq` is kept as a stored-id alias for `warm`, so
-  an old selection resolves to the warm palette rather than to a missing theme. Per-pack palettes and
-  user-authored themes remain out of scope.
+- Theme is host state, not pack state. Suite Desk owns the preset, brightness and density on desktop
+  (Suite Go owns them on mobile), stores the choice at `<dataRoot>/theme.json`, and paints every pack
+  view with the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A
+  pack has no picker and no stored choice; a change repaints open views through
+  `ShellWindow.setTheme` and a pack installed later starts in the same theme. The controls are in the
+  **View** menu — light, dark or follow-the-system, Suite, Warm or Solarized, and compact, cozy or
+  comfortable — and in the first-run wizard's appearance step. `logseq` is kept as a stored-id alias
+  for `warm`, so an old selection resolves to the warm palette rather than to a missing theme.
+  Per-pack palettes and user-authored themes remain out of scope.
 - A shared component kit is optional, not a requirement; Canvas must be able to be a canvas.
 - Documents are first-class in the launcher and recents, but tabs are app sessions. The host indexes
   metadata and opens the owning pack through a deep link. Recents are local; space entries are
@@ -248,17 +249,26 @@ The rules that shape the Suite host.
 ## Home and Screens
 
 - Home is a Screen named Home (`desk-home`), the host's own Loro document at
-  `<dataRoot>/screens/desk-home.loro`. It is created and opened before any pack view exists, first in
-  the tab strip, and active on a first run. The brand and `+` open it again, so closing its tab is
-  safe. A restored session keeps its own active tab and gains Home at the front.
+  `<dataRoot>/screens/desk-home.loro`. It is a role, not a permanent tab: launch restores the saved
+  session, and the brand and `+` open it again, so closing its tab is safe. A fresh data root shows
+  the first-run wizard; its last step opens Home. A Home that has never been edited is empty and
+  offers the first installed app, **Create a document** and **Choose an app**.
+- The first-run wizard is host chrome, not a pack and not a Screen. It lists the trusted catalogue,
+  selects every app by default, chooses palette, brightness and density, and installs the selected
+  apps concurrently. Completion is recorded per data root at `<dataRoot>/onboarding.json`; a
+  missing, unreadable or older record repeats the wizard, and only a completed record reveals the
+  chrome. The wizard's explicit selection is the install consent, so it calls the same verified
+  installer without a second per-app dialog.
 - A screen tab is host chrome. It creates no `WebContentsView`; activating one hides every pack view,
   which exposes the chrome's composition in the same content area. A pack tab hides the composition
   and shows that pack's view. Closing the last tab shows an empty state, not a second copy of the
   pack grid.
-- The host widget table belongs to the host and is keyed by registry id. `desk.apps` is host chrome:
-  it has no capture action and no app behind it, and it draws the installed-pack grid, the local
-  catalogue and **Add pack…**. Host widgets resolve before the pack registry, so an installed pack
-  cannot shadow `desk.apps`.
+- The host widget table belongs to the host and is keyed by registry id. `desk.apps` is optional host
+  chrome: it has no capture action and no app behind it, and it draws the installed-pack grid, the
+  local catalogue and **Add pack…**. A new Home does not include it, and launch removes the old
+  default placement, because the picker and the catalogue are host surfaces rather than a widget the
+  person has to dismiss. It remains addable from **Edit**. Host widgets resolve before the pack
+  registry, so an installed pack cannot shadow `desk.apps`.
 - App widgets are declared by installed pack manifests (`widgets`) and resolved through
   `@suite/screens` as `<pack id>.<widget id>`. The host draws the declared title, fields and resolved
   settings with its own components; the pack supplies data, never DOM. An unknown registry id is a

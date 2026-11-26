@@ -1224,22 +1224,22 @@ function renderWidgets(view) {
         ),
       );
       const actions = element("div", "home-empty-actions");
+      const packs = state.packs ?? [];
+      const first = packs.find((pack) => pack.id === "canvas") ?? packs[0] ?? null;
       actions.append(
         actionButton(
-          "Open a pack",
-          () => {
-            shouldFocusSearch = true;
-            run(api.newTab());
-          },
+          first === null ? "Open an app" : `Open ${first.name}`,
+          first === null ? () => run(api.newTab()) : () => run(api.openPack(first.id)),
           "action-primary",
         ),
       );
       actions.append(
-        actionButton("Add a widget", () => {
-          editing = true;
-          paint();
-        }),
+        actionButton(
+          "Create a document",
+          first === null ? () => run(api.newTab()) : () => run(api.newDocument(first.id)),
+        ),
       );
+      actions.append(actionButton("Choose an app", () => run(api.newTab())));
       empty.append(actions);
       fragment.append(empty);
     } else {

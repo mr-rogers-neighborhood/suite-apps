@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Density, ThemeMode } from "@suite/theme";
 import { Button } from "../Button.js";
 import { cx } from "../cx.js";
@@ -286,14 +286,26 @@ export function FirstRun({
 }: FirstRunProps) {
   const [step, setStep] = useState<FirstRunStep>(initialStep);
   const [selected, setSelected] = useState<ReadonlySet<string>>(
-    () => new Set(initialSelected ?? packs.map((pack) => pack.id)),
+    () => new Set(initialSelected ?? []),
   );
+  /**
+   * The host can mount the wizard before its catalogue scan answers, so the pack list may
+   * arrive on a later paint. Until the person touches the selection, every pack that appears
+   * is chosen; a card they clicked stays their answer.
+   */
+  const [followPacks, setFollowPacks] = useState(initialSelected === undefined);
   const [rows, setRows] = useState<readonly FirstRunRow[]>(initialRows ?? []);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!followPacks) return;
+    setSelected(new Set(packs.map((pack) => pack.id)));
+  }, [followPacks, packs]);
 
   const chosen = packs.filter((pack) => selected.has(pack.id));
 
   function toggle(id: string) {
+    setFollowPacks(false);
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -396,6 +408,7 @@ export function FirstRun({
               <Button
                 variant="ghost"
                 onClick={() => {
+                  setFollowPacks(false);
                   setSelected(new Set());
                   setStep("appearance");
                 }}
