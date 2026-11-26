@@ -69,13 +69,23 @@ function TabBar({
           onClick={actions.openCommands}
           className="flex h-7 w-56 shrink-0 items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas)]"
         >
-          <span aria-hidden="true" className="opacity-70">
-            {"\u2315"}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            className="h-3.5 w-3.5 shrink-0 opacity-70"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
+            <circle cx="7" cy="7" r="4.5" />
+            <path d="m10.5 10.5 3 3" />
+          </svg>
+          <span className="min-w-0 flex-1 truncate text-left">
+            {SEARCH_PLACEHOLDER}{" "}
+            <kbd className="rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
+              {SEARCH_SHORTCUT}
+            </kbd>
           </span>
-          <span className="min-w-0 flex-1 truncate text-left">{SEARCH_PLACEHOLDER}</span>
-          <kbd className="rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
-            {SEARCH_SHORTCUT}
-          </kbd>
         </button>
       }
       sync={
