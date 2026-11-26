@@ -55,7 +55,7 @@ function TabBar({
       }
       onHome={actions.newTab}
       homeLabel="Home"
-      controls={
+      search={
         <button
           type="button"
           data-testid="command-bar"

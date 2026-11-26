@@ -40,6 +40,8 @@ export interface HostTabBarProps {
   readonly homeLabel?: string;
   readonly sync?: ReactNode;
   readonly controls?: ReactNode;
+  /** A host-owned search trigger, in the bar's search zone. */
+  readonly search?: ReactNode;
   readonly onOpenSearch?: () => void;
   readonly searchPlaceholder?: string;
   readonly searchShortcut?: string;
@@ -57,6 +59,7 @@ export function HostTabBar({
   homeLabel = "Home",
   sync,
   controls,
+  search,
   onOpenSearch,
   searchPlaceholder,
   searchShortcut,
@@ -219,6 +222,7 @@ export function HostTabBar({
       {...(mark === undefined ? {} : { mark })}
       {...(onHome === undefined ? {} : { onNavigateHome: onHome, homeAriaLabel: homeLabel })}
       navigation={navigation}
+      {...(search === undefined ? {} : { search })}
       {...(onOpenSearch === undefined ? {} : { onOpenSearch })}
       {...(searchPlaceholder === undefined ? {} : { searchPlaceholder })}
       {...(searchShortcut === undefined ? {} : { searchShortcut })}
