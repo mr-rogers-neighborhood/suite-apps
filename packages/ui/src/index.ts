@@ -25,6 +25,12 @@
  */
 export { AppMark, type AppMarkProps, type AppMarkSize } from "./AppMark.js";
 export {
+  NewTabPicker,
+  type NewTabPack,
+  type NewTabPickerProps,
+  type NewTabScreen,
+} from "./chrome/NewTabPicker.js";
+export {
   HostTabBar,
   type HostTab,
   type HostTabBarProps,
