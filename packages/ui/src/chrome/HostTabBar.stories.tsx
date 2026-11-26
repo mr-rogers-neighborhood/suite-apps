@@ -36,6 +36,7 @@ const tabs: HostTab[] = [
 const meta = {
   title: "Components/HostTabBar",
   component: HostTabBar,
+  tags: ["pack:suite", "layer:host", "status:experimental"],
   args: {
     tabs,
     activeTabId: "canvas",

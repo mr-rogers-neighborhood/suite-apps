@@ -1,0 +1,136 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+import index from "../stories.index.json";
+
+export const stories = index.stories;
+
+export const facets = (prefix) => {
+  const counts = new Map();
+  for (const story of stories) {
+    for (const tag of story.tags) {
+      if (!tag.startsWith(`${prefix}:`)) continue;
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((left, right) => right[1] - left[1]);
+};
+
+export const groups = () => {
+  const map = new Map();
+  for (const story of stories) {
+    const rows = map.get(story.title) ?? [];
+    rows.push(story);
+    map.set(story.title, rows);
+  }
+  return [...map.entries()];
+};
+
+export const facetOf = (story, prefix) =>
+  story.tags.find((tag) => tag.startsWith(`${prefix}:`)) ?? `${prefix}:unknown`;
+
+export const label = (tag) => tag.slice(tag.indexOf(":") + 1);
+
+<Meta title="Workbench/Library" />
+
+# Component library
+
+This page is generated from the story files by `scripts/index-stories.mjs`. It is the catalog, not
+a second hand-written list: a story without a home here is a story without the right tags.
+
+The workbench is one place for the shared primitives, the host chrome, the task patterns and the
+pack surfaces. It is the design system's preview and the place a screen is drawn before it is wired
+into Desk or Go.
+
+## Facets
+
+<div className="grid gap-4 sm:grid-cols-3">
+  <div>
+    <h3>Pack</h3>
+    <ul>
+      {facets("pack").map(([tag, count]) => (
+        <li key={tag}>
+          <code>{label(tag)}</code> · {count}
+        </li>
+      ))}
+    </ul>
+  </div>
+  <div>
+    <h3>Layer</h3>
+    <ul>
+      {facets("layer").map(([tag, count]) => (
+        <li key={tag}>
+          <code>{label(tag)}</code> · {count}
+        </li>
+      ))}
+    </ul>
+  </div>
+  <div>
+    <h3>Status</h3>
+    <ul>
+      {facets("status").map(([tag, count]) => (
+        <li key={tag}>
+          <code>{label(tag)}</code> · {count}
+        </li>
+      ))}
+    </ul>
+  </div>
+</div>
+
+## Status
+
+- **ready** — the component is safe to use and a breaking change needs a migration note.
+- **experimental** — it exists and is being used, but the API can still move.
+- **deprecated** — it is on the way out; the story or the note names the replacement.
+
+A block is done when it has a story, a `play` test where it interacts, axe green, a local
+screenshot, and a short keyboard/screen-reader note. The checklist lives in
+`packages/ui/AGENTS.md`.
+
+## Stories
+
+{groups().map(([title, rows]) => (
+  <section key={title}>
+    <h3>{title}</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Story</th>
+          <th>Pack</th>
+          <th>Layer</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((story) => (
+          <tr key={story.id}>
+            <td>
+              <a href={`?path=/story/${story.id}`}>{story.name}</a>
+            </td>
+            <td><code>{label(facetOf(story, "pack"))}</code></td>
+            <td><code>{label(facetOf(story, "layer"))}</code></td>
+            <td><code>{label(facetOf(story, "status"))}</code></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+))}
+
+## Patterns
+
+Patterns are task-shaped pages that compose components. They live beside the stories as MDX:
+
+- **New tab** — the searchable picker, its keyboard model and its empty states.
+- **Home** — what a person lands on, and what a Screen and a pack each own.
+- **Settings** — appearance, packs, sync, backups and the advanced trust controls.
+- **Sync** — one panel for start, stop, address, code and the relay's state.
+- **First run** — an empty workbench with a clear next action.
+
+Each page says when to use the pattern, its anatomy, its content, its keyboard model and the
+accessibility notes. A pattern is not a new component; it is a decision about the components we
+already have.
+
+## Related
+
+- `docs/reference/menu-bar.md` owns the cross-app bar.
+- `packages/ui/README.md` owns the package's API and token rules.
+- The Storybook MCP endpoint is `http://localhost:6007/mcp` while the workbench is running.
