@@ -60,8 +60,8 @@ const DECODER = new TextDecoder();
  *
  * `primary` is the pack's own end-to-end suite: the one that mounts the pack
  * the way the host does. `phone` is the suite that asserts the phone layout.
- * Canvas has no phone-layout test yet (#387); that absence is a fact to report,
- * not something to invent here.
+ * Canvas has mobile CSS but no automated phone-layout test; that absence is a
+ * fact to report, not something to invent here.
  */
 export const READINESS_PACKS = [
   {
@@ -101,6 +101,7 @@ export const READINESS_PACKS = [
     devDir: "packs/canvas/.dev",
     primary: ["src/PackRender.test.tsx"],
     phone: [],
+    phoneAbsent: "no automated phone test; CSS-only, needs the #358 pass",
     needsContent: false,
   },
   {
@@ -256,16 +257,14 @@ function testLabel(result, absent = "absent") {
  */
 export function formatMatrix(rows) {
   const lines = [
-    "| App | Version | Capabilities | Contributions | Files | Signature | Shape | Launch | Install/remove | Primary path | Phone smoke |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| App | Version | Capabilities | Optional / conditional | Contributions | Files | Signature | Shape | Launch metadata | Install/remove | Primary path | Phone smoke |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
   for (const row of rows) {
-    const capabilities = [
-      ...row.capabilities,
-      ...row.optionalCapabilities.map((capability) => `${capability}?`),
-    ].join(", ") || "none";
+    const capabilities = row.capabilities.join(", ") || "none";
+    const optional = row.optionalCapabilities.join(", ") || "none";
     lines.push(
-      `| ${row.app} | ${row.version} | ${capabilities} | ${row.contributions} | ${row.fileCount} | ` +
+      `| ${row.app} | ${row.version} | ${capabilities} | ${optional} | ${row.contributions} | ${row.fileCount} | ` +
         `${status(row.signature)} | ${status(row.shape)} | ${status(row.launch)} | ` +
         `${status(row.install)} | ${testLabel(row.primary)} | ` +
         `${testLabel(row.phone, row.phoneAbsent ?? "absent")} |`,
@@ -550,7 +549,8 @@ async function checkPack(pack, { noBuild, quiet = false }) {
     install: false,
     primary: { ok: false, files: pack.primary.length, tests: 0, passed: 0 },
     phone: { ok: pack.phone.length === 0, files: pack.phone.length, tests: 0, passed: 0 },
-    phoneAbsent: pack.phone.length === 0 ? "absent (#387)" : "absent",
+    phoneAbsent:
+      pack.phoneAbsent ?? (pack.phone.length === 0 ? "no automated phone test" : "absent"),
     build: { ok: true, detail: "reused" },
     installDetail: "",
     testDetail: "",

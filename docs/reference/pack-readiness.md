@@ -41,14 +41,17 @@ has no versions.
 ## The matrix
 
 The command prints one row per app. A run looks like this; `<version>` is whatever the source
-manifest currently says, so the manifest stays the one home for the number.
+manifest currently says, so the manifest stays the one home for the number. `Capabilities` is the
+signed manifest's required list; `Optional / conditional` is its `optionalCapabilities` list. An
+optional capability is not a question mark on the required list: it is a declared extra that the
+host may or may not serve, and it never blocks install.
 
 ```text
-| App | Version | Capabilities | Contributions | Files | Signature | Shape | Launch | Install/remove | Primary path | Phone smoke |
-| budget | <version> | documents, files | none | 6 | ok | ok | ok | ok | ok (1 file, 1/1 tests) | ok (1 file, 6/6 tests) |
-| planner | <version> | documents, files, notifications, recents, relay?, commands? | commands:3, providers:2 | 18 | ok | ok | ok | ok | ok (1 file, 1/1 tests) | ok (5 files, 55/55 tests) |
-| canvas | <version> | documents, files, recents, relay? | none | 465 | ok | ok | ok | ok | ok (1 file, 1/1 tests) | absent (#387) |
-| help | <version> | none | none | 547 | ok | ok | ok | ok | ok (2 files, 8/8 tests) | ok (1 file, 2/2 tests) |
+| App | Version | Capabilities | Optional / conditional | Contributions | Files | Signature | Shape | Launch metadata | Install/remove | Primary path | Phone smoke |
+| budget | <version> | documents, files | none | none | 6 | ok | ok | ok | ok | ok (1 file, 1/1 tests) | ok (1 file, 6/6 tests) |
+| planner | <version> | documents, files, notifications, recents | relay, commands | commands:3, providers:2 | 18 | ok | ok | ok | ok | ok (1 file, 1/1 tests) | ok (5 files, 55/55 tests) |
+| canvas | <version> | documents, files, recents | relay | none | 465 | ok | ok | ok | ok | ok (1 file, 1/1 tests) | no automated phone test; CSS-only, needs the #358 pass |
+| help | <version> | none | none | none | 547 | ok | ok | ok | ok | ok (2 files, 8/8 tests) | ok (1 file, 2/2 tests) |
 ```
 
 The file counts are build facts and change with the source. They are here to show that an archive
@@ -61,7 +64,8 @@ carries its whole payload, not only an entry page.
 | Fact | Evidence |
 | --- | --- |
 | Artifact | `packs/budget/.dev/budget-<version>.suitepack`, built by `pnpm budget:pack`; version from [its manifest](../../packs/budget/pack/manifest.json) |
-| Signature | `SUITE_PACK_PUBLIC_KEY`, `.sha256` sidecar and every payload hash; entry CSP and module script |
+| Signature | `SUITE_PACK_PUBLIC_KEY`, `.sha256` sidecar and every payload hash |
+| Launch metadata | The entry has a CSP naming `default-src 'self'` and `connect-src 'self'` and a module script; this is not a rendered window |
 | Install/remove | Desk's verified path; installed tree, manifest and hashes checked; removal leaves no version and a clean scan |
 | Primary path | [`packs/budget/pack/src/PackRender.test.tsx`](../../packs/budget/pack/src/PackRender.test.tsx): a budget opens through the launcher, an edit is flushed, the export is a `.budget` file and the re-import carries the edit |
 | Export/import | The pack writes the host picker's `.budget` file and re-imports it as a second document |
@@ -74,7 +78,8 @@ carries its whole payload, not only an entry page.
 | Fact | Evidence |
 | --- | --- |
 | Artifact | `packs/planner/.dev/planner-<version>.suitepack`, built by `pnpm planner:pack`; version from [its manifest](../../packs/planner/pack/manifest.json) |
-| Signature | `SUITE_PACK_PUBLIC_KEY`, `.sha256` sidecar and every payload hash; entry CSP and module script |
+| Signature | `SUITE_PACK_PUBLIC_KEY`, `.sha256` sidecar and every payload hash |
+| Launch metadata | The entry has a CSP naming `default-src 'self'` and `connect-src 'self'` and a module script; this is not a rendered window |
 | Install/remove | Desk's verified path; the installed view carries the optional `relay` and `commands` capabilities and the command/scope providers |
 | Primary path | [`packs/planner/pack/src/PackRender.test.tsx`](../../packs/planner/pack/src/PackRender.test.tsx): the pack boots from the host, writes a task and a day page, then re-imports its own export |
 | Export/import | The pack writes a `.planner` workspace file and re-imports the same content |
@@ -87,20 +92,22 @@ carries its whole payload, not only an entry page.
 | Fact | Evidence |
 | --- | --- |
 | Artifact | `packs/canvas/.dev/canvas-<version>.suitepack`, built by `pnpm canvas:pack`; version from [its manifest](../../packs/canvas/pack/manifest.json) |
-| Signature | `SUITE_PACK_PUBLIC_KEY`, `.sha256` sidecar and every payload hash; entry CSP and module script |
+| Signature | `SUITE_PACK_PUBLIC_KEY`, `.sha256` sidecar and every payload hash |
+| Launch metadata | The entry has a CSP naming `default-src 'self'` and `connect-src 'self'` and a module script; this is not a rendered window |
 | Install/remove | Desk's verified path; the installed view keeps the optional `relay` capability |
 | Primary path | [`packs/canvas/pack/src/PackRender.test.tsx`](../../packs/canvas/pack/src/PackRender.test.tsx): a board opens from the host envelope, an edit reaches the document, the `.canvas` export re-imports with the same card |
 | Export/import | The whole canvas export envelope, images included, crosses the host unchanged |
-| Phone smoke | Absent. Mobile layout is Canvas's own job (#387); only the manifest's `mobile` declaration is tested today |
-| Intentionally absent | No relay service, so collaboration is unavailable in the pack; `relay` is optional and the pack shows the local-only state |
-| #358 still owns | Install the release archive, launch it, create a board and card, add an image, export and re-import, and test a real phone once #387 lands |
+| Phone smoke | No automated phone test; the mobile layout is CSS-only and needs the #358 pass |
+| Intentionally absent | No relay service, so collaboration is unavailable in the pack; `relay` is optional and the pack shows the local-only state; no automated phone-layout test |
+| #358 still owns | Install the release archive, launch it, create a board and card, add an image, export and re-import, and test the CSS-only phone layout on a real device |
 
 ### Help
 
 | Fact | Evidence |
 | --- | --- |
 | Artifact | `packs/help/.dev/help-<version>.suitepack`, built by `pnpm help:pack`; version from [its manifest](../../packs/help/pack/manifest.json) |
-| Signature | `SUITE_PACK_PUBLIC_KEY`, `.sha256` sidecar and every payload hash; entry CSP and module script |
+| Signature | `SUITE_PACK_PUBLIC_KEY`, `.sha256` sidecar and every payload hash |
+| Launch metadata | The entry has a CSP naming `default-src 'self'` and `connect-src 'self'` and a module script; this is not a rendered window |
 | Install/remove | Desk's verified path; the archive carries the generated index and compiled handbook pages |
 | Primary path | [`PackExplorer.test.tsx`](../../packs/help/pack/src/PackExplorer.test.tsx) and [`Handbook.test.tsx`](../../packs/help/pack/src/Handbook.test.tsx): the explorer renders from the bundled data, searches the handbook and renders an article |
 | Export/import | Not applicable: Help is read-only and has no document or export path |
@@ -131,5 +138,6 @@ installed archive: only the pack's own suite and a person's window pass do that.
   root, with the host's trust prompt.
 - Each pack launched in a real window, not only mounted in jsdom.
 - A real phone: 44px targets, TalkBack reading order, and the absence of hover-only controls.
-- Canvas's mobile layout, which does not exist yet (#387).
+- Canvas's mobile layout: the CSS exists, but there is no automated phone-layout test, so a person
+  must do the device pass.
 - Help's manual handbook read and the stale shell proof above.

@@ -183,19 +183,22 @@ describe("the pack readiness command", () => {
         tests: pack.phone.length,
         passed: pack.phone.length,
       },
-      phoneAbsent: pack.phone.length === 0 ? "absent (#387)" : "absent",
+      phoneAbsent:
+        pack.phoneAbsent ?? (pack.phone.length === 0 ? "no automated phone test" : "absent"),
     }));
     const table = formatMatrix(rows);
     const lines = table.split("\n");
     assert.equal(lines.length, 6, "a header, a divider and four rows");
+    assert.match(lines[0] ?? "", /Optional \/ conditional/u);
+    assert.match(lines[0] ?? "", /Launch metadata/u);
     assert.match(lines[0] ?? "", /Signature/u);
-    assert.match(lines[0] ?? "", /Launch/u);
     assert.match(lines[0] ?? "", /Install\/remove/u);
     assert.match(lines[0] ?? "", /Phone smoke/u);
     assert.match(lines[2] ?? "", /^\| budget /u);
     assert.match(lines[3] ?? "", /^\| planner /u);
     assert.match(lines[4] ?? "", /^\| canvas /u);
     assert.match(lines[5] ?? "", /^\| help /u);
-    assert.match(lines[4] ?? "", /absent \(#387\)/u);
+    assert.match(lines[4] ?? "", /no automated phone test; CSS-only, needs the #358 pass/u);
+    assert.doesNotMatch(lines[4] ?? "", /#387/u);
   });
 });
