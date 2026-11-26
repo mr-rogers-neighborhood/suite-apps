@@ -53,6 +53,8 @@ export interface SyncInfo {
   readonly contacts: readonly SyncContact[];
   /** The SHA-256 fingerprint this workspace pins for its relay certificate. */
   readonly fingerprint?: string | null;
+  /** The relay address this device last used, when the host can name one. */
+  readonly relayUrl?: string | null;
   /** What this device has said about its way back in; null until anybody asked. */
   readonly kit?: "made" | "declined" | null;
   /** What arrived while the workspace was closed, or null before any session record. */

@@ -1223,6 +1223,15 @@ importers:
       '@iconify-json/lucide':
         specifier: ^1.2.147
         version: 1.2.159
+      '@noble/ciphers':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@noble/ed25519':
+        specifier: ^3.2.0
+        version: 3.2.0
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
       '@suite/graph':
         specifier: workspace:*
         version: link:packages/graph
@@ -1235,6 +1244,9 @@ importers:
       '@suite/sync':
         specifier: workspace:*
         version: link:../../services/relay/packages/protocol
+      '@suite/sync-desktop':
+        specifier: workspace:*
+        version: link:../../packages/sync-desktop
       '@suite/ui':
         specifier: workspace:*
         version: link:../../packages/ui

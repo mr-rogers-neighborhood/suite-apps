@@ -7,9 +7,11 @@ import {
   type WorkspaceFileManifest,
 } from "@suite/graph";
 import type {
+  FilesService,
   ImportedFolder,
   RecentDocument,
   RecentsService,
+  RelayService,
 } from "@suite/pack-runtime";
 import {
   type PackBridgeHost,
@@ -32,6 +34,11 @@ import type {
   BridgeSaveRequest,
   DesktopBridge,
 } from "../../src/host/bridge";
+import {
+  createPackSyncAdapter,
+  type PackSyncAdapter,
+  packSyncBridge,
+} from "./sync/adapter";
 
 /**
  * Canvas's bridge, built out of the host's `window.suite` services.
@@ -68,6 +75,8 @@ const CANVAS_FILTERS = [{ name: "Suite Canvas", extensions: ["canvas", "suite", 
 /** The host services this pack uses. */
 export interface CanvasPackHost extends PackBridgeHost {
   readonly recents?: RecentsService | undefined;
+  /** The opaque-frame relay the host supervises, when the manifest declared `relay`. */
+  readonly relay?: RelayService | undefined;
 }
 
 export interface CanvasPackOptions {
@@ -93,7 +102,9 @@ export interface CanvasPackOptions {
 }
 
 export interface CanvasPack {
-  readonly bridge: DesktopBridge;
+  readonly bridge: DesktopBridge & Partial<ReturnType<typeof packSyncBridge>>;
+  /** Sync as this pack runs it. The renderer sees the bridge; tests may call this directly. */
+  readonly sync: PackSyncAdapter;
   /** Write the open document's envelope when it has unsaved updates. */
   flush(): Promise<void>;
   /** The host document id, for a device assertion. Never a path. */
@@ -638,7 +649,28 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
     return path === null ? { saved: false } : { saved: true, name: path };
   }
 
-  const bridge: DesktopBridge = {
+  /**
+   * Sync, over the host's relay and this pack's files — only when both are there.
+   *
+   * The renderer decides whether sync exists by whether `onSyncIncoming` is on the bridge, so
+   * a host without `relay` shows the local-only state rather than a door it would refuse.
+   */
+  const filesForSync =
+    host.files?.read !== undefined &&
+    host.files.write !== undefined &&
+    host.files.remove !== undefined
+      ? (host.files as FilesService)
+      : undefined;
+  const sync = createPackSyncAdapter({
+    files: filesForSync,
+    relay: host.relay,
+    workspaceId: () => runtime.current()?.workspaceId ?? null,
+  });
+  const syncBridge =
+    host.relay?.connect === undefined ? {} : packSyncBridge(sync);
+
+  const bridge: DesktopBridge & Partial<ReturnType<typeof packSyncBridge>> = {
+    ...syncBridge,
     host: "desktop",
     // The renderer shows this nowhere; it is the marker `desktopBridge()` requires.
     version: "0.0.0",
@@ -697,6 +729,7 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
 
   return {
     bridge,
+    sync,
     flush: async () => {
       await flushDocument();
     },
@@ -705,6 +738,9 @@ export function createCanvasPack(options: CanvasPackOptions): CanvasPack {
     importFolder,
     libraryChanges: () => [...changeLog],
     notices: runtime.notices,
-    dispose: runtime.dispose,
+    dispose: () => {
+      runtime.dispose();
+      void sync.dispose();
+    },
   };
 }

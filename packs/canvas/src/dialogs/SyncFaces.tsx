@@ -54,7 +54,7 @@ export function LocalFace({
         <label className="mt-1 block text-[11px] text-[var(--ink-muted)]" htmlFor="sync-host">
           {hubRunning
             ? "This machine is listening here."
-            : "Start shows this machine's address. It is not running right now."}
+            : "Suite Desk shows this machine's relay address beside Sync. Paste it here."}
         </label>
         <div className="mt-1.5 flex gap-2">
           <input
@@ -143,6 +143,8 @@ export interface SyncedFaceProps {
   members: readonly SyncMember[];
   deviceId: string;
   fingerprint?: string | null;
+  /** The relay this device connected to, when the host can name it. */
+  relayUrl?: string | null;
   link: string | null;
   busy: boolean;
   /** Whether to offer a way back in: true only while nobody has answered the question. */
@@ -213,6 +215,7 @@ export function SyncedFace({
   members,
   deviceId,
   fingerprint,
+  relayUrl = null,
   link,
   busy,
   offerKit,
@@ -315,18 +318,30 @@ export function SyncedFace({
         ) : null}
       </section>
 
-      {fingerprint ? (
+      {fingerprint || relayUrl ? (
         <section>
-          <h3 className="text-xs font-semibold">Relay certificate</h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
-            This device only syncs with a relay whose certificate matches this fingerprint.
-          </p>
-          <output
-            data-testid="sync-fingerprint-pinned"
-            className="mt-1 block select-all break-all rounded-md border border-[var(--hairline)] px-2 py-1 font-mono text-[11px]"
-          >
-            {fingerprint}
-          </output>
+          <h3 className="text-xs font-semibold">Relay</h3>
+          {relayUrl ? (
+            <output
+              data-testid="sync-relay-url"
+              className="mt-1 block select-all break-all rounded-md border border-[var(--hairline)] px-2 py-1 font-mono text-[11px]"
+            >
+              {relayUrl}
+            </output>
+          ) : null}
+          {fingerprint ? (
+            <>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+                This device only syncs with a relay whose certificate matches this fingerprint.
+              </p>
+              <output
+                data-testid="sync-fingerprint-pinned"
+                className="mt-1 block select-all break-all rounded-md border border-[var(--hairline)] px-2 py-1 font-mono text-[11px]"
+              >
+                {fingerprint}
+              </output>
+            </>
+          ) : null}
         </section>
       ) : null}
 
