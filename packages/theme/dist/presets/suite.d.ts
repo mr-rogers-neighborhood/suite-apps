@@ -1,13 +1,15 @@
 import type { SuiteTheme } from "../theme.js";
 /**
- * Suite — the palette the apps ship today.
+ * Suite — warm paper, ink and a single burnt-orange accent.
  *
- * Taken from Canvas's tokens rather than invented, because Canvas is the app whose look the
- * others are being brought to. Every value here is one already on screen: the surfaces are
- * the light greys and the near-black, the ink is the near-black and near-white, and the six
- * hues are the ones a section or a card can already wear.
+ * The palette borrows three things rather than a stylesheet: Sunsama's warm paper field, the
+ * Heptabase habit of keeping the shell almost monochrome and letting one warm mark carry the
+ * action, and Fumadocs' editorial contrast between display type and small utility labels. The
+ * six hues stay distinguishable for sections and charts; they are muted so the accent is still
+ * the loudest colour on the page.
  *
- * This is the default, so a reader who never opens the theme picker sees no change at all.
+ * This is the default, so a reader who never opens the theme picker sees the warm look. An
+ * existing stored choice keeps its own preset.
  */
 export declare const suite: SuiteTheme;
 //# sourceMappingURL=suite.d.ts.map

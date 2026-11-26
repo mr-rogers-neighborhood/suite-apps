@@ -1,24 +1,24 @@
 :root {
   color-scheme: dark;
-  --canvas: #0b0d12;
-  --surface: #141821;
-  --surface-sunk: #0f131b;
-  --surface-strong: #1d2430;
-  --accent: #7c9cff;
-  --accent-strong: #5f86ff;
-  --ink: #e9edf7;
-  --ink-muted: #a8b1c4;
-  --ink-faint: #6f7a8f;
-  --hairline: #242b38;
-  --border-strong: #354055;
-  --focus: #9db4ff;
-  --on-accent: #0b0d12;
-  --hue-blue: #7c9cff;
-  --hue-green: #6fd39a;
-  --hue-amber: #e7c46c;
-  --hue-rose: #e79ab3;
-  --hue-violet: #b79bff;
-  --hue-slate: #9aa7bd;
+  --canvas: #171411;
+  --surface: #201c18;
+  --surface-sunk: #100e0b;
+  --surface-strong: #2a251f;
+  --accent: #e8a87c;
+  --accent-strong: #f2c39e;
+  --ink: #f4eee6;
+  --ink-muted: #b9b0a3;
+  --ink-faint: #9f9587;
+  --hairline: #342e27;
+  --border-strong: #8a8072;
+  --focus: #e8a87c;
+  --on-accent: #1a1511;
+  --hue-blue: #8db8d9;
+  --hue-green: #9ccf9e;
+  --hue-amber: #e8b87a;
+  --hue-rose: #e7a0a6;
+  --hue-violet: #c0a6e0;
+  --hue-slate: #a79d8f;
   --tabbar: 56px;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
   font-synthesis: none;
@@ -132,7 +132,7 @@ body {
   border-radius: 6px;
   background:
     radial-gradient(circle at 30% 25%, #ffffff 0 8%, transparent 9%),
-    linear-gradient(135deg, var(--accent), var(--hue-violet));
+    linear-gradient(135deg, var(--accent), var(--accent-strong));
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
 }
 
@@ -140,8 +140,17 @@ body {
   flex: 1 1 auto;
   overflow: auto;
   background:
-    radial-gradient(1100px 520px at 12% -10%, rgb(124 156 255 / 16%), transparent 60%),
-    radial-gradient(900px 420px at 90% 0%, rgb(183 155 255 / 10%), transparent 55%), var(--canvas);
+    radial-gradient(
+      1100px 520px at 12% -10%,
+      color-mix(in srgb, var(--accent) 10%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 420px at 90% 0%,
+      color-mix(in srgb, var(--hue-amber) 8%, transparent),
+      transparent 55%
+    ),
+    var(--canvas);
 }
 
 .screen {
@@ -201,7 +210,7 @@ body {
   padding: 10px 12px;
   border: 1px solid var(--hue-amber);
   border-radius: 10px;
-  background: rgb(231 196 108 / 9%);
+  background: color-mix(in srgb, var(--hue-amber) 9%, transparent);
   color: var(--ink);
   font-size: 13px;
 }
@@ -211,7 +220,7 @@ body {
   padding: 12px 14px;
   border: 1px dashed var(--border-strong);
   border-radius: 12px;
-  background: rgb(124 156 255 / 5%);
+  background: color-mix(in srgb, var(--hue-blue) 5%, transparent);
 }
 
 .edit-add {
@@ -437,7 +446,7 @@ body {
 .search input:focus {
   border-color: var(--focus);
   outline: none;
-  box-shadow: 0 0 0 3px rgb(157 180 255 / 18%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
 }
 
 section {
@@ -646,7 +655,7 @@ section {
   padding: 7px 9px;
   border: 1px solid var(--hue-rose);
   border-radius: 8px;
-  background: rgb(231 154 179 / 9%);
+  background: color-mix(in srgb, var(--hue-rose) 9%, transparent);
   color: var(--ink-muted);
   font-size: 12px;
   line-height: 1.4;
@@ -938,7 +947,7 @@ section {
   display: grid;
   place-items: start center;
   padding: 32px 16px;
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  background: color-mix(in srgb, var(--canvas) 72%, transparent);
   backdrop-filter: blur(3px);
 }
 
@@ -1000,7 +1009,7 @@ section {
 
 .command-mode[aria-pressed="true"] {
   background: var(--ink);
-  color: var(--bg);
+  color: var(--canvas);
 }
 
 .command-close {
@@ -1030,7 +1039,7 @@ section {
   padding: 6px 8px;
   border: 1px solid var(--hairline);
   border-radius: 8px;
-  background: var(--bg);
+  background: var(--canvas);
   color: var(--ink);
   font: inherit;
 }
@@ -1041,7 +1050,7 @@ section {
   padding: 11px 12px;
   border: 1px solid var(--hairline);
   border-radius: 10px;
-  background: var(--bg);
+  background: var(--canvas);
   color: var(--ink);
   font: inherit;
   font-size: 15px;
@@ -1078,7 +1087,7 @@ section {
 
 .command-result[aria-selected="true"] {
   border-color: var(--hairline);
-  background: var(--bg);
+  background: var(--canvas);
 }
 
 .command-result-source {
@@ -1133,7 +1142,7 @@ section {
 
 .command-item:hover {
   border-color: var(--hairline);
-  background: var(--bg);
+  background: var(--canvas);
 }
 
 .command-item-done {

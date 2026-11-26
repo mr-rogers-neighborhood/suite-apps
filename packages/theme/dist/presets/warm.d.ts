@@ -4,8 +4,8 @@ import type { SuiteTheme } from "../theme.js";
  *
  * Not a copy of Logseq's stylesheet, and named for the resemblance rather than the source: a
  * warm near-neutral background with a single amber accent is the thing being borrowed, not
- * specific hex values. It is here because the suite's own palette is a cool grey, and a
- * reader who likes a warm dark theme had no way to say so.
+ * specific hex values. Suite is warm paper now, so this is the charcoal-and-amber variant: the
+ * same warmth after dark, with a deeper ink and a brighter accent.
  *
  * The id used to be `logseq`, after the app it resembles. The display name was always "Warm",
  * so the id now agrees with the name; `THEME_ID_ALIASES` in `./index.ts` keeps an existing

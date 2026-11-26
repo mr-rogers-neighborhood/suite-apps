@@ -2,10 +2,10 @@ import type { SuiteTheme } from "../theme.js";
 /**
  * The themes that ship inside the package.
  *
- * Order is the order the picker shows, and the first is the default. Suite is first because
- * it is what the apps look like today: a reader who never opens the picker sees no change,
- * which is the only honest way to add a theme system to software people are already using.
- * Warm is second and Solarized third, so the host's dropdown has one order everywhere.
+ * Order is the order the picker shows, and the first is the default. Suite is first because it
+ * is the default look: warm paper, near-black ink and one burnt-orange accent. Warm is the
+ * charcoal-and-amber variant and Solarized the low-glare canonical palette, so the host's
+ * dropdown has one order everywhere. A stored choice keeps its own preset.
  *
  * Presets live in code rather than in a directory on disk for this pass. A preset cannot be
  * corrupted, cannot be half-written, and is the same three themes in every app at every

@@ -144,7 +144,7 @@ host's; a pack that offers a picker would duplicate the host's launcher. Pack co
 
 Stories live beside the component (`src/**/*.stories.tsx`). The preview paints the host's colour
 record and scale record on the story document, so a story is measured under the same tokens a pack
-gets. The toolbar switches **preset** (Suite, Solarized, Warm), **mode** (light, dark) and
+gets. The toolbar switches **preset** (Suite, Warm, Solarized), **mode** (light, dark) and
 **density** (compact, cozy, comfortable); that is the second-theme proof — the surface changes
 without a component changing.
 
