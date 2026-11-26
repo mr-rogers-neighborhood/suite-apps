@@ -1,6 +1,7 @@
+import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import type { RelayView, ShellTab } from "../../shared.js";
-import { syncPresentation, toHostTabs } from "./state.js";
+import { colorFor, syncPresentation, toHostTabs } from "./state.js";
 
 const tabs: readonly ShellTab[] = [
   { kind: "pack", id: "tab-1", packId: "canvas", title: "Canvas", entry: "index.html" },
@@ -22,11 +23,18 @@ function relay(overrides: Partial<RelayView> = {}): RelayView {
 }
 
 describe("the host bar's state mapping", () => {
-  it("maps pack and screen tabs without losing the kind", () => {
-    expect(toHostTabs(tabs)).toEqual([
+  it("maps pack and screen tabs and keeps their identity colour", () => {
+    const mapped = toHostTabs(tabs);
+    expect(mapped.map(({ id, title, kind }) => ({ id, title, kind }))).toEqual([
       { id: "tab-1", title: "Canvas", kind: "pack" },
       { id: "tab-2", title: "Home", kind: "screen" },
     ]);
+
+    const packIcon = mapped[0]?.icon as ReactElement<{ style: { background: string } }>;
+    const screenIcon = mapped[1]?.icon as ReactElement<{ style: { background: string } }>;
+    expect(packIcon.props.style.background).toBe(colorFor("canvas"));
+    expect(screenIcon.props.style.background).toBe(colorFor("home"));
+    expect(packIcon.props.style.background).not.toBe(screenIcon.props.style.background);
   });
 
   it("names the relay lifecycle as the shared pill does", () => {
@@ -39,11 +47,13 @@ describe("the host bar's state mapping", () => {
       label: "Sync on",
       tooltip: "wss://127.0.0.1:1/sync",
     });
-    expect(syncPresentation(relay({ state: "failed", lastError: "no bus" })).situation).toBe(
-      "refused",
-    );
-    expect(syncPresentation(relay({ state: "failed", lastError: "no bus" })).tooltip).toBe(
-      "no bus",
+    expect(syncPresentation(relay({ state: "failed", lastError: "no bus" }))).toEqual({
+      situation: "refused",
+      label: "Sync failed",
+      tooltip: "no bus",
+    });
+    expect(syncPresentation(relay({ state: "crashed", lastError: "no bus" })).label).toBe(
+      "Sync failed",
     );
   });
 });

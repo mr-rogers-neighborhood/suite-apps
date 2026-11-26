@@ -7,8 +7,12 @@
  *
  * `@suite/ui` ships class names, not CSS, so Tailwind has to see the package's
  * built output or every class it uses compiles to nothing.
+ *
+ * `legacy` is the layer `shell.css` puts its element defaults in. It is declared before
+ * `utilities` on purpose: the page's `button { color: inherit }` and `:focus-visible`
+ * outline must lose to the island's `text-*` and ring classes.
  */
-@layer theme, base, components, utilities;
+@layer theme, base, components, legacy, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 @source "../../../node_modules/@suite/ui/dist";

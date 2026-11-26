@@ -10,7 +10,7 @@
  * file, keeps no document state, and calls host actions that answer with the new state.
  */
 
-import { mountTabBar } from "./tab-bar.js";
+import { colorFor, mountTabBar } from "./tab-bar.js";
 
 const api = globalThis.suiteShell;
 
@@ -492,12 +492,6 @@ function runRelayAction(promise) {
     });
 }
 
-function colorFor(id) {
-  let hash = 0;
-  for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) % 360;
-  return `hsl(${hash} 68% 62%)`;
-}
-
 function element(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -560,6 +554,7 @@ function updateHostBar() {
     tabs: state.tabs,
     activeTabId: state.activeTabId,
     syncOpen,
+    commandOpen,
     relay: { ...EMPTY_RELAY, ...(state.relay ?? {}) },
   });
 }
