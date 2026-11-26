@@ -1,4 +1,15 @@
 export type {
+  CommandInvocation,
+  CommandOutcome,
+  CommandProviderKind,
+  CommandProviderRequest,
+  CommandProviderResponse,
+  CommandScope,
+  CommandScopeItem,
+  CommandSearchRequest,
+  CommandSearchResult,
+} from "@suite/contracts/commands";
+export type {
   PackBridge,
   PackBridgeHost,
   PackBridgeOptions,
@@ -8,7 +19,6 @@ export type {
   PackLifecycle,
   PackWriter,
 } from "./bridge.js";
-
 export {
   createEmitter,
   createPackBridge,

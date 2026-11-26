@@ -1211,6 +1211,7 @@ function installedInfo(
       : { minHost: packMinimumHost(manifest) as number }),
     documents: manifest.documents ?? [],
     widgets: manifest.widgets ?? [],
+    contributions: manifest.contributions ?? {},
     publisher: { id: publisher.id, fingerprint: publisher.fingerprint },
     root,
     source: "installed",

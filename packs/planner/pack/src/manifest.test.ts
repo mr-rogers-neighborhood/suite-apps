@@ -22,6 +22,17 @@ const manifest = JSON.parse(manifestText) as {
     readonly mode?: string;
     readonly projection?: string;
   }[];
+  readonly contributions?: {
+    readonly commands?: readonly {
+      readonly id: string;
+      readonly provider?: string;
+    }[];
+    readonly providers?: readonly {
+      readonly kind: string;
+      readonly entry: string;
+      readonly scopes?: readonly string[];
+    }[];
+  };
 };
 
 describe("Planner's declared document", () => {
@@ -39,9 +50,11 @@ describe("Planner's declared document", () => {
 
   it("asks the host only for what it uses", () => {
     // `documents` holds the workspace; `files` is the picker and the pack's own sync
-    // state; `notifications` lets the host invoke the reminder projection; and
-    // `recents` lists this pack's other documents. Sync is optional (S7.1): the host
-    // serves the `relay` frame transport on Desk, and a phone without one runs the
+    // state; `notifications` lets the host invoke the reminder projection; `recents`
+    // lists this pack's other documents. `commands` is optional: Desk serves the
+    // Command Surface provider, and a host without it (Go until #227) runs the same
+    // pack without offering commands. Sync is optional for the same reason (S7.1):
+    // Desk serves the `relay` frame transport, and a phone without one runs the
     // same pack as a local-only planner. It never asks for a general network.
     expect(manifest.capabilities).toEqual([
       "documents",
@@ -49,6 +62,21 @@ describe("Planner's declared document", () => {
       "notifications",
       "recents",
     ]);
-    expect(manifest.optionalCapabilities).toEqual(["relay"]);
+    expect(manifest.optionalCapabilities).toEqual(["relay", "commands"]);
+  });
+
+  it("declares the command and scope providers the pack binds", () => {
+    expect(manifest.contributions?.providers).toEqual([
+      { kind: "commands", entry: "commands", scopes: ["global"] },
+      { kind: "scopes", entry: "scopes", scopes: ["today", "inbox"] },
+    ]);
+    expect(manifest.contributions?.commands?.map((command) => command.id)).toEqual([
+      "planner.quick-task",
+      "planner.today",
+      "planner.inbox",
+    ]);
+    for (const command of manifest.contributions?.commands ?? []) {
+      expect(command.provider).toBe("commands");
+    }
   });
 });

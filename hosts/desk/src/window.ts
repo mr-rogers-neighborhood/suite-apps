@@ -3,6 +3,7 @@ import { originKey } from "@suite/desktop";
 import { SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isWidgetRegistryId } from "@suite/screens";
 import { app, BaseWindow, session, shell, WebContentsView } from "electron";
+import { clearCommandEntries } from "./commandInvocation.js";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { LAUNCHER_CONTEXT, parseSuiteLink } from "./deepLink.js";
 import { navigationReleasesLocks } from "./files.js";
@@ -378,6 +379,7 @@ export class ShellWindow {
       if (!view.webContents.isDestroyed()) {
         clearPackSender(view.webContents.id);
         clearProjectionEntries(view.webContents.id);
+        clearCommandEntries(view.webContents.id);
         // A page's `beforeunload` may cancel `window.close`, leaving a token
         // owned by a tab that is no longer open. Closing without waiting
         // destroys the contents, so `destroyed` and the lock release run.
@@ -708,6 +710,7 @@ export class ShellWindow {
     view.webContents.once("destroyed", () => {
       clearPackSender(webContentsId);
       clearProjectionEntries(webContentsId);
+      clearCommandEntries(webContentsId);
       this.#themeKeys.delete(tab.id);
       // Locks are owned by the tab id. A destroyed view cannot release its own
       // writer, so the host does it here.
@@ -742,6 +745,7 @@ export class ShellWindow {
       if (!view.webContents.isDestroyed()) {
         clearPackSender(view.webContents.id);
         clearProjectionEntries(view.webContents.id);
+        clearCommandEntries(view.webContents.id);
         view.webContents.close({ waitForBeforeUnload: false });
       }
     }

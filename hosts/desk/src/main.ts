@@ -24,6 +24,9 @@ import {
   installCataloguePack,
   loadCatalogue,
 } from "./catalogue.js";
+import { CommandBroker, type HostCommand } from "./commandBroker.js";
+import { invokeProvider, registerCommandChannels } from "./commandInvocation.js";
+import { CommandRecency, ScopeRowsCache } from "./commandSurface.js";
 import {
   CAPABILITY_DENIALS,
   CAPABILITY_REASONS,
@@ -108,7 +111,7 @@ import {
   ReminderScheduler,
 } from "./reminders.js";
 import { SCREENS_INDEX_FILENAME, ScreenSet, writeScreenFile } from "./screens.js";
-import { type PackSender, packSender } from "./senders.js";
+import { type PackSender, packSender, packSenderForPack } from "./senders.js";
 import {
   type CatalogueEntry,
   CHROME_HOST,
@@ -178,6 +181,13 @@ protocol.registerSchemesAsPrivileged([
 let window: ShellWindow | null = null;
 let spaceStore: SpaceStore | null = null;
 let screenStore: ScreenSet | null = null;
+/**
+ * The Command Surface (#225). Discovery reads the loaded packs; the broker owns
+ * consent and the scoped channel. Recency and display-row cache are in-memory
+ * host session state, never telemetry and never written to a profile.
+ */
+let commandBroker: CommandBroker | null = null;
+let commandRecency: CommandRecency | null = null;
 /**
  * The host's theme choice. Loaded from the profile before the first window and written back
  * whenever the View menu changes it, so every pack opened later starts in the same theme.
@@ -931,8 +941,93 @@ function serveProtocols(): void {
   });
 }
 
+/**
+ * The host's own commands. They are listed beside installed packs' commands and
+ * run in the main process; no pack is called.
+ */
+function hostCommands(): readonly HostCommand[] {
+  return [
+    {
+      id: "desk.open-home",
+      title: "Open Home",
+      subtitle: "Suite Desk",
+      keywords: ["home", "launcher", "screens"],
+      run: async () => {
+        if (window === null) return { ok: false, message: "Suite Desk is not ready." };
+        await window.openHome();
+        return { ok: true, message: "Opened Home." };
+      },
+    },
+    {
+      id: "desk.new-tab",
+      title: "New Home tab",
+      subtitle: "Suite Desk",
+      keywords: ["new", "tab", "home"],
+      run: async () => {
+        if (window === null) return { ok: false, message: "Suite Desk is not ready." };
+        await window.newTab();
+        return { ok: true, message: "Opened a Home tab." };
+      },
+    },
+    {
+      id: "desk.install-pack",
+      title: "Install a pack",
+      subtitle: "Suite Desk",
+      keywords: ["install", "add", "pack", "suitepack"],
+      run: async () => {
+        await installPackFromFile();
+        return { ok: true, message: "The install dialog closed." };
+      },
+    },
+  ];
+}
+
+/**
+ * The Command Surface broker, created once the host can answer.
+ *
+ * Consent is the same `ensurePackConsent` every other capability uses, so a
+ * denial is remembered on the pack card and the surface refuses with a sentence.
+ * The channel is the separate command IPC, never the document or file bridge.
+ */
+function commandService(): CommandBroker {
+  if (commandBroker === null) {
+    commandRecency ??= new CommandRecency();
+    const recency = commandRecency;
+    commandBroker = new CommandBroker({
+      packs: () => packs,
+      hostCommands: hostCommands(),
+      findSender: (packId) => packSenderForPack(packId),
+      ensureConsent: async (pack) => {
+        if (!packAllows(pack, "commands")) return false;
+        const allowed = await ensurePackConsent(pack, "commands");
+        publishPackData();
+        return allowed;
+      },
+      channel: {
+        invoke: async (sender, entry, request) => {
+          const live = packSenderForPack(sender.packId);
+          if (live === null || live.webContentsId !== sender.webContentsId) {
+            throw new Error(`${sender.packId} closed before the command could run`);
+          }
+          return invokeProvider(live, entry, request);
+        },
+      },
+      recency,
+      cache: new ScopeRowsCache(),
+    });
+  }
+  return commandBroker;
+}
+
+/** Route a `suite://` link a provider answered with. The broker already validated it. */
+async function openCommandLink(link: string | undefined): Promise<void> {
+  if (link === undefined || window === null) return;
+  await window.openDeepLink(link);
+}
+
 function registerIpc(): void {
   registerProjectionChannels();
+  registerCommandChannels();
   onChrome(CHROME_IPC.state, () => window?.state());
   onChrome(CHROME_IPC.openPack, async (packId) => {
     if (typeof packId !== "string") return;
@@ -1052,6 +1147,52 @@ function registerIpc(): void {
   onChrome(CHROME_IPC.relayStop, async () => {
     if (relaySupervisor === null) return undefined;
     return relayView(await relaySupervisor.stop());
+  });
+
+  onChrome(CHROME_IPC.commandList, (query) => {
+    if (typeof query !== "string") return undefined;
+    return commandService().listing(query);
+  });
+  onChrome(CHROME_IPC.commandInvoke, async (commandId, scope, args) => {
+    if (typeof commandId !== "string") return undefined;
+    if (typeof scope !== "string") return undefined;
+    const outcome = await commandService().invoke(commandId, scope, args);
+    await openCommandLink(outcome.open);
+    return outcome;
+  });
+  onChrome(CHROME_IPC.commandScopes, (packId) => {
+    if (typeof packId !== "string") return undefined;
+    return commandService().scopes(packId);
+  });
+  onChrome(CHROME_IPC.commandItems, (packId, scopeId, limit) => {
+    if (typeof packId !== "string" || typeof scopeId !== "string") return undefined;
+    const bounded = typeof limit === "number" ? Math.min(50, Math.max(1, limit)) : 20;
+    return commandService().items(packId, scopeId, bounded);
+  });
+  onChrome(CHROME_IPC.commandCapture, async (packId, scopeId, values) => {
+    if (typeof packId !== "string" || typeof scopeId !== "string") return undefined;
+    const outcome = await commandService().capture(packId, scopeId, values);
+    await openCommandLink(outcome.open);
+    return outcome;
+  });
+  onChrome(CHROME_IPC.commandOpen, async (packId, scopeId, itemId) => {
+    if (typeof packId !== "string" || typeof scopeId !== "string") return undefined;
+    if (itemId !== undefined && typeof itemId !== "string") return undefined;
+    const outcome = await commandService().open(packId, scopeId, itemId);
+    await openCommandLink(outcome.open);
+    return outcome;
+  });
+  onChrome(CHROME_IPC.commandSearch, (query, scope) => {
+    if (typeof query !== "string") return undefined;
+    return commandService().search(query, typeof scope === "string" ? scope : "global");
+  });
+  onChrome(CHROME_IPC.commandOpenLink, async (link) => {
+    if (typeof link !== "string" || !link.startsWith("suite://")) return;
+    await window?.openDeepLink(link);
+  });
+  onChrome(CHROME_IPC.commandClearRecents, () => {
+    commandService().clearRecents();
+    return commandService().listing("");
   });
 
   onPack(PACK_IPC.launch, (sender): PackLaunchContext => {

@@ -71,6 +71,25 @@ describe("the Home composition", () => {
     }
   });
 
+  it("draws the Command Surface and calls the host actions it names", () => {
+    expect(shell).toContain("function renderCommandSurface");
+    expect(shell).toContain("function invokeSelectedCommand");
+    expect(shell).toContain("function refreshCommandSurface");
+    expect(shell).not.toContain("command-recents.json");
+    for (const action of [
+      "commandList",
+      "commandInvoke",
+      "commandItems",
+      "commandCapture",
+      "commandOpen",
+      "commandSearch",
+      "commandOpenLink",
+      "commandClearRecents",
+    ]) {
+      expect(shell).toContain(`api.${action}`);
+    }
+  });
+
   it("keeps document state out of the renderer", () => {
     expect(shell).not.toContain("localStorage");
     expect(shell).not.toContain("sessionStorage");

@@ -171,8 +171,25 @@ describe("pack discovery", () => {
 
   it("refuses a capability the host does not serve yet", async () => {
     const root = await temporaryRoot();
-    await writePack(root, "commands", { capabilities: ["documents", "commands"] });
+    await writePack(root, "storage", { capabilities: ["documents", "storage"] });
     expect(discoverPacks(root)).toEqual([]);
+  });
+
+  it("loads commands and keeps the provider declaration", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "commands", {
+      capabilities: ["documents", "commands"],
+      contributions: {
+        commands: [{ id: "commands.run", title: "Run", provider: "commands" }],
+        providers: [{ kind: "commands", entry: "commands", scopes: ["global"] }],
+      },
+    });
+    const packs = discoverPacks(root);
+    expect(packs).toHaveLength(1);
+    expect(packs[0]?.contributions?.providers).toEqual([
+      { kind: "commands", entry: "commands", scopes: ["global"] },
+    ]);
+    expect(HOST_CAPABILITIES).toContain("commands");
   });
 
   it("loads a pack that declares the relay capability", async () => {

@@ -1,9 +1,15 @@
+import {
+  packCommandContributionSchema,
+  packProviderContributionSchema,
+} from "@suite/contracts/commands";
 import { type SuiteWidget, suiteWidgetsSchema } from "@suite/contracts/widgets";
 import { z } from "zod";
 import { canonicalJsonValue, compareCodeUnits, findDuplicateJsonKey } from "./canonical.js";
 import { PACK_CAPABILITIES, type PackCapability } from "./capabilities.js";
 import type { PackContributions } from "./contributions.js";
 import { isSafePackPlatform, type PackPlatform } from "./platforms.js";
+
+export type { PackContributions } from "./contributions.js";
 
 /**
  * A Suite pack.
@@ -274,14 +280,9 @@ const fileSchema = z
   })
   .strict();
 
-const commandSchema = z
-  .object({
-    id: z.string().regex(COMMAND_ID),
-    title: z.string().min(1).max(80),
-    category: z.string().min(1).max(40).optional(),
-    keybinding: z.string().min(1).max(80).optional(),
-  })
-  .strict();
+const commandSchema = packCommandContributionSchema;
+
+const providerSchema = packProviderContributionSchema;
 
 const menuSchema = z
   .object({
@@ -296,6 +297,7 @@ const menuSchema = z
 const contributionsSchema = z
   .object({
     commands: z.array(commandSchema).max(200).optional(),
+    providers: z.array(providerSchema).max(16).optional(),
     menus: z.array(menuSchema).max(500).optional(),
     fileExtensions: z.array(z.string().regex(FILE_EXTENSION)).max(32).optional(),
     deepLinks: z.array(z.string().regex(DEEP_LINK)).max(32).optional(),
@@ -557,6 +559,19 @@ function manifestSchema(requireSignature: boolean) {
 
       if (value.contributions !== undefined) {
         const commands = new Set<string>();
+        const providers = new Set<string>();
+        value.contributions.providers?.forEach((provider, index) => {
+          const key = `${provider.kind}\u0000${provider.entry}`;
+          if (providers.has(key)) {
+            context.addIssue({
+              code: "custom",
+              path: ["contributions", "providers", index, "entry"],
+              message: `duplicate ${provider.kind} provider ${provider.entry}`,
+            });
+          }
+          providers.add(key);
+        });
+
         value.contributions.commands?.forEach((command, index) => {
           if (commands.has(command.id)) {
             context.addIssue({
@@ -566,6 +581,28 @@ function manifestSchema(requireSignature: boolean) {
             });
           }
           commands.add(command.id);
+
+          // A provider entry is a call target, so it must be one the manifest
+          // already declared. An explicit `provider` naming nothing is refused
+          // here rather than called and failing later.
+          if (
+            command.provider !== undefined &&
+            !providers.has(`commands\u0000${command.provider}`)
+          ) {
+            context.addIssue({
+              code: "custom",
+              path: ["contributions", "commands", index, "provider"],
+              message: `provider ${command.provider} is not declared in contributions.providers`,
+            });
+          }
+
+          if (command.icon !== undefined && !files.has(command.icon)) {
+            context.addIssue({
+              code: "custom",
+              path: ["contributions", "commands", index, "icon"],
+              message: `icon ${command.icon} is not a file the manifest lists`,
+            });
+          }
         });
 
         uniqueStrings(

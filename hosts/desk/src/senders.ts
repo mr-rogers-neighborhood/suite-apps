@@ -31,6 +31,15 @@ export function packSender(webContentsId: number): PackSender | undefined {
   return senders.get(webContentsId);
 }
 
+/** The live renderer for a pack, or null when no tab has it open. */
+export function packSenderForPack(packId: string): PackSender | null {
+  let found: PackSender | null = null;
+  for (const sender of senders.values()) {
+    if (sender.packId === packId) found = sender;
+  }
+  return found;
+}
+
 export function clearPackSender(webContentsId: number): void {
   senders.delete(webContentsId);
 }

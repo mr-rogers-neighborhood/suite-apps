@@ -81,6 +81,7 @@ export const CAPABILITY_REASONS: Readonly<Partial<Record<PackCapability, string>
   "identity.pack": "use the identity derived for this pack",
   recents: "read the host's recent-files list",
   notifications: "show reminders after the app is closed",
+  commands: "offer commands, search results and scope rows to the Command Surface",
 };
 
 /** A short name for a dialog title. */
@@ -92,12 +93,14 @@ export const CAPABILITY_TITLES: Readonly<Partial<Record<PackCapability, string>>
   "identity.pack": "Allow this pack's identity?",
   recents: "Allow recent files?",
   notifications: "Allow reminders?",
+  commands: "Allow Command Surface commands?",
 };
 
 /** The sentence a refused capability answers with. */
 export const CAPABILITY_DENIALS: Readonly<Partial<Record<PackCapability, string>>> = {
   recents: "Recent documents are off; this app may not read the host's recent list.",
   notifications: "Reminders are off: this app is not allowed to show notifications.",
+  commands: "Commands are off for this app; the Command Surface will not call it.",
 };
 
 /** The tier a capability is asked at. An unknown capability defaults to the weakest ask. */

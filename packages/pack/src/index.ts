@@ -48,6 +48,7 @@ export type {
   PackCommandContribution,
   PackContributions,
   PackMenuContribution,
+  PackProviderContribution,
 } from "./contributions.js";
 export {
   canonicalManifestBytes,

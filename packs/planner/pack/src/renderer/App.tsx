@@ -4,6 +4,7 @@ import { Shell } from "./app/Shell";
 import { Toast } from "./app/Toast";
 import { PlannerLauncher } from "./launcher/PlannerLauncher";
 import { getBridge } from "./platform/bridge";
+import { plannerDeepLinkView } from "../provider";
 import { type DocumentReplica, WorkspaceContext } from "./store/snapshotStore";
 import { useUiStore } from "./store/uiStore";
 
@@ -30,8 +31,19 @@ export function App({ replica, created }: { replica: DocumentReplica; created: b
     });
 
     // A reminder click opens the host, which routes `suite://planner/task/<id>`.
-    // Resolving it belongs here, once the pack is running with its document.
+    // A Command Surface scope opens `suite://planner/today` or `/inbox`. Resolving
+    // it belongs here, once the pack is running with its document.
     const resolveDeepLink = (url: string): void => {
+      const view = plannerDeepLinkView(url);
+      if (view === "today") {
+        setView("today");
+        setSelectedDate(todayKey());
+        return;
+      }
+      if (view === "inbox") {
+        setView("inbox");
+        return;
+      }
       const match = /^suite:\/\/planner\/task\/(.+)$/u.exec(url);
       if (match === null) return;
       try {

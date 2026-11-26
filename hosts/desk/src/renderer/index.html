@@ -26,6 +26,16 @@
       >
         Sync
       </button>
+      <button
+        id="command-toggle"
+        class="command-toggle"
+        type="button"
+        aria-haspopup="dialog"
+        aria-controls="command-surface"
+        title="Command Surface (Ctrl/Cmd+K)"
+      >
+        Commands
+      </button>
       <button id="new-tab" class="new-tab" type="button" title="Home" aria-label="Open Home">
         +
       </button>
@@ -58,6 +68,81 @@
       <div class="sync-actions">
         <button id="sync-start" class="action action-primary" type="button">Start relay</button>
         <button id="sync-stop" class="action" type="button">Stop relay</button>
+      </div>
+    </section>
+
+    <section
+      id="command-surface"
+      class="command-surface"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="command-title"
+      hidden
+    >
+      <div class="command-box">
+        <header class="command-head">
+          <p class="eyebrow">One input, three modes</p>
+          <h1 id="command-title">Command Surface</h1>
+          <fieldset class="command-modes">
+            <legend class="visually-hidden">Command Surface mode</legend>
+            <button class="command-mode" type="button" data-mode="capture" aria-pressed="false">
+              Capture
+            </button>
+            <button class="command-mode" type="button" data-mode="command" aria-pressed="true">
+              Command
+            </button>
+            <button class="command-mode" type="button" data-mode="search" aria-pressed="false">
+              Search
+            </button>
+          </fieldset>
+          <button id="command-close" class="command-close" type="button" aria-label="Close">
+            ×
+          </button>
+        </header>
+
+        <div class="command-apps">
+          <label class="command-field">
+            <span>App</span>
+            <select id="command-app"></select>
+          </label>
+          <label class="command-field">
+            <span>Scope</span>
+            <select id="command-scope"></select>
+          </label>
+        </div>
+
+        <label class="command-input">
+          <span class="visually-hidden">Command Surface input</span>
+          <input
+            id="command-query"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Type a command…"
+          />
+        </label>
+
+        <p id="command-note" class="notice" role="status" aria-live="polite" hidden></p>
+
+        <div
+          id="command-results"
+          class="command-results"
+          role="listbox"
+          aria-label="Commands"
+        ></div>
+
+        <section id="command-scope-panel" class="command-scope-panel" hidden>
+          <div class="command-scope-head">
+            <h2 id="command-scope-title">Scope</h2>
+            <span id="command-scope-age" class="pill">Live</span>
+          </div>
+          <ul id="command-items" class="command-items"></ul>
+        </section>
+
+        <footer class="command-foot">
+          <span id="command-hint">↑↓ to choose · Enter to run · Esc to close</span>
+          <button id="command-clear-recents" class="action" type="button">Clear recents</button>
+        </footer>
       </div>
     </section>
 

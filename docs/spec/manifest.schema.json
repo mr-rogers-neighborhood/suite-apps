@@ -143,7 +143,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "commands": { "type": "array", "maxItems": 200, "items": { "type": "object", "additionalProperties": true } },
+        "commands": {
+          "type": "array",
+          "maxItems": 200,
+          "items": { "$ref": "#/$defs/command" }
+        },
+        "providers": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/provider" }
+        },
         "menus": { "type": "array", "maxItems": 500, "items": { "type": "object", "additionalProperties": true } },
         "fileExtensions": {
           "type": "array",
@@ -220,6 +229,59 @@
         },
         "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "provider": {
+      "description": "One provider the pack answers Command Surface calls through. A provider the manifest does not list is refused, not called.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "entry"],
+      "properties": {
+        "kind": { "enum": ["commands", "search", "scopes"] },
+        "entry": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9-]+)*$"
+        },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9-]+)*$"
+          }
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9-]+)*$"
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "subtitle": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "keywords": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9 -]*$" }
+        },
+        "icon": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "scope": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9-]+)*$"
+        },
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9-]+)*$"
+        },
+        "category": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "keybinding": { "type": "string", "minLength": 1, "maxLength": 80 }
       }
     },
     "document": {

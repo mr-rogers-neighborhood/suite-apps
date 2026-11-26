@@ -66,7 +66,21 @@
     ],
     "components": [{ "kind": "map", "fallback": "web" }],
     "contributions": {
-      "commands": [],
+      "commands": [
+        {
+          "id": "chart.export",
+          "title": "Export chart",
+          "subtitle": "Chart",
+          "keywords": ["export", "csv"],
+          "icon": "index.html",
+          "scope": "global",
+          "provider": "commands"
+        }
+      ],
+      "providers": [
+        { "kind": "commands", "entry": "commands", "scopes": ["global"] },
+        { "kind": "scopes", "entry": "scopes", "scopes": ["today"] }
+      ],
       "menus": [],
       "fileExtensions": [".chart"],
       "deepLinks": ["chart"]
@@ -128,7 +142,12 @@
     { "clause": "S3.5", "name": "export without an entry", "set": { "export": {} } },
     { "clause": "S3.5", "name": "empty license", "set": { "license": "" } },
     { "clause": "S3.5", "name": "deprecated is not a boolean", "set": { "deprecated": "yes" } },
-    { "clause": "S3.5", "name": "sunset is not a date", "set": { "sunset": "soon" } }
+    { "clause": "S3.5", "name": "sunset is not a date", "set": { "sunset": "soon" } },
+    { "clause": "S4.6", "name": "unknown provider kind", "set": { "contributions": { "providers": [{ "kind": "telemetry", "entry": "metrics" }] } } },
+    { "clause": "S4.6", "name": "provider entry is a path", "set": { "contributions": { "providers": [{ "kind": "commands", "entry": "../commands" }] } } },
+    { "clause": "S4.6", "name": "provider without any scope", "set": { "contributions": { "providers": [{ "kind": "scopes", "entry": "scopes", "scopes": [] }] } } },
+    { "clause": "S4.6", "name": "command without a title", "set": { "contributions": { "commands": [{ "id": "chart.export" }] } } },
+    { "clause": "S4.6", "name": "command id is not dotted", "set": { "contributions": { "commands": [{ "id": "Chart Export", "title": "Export chart" }] } } }
   ],
   "catalogue": {
     "_comment": "A version 2 catalogue index (S12.9). `valid` must validate against catalogue.schema.json; each `invalid` entry must fail after its `remove`/`set` paths are applied.",

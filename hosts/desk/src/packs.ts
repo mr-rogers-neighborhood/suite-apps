@@ -1,6 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { type SuiteWidget, suiteWidgetsSchema } from "@suite/contracts";
+import {
+  packCommandContributionSchema,
+  packProviderContributionSchema,
+} from "@suite/contracts/commands";
 import { resolveProtocolAsset } from "@suite/desktop";
 import {
   DEFAULT_PACK_RING,
@@ -10,6 +14,7 @@ import {
   isSafePackPath,
   PACK_CONTRACT_VERSION,
   PACK_FORMAT,
+  type PackContributions,
   type PackDocument,
   type PackManifestCore,
   type PackRing,
@@ -119,6 +124,29 @@ const manifestSchema = z
     capabilities: z.array(z.enum(PACK_CAPABILITIES)).default([]),
     optionalCapabilities: z.array(z.enum(PACK_CAPABILITIES)).optional(),
     documents: z.array(packDocumentSchema).max(64).optional(),
+    contributions: z
+      .object({
+        commands: z.array(packCommandContributionSchema).max(200).optional(),
+        providers: z.array(packProviderContributionSchema).max(16).optional(),
+        menus: z
+          .array(
+            z
+              .object({
+                menu: z.string().min(1),
+                command: z.string().min(1),
+                label: z.string().min(1).max(80).optional(),
+                group: z.string().min(1).max(40).optional(),
+                when: z.string().min(1).max(200).optional(),
+              })
+              .strict(),
+          )
+          .max(500)
+          .optional(),
+        fileExtensions: z.array(z.string().min(1)).max(32).optional(),
+        deepLinks: z.array(z.string().min(1)).max(32).optional(),
+      })
+      .strict()
+      .optional(),
     // Opaque host kinds (S3.5): a development pack may name a kind this host has
     // never heard of, and the fit check below decides what that means.
     platforms: z.array(z.string()).min(1).optional(),
@@ -146,6 +174,8 @@ export interface PackInfo extends PackSummary {
   readonly widgets?: readonly SuiteWidget[];
   /** Documents the manifest declares, with their migrations and projection. */
   readonly documents?: readonly PackDocument[];
+  /** The commands and providers this pack declares for the host chrome. */
+  readonly contributions?: PackContributions;
 }
 
 export interface PackRequest {
@@ -301,6 +331,7 @@ function readPack(directory: string, host: HostContract): PackInfo | null {
         : { minHost: packMinimumHost(manifest) as number }),
       documents: (parsed.data.documents ?? []) as readonly PackDocument[],
       widgets: parsed.data.widgets ?? [],
+      contributions: (parsed.data.contributions ?? {}) as PackContributions,
       publisher: null,
       root: directory,
       source: "development",

@@ -647,8 +647,8 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
 
 ### The Command Surface and Composite Widget contract (#224)
 
-Recorded 2026-11-25. Draft: no code ships with this record. The points marked **open** need an owner
-call before the first provider lands; they are listed again at the end.
+Recorded 2026-11-25. Decided by the owner on 2026-11-25; implemented in #224, #225 and #226, with
+Planner as the first provider. The three calls that were open are recorded in place below.
 
 The [Command Surface epic](https://github.com/mrrnbhd/suite-apps/issues/217) puts capture, commands and
 search on one host-owned surface, and the Composite Widget (Capture Card) reuses the same providers in
@@ -673,23 +673,32 @@ second grammar.
     refuses a path outside the pack (S3.6).
   - `scope` — `global`, `documents`, or a provider-defined scope id; what the command acts on.
   - `provider` — the pack-side entry or method the host calls; the host never imports it.
-- **Where it lives.** The command half extends the signed `contributions.commands` entry, which today
-  carries `{id, title, category?, keybinding?}`, so the manifest stays the one declaration. Search,
-  scope rows and capture need their own entry because they answer calls rather than describe a menu
-  item. **Open:** one `contributions.providers` block (`{kind, entry, scopes}`) or three sibling lists
-  (`search`, `scopes`, `capture`). This record assumes one block; the manifest schema change waits on
-  that call.
+- **Where it lives.** The command half extends the signed `contributions.commands` entry, which
+  already carried `{id, title, category?, keybinding?}`, with `subtitle?`, `keywords?`, `icon?`,
+  `scope?` and `provider?`. Search, scope rows and capture answer calls rather than describe a menu
+  item, so they share **one `contributions.providers` list**. Each entry is `{kind, entry, scopes?}`:
+  `kind` is `commands`, `search` or `scopes`, `entry` is the pack-side method the host invokes, and
+  `scopes` names the scope ids that provider serves. A provider the manifest does not list is
+  refused, not called. The schema, canonical bytes and fixtures live in
+  `packages/contracts/src/commands.ts`, `packages/pack/src/manifest.ts` and
+  [the manifest schema](../spec/manifest.schema.json).
 - **Discovery is installed packs plus the host.** The host lists its own commands and those of
   installed packs whose manifest parses and whose `commands` capability is granted (S4.6). A provider
   entry the manifest does not list is refused, not called. An app or scope this build cannot resolve
   stays visible as a named placeholder; it is never hidden.
 - **Ranking is deterministic and local.** Exact title match, then prefix, then keyword match, then
   recency within the current host session, then title order. There is no popularity, telemetry or
-  cross-app signal (S12.4). **Open:** whether recency is stored at all. If it is, it is local,
-  clearable, and never leaves the host.
-- **Invocation.** The host sends `{commandId, scope, arguments}` over the scoped pack command channel;
-  the pack validates the arguments and answers with `{ok, message, open?}`. The host parses `open` as
-  a `suite://` link before opening it. No document bytes cross the channel.
+  cross-app signal (S12.4). **Recency is stored, and only in the host session.** It is a local,
+  clearable list of command ids owned by the host; it is not written to a profile, not keyed to an
+  app, never transmitted and gone when the host exits. The surface offers a Clear recents action, and
+  `CommandRecency` in `hosts/desk/src/commandSurface.ts` is the whole store.
+- **Invocation.** The host sends `{commandId, scope, arguments}` over a **separate scoped `commands`
+  channel**, not the document/file bridge. The pack validates the arguments and answers
+  `{ok, message, open?}`; the host parses `open` as a `suite://` link before opening it. No document
+  bytes cross the channel, and a pack may declare `commands` without `documents`. The host side is
+  `hosts/desk/src/commandInvocation.ts`, the pack side is `commands.provide(entry, handler)` in
+  `packages/pack-runtime/src/services.ts`, and the sender decides the pack as it does for documents
+  and files.
 - **Search.** A search provider returns opaque result ids plus display metadata for a query and a
   scope; the host aggregates and opens a result through a deep link (S5.2). The host never indexes
   document content (S11.3).
@@ -705,11 +714,33 @@ second grammar.
   ([#186](https://github.com/mrrnbhd/suite-apps/issues/186),
   [#227](https://github.com/mrrnbhd/suite-apps/issues/227)) open the same scope provider; the desktop
   tray opens the Command Surface. Invocation differs by host; the contract does not.
-- **What this does not decide.** The provider entry syntax, the manifest block shape, whether ranking
-  stores local recency, and whether the command channel is the same channel as the document and file
-  bridge or a sibling with its own scopes. The last is **open** and belongs with
-  [#226](https://github.com/mrrnbhd/suite-apps/issues/226) once a second provider exists. No markup
-  grammar, no model and no host-side app data are introduced.
+- **What this does not decide.** The Go implementation of the same quick capture and home-screen
+  widget ([#227](https://github.com/mrrnbhd/suite-apps/issues/227)) and the Go capture card
+  ([#304](https://github.com/mrrnbhd/suite-apps/issues/304)) are later issues: the desktop host is
+  the only implementation in this change. No markup grammar, no model and no host-side app data are
+  introduced. The host lists installed packs whose manifest parses and whose `commands` capability
+  is granted; an app or scope this build cannot resolve stays visible as a named placeholder, never
+  hidden.
+
+Implemented on 2026-11-25, end to end:
+
+- **Declaration.** `packages/contracts/src/commands.ts` owns the provider/command vocabulary and the
+  request/response shapes. `@suite/pack` parses `contributions.providers` and the extended command
+  entry, refuses an undeclared provider and an icon that is not a listed file, and keeps provider and
+  scope order in canonical bytes. `docs/spec/manifest.schema.json`, `docs/spec/fixtures.json` and
+  `packages/pack/src/manifest.test.ts` agree.
+- **Host surface.** `hosts/desk/src/commandSurface.ts` discovers the host's own commands and installed
+  packs' commands, ranks them, and keeps the session recency and the display-row cache.
+  `hosts/desk/src/commandBroker.ts` owns consent and invocation. The chrome overlay in
+  `hosts/desk/src/renderer/` has Capture, Command and Search modes, an app/scope switcher, keyboard
+  selection and a Clear recents action. An unknown app or scope is drawn as a named placeholder.
+- **Invocation.** `hosts/desk/src/commandInvocation.ts` is the separate scoped channel. The pack
+  preload binds a provider with `commands.provide`; the host refuses a capability-less, denied,
+  undeclared, closed or malformed call with a sentence.
+- **Planner provider.** `packs/planner/pack/src/provider.ts` binds `commands` and `scopes`. Quick task
+  captures through Planner's own `parseCapture` and document layer; `today` and `inbox` return row
+  metadata; `open` returns `suite://planner/...`; the manifest declares the three commands and the two
+  providers. A closed pack leaves cached rows with an age and "Open app to refresh".
 
 ## Declared, not executed
 

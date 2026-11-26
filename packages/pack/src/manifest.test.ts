@@ -76,6 +76,25 @@ function everyOptionalField(): Record<string, unknown> {
     input: ["pointer", "keyboard"],
     defaultLocale: "en",
     locales: ["en", "fr"],
+    contributions: {
+      commands: [
+        {
+          id: "canvas.new-card",
+          title: "New card",
+          subtitle: "Canvas",
+          keywords: ["card", "new"],
+          scope: "global",
+          provider: "commands",
+        },
+      ],
+      providers: [
+        { kind: "commands", entry: "commands", scopes: ["global"] },
+        { kind: "scopes", entry: "scopes", scopes: ["today", "inbox"] },
+      ],
+      menus: [{ menu: "file", command: "canvas.new-card" }],
+      fileExtensions: [".canvas"],
+      deepLinks: ["canvas"],
+    },
     widgets: [
       {
         id: "summary",
@@ -206,6 +225,89 @@ describe("the pack manifest", () => {
     expect(parsed.ok).toBe(false);
   });
 
+  it("accepts the command and provider declarations the Command Surface uses", () => {
+    const parsed = parsePackManifest(
+      manifest({
+        contributions: {
+          commands: [
+            {
+              id: "canvas.new-card",
+              title: "New card",
+              subtitle: "Canvas",
+              keywords: ["card", "new"],
+              icon: "assets/app.js",
+              scope: "global",
+              provider: "commands",
+            },
+          ],
+          providers: [
+            { kind: "commands", entry: "commands", scopes: ["global"] },
+            { kind: "scopes", entry: "scopes", scopes: ["today", "inbox"] },
+          ],
+        },
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.contributions?.providers).toEqual([
+      { kind: "commands", entry: "commands", scopes: ["global"] },
+      { kind: "scopes", entry: "scopes", scopes: ["today", "inbox"] },
+    ]);
+  });
+
+  it("refuses an undeclared provider, a bad kind and an icon not in files", () => {
+    const undeclared = parsePackManifest(
+      manifest({
+        contributions: {
+          commands: [{ id: "canvas.new", title: "New", provider: "missing" }],
+          providers: [{ kind: "commands", entry: "commands" }],
+        },
+      }),
+    );
+    expect(undeclared.ok).toBe(false);
+
+    const badKind = parsePackManifest(
+      manifest({
+        contributions: {
+          providers: [{ kind: "telemetry", entry: "metrics" }],
+        },
+      }),
+    );
+    expect(badKind.ok).toBe(false);
+
+    const icon = parsePackManifest(
+      manifest({
+        contributions: {
+          commands: [{ id: "canvas.new", title: "New", icon: "missing.png" }],
+        },
+      }),
+    );
+    expect(icon.ok).toBe(false);
+  });
+
+  it("refuses duplicate providers and duplicate scopes", () => {
+    const duplicateProvider = parsePackManifest(
+      manifest({
+        contributions: {
+          providers: [
+            { kind: "commands", entry: "commands" },
+            { kind: "commands", entry: "commands" },
+          ],
+        },
+      }),
+    );
+    expect(duplicateProvider.ok).toBe(false);
+
+    const duplicateScope = parsePackManifest(
+      manifest({
+        contributions: {
+          providers: [{ kind: "scopes", entry: "scopes", scopes: ["today", "today"] }],
+        },
+      }),
+    );
+    expect(duplicateScope.ok).toBe(false);
+  });
+
   it("refuses a non-HTML entry", () => {
     const parsed = parsePackManifest(
       manifest({
@@ -332,6 +434,38 @@ describe("canonical manifest bytes", () => {
     expect(first.ok && second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
     expect(canonicalManifestBytes(first.value)).not.toEqual(canonicalManifestBytes(second.value));
+  });
+
+  it("keeps provider order and scope order as authored", () => {
+    const first = parsePackManifest(
+      manifest({
+        contributions: {
+          providers: [
+            { kind: "commands", entry: "commands", scopes: ["global"] },
+            { kind: "scopes", entry: "scopes", scopes: ["today", "inbox"] },
+          ],
+        },
+      }),
+    );
+    const second = parsePackManifest(
+      manifest({
+        contributions: {
+          providers: [
+            { kind: "commands", entry: "commands", scopes: ["global"] },
+            { kind: "scopes", entry: "scopes", scopes: ["inbox", "today"] },
+          ],
+        },
+      }),
+    );
+    expect(first.ok && second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+    expect(canonicalManifestBytes(first.value)).not.toEqual(canonicalManifestBytes(second.value));
+    expect(canonicalJson(first.value).contributions).toEqual({
+      providers: [
+        { kind: "commands", entry: "commands", scopes: ["global"] },
+        { kind: "scopes", entry: "scopes", scopes: ["today", "inbox"] },
+      ],
+    });
   });
 
   // spec: S3.3

@@ -15,6 +15,9 @@ boundary it proves is:
   a refusal shown on the pack's card and re-askable only there;
 - a host-owned reminder queue: a pack declares a projection, the host validates display rows and
   schedules them with the pack closed; a denial is visible and a removed pack takes its rows with it;
+- a host-owned Command Surface: one input with Capture, Command and Search modes, pack-declared
+  commands and scopes, deterministic ranking and session recency, and a separate scoped command
+  channel that carries no document bytes;
 - a supervised relay child and a narrow pack-facing relay service: a pinned socket, opaque frames and
   no documents grant;
 - a user-consented external file surface: a host-owned picker, opaque handles, single-file import
@@ -61,8 +64,8 @@ index or, with `none`, leaves only the local directory.
 
 The shared pack work lives outside this app: `packages/pack` owns the manifest and signature,
 `packages/pack-runtime` owns the pack-side service types, and `packages/pack-host` owns the scoped
-file store and the archive reader. The spike uses the shared pack id, path and capability
-vocabulary. Contributions and multi-window work are the next slices.
+file store and the archive reader. The host uses the shared pack id, path and capability vocabulary. Menus, toolbar and status
+contributions and multi-window work are the next slices; commands, search and scopes are served now.
 
 The pinned pack key is shared with Suite Go, but the manifest is not: Go requires `independent` and
 `isolation`, has its own capability list and different canonical bytes. A desktop `.suitepack` is
@@ -363,6 +366,37 @@ before starting a fresh Home. It never deletes the only copy and never repairs a
 guessing. The same migration chain runs for a stored snapshot and an imported file, with one fixture
 per version in `@suite/screens`.
 
+## Command Surface
+
+One host-owned input opens over any surface with `Ctrl/Cmd+K` or the **Commands** button. It has three
+modes:
+
+- **Command** lists the host's own commands and the commands installed packs declare in
+  `contributions.commands`. Ranking is deterministic: exact title, then prefix, then keyword, then the
+  host session's recency, then title. **Clear recents** empties that session list; nothing is written
+  to a profile, sent anywhere or keyed to another app.
+- **Capture** chooses an app and one of its declared scopes, then sends the typed line to that pack.
+- **Search** asks each open pack that declares a `search` provider and aggregates its opaque result
+  ids plus display metadata. The host never indexes content and opens a hit through its `suite://`
+  link.
+
+A pack declares its providers in the one `contributions.providers` list. Each entry is
+`{kind, entry, scopes?}` where `kind` is `commands`, `search` or `scopes`, `entry` is the pack-side
+method, and `scopes` names the ids it serves. An undeclared entry is refused, not called. A pack must
+also declare the `commands` capability, and the first call asks for that grant at its install tier; a
+denial is remembered on the pack's card.
+
+Invocation uses `suite:command:*`, a separate scoped channel. The host sends
+`{commandId, scope, arguments}` — string values only — and the pack answers `{ok, message, open?}`.
+The host parses `open` as a `suite://` link. No document bytes, path or file handle crosses this
+channel, and the sender still decides the pack. A closed pack cannot answer: scope rows come from the
+in-memory display-row cache with an age and **Open app to refresh**, and a command asks the person to
+open the app. An app or scope this build cannot resolve stays as a named placeholder.
+
+Planner is the first provider. It binds `commands` and `scopes`; `planner.quick-task` captures through
+Planner's own parser and document layer, and the `today` and `inbox` scopes return item rows with a
+`suite://planner/...` link. Its source is `packs/planner/pack/src/provider.ts`.
+
 ## The pack contract
 
 An installed pack is one version directory, `<dataRoot>/packs/<id>/<version>/`, holding
@@ -456,8 +490,8 @@ files are refused. Writes are atomic and may carry `expectedMtimeMs`; `backup` r
 path of a dated sibling. `lock` returns a `FileLock`, and the host releases every lock a tab held
 when its view is destroyed. A pack without `files` gets a rejected call, not an empty success.
 
-The spike serves `documents`, `files`, `identity.pack`, `network`, `recents`, `notifications` and
-`relay`. A manifest that declares `storage` or `commands` is refused until the matching service
+The spike serves `documents`, `files`, `identity.pack`, `network`, `recents`, `notifications`,
+`relay` and `commands`. A manifest that declares `storage` is refused until the matching service
 exists; the shared capability vocabulary is wider than this host, and loading a pack into a missing
 service would only produce buttons that fail.
 
@@ -557,10 +591,11 @@ decision record owns that trade.
 - backing up `asset` and `derived` blobs, and exposing the blob stores or export over the bridge
   (the stores and the bundle writer exist and are tested);
 - a user-visible space document file, export and backup;
-- document-first launcher entries, recents and cross-app search;
+- document-first launcher entries and cross-app search across closed packs (the Command Surface
+  searches open packs and cached display rows only);
 - tab tear-off and split view (the view tree is ready; the UI is not);
-- host-rendered pack contributions (commands, menus, toolbar, status; widgets are host-rendered here,
-  but a pack's non-widget contributions still are not);
+- the remaining pack contributions: menus, toolbar and status (commands, search and scopes are
+  host-rendered now);
 - Screen sync across a person's devices (#199; a portable `.screen` file is a manual copy);
 - containers and saved spaces in the UI (the space document already carries a space id);
 - space-document sync, shared spaces, presence and follow;
