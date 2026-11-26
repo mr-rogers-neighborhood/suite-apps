@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { CHROME_IPC, CHROME_STATE, PACK_EVENT, PACK_IPC, PACK_PROJECTION } from "./shared.js";
+import {
+  CHROME_IPC,
+  CHROME_PICK,
+  CHROME_STATE,
+  PACK_EVENT,
+  PACK_IPC,
+  PACK_PROJECTION,
+} from "./shared.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const chrome = readFileSync(join(here, "preload", "chrome.cjs"), "utf8");
@@ -27,6 +34,11 @@ describe("the chrome bridge", () => {
 
   it("listens on the channel the main process broadcasts to", () => {
     expect(chrome).toContain(`"${CHROME_STATE}"`);
+  });
+
+  it("listens for the picker request and hands it to the page", () => {
+    expect(chrome).toContain(`"${CHROME_PICK}"`);
+    expect(chrome).toContain("onPick: (listener) =>");
   });
 
   it("exposes the one global the chrome page looks for", () => {
