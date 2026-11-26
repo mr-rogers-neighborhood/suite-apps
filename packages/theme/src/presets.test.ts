@@ -166,9 +166,19 @@ describe("preset list", () => {
     expect(PRESETS[0]?.id).toBe("suite");
   });
 
-  it("lists Suite, Warm, Solarized in that order", () => {
-    expect(PRESETS.map((theme) => theme.id)).toEqual(["suite", "warm", "solarized"]);
-    expect(PRESETS.map((theme) => theme.name)).toEqual(["Suite", "Warm", "Solarized"]);
+  it("lists Suite, Warm, Solarized and Catppuccin in that order", () => {
+    expect(PRESETS.map((theme) => theme.id)).toEqual([
+      "suite",
+      "warm",
+      "solarized",
+      "catppuccin",
+    ]);
+    expect(PRESETS.map((theme) => theme.name)).toEqual([
+      "Suite",
+      "Warm",
+      "Solarized",
+      "Catppuccin",
+    ]);
   });
 
   it("keeps a stored logseq selection on Warm rather than on a missing theme", () => {

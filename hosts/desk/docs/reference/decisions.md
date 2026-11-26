@@ -222,7 +222,7 @@ The rules that shape the Suite host.
   view with the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A
   pack has no picker and no stored choice; a change repaints open views through
   `ShellWindow.setTheme` and a pack installed later starts in the same theme. The controls are in the
-  **View** menu — light, dark or follow-the-system, Suite, Warm or Solarized, and compact, cozy or
+  **View** menu — light, dark or follow-the-system, Suite, Warm, Solarized or Catppuccin, and compact, cozy or
   comfortable — and in the first-run wizard's appearance step. `logseq` is kept as a stored-id alias
   for `warm`, so an old selection resolves to the warm palette rather than to a missing theme.
   Per-pack palettes and user-authored themes remain out of scope.

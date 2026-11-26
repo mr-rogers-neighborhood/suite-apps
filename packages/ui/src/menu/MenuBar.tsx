@@ -176,7 +176,7 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
           <a
             href={homeHref}
             aria-label={homeAriaLabel}
-            className="flex shrink-0 items-center transition-opacity duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))] hover:opacity-70"
+            className="flex shrink-0 items-center text-[var(--ink)] transition-opacity duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))] hover:opacity-70"
             onClick={handleHomeClick}
           >
             {mark}

@@ -5,7 +5,7 @@ import { isThemeRole, REQUIRED_ROLES, THEME_ROLES, } from "./roles.js";
  * The shape is deliberately the one the picker shows — a name, then light and dark — rather
  * than two independent themes. "Solarized at night" and "Solarized at noon" are the same
  * theme with different values; making them separate entries is how a list of three themes
- * becomes a list of six and nobody can find the one they wanted.
+ * becomes a list of many and nobody can find the one they wanted.
  *
  * Every role is required in both modes. A theme that defines `accent` in light and forgets it
  * in dark is not half a theme, it is a bug that only shows up after sunset.

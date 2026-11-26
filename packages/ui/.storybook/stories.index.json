@@ -1036,6 +1036,30 @@
       ]
     },
     {
+      "id": "packs-budget-month-header--catppuccin-dark",
+      "title": "Packs/Budget/Month header",
+      "name": "Catppuccin Dark",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-budget-month-header--catppuccin-light",
+      "title": "Packs/Budget/Month header",
+      "name": "Catppuccin Light",
+      "importPath": "../../packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "module": "packs/budget/pack/src/renderer/workbench/MonthSurface.stories.tsx",
+      "tags": [
+        "pack:budget",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
       "id": "packs-budget-month-header--comfortable",
       "title": "Packs/Budget/Month header",
       "name": "Comfortable",
@@ -1156,6 +1180,30 @@
       ]
     },
     {
+      "id": "packs-canvas-board-miniature--catppuccin-dark",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Catppuccin Dark",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-canvas-board-miniature--catppuccin-light",
+      "title": "Packs/Canvas/Board miniature",
+      "name": "Catppuccin Light",
+      "importPath": "../../packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "module": "packs/canvas/src/workbench/BoardSurface.stories.tsx",
+      "tags": [
+        "pack:canvas",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
       "id": "packs-canvas-board-miniature--default",
       "title": "Packs/Canvas/Board miniature",
       "name": "Default",
@@ -1240,6 +1288,30 @@
       ]
     },
     {
+      "id": "packs-help-handbook-note--catppuccin-dark",
+      "title": "Packs/Help/Handbook note",
+      "name": "Catppuccin Dark",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-help-handbook-note--catppuccin-light",
+      "title": "Packs/Help/Handbook note",
+      "name": "Catppuccin Light",
+      "importPath": ".storybook/workbench/packs/HelpSurface.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
+      "tags": [
+        "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
       "id": "packs-help-handbook-note--default",
       "title": "Packs/Help/Handbook note",
       "name": "Default",
@@ -1319,6 +1391,30 @@
       "module": "packages/ui/.storybook/workbench/packs/HelpSurface.stories.tsx",
       "tags": [
         "pack:help",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--catppuccin-dark",
+      "title": "Packs/Planner/Capacity",
+      "name": "Catppuccin Dark",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
+        "layer:surface",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "packs-planner-capacity--catppuccin-light",
+      "title": "Packs/Planner/Capacity",
+      "name": "Catppuccin Light",
+      "importPath": "../../packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "module": "packs/planner/pack/src/renderer/workbench/CapacitySurface.stories.tsx",
+      "tags": [
+        "pack:planner",
         "layer:surface",
         "status:experimental"
       ]

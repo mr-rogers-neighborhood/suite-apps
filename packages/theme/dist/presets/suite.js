@@ -1,70 +1,69 @@
 /**
- * Suite — warm paper, ink and a single burnt-orange accent.
+ * Suite — warm neutral paper, near-black ink, a monochrome accent.
  *
- * The palette borrows three things rather than a stylesheet: Sunsama's warm paper field, the
- * Heptabase habit of keeping the shell almost monochrome and letting one warm mark carry the
- * action, and Fumadocs' editorial contrast between display type and small utility labels. The
- * six hues stay distinguishable for sections and charts; they are muted so the accent is still
- * the loudest colour on the page.
+ * The default borrows macOS's quiet, layered neutrals and Heptabase's monochrome shell: the
+ * action is an ink-black button, not a coloured one, and the warmth comes from the paper and
+ * the ink rather than from an accent hue. The six section hues stay muted so a card can wear
+ * one without turning the page into a rainbow.
  *
- * This is the default, so a reader who never opens the theme picker sees the warm look. An
- * existing stored choice keeps its own preset.
+ * Warm carries the burnt-orange version of this look; Catppuccin and Solarized are the two
+ * named palettes.
  */
 export const suite = {
     format: "suite.theme",
     contractVersion: 1,
     id: "suite",
     name: "Suite",
-    description: "Warm paper, near-black ink and one burnt-orange accent.",
+    description: "Warm neutral paper, near-black ink and a monochrome accent.",
     light: {
-        canvas: "#f6f1e9",
-        surface: "#fffcf7",
-        "surface-sunk": "#ece4d8",
-        "surface-strong": "#fff7ec",
-        accent: "#b54a22",
-        "accent-strong": "#963716",
+        canvas: "#f6f4f1",
+        surface: "#fcfbf9",
+        "surface-sunk": "#eeebe6",
+        "surface-strong": "#ffffff",
+        accent: "#1f1e1c",
+        "accent-strong": "#000000",
         danger: "#a83228",
         success: "#3f6b3a",
         warning: "#8a5a12",
-        ink: "#211d18",
-        "ink-muted": "#5e574e",
-        "ink-faint": "#6d6459",
-        hairline: "#e4dacb",
-        "border-strong": "#8a7f70",
-        focus: "#b54a22",
-        "on-accent": "#fffaf3",
-        "on-danger": "#fffaf3",
-        "on-success": "#fffaf3",
-        "on-warning": "#fffaf3",
-        "hue-slate": "#6f6a63",
+        ink: "#1c1a18",
+        "ink-muted": "#5f5a54",
+        "ink-faint": "#6d675f",
+        hairline: "#e6e1da",
+        "border-strong": "#8c857c",
+        focus: "#1c1a18",
+        "on-accent": "#fcfbf9",
+        "on-danger": "#fffdf9",
+        "on-success": "#fffdf9",
+        "on-warning": "#fffdf9",
+        "hue-slate": "#6b6660",
         "hue-blue": "#2f6f9f",
         "hue-green": "#3f6b3a",
-        "hue-amber": "#a05a10",
+        "hue-amber": "#8a5a12",
         "hue-rose": "#a33a4e",
         "hue-violet": "#6b5490",
-        "chart-1": "#b54a22",
+        "chart-1": "#1f1e1c",
         "chart-2": "#3f6b3a",
-        "chart-3": "#a05a10",
+        "chart-3": "#8a5a12",
         "chart-4": "#6b5490",
         "chart-5": "#a33a4e",
     },
     dark: {
-        canvas: "#171411",
-        surface: "#201c18",
-        "surface-sunk": "#100e0b",
-        "surface-strong": "#2a251f",
-        accent: "#e8a87c",
-        "accent-strong": "#f2c39e",
+        canvas: "#1b1917",
+        surface: "#24211e",
+        "surface-sunk": "#12100e",
+        "surface-strong": "#2c2824",
+        accent: "#f3efe9",
+        "accent-strong": "#ffffff",
         danger: "#f0a19a",
         success: "#9ccf9e",
         warning: "#e8c27a",
-        ink: "#f4eee6",
-        "ink-muted": "#b9b0a3",
-        "ink-faint": "#9f9587",
-        hairline: "#342e27",
+        ink: "#f3efe9",
+        "ink-muted": "#b7afa5",
+        "ink-faint": "#9c9388",
+        hairline: "#36312b",
         "border-strong": "#8a8072",
-        focus: "#e8a87c",
-        "on-accent": "#1a1511",
+        focus: "#f3efe9",
+        "on-accent": "#1b1917",
         "on-danger": "#171411",
         "on-success": "#171411",
         "on-warning": "#171411",
@@ -74,7 +73,7 @@ export const suite = {
         "hue-amber": "#e8b87a",
         "hue-rose": "#e7a0a6",
         "hue-violet": "#c0a6e0",
-        "chart-1": "#e8a87c",
+        "chart-1": "#f3efe9",
         "chart-2": "#9ccf9e",
         "chart-3": "#e8b87a",
         "chart-4": "#c0a6e0",

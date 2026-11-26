@@ -107,9 +107,14 @@ describe("theme choice", () => {
     expect(isHostThemeChoice("dark")).toBe(false);
   });
 
-  it("offers the package's three names in the package's order", () => {
+  it("offers the package's preset names in the package's order", () => {
     expect(themeOptions()).toEqual([...PRESETS]);
-    expect(themeOptions().map((theme) => theme.name)).toEqual(["Suite", "Warm", "Solarized"]);
+    expect(themeOptions().map((theme) => theme.name)).toEqual([
+      "Suite",
+      "Warm",
+      "Solarized",
+      "Catppuccin",
+    ]);
   });
 });
 

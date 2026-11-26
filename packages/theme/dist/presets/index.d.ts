@@ -2,13 +2,13 @@ import type { SuiteTheme } from "../theme.js";
 /**
  * The themes that ship inside the package.
  *
- * Order is the order the picker shows, and the first is the default. Suite is first because it
- * is the default look: warm paper, near-black ink and one burnt-orange accent. Warm is the
- * charcoal-and-amber variant and Solarized the low-glare canonical palette, so the host's
- * dropdown has one order everywhere. A stored choice keeps its own preset.
+ * Order is the order the picker shows, and the first is the default. Suite is the warm-neutral
+ * default with a monochrome accent; Warm is its burnt-orange sibling; Solarized is the low-glare
+ * canonical palette; Catppuccin is the official Mocha/Latte pair with the yellow accent. A
+ * stored choice keeps its own preset.
  *
  * Presets live in code rather than in a directory on disk for this pass. A preset cannot be
- * corrupted, cannot be half-written, and is the same three themes in every app at every
+ * corrupted, cannot be half-written, and is the same four themes in every app at every
  * version. Authoring a theme and sharing it across apps is a later pass, and when it lands
  * these become the built-ins that a disk theme can override.
  */
