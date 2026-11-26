@@ -35,6 +35,8 @@ const withTokens: Decorator = (Story, context) => {
     applyTheme(presetById(preset) ?? defaultTheme(), mode, root);
     applyScale(density, root);
     root.classList.toggle("dark", mode === "dark");
+    // Native scrollbars and form controls follow the document's scheme, the way the host sets it.
+    root.style.colorScheme = mode;
   }, [preset, mode, density]);
 
   return (

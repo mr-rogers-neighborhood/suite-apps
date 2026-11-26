@@ -18,6 +18,11 @@ const output = join(app, ".storybook", "stories.index.json");
 
 const SKIP = new Set(["node_modules", "dist", "storybook-static", ".git"]);
 
+/** Storybook mounts `.stories.ts` as well as `.stories.tsx`; the catalog has to see both. */
+function isStoryFile(path) {
+  return /\.stories\.(?:ts|tsx)$/u.test(path);
+}
+
 async function filesUnder(root, accept) {
   const found = [];
   async function walk(directory) {
@@ -55,14 +60,13 @@ function defaultLayer(title) {
 
 async function build() {
   const storyFiles = [
-    ...(await filesUnder(join(app, "src"), (path) => path.endsWith(".stories.tsx"))),
-    ...(await filesUnder(join(app, ".storybook", "workbench"), (path) =>
-      path.endsWith(".stories.tsx"),
-    )),
+    ...(await filesUnder(join(app, "src"), isStoryFile)),
+    ...(await filesUnder(join(app, ".storybook", "workbench"), isStoryFile)),
     // A pack slice is the only pack code the workbench reads. Keep the glob narrow so Canvas's
     // existing story set is not pulled into the single instance by accident.
-    ...(await filesUnder(join(repo, "packs"), (path) =>
-      path.endsWith(".stories.tsx") && path.split(/[\\/]/).includes("workbench"),
+    ...(await filesUnder(
+      join(repo, "packs"),
+      (path) => isStoryFile(path) && path.split(/[\\/]/).includes("workbench"),
     )),
   ].sort();
 

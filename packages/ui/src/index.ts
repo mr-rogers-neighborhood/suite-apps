@@ -24,22 +24,6 @@
  * 4. React 19 is a peer, not a dependency.
  */
 export { AppMark, type AppMarkProps, type AppMarkSize } from "./AppMark.js";
-/*
- * Host chrome also has a `@suite/ui/chrome` subpath. These root re-exports stay only until the
- * Desk island moves to that subpath; a pack must not import them.
- */
-export {
-  NewTabPicker,
-  type NewTabPack,
-  type NewTabPickerProps,
-  type NewTabScreen,
-} from "./chrome/NewTabPicker.js";
-export {
-  HostTabBar,
-  type HostTab,
-  type HostTabBarProps,
-  type HostTabKind,
-} from "./chrome/HostTabBar.js";
 export { AppShell, type AppShellProps } from "./AppShell.js";
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button.js";
 export { type ClassValue, cx } from "./cx.js";
