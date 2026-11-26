@@ -128,6 +128,16 @@ export interface PackDocument {
   readonly id: string;
   readonly format: string;
   readonly version: number;
+  /**
+   * The noun a host shows for this document ("Canvas" / "Canvases").
+   *
+   * Absent means the host says "document". The field is display only; it never reaches a path
+   * or a document id.
+   */
+  readonly name?: {
+    readonly singular: string;
+    readonly plural: string;
+  };
   readonly mode?: "single" | "multi";
   readonly migrations?: readonly PackDocumentMigration[];
   readonly projection?: string;
@@ -315,12 +325,31 @@ const publisherSchema = z
   })
   .strict();
 
+/**
+ * The noun a host shows for one of a pack's documents.
+ *
+ * A host's picker needs a word for "New <thing>" and "Recent <things>", and only the pack knows
+ * it. A pack that declares none keeps the host's neutral "document", so every pack that shipped
+ * before this field still parses.
+ *
+ * Surrounding whitespace is refused rather than trimmed: the manifest that is signed must be the
+ * manifest that is installed, and a parse that silently rewrites a value makes those two differ.
+ */
+const NO_EDGE_SPACE = /^\S(?:.*\S)?$/u;
+const documentNameSchema = z
+  .object({
+    singular: z.string().min(1).max(40).regex(NO_EDGE_SPACE, "no leading or trailing whitespace"),
+    plural: z.string().min(1).max(40).regex(NO_EDGE_SPACE, "no leading or trailing whitespace"),
+  })
+  .strict();
+
 /** One declared document. A host validates this shape before it looks for an entry. */
 export const packDocumentSchema = z
   .object({
     id: z.string().regex(PACK_ID),
     format: z.string().min(1),
     version: z.number().int().positive(),
+    name: documentNameSchema.optional(),
     mode: z.enum(["single", "multi"]).optional(),
     migrations: z
       .array(

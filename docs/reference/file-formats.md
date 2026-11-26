@@ -81,6 +81,7 @@ A pack owns its schema. It declares each document in the manifest (S6.3):
 | `id` | The document name inside `<dataRoot>/documents/<container>/<pack>/`. |
 | `format` | The payload format the pack writes; the host never interprets it. |
 | `version` | The schema version a current document carries. |
+| `name` | The display noun a host's picker uses: `{ "singular": "Canvas", "plural": "Canvases" }`. Optional; absent means "document". |
 | `mode` | `single` or `multi`; optional when the pack has one answer. |
 | `migrations` | Ordered `{from, to, entry}` steps that reach `version`. |
 | `projection` | A read-only entry that turns the current payload into a widget view. |

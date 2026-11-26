@@ -34,6 +34,7 @@ describe("Canvas's declared document", () => {
         id: "canvas",
         format: WORKSPACE_FILE_KIND,
         version: SCHEMA_VERSION,
+        name: { singular: "Canvas", plural: "Canvases" },
         mode: "multi",
       },
     ]);

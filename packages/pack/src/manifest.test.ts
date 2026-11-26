@@ -345,6 +345,72 @@ describe("the pack manifest", () => {
     expect(parsePackManifest(manifest({ description: "x".repeat(201) })).ok).toBe(false);
     expect(parsePackManifest(manifest({ description: "" })).ok).toBe(false);
   });
+
+  // spec: S6.3
+  it("accepts the noun a host shows for a document", () => {
+    const parsed = parsePackManifest(
+      manifest({
+        documents: [
+          {
+            id: "canvas",
+            format: "suite.canvas",
+            version: 6,
+            name: { singular: "Canvas", plural: "Canvases" },
+          },
+        ],
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.documents?.[0]?.name).toEqual({
+      singular: "Canvas",
+      plural: "Canvases",
+    });
+
+    // A manifest is signed as written, so a padded word is refused before it can be stored
+    // trimmed: the bytes that verify must be the bytes that were signed.
+    const padded = parsePackManifest(
+      manifest({
+        documents: [
+          {
+            id: "canvas",
+            format: "suite.canvas",
+            version: 6,
+            name: { singular: " Canvas ", plural: " Canvases " },
+          },
+        ],
+      }),
+    );
+    expect(padded.ok).toBe(false);
+  });
+
+  // spec: S6.3
+  it("refuses a noun that is blank, incomplete, too long or carries another key", () => {
+    const withName = (name: unknown) =>
+      manifest({
+        documents: [{ id: "canvas", format: "suite.canvas", version: 6, name }],
+      });
+
+    expect(parsePackManifest(withName({ singular: " ", plural: "Canvases" })).ok).toBe(false);
+    expect(parsePackManifest(withName({ singular: "Canvas" })).ok).toBe(false);
+    expect(parsePackManifest(withName({ plural: "Canvases" })).ok).toBe(false);
+    expect(
+      parsePackManifest(withName({ singular: "Canvas", plural: "Canvases", short: "C" })).ok,
+    ).toBe(false);
+    expect(parsePackManifest(withName({ singular: "C".repeat(41), plural: "Canvases" })).ok).toBe(
+      false,
+    );
+  });
+
+  // spec: S6.3
+  it("leaves the noun absent when a pack declares none", () => {
+    const parsed = parsePackManifest(
+      manifest({ documents: [{ id: "canvas", format: "suite.canvas", version: 6 }] }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.documents?.[0]).not.toHaveProperty("name");
+  });
 });
 
 describe("canonical manifest bytes", () => {

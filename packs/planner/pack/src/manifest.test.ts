@@ -42,6 +42,7 @@ describe("Planner's declared document", () => {
         id: "workspace",
         format: WORKSPACE_FILE_FORMAT,
         version: SCHEMA_VERSION,
+        name: { singular: "Planner", plural: "Planners" },
         mode: "multi",
         projection: "reminders",
       },

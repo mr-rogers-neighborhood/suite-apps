@@ -29,6 +29,7 @@ describe("Budget's declared document", () => {
         id: "budget",
         format: "suite.budget.snapshot",
         version: SCHEMA_VERSION,
+        name: { singular: "Budget", plural: "Budgets" },
         mode: "multi",
       },
     ]);
