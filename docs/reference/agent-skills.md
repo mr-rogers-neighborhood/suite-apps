@@ -87,6 +87,7 @@ Repository skills:
 | `suite-release` | Publish a channel (explicit invocation only) |
 | `suite-docs` | Author or review module notes and tours |
 | `suite-review` | Review a diff with native OCR on DeepRelay, then Suite's invariants |
+| `storybook-workbench` | Build and verify UI in the Storybook catalog, patterns and theme proofs; use the Storybook MCP |
 
 User-level skills are machine-local and not listed here. The review rules for open-code-review live
 in `.opencodereview/rule.json`; the generic delegation skill is
