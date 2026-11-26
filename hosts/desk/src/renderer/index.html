@@ -8,38 +8,11 @@
       content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <title>Suite</title>
+    <link rel="stylesheet" href="tab-bar.css" />
     <link rel="stylesheet" href="shell.css" />
   </head>
   <body data-surface="launcher">
-    <header class="tabbar">
-      <button id="home" class="brand" type="button" title="Home" aria-label="Home">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span>Suite</span>
-      </button>
-      <div id="tabs" class="tabs" role="tablist" aria-label="Open tabs"></div>
-      <button
-        id="sync-toggle"
-        class="sync-toggle"
-        type="button"
-        aria-expanded="false"
-        title="Sync relay"
-      >
-        Sync
-      </button>
-      <button
-        id="command-toggle"
-        class="command-toggle"
-        type="button"
-        aria-haspopup="dialog"
-        aria-controls="command-surface"
-        title="Command Surface (Ctrl/Cmd+K)"
-      >
-        Commands
-      </button>
-      <button id="new-tab" class="new-tab" type="button" title="Home" aria-label="Open Home">
-        +
-      </button>
-    </header>
+    <div id="host-bar"></div>
 
     <section id="sync-panel" class="sync-panel" aria-label="Sync relay" hidden>
       <div class="sync-heading">

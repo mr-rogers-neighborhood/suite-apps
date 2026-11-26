@@ -1,0 +1,14 @@
+/*
+ * The island's stylesheet.
+ *
+ * Preflight is deliberately not imported: the legacy chrome has its own base
+ * styles, and Tailwind's reset would rewrite them. The theme and utilities
+ * layers are all the shared components need.
+ *
+ * `@suite/ui` ships class names, not CSS, so Tailwind has to see the package's
+ * built output or every class it uses compiles to nothing.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "../../../node_modules/@suite/ui/dist";

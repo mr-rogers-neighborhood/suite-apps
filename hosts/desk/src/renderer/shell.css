@@ -38,6 +38,19 @@ body {
   height: 100%;
 }
 
+/*
+ * The tab strip is a React island now. It keeps the legacy bar's height while the
+ * rest of the chrome is still the vanilla page, so the Screen layout below does
+ * not move; the token goes away with the last of shell.css.
+ */
+#host-bar {
+  flex: 0 0 auto;
+}
+
+#host-bar header {
+  height: var(--tabbar);
+}
+
 body {
   margin: 0;
   background: var(--canvas);

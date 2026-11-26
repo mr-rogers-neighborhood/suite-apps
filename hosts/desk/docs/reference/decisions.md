@@ -295,6 +295,20 @@ The rules that shape the Suite host.
 - Sync is still later (#199). A `.screen` file is a manual copy; the host has no Screen sync
   transport, and a pack never reads or writes a Screen document.
 
+## The chrome is React, one island at a time
+
+- `shell.js` stays the page while the shared chrome moves into React one piece at a time. The tab
+  strip is the first island; the Screens, catalogue, command surface and sync panel remain vanilla
+  until each is ported.
+- The island is built by `vite.island.config.ts` into `dist/renderer/tab-bar.js` and `tab-bar.css`,
+  and imports `@suite/ui` at build time. The page still runs from `suite-chrome://` under
+  `script-src 'self'`, so nothing is fetched and no new origin exists.
+- Host state stays in `shell.js`. React receives a snapshot (`tabs`, `activeTabId`, sync state) and
+  returns callbacks; it never holds a tab list, a document or a host service.
+- Tailwind is compiled for the island only, without preflight, so the legacy page's base styles are
+  untouched. The end state is one React renderer; the vanilla page is deleted when the last surface
+  moves, not kept as a second architecture.
+
 ## Channels
 
 - Suite Desk is a superapp, so it carries one channel for the whole product. Stable is `run.suite.desk` on

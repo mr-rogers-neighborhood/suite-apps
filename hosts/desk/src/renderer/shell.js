@@ -10,10 +10,12 @@
  * file, keeps no document state, and calls host actions that answer with the new state.
  */
 
+import { mountTabBar } from "./tab-bar.js";
+
 const api = globalThis.suiteShell;
 
 const elements = {
-  tabs: document.querySelector("#tabs"),
+  hostBar: document.querySelector("#host-bar"),
   screen: document.querySelector("#screen"),
   screenName: document.querySelector("#screen-name"),
   screenEyebrow: document.querySelector(".screen-title .eyebrow"),
@@ -32,10 +34,7 @@ const elements = {
   widgetChoice: document.querySelector("#widget-choice"),
   addWidget: document.querySelector("#add-widget"),
   empty: document.querySelector("#empty"),
-  newTab: document.querySelector("#new-tab"),
-  home: document.querySelector("#home"),
   openHome: document.querySelector("#open-home"),
-  syncToggle: document.querySelector("#sync-toggle"),
   syncPanel: document.querySelector("#sync-panel"),
   syncState: document.querySelector("#sync-state"),
   syncAddress: document.querySelector("#sync-address"),
@@ -44,7 +43,6 @@ const elements = {
   syncError: document.querySelector("#sync-error"),
   syncStart: document.querySelector("#sync-start"),
   syncStop: document.querySelector("#sync-stop"),
-  commandToggle: document.querySelector("#command-toggle"),
   commandSurface: document.querySelector("#command-surface"),
   commandClose: document.querySelector("#command-close"),
   commandApp: document.querySelector("#command-app"),
@@ -104,6 +102,7 @@ let query = "";
 let editing = false;
 let managingScreens = false;
 let syncOpen = false;
+let tabBar = null;
 let shouldFocusSearch = true;
 let appsView = {
   packs: null,
@@ -324,7 +323,6 @@ function renderCommandScopePanel() {
 
 function renderCommandSurface() {
   elements.commandSurface.hidden = !commandOpen;
-  elements.commandToggle.setAttribute("aria-expanded", String(commandOpen));
   if (!commandOpen) return;
 
   for (const button of elements.commandModes) {
@@ -535,47 +533,35 @@ function nextSize(size) {
   return SIZES[(index + 1) % SIZES.length];
 }
 
-function renderTabs() {
-  const fragment = document.createDocumentFragment();
+function openHomeTab() {
+  shouldFocusSearch = true;
+  run(api.newTab());
+}
 
-  for (const tab of state.tabs) {
-    const selected = tab.id === state.activeTabId;
-    const node = element("div", "tab");
-    node.setAttribute("role", "tab");
-    node.setAttribute("aria-selected", String(selected));
-    node.tabIndex = selected ? 0 : -1;
-    node.dataset.tabId = tab.id;
-    node.dataset.kind = tab.kind;
-    node.title = tab.title;
-
-    const dot = element("span", "tab-dot");
-    dot.style.background = colorFor(tab.kind === "pack" ? tab.packId : tab.screenId);
-    dot.setAttribute("aria-hidden", "true");
-    if (tab.kind === "screen") dot.classList.add("tab-dot-screen");
-
-    const title = element("span", "tab-title", tab.title);
-    const close = element("button", "tab-close", "×");
-    close.type = "button";
-    close.setAttribute("aria-label", `Close ${tab.title}`);
-    close.title = `Close ${tab.title}`;
-    close.addEventListener("click", (event) => {
-      event.stopPropagation();
-      run(api.closeTab(tab.id));
+/** Mount the React strip once, then hand it the host's snapshot on every paint. */
+function updateHostBar() {
+  if (elements.hostBar === null) return;
+  if (tabBar === null) {
+    tabBar = mountTabBar(elements.hostBar, {
+      activate: (id) => run(api.activateTab(id)),
+      close: (id) => run(api.closeTab(id)),
+      newTab: openHomeTab,
+      openCommands: () => {
+        if (commandOpen) closeCommandSurface();
+        else openCommandSurface();
+      },
+      toggleSync: () => {
+        syncOpen = !syncOpen;
+        paint();
+      },
     });
-
-    node.append(dot, title, close);
-    node.addEventListener("click", () => run(api.activateTab(tab.id)));
-    node.addEventListener("keydown", (event) => {
-      if (event.target !== node) return;
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        run(api.activateTab(tab.id));
-      }
-    });
-    fragment.append(node);
   }
-
-  elements.tabs.replaceChildren(fragment);
+  tabBar.update({
+    tabs: state.tabs,
+    activeTabId: state.activeTabId,
+    syncOpen,
+    relay: { ...EMPTY_RELAY, ...(state.relay ?? {}) },
+  });
 }
 
 function matchesQuery(name, id, description) {
@@ -1283,14 +1269,6 @@ function renderScreensPanel() {
 function renderSync() {
   const relay = { ...EMPTY_RELAY, ...(state.relay ?? {}) };
   elements.syncPanel.hidden = !syncOpen;
-  elements.syncToggle.setAttribute("aria-expanded", String(syncOpen));
-  elements.syncToggle.dataset.state = relay.state;
-  elements.syncToggle.textContent =
-    relay.state === "on"
-      ? "Sync · on"
-      : relay.state === "crashed" || relay.state === "failed"
-        ? "Sync · !"
-        : "Sync";
   elements.syncState.textContent = RELAY_LABELS[relay.state] ?? relay.state;
   elements.syncState.dataset.state = relay.state;
   elements.syncAddress.textContent = relay.address ?? "Not running";
@@ -1379,7 +1357,7 @@ function renderScreen() {
 
 function paint() {
   applyTheme();
-  renderTabs();
+  updateHostBar();
   renderSync();
   renderScreen();
   renderCommandSurface();
@@ -1390,26 +1368,11 @@ function paint() {
 }
 
 function bindChrome() {
-  const openHome = () => {
-    shouldFocusSearch = true;
-    run(api.newTab());
-  };
+  elements.openHome.addEventListener("click", openHomeTab);
 
-  elements.newTab.addEventListener("click", openHome);
-  elements.home.addEventListener("click", openHome);
-  elements.openHome.addEventListener("click", openHome);
-
-  elements.syncToggle.addEventListener("click", () => {
-    syncOpen = !syncOpen;
-    paint();
-  });
   elements.syncStart.addEventListener("click", () => runRelayAction(api.relayStart()));
   elements.syncStop.addEventListener("click", () => runRelayAction(api.relayStop()));
 
-  elements.commandToggle.addEventListener("click", () => {
-    if (commandOpen) closeCommandSurface();
-    else openCommandSurface();
-  });
   elements.commandClose.addEventListener("click", closeCommandSurface);
   elements.commandSurface.addEventListener("click", (event) => {
     if (event.target === elements.commandSurface) closeCommandSurface();
