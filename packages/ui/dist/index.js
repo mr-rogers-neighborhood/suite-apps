@@ -24,6 +24,7 @@
  * 4. React 19 is a peer, not a dependency.
  */
 export { AppMark } from "./AppMark.js";
+export { NewTabPicker, } from "./chrome/NewTabPicker.js";
 export { HostTabBar, } from "./chrome/HostTabBar.js";
 export { AppShell } from "./AppShell.js";
 export { Button } from "./Button.js";
