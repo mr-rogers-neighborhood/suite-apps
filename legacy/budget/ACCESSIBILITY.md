@@ -6,14 +6,15 @@ in [`docs/reference/accessibility/wcag-22-map.md`](../../docs/reference/accessib
 
 ## What is verified by machine
 
-One check runs on every change and a failure stops the work. One runs in the workshop and reports
-what it finds without failing a build.
+Budget's register and plan tests run in the gate on every change. The palette test passes when run
+but no gate row runs it, and the workshop panel reports without failing a build.
 
-- **Colour contrast in every theme, on every change.** Each preset in `@suite/theme` is measured in
-  both modes: 4.5:1 for body, secondary and faint text on every surface it can sit on, 4.5:1 for
-  text on every filled role, and 3:1 for focus rings and component boundaries. A preset that fails
-  cannot be merged; the test is in `packages/theme/src/presets.test.ts` and Budget draws its three
-  presets from it.
+- **Colour contrast in every theme.** Each preset in `@suite/theme` is measured in both modes: 4.5:1
+  for body, secondary and faint text on every surface it can sit on, 4.5:1 for text on every filled
+  role, and 3:1 for focus rings and component boundaries. The test is in
+  `packages/theme/src/presets.test.ts` and passes with
+  `mise exec -- pnpm --filter @suite/theme test`; a failing preset would not block a merge today.
+  Budget draws its three presets from it.
 - **Storybook's accessibility panel, in the workshop.** The a11y addon is enabled for every story,
   so a story opened in the workshop runs axe and reports its violations. It is the author's check,
   not the gate: a violation is visible but does not fail `pnpm verify`, and only the two stories

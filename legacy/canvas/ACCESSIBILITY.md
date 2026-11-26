@@ -6,13 +6,15 @@ in [`docs/reference/accessibility/wcag-22-map.md`](../../docs/reference/accessib
 
 ## What is verified by machine
 
-Two checks run on every change, and a failure stops the work.
+One check runs in the gate on every change, and a failure stops the work. The palette test is written
+and passes when run, but no gate row runs it today.
 
 - **Colour contrast in every theme.** Each preset in `@suite/theme` is measured: 4.5:1 for body text
   on every surface it can sit on, 4.5:1 for faint text, and 3:1 for focus rings and component
-  boundaries. A preset that fails cannot be merged. A colour that cannot be measured, such as a
-  gradient or a `color-mix()`, is not allowed in a preset, because an unmeasurable colour cannot be
-  checked.
+  boundaries. The test is in `packages/theme/src/presets.test.ts` and passes with
+  `mise exec -- pnpm --filter @suite/theme test`; a failing preset would not block a merge today. A
+  colour that cannot be measured, such as a gradient or a `color-mix()`, is not allowed in a preset,
+  because an unmeasurable colour cannot be checked.
 - **axe over the Storybook stories.** Every story is audited against the WCAG 2.2 A and AA rule sets
   through the a11y addon, and a violation fails the story test in the gate. This covers the stories
   that exist, not the running window; painted contrast, focus order and screen-reader output still
