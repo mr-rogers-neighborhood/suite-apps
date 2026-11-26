@@ -139,4 +139,16 @@ describe("Shell navigation", () => {
     expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull();
     expect(opener).toHaveFocus();
   });
+
+  it("should keep sync in the phone bar and navigation at a thumb target", async () => {
+    render(<Shell />);
+
+    const sync = await screen.findByTestId("sync-status");
+    expect(sync.className).not.toMatch(/\bhidden\b/u);
+    expect(sync).toHaveClass("touch");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+    expect(within(drawer).getByRole("button", { name: "Today" })).toHaveClass("touch");
+  });
 });

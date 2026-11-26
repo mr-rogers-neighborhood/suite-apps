@@ -269,4 +269,17 @@ describe("WeekView", () => {
       "Plan the week is already on the first day of this week.",
     );
   });
+
+  it("should keep a task's actions visible and thumb-sized at phone width", () => {
+    mocks.snapshot.current = snapshot({
+      tasks: [task({ id: "task-1", title: "Phone task", scheduledFor: weekStart })],
+    });
+
+    render(<WeekView />);
+
+    const actions = screen.getByRole("button", { name: "Actions for Phone task" });
+    expect(actions).toHaveClass("touch");
+    expect(actions.className).not.toMatch(/opacity-0/u);
+    expect(screen.getByRole("button", { name: "Phone task" })).toHaveClass("touch");
+  });
 });

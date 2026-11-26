@@ -87,7 +87,7 @@ export function WeekView() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Week plan">
-      <header className="border-b border-line px-6 pb-4 pt-5">
+      <header className="border-b border-line px-4 pb-4 pt-5 sm:px-6">
         <div className="flex flex-wrap items-baseline gap-2.5">
           <h1 className="text-xl font-semibold tracking-tight">Week</h1>
           <span className="text-xs text-faint">
@@ -132,7 +132,7 @@ export function WeekView() {
       {plan.carryOver.length > 0 && (
         <section
           aria-labelledby="week-carry-over-heading"
-          className="mx-6 mt-4 rounded-2xl border border-warn/40 bg-panel p-4"
+          className="mx-4 mt-4 rounded-2xl border border-warn/40 bg-panel p-4 sm:mx-6"
         >
           <div className="flex flex-wrap items-baseline gap-2.5">
             <h2 id="week-carry-over-heading" className="text-sm font-semibold text-ink">
@@ -169,7 +169,7 @@ export function WeekView() {
         </section>
       )}
 
-      <div className="mt-4 flex-1 overflow-auto px-6 pb-24">
+      <div className="mt-4 flex-1 overflow-auto px-4 pb-24 sm:px-6">
         <div className="grid min-w-[1050px] grid-cols-7 gap-3">
           {plan.days.map((day) => (
             <WeekColumn

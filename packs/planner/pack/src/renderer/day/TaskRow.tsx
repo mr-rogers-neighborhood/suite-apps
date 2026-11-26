@@ -95,7 +95,7 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
     : null;
 
   return (
-    <li className="group flex items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 transition-colors hover:border-line hover:bg-panel">
+    <li className="group flex items-start gap-2 rounded-xl border border-transparent px-2 py-2.5 transition-colors hover:border-line hover:bg-panel sm:gap-3 sm:px-3">
       <TaskCheckbox
         checked={entry.done}
         onCheckedChange={toggle}
@@ -121,7 +121,7 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
             ref={titleRef}
             type="button"
             onClick={() => setEditing(true)}
-            className={`block w-full truncate text-left text-sm ${
+            className={`block w-full truncate text-left text-sm touch ${
               entry.done ? "text-faint line-through" : "text-ink"
             }`}
           >
@@ -173,17 +173,14 @@ export function TaskRow({ entry, project, tags }: TaskRowProps) {
         aria-label={`Open details for ${entry.task.title}`}
         title={`Open details for ${entry.task.title}`}
         onClick={openDetails}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent bg-transparent text-muted opacity-0 transition-colors hover:bg-raised hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+        className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent bg-transparent text-muted transition-colors touch hover:bg-raised hover:text-ink sm:flex"
       >
         <Maximize2 size={14} />
       </button>
 
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
-          <IconButton
-            label={`Actions for ${entry.task.title}`}
-            className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-          >
+          <IconButton label={`Actions for ${entry.task.title}`} className="touch">
             <MoreHorizontal size={15} />
           </IconButton>
         </DropdownMenu.Trigger>

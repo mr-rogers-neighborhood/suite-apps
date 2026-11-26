@@ -130,7 +130,7 @@ export function UpcomingView() {
                             variant="ghost"
                             aria-label={`Open ${task.title}`}
                             onClick={() => openDay(dateKey)}
-                            className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
+                            className="touch"
                           >
                             Open day
                           </Button>

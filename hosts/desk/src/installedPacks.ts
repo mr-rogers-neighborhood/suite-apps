@@ -1202,7 +1202,9 @@ function installedInfo(
     version: manifest.version,
     description: manifest.description ?? null,
     entry: manifest.entry,
-    capabilities: manifest.capabilities,
+    capabilities: [
+      ...new Set([...manifest.capabilities, ...(manifest.optionalCapabilities ?? [])]),
+    ],
     ring: packRing(manifest),
     ...(packMinimumHost(manifest) === undefined
       ? {}

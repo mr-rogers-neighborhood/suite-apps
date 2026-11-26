@@ -10,6 +10,10 @@ const ui = fileURLToPath(new URL("../../../packages/ui/src/index.ts", import.met
 const documentRuntime = fileURLToPath(
   new URL("../../../packages/document-runtime/src/index.ts", import.meta.url),
 );
+const browserNode = fileURLToPath(new URL("./src/sync/browserNode.ts", import.meta.url));
+const browserSyncDesktop = fileURLToPath(
+  new URL("./src/sync/browserSyncDesktop.ts", import.meta.url),
+);
 
 export default defineConfig({
   // The config lives with the pack, but the command runs from the app so no
@@ -22,6 +26,8 @@ export default defineConfig({
     alias: {
       "@suite/document-runtime": documentRuntime,
       "@suite/pack-runtime": runtime,
+      "@suite/sync-desktop": browserSyncDesktop,
+      "@suite/sync/node": browserNode,
       "@suite/ui": ui,
     },
   },

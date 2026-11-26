@@ -19,12 +19,29 @@ import wasm from "vite-plugin-wasm";
  */
 const packRoot = fileURLToPath(new URL(".", import.meta.url));
 const outputRoot = new URL("../.dev/", import.meta.url);
+const browserNode = fileURLToPath(new URL("./src/sync/browserNode.ts", import.meta.url));
+const browserSyncDesktop = fileURLToPath(
+  new URL("./src/sync/browserSyncDesktop.ts", import.meta.url),
+);
 
 export default defineConfig({
   root: packRoot,
   base: "./",
   cacheDir: fileURLToPath(new URL("vite", outputRoot)),
   plugins: [react(), tailwindcss(), wasm()],
+  resolve: {
+    // The shared sync lifecycle imports the protocol's Node entry for its pin class and
+    // its sentences. A pack has neither `node:https` nor `ws`; this entry supplies the
+    // same names and refuses the Node-only socket factory. The host's relay service is
+    // the only transport a pack gets.
+    //
+    // The package root also re-exports Node file stores, so the browser points at the
+    // lifecycle source itself. That keeps `node:fs` out of a pack bundle.
+    alias: {
+      "@suite/sync-desktop": browserSyncDesktop,
+      "@suite/sync/node": browserNode,
+    },
+  },
   optimizeDeps: {
     // Loro ships a wasm-bindgen entry; pre-bundling it breaks the wasm URL.
     exclude: ["loro-crdt"],

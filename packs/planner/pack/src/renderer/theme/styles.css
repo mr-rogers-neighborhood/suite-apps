@@ -94,6 +94,22 @@ body {
   outline-offset: 2px;
 }
 
+/*
+ * The phone's 44px floor.
+ *
+ * `@suite/ui` sizes controls from the density variables, and a touch host
+ * publishes the 44px step. The pack's own small controls — a checkbox, a row's
+ * overflow button, a capture submit — are not theme-sized, so this is the one
+ * utility that gives them the same floor. It applies on a coarse pointer or at
+ * phone width and leaves a desktop pointer's dense rows alone.
+ */
+@media (pointer: coarse), (max-width: 639px) {
+  .touch {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

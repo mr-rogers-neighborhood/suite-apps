@@ -26,7 +26,7 @@ export function InboxView() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Inbox">
-      <header className="border-b border-line px-6 pb-4 pt-5">
+      <header className="border-b border-line px-4 pb-4 pt-5 sm:px-6">
         <div className="flex items-baseline gap-2.5">
           <h1 className="text-xl font-semibold tracking-tight">Inbox</h1>
           <span className="text-xs text-faint">
@@ -36,11 +36,11 @@ export function InboxView() {
         <p className="mt-1 text-xs text-faint">Captured work lands here until you give it a day.</p>
       </header>
 
-      <div className="px-6 pt-4">
+      <div className="px-4 pt-4 sm:px-6">
         <CaptureBar target={{ kind: "inbox" }} />
       </div>
 
-      <div className="mt-4 flex-1 overflow-y-auto px-6 pb-24">
+      <div className="mt-4 flex-1 overflow-y-auto px-4 pb-24 sm:px-6">
         {tasks.length === 0 ? (
           <div className="mt-16 flex flex-col items-center text-center">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-panel">
@@ -58,7 +58,7 @@ export function InboxView() {
               return (
                 <li
                   key={task.id}
-                  className="group flex items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 transition-colors hover:border-line hover:bg-panel"
+                  className="group flex items-start gap-2 rounded-xl border border-transparent px-2 py-2.5 transition-colors hover:border-line hover:bg-panel sm:gap-3 sm:px-3"
                 >
                   <TaskCheckbox
                     checked={false}
@@ -88,7 +88,7 @@ export function InboxView() {
                     aria-label={`Schedule ${task.title} for ${dayLabel}`}
                     title={`Schedule for ${dayLabel}`}
                     onClick={() => replica.document.scheduleTask(task.id, date)}
-                    className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+                    className="touch"
                   >
                     Schedule
                   </Button>
@@ -101,7 +101,7 @@ export function InboxView() {
                       event.currentTarget.focus();
                       selectTask(task.id);
                     }}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-muted opacity-0 transition-colors hover:bg-raised hover:text-ink focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-muted transition-colors touch hover:bg-raised hover:text-ink"
                   >
                     <Maximize2 size={14} />
                   </button>

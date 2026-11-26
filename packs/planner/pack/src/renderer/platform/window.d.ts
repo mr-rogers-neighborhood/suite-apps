@@ -1,7 +1,7 @@
-import type { PlannerBridge } from "@suite/planner-core";
+import type { PlannerRendererBridge } from "./bridge";
 
 declare global {
   interface Window {
-    suitePlanner?: PlannerBridge;
+    suitePlanner?: PlannerRendererBridge;
   }
 }

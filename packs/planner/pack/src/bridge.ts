@@ -1,4 +1,10 @@
-import type { PackLaunchContext, ProjectionsService } from "@suite/pack-runtime";
+import type {
+  PackLaunchContext,
+  ProjectionsService,
+  RecentDocument,
+  RecentsService,
+  RelayService,
+} from "@suite/pack-runtime";
 import {
   type PackBridgeHost,
   createEmitter,
@@ -17,10 +23,12 @@ import {
   encodeWorkspaceFile,
   type ImportResult,
   type PlannerBridge,
+  type SyncInfo,
   WorkspaceDocument,
   type WorkspaceInfo,
 } from "@suite/planner-core";
 import { projectReminders, REMINDER_PACK_ID, REMINDER_PROJECTION } from "./projection";
+import { createPlannerSync, type PlannerSync } from "./sync/service";
 
 /**
  * Planner's bridge, built out of the host's `window.suite` services.
@@ -70,6 +78,22 @@ export interface PlannerPackHost extends PackBridgeHost {
   readonly onDeepLink?: ((listener: (url: string) => void) => () => void) | undefined;
   /** The declared-projection seam. The host calls the entry the manifest names. */
   readonly projections?: ProjectionsService | undefined;
+  /** The host's recent list, when `recents` is declared. */
+  readonly recents?: RecentsService | undefined;
+  /** The host's opaque relay transport, when `relay` is declared. */
+  readonly relay?: RelayService | undefined;
+}
+
+/**
+ * The bridge the pack installs, with the two recents calls the launcher adds.
+ *
+ * `PlannerBridge` is the frozen app's contract and does not know a host has a
+ * recent list. These two are pack-only surface: they read the host's metadata
+ * and switch the open document, never a path or another pack's row.
+ */
+export interface PlannerPackBridge extends PlannerBridge {
+  recentDocuments?(): Promise<readonly RecentDocument[]>;
+  openRecentDocument?(documentId: string): Promise<boolean>;
 }
 
 export interface PlannerPackOptions {
@@ -81,12 +105,12 @@ export interface PlannerPackOptions {
 }
 
 export interface PlannerPack {
-  readonly bridge: PlannerBridge;
+  readonly bridge: PlannerPackBridge;
   /** Write the open document's snapshot when it has unsaved updates. */
   flush(): Promise<void>;
   /** The host document id, for a device assertion. Never a path. */
   documentId(): string | null;
-  dispose(): void;
+  dispose(): Promise<void>;
 }
 
 interface OpenDocument {
@@ -220,6 +244,108 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
     replacements.emit(snapshot, runtime.fail, "a workspace-replaced listener failed");
   }
 
+  /**
+   * Sync status is pushed, not polled.
+   *
+   * The service owns the listener set; this only turns a change into the same
+   * `SyncInfo` the dialog asks for, so the pill and the dialog cannot disagree.
+   */
+  const syncListeners = new Set<(info: SyncInfo) => void>();
+  let started: PlannerSync | null = null;
+
+  async function announceSync(): Promise<void> {
+    const service = started;
+    if (service === null) return;
+    try {
+      const info = await service.info();
+      for (const listener of [...syncListeners]) listener(info);
+    } catch {
+      // A status read failed; the next change or an explicit syncStatus() will try again.
+    }
+  }
+
+  /**
+   * The host's own recent list, for this pack's documents only.
+   *
+   * Another pack's row carries no document id (S11.1), so it is skipped rather
+   * than painted as one this pack could open. The row is metadata; a document is
+   * read only when a person chooses it.
+   */
+  async function recentDocuments(): Promise<readonly RecentDocument[]> {
+    const recents = host.recents;
+    if (recents === undefined) return [];
+    let rows: readonly RecentDocument[];
+    try {
+      rows = await recents.list();
+    } catch {
+      return [];
+    }
+    const open = runtime.current()?.id ?? null;
+    const seen = new Set<string>();
+    const entries: RecentDocument[] = [];
+    for (const row of rows) {
+      if (row.packId !== packId || row.documentId === null) continue;
+      if (row.documentId === open || seen.has(row.documentId)) continue;
+      seen.add(row.documentId);
+      entries.push(row);
+    }
+    return entries;
+  }
+
+  /** Open one host-recorded document by id. The host resolves the path. */
+  async function openRecentDocument(documentId: string): Promise<boolean> {
+    await ensure();
+    const service = runtime.documents();
+    const record = await service.open(documentId);
+    if (record === null) return false;
+
+    let next: WorkspaceDocument;
+    let fresh = false;
+    if (record.bytes.byteLength === 0) {
+      next = WorkspaceDocument.create();
+      fresh = true;
+    } else {
+      next = documentFromSnapshot(record.bytes);
+    }
+
+    await syncService.workspaceChanged();
+    runtime.setCurrent({ id: record.id, doc: next });
+    created = fresh;
+    hasDocument = !fresh;
+    if (fresh) {
+      runtime.markDirty();
+      await flush();
+    }
+    emitReplaced(next.snapshot());
+    return true;
+  }
+
+  const syncService = createPlannerSync({
+    host: {
+      ...(host.relay === undefined ? {} : { relay: host.relay }),
+      ...(host.files === undefined ? {} : { files: host.files }),
+      ...(host.info === undefined ? {} : { info: host.info }),
+    },
+    workspace: async () => {
+      await ensure();
+      return runtime.current()?.doc.getMeta().workspaceId ?? null;
+    },
+    onDocumentUpdate: async (update) => {
+      const target = runtime.current();
+      if (target === null) return;
+      target.doc.applyUpdate(update);
+      runtime.markDirty();
+      // The renderer reads snapshots, not updates. The same path an import uses.
+      emitReplaced(target.doc.snapshot());
+    },
+    onDocumentSnapshot: () => runtime.current()?.doc.snapshot() ?? null,
+    onChange: () => {
+      void announceSync();
+    },
+    now: clock,
+  });
+  started = syncService;
+
   async function exportWorkspace(): Promise<ExportResult> {
     await ensure();
     const target = runtime.current();
@@ -271,6 +397,9 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
     if (target === null) throw new Error("No workspace is open.");
     await flush();
 
+    // The import replaces the workspace, so the old connection and its cursor do not
+    // belong to the new id. The document itself is not touched by the disconnect.
+    await syncService.workspaceChanged();
     target.doc = decoded;
     hasDocument = true;
     runtime.markDirty();
@@ -279,7 +408,7 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
     return { canceled: false };
   }
 
-  const bridge: PlannerBridge = {
+  const bridge: PlannerPackBridge = {
     async loadSnapshot() {
       await ensure();
       const target = runtime.current();
@@ -308,9 +437,12 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
       if (target === null) return;
       target.doc.applyUpdate(update);
       runtime.markDirty();
+      // A live relay gets the same update the document authority just applied. It is
+      // sealed by the shared lifecycle before the host sees a byte.
+      syncService.publish(update);
     },
 
-    // Nothing replaces the document until an import arrives; sync is a later phase.
+    // Sync applies a snapshot to the authority and replaces what the renderer reads.
     onWorkspaceReplaced(listener) {
       return replacements.add(listener);
     },
@@ -345,15 +477,40 @@ export function createPlannerPack(options: PlannerPackOptions): PlannerPack {
     async wasCreated() {
       return created;
     },
+
+    recentDocuments,
+    openRecentDocument,
+
+    syncStatus: () => syncService.info(),
+    syncEnable: (url, fingerprint) => syncService.enable(url, fingerprint),
+    syncDisable: () => syncService.disable(),
+    syncInvite: (role, to) => syncService.invite(role, to),
+    syncJoin: (link, fingerprint) => syncService.join(link, fingerprint),
+    syncAddContact: (input) => syncService.addContact(input),
+    syncRemoveContact: (code) => syncService.removeContact(code),
+    onSyncChanged(listener) {
+      syncListeners.add(listener);
+      void syncService
+        .info()
+        .then((info) => {
+          if (syncListeners.has(listener)) listener(info);
+        })
+        .catch(() => undefined);
+      return () => {
+        syncListeners.delete(listener);
+      };
+    },
   };
 
   return {
     bridge,
     flush,
     documentId: () => runtime.current()?.id ?? null,
-    dispose: () => {
+    async dispose() {
       runtime.dispose();
       replacements.clear();
+      syncListeners.clear();
+      await syncService.dispose();
     },
   };
 }

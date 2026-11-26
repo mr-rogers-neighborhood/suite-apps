@@ -35,15 +35,15 @@ export function DayView() {
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Day plan">
       <DayHeader date={date} />
 
-      <div className="px-6 pt-4">
+      <div className="px-4 pt-4 sm:px-6">
         <CapacityMeter capacity={capacity} />
       </div>
 
-      <div className="px-6 pt-4">
+      <div className="px-4 pt-4 sm:px-6">
         <CaptureBar target={{ kind: "day", dateKey: date }} />
       </div>
 
-      <div className="mt-2 flex-1 overflow-y-auto px-6 pb-24">
+      <div className="mt-2 flex-1 overflow-y-auto px-4 pb-24 sm:px-6">
         {plan.overdue.length > 0 && (
           <section className="mt-4">
             <h2 className="px-3 text-[11px] font-medium uppercase tracking-wider text-warn">
@@ -59,7 +59,7 @@ export function DayView() {
                   <button
                     type="button"
                     onClick={() => replica.document.scheduleTask(task.id, date)}
-                    className="rounded-md border border-line px-2 py-0.5 text-[11px] text-muted transition-colors hover:bg-raised hover:text-ink"
+                    className="rounded-md border border-line px-2 py-0.5 text-[11px] text-muted transition-colors touch hover:bg-raised hover:text-ink"
                   >
                     Pull to this day
                   </button>
@@ -130,7 +130,7 @@ function EmptyDay({
         <button
           type="button"
           onClick={onPullFromInbox}
-          className="mt-4 rounded-lg border border-line px-3 py-1.5 text-xs text-muted transition-colors hover:bg-raised hover:text-ink"
+          className="mt-4 rounded-lg border border-line px-3 py-1.5 text-xs text-muted transition-colors touch hover:bg-raised hover:text-ink"
         >
           Open inbox · {inboxCount} waiting
         </button>

@@ -117,6 +117,7 @@ const manifestSchema = z
       .strict()
       .optional(),
     capabilities: z.array(z.enum(PACK_CAPABILITIES)).default([]),
+    optionalCapabilities: z.array(z.enum(PACK_CAPABILITIES)).optional(),
     documents: z.array(packDocumentSchema).max(64).optional(),
     // Opaque host kinds (S3.5): a development pack may name a kind this host has
     // never heard of, and the fit check below decides what that means.
@@ -279,13 +280,21 @@ function readPack(directory: string, host: HostContract): PackInfo | null {
       return null;
     }
 
+    // The summary is what every later `packAllows` call reads, so it carries the
+    // optional capabilities too. The load refusal above still checks only the
+    // required list: a missing optional capability degrades (S4.1), and the host's
+    // absent service is what a pack observes.
+    const declared = [
+      ...new Set([...parsed.data.capabilities, ...(parsed.data.optionalCapabilities ?? [])]),
+    ] as readonly PackCapability[];
+
     return {
       id: parsed.data.id,
       name: parsed.data.name,
       version: parsed.data.version,
       description: parsed.data.description ?? null,
       entry: parsed.data.entry,
-      capabilities: parsed.data.capabilities as readonly PackCapability[],
+      capabilities: declared,
       ring: packRing(manifest),
       ...(packMinimumHost(manifest) === undefined
         ? {}

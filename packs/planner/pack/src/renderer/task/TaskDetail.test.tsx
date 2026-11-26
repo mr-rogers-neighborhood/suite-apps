@@ -526,4 +526,19 @@ describe("TaskDetail", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(opener).toHaveFocus();
   });
+
+  it("should fit a phone viewport and keep its controls at a thumb target", () => {
+    const { doc, replica } = makeDocument();
+    const task = doc.createTask({ title: "A task", scheduledFor: "2026-11-20" });
+    open(task.id);
+
+    renderDetail(replica);
+
+    const dialog = screen.getByRole("dialog", { name: "Task details" });
+    // The panel never exceeds the viewport and scrolls its long form inside it.
+    expect(dialog.className).toContain("max-h-[calc(100vh-4rem)]");
+    expect(dialog.className).toContain("overflow-y-auto");
+    expect(screen.getByRole("button", { name: "Close task details" })).toHaveClass("touch");
+    expect(screen.getByLabelText("New checklist item")).toHaveClass("touch");
+  });
 });

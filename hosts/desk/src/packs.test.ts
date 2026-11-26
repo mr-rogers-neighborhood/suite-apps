@@ -63,6 +63,19 @@ describe("pack discovery", () => {
     expect(packs[0]?.source).toBe("development");
   });
 
+  // spec: S4.1
+  it("keeps an optional capability in the summary so a served service can be used", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "planner", {
+      capabilities: ["documents"],
+      optionalCapabilities: ["relay"],
+    });
+
+    const [pack] = discoverPacks(root);
+    expect(pack?.capabilities).toEqual(["documents", "relay"]);
+    expect(pack === undefined ? false : packAllows(pack, "relay")).toBe(true);
+  });
+
   it("skips a manifest whose entry does not exist", async () => {
     const root = await temporaryRoot();
     await writePack(root, "broken", { entry: "missing.html" });

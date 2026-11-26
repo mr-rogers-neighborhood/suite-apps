@@ -45,15 +45,15 @@ export function DayHeader({ date }: { date: DateKey }) {
   });
 
   return (
-    <header className="border-b border-line px-6 pb-4 pt-5">
-      <div className="flex items-center gap-2">
+    <header className="border-b border-line px-4 pb-4 pt-5 sm:px-6">
+      <div className="flex flex-wrap items-center gap-2">
         <IconButton label="Previous day" onClick={() => setSelectedDate(addDaysToKey(date, -1))}>
           <ChevronLeft size={16} />
         </IconButton>
         <IconButton label="Next day" onClick={() => setSelectedDate(addDaysToKey(date, 1))}>
           <ChevronRight size={16} />
         </IconButton>
-        <div className="ml-1 flex items-baseline gap-2.5">
+        <div className="ml-1 flex min-w-0 flex-wrap items-baseline gap-2.5">
           <h1 ref={headingRef} tabIndex={-1} className="text-xl font-semibold tracking-tight">
             {dayLabel}
           </h1>
@@ -66,7 +66,7 @@ export function DayHeader({ date }: { date: DateKey }) {
               restoreHeadingFocus.current = true;
               setSelectedDate(today);
             }}
-            className="ml-auto rounded-md border border-line px-2.5 py-1 text-xs text-muted transition-colors hover:bg-raised hover:text-ink"
+            className="ml-auto rounded-md border border-line px-2.5 py-1 text-xs text-muted transition-colors touch hover:bg-raised hover:text-ink"
           >
             Back to today
           </button>
