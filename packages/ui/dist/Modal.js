@@ -9,7 +9,7 @@ const SIZES = {
     lg: "w-[min(760px,calc(100vw-2rem))]",
     xl: "w-[min(896px,calc(100vw-2rem))]",
 };
-export function Modal({ open, onClose, label, header, description, footer, children, size = "md", className, }) {
+export function Modal({ open, onClose, label, header, description, footer, children, size = "md", className, onEscapeKeyDown, }) {
     // Radix restores focus on close, but capture the opener explicitly as well: a caller may
     // unmount the dialog in the same render that closes it, and the explicit target survives
     // that. This is the one behaviour the package owned before Radix and still promises.
@@ -23,7 +23,7 @@ export function Modal({ open, onClose, label, header, description, footer, child
         }, children: _jsxs(DialogPrimitive.Portal, { children: [_jsx(DialogPrimitive.Overlay, { className: "fixed inset-0 z-[70] bg-[color-mix(in_srgb,var(--ink)_30%,transparent)] backdrop-blur-[2px]" }), _jsxs(DialogPrimitive.Content
                 // A visible heading belongs to the caller. The hidden title names the dialog for
                 // assistive technology; the description, when given, is Radix's to wire up.
-                , { ...(description === undefined ? { "aria-describedby": undefined } : {}), "aria-modal": "true", onOpenAutoFocus: () => {
+                , { ...(description === undefined ? { "aria-describedby": undefined } : {}), "aria-modal": "true", onEscapeKeyDown: onEscapeKeyDown, onOpenAutoFocus: () => {
                         restoreTo.current =
                             document.activeElement instanceof HTMLElement ? document.activeElement : null;
                     }, onCloseAutoFocus: (event) => {

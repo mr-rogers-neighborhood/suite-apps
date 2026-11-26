@@ -1,17 +1,18 @@
 import { Canvas, Meta } from "@storybook/addon-docs/blocks";
-import * as NewTabStories from "../../../src/chrome/NewTabPicker.stories";
+import * as NewTabStories from "./NewTab.stories";
 
-<Meta title="Workbench/Patterns/New tab" />
+<Meta of={NewTabStories} />
 
 # New tab
 
-The picker is how a person opens a pack or a Screen, or starts a new one. It replaces the old Home
-screen as the default action of `+`; a person can still choose a Screen or a pack as Home.
+The picker is how a person opens a pack, a document inside one, or a Screen. It replaces the old
+Home screen as the default action of `+`, and it is the host's answer to "what am I opening?" — a
+pack almost always holds more than one document, so choosing the pack is only half the question.
 
 ## When to use it
 
 - A `+`, a keyboard shortcut, or a host's new-tab gesture.
-- Returning to a recent pack or Screen.
+- Returning to a recent document, whichever pack it belongs to.
 - Starting a Screen before any pack has been opened.
 
 Do not use it as a settings page or a catalogue. Settings has its own tab; installing and removing
@@ -19,35 +20,79 @@ packs belongs there.
 
 ## Anatomy
 
-1. **Search** — the only input, focused on open.
-2. **Recents** — the last packs and Screens, most recent first.
-3. **Packs** — installed packs with their own mark.
-4. **Screens** — the person's compositions, plus **New Screen**.
-5. **Settings** — the escape hatch for the app's non-content surfaces.
+The root is one list in four parts:
+
+1. **Recents** — the last five documents opened, newest first, each labelled with its pack. A
+   document already open in a tab is skipped, because the tab strip is one click away.
+2. **Packs** — installed packs with their own mark and a count in the pack's own noun. A pack that
+   declares documents opens a second level; a pack that declares none opens directly.
+3. **Screens** — the person's compositions, plus **New screen**.
+4. **Host** — **Open a file…** when the host can hand a file to a pack, and **Settings**.
+
+The second level is the chosen pack's documents:
+
+1. **Recent \<plural\>** — the five most recent inside that pack.
+2. **\<plural\>** — everything else, by name.
+3. **New \<singular\>**.
+
+Search filters the level it is on. At the root it also reaches documents inside packs and jumps
+straight to them, which is the fastest route to a document whose pack you cannot remember. A query
+that matches nothing says so with the query named.
+
+## Documents and nouns
+
+A pack declares each document format in its manifest, and may declare the word for it:
+
+```json
+"documents": [
+  {
+    "id": "canvas",
+    "format": "suite.canvas",
+    "version": 6,
+    "name": { "singular": "Canvas", "plural": "Canvases" },
+    "mode": "multi"
+  }
+]
+```
+
+`name` is optional. Absent means the host says **document**. Help declares no documents at all, so
+it never gets a second level — the picker does not special-case it.
 
 ## Keyboard
 
-- `Ctrl/Cmd+K` or `+` opens the picker.
-- `ArrowUp` / `ArrowDown` move the active row; `Enter` opens it.
-- `Escape` closes the picker and returns focus to the opener.
-- Typing filters every section; a section with no match is hidden.
+- `ArrowUp` / `ArrowDown` move the active row; `Home` and `End` jump to the first and last.
+- `Enter` opens the active row, including a pack's second level.
+- `Escape` steps back from a pack's level, and closes the picker at the root.
+- `Backspace` on an empty query also steps back.
+
+Focus never leaves the search input: the list is a listbox driven by `aria-activedescendant`.
 
 ## Copy
 
-- Placeholder: **Search apps, screens and commands**.
-- Empty: **Nothing matched “…”** with the query named; do not say “No results”.
-- New Screen: **New Screen**; a Screen is a tab, not a workspace.
-- Pack unavailable: `This build cannot open <name>`; do not hide it silently.
+- Placeholder: **Search packs, Screens and documents**; inside a pack, **Search \<plural\>**.
+- Empty search: **Nothing matches “…”** with the query named; do not say “No results”.
+- First run: **No packs are installed yet…**, with **Install a pack** as the first row.
+- New: **New \<singular\>** from the pack's own noun; **New screen** for a Screen, which is a tab
+  and not a workspace.
+- Pack unavailable: the row stays with an `unavailable` note and refuses activation; do not hide it
+  silently.
 
 ## Accessibility
 
-The current picker is a list of buttons with one search input, not yet a full ARIA combobox. Until
-it becomes one, the search input must keep its label, the active row must be reachable with the
-arrow keys, and the section headings must be real headings. The story's axe pass is the check; a
-keyboard-only pass is still required before this pattern is called ready.
+The search field is an ARIA combobox over a listbox. The visible caption of each section is
+decorative; the section's accessible name is the `group` label (`Recents`, `Packs`,
+`Recent Canvases`, `Screens`, `Host`), which is what a screen reader announces when the active row
+enters it. A polite live region announces the pack and its document count when the level changes,
+and nothing on each keystroke.
+
+Entering the second level keeps focus in the input and moves only the active descendant; the Back
+control exists for a pointer, not as the only route. Every story is an axe test. This page's
+keyboard pass was done in the running workbench, not only in jsdom.
 
 ## Stories
 
 <Canvas of={NewTabStories.Default} />
-<Canvas of={NewTabStories.NoMatches} />
+<Canvas of={NewTabStories.SecondLevel} />
+<Canvas of={NewTabStories.KeyboardOnly} />
+<Canvas of={NewTabStories.OpenDocumentSkipped} />
 <Canvas of={NewTabStories.FirstRun} />
