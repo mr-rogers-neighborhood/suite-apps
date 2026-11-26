@@ -5,7 +5,7 @@ import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/deskto
 import { isPublisherKeyTrusted, type PackDocument, SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isPackCapability, type PackCapability } from "@suite/pack/capabilities";
 import { SCREEN_FILE_EXTENSION, SCREEN_FILE_MAX_BYTES, SUITE_SCREEN_VERSION } from "@suite/screens";
-import { DENSITIES } from "@suite/theme";
+import { DENSITIES, DENSITY_LABELS } from "@suite/theme";
 import {
   app,
   dialog,
@@ -63,7 +63,12 @@ import {
 } from "./installedPacks.js";
 import { type LibraryScope, LibraryWatch, revealDocument } from "./library.js";
 import { planUninstall } from "./lifecycle.js";
-import { completeOnboarding, isFirstRun } from "./onboarding.js";
+import {
+  completeOnboarding,
+  isFirstRun,
+  needsHomeAppsMigration,
+  recordHomeAppsMigration,
+} from "./onboarding.js";
 import { documentScopeLabel, documentsRootFor } from "./packIdentity.js";
 import {
   type DeviceKey,
@@ -373,7 +378,10 @@ async function bootstrap(): Promise<void> {
     directory: join(dataRoot, "screens"),
     indexFile: join(dataRoot, SCREENS_INDEX_FILENAME),
   });
-  await migrateHome(screenStore);
+  if (await needsHomeAppsMigration(dataRoot)) {
+    await migrateHome(screenStore);
+    await recordHomeAppsMigration(dataRoot);
+  }
   // One store per (container, pack) under the publisher's root. This is host
   // data, deliberately separate from the pack's code root.
   const fileService = new PackFilesService(join(dataRoot, "files"));
@@ -805,8 +813,19 @@ async function refreshCatalogue(): Promise<void> {
  * Verified installs under the data root are the load path. An unsigned directory
  * beside the checkout is added only when the dev switch opened; its issues are
  * logged, not shown, because a development directory is not a user install.
+ *
+ * Concurrent first-run installs each ask for a refresh. They queue instead of scanning over
+ * each other, so the last scan sees every install that finished before it.
  */
-async function refreshPacks(): Promise<void> {
+let packRefreshChain: Promise<void> = Promise.resolve();
+
+function refreshPacks(): Promise<void> {
+  const next = packRefreshChain.then(() => scanPacks());
+  packRefreshChain = next.catch(() => undefined);
+  return next;
+}
+
+async function scanPacks(): Promise<void> {
   const scan = await loadInstalledPacks(join(dataRootFor(), "packs"), packTrustOptions());
   for (const issue of scan.issues) {
     const label = [issue.id ?? "unknown", issue.version ?? ""].join(" ").trim();
@@ -873,13 +892,8 @@ function installApplicationMenu(): void {
     checked: themeChoice.preset === theme.id,
     click: () => void chooseTheme({ preset: theme.id }),
   }));
-  const densityLabels: Record<HostThemeChoice["density"], string> = {
-    compact: "Compact",
-    cozy: "Cozy",
-    comfortable: "Comfortable",
-  };
   const densityItems: MenuItemConstructorOptions[] = DENSITIES.map((density) => ({
-    label: densityLabels[density],
+    label: DENSITY_LABELS[density],
     type: "radio",
     checked: themeChoice.density === density,
     click: () => void chooseTheme({ density }),
@@ -1131,6 +1145,7 @@ function registerIpc(): void {
   });
   onChrome(CHROME_IPC.installFirstRunPack, async (id) => {
     if (typeof id !== "string") return { ok: false, detail: "No app was named." };
+    if (!firstRun) return { ok: false, detail: "The first-run wizard is closed." };
     return installFirstRunPack(id);
   });
   onChrome(CHROME_IPC.completeFirstRun, async () => {
@@ -2053,6 +2068,9 @@ async function installFirstRunPack(id: string): Promise<FirstRunInstallResult> {
     return { ok: false, detail: `No trusted ${id} is in the catalogue.` };
   }
   const previous = packs.find((pack) => pack.id === id) ?? null;
+  if (previous !== null && previous.version === entry.version) {
+    return { ok: true, detail: "Already installed" };
+  }
   const action = catalogueActionFor(id, entry.version, previous);
   try {
     const installed = await installCataloguePack(

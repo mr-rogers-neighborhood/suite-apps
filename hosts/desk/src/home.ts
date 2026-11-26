@@ -319,12 +319,12 @@ export async function openHomeScreen(screens: ScreenSet, spaces: SpaceStore): Pr
 }
 
 /**
- * Remove the old host app grid from Home.
+ * Remove the old host app grid from Home, once.
  *
  * `desk.apps` was Home's launcher before the picker became the new-tab surface. A Screen that
  * still carries it keeps every other widget; an old default Home becomes empty and the Suite
  * mark and the picker carry the next action. The placement is removed from the document, not
- * hidden in the view.
+ * hidden in the view. The caller records the migration, so adding it back is not undone.
  */
 export async function migrateHome(screens: ScreenSet): Promise<void> {
   const screen = screens.screen(screens.homeId);

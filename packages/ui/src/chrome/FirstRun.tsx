@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Density, ThemeMode } from "@suite/theme";
+import { DENSITIES, DENSITY_LABELS, type Density, PRESETS, type ThemeMode } from "@suite/theme";
 import { Button } from "../Button.js";
 import { cx } from "../cx.js";
 import { PackCard, type PackStatus } from "./PackCard.js";
@@ -12,6 +12,7 @@ import { PackCard, type PackStatus } from "./PackCard.js";
  * and the installer; this component owns the question and its progress.
  */
 export type FirstRunStep = "apps" | "appearance" | "install";
+export type FirstRunMode = ThemeMode | "system";
 
 export interface FirstRunPack {
   readonly id: string;
@@ -19,11 +20,15 @@ export interface FirstRunPack {
   readonly description?: string;
   readonly version?: string;
   readonly status?: PackStatus;
+  /** What the catalogue showed: who signed it and which capabilities it declares. */
+  readonly publisher?: string;
+  readonly capabilities?: readonly string[];
 }
 
 export interface FirstRunTheme {
   readonly preset: string;
-  readonly mode: ThemeMode;
+  /** `system` keeps following the OS; the host resolves light or dark for the paint. */
+  readonly mode: FirstRunMode;
   readonly density: Density;
 }
 
@@ -46,27 +51,23 @@ export interface FirstRunProps {
   /** Install one pack. The component calls these concurrently, one per selected pack. */
   readonly onInstall: (id: string) => Promise<FirstRunInstall>;
   /** Leave the wizard. The host shows the empty Home only after this returns. */
-  readonly onComplete: () => void;
+  readonly onComplete: () => void | Promise<void>;
   /** Story and resumed-flow seams; the host omits both on a fresh install. */
   readonly initialStep?: FirstRunStep;
   readonly initialSelected?: readonly string[];
   readonly initialRows?: readonly FirstRunRow[];
 }
 
-const PRESETS: readonly { readonly id: string; readonly label: string }[] = [
-  { id: "suite", label: "Suite" },
-  { id: "solarized", label: "Solarized" },
-  { id: "warm", label: "Warm" },
-];
-const MODES: readonly { readonly id: ThemeMode; readonly label: string }[] = [
+const PRESET_OPTIONS: readonly { readonly id: string; readonly label: string }[] = PRESETS.map(
+  (theme) => ({ id: theme.id, label: theme.name }),
+);
+const MODES: readonly { readonly id: FirstRunMode; readonly label: string }[] = [
   { id: "light", label: "Light" },
   { id: "dark", label: "Dark" },
+  { id: "system", label: "Follow the system" },
 ];
-const DENSITY_OPTIONS: readonly { readonly id: Density; readonly label: string }[] = [
-  { id: "compact", label: "Compact" },
-  { id: "cozy", label: "Cozy" },
-  { id: "comfortable", label: "Comfortable" },
-];
+const DENSITY_OPTIONS: readonly { readonly id: Density; readonly label: string }[] =
+  DENSITIES.map((density) => ({ id: density, label: DENSITY_LABELS[density] }));
 
 function StepRail({ step }: { readonly step: FirstRunStep }) {
   const steps: readonly { readonly id: FirstRunStep; readonly label: string }[] = [
@@ -150,7 +151,7 @@ function Appearance({
         <section>
           <h2 className="text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]">Palette</h2>
           <div className="mt-2 flex flex-wrap gap-2">
-            {PRESETS.map((preset) => (
+            {PRESET_OPTIONS.map((preset) => (
               <Choice
                 key={preset.id}
                 label={preset.label}
@@ -210,6 +211,51 @@ function Appearance({
         </div>
       </div>
     </div>
+  );
+}
+
+function InstallReview({ packs }: { readonly packs: readonly FirstRunPack[] }) {
+  return (
+    <section className="mt-6" aria-label="What this installs">
+      <h2 className="text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]">
+        What this installs
+      </h2>
+      {packs.length === 0 ? (
+        <p className="mt-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]">
+          No apps selected. You can add them later in Settings.
+        </p>
+      ) : (
+        <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
+          {packs.map((pack) => (
+            <li
+              key={pack.id}
+              className="rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-3 text-[length:var(--text-label,12px)]"
+            >
+              <p className="m-0 flex flex-wrap items-baseline gap-2">
+                <span className="text-[length:var(--text-title,15px)] text-[var(--ink)]">
+                  {pack.name}
+                </span>
+                <span className="text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
+                  {pack.id}
+                  {pack.version === undefined ? "" : ` · v${pack.version}`}
+                </span>
+              </p>
+              <p className="mt-1 text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]">
+                {pack.publisher === undefined
+                  ? "Publisher not shown by this catalogue."
+                  : `Publisher ${pack.publisher}`}
+              </p>
+              <p className="mt-0.5 text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]">
+                Needs:{" "}
+                {pack.capabilities === undefined || pack.capabilities.length === 0
+                  ? "no capabilities"
+                  : pack.capabilities.join(", ")}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -296,6 +342,7 @@ export function FirstRun({
   const [followPacks, setFollowPacks] = useState(initialSelected === undefined);
   const [rows, setRows] = useState<readonly FirstRunRow[]>(initialRows ?? []);
   const [busy, setBusy] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!followPacks) return;
@@ -352,9 +399,23 @@ export function FirstRun({
     setBusy(false);
   }
 
+  async function finish() {
+    setBusy(true);
+    setCompleteError(null);
+    try {
+      await onComplete();
+    } catch (error) {
+      setCompleteError(
+        error instanceof Error ? error.message : "The host could not finish setup.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function startInstall() {
     if (chosen.length === 0) {
-      onComplete();
+      void finish();
       return;
     }
     const ids = chosen.map((pack) => pack.id);
@@ -432,6 +493,7 @@ export function FirstRun({
             <div className="mt-6">
               <Appearance theme={theme} onThemeChange={onThemeChange} />
             </div>
+            <InstallReview packs={chosen} />
             <div className="mt-6 flex flex-wrap gap-2">
               <Button variant="primary" onClick={startInstall}>
                 {chosen.length === 0
@@ -460,7 +522,7 @@ export function FirstRun({
             <div className="mt-6 flex flex-wrap gap-2">
               <Button
                 variant="primary"
-                onClick={onComplete}
+                onClick={() => void finish()}
                 disabled={busy || rows.some((row) => row.state === "installing" || row.state === "queued")}
               >
                 Continue to Home
@@ -476,6 +538,12 @@ export function FirstRun({
             </div>
           </div>
         ) : null}
+
+        {completeError === null ? null : (
+          <p role="alert" className="mx-8 mt-4 text-[length:var(--text-label,12px)] text-[var(--danger)]">
+            {completeError}
+          </p>
+        )}
       </main>
     </div>
   );

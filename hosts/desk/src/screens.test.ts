@@ -51,6 +51,13 @@ describe("the Home screen", () => {
     await migrateHome(set);
 
     expect(set.screen(HOME_SCREEN_ID)?.widgets).toEqual([]);
+
+    await set.flush();
+    const reopened = await ScreenSet.open({
+      directory: join(root, "screens"),
+      indexFile: join(root, SCREENS_INDEX_FILENAME),
+    });
+    expect(reopened.screen(HOME_SCREEN_ID)?.widgets).toEqual([]);
   });
 
   it("does not write until something changes", async () => {

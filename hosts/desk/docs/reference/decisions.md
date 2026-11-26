@@ -198,10 +198,10 @@ The rules that shape the Suite host.
   at all. A remembered denial never opens the dialog again, which is what makes a pack unable to
   nag; the pack's card is the only deliberate re-ask.
 - Tiers are a property of the capability, not a caller's choice. `documents`, `files`, `network` and
-  `identity.pack` are install-tier: the install confirmation showed them, so they are recorded then
-  and never asked per use. `recents` is first-use. `notifications` is a token, re-asked when thirty
-  days pass. Every-use is implemented for the media capabilities the spec names, which this host
-  does not serve yet.
+  `identity.pack` are install-tier: the install confirmation or the first-run review showed them, so
+  they are recorded then and never asked per use. `recents` is first-use. `notifications` is a token,
+  re-asked when thirty days pass. Every-use is implemented for the media capabilities the spec names,
+  which this host does not serve yet.
 - Keying by version is deliberate: an update that adds a capability has no answer for the new
   version and pauses on a fresh consent, while a removed capability is no longer read because the
   pack no longer declares it. Removing a pack's last version clears its rows.
@@ -255,20 +255,24 @@ The rules that shape the Suite host.
   offers the first installed app, **Create a document** and **Choose an app**.
 - The first-run wizard is host chrome, not a pack and not a Screen. It lists the trusted catalogue,
   selects every app by default, chooses palette, brightness and density, and installs the selected
-  apps concurrently. Completion is recorded per data root at `<dataRoot>/onboarding.json`; a
-  missing, unreadable or older record repeats the wizard, and only a completed record reveals the
-  chrome. The wizard's explicit selection is the install consent, so it calls the same verified
-  installer without a second per-app dialog.
+  apps concurrently. The appearance step names each chosen app's publisher id, key fingerprint, pack
+  id, version and capabilities before **Install**; that review is the install consent, so the host
+  calls the same verified installer without a second per-app dialog. Completion is recorded per data
+  root at `<dataRoot>/onboarding.json`; a missing, unreadable or older record repeats the wizard, and
+  only a completed record reveals the chrome. A root that already has a space document or a Screen is
+  an upgrade, not a first run. While the wizard is showing, no pack view is painted, even for a
+  restored or deep-linked tab.
 - A screen tab is host chrome. It creates no `WebContentsView`; activating one hides every pack view,
   which exposes the chrome's composition in the same content area. A pack tab hides the composition
   and shows that pack's view. Closing the last tab shows an empty state, not a second copy of the
   pack grid.
 - The host widget table belongs to the host and is keyed by registry id. `desk.apps` is optional host
   chrome: it has no capture action and no app behind it, and it draws the installed-pack grid, the
-  local catalogue and **Add pack…**. A new Home does not include it, and launch removes the old
-  default placement, because the picker and the catalogue are host surfaces rather than a widget the
-  person has to dismiss. It remains addable from **Edit**. Host widgets resolve before the pack
-  registry, so an installed pack cannot shadow `desk.apps`.
+  local catalogue and **Add pack…**. A new Home does not include it, and the first launch on an
+  upgraded root removes the old default placement once, because the picker and the catalogue are host
+  surfaces rather than a widget the person has to dismiss. A recorded migration keeps a person who
+  adds it back from losing it again; it remains addable from **Edit**. Host widgets resolve before the
+  pack registry, so an installed pack cannot shadow `desk.apps`.
 - App widgets are declared by installed pack manifests (`widgets`) and resolved through
   `@suite/screens` as `<pack id>.<widget id>`. The host draws the declared title, fields and resolved
   settings with its own components; the pack supplies data, never DOM. An unknown registry id is a
@@ -349,8 +353,8 @@ The rules that shape the Suite host.
   another key only after seeing its fingerprint; the install refusal shows the fingerprint, and the
   unknown-publisher dialog adds the key only from that display. A malformed store is ignored rather
   than guessed at, so it trusts the first-party key and nothing else.
-- Install and update show the publisher id, key fingerprint, pack id, version and capability list
-  before anything is written, and the result notice repeats them.
+- Install and update — and the first-run review — show the publisher id, key fingerprint, pack id,
+  version and capability list before anything is written, and the result notice repeats them.
 - The install identity is `(publisher id, pack id)`. The active publisher is recorded beside the
   version directories. A different publisher under an existing id is refused without the explicit
   migration. A different key under the same id is refused unless a rotation statement retired the

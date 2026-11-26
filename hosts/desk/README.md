@@ -304,9 +304,12 @@ installed app, preferring Canvas), **Create a document** and **Choose an app**.
 
 The first-run wizard is host chrome from `@suite/ui/chrome`. It selects every trusted catalogue app
 by default, chooses palette, brightness and density, and installs the selection concurrently through
-the same verified installer the catalogue uses. Its choice is the install consent, so it asks once
-rather than once per app. Completion is recorded at `<dataRoot>/onboarding.json`; a missing,
-unreadable or older record repeats the wizard. **Skip choosing for now** goes straight to Home.
+the same verified installer the catalogue uses. Before **Install**, the appearance step lists every
+chosen app's publisher id, key fingerprint, pack id, version and capabilities, so the selection is
+informed consent and the host does not ask once per app. Completion is recorded at
+`<dataRoot>/onboarding.json`; a missing, unreadable or older record repeats the wizard. A root that
+already has a space document or a Screen is an upgrade, not a first run. **Skip choosing for now**
+leaves every app unselected and continues to the look step.
 
 The composition is the same content area the launcher used to fill. A composed Home looks like this:
 
@@ -338,10 +341,11 @@ second copy of the pack grid.
 
 `desk.apps` is an optional **host widget**, not a `SuiteWidget` descriptor: it lives in a host table
 keyed by registry id and has no capture action or app behind it. It draws the installed-pack grid,
-the search field, the local catalogue and **Add pack…**. A new Home does not include it, and launch
-removes the old default placement from Home, because the picker and the catalogue are host surfaces
-rather than a widget the person has to dismiss. It can still be added to any Screen from **Edit**.
-Host widgets are resolved first, so an installed pack cannot shadow `desk.apps`.
+the search field, the local catalogue and **Add pack…**. A new Home does not include it, and the first
+launch on an upgraded root removes the old default placement from Home, because the picker and the
+catalogue are host surfaces rather than a widget the person has to dismiss. Removal happens once; a
+person who adds it back keeps it. Host widgets are resolved first, so an installed pack cannot shadow
+`desk.apps`.
 
 App widgets come from `widgets` in each installed pack manifest, resolved through
 `@suite/screens`'s registry as `<pack id>.<widget id>`. The host draws the declared title, fields and

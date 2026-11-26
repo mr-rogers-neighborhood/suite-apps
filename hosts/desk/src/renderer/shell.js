@@ -17,6 +17,7 @@ const api = globalThis.suiteShell;
 const elements = {
   hostBar: document.querySelector("#host-bar"),
   firstRun: document.querySelector("#first-run"),
+  content: document.querySelector(".content"),
   screen: document.querySelector("#screen"),
   screenName: document.querySelector("#screen-name"),
   screenEyebrow: document.querySelector(".screen-title .eyebrow"),
@@ -582,23 +583,71 @@ function updateHostBar() {
   });
 }
 
+/** Compare dotted versions for the chooser; an unreadable segment sorts low. */
+function compareVersions(left, right) {
+  const a = String(left).split(/[.+-]/u);
+  const b = String(right).split(/[.+-]/u);
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    const one = Number.parseInt(a[index] ?? "0", 10);
+    const two = Number.parseInt(b[index] ?? "0", 10);
+    const first = Number.isFinite(one) ? one : 0;
+    const second = Number.isFinite(two) ? two : 0;
+    if (first !== second) return first < second ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * The catalogue as the wizard sees it.
+ *
+ * One row per app id: a catalogue that still lists two versions offers the highest one, so the
+ * person never sees duplicate rows or starts two installs for one id. Status comes from the
+ * active install, which also keeps a resumed wizard from calling an installed app "available".
+ */
 function firstRunPacks() {
-  return (state.catalogue ?? [])
-    .filter((entry) => entry.trusted)
-    .map((entry) => ({
+  const current = new Map(
+    (state.installedVersions ?? [])
+      .filter((version) => version.current)
+      .map((version) => [version.id, version.version]),
+  );
+  const entries = new Map();
+  for (const entry of state.catalogue ?? []) {
+    if (!entry.trusted) continue;
+    const existing = entries.get(entry.id);
+    if (existing === undefined || compareVersions(entry.version, existing.version) > 0) {
+      entries.set(entry.id, entry);
+    }
+  }
+
+  return [...entries.values()].map((entry) => {
+    const installed = current.get(entry.id);
+    const status =
+      installed === undefined
+        ? "available"
+        : compareVersions(entry.version, installed) > 0
+          ? "update"
+          : "installed";
+    return {
       id: entry.id,
       name: entry.name,
       ...(entry.description === null ? {} : { description: entry.description }),
       version: entry.version,
-      status: "available",
-    }));
+      status,
+      ...(entry.publisher === null
+        ? {}
+        : { publisher: `${entry.publisher.id} · key ${entry.publisher.fingerprint}` }),
+      capabilities: entry.capabilities ?? [],
+    };
+  });
 }
 
 function firstRunTheme() {
   const theme = state.theme ?? {};
   return {
     preset: theme.preset ?? "suite",
-    mode: theme.mode === "dark" ? "dark" : "light",
+    // Keep "follow the system" as a choice; the resolved light/dark is only what is painted now.
+    mode: theme.source ?? (theme.mode === "dark" ? "dark" : "light"),
     density: theme.density ?? "cozy",
   };
 }
@@ -612,6 +661,7 @@ function firstRunTheme() {
 function updateFirstRun() {
   const firstRun = state.firstRun === true;
   if (elements.firstRun !== null) elements.firstRun.hidden = !firstRun;
+  if (elements.content !== null) elements.content.hidden = firstRun;
   if (elements.hostBar !== null) elements.hostBar.hidden = firstRun;
   if (elements.screen !== null) elements.screen.hidden = firstRun;
   if (elements.empty !== null) elements.empty.hidden = firstRun || state.surface !== "launcher";
@@ -629,7 +679,7 @@ function updateFirstRun() {
   if (elements.firstRun === null) return;
   if (firstRunWizard === null) {
     firstRunWizard = mountFirstRun(elements.firstRun, {
-      packs: [],
+      packs: firstRunPacks(),
       theme: firstRunTheme(),
       onThemeChange: (theme) => run(api.setTheme(theme)),
       onInstall: async (id) => {
@@ -640,7 +690,7 @@ function updateFirstRun() {
           detail: typeof result?.detail === "string" ? result.detail : "The install was refused.",
         };
       },
-      onComplete: () => run(api.completeFirstRun()),
+      onComplete: () => api.completeFirstRun(),
     });
   }
   firstRunWizard.update(firstRunPacks(), firstRunTheme());
@@ -1216,30 +1266,28 @@ function renderWidgets(view) {
       empty.setAttribute("aria-label", "Empty Home");
       empty.append(element("p", "eyebrow", "Home"));
       empty.append(element("h2", "", "A clean start."));
+      const packs = state.packs ?? [];
+      const first = packs.find((pack) => pack.id === "canvas") ?? packs[0] ?? null;
       empty.append(
         element(
           "p",
           "lede",
-          "Your apps are installed. Open one to make a document, or add a new widget.",
+          first === null
+            ? "No apps are installed yet. Add one, then make a document or add a widget."
+            : "Your apps are installed. Open one to make a document, or add a new widget.",
         ),
       );
       const actions = element("div", "home-empty-actions");
-      const packs = state.packs ?? [];
-      const first = packs.find((pack) => pack.id === "canvas") ?? packs[0] ?? null;
-      actions.append(
-        actionButton(
-          first === null ? "Open an app" : `Open ${first.name}`,
-          first === null ? () => run(api.newTab()) : () => run(api.openPack(first.id)),
-          "action-primary",
-        ),
-      );
-      actions.append(
-        actionButton(
-          "Create a document",
-          first === null ? () => run(api.newTab()) : () => run(api.newDocument(first.id)),
-        ),
-      );
-      actions.append(actionButton("Choose an app", () => run(api.newTab())));
+      if (first === null) {
+        actions.append(actionButton("Add an app", () => run(api.installPack()), "action-primary"));
+        actions.append(actionButton("Choose an app", () => run(api.newTab())));
+      } else {
+        actions.append(
+          actionButton(`Open ${first.name}`, () => run(api.openPack(first.id)), "action-primary"),
+        );
+        actions.append(actionButton("Create a document", () => run(api.newDocument(first.id))));
+        actions.append(actionButton("Choose an app", () => run(api.newTab())));
+      }
       empty.append(actions);
       fragment.append(empty);
     } else {

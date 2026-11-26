@@ -1,22 +1,16 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useState } from "react";
+import { DENSITIES, DENSITY_LABELS, PRESETS } from "@suite/theme";
 import { Button } from "../Button.js";
 import { cx } from "../cx.js";
 import { PackCard } from "./PackCard.js";
-const PRESETS = [
-    { id: "suite", label: "Suite" },
-    { id: "solarized", label: "Solarized" },
-    { id: "warm", label: "Warm" },
-];
+const PRESET_OPTIONS = PRESETS.map((theme) => ({ id: theme.id, label: theme.name }));
 const MODES = [
     { id: "light", label: "Light" },
     { id: "dark", label: "Dark" },
+    { id: "system", label: "Follow the system" },
 ];
-const DENSITY_OPTIONS = [
-    { id: "compact", label: "Compact" },
-    { id: "cozy", label: "Cozy" },
-    { id: "comfortable", label: "Comfortable" },
-];
+const DENSITY_OPTIONS = DENSITIES.map((density) => ({ id: density, label: DENSITY_LABELS[density] }));
 function StepRail({ step }) {
     const steps = [
         { id: "apps", label: "Apps" },
@@ -36,7 +30,14 @@ function Choice({ label, selected, onClick, }) {
             : "border-[var(--hairline)] bg-[var(--surface)] text-[var(--ink-muted)]"), children: label }));
 }
 function Appearance({ theme, onThemeChange, }) {
-    return (_jsxs("div", { className: "grid gap-5 md:grid-cols-[1fr_260px]", children: [_jsxs("div", { className: "flex flex-col gap-4", children: [_jsxs("section", { children: [_jsx("h2", { className: "text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]", children: "Palette" }), _jsx("div", { className: "mt-2 flex flex-wrap gap-2", children: PRESETS.map((preset) => (_jsx(Choice, { label: preset.label, selected: theme.preset === preset.id, onClick: () => onThemeChange({ ...theme, preset: preset.id }) }, preset.id))) })] }), _jsxs("section", { children: [_jsx("h2", { className: "text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]", children: "Brightness" }), _jsx("div", { className: "mt-2 flex flex-wrap gap-2", children: MODES.map((mode) => (_jsx(Choice, { label: mode.label, selected: theme.mode === mode.id, onClick: () => onThemeChange({ ...theme, mode: mode.id }) }, mode.id))) })] }), _jsxs("section", { children: [_jsx("h2", { className: "text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]", children: "Density" }), _jsx("p", { className: "mt-1 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]", children: "How much room controls and lists get. The type stays the same." }), _jsx("div", { className: "mt-2 flex flex-wrap gap-2", children: DENSITY_OPTIONS.map((density) => (_jsx(Choice, { label: density.label, selected: theme.density === density.id, onClick: () => onThemeChange({ ...theme, density: density.id }) }, density.id))) })] })] }), _jsxs("div", { className: "rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-4", children: [_jsx("p", { className: "text-[length:var(--text-caption,11px)] uppercase tracking-wide text-[var(--ink-faint)]", children: "Preview" }), _jsx("p", { className: "mt-2 text-[length:var(--text-title,15px)] text-[var(--ink)]", children: "A calm place to work" }), _jsx("p", { className: "mt-1 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]", children: "Your files stay on this device." }), _jsxs("div", { className: "mt-3 flex gap-2", children: [_jsx(Button, { variant: "primary", size: "sm", children: "Continue" }), _jsx(Button, { variant: "ghost", size: "sm", children: "Later" })] })] })] }));
+    return (_jsxs("div", { className: "grid gap-5 md:grid-cols-[1fr_260px]", children: [_jsxs("div", { className: "flex flex-col gap-4", children: [_jsxs("section", { children: [_jsx("h2", { className: "text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]", children: "Palette" }), _jsx("div", { className: "mt-2 flex flex-wrap gap-2", children: PRESET_OPTIONS.map((preset) => (_jsx(Choice, { label: preset.label, selected: theme.preset === preset.id, onClick: () => onThemeChange({ ...theme, preset: preset.id }) }, preset.id))) })] }), _jsxs("section", { children: [_jsx("h2", { className: "text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]", children: "Brightness" }), _jsx("div", { className: "mt-2 flex flex-wrap gap-2", children: MODES.map((mode) => (_jsx(Choice, { label: mode.label, selected: theme.mode === mode.id, onClick: () => onThemeChange({ ...theme, mode: mode.id }) }, mode.id))) })] }), _jsxs("section", { children: [_jsx("h2", { className: "text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]", children: "Density" }), _jsx("p", { className: "mt-1 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]", children: "How much room controls and lists get. The type stays the same." }), _jsx("div", { className: "mt-2 flex flex-wrap gap-2", children: DENSITY_OPTIONS.map((density) => (_jsx(Choice, { label: density.label, selected: theme.density === density.id, onClick: () => onThemeChange({ ...theme, density: density.id }) }, density.id))) })] })] }), _jsxs("div", { className: "rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-4", children: [_jsx("p", { className: "text-[length:var(--text-caption,11px)] uppercase tracking-wide text-[var(--ink-faint)]", children: "Preview" }), _jsx("p", { className: "mt-2 text-[length:var(--text-title,15px)] text-[var(--ink)]", children: "A calm place to work" }), _jsx("p", { className: "mt-1 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]", children: "Your files stay on this device." }), _jsxs("div", { className: "mt-3 flex gap-2", children: [_jsx(Button, { variant: "primary", size: "sm", children: "Continue" }), _jsx(Button, { variant: "ghost", size: "sm", children: "Later" })] })] })] }));
+}
+function InstallReview({ packs }) {
+    return (_jsxs("section", { className: "mt-6", "aria-label": "What this installs", children: [_jsx("h2", { className: "text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]", children: "What this installs" }), packs.length === 0 ? (_jsx("p", { className: "mt-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]", children: "No apps selected. You can add them later in Settings." })) : (_jsx("ul", { className: "m-0 mt-2 flex list-none flex-col gap-2 p-0", children: packs.map((pack) => (_jsxs("li", { className: "rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-3 text-[length:var(--text-label,12px)]", children: [_jsxs("p", { className: "m-0 flex flex-wrap items-baseline gap-2", children: [_jsx("span", { className: "text-[length:var(--text-title,15px)] text-[var(--ink)]", children: pack.name }), _jsxs("span", { className: "text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: [pack.id, pack.version === undefined ? "" : ` · v${pack.version}`] })] }), _jsx("p", { className: "mt-1 text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]", children: pack.publisher === undefined
+                                ? "Publisher not shown by this catalogue."
+                                : `Publisher ${pack.publisher}` }), _jsxs("p", { className: "mt-0.5 text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]", children: ["Needs:", " ", pack.capabilities === undefined || pack.capabilities.length === 0
+                                    ? "no capabilities"
+                                    : pack.capabilities.join(", ")] })] }, pack.id))) }))] }));
 }
 function InstallList({ packs, rows, }) {
     return (_jsx("ul", { className: "m-0 flex list-none flex-col gap-2 p-0", children: rows.map((row) => {
@@ -56,6 +57,7 @@ export function FirstRun({ packs, theme, onThemeChange, onInstall, onComplete, i
     const [followPacks, setFollowPacks] = useState(initialSelected === undefined);
     const [rows, setRows] = useState(initialRows ?? []);
     const [busy, setBusy] = useState(false);
+    const [completeError, setCompleteError] = useState(null);
     useEffect(() => {
         if (!followPacks)
             return;
@@ -99,9 +101,22 @@ export function FirstRun({ packs, theme, onThemeChange, onInstall, onComplete, i
         }));
         setBusy(false);
     }
+    async function finish() {
+        setBusy(true);
+        setCompleteError(null);
+        try {
+            await onComplete();
+        }
+        catch (error) {
+            setCompleteError(error instanceof Error ? error.message : "The host could not finish setup.");
+        }
+        finally {
+            setBusy(false);
+        }
+    }
     function startInstall() {
         if (chosen.length === 0) {
-            onComplete();
+            void finish();
             return;
         }
         const ids = chosen.map((pack) => pack.id);
@@ -114,8 +129,8 @@ export function FirstRun({ packs, theme, onThemeChange, onInstall, onComplete, i
                                             setFollowPacks(false);
                                             setSelected(new Set());
                                             setStep("appearance");
-                                        }, children: "Skip choosing for now" }), _jsx("span", { className: "text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: chosen.length === 0 ? "No apps selected" : `${chosen.length} selected` })] })] })) : null, step === "appearance" ? (_jsxs("div", { className: "mx-auto max-w-[860px]", children: [_jsx("h1", { className: "text-[length:var(--text-display,34px)]", children: "Make it yours." }), _jsx("p", { className: "mt-3 max-w-[62ch] text-[length:var(--text-body,13px)] leading-relaxed text-[var(--ink-muted)]", children: "Pick a palette, a brightness and how much room controls get. The apps follow the host, so this choice is the one every app opens in." }), _jsx("div", { className: "mt-6", children: _jsx(Appearance, { theme: theme, onThemeChange: onThemeChange }) }), _jsxs("div", { className: "mt-6 flex flex-wrap gap-2", children: [_jsx(Button, { variant: "primary", onClick: startInstall, children: chosen.length === 0
+                                        }, children: "Skip choosing for now" }), _jsx("span", { className: "text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: chosen.length === 0 ? "No apps selected" : `${chosen.length} selected` })] })] })) : null, step === "appearance" ? (_jsxs("div", { className: "mx-auto max-w-[860px]", children: [_jsx("h1", { className: "text-[length:var(--text-display,34px)]", children: "Make it yours." }), _jsx("p", { className: "mt-3 max-w-[62ch] text-[length:var(--text-body,13px)] leading-relaxed text-[var(--ink-muted)]", children: "Pick a palette, a brightness and how much room controls get. The apps follow the host, so this choice is the one every app opens in." }), _jsx("div", { className: "mt-6", children: _jsx(Appearance, { theme: theme, onThemeChange: onThemeChange }) }), _jsx(InstallReview, { packs: chosen }), _jsxs("div", { className: "mt-6 flex flex-wrap gap-2", children: [_jsx(Button, { variant: "primary", onClick: startInstall, children: chosen.length === 0
                                             ? "Continue to Home"
-                                            : `Install ${chosen.length === 1 ? "1 app" : `${chosen.length} apps`}` }), _jsx(Button, { variant: "ghost", onClick: () => setStep("apps"), children: "Back" })] })] })) : null, step === "install" ? (_jsxs("div", { className: "mx-auto max-w-[620px]", children: [_jsx("h1", { className: "text-[length:var(--text-display,34px)]", children: finished ? "You’re set." : "Installing your apps." }), _jsx("p", { className: "mt-3 text-[length:var(--text-body,13px)] leading-relaxed text-[var(--ink-muted)]", children: "Suite verifies each signed archive before it is used. A refusal names the app and leaves the rest of the setup alone." }), _jsx("div", { className: "mt-6", children: _jsx(InstallList, { packs: packs, rows: rows }) }), _jsxs("div", { className: "mt-6 flex flex-wrap gap-2", children: [_jsx(Button, { variant: "primary", onClick: onComplete, disabled: busy || rows.some((row) => row.state === "installing" || row.state === "queued"), children: "Continue to Home" }), rows.some((row) => row.state === "failed") ? (_jsx(Button, { variant: "secondary", onClick: () => void install(rows.filter((row) => row.state === "failed").map((row) => row.id)), children: "Retry failed" })) : null] })] })) : null] })] }));
+                                            : `Install ${chosen.length === 1 ? "1 app" : `${chosen.length} apps`}` }), _jsx(Button, { variant: "ghost", onClick: () => setStep("apps"), children: "Back" })] })] })) : null, step === "install" ? (_jsxs("div", { className: "mx-auto max-w-[620px]", children: [_jsx("h1", { className: "text-[length:var(--text-display,34px)]", children: finished ? "You’re set." : "Installing your apps." }), _jsx("p", { className: "mt-3 text-[length:var(--text-body,13px)] leading-relaxed text-[var(--ink-muted)]", children: "Suite verifies each signed archive before it is used. A refusal names the app and leaves the rest of the setup alone." }), _jsx("div", { className: "mt-6", children: _jsx(InstallList, { packs: packs, rows: rows }) }), _jsxs("div", { className: "mt-6 flex flex-wrap gap-2", children: [_jsx(Button, { variant: "primary", onClick: () => void finish(), disabled: busy || rows.some((row) => row.state === "installing" || row.state === "queued"), children: "Continue to Home" }), rows.some((row) => row.state === "failed") ? (_jsx(Button, { variant: "secondary", onClick: () => void install(rows.filter((row) => row.state === "failed").map((row) => row.id)), children: "Retry failed" })) : null] })] })) : null, completeError === null ? null : (_jsx("p", { role: "alert", className: "mx-8 mt-4 text-[length:var(--text-label,12px)] text-[var(--danger)]", children: completeError }))] })] }));
 }
 //# sourceMappingURL=FirstRun.js.map

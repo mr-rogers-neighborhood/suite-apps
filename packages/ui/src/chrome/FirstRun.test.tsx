@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FirstRun, type FirstRunPack, type FirstRunTheme } from "./FirstRun.js";
 
@@ -85,5 +85,47 @@ describe("FirstRun", () => {
 
     expect(props.onComplete).toHaveBeenCalledTimes(1);
     expect(props.onInstall).not.toHaveBeenCalled();
+  });
+
+  it("shows a refused install and retries only the failed app", async () => {
+    const onInstall = vi.fn(async (id: string) =>
+      id === "planner"
+        ? { id, ok: false, detail: "Signature refused" }
+        : { id, ok: true, detail: "Installed" },
+    );
+    renderFirstRun({ onInstall });
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Install 2 apps" }));
+
+    await screen.findByText("Signature refused");
+    expect(onInstall).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry failed" }));
+    await waitFor(() => expect(onInstall).toHaveBeenCalledTimes(3));
+    expect(onInstall).toHaveBeenLastCalledWith("planner");
+  });
+
+  it("keeps follow-the-system as a choice and sends it to the host", () => {
+    const onThemeChange = vi.fn();
+    renderFirstRun({ onThemeChange });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Follow the system" }));
+
+    expect(onThemeChange).toHaveBeenCalledWith({
+      preset: "suite",
+      mode: "system",
+      density: "cozy",
+    });
+  });
+
+  it("shows a completion failure instead of leaving the wizard silent", async () => {
+    const onComplete = vi.fn(() => Promise.reject(new Error("The data root is read-only.")));
+    renderFirstRun({ onComplete });
+
+    fireEvent.click(screen.getByRole("button", { name: "Skip choosing for now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Home" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("read-only");
   });
 });

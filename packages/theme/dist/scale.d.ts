@@ -53,6 +53,8 @@ export declare const TYPE_SCALE: Readonly<Record<TypeRole, TypeStep>>;
  */
 export declare const DENSITIES: readonly ["compact", "cozy", "comfortable"];
 export type Density = (typeof DENSITIES)[number];
+/** The one place the three density choices are written for people rather than code. */
+export declare const DENSITY_LABELS: Record<Density, string>;
 export interface DensityMetrics {
     /** A full-size control: a primary button, a field. */
     readonly controlHeight: string;

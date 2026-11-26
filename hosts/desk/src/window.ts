@@ -473,6 +473,16 @@ export class ShellWindow {
       return;
     }
 
+    // The wizard is the only surface until the host records completion. Keeping a restored
+    // pack view hidden means an upgrade cannot show a pack over setup with no tab strip to
+    // leave it. Completion activates the tab that is current again.
+    if (this.#firstRun) {
+      this.#hideViews();
+      this.#chrome.webContents.focus();
+      this.broadcast();
+      return;
+    }
+
     // A screen tab is host chrome, not a pack view. The chrome page draws the
     // composition in the same content area; hiding every pack view is what makes it
     // visible, because a pack view is layered over that area.
@@ -704,6 +714,17 @@ export class ShellWindow {
   setFirstRun(firstRun: boolean): void {
     if (this.#firstRun === firstRun) return;
     this.#firstRun = firstRun;
+    if (!firstRun) {
+      // Completion may have opened Home behind the wizard, or a restored/deep-linked pack may
+      // still be the active tab. Activating it now is what paints a view for the first time.
+      const active = this.#spaces.state().activeTabId;
+      if (active !== null) {
+        void this.activateTab(active).catch((error: unknown) => {
+          console.warn("[desk] could not activate the tab after first run", error);
+        });
+        return;
+      }
+    }
     this.broadcast();
   }
 

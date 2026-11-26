@@ -34,24 +34,32 @@ const PACKS: readonly FirstRunPack[] = [
     name: "Canvas",
     description: "Boards, cards and the book reader",
     version: "0.1.13",
+    publisher: "suite.run · key 9f2c 41a0 7d3e",
+    capabilities: ["documents", "files", "network", "identity.pack"],
   },
   {
     id: "planner",
     name: "Planner",
     description: "Plans, tasks and reminders",
     version: "0.5.2",
+    publisher: "suite.run · key 9f2c 41a0 7d3e",
+    capabilities: ["documents", "network", "notifications"],
   },
   {
     id: "budget",
     name: "Budget",
     description: "Envelopes, accounts and reports",
     version: "0.4.2",
+    publisher: "suite.run · key 9f2c 41a0 7d3e",
+    capabilities: ["documents"],
   },
   {
     id: "help",
     name: "Help",
     description: "The user handbook and the developer docs",
     version: "0.1.3",
+    publisher: "suite.run · key 9f2c 41a0 7d3e",
+    capabilities: ["documents", "files"],
   },
 ];
 
@@ -76,10 +84,11 @@ function ThemeScope({
   readonly theme: FirstRunTheme;
   readonly children: ReactNode;
 }) {
+  const mode = theme.mode === "system" ? "light" : theme.mode;
   const style = {
-    ...cssVariables(presetById(theme.preset) ?? defaultTheme(), theme.mode),
+    ...cssVariables(presetById(theme.preset) ?? defaultTheme(), mode),
     ...scaleVariables(theme.density),
-    colorScheme: theme.mode,
+    colorScheme: mode,
   } as CSSProperties;
   return (
     <div style={style} className="bg-[var(--canvas)] p-4 text-[var(--ink)]">

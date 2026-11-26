@@ -64,6 +64,7 @@ export {
   applyScale,
   DEFAULT_DENSITY,
   DENSITIES,
+  DENSITY_LABELS,
   DENSITY_SCALE,
   type Density,
   type DensityMetrics,

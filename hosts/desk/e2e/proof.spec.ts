@@ -94,10 +94,9 @@ test("opens Home Screen, creates a Screen document, and switches to it", {
       await expect(page.locator("#screen-name")).toHaveText("Home");
       await expect(page.locator(".home-empty")).toBeVisible();
       await expect(
-        page.getByText(
-          "Your apps are installed. Open one to make a document, or add a new widget.",
-        ),
+        page.getByText("No apps are installed yet. Add one, then make a document or add a widget."),
       ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Add an app" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Choose an app" })).toBeVisible();
       await captureProofScreenshot(page, proofDir, "01-home-screen.png", testInfo);
     });

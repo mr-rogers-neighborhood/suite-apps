@@ -1,4 +1,4 @@
-import type { Density, ThemeMode } from "@suite/theme";
+import { type Density, type ThemeMode } from "@suite/theme";
 import { type PackStatus } from "./PackCard.js";
 /**
  * First run.
@@ -8,16 +8,21 @@ import { type PackStatus } from "./PackCard.js";
  * and the installer; this component owns the question and its progress.
  */
 export type FirstRunStep = "apps" | "appearance" | "install";
+export type FirstRunMode = ThemeMode | "system";
 export interface FirstRunPack {
     readonly id: string;
     readonly name: string;
     readonly description?: string;
     readonly version?: string;
     readonly status?: PackStatus;
+    /** What the catalogue showed: who signed it and which capabilities it declares. */
+    readonly publisher?: string;
+    readonly capabilities?: readonly string[];
 }
 export interface FirstRunTheme {
     readonly preset: string;
-    readonly mode: ThemeMode;
+    /** `system` keeps following the OS; the host resolves light or dark for the paint. */
+    readonly mode: FirstRunMode;
     readonly density: Density;
 }
 export interface FirstRunInstall {
@@ -37,7 +42,7 @@ export interface FirstRunProps {
     /** Install one pack. The component calls these concurrently, one per selected pack. */
     readonly onInstall: (id: string) => Promise<FirstRunInstall>;
     /** Leave the wizard. The host shows the empty Home only after this returns. */
-    readonly onComplete: () => void;
+    readonly onComplete: () => void | Promise<void>;
     /** Story and resumed-flow seams; the host omits both on a fresh install. */
     readonly initialStep?: FirstRunStep;
     readonly initialSelected?: readonly string[];

@@ -52,6 +52,12 @@ export const TYPE_SCALE = {
  * extra steps.
  */
 export const DENSITIES = ["compact", "cozy", "comfortable"];
+/** The one place the three density choices are written for people rather than code. */
+export const DENSITY_LABELS = {
+    compact: "Compact",
+    cozy: "Cozy",
+    comfortable: "Comfortable",
+};
 /**
  * `cozy` is what shipped, exactly: a 36px button with 12px of side padding.
  *
