@@ -51,6 +51,10 @@ All four packs are pack-owned: Budget (#454), Help (#456), Canvas (#457, #459) a
 from `packs/<app>`. Shell retirement is the next delivery step; the order is Budget, Help, Planner and
 Canvas, and no shell has retired yet.
 
+Each pack's archive, signature, install/remove through Desk and headless primary path are recorded in
+[Pack readiness](pack-readiness.md). A person's window pass, release-archive install and device pass
+remain #358.
+
 A retired app is a delivery state, not a deletion either: its code and tests stay and its last
 published ref stays on the signed remote, but it is not a shipped artifact and no new build is
 published. Sync is retired as an app (#315); the relay becomes a supervised child of the host.
