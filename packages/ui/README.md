@@ -166,7 +166,9 @@ mise exec -- pnpm --filter @suite/ui storybook
   tabs. `Workbench/Patterns/New tab` and `Workbench/Foundations/Content` are the first pattern and
   content pages.
 - `Workbench/Theme matrix` links the four pack surfaces across every preset and mode; the pack
-  stories live in `packs/*/workbench` and import the pack's own stylesheet.
+  stories live in `packs/*/workbench` and import the pack's own stylesheet. Help's story lives in
+  `.storybook/workbench/packs` because the frozen Help app typechecks the pack renderer without
+  Storybook types; moving it would add Storybook to that pack's typecheck.
 - The Storybook MCP server is at `http://localhost:6007/mcp` while Storybook runs. It serves
   `docs-list`, `docs-show` and `test-run`; the component manifest is on, so an agent can read real
   props instead of guessing.
@@ -215,8 +217,10 @@ Budget's Plan → category row → row-action affordance (`CategoryRow.tsx`, the
 -  className="rounded p-0.5 text-faint opacity-0 transition-opacity hover:text-ink group-hover:opacity-100 focus-visible:opacity-100">
 -  <MoreHorizontal size={14} />
 -</button>
-+<IconButton label={`Actions for ${entry.category.name}`} icon={<MoreHorizontal size={14} />}
-+  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" />
++<IconButton label={`Actions for ${entry.category.name}`}
++  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
++  <MoreHorizontal size={14} />
++</IconButton>
 ```
 
 `IconButton` adds the ring from `FOCUS_RING` and reads `--control-height-sm`; the current class has

@@ -88,6 +88,18 @@ describe("MenuBar slot rendering", () => {
     expect(onOpenSearch).toHaveBeenCalledOnce();
   });
 
+  it("keeps the shortcut outside the truncating label", () => {
+    render(<MenuBar onOpenSearch={() => {}} />);
+
+    const searchBtn = screen.getByTestId("command-bar");
+    const label = searchBtn.querySelector(".command-bar__label");
+    const key = searchBtn.querySelector("kbd");
+    if (label === null || key === null) throw new Error("the command bar lost its label or key");
+
+    expect(label.contains(key)).toBe(false);
+    expect(key).toHaveTextContent("\u2318K");
+  });
+
   it("renders peers, sync, actions, and controls in zones 5, 6, and 7", () => {
     render(
       <MenuBar

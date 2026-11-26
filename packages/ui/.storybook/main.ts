@@ -1,8 +1,11 @@
 import { fileURLToPath } from "node:url";
 import type { StorybookConfig } from "@storybook/react-vite";
 import tailwindcss from "@tailwindcss/vite";
-import { searchForWorkspaceRoot } from "vite";
 import wasm from "vite-plugin-wasm";
+
+// The workbench lives in packages/ui, but the pack slice is two directories up. Resolve the
+// workspace root from this file, not from the process cwd, so any launch path works.
+const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 
 const config: StorybookConfig = {
   stories: [
@@ -38,10 +41,7 @@ const config: StorybookConfig = {
       ...viteConfig.server,
       fs: {
         ...viteConfig.server?.fs,
-        allow: [
-          searchForWorkspaceRoot(process.cwd()),
-          ...(viteConfig.server?.fs?.allow ?? []),
-        ],
+        allow: [repoRoot, ...(viteConfig.server?.fs?.allow ?? [])],
       },
     };
     // Loro ships a wasm-bindgen entry; pre-bundling it breaks the wasm URL on the pack
