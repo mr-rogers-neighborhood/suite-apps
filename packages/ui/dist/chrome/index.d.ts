@@ -8,4 +8,6 @@
  */
 export { HostTabBar, type HostTab, type HostTabBarProps, type HostTabKind, } from "./HostTabBar.js";
 export { NewTabPicker, type NewTabPack, type NewTabPickerProps, type NewTabScreen, } from "./NewTabPicker.js";
+export { PackCard, type PackCardProps, type PackStatus, } from "./PackCard.js";
+export { PackRail, type PackRailAction, type PackRailDetail, type PackRailPack, type PackRailProps, type PackRailScreenshot, } from "./PackRail.js";
 //# sourceMappingURL=index.d.ts.map
