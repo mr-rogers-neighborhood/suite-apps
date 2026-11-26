@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Suite — work you keep in your own files</title>
-  <meta name="description" content="Suite Desk runs signed packs on your computer. Suite Go runs the same packs on your phone. Every document is a file you own: no account, no telemetry and no server the project operates.">
+  <title>Suite — apps for your life, with your files still yours</title>
+  <meta name="description" content="Suite runs mini-apps on your computer and phone — boards, plans, budgets and more. Every document is a file you own, and you choose who to share it with. No account, no ads and no telemetry.">
   <link rel="icon" href="docs/assets/suite-icon.png">
   <link rel="stylesheet" href="style.css">
   <script>
@@ -31,7 +31,7 @@
   </a>
   <nav class="site-nav" aria-label="Suite">
     <a href="#what">What it is</a>
-    <a href="#hosts">Hosts</a>
+    <a href="#hosts">Desktop &amp; phone</a>
     <a href="#install">Install</a>
     <a href="https://docs.suite.run/">Docs</a>
     <a href="https://github.com/mrrnbhd/suite-apps">GitHub</a>
@@ -41,12 +41,12 @@
 <main id="main">
   <section class="hero">
     <img class="hero-mark" src="docs/assets/suite-icon.png" alt="" width="96" height="96">
-    <p class="eyebrow">Local-first · MIT licensed · Superapp</p>
-    <h1>Work you keep in your own files.</h1>
+    <p class="eyebrow">Cross-platform · Local-first · Collaborative · MIT-licensed · Super-app</p>
+    <h1>Apps for your life, with your files still yours.</h1>
     <p class="lede">
-      Suite Desk runs signed packs on your computer. Suite Go runs the same packs on your phone.
-      Every document a pack opens is a file you own: copy it, back it up, open it offline.
-      There is no account, no telemetry and no server the project operates.
+      Suite runs mini-apps — boards, plans, budgets and more — on your computer and phone.
+      Every document is a file you own, and you choose who to share it with. There is no account,
+      no ads and no server standing between you and your stuff.
     </p>
     <div class="actions">
       <a class="button button-primary" href="#install">Install Suite</a>
@@ -62,33 +62,46 @@
     <h2 id="what-title">What Suite is</h2>
     <div class="card-grid">
       <article class="card">
-        <h3>Documents, not accounts</h3>
+        <h3>Your files stay yours</h3>
         <p>
-          A document is a file, handed to a pack as an opaque handle scoped to that pack. Nothing
-          here has an account or a hosted copy.
+          Boards, plans and budgets are ordinary files on your computer or phone. Copy them, back
+          them up, open them offline. No account, no hosted copy, no one else holding the original.
         </p>
       </article>
       <article class="card">
-        <h3>Packs with a contract</h3>
+        <h3>One home for mini-apps</h3>
         <p>
-          A pack is a signed web bundle with a manifest. The host verifies the publisher key and
-          every file hash before it runs, gives the pack its own origin and session, and enforces
-          the capabilities the manifest declares.
+          Canvas for boards, Planner for days, Budget for money, Help for the handbook: small apps
+          that live in one place, with more on the way. Each one does its job and shares the same
+          home.
         </p>
       </article>
       <article class="card">
-        <h3>Two hosts, one model</h3>
+        <h3>Made to share</h3>
         <p>
-          Canvas for boards, Planner for days, Budget for money: the same pack contract on the
-          desktop and on a phone. A pack renders its UI; the host carries bytes and never parses a
-          document.
+          Share a board or a plan with the people you choose. It stays your file, and you decide
+          who gets to work on it.
+        </p>
+      </article>
+      <article class="card">
+        <h3>The same on every screen</h3>
+        <p>
+          Suite Desk runs on your computer and Suite Go on your phone, and both are built for the
+          same mini-apps. What you learn on one feels familiar on the other.
+        </p>
+      </article>
+      <article class="card">
+        <h3>Free and open</h3>
+        <p>
+          Suite is MIT-licensed. Read the code, change it, keep it. Nothing here is locked to us,
+          and there is no paid tier waiting behind the door.
         </p>
       </article>
     </div>
   </section>
 
   <section id="hosts" aria-labelledby="hosts-title">
-    <h2 id="hosts-title">The two hosts</h2>
+    <h2 id="hosts-title">Desktop and phone</h2>
     <div class="host-grid">
       <article class="host">
         <div class="host-heading">
@@ -96,8 +109,9 @@
           <span class="tag">Alpha</span>
         </div>
         <p>
-          The desktop host: one window, a tab per pack, a Home Screen and a local catalogue. It
-          installs and updates from the signed Flatpak remote on Linux x86_64.
+          The desktop side of Suite: one window, a tab for each mini-app, a Home screen and a
+          catalogue to install more. It installs and updates from the signed Flatpak remote on
+          Linux.
         </p>
       </article>
       <article class="host">
@@ -106,8 +120,8 @@
           <span class="tag">v0</span>
         </div>
         <p>
-          The mobile host: one container, one pack at a time, and the same document boundary. It
-          ships as an Android arm64 APK, not a Flatpak.
+          The phone side: one home for your mini-apps, with the same rule that documents are files
+          you own. It ships as an Android APK.
         </p>
       </article>
     </div>
@@ -116,16 +130,16 @@
   <section id="install" aria-labelledby="install-title">
     <h2 id="install-title">Install</h2>
     <p>
-      The README carries the channel tables: the current install command and release page for
-      each host, plus the preview, nightly and slop channels that install beside the stable one.
+      Install Suite Desk on Linux or Suite Go on Android. Both are early, so keep your documents
+      somewhere you back up.
     </p>
     <ul class="link-list">
       <li><a href="https://github.com/mrrnbhd/suite-apps#release">Release channel</a> — the stable Suite Desk and Suite Go builds.</li>
-      <li><a href="https://github.com/mrrnbhd/suite-apps#pre-release">Pre-release channels</a> — preview, nightly and slop.</li>
+      <li><a href="https://github.com/mrrnbhd/suite-apps#pre-release">Pre-release channels</a> — preview, nightly and slop, installed beside the stable one.</li>
       <li><a href="https://docs.suite.run/docs/explanation/channels.html">Channels</a> — what each channel promises.</li>
     </ul>
     <p class="note">
-      The signed Flatpak remote is the update path. The rolling
+      Suite Desk updates from its signed remote; the rolling
       <a href="https://github.com/mrrnbhd/suite-apps/releases/latest">GitHub release</a> is the
       mirror.
     </p>
@@ -134,9 +148,8 @@
   <section id="docs" aria-labelledby="docs-title">
     <h2 id="docs-title">Documentation</h2>
     <p>
-      The documentation is built from the same <code>docs/</code> tree the repository and Suite
-      Help read. Start with the handbook if you are using Suite, or the developer documentation if
-      you are changing it.
+      Start with the handbook if you are using Suite, or the developer documentation if you are
+      building on it or changing it. Both read from the same pages the repository keeps.
     </p>
     <div class="actions">
       <a class="button" href="https://docs.suite.run/docs/handbook/">User Handbook</a>
@@ -147,7 +160,7 @@
 </main>
 
 <footer class="site-footer">
-  <p><img src="docs/assets/suite-icon.png" alt="" width="20" height="20"> Suite is local-first, MIT licensed.</p>
+  <p><img src="docs/assets/suite-icon.png" alt="" width="20" height="20"> Suite is free and open source, and your files stay yours.</p>
   <nav aria-label="Elsewhere">
     <a href="https://docs.suite.run/">docs.suite.run</a>
     <a href="https://github.com/mrrnbhd/suite-apps">GitHub</a>
