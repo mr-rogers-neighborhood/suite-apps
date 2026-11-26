@@ -588,22 +588,28 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
 - A widget opens the full app through the existing `suite://` link when the task needs more room. It
   never embeds a second instance of the app; capture is the only write path phase 1 adds.
 - A **Screen** is the host's own Loro document, and `@suite/screens` owns its shape. It is
-  `{ format: "suite.screen", version: 1, id, name, widgets: [{ registryId, size, settings? }] }`.
-  The widget list is ordered; settings are the instance strings above. The schema is strict and
-  accepts no code, HTML, path, document bytes or app-data field; that refusal is the point. The
-  package carries no React, Electron, DOM or file IO: the host owns the path, the atomic write and
-  the backup, and the package only produces and reads snapshots.
+  `{ format: "suite.screen", version: 2, id, name, widgets: [...] }`. The widget list is ordered and
+  each entry is either a widget or a row. A widget is `{ registryId, size, settings? }`; a row is
+  `{ kind: "row", size, layout: "row" | "carousel", items: [{ registryId, weight, settings? }] }`
+  and may not nest. The schema is strict and accepts no code, HTML, path, document bytes or app-data
+  field; that refusal is the point. The package carries no React, Electron, DOM or file IO: the host
+  owns the path, the atomic write and the backup, and the package only produces and reads snapshots.
+- A **row** is the composition primitive, not a page builder. Items declare a weight instead of a
+  pixel position; the shared layout gives them relative width on a wide window and turns the row into
+  one horizontal scrolling line at phone width, so two widgets never squeeze into unreadable half
+  columns. A host that cannot draw a row flattens it to a stacked list and says so rather than
+  dropping placements.
 - **Home is a role**, not an app and not a fixed window. The host's Home is a Screen named Home with
   id `desk-home`, the first role over one descriptor table. A Screen tab is an open surface beside
   app tabs: it belongs to the host chrome, not to a pack, and no app can draw into it. A Screen can be opened from a tile, a launcher entry or an Android
   home-screen widget, and Screens do not nest inline inside other Screens.
 - The Home manager is the host's, not an app's. It adds, removes, moves, resizes and configures
   placements, with an inline edit mode for quick reorder, resize and add. The host-owned Screens
-  manager creates, renames, duplicates and deletes a Screen, sets Home, and later imports or exports
-  the portable file. The host owns it; no app manages the layout, and there is no separate Suite
-  Screens app. This manager moved from Start to the host with #314.
+  manager creates, renames, duplicates and deletes a Screen, sets Home, and exports or imports the
+  portable `.screen` file. The host owns it; no app manages the layout, and there is no separate
+  Suite Screens app. This manager moved from Start to the host with #314.
 - A Screen owns order, size and placement. Every host renders the same composition responsively;
-  there is no per-device placement override in v1.
+  there is no per-device placement override in v2.
 - Unknown is visible. A registry id this build cannot resolve stays in the document and is drawn as
   an unknown placement with a note naming it; an unknown setting stays on the instance and is
   reported. Showing less than the Screen says, silently, is the failure this rule prevents.
@@ -615,14 +621,21 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
   host's sandbox, and this issue rules out a migration tool. The file stays where Start left it,
   untouched; see the retirement record above. Go's current home is its default Home Screen when Go
   adopts the contract.
-- The Screen is local to this host and device in this slice. A portable `.screen` file, import and
-  export, and sync are later; the document format is designed not to block them, but none of them
-  ships here. The Screen is not stored in an app document and is not owned by an app.
+- The Screen is portable as a `.screen` file: a Loro snapshot in a small `SUITE-SCREEN` envelope with
+  its own envelope version and a canonical header (`format`, `version`, `id`, `name`, `home`,
+  `payloadLength`). Export writes the current Screen version; import runs the same migration chain as
+  the stored document, accepts an older version, and refuses a newer one before decoding it. A refusal
+  names the next action and leaves the existing Screens and Home choice untouched. A valid import
+  creates a new Screen rather than replacing an id; a file that was Home on the writer's device
+  becomes Home. Sync across a person's devices is still #199; a file is a manual copy.
+- The Screen is local to this host and device in this slice. It is not stored in an app document and
+  is not owned by an app. A pack never reads or writes a Screen document.
 - The registry is what this host build can draw: its own widgets plus the app widgets whose action it
   implements and whose manifest parses. A host that does not draw a widget leaves its entry in the
   unknown case.
-- Composite layout is constrained: a row or carousel groups widgets under the same size classes. It
-  is not a page builder and cannot place content outside the grid.
+- Composite layout is constrained: a row or carousel groups widgets under the same size classes, and
+  its items declare a weight rather than a position. It is not a page builder and cannot place
+  content outside the grid; nesting stops at one level and a row cannot contain a Screen.
 - The name is **Screen**, not View, Board or Space. The Home Screen is the one named Home, and
   Screens are the set a person manages.
 - Rejected: a general page builder; arbitrary app code, scripts or HTML in the host; a Screen owned

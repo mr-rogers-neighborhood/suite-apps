@@ -1,14 +1,22 @@
 {
   "format": "suite.screen",
-  "version": 1,
+  "version": 2,
   "id": "home",
   "name": "Home",
   "widgets": [
     { "registryId": "desk.apps", "size": "full" },
     {
-      "registryId": "planner.quick-task",
-      "size": "1x1",
-      "settings": { "project": "inbox" }
+      "kind": "row",
+      "size": "full",
+      "layout": "row",
+      "items": [
+        {
+          "registryId": "planner.quick-task",
+          "weight": 2,
+          "settings": { "project": "inbox" }
+        },
+        { "registryId": "budget.saved-views", "weight": 1 }
+      ]
     }
   ]
 }

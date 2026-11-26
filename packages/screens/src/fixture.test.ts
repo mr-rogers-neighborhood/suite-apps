@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { ScreenDocument } from "./document.js";
 import { HOME_SCREEN_FIXTURE, homeScreen, homeScreenDocument } from "./fixture.js";
+import { isScreenRow } from "./screen.js";
 
 describe("the shared Home fixture", () => {
-  it("is a valid Screen", () => {
+  it("is a valid Screen with one row composition", () => {
     expect(homeScreen().id).toBe("home");
-    expect(homeScreen().widgets.map((widget) => widget.registryId)).toEqual([
-      "desk.apps",
+    expect(homeScreen().version).toBe(2);
+    expect(
+      homeScreen().widgets.map((entry) => (isScreenRow(entry) ? entry.kind : entry.registryId)),
+    ).toEqual(["desk.apps", "row"]);
+
+    const row = homeScreen().widgets[1];
+    expect(row !== undefined && isScreenRow(row)).toBe(true);
+    if (row === undefined || !isScreenRow(row)) return;
+    expect(row.items.map((item) => item.registryId)).toEqual([
       "planner.quick-task",
+      "budget.saved-views",
     ]);
   });
 

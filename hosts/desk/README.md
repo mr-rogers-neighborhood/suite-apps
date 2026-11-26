@@ -292,10 +292,21 @@ The composition is the same content area the launcher used to fill:
 ```json
 {
   "format": "suite.screen",
-  "version": 1,
+  "version": 2,
   "id": "desk-home",
   "name": "Home",
-  "widgets": [{ "registryId": "desk.apps", "size": "full" }]
+  "widgets": [
+    { "registryId": "desk.apps", "size": "full" },
+    {
+      "kind": "row",
+      "size": "full",
+      "layout": "row",
+      "items": [
+        { "registryId": "planner.quick-task", "weight": 2 },
+        { "registryId": "budget.saved-views", "weight": 1 }
+      ]
+    }
+  ]
 }
 ```
 
@@ -331,10 +342,26 @@ the host table and the installed packs. The chrome never keeps document state; e
 registry id and the main process answers with the new state. Unknown ids and unknown settings survive
 editing, saving and reopening.
 
+A row groups two to eight widgets one level deep. Its items declare a `weight`, which is their share
+of the row on a wide window; at phone width the row becomes one horizontal, snapping line instead of
+squeezing them. The shared `screenLayout` computes both modes, children stay in document order, and a
+host that cannot draw a row flattens it to a stacked list rather than dropping it. Rows are drawn in
+this slice and are not edited inline; their placements and settings survive every flat edit.
+
+The Screens manager exports the current Screen as a `.screen` file and imports one. The file is a Loro
+snapshot in a `SUITE-SCREEN` envelope with a canonical header (Screen version, id, name, Home flag and
+payload length); the extension is `.screen` and the media type is `application/vnd.suite.screen`.
+Export writes through a temporary sibling into the path the person chose. Import validates the
+envelope, version and shape before touching the store: a newer file is refused with a sentence that
+names the next action, and the existing Screens and Home choice are untouched. A valid import always
+adds a new Screen; a colliding id gets a new one, and a file that was Home on the writer's device
+becomes Home here.
+
 The screen store writes a snapshot through a temporary file and rename, keeps the previous good
 snapshot as `<id>.loro.bak`, and renames an unreadable or oversized file to `<id>.loro.corrupt-<time>`
 before starting a fresh Home. It never deletes the only copy and never repairs a newer version by
-guessing.
+guessing. The same migration chain runs for a stored snapshot and an imported file, with one fixture
+per version in `@suite/screens`.
 
 ## The pack contract
 
@@ -534,7 +561,7 @@ decision record owns that trade.
 - tab tear-off and split view (the view tree is ready; the UI is not);
 - host-rendered pack contributions (commands, menus, toolbar, status; widgets are host-rendered here,
   but a pack's non-widget contributions still are not);
-- a portable `.screen` file with export/import;
+- Screen sync across a person's devices (#199; a portable `.screen` file is a manual copy);
 - containers and saved spaces in the UI (the space document already carries a space id);
 - space-document sync, shared spaces, presence and follow;
 - Windows and macOS packaging.

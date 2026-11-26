@@ -45,10 +45,19 @@ describe("the Home composition", () => {
       "deleteScreen",
       "setHomeScreen",
       "openScreen",
+      "exportScreen",
+      "importScreen",
     ]) {
       expect(shell).toContain(`api.${action}`);
     }
     expect(shell).not.toContain("screens.json");
+  });
+
+  it("draws a row in document order and leaves its children outside the edit controls", () => {
+    expect(shell).toContain("function rowTile");
+    expect(shell).toContain("widget-row-track");
+    expect(shell).toContain("--row-weight");
+    expect(shell).toContain('entry.kind === "row" ? rowTile(entry)');
   });
 
   it("draws the relay state the tray app used to own", () => {

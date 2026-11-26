@@ -16,6 +16,7 @@ import {
 } from "./home.js";
 import type { PackInfo } from "./packs.js";
 import { SCREENS_INDEX_FILENAME, ScreenSet } from "./screens.js";
+import type { ScreenView, ScreenWidgetView } from "./shared.js";
 import { SpaceStore } from "./spaces.js";
 
 function quickTask(overrides: Partial<SuiteWidget> = {}): SuiteWidget {
@@ -56,11 +57,19 @@ function pack(
   };
 }
 
+function widgetEntry(view: ScreenView, index: number): ScreenWidgetView {
+  const entry = view.widgets[index];
+  if (entry === undefined || entry.kind !== "widget") {
+    throw new Error(`widget ${index} is not a widget entry`);
+  }
+  return entry;
+}
+
 describe("the default Home", () => {
   it("is a Screen named Home with the host app grid", () => {
     expect(defaultHomeScreen()).toEqual({
       format: "suite.screen",
-      version: 1,
+      version: 2,
       id: HOME_SCREEN_ID,
       name: HOME_SCREEN_NAME,
       widgets: [{ registryId: DESK_APPS_WIDGET, size: "full" }],
@@ -81,7 +90,7 @@ describe("drawing a Screen", () => {
       size: "full",
       fields: [],
     });
-    expect(view.widgets[0]?.note).toContain("catalogue");
+    expect(widgetEntry(view, 0).note).toContain("catalogue");
   });
 
   it("renders an installed app widget's title and declared fields", () => {
@@ -95,7 +104,7 @@ describe("drawing a Screen", () => {
     };
 
     const view = screenView(screen, [planner], shellWidgetRegistry([planner]));
-    const widget = view.widgets[1];
+    const widget = widgetEntry(view, 1);
 
     expect(widget).toMatchObject({
       registryId: "planner.quick-task",
@@ -105,9 +114,9 @@ describe("drawing a Screen", () => {
       appName: "Planner",
       size: "2x1",
     });
-    expect(widget?.fields).toEqual([{ id: "title", label: "Title", type: "text", required: true }]);
-    expect(widget?.settings).toEqual([{ id: "project", label: "Project", value: "work" }]);
-    expect(widget?.note).toContain("not available");
+    expect(widget.fields).toEqual([{ id: "title", label: "Title", type: "text", required: true }]);
+    expect(widget.settings).toEqual([{ id: "project", label: "Project", value: "work" }]);
+    expect(widget.note).toContain("not available");
   });
 
   it("applies a declared default when the Screen has no setting", () => {
@@ -121,7 +130,7 @@ describe("drawing a Screen", () => {
     };
 
     const view = screenView(screen, [planner], shellWidgetRegistry([planner]));
-    expect(view.widgets[1]?.settings).toEqual([
+    expect(widgetEntry(view, 1).settings).toEqual([
       { id: "project", label: "Project", value: "inbox" },
     ]);
   });
@@ -142,8 +151,47 @@ describe("drawing a Screen", () => {
       title: "ghost.notes",
       size: "1x1",
     });
-    expect(view.widgets[1]?.note).toContain("not installed");
-    expect(view.widgets[1]?.unknownSettings).toEqual(["project"]);
+    expect(widgetEntry(view, 1).note).toContain("not installed");
+    expect(widgetEntry(view, 1).unknownSettings).toEqual(["project"]);
+  });
+
+  it("renders a row with weighted children and a phone scroll mode", () => {
+    const planner = pack("planner", "Planner", [quickTask()]);
+    const screen = {
+      ...defaultHomeScreen(),
+      widgets: [
+        {
+          kind: "row" as const,
+          size: "full" as const,
+          layout: "row" as const,
+          items: [
+            { registryId: "planner.quick-task", weight: 2, settings: { project: "work" } },
+            { registryId: "ghost.notes", weight: 1 },
+          ],
+        },
+      ],
+    };
+
+    const registry = shellWidgetRegistry([planner]);
+    const wide = screenView(screen, [planner], registry, 1200);
+    const row = wide.widgets[0];
+    expect(row).toMatchObject({ kind: "row", size: "full", layout: "row", mode: "wrap" });
+    if (row === undefined || row.kind !== "row") return;
+    expect(row.items.map((item) => item.weight)).toEqual([2, 1]);
+    expect(row.items[0]?.widget).toMatchObject({
+      kind: "widget",
+      registryId: "planner.quick-task",
+      source: "app",
+    });
+    expect(row.items[1]?.widget).toMatchObject({
+      kind: "widget",
+      registryId: "ghost.notes",
+      source: "unknown",
+    });
+
+    const narrow = screenView(screen, [planner], registry, 390);
+    const phoneRow = narrow.widgets[0];
+    expect(phoneRow).toMatchObject({ kind: "row", mode: "scroll" });
   });
 
   it("offers the host widget and each installed app widget to add", () => {

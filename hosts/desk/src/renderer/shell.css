@@ -362,6 +362,34 @@ h1 {
   grid-column: span 1;
 }
 
+.widget-row {
+  min-width: 0;
+}
+
+.widget-row-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.widget-row-item {
+  flex: var(--row-weight, 1) 1 0;
+  min-width: 0;
+}
+
+.widget-row[data-mode="scroll"] .widget-row-track {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+}
+
+.widget-row[data-mode="scroll"] .widget-row-item {
+  flex: 0 0 min(78%, 360px);
+  scroll-snap-align: start;
+}
+
 .widget-unknown,
 .widget-app {
   border-style: dashed;
@@ -782,6 +810,19 @@ h2 {
   .widget-2x1,
   .widget-1x1 {
     grid-column: 1 / -1;
+  }
+
+  /* A row never squeezes: at phone width it is one horizontal, snapping line. */
+  .widget-row .widget-row-track {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .widget-row .widget-row-item {
+    flex: 0 0 min(78%, 360px);
+    scroll-snap-align: start;
   }
 }
 

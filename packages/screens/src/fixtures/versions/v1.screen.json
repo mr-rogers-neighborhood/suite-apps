@@ -1,0 +1,14 @@
+{
+  "format": "suite.screen",
+  "version": 1,
+  "id": "home",
+  "name": "Home",
+  "widgets": [
+    { "registryId": "desk.apps", "size": "full" },
+    {
+      "registryId": "planner.quick-task",
+      "size": "1x1",
+      "settings": { "project": "inbox" }
+    }
+  ]
+}

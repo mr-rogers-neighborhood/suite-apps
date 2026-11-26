@@ -1,16 +1,23 @@
 import { SUITE_WIDGET_SIZES, type SuiteWidget, type SuiteWidgetSize } from "@suite/contracts";
 import {
   createWidgetRegistry,
+  isScreenRow,
   type Screen,
+  type ScreenEntry,
+  type ScreenEntryLayout,
   SUITE_SCREEN_FORMAT,
   SUITE_SCREEN_VERSION,
+  type SuiteScreenRowItem,
   type SuiteScreenWidget,
+  screenLayout,
   type WidgetRegistry,
 } from "@suite/screens";
 import type { PackInfo } from "./packs.js";
 import type { ScreenSet } from "./screens.js";
 import type {
   ScreenChoiceView,
+  ScreenEntryView,
+  ScreenRowView,
   ScreenView,
   ScreenWidgetFieldView,
   ScreenWidgetView,
@@ -98,20 +105,64 @@ export function preferredWidgetSize(registryId: string, registry: WidgetRegistry
  *
  * A host id resolves from the host table, an installed app id from the registry, and
  * anything else is a named placeholder with a sentence. The unknown placement is still
- * in the document; it is not a renderer-side omission.
+ * in the document; it is not a renderer-side omission. A row is laid out by the shared
+ * layout function, so the same weights produce a wrap on a wide window and a scroll on
+ * a phone.
  */
 export function screenView(
   screen: Screen,
   packs: readonly PackInfo[],
   registry: WidgetRegistry = shellWidgetRegistry(packs),
+  viewportWidth = 1024,
 ): ScreenView {
+  const layout = screenLayout(screen, { width: viewportWidth });
   return {
     id: screen.id,
     name: screen.name,
     available: true,
-    widgets: screen.widgets.map((placement) => screenWidgetView(placement, packs, registry)),
+    widgets: screen.widgets.map((entry, index) =>
+      screenEntryView(entry, layout.entries[index], packs, registry),
+    ),
     choices: screenChoices(packs, registry),
   };
+}
+
+function screenEntryView(
+  entry: ScreenEntry,
+  layout: ScreenEntryLayout | undefined,
+  packs: readonly PackInfo[],
+  registry: WidgetRegistry,
+): ScreenEntryView {
+  if (!isScreenRow(entry)) return screenWidgetView(entry, packs, registry);
+
+  const view: ScreenRowView = {
+    kind: "row",
+    size: entry.size,
+    layout: entry.layout,
+    mode: layout?.kind === "row" ? layout.mode : "wrap",
+    items: entry.items.map((item) => ({
+      weight: item.weight,
+      widget: rowItemWidgetView(item, entry.size, packs, registry),
+    })),
+  };
+  return view;
+}
+
+function rowItemWidgetView(
+  item: SuiteScreenRowItem,
+  rowSize: SuiteWidgetSize,
+  packs: readonly PackInfo[],
+  registry: WidgetRegistry,
+): ScreenWidgetView {
+  return screenWidgetView(
+    {
+      registryId: item.registryId,
+      size: rowSize,
+      ...(item.settings === undefined ? {} : { settings: item.settings }),
+    },
+    packs,
+    registry,
+  );
 }
 
 function screenWidgetView(
@@ -122,6 +173,7 @@ function screenWidgetView(
   const host = hostWidget(placement.registryId);
   if (host !== undefined) {
     return {
+      kind: "widget",
       registryId: placement.registryId,
       size: placement.size,
       source: "host",
@@ -139,6 +191,7 @@ function screenWidgetView(
   const resolved = registry.resolve(placement.registryId);
   if (resolved === undefined) {
     return {
+      kind: "widget",
       registryId: placement.registryId,
       size: placement.size,
       source: "unknown",
@@ -158,6 +211,7 @@ function screenWidgetView(
   const resolution = registry.settings(placement.registryId, placement.settings ?? {});
 
   return {
+    kind: "widget",
     registryId: placement.registryId,
     size: placement.size,
     source: "app",
