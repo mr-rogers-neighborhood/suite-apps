@@ -9,13 +9,13 @@
   "main": "./dist/main.js",
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build": "pnpm clean && tsc -p tsconfig.build.json && node scripts/stage.mjs",
+    "build": "pnpm clean && tsc -p tsconfig.build.json && pnpm build:island && node scripts/stage.mjs",
     "package:dir": "pnpm build:all && electron-builder --dir",
     "start": "electron .",
     "dev": "SUITE_DESK_DEV_PACKS=1 pnpm build:all && SUITE_DESK_DEV_PACKS=1 pnpm start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build:all": "pnpm --filter @suite/sync run build && pnpm --filter @suite/host run build && pnpm --filter @suite/sync-server run build && pnpm --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme --filter @suite/desk --workspace-concurrency=1 run build",
-    "typecheck:all": "pnpm --filter @suite/desk --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme run typecheck",
+    "build:all": "pnpm --filter @suite/sync run build && pnpm --filter @suite/host run build && pnpm --filter @suite/sync-server run build && pnpm --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme --filter @suite/ui --filter @suite/desk --workspace-concurrency=1 run build",
+    "typecheck:all": "pnpm --filter @suite/desk --filter @suite/contracts --filter @suite/screens --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host --filter @suite/desktop --filter @suite/theme --filter @suite/ui run typecheck",
     "check:packages": "pnpm --filter @suite/pack --filter @suite/pack-runtime --filter @suite/pack-host run check && pnpm --filter @suite/pack --filter @suite/pack-host test",
     "check": "pnpm build:all && pnpm check:packages && node ../../scripts/lint.mjs && pnpm typecheck:all && vitest run",
     "check:full": "pnpm check",
@@ -23,7 +23,8 @@
     "lint": "node ../../scripts/lint.mjs",
     "test": "vitest run",
     "e2e:proof": "playwright test --grep @proof",
-    "verify": "pnpm check"
+    "verify": "pnpm check",
+    "build:island": "vite build --config vite.island.config.ts"
   },
   "dependencies": {
     "@suite/contracts": "workspace:*",
@@ -34,18 +35,27 @@
     "@suite/screens": "workspace:*",
     "@suite/sync-server": "workspace:*",
     "@suite/theme": "workspace:*",
+    "@suite/ui": "workspace:*",
     "loro-crdt": "^1.18.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "ws": "^8.22.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
     "@playwright/test": "^1.64.1",
+    "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.3.0",
     "electron": "^45.2.2",
     "electron-builder": "^26.0.12",
+    "tailwindcss": "^4.3.5",
     "typescript": "~5.9.3",
+    "vite": "^8.3.8",
     "vitest": "5.1.0"
   },
   "repository": {

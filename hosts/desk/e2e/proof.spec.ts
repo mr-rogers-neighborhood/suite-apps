@@ -94,7 +94,9 @@ test("opens Home Screen, creates a Screen document, and switches to it", {
       await page.getByRole("button", { name: "Create Screen" }).click();
 
       await expect(page.locator("#screen-name")).toHaveText("Focus");
-      await expect(page.locator('[role="tab"][aria-selected="true"]')).toContainText("Focus");
+      await expect(page.locator('nav[aria-label="Open tabs"] [aria-current="page"]')).toContainText(
+        "Focus",
+      );
 
       const screenFiles = await readdir(join(dataDir, "screens"));
       expect(screenFiles.filter((file) => file.endsWith(".loro")).length).toBeGreaterThanOrEqual(1);
