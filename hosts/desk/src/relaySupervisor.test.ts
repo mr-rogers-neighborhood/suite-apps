@@ -1,19 +1,21 @@
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
 import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   parseRelayReport,
-  type RelayChildProcess,
   RelaySupervisor,
   type RelaySupervisorOptions,
   type RelaySupervisorStatus,
-  relayChildArgs,
-  relayChildEnvironment,
-  type SpawnRelayChild,
+  type RelayWorker,
+  relayWorkerArguments,
+  relayWorkerEnvironment,
+  type SpawnRelayWorker,
 } from "./relaySupervisor.js";
 
 const STORE = "/home/person/.config/Suite Desk/desk/relay";
-const ENTRY = "/repo/services/relay/dist/child.js";
+const WORKER = new URL("file:///repo/hosts/desk/dist/relayWorker.js");
 
 function state(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -33,22 +35,21 @@ function state(overrides: Record<string, unknown> = {}): Record<string, unknown>
   };
 }
 
-class FakeChild extends EventEmitter implements RelayChildProcess {
+class FakeWorker extends EventEmitter implements RelayWorker {
   readonly stdin = new PassThrough();
   readonly stdout = new PassThrough();
   readonly stderr = new PassThrough();
   readonly written: string[] = [];
-  readonly signals: string[] = [];
+  terminated = false;
 
   constructor() {
     super();
     this.stdin.on("data", (chunk) => this.written.push(String(chunk)));
   }
 
-  kill(signal?: NodeJS.Signals | number): boolean {
-    this.signals.push(String(signal ?? "SIGTERM"));
+  terminate(): void {
+    this.terminated = true;
     this.exit(null, "SIGKILL");
-    return true;
   }
 
   exit(code: number | null, signal: NodeJS.Signals | null = null): void {
@@ -69,9 +70,9 @@ class FakeChild extends EventEmitter implements RelayChildProcess {
 }
 
 interface SpawnRecord {
-  readonly child: FakeChild;
-  readonly command: string;
-  readonly args: readonly string[];
+  readonly worker: FakeWorker;
+  readonly url: URL;
+  readonly argv: readonly string[];
   readonly env: NodeJS.ProcessEnv;
 }
 
@@ -85,15 +86,14 @@ function harness(overrides: Partial<RelaySupervisorOptions> = {}): Harness {
   const spawns: SpawnRecord[] = [];
   const statuses: RelaySupervisorStatus[] = [];
   let clock = 1_000;
-  const spawn: SpawnRelayChild = (command, args, options) => {
-    const child = new FakeChild();
-    spawns.push({ child, command, args: [...args], env: options.env });
-    return child;
+  const spawnWorker: SpawnRelayWorker = (url, options) => {
+    const worker = new FakeWorker();
+    spawns.push({ worker, url, argv: [...options.workerData.argv], env: options.env });
+    return worker;
   };
   const supervisor = new RelaySupervisor({
-    entry: ENTRY,
+    worker: WORKER,
     store: STORE,
-    execPath: "/usr/bin/node",
     host: "127.0.0.1",
     port: 0,
     baseEnv: {
@@ -105,7 +105,7 @@ function harness(overrides: Partial<RelaySupervisorOptions> = {}): Harness {
       SUITE_DESK_TRUST: "/home/person/.config/Suite Desk/desk/trust",
       PACK_SECRET: "do-not-carry",
     },
-    spawn,
+    spawnWorker,
     restartDelayMs: 2,
     readinessTimeoutMs: 500,
     stopTimeoutMs: 500,
@@ -128,9 +128,9 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<voi
   }
 }
 
-describe("the relay child environment", () => {
+describe("the relay worker environment", () => {
   it("passes only the store and no host data or document path", () => {
-    const env = relayChildEnvironment({
+    const env = relayWorkerEnvironment({
       PATH: "/usr/bin",
       LANG: "en_GB.UTF-8",
       HOME: "/home/person",
@@ -139,16 +139,16 @@ describe("the relay child environment", () => {
       SUITE_DESK_TRUST: "/home/person/desk/trust",
       PACK_SECRET: "do-not-carry",
     });
-    expect(env).toEqual({
-      ELECTRON_RUN_AS_NODE: "1",
-      PATH: "/usr/bin",
-      LANG: "en_GB.UTF-8",
-    });
+    expect(env).toEqual({ PATH: "/usr/bin", LANG: "en_GB.UTF-8" });
     expect(JSON.stringify(env)).not.toContain("/documents");
+    // The Electron switch was the child-process launch's fingerprint. A worker
+    // thread is Node code in this process, and the packaged host fuses
+    // `runAsNode` off, so the switch must not come back.
+    expect(env.ELECTRON_RUN_AS_NODE).toBeUndefined();
   });
 
   it("puts only the store, the bind and the port in the argument list", () => {
-    expect(relayChildArgs(STORE, "127.0.0.1", 8787)).toEqual([
+    expect(relayWorkerArguments(STORE, "127.0.0.1", 8787)).toEqual([
       "--store",
       STORE,
       "--host",
@@ -160,32 +160,43 @@ describe("the relay child environment", () => {
 });
 
 describe("the supervisor", () => {
-  it("spawns the child with only its store", () => {
+  it("starts a worker thread with only its store, never the host's own executable", () => {
     const { supervisor, spawns } = harness();
-    // A host object that carries a document path must not leak into the child.
+    // A host object that carries a document path must not leak into the worker.
     (supervisor as unknown as { documentRoot?: string }).documentRoot =
       "/home/person/desk/documents/secret.canvas";
     supervisor.start();
 
     expect(spawns).toHaveLength(1);
     const spawn = spawns[0] as SpawnRecord;
-    expect(spawn.command).toBe("/usr/bin/node");
-    expect(spawn.args).toEqual([ENTRY, "--store", STORE, "--host", "127.0.0.1", "--port", "0"]);
+    expect(spawn.url.href).toBe(WORKER.href);
+    expect(spawn.argv).toEqual(["--store", STORE, "--host", "127.0.0.1", "--port", "0"]);
     expect(JSON.stringify(spawn.env)).not.toContain("documents");
-    expect(JSON.stringify(spawn.args)).not.toContain("documents");
+    expect(JSON.stringify(spawn.argv)).not.toContain("documents");
     expect(spawn.env.SUITE_DESK_DATA).toBeUndefined();
     expect(spawn.env.SUITE_DESK_DOCUMENTS).toBeUndefined();
     expect(spawn.env.PACK_SECRET).toBeUndefined();
     expect(spawn.env.HOME).toBeUndefined();
+
+    // The regression tripwire: a process launch needs `child_process` and the
+    // host's executable path, which is the zypak-wrapped Electron binary under
+    // Flatpak. Neither may return to this module.
+    const source = readFileSync(
+      fileURLToPath(new URL("./relaySupervisor.ts", import.meta.url)),
+      "utf8",
+    );
+    expect(source).not.toMatch(/from "node:child_process"/u);
+    expect(source).not.toMatch(/process\.execPath/u);
+    expect(source).toMatch(/new Worker\(/u);
   });
 
-  it("reports starting, then ready only after the child says so", async () => {
+  it("reports starting, then ready only after the worker says so", async () => {
     const { supervisor, spawns, statuses } = harness();
     supervisor.start();
     expect(supervisor.status.state).toBe("starting");
     expect(supervisor.ready).toBe(false);
 
-    (spawns[0] as SpawnRecord).child.ready();
+    (spawns[0] as SpawnRecord).worker.ready();
     await waitFor(() => supervisor.ready);
 
     expect(supervisor.status).toMatchObject({
@@ -204,24 +215,24 @@ describe("the supervisor", () => {
   it("does not treat an arbitrary line as readiness", async () => {
     const { supervisor, spawns } = harness();
     supervisor.start();
-    (spawns[0] as SpawnRecord).child.stdout.write("not a handshake\n");
+    (spawns[0] as SpawnRecord).worker.stdout.write("not a handshake\n");
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(supervisor.status.state).toBe("starting");
   });
 
-  it("restarts a crashed child and keeps the crash visible", async () => {
+  it("restarts a crashed worker and keeps the crash visible", async () => {
     const { supervisor, spawns } = harness();
     supervisor.start();
-    (spawns[0] as SpawnRecord).child.ready();
+    (spawns[0] as SpawnRecord).worker.ready();
     await waitFor(() => supervisor.ready);
 
-    (spawns[0] as SpawnRecord).child.exit(1);
+    (spawns[0] as SpawnRecord).worker.exit(1);
     expect(supervisor.status.state).toBe("crashed");
     expect(supervisor.status.lastError).toContain("code 1");
     expect(supervisor.status.restartCount).toBe(1);
 
     await waitFor(() => spawns.length === 2);
-    (spawns[1] as SpawnRecord).child.ready();
+    (spawns[1] as SpawnRecord).worker.ready();
     await waitFor(() => supervisor.ready);
 
     expect(supervisor.status.restartCount).toBe(1);
@@ -231,12 +242,12 @@ describe("the supervisor", () => {
   it("stops retrying after the bounded number of restarts", async () => {
     const { supervisor, spawns } = harness({ maxRestarts: 1 });
     supervisor.start();
-    (spawns[0] as SpawnRecord).child.ready();
+    (spawns[0] as SpawnRecord).worker.ready();
     await waitFor(() => supervisor.ready);
 
-    (spawns[0] as SpawnRecord).child.exit(1);
+    (spawns[0] as SpawnRecord).worker.exit(1);
     await waitFor(() => spawns.length === 2);
-    (spawns[1] as SpawnRecord).child.exit(1);
+    (spawns[1] as SpawnRecord).worker.exit(1);
 
     expect(supervisor.status.state).toBe("failed");
     expect(supervisor.status.lastError).toContain("will not be retried");
@@ -244,39 +255,39 @@ describe("the supervisor", () => {
     expect(spawns).toHaveLength(2);
   });
 
-  it("sends stop before the child exits and does not restart it", async () => {
+  it("sends stop before the worker exits and does not restart it", async () => {
     const { supervisor, spawns } = harness();
     supervisor.start();
-    (spawns[0] as SpawnRecord).child.ready();
+    (spawns[0] as SpawnRecord).worker.ready();
     await waitFor(() => supervisor.ready);
 
     const stopping = supervisor.stop();
     expect(supervisor.status.state).toBe("stopping");
-    const child = (spawns[0] as SpawnRecord).child;
-    expect(child.written.join("")).toContain('{"type":"stop"}\n');
+    const worker = (spawns[0] as SpawnRecord).worker;
+    expect(worker.written.join("")).toContain('{"type":"stop"}\n');
 
-    child.exit(0);
+    worker.exit(0);
     await stopping;
     expect(supervisor.status.state).toBe("stopped");
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(spawns).toHaveLength(1);
   });
 
-  it("kills a child that does not stop in time", async () => {
+  it("terminates a worker that does not stop in time", async () => {
     const { supervisor, spawns } = harness({ stopTimeoutMs: 10 });
     supervisor.start();
-    const child = (spawns[0] as SpawnRecord).child;
-    child.ready();
+    const worker = (spawns[0] as SpawnRecord).worker;
+    worker.ready();
     await waitFor(() => supervisor.ready);
 
     const stopping = supervisor.stop();
-    // The fake kill emits the exit the real process would emit.
+    // The fake terminate emits the exit a terminated thread would emit.
     await stopping;
-    expect(child.signals).toContain("SIGKILL");
+    expect(worker.terminated).toBe(true);
     expect(supervisor.status.state).toBe("stopped");
   });
 
-  it("fails visibly when the child never reports ready", async () => {
+  it("fails visibly when the worker never reports ready", async () => {
     const { supervisor, spawns } = harness({ readinessTimeoutMs: 10, maxRestarts: 0 });
     supervisor.start();
     expect(spawns).toHaveLength(1);
@@ -287,10 +298,10 @@ describe("the supervisor", () => {
   it("turns an error report into the crash sentence", async () => {
     const { supervisor, spawns } = harness();
     supervisor.start();
-    const child = (spawns[0] as SpawnRecord).child;
-    child.fail("the store could not be opened");
+    const worker = (spawns[0] as SpawnRecord).worker;
+    worker.fail("the store could not be opened");
     await waitFor(() => supervisor.status.lastError !== null);
-    child.exit(1);
+    worker.exit(1);
     await waitFor(() => supervisor.status.state === "crashed");
     expect(supervisor.status.lastError).toContain("the store could not be opened");
   });

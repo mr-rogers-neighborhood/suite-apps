@@ -1,15 +1,30 @@
-import { spawn as nodeSpawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
+import { PassThrough } from "node:stream";
+import { Worker } from "node:worker_threads";
+import {
+  isRelayWorkerOutput,
+  type RelayWorkerInput,
+  type RelayWorkerOutput,
+} from "./relayWorkerMessages.js";
 
 /**
- * The host's supervisor for the relay child.
+ * The host's supervisor for the relay worker.
  *
- * The host owns the lifecycle, not the relay: it spawns `services/relay`'s child
- * entry with its own store, waits for one readiness line before reporting sync
- * as available, applies a bounded restart policy when the child dies, and sends
- * `stop` before it exits. The child never receives a document handle or a
+ * The host owns the lifecycle, not the relay: it starts the worker entry with
+ * its own store, waits for one readiness line before reporting sync as
+ * available, applies a bounded restart policy when the worker dies, and sends
+ * `stop` before it exits. The worker never receives a document handle or a
  * document path: the only path in its argument list is the store.
+ *
+ * The relay runs in a `worker_threads` thread, not a spawned process. The host
+ * is the Electron binary, and under Flatpak that binary is zypak-wrapped; a
+ * child started with `ELECTRON_RUN_AS_NODE=1` made zypak abort
+ * (`DetermineZygoteStrategy: Assertion failed: bus`) because the child's
+ * whitelisted environment has no session bus. The packaged host also fuses
+ * `runAsNode` off, so that child could never have run the relay. A thread is
+ * plain Node code in this process and stays inside the same sandbox.
  *
  * Nothing here imports Electron, so the whole lifecycle is a Node test. The
  * pack-facing socket is a separate module; this one never opens a frame.
@@ -35,20 +50,21 @@ export interface RelaySupervisorStatus {
   /** `suite://relay?...`, the code the tray used to show. */
   readonly code: string | null;
   readonly consoleUrl: string | null;
-  /** The one path the child is given. It is the relay's own store. */
+  /** The one path the worker is given. It is the relay's own store. */
   readonly store: string;
-  /** How many times this supervisor has restarted the child since the last start. */
+  /** How many times this supervisor has restarted the worker since the last start. */
   readonly restartCount: number;
   /** The last crash sentence, kept after a successful restart so a crash stays visible. */
   readonly lastError: string | null;
 }
 
-/** A process shape a test can fake without a real child. */
-export interface RelayChildProcess {
+/** A worker shape a test can fake without starting a thread. */
+export interface RelayWorker {
   readonly stdin: Writable | null;
   readonly stdout: Readable | null;
   readonly stderr: Readable | null;
-  kill(signal?: NodeJS.Signals | number): boolean;
+  /** Terminate the thread. The worker's `exit` event follows. */
+  terminate(): unknown;
   once(
     event: "exit",
     listener: (code: number | null, signal: NodeJS.Signals | null) => void,
@@ -56,27 +72,23 @@ export interface RelayChildProcess {
   once(event: "error", listener: (error: Error) => void): unknown;
 }
 
-export interface SpawnRelayChildOptions {
+export interface SpawnRelayWorkerOptions {
+  /** The relay's arguments: only the store, the bind and the port. */
+  readonly workerData: { readonly argv: readonly string[] };
   readonly env: NodeJS.ProcessEnv;
-  readonly stdio: readonly ["pipe", "pipe", "pipe"];
 }
 
-export type SpawnRelayChild = (
-  command: string,
-  args: readonly string[],
-  options: SpawnRelayChildOptions,
-) => RelayChildProcess;
+export type SpawnRelayWorker = (url: URL, options: SpawnRelayWorkerOptions) => RelayWorker;
 
 export interface RelaySupervisorOptions {
-  /** The built child entry, `services/relay/dist/child.js` in a checkout. */
-  readonly entry: string;
+  /** The built worker entry, `dist/relayWorker.js` beside this module. */
+  readonly worker: URL;
   /** The relay's own store. Never a document root. */
   readonly store: string;
-  readonly execPath?: string;
   readonly host?: string;
   readonly port?: number;
   readonly baseEnv?: NodeJS.ProcessEnv;
-  readonly spawn?: SpawnRelayChild;
+  readonly spawnWorker?: SpawnRelayWorker;
   readonly maxRestarts?: number;
   readonly restartWindowMs?: number;
   readonly restartDelayMs?: number;
@@ -88,11 +100,12 @@ export interface RelaySupervisorOptions {
 }
 
 /**
- * The environment the child is allowed to inherit.
+ * The environment the worker is allowed to inherit.
  *
  * This is a whitelist, not `process.env` minus a few keys: a host variable that
  * names a document root or a pack data directory must not travel by accident.
- * `ELECTRON_RUN_AS_NODE` is set because the host's own executable is Electron.
+ * There is no `ELECTRON_RUN_AS_NODE` here any more: the worker is Node code in
+ * this process, and the packaged host's `runAsNode` fuse is off.
  */
 const PASS_THROUGH_ENV = [
   "PATH",
@@ -105,8 +118,8 @@ const PASS_THROUGH_ENV = [
   "TZ",
 ] as const;
 
-export function relayChildEnvironment(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ELECTRON_RUN_AS_NODE: "1" };
+export function relayWorkerEnvironment(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
   for (const key of PASS_THROUGH_ENV) {
     const value = base[key];
     if (value !== undefined) env[key] = value;
@@ -115,7 +128,7 @@ export function relayChildEnvironment(base: NodeJS.ProcessEnv): NodeJS.ProcessEn
 }
 
 /** Only the store, the bind and the port. Nothing that could name a document. */
-export function relayChildArgs(store: string, host: string, port: number): readonly string[] {
+export function relayWorkerArguments(store: string, host: string, port: number): readonly string[] {
   return ["--store", store, "--host", host, "--port", String(port)];
 }
 
@@ -199,7 +212,7 @@ const DEFAULT_STOP_TIMEOUT_MS = 5_000;
 function describeError(error: unknown): string {
   return error instanceof Error && error.message.length > 0
     ? error.message
-    : "the relay child could not start, and did not say why";
+    : "the relay worker could not start, and did not say why";
 }
 
 function exitSentence(
@@ -209,7 +222,7 @@ function exitSentence(
 ): string {
   const how = signal === null ? `code ${code ?? "unknown"}` : `signal ${signal}`;
   const detail = stderr === null ? "" : ` Last line: ${stderr}`;
-  return `the relay child exited (${how}).${detail}`;
+  return `the relay worker exited (${how}).${detail}`;
 }
 
 function delay(ms: number): Promise<void> {
@@ -219,14 +232,67 @@ function delay(ms: number): Promise<void> {
   });
 }
 
+/**
+ * The real worker: a thread that speaks the relay's line protocol.
+ *
+ * The thread is given two in-memory pipes. `stdin` forwards each line to the
+ * worker; stdout and stderr collect the lines it sends back, so the supervisor's
+ * readiness handshake and `stop` command are the same code they were for a
+ * process.
+ */
+class ThreadRelayWorker extends EventEmitter implements RelayWorker {
+  readonly stdin = new PassThrough();
+  readonly stdout = new PassThrough();
+  readonly stderr = new PassThrough();
+  readonly #thread: Worker;
+
+  constructor(url: URL, options: SpawnRelayWorkerOptions) {
+    super();
+    this.#thread = new Worker(url, { workerData: options.workerData, env: options.env });
+    this.stdin.on("data", (chunk: unknown) => {
+      this.#post({ type: "line", line: String(chunk) });
+    });
+    this.stdin.on("end", () => {
+      this.#post({ type: "close" });
+    });
+    this.#thread.on("message", (message: unknown) => {
+      if (isRelayWorkerOutput(message)) this.#receive(message);
+    });
+    this.#thread.on("error", (error: Error) => {
+      this.emit("error", error);
+    });
+    this.#thread.on("exit", (code: number) => {
+      this.stdout.end();
+      this.stderr.end();
+      this.emit("exit", code, null);
+    });
+  }
+
+  terminate(): unknown {
+    return this.#thread.terminate();
+  }
+
+  #post(message: RelayWorkerInput): void {
+    try {
+      this.#thread.postMessage(message);
+    } catch {
+      // A stopped thread has no port. Its exit event owns the outcome.
+    }
+  }
+
+  #receive(message: RelayWorkerOutput): void {
+    if (message.stream === "stderr") this.stderr.write(message.line);
+    else this.stdout.write(message.line);
+  }
+}
+
 export class RelaySupervisor {
-  readonly #entry: string;
+  readonly #workerUrl: URL;
   readonly #store: string;
-  readonly #execPath: string;
   readonly #host: string;
   readonly #port: number;
   readonly #baseEnv: NodeJS.ProcessEnv;
-  readonly #spawnChild: SpawnRelayChild;
+  readonly #spawnWorker: SpawnRelayWorker;
   readonly #maxRestarts: number;
   readonly #restartWindowMs: number;
   readonly #restartDelayMs: number;
@@ -237,7 +303,7 @@ export class RelaySupervisor {
   readonly #logger: ((line: string) => void) | undefined;
 
   #status: RelaySupervisorStatus;
-  #child: RelayChildProcess | null = null;
+  #worker: RelayWorker | null = null;
   #restartTimer: ReturnType<typeof setTimeout> | null = null;
   #readinessTimer: ReturnType<typeof setTimeout> | null = null;
   #stopResolve: (() => void) | null = null;
@@ -247,19 +313,13 @@ export class RelaySupervisor {
   #failures: number[] = [];
 
   constructor(options: RelaySupervisorOptions) {
-    this.#entry = options.entry;
+    this.#workerUrl = options.worker;
     this.#store = options.store;
-    this.#execPath = options.execPath ?? process.execPath;
     this.#host = options.host ?? "127.0.0.1";
     this.#port = options.port ?? 0;
     this.#baseEnv = options.baseEnv ?? process.env;
-    this.#spawnChild =
-      options.spawn ??
-      ((command, args, spawnOptions) =>
-        nodeSpawn(command, args, {
-          env: spawnOptions.env,
-          stdio: ["pipe", "pipe", "pipe"],
-        }));
+    this.#spawnWorker =
+      options.spawnWorker ?? ((url, spawnOptions) => new ThreadRelayWorker(url, spawnOptions));
     this.#maxRestarts = options.maxRestarts ?? DEFAULT_MAX_RESTARTS;
     this.#restartWindowMs = options.restartWindowMs ?? DEFAULT_RESTART_WINDOW_MS;
     this.#restartDelayMs = options.restartDelayMs ?? DEFAULT_RESTART_DELAY_MS;
@@ -291,9 +351,9 @@ export class RelaySupervisor {
     return this.#status.state === "ready";
   }
 
-  /** Start the child now, cancelling a scheduled restart. */
+  /** Start the worker now, cancelling a scheduled restart. */
   start(): RelaySupervisorStatus {
-    if (this.#child !== null) return this.#status;
+    if (this.#worker !== null) return this.#status;
     this.#cancelRestart();
     this.#failures = [];
     this.#lastStderr = null;
@@ -303,11 +363,11 @@ export class RelaySupervisor {
   }
 
   /**
-   * Stop accepting work, then wait for the child to exit.
+   * Stop accepting work, then wait for the worker to exit.
    *
-   * The stop command is the ordering: the child closes its listener and store
-   * before it writes `stopped` or exits. A child that does not answer is killed
-   * after the bound, so the host is never held open by a broken relay.
+   * The stop command is the ordering: the worker closes its listener and store
+   * before it writes `stopped` or exits. A worker that does not answer is
+   * terminated after the bound, so the host is never held open by a broken relay.
    */
   async stop(): Promise<RelaySupervisorStatus> {
     if (this.#stopPromise !== null) return this.#stopPromise;
@@ -323,8 +383,8 @@ export class RelaySupervisor {
   async #stop(): Promise<RelaySupervisorStatus> {
     this.#cancelRestart();
     this.#clearReadinessTimer();
-    const child = this.#child;
-    if (child === null) {
+    const worker = this.#worker;
+    if (worker === null) {
       this.#stopping = false;
       this.#emitStopped();
       return this.#status;
@@ -335,18 +395,18 @@ export class RelaySupervisor {
     const exited = new Promise<void>((resolve) => {
       this.#stopResolve = resolve;
     });
-    this.#write(child, '{"type":"stop"}\n');
+    this.#write(worker, '{"type":"stop"}\n');
     const timedOut = await Promise.race([
       exited.then(() => false),
       delay(this.#stopTimeoutMs).then(() => true),
     ]);
-    if (timedOut && this.#child === child) {
-      this.#logger?.("the relay child did not stop in time; killing it");
-      child.kill("SIGKILL");
+    if (timedOut && this.#worker === worker) {
+      this.#logger?.("the relay worker did not stop in time; terminating it");
+      this.#terminate(worker);
       await Promise.race([exited, delay(1000)]);
     }
-    if (this.#child === child) {
-      this.#child = null;
+    if (this.#worker === worker) {
+      this.#worker = null;
       this.#finishStopped();
     }
     return this.#status;
@@ -357,9 +417,9 @@ export class RelaySupervisor {
   }
 
   #launch(): void {
-    if (this.#child !== null) return;
-    const args = relayChildArgs(this.#store, this.#host, this.#port);
-    const env = relayChildEnvironment(this.#baseEnv);
+    if (this.#worker !== null) return;
+    const argv = relayWorkerArguments(this.#store, this.#host, this.#port);
+    const env = relayWorkerEnvironment(this.#baseEnv);
     this.#lastStderr = null;
     this.#emit({
       state: "starting",
@@ -372,48 +432,45 @@ export class RelaySupervisor {
       consoleUrl: null,
     });
 
-    let child: RelayChildProcess;
+    let worker: RelayWorker;
     try {
-      child = this.#spawnChild(this.#execPath, [this.#entry, ...args], {
-        env,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+      worker = this.#spawnWorker(this.#workerUrl, { workerData: { argv }, env });
     } catch (error) {
-      this.#handleFailure(`the relay child could not start: ${describeError(error)}`);
+      this.#handleFailure(`the relay worker could not start: ${describeError(error)}`);
       return;
     }
-    this.#child = child;
-    this.#readLines(child.stdout, (line) => this.#onLine(child, line));
-    this.#readLines(child.stderr, (line) => {
+    this.#worker = worker;
+    this.#readLines(worker.stdout, (line) => this.#onLine(worker, line));
+    this.#readLines(worker.stderr, (line) => {
       if (line.trim().length === 0) return;
       this.#lastStderr = line.trim();
       this.#logger?.(`relay: ${line}`);
     });
-    child.once("exit", (code, signal) => this.#onExit(child, code, signal));
-    child.once("error", (error) => {
-      if (this.#child !== child) return;
-      this.#child = null;
+    worker.once("exit", (code, signal) => this.#onExit(worker, code, signal));
+    worker.once("error", (error) => {
+      if (this.#worker !== worker) return;
+      this.#worker = null;
       this.#clearReadinessTimer();
-      this.#handleFailure(`the relay child failed: ${error.message}`);
+      this.#handleFailure(`the relay worker failed: ${error.message}`);
     });
     this.#readinessTimer = setTimeout(() => {
-      if (this.#child !== child || this.#status.state === "ready") return;
-      this.#child = null;
+      if (this.#worker !== worker || this.#status.state === "ready") return;
+      this.#worker = null;
       this.#clearReadinessTimer();
-      child.kill("SIGKILL");
+      this.#terminate(worker);
       this.#handleFailure(`the relay did not report ready within ${this.#readinessTimeoutMs} ms`);
     }, this.#readinessTimeoutMs);
     this.#readinessTimer.unref?.();
   }
 
-  #onLine(child: RelayChildProcess, line: string): void {
+  #onLine(worker: RelayWorker, line: string): void {
     if (line.trim().length === 0) return;
     const report = parseRelayReport(line);
     if (report === null) {
       this.#logger?.(`relay: ${line}`);
       return;
     }
-    if (this.#child !== child) return;
+    if (this.#worker !== worker) return;
     if (report.type === "error") {
       this.#lastStderr = report.message;
       this.#logger?.(`relay: ${report.message ?? "the relay reported an error"}`);
@@ -436,9 +493,9 @@ export class RelaySupervisor {
     }
   }
 
-  #onExit(child: RelayChildProcess, code: number | null, signal: NodeJS.Signals | null): void {
-    if (this.#child !== child) return;
-    this.#child = null;
+  #onExit(worker: RelayWorker, code: number | null, signal: NodeJS.Signals | null): void {
+    if (this.#worker !== worker) return;
+    this.#worker = null;
     this.#clearReadinessTimer();
     if (this.#stopping) {
       this.#finishStopped();
@@ -520,11 +577,21 @@ export class RelaySupervisor {
     lines.on("line", onLine);
   }
 
-  #write(child: RelayChildProcess, line: string): void {
+  #write(worker: RelayWorker, line: string): void {
     try {
-      child.stdin?.write(line);
+      worker.stdin?.write(line);
     } catch {
       // The exit handler owns the outcome; a closed pipe is not a second failure.
+    }
+  }
+
+  #terminate(worker: RelayWorker): void {
+    try {
+      const result = worker.terminate();
+      if (result instanceof Promise) result.catch(() => {});
+    } catch {
+      // The exit event owns the outcome; a thread that is already gone is not a
+      // second failure.
     }
   }
 

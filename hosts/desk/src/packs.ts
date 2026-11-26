@@ -72,7 +72,7 @@ export function hostRingsFor(value: string | undefined): readonly PackRing[] {
  *
  * The declaration lives in `@suite/pack/platforms` beside the Go host's, so the
  * catalogue compares one shared fact rather than a copy. The desk host extends
- * that base with `relay`: the supervisor spawns the relay child and the pack
+ * that base with `relay`: the supervisor starts the relay worker and the pack
  * broker forwards opaque frames, so a pack that declares it is no longer refused
  * at discovery. The shared declaration catches up when the catalogue rows need
  * to name the relay too; until then this is the host's own addition.

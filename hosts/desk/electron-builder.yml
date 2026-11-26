@@ -39,6 +39,11 @@ files:
   - "!node_modules/zod/mini/**"
   - "!node_modules/zod/v4/mini/**"
   - "!node_modules/@types/**"
+  # electron-builder copies a workspace dependency's whole directory. The relay
+  # worker needs the server's `dist` and runtime dependencies, not the Electron
+  # shell, sources, tests or docs that live beside it in `services/relay`; the
+  # relay app's own package check guards the same seam.
+  - "!node_modules/@suite/sync-server/{app,docs,deploy,packages,scripts,src}/**"
 
 asar: true
 

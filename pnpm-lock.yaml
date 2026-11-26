@@ -218,6 +218,9 @@ importers:
       '@suite/screens':
         specifier: workspace:*
         version: link:../../packages/screens
+      '@suite/sync-server':
+        specifier: workspace:*
+        version: link:../../services/relay
       '@suite/theme':
         specifier: workspace:*
         version: link:../../packages/theme

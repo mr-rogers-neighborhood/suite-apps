@@ -123,11 +123,15 @@ Point each device at the relay's address — for example `wss://192.168.1.20:878
 
 Nothing else changes: the apps keep their documents, and no Suite process manages a relay running on
 another machine. The address must be one the device can route to; `127.0.0.1`
-is always the device itself. The host seam that absorbs the relay is a **supervised child**: Suite
-Desk spawns `src/child.ts` with its own store, waits for a JSON readiness line, restarts it under a
-bounded policy and stops it before exit. A module inside the host was rejected because it shares the
-host's crash domain. Both shapes keep the "never reads a document" rule, and the child starts without
-a documents grant. Per-document keys, frame verification, the header index and gap recovery are still
+is always the device itself. The host seam that absorbs the relay is a **supervised worker**: Suite
+Desk starts `src/child.ts` as a `worker_threads` thread with its own store, waits for a JSON readiness
+line, restarts it under a bounded policy and stops it before exit. It is a thread rather than a child
+process because the packaged host's executable is Electron: under Flatpak a child launched with
+`ELECTRON_RUN_AS_NODE=1` aborts in zypak, and the packaged host fuses `runAsNode` off. A module
+imported directly into the host's code was rejected because it shares the host's full module graph; a
+thread still gets only its store. Both shapes keep the "never reads a document" rule, and the relay
+starts without a documents grant. Per-document keys, frame verification, the header index and gap
+recovery are still
 #304; this seam is the lifecycle and transport.
 
 ## Working in the monorepo
