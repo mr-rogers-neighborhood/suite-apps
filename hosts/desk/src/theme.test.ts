@@ -125,6 +125,7 @@ describe("resolving the choice", () => {
     const view = resolveThemeView(themeChoice("logseq", "system"), true);
     expect(view.preset).toBe("warm");
     expect(view.mode).toBe("dark");
+    expect(view.source).toBe("system");
     expect(view.values["--canvas"]).toBeTruthy();
     expect(view.values["--ink"]).toBeTruthy();
   });

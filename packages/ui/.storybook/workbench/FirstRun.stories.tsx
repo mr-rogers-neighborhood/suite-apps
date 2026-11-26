@@ -197,7 +197,7 @@ function EmptyHome({
           </Button>
         </div>
         <p className="mt-6 text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
-          You can change Home later from a tab&apos;s menu or Settings.
+          You can change Home later from a Screen tab&apos;s menu.
         </p>
       </main>
     </div>

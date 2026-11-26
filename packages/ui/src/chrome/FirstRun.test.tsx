@@ -57,6 +57,16 @@ describe("FirstRun", () => {
     expect(screen.getByText("2 selected")).toBeInTheDocument();
   });
 
+  it("does not preselect an app the host already reports as installed", () => {
+    renderFirstRun({ packs: [canvas, { ...planner, status: "installed" }] });
+
+    expect(screen.getByRole("button", { name: /^Planner/u })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+  });
+
   it("keeps a choice the person made when the host repaints the catalogue", () => {
     const { rerender } = renderFirstRun();
     fireEvent.click(screen.getByRole("button", { name: /^Planner/u }));

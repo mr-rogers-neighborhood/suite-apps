@@ -252,7 +252,8 @@ The rules that shape the Suite host.
   `<dataRoot>/screens/desk-home.loro`. It is a role, not a permanent tab: launch restores the saved
   session, and the brand and `+` open it again, so closing its tab is safe. A fresh data root shows
   the first-run wizard; its last step opens Home. A Home that has never been edited is empty and
-  offers the first installed app, **Create a document** and **Choose an app**.
+  offers the first installed app, **Create a document** and **Choose an app**; with no apps it offers
+  **Install from a file…** and **Choose an app**.
 - The first-run wizard is host chrome, not a pack and not a Screen. It lists the trusted catalogue,
   selects every app by default, chooses palette, brightness and density, and installs the selected
   apps concurrently. The appearance step names each chosen app's publisher id, key fingerprint, pack

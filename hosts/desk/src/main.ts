@@ -2067,6 +2067,9 @@ async function installFirstRunPack(id: string): Promise<FirstRunInstallResult> {
   if (entry === undefined) {
     return { ok: false, detail: `No trusted ${id} is in the catalogue.` };
   }
+  if (entry.publisher === null) {
+    return { ok: false, detail: `No publisher was resolved for ${id}.` };
+  }
   const previous = packs.find((pack) => pack.id === id) ?? null;
   if (previous !== null && previous.version === entry.version) {
     return { ok: true, detail: "Already installed" };
@@ -2079,6 +2082,21 @@ async function installFirstRunPack(id: string): Promise<FirstRunInstallResult> {
       packTrustOptions(),
       { replace: action === "reinstall" },
     );
+    // The review showed the catalogue's capability list. A file swapped between the scan and
+    // this read may declare more, so remove it rather than record consent for a list nobody saw.
+    if (!sameCapabilities(installed.capabilities, entry.capabilities)) {
+      await uninstallPackVersion(
+        join(dataRootFor(), "packs"),
+        installed.id,
+        installed.version,
+      ).catch(() => undefined);
+      await refreshPacks();
+      publishPackData();
+      return {
+        ok: false,
+        detail: "The archive's capabilities changed after the review; it was removed.",
+      };
+    }
     await recordInstallConsent(installed);
     await refreshPacks();
     publishPackData();
@@ -2086,6 +2104,10 @@ async function installFirstRunPack(id: string): Promise<FirstRunInstallResult> {
   } catch (error) {
     return { ok: false, detail: installRefusal(error) };
   }
+}
+
+function sameCapabilities(left: readonly string[], right: readonly string[]): boolean {
+  return [...left].sort().join("\u0000") === [...right].sort().join("\u0000");
 }
 
 /** Record that the person finished the first-run wizard and show the chrome. */

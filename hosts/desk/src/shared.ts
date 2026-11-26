@@ -415,7 +415,10 @@ export interface ScreenSummaryView {
 export interface ThemeView {
   /** The resolved preset id, after any stored-id rename. */
   readonly preset: string;
+  /** The brightness the page draws. */
   readonly mode: "light" | "dark";
+  /** The stored choice: `mode` when it is fixed, or follow-the-system. */
+  readonly source: "system" | "light" | "dark";
   readonly density: Density;
   readonly values: Readonly<Record<string, string>>;
   /** The type, density, radius, elevation and motion record for this choice. */

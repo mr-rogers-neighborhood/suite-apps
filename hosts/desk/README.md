@@ -300,7 +300,8 @@ Home is the host's own Screen, `desk-home`, stored at `<dataRoot>/screens/desk-h
 role, not a permanent tab: launch restores the saved session, and the brand and the `+` button open
 Home again, so closing its tab is safe. A fresh data root shows the first-run wizard instead; its
 last step opens Home. A Home that has never been edited is empty and offers **Open** (the first
-installed app, preferring Canvas), **Create a document** and **Choose an app**.
+installed app, preferring Canvas), **Create a document** and **Choose an app**; with no apps it offers
+**Install from a file…** and **Choose an app**.
 
 The first-run wizard is host chrome from `@suite/ui/chrome`. It selects every trusted catalogue app
 by default, chooses palette, brightness and density, and installs the selection concurrently through

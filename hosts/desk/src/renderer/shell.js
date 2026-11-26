@@ -1279,7 +1279,9 @@ function renderWidgets(view) {
       );
       const actions = element("div", "home-empty-actions");
       if (first === null) {
-        actions.append(actionButton("Add an app", () => run(api.installPack()), "action-primary"));
+        actions.append(
+          actionButton("Install from a file…", () => run(api.installPack()), "action-primary"),
+        );
         actions.append(actionButton("Choose an app", () => run(api.newTab())));
       } else {
         actions.append(

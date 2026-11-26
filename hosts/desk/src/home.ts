@@ -302,7 +302,6 @@ export interface HomeOpen {
  * gains Home at the front.
  */
 export async function openHomeScreen(screens: ScreenSet, spaces: SpaceStore): Promise<HomeOpen> {
-  await migrateHome(screens);
   const screen = screens.screen(screens.homeId);
   if (screen === null) throw new Error("the host has no Home Screen");
   const ensured = await spaces.ensureScreenTab({

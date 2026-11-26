@@ -721,6 +721,9 @@ export class ShellWindow {
       if (active !== null) {
         void this.activateTab(active).catch((error: unknown) => {
           console.warn("[desk] could not activate the tab after first run", error);
+          // The onboarding write already succeeded; reveal the chrome even if the saved
+          // tab cannot be painted, rather than leaving the wizard up with no way forward.
+          this.broadcast();
         });
         return;
       }

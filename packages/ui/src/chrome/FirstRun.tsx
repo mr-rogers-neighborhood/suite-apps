@@ -222,7 +222,7 @@ function InstallReview({ packs }: { readonly packs: readonly FirstRunPack[] }) {
       </h2>
       {packs.length === 0 ? (
         <p className="mt-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]">
-          No apps selected. You can add them later in Settings.
+          No apps selected. You can add them later from Home's Edit.
         </p>
       ) : (
         <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
@@ -346,7 +346,7 @@ export function FirstRun({
 
   useEffect(() => {
     if (!followPacks) return;
-    setSelected(new Set(packs.map((pack) => pack.id)));
+    setSelected(new Set(packs.filter((pack) => pack.status !== "installed").map((pack) => pack.id)));
   }, [followPacks, packs]);
 
   const chosen = packs.filter((pack) => selected.has(pack.id));
@@ -495,7 +495,7 @@ export function FirstRun({
             </div>
             <InstallReview packs={chosen} />
             <div className="mt-6 flex flex-wrap gap-2">
-              <Button variant="primary" onClick={startInstall}>
+              <Button variant="primary" onClick={startInstall} disabled={busy}>
                 {chosen.length === 0
                   ? "Continue to Home"
                   : `Install ${chosen.length === 1 ? "1 app" : `${chosen.length} apps`}`}
