@@ -436,8 +436,8 @@ service would only produce buttons that fail.
 
 ## Sync and the relay child
 
-The host owns the relay's lifecycle. `src/relaySupervisor.ts` spawns the built child entry
-(`services/relay/dist/child.js`) with only `--store <dataRoot>/relay --host 127.0.0.1 --port 0`, waits
+The host owns the relay's lifecycle. `src/relaySupervisor.ts` spawns the entry built from
+`services/relay/src/child.ts` with only `--store <dataRoot>/relay --host 127.0.0.1 --port 0`, waits
 for one JSON readiness line before it reports sync as available, and applies a bounded restart
 policy. The child closes its listener, console and store before it writes `stopped`; the host sends
 `{"type":"stop"}` before it exits and kills the child after the bound. `build:all` builds the relay

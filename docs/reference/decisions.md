@@ -407,7 +407,7 @@ Implemented on 2026-11-25 in `hosts/desk` and `services/relay`:
   exits. `hosts/desk/src/relayAdapter.ts` is the pack-facing service: one pinned socket to this
   host's relay, opaque frames and a tab-scoped token. The host never parses a frame.
 - The relay child is built by the host's `build:all` but is not packaged inside the Flatpak yet;
-  a checkout runs it from `services/relay/dist/child.js`.
+  a checkout runs the entry built from `services/relay/src/child.ts`.
 - Per-document keys, relay frame verification, the header index and gap recovery remain S7.2–S7.6
   (#304). This slice is the lifecycle and transport seam, not the document protocol.
 
