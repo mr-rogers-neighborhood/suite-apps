@@ -387,7 +387,9 @@ watches, not a module inside the host process.
   and with only its own store, so "the relay never reads a document" becomes an operating-system
   boundary where the platform allows one — the Flatpak sandbox on desktop, and the mobile host's
   process model on Android and iOS. Where the platform cannot enforce it, the same rule stays a
-  code-path and test boundary.
+  code-path and test boundary. The desktop host is that case: a Flatpak carries no Node runtime, and
+  its Electron binary cannot be its own Node under zypak, so the relay is a `worker_threads` thread
+  in the host's process and receives only its store.
 - **Frames stay opaque.** The host may open the pinned socket and forward bytes; the relay persists
   sealed frames and signed membership records and never receives a document handle, a path or a
   plaintext frame. A module inside the host was rejected because it gives the relay the host's crash
@@ -398,16 +400,23 @@ watches, not a module inside the host process.
 
 Implemented on 2026-11-25 in `hosts/desk` and `services/relay`:
 
-- `services/relay/src/child.ts` is the child entry. It takes `--store` (and optionally `--host` and
+- `services/relay/src/child.ts` is the relay entry. It takes `--store` (and optionally `--host` and
   `--port`), starts the same relay `serve` starts, and writes one JSON readiness line. `stop` closes
-  the listener, console and store before it reports `stopped`; the child refuses a document, file,
+  the listener, console and store before it reports `stopped`; the relay refuses a document, file,
   workspace or data-root argument by name.
-- `hosts/desk/src/relaySupervisor.ts` spawns that entry with only its store and a whitelisted
-  environment, waits for readiness, applies a bounded restart policy, and stops it before the host
-  exits. `hosts/desk/src/relayAdapter.ts` is the pack-facing service: one pinned socket to this
-  host's relay, opaque frames and a tab-scoped token. The host never parses a frame.
-- The relay child is built by the host's `build:all` but is not packaged inside the Flatpak yet;
-  a checkout runs the entry built from `services/relay/src/child.ts`.
+- `hosts/desk/src/relaySupervisor.ts` starts that entry as a `worker_threads` thread with only its
+  store and a whitelisted environment, waits for readiness, applies a bounded restart policy, and
+  stops it before the host exits. `hosts/desk/src/relayAdapter.ts` is the pack-facing service: one
+  pinned socket to this host's relay, opaque frames and a tab-scoped token. The host never parses a
+  frame.
+- The relay is a thread rather than a spawned process (changed 2026-11-26). The packed host's
+  executable is Electron, and under Flatpak it is zypak-wrapped: a child started with
+  `ELECTRON_RUN_AS_NODE=1` aborts in zypak (`DetermineZygoteStrategy: Assertion failed: bus`) because
+  the supervisor's whitelisted environment carries no session bus. The packaged host also fuses
+  `runAsNode` off, so that child could not have run the relay even with one. A `worker_threads` thread
+  is Node code in the host's process, never launches Electron, and keeps the status contract, the
+  store and the no-documents rule. The thread's imports of `@suite/sync-server` ship in the app's
+  asar, so the packaged host carries the relay instead of failing at start.
 - Per-document keys, relay frame verification, the header index and gap recovery remain S7.2–S7.6
   (#304). This slice is the lifecycle and transport seam, not the document protocol.
 
@@ -473,7 +482,7 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
 - The relay's reach is a stored choice, not a bind the build ships: `loopback` by default, `tailnet`
   when Tailscale is running, and `network` only after a confirmation — the last app's form of the
   CLI's `--trust-all-remote`. `SUITE_SYNC_BIND` overrides it for a test or a host unit. The host stores
-  and shows the choice and starts the supervised child with it;
+  and shows the choice and starts the supervised worker with it;
   [The relay becomes a supervised child of the host](#the-relay-becomes-a-supervised-child-of-the-host)
   records the shape.
 - A version lives in one place and the rolling release carries it; per-app tags are retired.

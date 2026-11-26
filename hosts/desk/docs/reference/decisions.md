@@ -21,7 +21,7 @@ The rules that shape the Suite host.
   `identity.pack`, the `network` policy, `relay`, `recents` and `notifications`; `storage` and
   `commands` are in the shared vocabulary but are refused at discovery until their service exists.
   A manifest never widens the bridge by asking. `relay` is not a general socket: the host supervises
-  the relay child and gives a pack one pinned connection to it, and only while that relay is ready.
+  the relay worker and gives a pack one pinned connection to it, and only while that relay is ready.
 - `capabilities` is the required list and `optionalCapabilities` is what a pack may use when the
   host serves it. A missing required capability refuses the pack; a missing optional one degrades.
   The loaded summary carries both lists, so `packAllows` grants a served optional service while the
@@ -396,14 +396,19 @@ The rules that shape the Suite host.
 ## Sync and collaboration
 
 - Sync stays a separate relay and service. The host does not become the relay.
-- The host supervises the relay as a child (`relaySupervisor.ts`). It spawns the relay's child entry
-  with its own store and a whitelisted environment, waits for one JSON readiness line before it
-  reports sync as available, applies a bounded restart policy, and sends `stop` before it exits. The
-  child closes its listener, console and store before it exits. A crash is shown on the Sync
-  surface, not swallowed, and a successful restart keeps the crash sentence visible.
-- The relay child starts without a `documents` grant. The only path it receives is its own store;
-  the child's argument parser refuses a document, file, workspace or data-root argument by name, and
+- The host supervises the relay as a worker thread (`relaySupervisor.ts`). It starts the relay's
+  worker entry in this process with its own store and a whitelisted environment, waits for one JSON
+  readiness line before it reports sync as available, applies a bounded restart policy, and sends
+  `stop` before it exits. The worker closes its listener, console and store before it exits. A crash
+  is shown on the Sync surface, not swallowed, and a successful restart keeps the crash sentence
+  visible.
+- The relay starts without a `documents` grant. The only path it receives is its own store;
+  the relay's argument parser refuses a document, file, workspace or data-root argument by name, and
   the supervisor's environment is a whitelist rather than the host's whole environment.
+- The relay is a `worker_threads` thread, not a second copy of the host's executable. Under Flatpak
+  the Electron binary is zypak-wrapped, and a child launched with `ELECTRON_RUN_AS_NODE=1` aborts in
+  zypak when the whitelisted environment has no session bus; the packaged host also fuses
+  `runAsNode` off. A thread is Node code in this process, so it never launches Electron.
 - The pack-facing service is `relayAdapter.ts`: `connect({ url, certificateSha256 })` opens a
   pinned socket only to this host's relay, returns a tab-scoped connection and forwards opaque bytes.
   The host never parses a frame, and a token from one tab cannot be spent by another.
@@ -423,7 +428,6 @@ The rules that shape the Suite host.
 - app-widget capture delivery (app widgets render; captures are not sent);
 - Screen sync across devices (#199; a portable `.screen` file is manual);
 - per-document keys, relay frame verification, the header index and gap recovery (S7.2–S7.6, #304);
-- packaging the relay child inside the Flatpak;
 - a user-visible space document file, export and backup;
 - document-first launcher entries, recents and cross-app search;
 - tab tear-off and split view;

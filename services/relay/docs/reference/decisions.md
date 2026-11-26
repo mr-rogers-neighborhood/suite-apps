@@ -43,4 +43,6 @@ The rules that shape Sync.
 - The relay never reads a document. Whatever shape the host gives it, the relay is handed no document
   handle, no document path and no decrypted frame; it holds only its sealed-frame store and the signed
   membership records it already needs. A module shape enforces that by code path, a supervised child
-  can also enforce it with an OS boundary.
+  can also enforce it with an OS boundary. The desktop host chose a `worker_threads` thread (recorded
+  in the host's decision record): its Flatpak carries no Node runtime and its zypak-wrapped Electron
+  binary cannot serve as one, so the store-only rule is a code-path and test boundary there.

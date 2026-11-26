@@ -224,7 +224,7 @@ let reminderScheduler: ReminderScheduler | null = null;
 /** The host's recent list and the seen fingerprints its document watch compares. */
 let recentsStore: RecentsStore | null = null;
 let libraryWatch: LibraryWatch | null = null;
-/** The supervised relay child and the pack-facing broker over its socket. */
+/** The supervised relay worker and the pack-facing broker over its socket. */
 let relaySupervisor: RelaySupervisor | null = null;
 let relayBroker: RelayBroker | null = null;
 /** The quit hook prevents the first `before-quit`, stops the relay, then quits again. */
@@ -278,9 +278,9 @@ if (!gotLock) {
     }
   });
   app.on("before-quit", (event) => {
-    // The relay is a child, not a thread: stop accepting sync work and wait for
-    // it to close its store before this process exits. The first quit is held,
-    // the second one (after the await below) is the real one.
+    // The relay runs in this process as a worker thread, so stop accepting sync
+    // work and let it close its store before this process exits. The first quit
+    // is held, the second one (after the await below) is the real one.
     if (shuttingDown) return;
     shuttingDown = true;
     event.preventDefault();
@@ -288,7 +288,7 @@ if (!gotLock) {
     relayBroker?.closeAll();
     void (async () => {
       await relaySupervisor?.stop().catch((error: unknown) => {
-        console.warn("[desk] the relay child could not be stopped", error);
+        console.warn("[desk] the relay worker could not be stopped", error);
       });
       await spaceStore?.flush().catch((error: unknown) => {
         console.warn("[desk] space document flush failed", error);
@@ -374,10 +374,11 @@ async function bootstrap(): Promise<void> {
   // `external.ts` turns it into an opaque, tab-scoped token for the pack.
   externalFiles = new ExternalFilesService(externalDialog(), fileService);
 
-  // The relay is a supervised child, not a module in this process. It gets its
-  // own store and nothing else: no document root, no pack root, no device key.
+  // The relay is a supervised worker, not a module in this process and not a
+  // second copy of the Electron binary. It gets its own store and nothing else:
+  // no document root, no pack root, no device key.
   relaySupervisor = new RelaySupervisor({
-    entry: relayChildEntry(),
+    worker: relayWorkerUrl(),
     store: join(dataRoot, "relay"),
     baseEnv: process.env,
     logger: (line) => console.info(`[desk] ${line}`),
@@ -431,17 +432,22 @@ function dataRootFor(): string {
 }
 
 /**
- * Where the built relay child lives.
+ * The relay's worker entry, compiled beside this module.
  *
- * A checkout runs the host from `hosts/desk`, so the relay's compiled entry is
- * two levels up and beside it. `SUITE_DESK_RELAY_ENTRY` names a different file
- * for a test or a packaging experiment. A packaged host that does not carry the
- * child fails visibly at start rather than pretending sync is available.
+ * A checkout and a packaged build resolve the same file: `tsc` writes
+ * `dist/relayWorker.js`, electron-builder puts `dist/` in the asar, and the
+ * thread's imports of `@suite/sync-server` come from the app's own
+ * `node_modules`. `SUITE_DESK_RELAY_WORKER` names a different file for a test.
+ *
+ * It must not be the host's executable. Under Flatpak that binary is
+ * zypak-wrapped, and a child started with `ELECTRON_RUN_AS_NODE=1` aborts in
+ * zypak when the whitelisted environment has no session bus; the packaged host
+ * also fuses `runAsNode` off. A worker thread is Node code in this process.
  */
-function relayChildEntry(): string {
-  const override = process.env.SUITE_DESK_RELAY_ENTRY?.trim();
-  if (override !== undefined && override.length > 0) return override;
-  return join(app.getAppPath(), "..", "..", "services", "relay", "dist", "child.js");
+function relayWorkerUrl(): URL {
+  const override = process.env.SUITE_DESK_RELAY_WORKER?.trim();
+  if (override !== undefined && override.length > 0) return pathToFileURL(override);
+  return new URL("./relayWorker.js", import.meta.url);
 }
 
 function relayLifecycle(state: RelaySupervisorStatus["state"]): RelayLifecycle {

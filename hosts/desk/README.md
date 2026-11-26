@@ -3,7 +3,7 @@
 The desktop host. One installed Electron app; each app is a sandboxed, signed pack opened as a tab.
 
 Suite Desk is the desktop host and the only desktop install path. Canvas, Planner, Budget and Help
-remain frozen Flatpaks beside it; the relay runs as a supervised child of the host (#315). The host
+remain frozen Flatpaks beside it; the relay runs as a supervised worker of the host (#315). The host
 boundary it proves is:
 
 - one window, a host-owned tab strip, pack views and host-rendered Screen tabs;
@@ -18,7 +18,7 @@ boundary it proves is:
 - a host-owned Command Surface: one input with Capture, Command and Search modes, pack-declared
   commands and scopes, deterministic ranking and session recency, and a separate scoped command
   channel that carries no document bytes;
-- a supervised relay child and a narrow pack-facing relay service: a pinned socket, opaque frames and
+- a supervised relay worker and a narrow pack-facing relay service: a pinned socket, opaque frames and
   no documents grant;
 - a user-consented external file surface: a host-owned picker, opaque handles, single-file import
   and a bounded folder import that copies into the pack's own root;
@@ -495,15 +495,22 @@ The spike serves `documents`, `files`, `identity.pack`, `network`, `recents`, `n
 exists; the shared capability vocabulary is wider than this host, and loading a pack into a missing
 service would only produce buttons that fail.
 
-## Sync and the relay child
+## Sync and the relay worker
 
-The host owns the relay's lifecycle. `src/relaySupervisor.ts` spawns the entry built from
-`services/relay/src/child.ts` with only `--store <dataRoot>/relay --host 127.0.0.1 --port 0`, waits
-for one JSON readiness line before it reports sync as available, and applies a bounded restart
-policy. The child closes its listener, console and store before it writes `stopped`; the host sends
-`{"type":"stop"}` before it exits and kills the child after the bound. `build:all` builds the relay
-first, and `SUITE_DESK_RELAY_ENTRY` names another entry for a test. A packaged host does not carry the
-child yet, so Start fails visibly rather than pretending sync is on.
+The host owns the relay's lifecycle. `src/relaySupervisor.ts` starts `src/relayWorker.ts` as a
+`worker_threads` thread with only `--store <dataRoot>/relay --host 127.0.0.1 --port 0`, waits for one
+JSON readiness line before it reports sync as available, and applies a bounded restart policy. The
+thread runs the relay's own child entry (`services/relay/src/child.ts`), which closes its listener,
+console and store before it writes `stopped`; the host sends `{"type":"stop"}` before it exits and
+terminates the thread after the bound. `build:all` builds `@suite/sync-server` first, and
+`SUITE_DESK_RELAY_WORKER` names another entry for a test.
+
+The relay is a thread, never a second copy of the host's executable. Under Flatpak the Electron binary
+is zypak-wrapped, and a child launched with `ELECTRON_RUN_AS_NODE=1` aborts in zypak
+(`DetermineZygoteStrategy: Assertion failed: bus`) because the whitelisted environment has no session
+bus; the packaged host also fuses `runAsNode` off, so that child could not have run the relay anyway.
+A thread is Node code in this process, ships inside the app's asar with its `@suite/sync-server`
+dependency, and stays inside the host's sandbox.
 
 The host chrome shows the state the tray app used to own: on/off, the advertised address, the
 certificate fingerprint, the `suite://relay` code, start/stop and the last crash. The relay has no
@@ -583,8 +590,6 @@ decision record owns that trade.
 - app-widget capture delivery (app widgets render their declared fields, but the host does not send
   a capture to the pack yet);
 - per-document keys, relay frame verification, the header index and gap recovery (S7.2–S7.6, #304);
-- packaging the relay child inside the Flatpak (the supervisor finds it in a checkout, or through
-  `SUITE_DESK_RELAY_ENTRY`);
 - binding a declared migration, projection or export entry to a pack renderer, and any app's own
   migration bodies (the host's chain, backup, idempotence and failed-migration path exist and are
   tested);
