@@ -28,11 +28,14 @@ import { clearPackSender, setPackSender } from "./senders.js";
 import {
   type CatalogueEntry,
   CHROME_ORIGIN,
+  CHROME_PICK,
   CHROME_STATE,
   type InstalledVersionView,
   PACK_EVENT,
   type PackLaunchContext,
   type PackShellTab,
+  type PickerData,
+  type PickerPackView,
   type RelayView,
   type ScreenView,
   type ShellState,
@@ -40,6 +43,21 @@ import {
 } from "./shared.js";
 import type { SpaceState, SpaceStore } from "./spaces.js";
 import { paintThemeSurface } from "./theme.js";
+
+/**
+ * What a pack calls one of its documents.
+ *
+ * A pack may declare several formats; the first one that names itself supplies the word, because
+ * a list row can only carry one. A pack that names none keeps the neutral "document".
+ */
+function packNoun(pack: PackInfo): { readonly singular: string; readonly plural: string } | null {
+  for (const document of pack.documents ?? []) {
+    if (document.name !== undefined) {
+      return { singular: document.name.singular, plural: document.name.plural };
+    }
+  }
+  return null;
+}
 
 /** The chrome's own height. The chrome page uses the same number in its stylesheet. */
 export const TAB_BAR_HEIGHT = 56;
@@ -78,6 +96,19 @@ export class ShellWindow {
    * or names another tab. A deep link updates the entry before the tab activates.
    */
   readonly #launchContexts = new Map<string, PackLaunchContext>();
+  /** The document each pack tab was opened on, so the picker leaves it out of Recents. */
+  readonly #tabDocuments = new Map<
+    string,
+    { readonly packId: string; readonly documentId: string }
+  >();
+  readonly #listDocuments: (
+    packId: string,
+  ) => Promise<readonly { readonly id: string; readonly name: string }[]>;
+  readonly #recentRows: () => readonly {
+    readonly packId: string;
+    readonly documentId: string;
+    readonly openedAt: number;
+  }[];
   #theme: ThemeView;
   #notice: string | null = null;
   #reminderStatus: string | null = null;
@@ -103,6 +134,16 @@ export class ShellWindow {
     readonly theme: ThemeView;
     readonly relay?: RelayView;
     readonly containerId?: string;
+    /** The pack's documents, read from the store on each picker open. */
+    readonly listDocuments?: (
+      packId: string,
+    ) => Promise<readonly { readonly id: string; readonly name: string }[]>;
+    /** The host's own recent rows, so the picker can order documents. */
+    readonly recentRows?: () => readonly {
+      readonly packId: string;
+      readonly documentId: string;
+      readonly openedAt: number;
+    }[];
     readonly onViewClosed?: (tabId: string) => void;
     readonly onClosed?: () => void;
   }) {
@@ -113,6 +154,8 @@ export class ShellWindow {
     this.#spaces = options.spaces;
     this.#screens = options.screens;
     this.#containerId = options.containerId ?? DEFAULT_CONTAINER_ID;
+    this.#listDocuments = options.listDocuments ?? (async () => []);
+    this.#recentRows = options.recentRows ?? (() => []);
     this.#onViewClosed = options.onViewClosed;
     this.#theme = options.theme;
     this.#relay = options.relay ?? this.#relay;
@@ -266,13 +309,101 @@ export class ShellWindow {
       return;
     }
 
+    await this.#openPackTab(pack, launch, pack.name);
+  }
+
+  /**
+   * Open one of a pack's documents in its own tab.
+   *
+   * A document already showing is focused instead of duplicated. The title is the document's own
+   * name, because that is what the person chose in the picker.
+   */
+  async openDocument(packId: string, documentId: string): Promise<void> {
+    const pack = this.#packs.find((candidate) => candidate.id === packId);
+    if (pack === undefined) {
+      this.#notice = `No pack named ${packId} is installed.`;
+      this.broadcast();
+      return;
+    }
+    const open = [...this.#tabDocuments.entries()].find(
+      ([, document]) => document.packId === packId && document.documentId === documentId,
+    );
+    if (open !== undefined) {
+      await this.activateTab(open[0]);
+      return;
+    }
+    await this.#openPackTab(pack, { kind: "document", documentId }, documentId, {
+      packId,
+      documentId,
+    });
+  }
+
+  /** Ask a pack to make a document and open it. The tab is named before the pack answers. */
+  async newDocument(packId: string): Promise<void> {
+    const pack = this.#packs.find((candidate) => candidate.id === packId);
+    if (pack === undefined) {
+      this.#notice = `No pack named ${packId} is installed.`;
+      this.broadcast();
+      return;
+    }
+    const noun = packNoun(pack)?.singular ?? "document";
+    await this.#openPackTab(pack, { kind: "create" }, `New ${noun}`);
+  }
+
+  /** The picker's data: packs, their documents, Screens and what already has a tab. */
+  async picker(): Promise<PickerData> {
+    const recents = new Map<string, number>();
+    for (const row of this.#recentRows()) {
+      recents.set(`${row.packId}\u0000${row.documentId}`, row.openedAt);
+    }
+
+    const packs: PickerPackView[] = [];
+    for (const pack of this.#packs) {
+      const declared = pack.documents ?? [];
+      let documents: PickerData["packs"][number]["documents"] = null;
+      if (declared.length > 0) {
+        try {
+          documents = (await this.#listDocuments(pack.id)).map((document) => ({
+            id: document.id,
+            name: document.name,
+            openedAt: recents.get(`${pack.id}\u0000${document.id}`) ?? null,
+          }));
+        } catch {
+          // An unreadable list is an empty one; the pack can still be opened.
+          documents = [];
+        }
+      }
+      packs.push({
+        id: pack.id,
+        name: pack.name,
+        description: pack.description ?? null,
+        noun: packNoun(pack),
+        documents,
+        unavailable: false,
+      });
+    }
+
+    return {
+      packs,
+      screens: this.#screens.summaries().map((screen) => ({ id: screen.id, name: screen.name })),
+      openDocuments: [...this.#tabDocuments.values()],
+    };
+  }
+
+  async #openPackTab(
+    pack: PackInfo,
+    launch: PackLaunchContext,
+    title: string,
+    document?: { readonly packId: string; readonly documentId: string },
+  ): Promise<void> {
     const tab = await this.#spaces.openTab({
       kind: "pack",
       packId: pack.id,
-      title: pack.name,
+      title,
       entry: pack.entry,
     });
     this.#launchContexts.set(tab.id, launch);
+    if (document !== undefined) this.#tabDocuments.set(tab.id, document);
     this.#notice = null;
     await this.activateTab(tab.id);
   }
@@ -372,6 +503,7 @@ export class ShellWindow {
   async closeTab(tabId: string): Promise<void> {
     const next = await this.#spaces.closeTab(tabId);
     this.#launchContexts.delete(tabId);
+    this.#tabDocuments.delete(tabId);
     const view = this.#views.get(tabId);
     if (view !== undefined) {
       this.#views.delete(tabId);
@@ -397,7 +529,13 @@ export class ShellWindow {
   }
 
   async newTab(): Promise<void> {
-    await this.openHome();
+    this.pick();
+  }
+
+  /** Ask the chrome to show the new-tab picker; the picker owns the rest. */
+  pick(): void {
+    if (this.#closed) return;
+    this.#chrome.webContents.send(CHROME_PICK);
   }
 
   /** Open the Home screen tab, or activate the one already showing it. */

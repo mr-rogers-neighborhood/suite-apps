@@ -1,6 +1,8 @@
 import { SyncPill } from "@suite/ui";
-import { HostTabBar } from "@suite/ui/chrome";
+import { HostTabBar, NewTabPicker } from "@suite/ui/chrome";
 import { createRoot } from "react-dom/client";
+import { useCallback, useEffect, useState } from "react";
+import type { PickerData } from "../../shared.js";
 import { type HostBarSnapshot, syncPresentation, toHostTabs } from "./state.js";
 import "./tab-bar.css";
 
@@ -14,16 +16,29 @@ export { colorFor } from "./state.js";
  * and calls back into the shell. The host state never moves into React, so removing
  * the island later is a smaller change than porting everything at once.
  */
+export interface PickerBridge {
+  readonly load: () => Promise<PickerData>;
+  readonly openPack: (id: string) => void;
+  readonly openDocument: (packId: string, documentId: string) => void;
+  readonly newDocument: (packId: string) => void;
+  readonly openScreen: (id: string) => void;
+  readonly newScreen: () => void;
+}
+
 export interface TabBarActions {
   readonly activate: (id: string) => void;
   readonly close: (id: string) => void;
+  /** A new tab is the picker: which surface, and which document inside it. */
   readonly newTab: () => void;
+  readonly home: () => void;
+  readonly picker: PickerBridge;
   readonly openCommands: () => void;
   readonly toggleSync: () => void;
 }
 
 export interface TabBarHandle {
   update(snapshot: HostBarSnapshot): void;
+  showPicker(): void;
   unmount(): void;
 }
 
@@ -36,12 +51,51 @@ const SEARCH_SHORTCUT =
 function TabBar({
   snapshot,
   actions,
+  bindPicker,
 }: {
   readonly snapshot: HostBarSnapshot;
   readonly actions: TabBarActions;
+  readonly bindPicker: (open: () => void) => void;
 }) {
   const sync = syncPresentation(snapshot.relay);
+  const [pickOpen, setPickOpen] = useState(false);
+  const [picker, setPicker] = useState<PickerData | null>(null);
+
+  const openPicker = useCallback(async () => {
+    setPickOpen(true);
+    try {
+      setPicker(await actions.picker.load());
+    } catch {
+      // A host that cannot answer still shows the picker's own Screens and actions.
+      setPicker(null);
+    }
+  }, [actions]);
+
+  useEffect(() => {
+    bindPicker(() => {
+      void openPicker();
+    });
+  }, [bindPicker, openPicker]);
+
+  const packs = (picker?.packs ?? []).map((pack) => ({
+    id: pack.id,
+    name: pack.name,
+    unavailable: pack.unavailable,
+    ...(pack.description === null ? {} : { description: pack.description }),
+    ...(pack.noun === null ? {} : { noun: pack.noun }),
+    ...(pack.documents === null
+      ? {}
+      : {
+          documents: pack.documents.map((document) => ({
+            id: document.id,
+            name: document.name,
+            ...(document.openedAt === null ? {} : { openedAt: document.openedAt }),
+          })),
+        }),
+  }));
+
   return (
+    <>
     <HostTabBar
       tabs={toHostTabs(snapshot.tabs)}
       activeTabId={snapshot.activeTabId}
@@ -54,7 +108,7 @@ function TabBar({
           <span>Suite</span>
         </span>
       }
-      onHome={actions.newTab}
+      onHome={actions.home}
       homeLabel="Home"
       search={
         <button
@@ -100,14 +154,45 @@ function TabBar({
         />
       }
     />
+    <NewTabPicker
+      open={pickOpen}
+      packs={packs}
+      screens={(picker?.screens ?? []).map((screen) => ({
+        id: screen.id,
+        name: screen.name,
+      }))}
+      openDocuments={picker?.openDocuments ?? []}
+      onClose={() => setPickOpen(false)}
+      onOpenPack={actions.picker.openPack}
+      onOpenDocument={actions.picker.openDocument}
+      onNewDocument={actions.picker.newDocument}
+      onOpenScreen={actions.picker.openScreen}
+      onNewScreen={() => {
+        setPickOpen(false);
+        actions.picker.newScreen();
+      }}
+      onOpenSettings={() => {
+        setPickOpen(false);
+        // Settings has no surface yet; Home is where appearance and the catalogue live today.
+        actions.home();
+      }}
+    />
+    </>
   );
 }
 
 export function mountTabBar(container: HTMLElement, actions: TabBarActions): TabBarHandle {
   const root = createRoot(container);
+  let open: (() => void) | null = null;
+  const bindPicker = (next: () => void): void => {
+    open = next;
+  };
   return {
     update(snapshot) {
-      root.render(<TabBar snapshot={snapshot} actions={actions} />);
+      root.render(<TabBar snapshot={snapshot} actions={actions} bindPicker={bindPicker} />);
+    },
+    showPicker() {
+      open?.();
     },
     unmount() {
       root.unmount();

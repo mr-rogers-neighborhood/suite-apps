@@ -529,7 +529,14 @@ function nextSize(size) {
 
 function openHomeTab() {
   shouldFocusSearch = true;
-  run(api.newTab());
+  run(api.home());
+}
+
+/** The picker's New screen: show the Screens manager with the name field ready. */
+function composeScreen() {
+  managingScreens = true;
+  paint();
+  elements.screenNewName?.focus();
 }
 
 /** Mount the React strip once, then hand it the host's snapshot on every paint. */
@@ -539,7 +546,16 @@ function updateHostBar() {
     tabBar = mountTabBar(elements.hostBar, {
       activate: (id) => run(api.activateTab(id)),
       close: (id) => run(api.closeTab(id)),
-      newTab: openHomeTab,
+      newTab: () => run(api.newTab()),
+      home: openHomeTab,
+      picker: {
+        load: () => api.picker(),
+        openPack: (id) => run(api.openPack(id)),
+        openDocument: (packId, documentId) => run(api.openDocument(packId, documentId)),
+        newDocument: (packId) => run(api.newDocument(packId)),
+        openScreen: (id) => run(api.openScreen(id)),
+        newScreen: composeScreen,
+      },
       openCommands: () => {
         if (commandOpen) closeCommandSurface();
         else openCommandSurface();
@@ -1483,6 +1499,7 @@ async function start() {
 
   bindChrome();
   let received = false;
+  api.onPick?.(() => tabBar?.showPicker());
   api.onState((next) => {
     if (!next) return;
     received = true;

@@ -25,6 +25,7 @@ import {
   loadCatalogue,
 } from "./catalogue.js";
 import { CommandBroker, type HostCommand } from "./commandBroker.js";
+import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { invokeProvider, registerCommandChannels } from "./commandInvocation.js";
 import { CommandRecency, ScopeRowsCache } from "./commandSurface.js";
 import {
@@ -561,8 +562,7 @@ function identityFor(sender: PackSender) {
 }
 
 /** The document store for a sender's publisher, created on first use. */
-function documentsFor(sender: PackSender): DocumentStore {
-  const publisherId = sender.pack.publisher?.id ?? SUITE_PUBLISHER_ID;
+function documentsForPublisher(publisherId: string): DocumentStore {
   let store = documentStores.get(publisherId);
   if (store === undefined) {
     const root = documentsRootFor(dataRootFor(), publisherId);
@@ -570,6 +570,10 @@ function documentsFor(sender: PackSender): DocumentStore {
     documentStores.set(publisherId, store);
   }
   return store;
+}
+
+function documentsFor(sender: PackSender): DocumentStore {
+  return documentsForPublisher(sender.pack.publisher?.id ?? SUITE_PUBLISHER_ID);
 }
 
 function recentsService(): RecentsStore {
@@ -918,6 +922,24 @@ function openWindow(): void {
     screens: screenStore,
     theme: themeView(),
     relay: currentRelayView(),
+    listDocuments: async (packId) => {
+      const pack = packViews().find((candidate) => candidate.id === packId);
+      if (pack === undefined) return [];
+      const store = documentsForPublisher(pack.publisher?.id ?? SUITE_PUBLISHER_ID);
+      return (await store.list(DEFAULT_CONTAINER_ID, packId)).map((document) => ({
+        id: document.id,
+        name: document.name,
+      }));
+    },
+    recentRows: () =>
+      recentsService()
+        .rows()
+        .filter((row) => row.containerId === DEFAULT_CONTAINER_ID)
+        .map((row) => ({
+          packId: row.packId,
+          documentId: row.documentId,
+          openedAt: row.openedAt,
+        })),
     onViewClosed: (tabId) => {
       files?.releaseOwner(tabId);
       externalFiles?.releaseOwner(tabId);
@@ -966,13 +988,13 @@ function hostCommands(): readonly HostCommand[] {
     },
     {
       id: "desk.new-tab",
-      title: "New Home tab",
+      title: "New tab",
       subtitle: "Suite Desk",
-      keywords: ["new", "tab", "home"],
+      keywords: ["new", "tab", "document", "pack"],
       run: async () => {
         if (window === null) return { ok: false, message: "Suite Desk is not ready." };
         await window.newTab();
-        return { ok: true, message: "Opened a Home tab." };
+        return { ok: true, message: "Opened the new-tab picker." };
       },
     },
     {
@@ -1049,6 +1071,18 @@ function registerIpc(): void {
   });
   onChrome(CHROME_IPC.newTab, async () => {
     await window?.newTab();
+  });
+  onChrome(CHROME_IPC.home, async () => {
+    await window?.openHome();
+  });
+  onChrome(CHROME_IPC.picker, async () => window?.picker());
+  onChrome(CHROME_IPC.openDocument, async (packId, documentId) => {
+    if (typeof packId !== "string" || typeof documentId !== "string") return;
+    await window?.openDocument(packId, documentId);
+  });
+  onChrome(CHROME_IPC.newDocument, async (packId) => {
+    if (typeof packId !== "string") return;
+    await window?.newDocument(packId);
   });
   onChrome(CHROME_IPC.reloadTab, (tabId) => {
     if (typeof tabId !== "string") return;

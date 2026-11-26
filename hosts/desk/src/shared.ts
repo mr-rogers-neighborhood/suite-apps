@@ -21,6 +21,10 @@ export const CHROME_IPC = {
   activateTab: "suite:shell:activate-tab",
   closeTab: "suite:shell:close-tab",
   newTab: "suite:shell:new-tab",
+  home: "suite:shell:home",
+  picker: "suite:shell:picker",
+  openDocument: "suite:shell:open-document",
+  newDocument: "suite:shell:new-document",
   reloadTab: "suite:shell:reload-tab",
   openExternal: "suite:shell:open-external",
   installPack: "suite:shell:install-pack",
@@ -56,6 +60,38 @@ export const CHROME_IPC = {
 
 /** Pushed, not invoked: the chrome redraws from the last state it received. */
 export const CHROME_STATE = "suite:shell:state-changed";
+
+/** Pushed, not invoked: the host asks the chrome to show the new-tab picker. */
+export const CHROME_PICK = "suite:shell:pick";
+
+/** One of a pack's documents, as the new-tab picker shows it. */
+export interface PickerDocumentView {
+  readonly id: string;
+  readonly name: string;
+  /** Epoch milliseconds the host recorded, or null when it has no record. */
+  readonly openedAt: number | null;
+}
+
+/** A pack in the picker. `documents` is null when the pack declares none. */
+export interface PickerPackView {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly noun: { readonly singular: string; readonly plural: string } | null;
+  readonly documents: readonly PickerDocumentView[] | null;
+  readonly unavailable: boolean;
+}
+
+export interface PickerScreenView {
+  readonly id: string;
+  readonly name: string;
+}
+
+export interface PickerData {
+  readonly packs: readonly PickerPackView[];
+  readonly screens: readonly PickerScreenView[];
+  readonly openDocuments: readonly { readonly packId: string; readonly documentId: string }[];
+}
 
 export const PACK_IPC = {
   info: "suite:pack:info",
