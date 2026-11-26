@@ -108,9 +108,11 @@ own docs. One fact has one home; a page links the owner rather than restating it
 
 Read `AGENTS.md` at the root and the owning app's `AGENTS.md` before editing. Shared packages are
 `workspace:*`; a change that needs a sibling app edited is a coordination, not a side effect.
-[Contribute a change](docs/how-to/contribute.md) has the branch, commit, docs and verification rules.
+[CONTRIBUTING.md](CONTRIBUTING.md) is the entry point; [Contribute a change](docs/how-to/contribute.md)
+has the branch, commit, docs and verification rules.
 
-Report a vulnerability per the owning app's `SECURITY.md`.
+Report a vulnerability privately through [SECURITY.md](SECURITY.md). Accessibility has its own
+[statement](ACCESSIBILITY.md) and a report path.
 
 ## Licence
 

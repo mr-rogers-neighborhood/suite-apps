@@ -142,8 +142,8 @@ remains. The host has no "show in folder", so reveal is a notice, and the pack h
 
 ## Security
 
-Report a vulnerability per [SECURITY.md](SECURITY.md). The app makes no network calls and does not
-encrypt the budget file; use OS disk encryption.
+Report a vulnerability privately through the root [SECURITY.md](../../SECURITY.md). The app makes no
+network calls and does not encrypt the budget file; use OS disk encryption.
 
 ## Licence
 

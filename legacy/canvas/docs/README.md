@@ -40,8 +40,8 @@ comparison while a page in it is uncommitted, and checks it once the tree is com
 ## Elsewhere
 
 Cross-app documentation, the gate, packaging and the monorepo decisions are in the
-[root docs](../../../docs/README.md). This repository's [README](../README.md), [AGENTS](../AGENTS.md),
-[CONTRIBUTING](../CONTRIBUTING.md) and [SECURITY](../SECURITY.md) cover setup, contribution and
-vulnerability reporting.
+[root docs](../../../docs/README.md). The root [CONTRIBUTING.md](../../../CONTRIBUTING.md) and
+[SECURITY.md](../../../SECURITY.md) own setup, contribution and reporting; Canvas's
+[SECURITY.md](../SECURITY.md) keeps its access model, and [AGENTS.md](../AGENTS.md) has the rules.
 
 The rules that still bind are in [Decisions](reference/decisions.md).

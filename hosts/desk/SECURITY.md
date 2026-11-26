@@ -1,7 +1,8 @@
-# Security
+# Suite Desk security
 
 The Suite host is a spike. It opens local packs, so the pack is the untrusted side and the host is
-the trust boundary.
+the trust boundary. The reporting channel and supported state are in the root
+[security policy](../../SECURITY.md); this page owns the desktop host's threat model.
 
 - **A pack is renderer-only.** It runs in a sandboxed renderer with context isolation, no Node and no
   `nodeIntegration`. It loads from `suite-pack://<container>.<id>` on its own
@@ -58,7 +59,6 @@ manifest signature and every file hash verified against the pinned key before ex
 
 ## Reporting a vulnerability
 
-Use GitHub's private security advisory for
-[mrrnbhd/suite-apps](https://github.com/mrrnbhd/suite-apps/security/advisories/new).
-Do not open a public issue for a vulnerability. Include the version, the platform, and the smallest
-reproduction you can.
+Report privately through the root [security policy](../../SECURITY.md). Do not open a public issue
+for a pack that escaped its sandbox, read another pack's bytes or reached the network without
+`network`.

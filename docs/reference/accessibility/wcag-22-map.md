@@ -6,9 +6,9 @@ audience: developer
 
 Every success criterion in WCAG 2.2, and what this project does about it.
 
-The point of this file is that `ACCESSIBILITY.md` should never claim something this table does not
-support. If a row says _manual_ and nobody has run the manual step, the statement cannot call it
-working.
+The point of this file is that the root [ACCESSIBILITY.md](../../../ACCESSIBILITY.md) and each app
+statement should never claim something this table does not support. If a row says _manual_ and nobody
+has run the manual step, the statement cannot call it working.
 
 **Target: Level AA.** That is 55 of the 86 criteria.
 
@@ -38,9 +38,10 @@ The `@suite/theme` contrast test is one suite-level check, not one per app: it l
 `packages/theme/src/presets.test.ts` and runs in the root gate, for every app that draws its presets
 from that package. A **Gated** row is a check that fails the
 build; it is not a claim that every app runs every check named in it. A **Partial** row is gated in
-the app named in its How column and manual elsewhere. Help and Go have no accessibility statement and
-this table makes no claim about them; Canvas, Planner, Budget and Sync each have an
-`ACCESSIBILITY.md` that owns its detail.
+the app named in its How column and manual elsewhere. Desk, Help and Go have no accessibility statement
+and this table makes no claim about them; the root [ACCESSIBILITY.md](../../../ACCESSIBILITY.md) owns
+the target and summary, and Canvas, Planner, Budget and Sync each keep a statement that owns its
+detail.
 
 ## Principle 1: Perceivable
 
@@ -151,7 +152,8 @@ this table makes no claim about them; Canvas, Planner, Budget and Sync each have
 
 ## The gaps, in one place
 
-These are the honest list. Each is tracked, and none is claimed as working in `ACCESSIBILITY.md`.
+These are the honest list. Each is tracked, and none is claimed as working in the root or an app
+statement.
 
 | SC     | What is missing                                                |
 | ------ | -------------------------------------------------------------- |

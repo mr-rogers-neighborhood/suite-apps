@@ -1,17 +1,7 @@
-# Security policy
+# Suite Canvas security
 
-## Reporting a vulnerability
-
-Open a private security advisory on the repository ("Security" → "Advisories" → "Report a
-vulnerability"), or email the maintainer listed on the repository profile. Do not open a public issue
-for anything that would let someone else read, write or destroy a workspace they were not given a
-link to.
-
-Include what you did, what happened and what you expected. A proof of concept against your own
-instance is ideal; do not test against an instance you do not own.
-
-There is no bug bounty. Acknowledgement within a few days, then a fix or an explanation as soon as the
-maintainer can, is the commitment.
+The reporting channel and supported state are in the root [security policy](../../SECURITY.md); this
+page owns Canvas's access model and the risks it accepts.
 
 ## Access model
 
@@ -62,7 +52,8 @@ Canvas has no hosted deployment. The file, the machine and, when sync is on, the
 whole surface. TLS, disk encryption and backups belong to the person running it.
 [Security model](docs/reference/security-model.md) covers the renderer, the binary and the file.
 
-## Supported versions
+## Reporting a vulnerability
 
-Beta releases are tagged `v0.2.0-beta.N`. Only the newest tag gets fixes; an older beta is expected to
-be replaced, not patched.
+Report privately through the root [security policy](../../SECURITY.md). Do not open a public issue
+for anything that would let someone else read, write or destroy a workspace they were not given a
+link to.

@@ -59,9 +59,12 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-contact@suite.run.
+reported to the community leaders responsible for enforcement through
+GitHub's [report abuse form](https://github.com/contact/report-abuse).
 All complaints will be reviewed and investigated promptly and fairly.
+
+A project address will replace the form once mail on the project domain is
+live; this section will name it then.
 
 All community leaders are obligated to respect the privacy and security of the
 reporter of any incident.
