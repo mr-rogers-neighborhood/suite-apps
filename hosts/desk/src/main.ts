@@ -892,6 +892,12 @@ function installApplicationMenu(): void {
     {
       label: "View",
       submenu: [
+        {
+          label: "Settings…",
+          accelerator: process.platform === "darwin" ? "Cmd+," : "Ctrl+,",
+          click: () => window?.openSettings(),
+        },
+        { type: "separator" },
         modeItem("light", "Light"),
         modeItem("dark", "Dark"),
         modeItem("system", "Follow the system"),
@@ -1095,6 +1101,10 @@ function registerIpc(): void {
   onChrome(CHROME_IPC.closeTab, async (tabId) => {
     if (typeof tabId !== "string") return;
     await window?.closeTab(tabId);
+  });
+  onChrome(CHROME_IPC.tabMenu, (tabId) => {
+    if (typeof tabId !== "string") return;
+    window?.showTabMenu(tabId);
   });
   onChrome(CHROME_IPC.newTab, async () => {
     await window?.newTab();

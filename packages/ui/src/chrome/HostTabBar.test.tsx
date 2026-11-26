@@ -94,6 +94,18 @@ describe("HostTabBar", () => {
     expect(onClose).toHaveBeenCalledWith("planner");
   });
 
+  it("opens a tab menu from the context menu or the keyboard", () => {
+    const onTabMenu = vi.fn();
+    renderBar({ onTabMenu });
+    const home = screen.getByRole("button", { name: "Home" });
+
+    fireEvent.contextMenu(home);
+    expect(onTabMenu).toHaveBeenLastCalledWith("home");
+
+    fireEvent.keyDown(home, { key: "F10", shiftKey: true });
+    expect(onTabMenu).toHaveBeenCalledTimes(2);
+  });
+
   it("opens a new tab and the command surface", () => {
     const onNewTab = vi.fn();
     const onOpenSearch = vi.fn();

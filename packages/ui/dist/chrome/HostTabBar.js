@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { cx } from "../cx.js";
 import { MenuBar } from "../menu/MenuBar.js";
 import { FOCUS_RING, MOTION } from "../tokens.js";
-export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onNewTab, mark, onHome, homeLabel = "Home", sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId = "host-tab-bar", }) {
+export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTabMenu, onNewTab, mark, onHome, homeLabel = "Home", sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId = "host-tab-bar", }) {
     const tabButtons = useRef(new Map());
     const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId);
     function moveTo(index) {
@@ -58,7 +58,21 @@ export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onNe
                                         tabButtons.current.delete(tab.id);
                                     else
                                         tabButtons.current.set(tab.id, node);
-                                }, type: "button", "aria-current": selected ? "page" : undefined, "aria-disabled": tab.unavailable === true ? true : undefined, tabIndex: reachable ? 0 : -1, title: tab.title, onClick: () => onActivate?.(tab.id), onKeyDown: (event) => tabKeyDown(event, index, tab.id), className: cx("flex h-7 max-w-[220px] items-center gap-1.5 rounded-md pl-2 text-[length:var(--text-label,12px)]", selected
+                                }, type: "button", "aria-current": selected ? "page" : undefined, "aria-disabled": tab.unavailable === true ? true : undefined, tabIndex: reachable ? 0 : -1, title: tab.title, onClick: () => onActivate?.(tab.id), onContextMenu: (event) => {
+                                    if (onTabMenu === undefined)
+                                        return;
+                                    event.preventDefault();
+                                    onTabMenu(tab.id);
+                                }, onKeyDown: (event) => {
+                                    if (onTabMenu !== undefined &&
+                                        (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10"))) {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        onTabMenu(tab.id);
+                                        return;
+                                    }
+                                    tabKeyDown(event, index, tab.id);
+                                }, className: cx("flex h-7 max-w-[220px] items-center gap-1.5 rounded-md pl-2 text-[length:var(--text-label,12px)]", selected
                                     ? "bg-[var(--surface)] text-[var(--ink)] shadow-[inset_0_-2px_0_var(--accent)]"
                                     : "text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: [tab.icon === undefined ? (_jsx("span", { "aria-hidden": "true", className: cx("h-1.5 w-1.5 shrink-0 rounded-full", tab.kind === "pack" ? "bg-[var(--accent)]" : "bg-[var(--ink-faint)]") })) : (_jsx("span", { "aria-hidden": "true", className: "flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-sm [&_img]:h-full [&_img]:w-full [&_img]:object-contain", children: tab.icon })), _jsx("span", { className: "min-w-0 truncate", children: tab.title })] }), onClose === undefined ? null : (_jsx("button", { type: "button", "aria-label": `Close ${tab.title}`, title: `Close ${tab.title}`, onClick: (event) => {
                                     event.stopPropagation();

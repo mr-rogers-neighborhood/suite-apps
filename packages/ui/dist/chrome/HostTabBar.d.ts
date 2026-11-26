@@ -27,6 +27,8 @@ export interface HostTabBarProps {
     readonly activeTabId?: string | null;
     readonly onActivate?: (id: string) => void;
     readonly onClose?: (id: string) => void;
+    /** A context menu for one tab: the host adds Set as Home and Reload there. */
+    readonly onTabMenu?: (id: string) => void;
     readonly onNewTab?: () => void;
     /** The suite mark. Omitted, the bar has no home anchor. */
     readonly mark?: ReactNode;
@@ -41,5 +43,5 @@ export interface HostTabBarProps {
     readonly searchShortcut?: string;
     readonly "data-testid"?: string;
 }
-export declare function HostTabBar({ tabs, activeTabId, onActivate, onClose, onNewTab, mark, onHome, homeLabel, sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId, }: HostTabBarProps): ReactNode;
+export declare function HostTabBar({ tabs, activeTabId, onActivate, onClose, onTabMenu, onNewTab, mark, onHome, homeLabel, sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId, }: HostTabBarProps): ReactNode;
 //# sourceMappingURL=HostTabBar.d.ts.map

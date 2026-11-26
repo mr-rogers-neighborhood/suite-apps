@@ -17,6 +17,17 @@ const api = globalThis.suiteShell;
 const elements = {
   hostBar: document.querySelector("#host-bar"),
   firstRun: document.querySelector("#first-run"),
+  settings: document.querySelector("#settings-surface"),
+  settingsClose: document.querySelector("#settings-close"),
+  settingsNav: document.querySelectorAll("#settings-nav button"),
+  settingsAppearance: document.querySelector("#settings-appearance"),
+  settingsHome: document.querySelector("#settings-home"),
+  settingsPacks: document.querySelector("#settings-packs"),
+  settingsPresets: document.querySelector("#settings-presets"),
+  settingsModes: document.querySelector("#settings-modes"),
+  settingsDensities: document.querySelector("#settings-densities"),
+  settingsScreens: document.querySelector("#settings-screens"),
+  settingsApps: document.querySelector("#settings-apps"),
   screen: document.querySelector("#screen"),
   screenName: document.querySelector("#screen-name"),
   screenEyebrow: document.querySelector(".screen-title .eyebrow"),
@@ -95,7 +106,15 @@ let state = {
   catalogue: [],
   catalogueSource: "",
   installedVersions: [],
-  theme: { preset: "suite", mode: "dark", density: "cozy", values: {}, scale: {} },
+  theme: {
+    preset: "suite",
+    mode: "dark",
+    source: "system",
+    density: "cozy",
+    values: {},
+    scale: {},
+  },
+  themeChoices: [],
   notice: null,
   reminderStatus: null,
   relay: { ...EMPTY_RELAY },
@@ -106,6 +125,9 @@ let managingScreens = false;
 let syncOpen = false;
 let tabBar = null;
 let firstRunWizard = null;
+/** The host Settings surface is chrome state, like the Screens manager. */
+let settingsOpen = false;
+let settingsSection = "appearance";
 let shouldFocusSearch = true;
 let appsView = {
   packs: null,
@@ -553,6 +575,9 @@ function updateHostBar() {
     tabBar = mountTabBar(elements.hostBar, {
       activate: (id) => run(api.activateTab(id)),
       close: (id) => run(api.closeTab(id)),
+      tabMenu: (id) => {
+        void api.tabMenu(id);
+      },
       newTab: () => run(api.newTab()),
       home: openHomeTab,
       picker: {
@@ -563,6 +588,7 @@ function updateHostBar() {
         openScreen: (id) => run(api.openScreen(id)),
         newScreen: composeScreen,
       },
+      settings: (section) => openSettings(section),
       openCommands: () => {
         if (commandOpen) closeCommandSurface();
         else openCommandSurface();
@@ -611,6 +637,7 @@ function firstRunTheme() {
  */
 function updateFirstRun() {
   const firstRun = state.firstRun === true;
+  if (firstRun) settingsOpen = false;
   if (elements.firstRun !== null) elements.firstRun.hidden = !firstRun;
   if (elements.hostBar !== null) elements.hostBar.hidden = firstRun;
   if (elements.screen !== null) elements.screen.hidden = firstRun;
@@ -644,6 +671,145 @@ function updateFirstRun() {
     });
   }
   firstRunWizard.update(firstRunPacks(), firstRunTheme());
+}
+
+const SETTINGS_SECTIONS = ["appearance", "home", "packs"];
+
+/** Apply one Settings choice: merge it with the resolved theme the host already draws. */
+function chooseTheme(patch) {
+  const theme = state.theme ?? {};
+  run(
+    api.setTheme({
+      preset: theme.preset ?? "suite",
+      mode: theme.source ?? "system",
+      density: theme.density ?? "cozy",
+      ...patch,
+    }),
+  );
+}
+
+function settingsChoice(label, selected, onClick) {
+  const button = actionButton(
+    label,
+    onClick,
+    selected ? "settings-choice is-selected" : "settings-choice",
+  );
+  button.setAttribute("aria-pressed", String(selected));
+  return button;
+}
+
+function renderSettingsAppearance() {
+  const theme = state.theme ?? {};
+  const presets = state.themeChoices ?? [];
+  const mode = theme.source ?? theme.mode ?? "system";
+  const density = theme.density ?? "cozy";
+
+  elements.settingsPresets.replaceChildren(
+    ...presets.map((preset) =>
+      settingsChoice(preset.name, theme.preset === preset.id, () =>
+        chooseTheme({ preset: preset.id }),
+      ),
+    ),
+  );
+  elements.settingsModes.replaceChildren(
+    ...[
+      ["light", "Light"],
+      ["dark", "Dark"],
+      ["system", "Follow the system"],
+    ].map(([value, label]) =>
+      settingsChoice(label, mode === value, () => chooseTheme({ mode: value })),
+    ),
+  );
+  elements.settingsDensities.replaceChildren(
+    ...[
+      ["compact", "Compact"],
+      ["cozy", "Cozy"],
+      ["comfortable", "Comfortable"],
+    ].map(([value, label]) =>
+      settingsChoice(label, density === value, () => chooseTheme({ density: value })),
+    ),
+  );
+}
+
+function renderSettingsHome() {
+  const screens = state.screenList ?? [];
+  if (screens.length === 0) {
+    elements.settingsScreens.replaceChildren(element("p", "empty", "No Screens on this device."));
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const screen of screens) {
+    const row = element("li", "settings-screen");
+    const name = element("div", "settings-screen-name");
+    name.append(element("span", "", screen.name));
+    if (screen.home) name.append(element("span", "screen-badge", "Home"));
+    if (screen.open) name.append(element("span", "screen-badge", "Open"));
+    if (screen.readable === false) name.append(element("span", "screen-badge", "Unavailable"));
+    row.append(name);
+
+    const tools = element("div", "settings-screen-tools");
+    const open = actionButton("Open", () => run(api.openScreen(screen.id)));
+    open.setAttribute("aria-label", `Open ${screen.name}`);
+    const home = actionButton(screen.home ? "This is Home" : "Set as Home", () =>
+      run(api.setHomeScreen(screen.id)),
+    );
+    home.disabled = screen.home || screen.readable === false;
+    home.setAttribute("aria-label", `Make ${screen.name} the Home Screen`);
+    tools.append(open, home);
+    row.append(tools);
+    fragment.append(row);
+  }
+  elements.settingsScreens.replaceChildren(fragment);
+}
+
+function renderSettingsPacks() {
+  elements.settingsApps.replaceChildren();
+  renderAppsWidget(elements.settingsApps);
+}
+
+/**
+ * The host Settings surface.
+ *
+ * Appearance is host state, Home is a role over the Screen set, and Packs is the same
+ * catalogue widget a Screen can hold. The page reads `state` and calls host actions; it
+ * never keeps a preference or a document here.
+ */
+function renderSettings() {
+  const surface = elements.settings;
+  if (surface === null) return;
+  const visible = settingsOpen && state.firstRun !== true;
+  surface.hidden = !visible;
+  if (!visible) return;
+
+  for (const button of elements.settingsNav) {
+    button.setAttribute("aria-pressed", String(button.dataset.section === settingsSection));
+  }
+  elements.settingsAppearance.hidden = settingsSection !== "appearance";
+  elements.settingsHome.hidden = settingsSection !== "home";
+  elements.settingsPacks.hidden = settingsSection !== "packs";
+
+  if (settingsSection === "appearance") renderSettingsAppearance();
+  else if (settingsSection === "home") renderSettingsHome();
+  else renderSettingsPacks();
+}
+
+function openSettings(section) {
+  settingsOpen = true;
+  if (typeof section === "string" && SETTINGS_SECTIONS.includes(section)) {
+    settingsSection = section;
+  }
+  paint();
+  const active = [...elements.settingsNav].find(
+    (button) => button.dataset.section === settingsSection,
+  );
+  active?.focus();
+}
+
+function closeSettings() {
+  if (!settingsOpen) return;
+  settingsOpen = false;
+  paint();
 }
 
 function matchesQuery(name, id, description) {
@@ -1475,6 +1641,7 @@ function paint() {
   renderSync();
   renderScreen();
   renderCommandSurface();
+  renderSettings();
   updateFirstRun();
 
   const active = state.tabs.find((tab) => tab.id === state.activeTabId);
@@ -1492,6 +1659,19 @@ function bindChrome() {
   elements.commandSurface.addEventListener("click", (event) => {
     if (event.target === elements.commandSurface) closeCommandSurface();
   });
+
+  elements.settingsClose?.addEventListener("click", closeSettings);
+  elements.settings?.addEventListener("click", (event) => {
+    if (event.target === elements.settings) closeSettings();
+  });
+  for (const button of elements.settingsNav) {
+    button.addEventListener("click", () => {
+      const section = button.dataset.section;
+      if (section === undefined || section === settingsSection) return;
+      settingsSection = section;
+      paint();
+    });
+  }
   for (const button of elements.commandModes) {
     button.addEventListener("click", () => {
       if (commandMode === button.dataset.mode) return;
@@ -1571,6 +1751,11 @@ function bindChrome() {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && settingsOpen) {
+      event.preventDefault();
+      closeSettings();
+      return;
+    }
     if (event.key === "Escape" && commandOpen) {
       event.preventDefault();
       closeCommandSurface();
@@ -1604,6 +1789,7 @@ async function start() {
   bindChrome();
   let received = false;
   api.onPick?.(() => tabBar?.showPicker());
+  api.onOpenSettings?.((section) => openSettings(section));
   api.onState((next) => {
     if (!next) return;
     received = true;

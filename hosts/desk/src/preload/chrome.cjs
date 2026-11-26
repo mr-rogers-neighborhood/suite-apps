@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("suiteShell", {
   openPack: (packId) => ipcRenderer.invoke("suite:shell:open-pack", packId),
   activateTab: (tabId) => ipcRenderer.invoke("suite:shell:activate-tab", tabId),
   closeTab: (tabId) => ipcRenderer.invoke("suite:shell:close-tab", tabId),
+  tabMenu: (tabId) => ipcRenderer.invoke("suite:shell:tab-menu", tabId),
   newTab: () => ipcRenderer.invoke("suite:shell:new-tab"),
   home: () => ipcRenderer.invoke("suite:shell:home"),
   picker: () => ipcRenderer.invoke("suite:shell:picker"),
@@ -69,5 +70,8 @@ contextBridge.exposeInMainWorld("suiteShell", {
   },
   onPick: (listener) => {
     ipcRenderer.on("suite:shell:pick", () => listener());
+  },
+  onOpenSettings: (listener) => {
+    ipcRenderer.on("suite:shell:open-settings", (_event, section) => listener(section));
   },
 });

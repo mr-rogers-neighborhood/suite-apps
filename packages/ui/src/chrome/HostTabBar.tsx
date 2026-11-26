@@ -33,6 +33,8 @@ export interface HostTabBarProps {
   readonly activeTabId?: string | null;
   readonly onActivate?: (id: string) => void;
   readonly onClose?: (id: string) => void;
+  /** A context menu for one tab: the host adds Set as Home and Reload there. */
+  readonly onTabMenu?: (id: string) => void;
   readonly onNewTab?: () => void;
   /** The suite mark. Omitted, the bar has no home anchor. */
   readonly mark?: ReactNode;
@@ -53,6 +55,7 @@ export function HostTabBar({
   activeTabId = null,
   onActivate,
   onClose,
+  onTabMenu,
   onNewTab,
   mark,
   onHome,
@@ -146,7 +149,23 @@ export function HostTabBar({
                   tabIndex={reachable ? 0 : -1}
                   title={tab.title}
                   onClick={() => onActivate?.(tab.id)}
-                  onKeyDown={(event) => tabKeyDown(event, index, tab.id)}
+                  onContextMenu={(event) => {
+                    if (onTabMenu === undefined) return;
+                    event.preventDefault();
+                    onTabMenu(tab.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      onTabMenu !== undefined &&
+                      (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10"))
+                    ) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onTabMenu(tab.id);
+                      return;
+                    }
+                    tabKeyDown(event, index, tab.id);
+                  }}
                   className={cx(
                     "flex h-7 max-w-[220px] items-center gap-1.5 rounded-md pl-2 text-[length:var(--text-label,12px)]",
                     selected

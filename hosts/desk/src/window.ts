@@ -2,7 +2,15 @@ import { join } from "node:path";
 import { originKey } from "@suite/desktop";
 import { SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isWidgetRegistryId } from "@suite/screens";
-import { app, BaseWindow, session, shell, WebContentsView } from "electron";
+import {
+  app,
+  BaseWindow,
+  Menu,
+  type MenuItemConstructorOptions,
+  session,
+  shell,
+  WebContentsView,
+} from "electron";
 import { clearCommandEntries } from "./commandInvocation.js";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { LAUNCHER_CONTEXT, parseSuiteLink } from "./deepLink.js";
@@ -29,6 +37,7 @@ import {
   type CatalogueEntry,
   CHROME_ORIGIN,
   CHROME_PICK,
+  CHROME_SETTINGS,
   CHROME_STATE,
   type InstalledVersionView,
   PACK_EVENT,
@@ -42,7 +51,7 @@ import {
   type ThemeView,
 } from "./shared.js";
 import type { SpaceState, SpaceStore } from "./spaces.js";
-import { paintThemeSurface } from "./theme.js";
+import { paintThemeSurface, themeOptions } from "./theme.js";
 
 /**
  * What a pack calls one of its documents.
@@ -259,6 +268,7 @@ export class ShellWindow {
       catalogueSource: this.#catalogueSource,
       installedVersions: this.#installedVersions,
       theme: this.#theme,
+      themeChoices: themeOptions().map((theme) => ({ id: theme.id, name: theme.name })),
       notice: this.#notice,
       reminderStatus: this.#reminderStatus,
       relay: this.#relay,
@@ -671,6 +681,61 @@ export class ShellWindow {
       if (screen !== null) await this.#retitleScreenTab(screenId);
     }
     this.broadcast();
+  }
+
+  /**
+   * The context menu for one tab.
+   *
+   * A Screen tab can become Home; a pack tab can reload. Both close, and Close is the menu's
+   * last item so the destructive choice is not where a hurried click lands first.
+   */
+  showTabMenu(tabId: string): void {
+    const tab = this.#spaces.state().tabs.find((entry) => entry.id === tabId);
+    if (tab === undefined) return;
+    const items: MenuItemConstructorOptions[] = [];
+
+    if (tab.kind === "screen") {
+      const isHome = tab.screenId === this.#screens.homeId;
+      items.push({
+        label: isHome ? "This is Home" : "Set as Home",
+        enabled: !isHome,
+        click: () => {
+          void this.setHomeScreen(tab.screenId);
+        },
+      });
+    } else {
+      items.push({
+        label: "Reload Tab",
+        click: () => {
+          this.reloadTab(tab.id);
+        },
+      });
+    }
+
+    items.push(
+      {
+        label: "Settings…",
+        click: () => {
+          this.openSettings(tab.kind === "screen" ? "home" : "appearance");
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Close Tab",
+        accelerator: process.platform === "darwin" ? "Cmd+W" : "Ctrl+W",
+        click: () => {
+          void this.closeTab(tab.id);
+        },
+      },
+    );
+
+    Menu.buildFromTemplate(items).popup({ window: this.window });
+  }
+
+  /** Ask the chrome to draw Settings; the page owns the surface and its section. */
+  openSettings(section?: "appearance" | "home" | "packs"): void {
+    if (this.#closed) return;
+    this.#chrome.webContents.send(CHROME_SETTINGS, section ?? null);
   }
 
   /** Keep a renamed Screen's tab title in step with its document. */

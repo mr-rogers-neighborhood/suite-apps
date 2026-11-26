@@ -21,6 +21,7 @@ export const CHROME_IPC = {
   openPack: "suite:shell:open-pack",
   activateTab: "suite:shell:activate-tab",
   closeTab: "suite:shell:close-tab",
+  tabMenu: "suite:shell:tab-menu",
   newTab: "suite:shell:new-tab",
   home: "suite:shell:home",
   picker: "suite:shell:picker",
@@ -64,6 +65,8 @@ export const CHROME_IPC = {
 
 /** Pushed, not invoked: the chrome redraws from the last state it received. */
 export const CHROME_STATE = "suite:shell:state-changed";
+/** Main asks the chrome to open Settings; the section is optional. */
+export const CHROME_SETTINGS = "suite:shell:open-settings";
 
 /** Pushed, not invoked: the host asks the chrome to show the new-tab picker. */
 export const CHROME_PICK = "suite:shell:pick";
@@ -415,7 +418,10 @@ export interface ScreenSummaryView {
 export interface ThemeView {
   /** The resolved preset id, after any stored-id rename. */
   readonly preset: string;
+  /** The brightness the page draws. */
   readonly mode: "light" | "dark";
+  /** The stored choice: `mode` when it is fixed, or follow-the-system. */
+  readonly source: "system" | "light" | "dark";
   readonly density: Density;
   readonly values: Readonly<Record<string, string>>;
   /** The type, density, radius, elevation and motion record for this choice. */
@@ -468,6 +474,8 @@ export interface ShellState {
   readonly catalogueSource: string;
   readonly installedVersions: readonly InstalledVersionView[];
   readonly theme: ThemeView;
+  /** The palettes the host offers, resolved from `@suite/theme` so labels cannot drift. */
+  readonly themeChoices: readonly { readonly id: string; readonly name: string }[];
   readonly notice: string | null;
   /** A host sentence about reminders, such as a denied permission. Null is the quiet state. */
   readonly reminderStatus: string | null;

@@ -58,7 +58,7 @@ async function captureProofScreenshot(
   });
 }
 
-test("opens Home Screen, creates a Screen document, and switches to it", {
+test("opens Home, visits Settings and creates a Screen document", {
   tag: "@proof",
 }, async () => {
   const testInfo = test.info();
@@ -102,6 +102,19 @@ test("opens Home Screen, creates a Screen document, and switches to it", {
       await captureProofScreenshot(page, proofDir, "01-home-screen.png", testInfo);
     });
 
+    await test.step("Open Settings from the picker and change Home", async () => {
+      await page.getByRole("button", { name: "Choose an app" }).click();
+      await page.getByRole("option", { name: /^Settings/u }).click();
+      await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+
+      await page.locator('#settings-nav button[data-section="home"]').click();
+      await expect(page.locator("#settings-screens .settings-screen").first()).toBeVisible();
+      await captureProofScreenshot(page, proofDir, "02-settings-home.png", testInfo);
+
+      await page.getByRole("button", { name: "Close settings" }).click();
+      await expect(page.locator("#settings-surface")).toBeHidden();
+    });
+
     await test.step("Create and open a Focus Screen document", async () => {
       await page.getByRole("button", { name: "Screens", exact: true }).click();
       await page.getByLabel("New Screen name").fill("Focus");
@@ -115,7 +128,7 @@ test("opens Home Screen, creates a Screen document, and switches to it", {
       const screenFiles = await readdir(join(dataDir, "screens"));
       expect(screenFiles.filter((file) => file.endsWith(".loro")).length).toBeGreaterThanOrEqual(1);
 
-      await captureProofScreenshot(page, proofDir, "02-focus-screen.png", testInfo);
+      await captureProofScreenshot(page, proofDir, "03-focus-screen.png", testInfo);
     });
   } finally {
     const tracePath = join(proofDir, "trace.zip");

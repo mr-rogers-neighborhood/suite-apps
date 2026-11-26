@@ -130,6 +130,7 @@ export function resolveThemeView(choice: HostThemeChoice, shouldUseDarkColors: b
   return {
     preset: preset.id,
     mode,
+    source: choice.mode,
     density: choice.density,
     values: { ...cssVariables(preset, mode) },
     scale: { ...scaleVariables(choice.density) },

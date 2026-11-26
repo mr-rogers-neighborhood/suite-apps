@@ -223,9 +223,9 @@ The rules that shape the Suite host.
   pack has no picker and no stored choice; a change repaints open views through
   `ShellWindow.setTheme` and a pack installed later starts in the same theme. The controls are in the
   **View** menu — light, dark or follow-the-system, Suite, Warm or Solarized, and compact, cozy or
-  comfortable — and in the first-run wizard's appearance step. `logseq` is kept as a stored-id alias
-  for `warm`, so an old selection resolves to the warm palette rather than to a missing theme.
-  Per-pack palettes and user-authored themes remain out of scope.
+  comfortable — in the first-run wizard's appearance step, and in **Settings → Appearance**.
+  `logseq` is kept as a stored-id alias for `warm`, so an old selection resolves to the warm palette
+  rather than to a missing theme. Per-pack palettes and user-authored themes remain out of scope.
 - A shared component kit is optional, not a requirement; Canvas must be able to be a canvas.
 - Documents are first-class in the launcher and recents, but tabs are app sessions. The host indexes
   metadata and opens the owning pack through a deep link. Recents are local; space entries are
@@ -253,6 +253,11 @@ The rules that shape the Suite host.
   session, and the brand and `+` open it again, so closing its tab is safe. A fresh data root shows
   the first-run wizard; its last step opens Home. A Home that has never been edited is empty and
   offers the first installed app, **Create a document** and **Choose an app**.
+- A Screen tab's context menu, also reachable with `Shift+F10`, offers **Set as Home**; the same
+  action is in **Settings → Home**. Settings is host chrome, not a pack and not a Screen: it draws
+  appearance, the Home choice and the catalogue, and it opens from the new-tab picker, the View
+  menu's **Settings…** item, or a tab's menu. It keeps no state on the page; every control calls a
+  host action and repaints from the next snapshot.
 - The first-run wizard is host chrome, not a pack and not a Screen. It lists the trusted catalogue,
   selects every app by default, chooses palette, brightness and density, and installs the selected
   apps concurrently. Completion is recorded per data root at `<dataRoot>/onboarding.json`; a

@@ -126,11 +126,11 @@ pin is a compile-time constant, never a value the index supplies. An index entry
 after the index verified; the archive it names is still read and verified before it is listed, and
 again before install.
 
-The catalogue lives in the host's **Apps** widget: add it to any Screen from **Edit**. A trusted
-entry offers **Install**, **Update** or **Reinstall** as its state requires; a refused entry stays
-visible with the sentence that explains it and cannot be installed. A `.suitepack` file can also be
-opened on its own. Removing a pack leaves its documents and files on disk until the person removes
-them.
+The catalogue is in **Settings → Packs**, the same installed-pack and catalogue widget a Screen can
+hold; it can also be added to any Screen from **Edit**. A trusted entry offers **Install**,
+**Update** or **Reinstall** as its state requires; a refused entry stays visible with the sentence
+that explains it and cannot be installed. A `.suitepack` file can also be opened on its own.
+Removing a pack leaves its documents and files on disk until the person removes them.
 
 The index refusals are named, not silent: an index changed after signing, an unsigned index, an
 index signed by an operator key this host does not pin, an expired index, a lower `sequence` than
@@ -301,6 +301,11 @@ role, not a permanent tab: launch restores the saved session, and the brand and 
 Home again, so closing its tab is safe. A fresh data root shows the first-run wizard instead; its
 last step opens Home. A Home that has never been edited is empty and offers **Open** (the first
 installed app, preferring Canvas), **Create a document** and **Choose an app**.
+
+Home can be changed in two places: a Screen tab's context menu or the tab's `Shift+F10` menu offers
+**Set as Home**, and **Settings → Home** lists every Screen with the same action. Settings is the
+host surface for appearance (palette, brightness and density), Home and the catalogue; it opens from
+the new-tab picker, the View menu's **Settings…** item, or from a tab's menu.
 
 The first-run wizard is host chrome from `@suite/ui/chrome`. It selects every trusted catalogue app
 by default, chooses palette, brightness and density, and installs the selection concurrently through
