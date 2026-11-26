@@ -6,6 +6,19 @@ underneath enough to matter.
 Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 [Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
 
+## [0.4.3] - 2026-11-26
+
+### Added
+
+- **Budget fits a phone.** The plan, register and dialogs have phone layouts: the four primary
+  destinations move into a bar, and schedules, payees and rules stay one tap away in a tools sheet.
+  A control a person taps is 44px, and the desktop rail is not drawn below the breakpoint.
+
+### Changed
+
+- **Budget draws on the shared shell.** The pack uses the same app shell as Planner and Help, and
+  the same fields and modal as Planner, so the apps look and behave alike.
+
 ## [0.4.2] - 2026-11-24
 
 ### Added

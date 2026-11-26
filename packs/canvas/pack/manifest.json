@@ -2,7 +2,7 @@
   "id": "canvas",
   "name": "Suite Canvas",
   "description": "A local-first canvas of boards, cards and links.",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "entry": "index.html",
   "contractVersion": 1,
   "capabilities": ["documents", "files", "recents"],
