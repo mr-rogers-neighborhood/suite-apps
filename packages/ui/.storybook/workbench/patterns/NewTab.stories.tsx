@@ -198,3 +198,30 @@ export const FirstRun: Story = {
     );
   },
 };
+
+/** A pack that declares documents but holds none yet still offers the way to make one. */
+export const EmptyPack: Story = {
+  args: {
+    startPacks: [
+      {
+        id: "canvas",
+        name: "Canvas",
+        description: "Boards, cards and the book reader",
+        icon: canvasIcon,
+        noun: { singular: "Canvas", plural: "Canvases" },
+        documents: [],
+      },
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const dialog = await screen.findByRole("dialog", { name: "New tab" });
+    const list = within(dialog);
+    await userEvent.click(list.getByRole("option", { name: /^Canvas/u }));
+    await expect(list.getByText("No Canvases yet.")).toBeInTheDocument();
+    await userEvent.click(list.getByRole("option", { name: "New Canvas" }));
+    await expect(canvas.getByTestId("opened")).toHaveTextContent(
+      "The host asks canvas to create a document.",
+    );
+  },
+};

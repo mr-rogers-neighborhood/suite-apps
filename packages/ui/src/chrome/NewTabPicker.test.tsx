@@ -120,6 +120,24 @@ describe("NewTabPicker", () => {
     expect(props.onClose).toHaveBeenCalled();
   });
 
+  it("opens the second level for a pack that declares documents but has none yet", () => {
+    renderPicker({
+      packs: [
+        {
+          id: "fresh",
+          name: "Fresh",
+          noun: { singular: "Canvas", plural: "Canvases" },
+          documents: [],
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("option", { name: /^Fresh/u }));
+
+    expect(screen.getByText("No Canvases yet.")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "New Canvas" })).toBeInTheDocument();
+  });
+
   it("opens a pack that declares no documents directly", () => {
     const props = renderPicker();
 
@@ -169,7 +187,7 @@ describe("NewTabPicker", () => {
     expect(screen.getByRole("group", { name: "Recent Canvases" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Canvases" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "New Canvas" })).toBeInTheDocument();
-    expect(search()).toHaveAccessibleName("Search canvases");
+    expect(search()).toHaveAccessibleName("Search Canvases");
     expect(screen.getByText("New Canvas")).toBeInTheDocument();
   });
 
@@ -205,7 +223,7 @@ describe("NewTabPicker", () => {
     expect(second.onNewScreen).toHaveBeenCalled();
   });
 
-  it("shows an unavailable pack but refuses it", () => {
+  it("shows an unavailable pack but refuses it and its documents", () => {
     const props = renderPicker({
       packs: [
         ...packs,
@@ -214,16 +232,22 @@ describe("NewTabPicker", () => {
           name: "Retired app",
           description: "Kept, but this build cannot draw it",
           unavailable: true,
-          documents: [{ id: "one", name: "One" }],
+          documents: [{ id: "one", name: "One", openedAt: 900 }],
         },
       ],
     });
+
+    // Its document is the most recent thing on record, and still must not be offered.
+    expect(screen.queryByRole("option", { name: /^One/u })).toBeNull();
 
     const row = screen.getByRole("option", { name: /^Retired app/u });
     expect(row).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(row);
     expect(props.onOpenPack).not.toHaveBeenCalled();
-    expect(screen.queryByRole("option", { name: "One" })).toBeNull();
+    expect(screen.queryByRole("option", { name: /^One/u })).toBeNull();
+
+    fireEvent.change(search(), { target: { value: "one" } });
+    expect(screen.queryByRole("option", { name: /^One/u })).toBeNull();
   });
 
   it("says when nothing matches", () => {
@@ -243,6 +267,44 @@ describe("NewTabPicker", () => {
 
     fireEvent.keyDown(search(), { key: "Escape" });
     expect(props.onClose).toHaveBeenCalled();
+  });
+
+  it("clears a query before it steps back or closes", () => {
+    const props = renderPicker();
+    fireEvent.click(screen.getByRole("option", { name: /^Canvas/u }));
+    fireEvent.change(search(), { target: { value: "reading" } });
+
+    fireEvent.keyDown(search(), { key: "Escape" });
+    expect(search()).toHaveValue("");
+    expect(screen.getByRole("group", { name: "Recent Canvases" })).toBeInTheDocument();
+    expect(props.onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(search(), { key: "Escape" });
+    expect(screen.getByRole("group", { name: "Packs" })).toBeInTheDocument();
+
+    fireEvent.keyDown(search(), { key: "Escape" });
+    expect(props.onClose).toHaveBeenCalled();
+  });
+
+  it("skips an unavailable row when moving with the keyboard", () => {
+    renderPicker({
+      packs: [
+        canvas,
+        {
+          id: "old",
+          name: "Retired app",
+          unavailable: true,
+          documents: [{ id: "one", name: "One" }],
+        },
+        help,
+      ],
+    });
+    const input = search();
+
+    fireEvent.keyDown(input, { key: "End" });
+
+    const settings = screen.getByRole("option", { name: /^Settings/u });
+    expect(input.getAttribute("aria-activedescendant")).toBe(settings.id);
   });
 
   it("steps back on Backspace when the query is empty", () => {

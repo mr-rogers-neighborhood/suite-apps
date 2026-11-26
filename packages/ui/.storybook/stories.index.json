@@ -698,6 +698,18 @@
       ]
     },
     {
+      "id": "components-newtabpicker--empty-pack",
+      "title": "Components/NewTabPicker",
+      "name": "Empty Pack",
+      "importPath": "src/chrome/NewTabPicker.stories.tsx",
+      "module": "packages/ui/src/chrome/NewTabPicker.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
       "id": "components-newtabpicker--first-run",
       "title": "Components/NewTabPicker",
       "name": "First Run",
@@ -1340,6 +1352,19 @@
       "id": "workbench-patterns-new-tab--default",
       "title": "Workbench/Patterns/New tab",
       "name": "Default",
+      "importPath": ".storybook/workbench/patterns/NewTab.stories.tsx",
+      "module": "packages/ui/.storybook/workbench/patterns/NewTab.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:pattern",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "workbench-patterns-new-tab--empty-pack",
+      "title": "Workbench/Patterns/New tab",
+      "name": "Empty Pack",
       "importPath": ".storybook/workbench/patterns/NewTab.stories.tsx",
       "module": "packages/ui/.storybook/workbench/patterns/NewTab.stories.tsx",
       "tags": [

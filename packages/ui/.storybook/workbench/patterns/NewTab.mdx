@@ -25,7 +25,8 @@ The root is one list in four parts:
 1. **Recents** — the last five documents opened, newest first, each labelled with its pack. A
    document already open in a tab is skipped, because the tab strip is one click away.
 2. **Packs** — installed packs with their own mark and a count in the pack's own noun. A pack that
-   declares documents opens a second level; a pack that declares none opens directly.
+   declares documents opens a second level, even before it holds any; a pack that declares none
+   opens directly.
 3. **Screens** — the person's compositions, plus **New screen**.
 4. **Host** — **Open a file…** when the host can hand a file to a pack, and **Settings**.
 
@@ -60,9 +61,10 @@ it never gets a second level — the picker does not special-case it.
 
 ## Keyboard
 
-- `ArrowUp` / `ArrowDown` move the active row; `Home` and `End` jump to the first and last.
+- `ArrowUp` / `ArrowDown` move the active row; `Home` and `End` jump to the first and last. A row
+  that cannot be opened is skipped.
 - `Enter` opens the active row, including a pack's second level.
-- `Escape` steps back from a pack's level, and closes the picker at the root.
+- `Escape` clears the query first, then steps back from a pack's level, then closes the picker.
 - `Backspace` on an empty query also steps back.
 
 Focus never leaves the search input: the list is a listbox driven by `aria-activedescendant`.
@@ -70,7 +72,9 @@ Focus never leaves the search input: the list is a listbox driven by `aria-activ
 ## Copy
 
 - Placeholder: **Search packs, Screens and documents**; inside a pack, **Search \<plural\>**.
-- Empty search: **Nothing matches “…”** with the query named; do not say “No results”.
+- Empty search: **Nothing matches “…”** with the query named, and the level named inside a pack;
+  do not say “No results”.
+- Empty pack: **No \<plural\> yet.** with **New \<singular\>** as the one action.
 - First run: **No packs are installed yet…**, with **Install a pack** as the first row.
 - New: **New \<singular\>** from the pack's own noun; **New screen** for a Screen, which is a tab
   and not a workspace.
@@ -95,4 +99,5 @@ keyboard pass was done in the running workbench, not only in jsdom.
 <Canvas of={NewTabStories.SecondLevel} />
 <Canvas of={NewTabStories.KeyboardOnly} />
 <Canvas of={NewTabStories.OpenDocumentSkipped} />
+<Canvas of={NewTabStories.EmptyPack} />
 <Canvas of={NewTabStories.FirstRun} />

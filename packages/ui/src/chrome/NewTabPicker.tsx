@@ -103,7 +103,7 @@ function documentKey(packId: string, documentId: string): string {
 }
 
 function byRecent(left: NewTabDocument, right: NewTabDocument): number {
-  return (right.openedAt ?? 0) - (left.openedAt ?? 0);
+  return (right.openedAt ?? 0) - (left.openedAt ?? 0) || left.name.localeCompare(right.name);
 }
 
 function byName(left: NewTabDocument, right: NewTabDocument): number {
@@ -174,6 +174,7 @@ export function NewTabPicker({
 
     if (needle.length === 0) {
       const recents = packs
+        .filter((owner) => owner.unavailable !== true)
         .flatMap((owner) =>
           (owner.documents ?? [])
             .filter(
@@ -213,8 +214,8 @@ export function NewTabPicker({
         description: row.description,
         icon: row.icon,
         disabled: row.unavailable === true,
-        ...(count > 0 && row.unavailable !== true
-          ? { drill: row.id, hint: `${String(count)} ${nounFor(row).plural.toLowerCase()}` }
+        ...(row.documents !== undefined && row.unavailable !== true
+          ? { drill: row.id, hint: `${String(count)} ${nounFor(row).plural}` }
           : {}),
         run: () => onOpenPack(row.id),
       });
@@ -225,6 +226,7 @@ export function NewTabPicker({
       // without choosing a pack first. Each hit carries its pack, because the row alone would
       // not say which app it belongs to.
       const hits = packs
+        .filter((owner) => owner.unavailable !== true)
         .flatMap((owner) =>
           (owner.documents ?? []).map((document) => ({ owner, document })),
         )
@@ -394,25 +396,44 @@ export function NewTabPicker({
     onClose();
   }
 
+  function move(step: number): void {
+    if (visible.length === 0) return;
+    let next = activeIndex;
+    for (let taken = 0; taken < visible.length; taken += 1) {
+      next = (next + step + visible.length) % visible.length;
+      if (visible[next]?.disabled !== true) {
+        setActive(next);
+        return;
+      }
+    }
+  }
+
+  function edge(fromEnd: boolean): void {
+    const order = fromEnd ? [...visible].reverse() : visible;
+    const found = order.findIndex((item) => !item.disabled);
+    if (found < 0) return;
+    setActive(fromEnd ? visible.length - 1 - found : found);
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActive(visible.length === 0 ? 0 : (activeIndex + 1) % visible.length);
+      move(1);
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActive(visible.length === 0 ? 0 : (activeIndex - 1 + visible.length) % visible.length);
+      move(-1);
       return;
     }
     if (event.key === "Home") {
       event.preventDefault();
-      setActive(0);
+      edge(false);
       return;
     }
     if (event.key === "End") {
       event.preventDefault();
-      setActive(Math.max(visible.length - 1, 0));
+      edge(true);
       return;
     }
     if (event.key === "Enter") {
@@ -429,15 +450,23 @@ export function NewTabPicker({
   const placeholder =
     pack === undefined
       ? "Search packs, Screens and documents"
-      : `Search ${noun.plural.toLowerCase()}`;
+      : `Search ${noun.plural}`;
+  const escapeHint =
+    query.length > 0 ? "Esc to clear" : pack === undefined ? "Esc to close" : "Esc to go back";
   const empty = visible.length === 0;
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      // Escape closes at the root; inside a pack it steps back one level.
+      // One key, one step: Escape clears a query, then leaves the level, then closes.
       onEscapeKeyDown={(event) => {
+        if (query.length > 0) {
+          event.preventDefault();
+          setQuery("");
+          setActive(0);
+          return;
+        }
         if (pack === undefined) return;
         event.preventDefault();
         goBack();
@@ -511,8 +540,8 @@ export function NewTabPicker({
       }
       footer={
         <p className="text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
-          <span aria-hidden="true">{"\u2191\u2193"}</span> to move · Enter to open ·{" "}
-          {pack === undefined ? "Esc to close" : "Backspace to go back"}
+          <span aria-hidden="true">{"\u2191\u2193"}</span> to move · Enter to open · {escapeHint}
+          {pack === undefined ? null : " · Backspace goes back"}
         </p>
       }
     >
@@ -521,11 +550,16 @@ export function NewTabPicker({
       <p aria-live="polite" className="sr-only">
         {pack === undefined
           ? ""
-          : `${pack.name}, ${String(documents.length)} ${noun.plural.toLowerCase()}`}
+          : `${pack.name}, ${String(documents.length)} ${noun.plural}`}
       </p>
       {packs.length === 0 && needle.length === 0 ? (
         <p className="px-2 pb-2 text-[length:var(--text-body,13px)] text-[var(--ink-muted)]">
           No packs are installed yet. Install one to open its documents, or compose a Screen.
+        </p>
+      ) : null}
+      {pack !== undefined && documents.length === 0 && needle.length === 0 ? (
+        <p className="px-2 pb-2 text-[length:var(--text-body,13px)] text-[var(--ink-muted)]">
+          No {noun.plural} yet.
         </p>
       ) : null}
       <div id={listId} role="listbox" aria-label="Open a tab">
@@ -554,7 +588,7 @@ export function NewTabPicker({
                       onMouseMove={() => setActive(index)}
                       className={cx(
                         "flex items-center gap-3 rounded-md px-2 py-2",
-                        selected && !item.disabled ? SURFACE.sunk : undefined,
+                        selected ? SURFACE.sunk : undefined,
                         item.disabled
                           ? "cursor-not-allowed opacity-50"
                           : "cursor-pointer hover:bg-[var(--surface-sunk)]",
@@ -624,9 +658,9 @@ export function NewTabPicker({
           role="status"
           className="px-2 py-3 text-[length:var(--text-body,13px)] text-[var(--ink-muted)]"
         >
-          {needle.length === 0 && pack !== undefined
-            ? `No ${noun.plural.toLowerCase()} yet. Start a new ${noun.singular.toLowerCase()}.`
-            : `Nothing matches “${query.trim()}”. Try a pack, a Screen or “Settings”.`}
+          {pack === undefined
+            ? `Nothing matches “${query.trim()}”. Try a pack, a Screen or “Settings”.`
+            : `Nothing matches “${query.trim()}” in ${noun.plural}.`}
         </p>
       ) : null}
     </Modal>

@@ -13,7 +13,7 @@ function documentKey(packId, documentId) {
     return `${packId}\u0000${documentId}`;
 }
 function byRecent(left, right) {
-    return (right.openedAt ?? 0) - (left.openedAt ?? 0);
+    return (right.openedAt ?? 0) - (left.openedAt ?? 0) || left.name.localeCompare(right.name);
 }
 function byName(left, right) {
     return left.name.localeCompare(right.name);
@@ -61,6 +61,7 @@ export function NewTabPicker({ open, packs, screens, openDocuments, onClose, onO
         const needle = query.trim().toLowerCase();
         if (needle.length === 0) {
             const recents = packs
+                .filter((owner) => owner.unavailable !== true)
                 .flatMap((owner) => (owner.documents ?? [])
                 .filter((document) => document.openedAt !== undefined &&
                 !openKeys.has(documentKey(owner.id, document.id)))
@@ -92,8 +93,8 @@ export function NewTabPicker({ open, packs, screens, openDocuments, onClose, onO
                 description: row.description,
                 icon: row.icon,
                 disabled: row.unavailable === true,
-                ...(count > 0 && row.unavailable !== true
-                    ? { drill: row.id, hint: `${String(count)} ${nounFor(row).plural.toLowerCase()}` }
+                ...(row.documents !== undefined && row.unavailable !== true
+                    ? { drill: row.id, hint: `${String(count)} ${nounFor(row).plural}` }
                     : {}),
                 run: () => onOpenPack(row.id),
             });
@@ -103,6 +104,7 @@ export function NewTabPicker({ open, packs, screens, openDocuments, onClose, onO
             // without choosing a pack first. Each hit carries its pack, because the row alone would
             // not say which app it belongs to.
             const hits = packs
+                .filter((owner) => owner.unavailable !== true)
                 .flatMap((owner) => (owner.documents ?? []).map((document) => ({ owner, document })))
                 .sort((left, right) => byRecent(left.document, right.document));
             for (const { owner, document } of hits) {
@@ -248,25 +250,44 @@ export function NewTabPicker({ open, packs, screens, openDocuments, onClose, onO
         item.run();
         onClose();
     }
+    function move(step) {
+        if (visible.length === 0)
+            return;
+        let next = activeIndex;
+        for (let taken = 0; taken < visible.length; taken += 1) {
+            next = (next + step + visible.length) % visible.length;
+            if (visible[next]?.disabled !== true) {
+                setActive(next);
+                return;
+            }
+        }
+    }
+    function edge(fromEnd) {
+        const order = fromEnd ? [...visible].reverse() : visible;
+        const found = order.findIndex((item) => !item.disabled);
+        if (found < 0)
+            return;
+        setActive(fromEnd ? visible.length - 1 - found : found);
+    }
     function onKeyDown(event) {
         if (event.key === "ArrowDown") {
             event.preventDefault();
-            setActive(visible.length === 0 ? 0 : (activeIndex + 1) % visible.length);
+            move(1);
             return;
         }
         if (event.key === "ArrowUp") {
             event.preventDefault();
-            setActive(visible.length === 0 ? 0 : (activeIndex - 1 + visible.length) % visible.length);
+            move(-1);
             return;
         }
         if (event.key === "Home") {
             event.preventDefault();
-            setActive(0);
+            edge(false);
             return;
         }
         if (event.key === "End") {
             event.preventDefault();
-            setActive(Math.max(visible.length - 1, 0));
+            edge(true);
             return;
         }
         if (event.key === "Enter") {
@@ -281,11 +302,18 @@ export function NewTabPicker({ open, packs, screens, openDocuments, onClose, onO
     }
     const placeholder = pack === undefined
         ? "Search packs, Screens and documents"
-        : `Search ${noun.plural.toLowerCase()}`;
+        : `Search ${noun.plural}`;
+    const escapeHint = query.length > 0 ? "Esc to clear" : pack === undefined ? "Esc to close" : "Esc to go back";
     const empty = visible.length === 0;
     return (_jsxs(Modal, { open: open, onClose: onClose, 
-        // Escape closes at the root; inside a pack it steps back one level.
+        // One key, one step: Escape clears a query, then leaves the level, then closes.
         onEscapeKeyDown: (event) => {
+            if (query.length > 0) {
+                event.preventDefault();
+                setQuery("");
+                setActive(0);
+                return;
+            }
             if (pack === undefined)
                 return;
             event.preventDefault();
@@ -293,18 +321,18 @@ export function NewTabPicker({ open, packs, screens, openDocuments, onClose, onO
         }, label: "New tab", size: "lg", header: _jsxs("div", { className: "flex items-center gap-2", "data-testid": testId, children: [pack === undefined ? null : (_jsx("button", { type: "button", "aria-label": "Back to packs", onClick: goBack, className: cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: _jsx("svg", { "aria-hidden": "true", viewBox: "0 0 16 16", className: "h-3.5 w-3.5", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: _jsx("path", { d: "M10 3 5 8l5 5" }) }) })), _jsx("input", { ref: input, type: "text", role: "combobox", "aria-label": placeholder, "aria-expanded": open, "aria-controls": listId, "aria-autocomplete": "list", "aria-activedescendant": activeItem === undefined ? undefined : `${listId}-option-${activeIndex}`, autoComplete: "off", spellCheck: false, placeholder: placeholder, value: query, onChange: (event) => {
                         setQuery(event.target.value);
                         setActive(0);
-                    }, onKeyDown: onKeyDown, className: cx("h-9 min-w-0 flex-1 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2.5 text-[length:var(--text-body,13px)]", INK.base, FOCUS_RING) }), _jsx("button", { type: "button", "aria-label": "Close", onClick: onClose, className: cx("flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: _jsx("span", { "aria-hidden": "true", children: "\u00d7" }) })] }), footer: _jsxs("p", { className: "text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: [_jsx("span", { "aria-hidden": "true", children: "\u2191\u2193" }), " to move \u00B7 Enter to open \u00B7", " ", pack === undefined ? "Esc to close" : "Backspace to go back"] }), children: [_jsx("p", { "aria-live": "polite", className: "sr-only", children: pack === undefined
+                    }, onKeyDown: onKeyDown, className: cx("h-9 min-w-0 flex-1 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2.5 text-[length:var(--text-body,13px)]", INK.base, FOCUS_RING) }), _jsx("button", { type: "button", "aria-label": "Close", onClick: onClose, className: cx("flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: _jsx("span", { "aria-hidden": "true", children: "\u00d7" }) })] }), footer: _jsxs("p", { className: "text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: [_jsx("span", { "aria-hidden": "true", children: "\u2191\u2193" }), " to move \u00B7 Enter to open \u00B7 ", escapeHint, pack === undefined ? null : " · Backspace goes back"] }), children: [_jsx("p", { "aria-live": "polite", className: "sr-only", children: pack === undefined
                     ? ""
-                    : `${pack.name}, ${String(documents.length)} ${noun.plural.toLowerCase()}` }), packs.length === 0 && needle.length === 0 ? (_jsx("p", { className: "px-2 pb-2 text-[length:var(--text-body,13px)] text-[var(--ink-muted)]", children: "No packs are installed yet. Install one to open its documents, or compose a Screen." })) : null, _jsx("div", { id: listId, role: "listbox", "aria-label": "Open a tab", children: _jsx("div", { className: "flex flex-col gap-3", "data-testid": `${testId}-list`, children: groups.map((group) => (_jsxs("div", { role: "group", "aria-label": group.label, children: [_jsx("p", { "aria-hidden": "true", className: "px-2 pb-1 text-[length:var(--text-caption,11px)] uppercase tracking-wide text-[var(--ink-faint)]", children: group.label }), _jsx("div", { className: "flex flex-col gap-0.5", children: group.items.map((item) => {
+                    : `${pack.name}, ${String(documents.length)} ${noun.plural}` }), packs.length === 0 && needle.length === 0 ? (_jsx("p", { className: "px-2 pb-2 text-[length:var(--text-body,13px)] text-[var(--ink-muted)]", children: "No packs are installed yet. Install one to open its documents, or compose a Screen." })) : null, pack !== undefined && documents.length === 0 && needle.length === 0 ? (_jsxs("p", { className: "px-2 pb-2 text-[length:var(--text-body,13px)] text-[var(--ink-muted)]", children: ["No ", noun.plural, " yet."] })) : null, _jsx("div", { id: listId, role: "listbox", "aria-label": "Open a tab", children: _jsx("div", { className: "flex flex-col gap-3", "data-testid": `${testId}-list`, children: groups.map((group) => (_jsxs("div", { role: "group", "aria-label": group.label, children: [_jsx("p", { "aria-hidden": "true", className: "px-2 pb-1 text-[length:var(--text-caption,11px)] uppercase tracking-wide text-[var(--ink-faint)]", children: group.label }), _jsx("div", { className: "flex flex-col gap-0.5", children: group.items.map((item) => {
                                     const index = visible.indexOf(item);
                                     const selected = index === activeIndex;
-                                    return (_jsxs("div", { id: `${listId}-option-${index}`, role: "option", "aria-selected": selected, "aria-disabled": item.disabled ? true : undefined, tabIndex: -1, onClick: () => activate(item), onMouseMove: () => setActive(index), className: cx("flex items-center gap-3 rounded-md px-2 py-2", selected && !item.disabled ? SURFACE.sunk : undefined, item.disabled
+                                    return (_jsxs("div", { id: `${listId}-option-${index}`, role: "option", "aria-selected": selected, "aria-disabled": item.disabled ? true : undefined, tabIndex: -1, onClick: () => activate(item), onMouseMove: () => setActive(index), className: cx("flex items-center gap-3 rounded-md px-2 py-2", selected ? SURFACE.sunk : undefined, item.disabled
                                             ? "cursor-not-allowed opacity-50"
                                             : "cursor-pointer hover:bg-[var(--surface-sunk)]", MOTION), children: [item.icon === undefined ? (_jsx("span", { "aria-hidden": "true", className: cx("h-1.5 w-1.5 shrink-0 rounded-full", item.group === "Packs" || item.group === "Recents"
                                                     ? "bg-[var(--accent)]"
                                                     : "bg-[var(--ink-faint)]") })) : (_jsx("span", { "aria-hidden": "true", className: "flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md [&_img]:h-full [&_img]:w-full [&_img]:object-contain", children: item.icon })), _jsxs("span", { className: "min-w-0 flex-1", children: [_jsx("span", { className: "block truncate text-[length:var(--text-body,13px)] text-[var(--ink)]", children: item.label }), item.description === undefined ? null : (_jsx("span", { className: "block truncate text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]", children: item.description }))] }), item.disabled ? (_jsx("span", { className: "shrink-0 text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: "unavailable" })) : null, item.hint === undefined ? null : (_jsx("span", { className: "shrink-0 text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: item.hint })), item.drill === undefined ? null : (_jsx("svg", { "aria-hidden": "true", viewBox: "0 0 16 16", className: "h-3 w-3 shrink-0 text-[var(--ink-faint)]", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: _jsx("path", { d: "m6 3 5 5-5 5" }) }))] }, item.key));
-                                }) })] }, group.label))) }) }), empty ? (_jsx("p", { role: "status", className: "px-2 py-3 text-[length:var(--text-body,13px)] text-[var(--ink-muted)]", children: needle.length === 0 && pack !== undefined
-                    ? `No ${noun.plural.toLowerCase()} yet. Start a new ${noun.singular.toLowerCase()}.`
-                    : `Nothing matches “${query.trim()}”. Try a pack, a Screen or “Settings”.` })) : null] }));
+                                }) })] }, group.label))) }) }), empty ? (_jsx("p", { role: "status", className: "px-2 py-3 text-[length:var(--text-body,13px)] text-[var(--ink-muted)]", children: pack === undefined
+                    ? `Nothing matches “${query.trim()}”. Try a pack, a Screen or “Settings”.`
+                    : `Nothing matches “${query.trim()}” in ${noun.plural}.` })) : null] }));
 }
 //# sourceMappingURL=NewTabPicker.js.map

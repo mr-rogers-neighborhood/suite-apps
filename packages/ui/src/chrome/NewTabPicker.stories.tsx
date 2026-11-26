@@ -101,8 +101,23 @@ export const RecentDocument: Story = {
   },
 };
 
-/** Help declares no documents, so it opens directly and never shows a second level. */
+/** A pack that declares no documents opens directly and never shows a second level. */
 export const PackWithoutDocuments: Story = {};
+
+/** A pack that declares documents but holds none yet still opens its level, so New is reachable. */
+export const EmptyPack: Story = {
+  args: {
+    packs: [
+      {
+        id: "fresh",
+        name: "Fresh",
+        description: "Installed, nothing in it yet",
+        noun: { singular: "Canvas", plural: "Canvases" },
+        documents: [],
+      },
+    ],
+  },
+};
 
 export const FirstRun: Story = {
   args: { packs: [], screens: [] },
