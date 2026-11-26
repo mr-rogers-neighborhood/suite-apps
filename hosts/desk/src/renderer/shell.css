@@ -887,3 +887,100 @@ h2 {
   color: var(--ink-muted);
   font-size: 13px;
 }
+
+/* The Sync surface the tray app used to own. Host chrome, not pack content. */
+.sync-toggle {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sync-toggle:hover {
+  background: var(--surface-strong);
+  color: var(--ink);
+}
+
+.sync-toggle[data-state="on"] {
+  border-color: var(--hue-green);
+  color: var(--hue-green);
+}
+
+.sync-toggle[data-state="crashed"],
+.sync-toggle[data-state="failed"] {
+  border-color: var(--hue-amber);
+  color: var(--hue-amber);
+}
+
+.sync-panel {
+  flex: 0 0 auto;
+  padding: 16px 24px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.sync-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.sync-heading .eyebrow {
+  margin: 0;
+}
+
+.sync-lede {
+  max-width: 720px;
+  margin: 8px 0 12px;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.sync-grid {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.sync-row {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.sync-label {
+  color: var(--ink-faint);
+}
+
+.sync-row code {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+.sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sync-panel .notice {
+  margin: 0 0 12px;
+}
+
+#sync-state[data-state="on"] {
+  border-color: var(--hue-green);
+  color: var(--hue-green);
+}
+
+#sync-state[data-state="crashed"],
+#sync-state[data-state="failed"] {
+  border-color: var(--hue-amber);
+  color: var(--hue-amber);
+}

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   discoverPacks,
   externalLinkFor,
+  HOST_CAPABILITIES,
   hostRingsFor,
   packAllows,
   packOrigin,
@@ -157,8 +158,18 @@ describe("pack discovery", () => {
 
   it("refuses a capability the host does not serve yet", async () => {
     const root = await temporaryRoot();
-    await writePack(root, "relay", { capabilities: ["documents", "relay"] });
+    await writePack(root, "commands", { capabilities: ["documents", "commands"] });
     expect(discoverPacks(root)).toEqual([]);
+  });
+
+  it("loads a pack that declares the relay capability", async () => {
+    const root = await temporaryRoot();
+    await writePack(root, "relay", { capabilities: ["documents", "relay"] });
+
+    const packs = discoverPacks(root);
+    expect(packs).toHaveLength(1);
+    expect(packs[0]?.capabilities).toEqual(["documents", "relay"]);
+    expect(HOST_CAPABILITIES).toContain("relay");
   });
 
   it("loads a pack that declares the files capability", async () => {

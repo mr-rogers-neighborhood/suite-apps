@@ -51,6 +51,17 @@ describe("the Home composition", () => {
     expect(shell).not.toContain("screens.json");
   });
 
+  it("draws the relay state the tray app used to own", () => {
+    expect(shell).toContain("function renderSync");
+    expect(shell).toContain("relay: { ...EMPTY_RELAY }");
+    expect(shell).toContain('document.querySelector("#sync-address")');
+    expect(shell).toContain('document.querySelector("#sync-fingerprint")');
+    expect(shell).toContain('document.querySelector("#sync-code")');
+    for (const action of ["relayStart", "relayStop"]) {
+      expect(shell).toContain(`api.${action}`);
+    }
+  });
+
   it("keeps document state out of the renderer", () => {
     expect(shell).not.toContain("localStorage");
     expect(shell).not.toContain("sessionStorage");

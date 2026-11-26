@@ -3,8 +3,8 @@
 The desktop host. One installed Electron app; each app is a sandboxed, signed pack opened as a tab.
 
 Suite Desk is the desktop host and the only desktop install path. Canvas, Planner, Budget and Help
-remain frozen Flatpaks beside it, and Sync is still the relay Flatpak until #315. The host boundary
-it proves is:
+remain frozen Flatpaks beside it; the relay runs as a supervised child of the host (#315). The host
+boundary it proves is:
 
 - one window, a host-owned tab strip, pack views and host-rendered Screen tabs;
 - each pack on its own `suite-pack://<container>.<id>` origin and its own session partition;
@@ -15,6 +15,8 @@ it proves is:
   a refusal shown on the pack's card and re-askable only there;
 - a host-owned reminder queue: a pack declares a projection, the host validates display rows and
   schedules them with the pack closed; a denial is visible and a removed pack takes its rows with it;
+- a supervised relay child and a narrow pack-facing relay service: a pinned socket, opaque frames and
+  no documents grant;
 - a user-consented external file surface: a host-owned picker, opaque handles, single-file import
   and a bounded folder import that copies into the pack's own root;
 - the person's file and library surface: reveal a document where the host keeps it, a host recent
@@ -427,10 +429,30 @@ files are refused. Writes are atomic and may carry `expectedMtimeMs`; `backup` r
 path of a dated sibling. `lock` returns a `FileLock`, and the host releases every lock a tab held
 when its view is destroyed. A pack without `files` gets a rejected call, not an empty success.
 
-The spike serves `documents`, `files`, `identity.pack` and the `network` policy. A manifest that
-declares `storage`, `recents`, `notifications`, `relay` or `commands` is refused until the matching
-service exists; the shared capability vocabulary is wider than this host, and loading a pack into a
-missing service would only produce buttons that fail.
+The spike serves `documents`, `files`, `identity.pack`, `network`, `recents`, `notifications` and
+`relay`. A manifest that declares `storage` or `commands` is refused until the matching service
+exists; the shared capability vocabulary is wider than this host, and loading a pack into a missing
+service would only produce buttons that fail.
+
+## Sync and the relay child
+
+The host owns the relay's lifecycle. `src/relaySupervisor.ts` spawns the entry built from
+`services/relay/src/child.ts` with only `--store <dataRoot>/relay --host 127.0.0.1 --port 0`, waits
+for one JSON readiness line before it reports sync as available, and applies a bounded restart
+policy. The child closes its listener, console and store before it writes `stopped`; the host sends
+`{"type":"stop"}` before it exits and kills the child after the bound. `build:all` builds the relay
+first, and `SUITE_DESK_RELAY_ENTRY` names another entry for a test. A packaged host does not carry the
+child yet, so Start fails visibly rather than pretending sync is on.
+
+The host chrome shows the state the tray app used to own: on/off, the advertised address, the
+certificate fingerprint, the `suite://relay` code, start/stop and the last crash. The relay has no
+`documents` grant; the supervisor passes a whitelisted environment and no document path.
+
+A pack with the `relay` capability calls `relay.connect({ url, certificateSha256 })`. The host opens
+the socket only to the relay it supervises, verifies the same pin it shows, and returns a tab-scoped
+connection whose `send`, `onFrame`, `onClose` and `close` carry opaque bytes. The host never parses a
+frame, and a token from one tab cannot be spent by another. Per-document keys, frame verification,
+the header index and gap recovery are still S7.2–S7.6 (#304).
 
 External files are the consented half of `files`: the person, not the pack, chooses what to open or
 where to save. `pickOpen(filters)` and `pickSave(suggestedName)` show a host-owned platform dialog
@@ -499,7 +521,9 @@ decision record owns that trade.
 - `identity.pack` parity in Suite Go, so a pack sees one identity across desktop and mobile;
 - app-widget capture delivery (app widgets render their declared fields, but the host does not send
   a capture to the pack yet);
-- the host's blind relay transport for pack sync;
+- per-document keys, relay frame verification, the header index and gap recovery (S7.2–S7.6, #304);
+- packaging the relay child inside the Flatpak (the supervisor finds it in a checkout, or through
+  `SUITE_DESK_RELAY_ENTRY`);
 - binding a declared migration, projection or export entry to a pack renderer, and any app's own
   migration bodies (the host's chain, backup, idempotence and failed-migration path exist and are
   tested);

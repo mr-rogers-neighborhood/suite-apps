@@ -32,6 +32,7 @@ import {
   PACK_EVENT,
   type PackLaunchContext,
   type PackShellTab,
+  type RelayView,
   type ScreenView,
   type ShellState,
   type ThemeView,
@@ -79,6 +80,16 @@ export class ShellWindow {
   #theme: ThemeView;
   #notice: string | null = null;
   #reminderStatus: string | null = null;
+  #relay: RelayView = {
+    state: "off",
+    on: false,
+    address: null,
+    fingerprint: null,
+    code: null,
+    consoleUrl: null,
+    restartCount: 0,
+    lastError: null,
+  };
   #closed = false;
 
   constructor(options: {
@@ -89,6 +100,7 @@ export class ShellWindow {
     readonly spaces: SpaceStore;
     readonly screens: ScreenSet;
     readonly theme: ThemeView;
+    readonly relay?: RelayView;
     readonly containerId?: string;
     readonly onViewClosed?: (tabId: string) => void;
     readonly onClosed?: () => void;
@@ -102,6 +114,7 @@ export class ShellWindow {
     this.#containerId = options.containerId ?? DEFAULT_CONTAINER_ID;
     this.#onViewClosed = options.onViewClosed;
     this.#theme = options.theme;
+    this.#relay = options.relay ?? this.#relay;
 
     this.window = new BaseWindow({
       width: 1280,
@@ -200,6 +213,7 @@ export class ShellWindow {
       theme: this.#theme,
       notice: this.#notice,
       reminderStatus: this.#reminderStatus,
+      relay: this.#relay,
     };
   }
 
@@ -580,6 +594,12 @@ export class ShellWindow {
   setReminderStatus(message: string | null): void {
     if (this.#reminderStatus === message) return;
     this.#reminderStatus = message;
+    this.broadcast();
+  }
+
+  /** Replace the relay state the chrome draws. */
+  setRelayStatus(relay: RelayView): void {
+    this.#relay = relay;
     this.broadcast();
   }
 

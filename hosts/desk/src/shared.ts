@@ -39,6 +39,8 @@ export const CHROME_IPC = {
   deleteScreen: "suite:shell:delete-screen",
   setHomeScreen: "suite:shell:set-home-screen",
   openScreen: "suite:shell:open-screen",
+  relayStart: "suite:shell:relay-start",
+  relayStop: "suite:shell:relay-stop",
 } as const;
 
 /** Pushed, not invoked: the chrome redraws from the last state it received. */
@@ -76,6 +78,9 @@ export const PACK_IPC = {
   closeExternalFile: "suite:files:close-external",
   importExternalFile: "suite:files:import-external",
   importExternalFolder: "suite:files:import-folder",
+  relayConnect: "suite:relay:connect",
+  relaySend: "suite:relay:send",
+  relayClose: "suite:relay:close",
   setTitle: "suite:pack:set-title",
   openExternal: "suite:pack:open-external",
 } as const;
@@ -102,6 +107,8 @@ export const PACK_PROJECTION = {
 export const PACK_EVENT = {
   deepLink: "suite:pack:deep-link",
   documentsChanged: "suite:documents:changed",
+  relayFrame: "suite:relay:frame",
+  relayClosed: "suite:relay:closed",
 } as const;
 
 export type {
@@ -326,6 +333,28 @@ export interface ThemeView {
   readonly values: Readonly<Record<string, string>>;
 }
 
+/** What the relay is doing, in the words the tray used to show. */
+export type RelayLifecycle = "off" | "starting" | "on" | "stopping" | "crashed" | "failed";
+
+/**
+ * The relay's state as the host chrome draws it.
+ *
+ * The host supervises the child and owns this surface: on/off, the address a
+ * device is given, the certificate pin, the shareable code and the last crash.
+ * A pack never sees this view; its own service is the opaque connection only.
+ */
+export interface RelayView {
+  readonly state: RelayLifecycle;
+  readonly on: boolean;
+  readonly address: string | null;
+  readonly fingerprint: string | null;
+  readonly code: string | null;
+  readonly consoleUrl: string | null;
+  readonly restartCount: number;
+  /** A crash sentence, kept after a successful restart so a crash is not silent. */
+  readonly lastError: string | null;
+}
+
 export interface ShellState {
   readonly tabs: readonly ShellTab[];
   readonly activeTabId: string | null;
@@ -345,6 +374,7 @@ export interface ShellState {
   readonly notice: string | null;
   /** A host sentence about reminders, such as a denied permission. Null is the quiet state. */
   readonly reminderStatus: string | null;
+  readonly relay: RelayView;
 }
 
 /** A document as the host lists it. `id` is a file name inside the pack's root. */
