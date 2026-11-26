@@ -2,11 +2,11 @@
 
 # Suite
 
-Suite is a desktop app and a phone app for work you keep in your own files. **Suite Desk** runs
-*packs* on your computer; **Suite Go** runs the same packs on your phone. A pack is a small signed
-app for one job — Canvas for boards, Planner for days, Budget for money — and every document it
-opens is a file you own. There is no account, no telemetry and no server this project operates:
-copy a document, back it up, open it offline.
+Suite is a home for mini-apps. **Suite Desk** runs them on your computer; **Suite Go** runs them on
+your phone. Canvas for boards, Planner for days, Budget for money, Help for the handbook: small apps
+that share one place, and every document they open is a file you own. Share a board or a plan with
+the people you choose, and it stays your file. There is no account, no ads, no telemetry and no
+server this project operates: copy a document, back it up, open it offline.
 
 <!-- The canonical brand asset is the Suite Desk app icon, promoted in #411. -->
 
@@ -15,8 +15,8 @@ copy a document, back it up, open it offline.
 
 ## Install
 
-Suite Desk is the desktop host and Suite Go is the mobile host. Add the signed Flatpak remote once,
-then install the stable release:
+Install Suite Desk on Linux or Suite Go on Android. Add the signed Flatpak remote once, then install
+the stable release:
 
 ```sh
 flatpak remote-add --user --if-not-exists --from suite https://flatpak.suite.run/suite.flatpakrepo
@@ -55,27 +55,28 @@ installed. Suite Go is not a Flatpak: download the channel page's APK and `adb i
 rolling [`suite-<date>` release](https://github.com/mrrnbhd/suite-apps/releases/latest) is the
 GitHub mirror; the signed remote is the update path.
 
-## Packs
+## Mini-apps
 
-A pack is a signed web bundle with a manifest. The host verifies the publisher key and every file hash
-before it runs, gives the pack its own origin and session, and enforces the capabilities the manifest
-declares. A pack renders its UI; the host carries bytes and never parses a document.
+A mini-app is a small signed app for one job. Suite checks who made it and that every file is the
+one they signed before it runs, gives it its own space, and lets it do only what it asks for. A
+mini-app draws its own screen; Suite carries your files without reading them.
 
-The contract is [the superapp specification](docs/spec/superapp.md); its
-[ledger](docs/spec/ledger.md) says which clauses the tree implements. [The mini-app
+Behind that promise are [the superapp specification](docs/spec/superapp.md) and its
+[ledger](docs/spec/ledger.md), which says what the code already does. [The mini-app
 model](docs/explanation/mini-app-model.md) explains what is borrowed from WeChat and the W3C MiniApp
-work, and where Suite differs.
+work, and where Suite differs. Developers still call the package a pack; the contract is the same.
 
 ## Documents
 
-A document is a file you own, handed to a pack as an opaque handle scoped to that pack. Copy it, back
-it up, open it offline. Nothing here has an account or a hosted copy.
+A document is a file you own. Suite hands it to a mini-app without giving the app your file system:
+each app sees only the documents it is allowed to open. Copy it, back it up, open it offline.
+Nothing here has an account or a hosted copy.
 
 ## State
 
-Desk is alpha: Home, the pack catalogue, install, update, remove and `suite://` routing work; capture,
-contributions and Screen export/import do not. Go is v0: Scratch proves capture and the document
-handoff, Canvas is a placeholder, and an installed pack appears on home.
+Desk is alpha: Home, the catalogue, install, update, remove and `suite://` links work; some parts are
+still being built. Go is v0: Scratch proves capture and the document handoff, Canvas is a
+placeholder, and an installed mini-app appears on home.
 
 [Status](docs/reference/status.md) has every subsystem, including the parts that are not built.
 
