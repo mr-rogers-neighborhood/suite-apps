@@ -29,6 +29,19 @@ function setup() {
   return new DocumentReplica(doc);
 }
 
+function stubWide(wide: boolean): void {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: wide,
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  }));
+}
+
 describe("Budget's phone navigation", () => {
   const commit = vi.fn(async () => undefined);
   let replica: DocumentReplica | null = null;
@@ -47,6 +60,7 @@ describe("Budget's phone navigation", () => {
     replica?.dispose();
     replica = null;
     delete window.suiteBudget;
+    vi.unstubAllGlobals();
   });
 
   function renderShell() {
@@ -74,6 +88,40 @@ describe("Budget's phone navigation", () => {
     expect(within(nav).getByRole("button", { name: "Accounts" })).toBeInTheDocument();
     expect(within(nav).getByRole("button", { name: "Reports" })).toBeInTheDocument();
     expect(within(nav).getByRole("button", { name: "Tools" })).toBeInTheDocument();
+  });
+
+  it("puts the desktop rail in the shared frame's navigation landmark", () => {
+    renderShell();
+
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    expect(within(nav).getByRole("listbox", { name: "Views" })).toBeInTheDocument();
+    expect(within(nav).getByRole("option", { name: "Plan" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(within(nav).getByRole("listbox", { name: "On budget accounts" })).toBeInTheDocument();
+    expect(within(nav).getByRole("listbox", { name: "Tools" })).toBeInTheDocument();
+  });
+
+  it("switches views and accounts from the desktop rail's listboxes", () => {
+    renderShell();
+
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    fireEvent.click(within(nav).getByRole("option", { name: "Reports" }));
+    expect(useUiStore.getState().view).toBe("reports");
+    expect(screen.getByRole("heading", { level: 1, name: "Reports" })).toBeInTheDocument();
+
+    fireEvent.click(within(nav).getByRole("option", { name: /Checking/u }));
+    expect(useUiStore.getState().view).toBe("accounts");
+    expect(useUiStore.getState().selectedAccountId).not.toBeNull();
+  });
+
+  it("omits the desktop rail below the breakpoint", () => {
+    stubWide(false);
+    renderShell();
+
+    expect(screen.queryByRole("navigation", { name: "Sections" })).toBeNull();
+    expect(screen.getByTestId("mobile-nav")).toBeInTheDocument();
   });
 
   it("changes the view from the phone bar", () => {

@@ -66,6 +66,18 @@ export const WithNavigation: Story = {
   args: { navigation: NAVIGATION },
 };
 
+export const WithCallerBar: Story = {
+  args: {
+    // A pack whose cross-app `MenuBar` is its top bar passes it here instead of a title header.
+    title: undefined,
+    header: (
+      <header className="flex h-11 shrink-0 items-center border-b border-[var(--hairline)] bg-[var(--surface)] px-4 text-[length:var(--text-body,13px)]">
+        Suite Planner
+      </header>
+    ),
+  },
+};
+
 export const Complete: Story = {
   args: {
     leading: (

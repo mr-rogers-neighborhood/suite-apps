@@ -1,4 +1,5 @@
 import { type CalendarEvent, fromDateKey, todayKey } from "@suite/planner-core";
+import { DetailView } from "@suite/ui";
 import { useEffect, useState } from "react";
 
 import { useWorkspaceSnapshot } from "../store/snapshotStore";
@@ -33,19 +34,12 @@ export function DayCalendar() {
   });
 
   return (
-    <aside
-      className="hidden w-[326px] shrink-0 flex-col border-l border-line bg-panel lg:flex"
-      aria-label="Calendar"
-    >
-      <header className="border-b border-line px-5 pb-4 pt-5">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold tracking-tight">Calendar</h2>
-          <span className="text-[11px] text-faint">{label}</span>
-        </div>
-        <p className="mt-1 text-[11px] text-faint">Local events only · no account</p>
-      </header>
-
-      <div className="relative flex-1 overflow-y-auto px-4 py-3">
+    <aside aria-label="Calendar" className="hidden w-[326px] shrink-0 lg:flex">
+      <DetailView
+        title="Calendar"
+        subtitle={`${label} · Local events only · no account`}
+        className="w-full border-l border-line"
+      >
         <div className="grid grid-cols-[38px_1fr] gap-x-2">
           <div className="relative">
             {hours().map((hour) => (
@@ -85,7 +79,7 @@ export function DayCalendar() {
             )}
           </div>
         </div>
-      </div>
+      </DetailView>
     </aside>
   );
 }

@@ -1,7 +1,7 @@
 import { todayKey } from "@suite/planner-core";
-import { IconButton, MenuBar } from "@suite/ui";
+import { AppShell, IconButton, MenuBar } from "@suite/ui";
 import { Menu } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 
 import { DayCalendar } from "../calendar/DayCalendar";
 import { getBridge } from "../platform/bridge";
@@ -9,6 +9,7 @@ import { useUiStore } from "../store/uiStore";
 import { SyncControl } from "../sync/SyncControl";
 import { PlannerMark } from "./PlannerMark";
 import { Sidebar, SidebarDrawer } from "./Sidebar";
+import { useWideViewport } from "./useWideViewport";
 import { ViewMenu } from "./ViewMenu";
 import { resolveView, views } from "./views";
 import { WorkspaceActions } from "./WorkspaceActions";
@@ -16,9 +17,10 @@ import { WorkspaceActions } from "./WorkspaceActions";
 /**
  * The shell.
  *
- * The rail is the full navigation; the bar is the compact one. Below `md` the rail becomes the
- * drawer, opened from the bar, and the bar keeps only the mark, the drawer button and the view
- * menu so a phone spends its width on the plan.
+ * `AppShell` owns the frame: the bar, the desktop rail column and the content region. Planner
+ * supplies the bar, the rail's content and the view. The rail is the full navigation; the bar's
+ * view menu is the compact one. Below `md` the rail is a drawer, opened from the bar, so the
+ * shared shell is asked for no navigation at all and a phone keeps its width for the plan.
  */
 export function Shell() {
   const view = useUiStore((state) => state.view);
@@ -26,6 +28,7 @@ export function Shell() {
   const setSelectedDate = useUiStore((state) => state.setSelectedDate);
   const [navOpen, setNavOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("Suite Planner");
+  const wide = useWideViewport();
   const View = resolveView(views, view).component;
 
   useEffect(() => {
@@ -46,42 +49,49 @@ export function Shell() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
-      <Sidebar />
-      <SidebarDrawer open={navOpen} onClose={() => setNavOpen(false)} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <MenuBar
-          mark={<PlannerMark size="sm" />}
-          homeAriaLabel="Go to today"
-          onNavigateHome={goToday}
-          context={
-            <div className="hidden min-w-0 items-center lg:flex">
-              <span className="max-w-56 truncate text-[13px] font-medium" title={workspaceName}>
-                {workspaceName}
-              </span>
-            </div>
-          }
-          navigation={
-            <div className="flex min-w-0 items-center gap-1">
-              <IconButton
-                label="Open navigation"
-                className="md:hidden"
-                onClick={() => setNavOpen(true)}
-              >
-                <Menu size={16} />
-              </IconButton>
-              <ViewMenu />
-            </div>
-          }
-          actions={
-            <WorkspaceActions className="hidden items-center gap-2 md:flex" variant="ghost" />
-          }
-          sync={<SyncControl />}
-        />
-        <main aria-label="Planner" className="flex min-h-0 flex-1 flex-col">
+      <AppShell
+        header={
+          <MenuBar
+            mark={<PlannerMark size="sm" />}
+            homeAriaLabel="Go to today"
+            onNavigateHome={goToday}
+            context={
+              <div className="hidden min-w-0 items-center lg:flex">
+                <span className="max-w-56 truncate text-[13px] font-medium" title={workspaceName}>
+                  {workspaceName}
+                </span>
+              </div>
+            }
+            navigation={
+              <div className="flex min-w-0 items-center gap-1">
+                <IconButton
+                  label="Open navigation"
+                  className="md:hidden"
+                  onClick={() => setNavOpen(true)}
+                >
+                  <Menu size={16} />
+                </IconButton>
+                <ViewMenu />
+              </div>
+            }
+            actions={
+              <WorkspaceActions className="hidden items-center gap-2 md:flex" variant="ghost" />
+            }
+            sync={<SyncControl />}
+          />
+        }
+        navigation={wide ? <Sidebar /> : undefined}
+        navigationLabel="Primary"
+        navigationClassName="bg-panel"
+        style={{ "--shell-nav-width": "228px" } as CSSProperties}
+        className="min-w-0 flex-1"
+      >
+        <div className="flex h-full min-h-0 flex-col">
           <View />
-        </main>
-      </div>
+        </div>
+      </AppShell>
       <DayCalendar />
+      <SidebarDrawer open={navOpen} onClose={() => setNavOpen(false)} />
     </div>
   );
 }

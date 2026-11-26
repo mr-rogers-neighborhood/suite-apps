@@ -1,7 +1,7 @@
 import { todayKey } from "@suite/planner-core";
-import { IconButton, Modal, PrivacyLine } from "@suite/ui";
+import { IconButton, ListView, Modal, PrivacyLine } from "@suite/ui";
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getBridge } from "../platform/bridge";
 import { useUiStore } from "../store/uiStore";
 import { PlannerMark } from "./PlannerMark";
@@ -9,20 +9,14 @@ import { views } from "./views";
 import { WorkspaceActions } from "./WorkspaceActions";
 
 /**
- * The desktop rail.
+ * The rail's content.
  *
- * Below `md` the rail is not rendered at all: `SidebarDrawer` carries the same content on top of
- * the day view, so a phone spends its width on the plan and not on navigation.
+ * `AppShell` owns the desktop column and its landmark; this file owns what Planner puts in it:
+ * the brand, the view list and the workspace footer. Below `md` the same content is a drawer,
+ * opened from the shell's phone header, so a phone spends its width on the plan.
  */
 export function Sidebar() {
-  return (
-    <aside
-      aria-label="Navigation"
-      className="hidden w-[228px] shrink-0 flex-col border-r border-line bg-panel md:flex"
-    >
-      <SidebarContent />
-    </aside>
-  );
+  return <Rail />;
 }
 
 /** The same navigation as a drawer, opened from the shell's phone header. */
@@ -34,12 +28,12 @@ export function SidebarDrawer({ open, onClose }: { open: boolean; onClose: () =>
       label="Navigation"
       className="mr-auto h-full max-h-none w-[min(272px,85vw)] rounded-none border-y-0 border-l-0 p-0"
     >
-      <SidebarContent onNavigate={onClose} onClose={onClose} />
+      <Rail onNavigate={onClose} onClose={onClose} />
     </Modal>
   );
 }
 
-function SidebarContent({
+function Rail({
   onNavigate,
   onClose,
 }: {
@@ -60,9 +54,31 @@ function SidebarContent({
       .catch(() => setWorkspacePath(""));
   }, []);
 
+  const destinations = Object.values(views);
+  const items = destinations.map((destination) => {
+    const Icon = destination.icon;
+    return {
+      id: destination.id,
+      content: (
+        <span className="flex items-center gap-2.5">
+          <Icon size={15} />
+          <span className="min-w-0 truncate">{destination.label}</span>
+        </span>
+      ),
+    };
+  });
+
+  function go(id: string): void {
+    const destination = destinations.find((candidate) => candidate.id === id);
+    if (destination === undefined) return;
+    setView(destination.id);
+    if (destination.id === "today") setSelectedDate(todayKey());
+    onNavigate?.();
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2.5 px-5 pb-5 pt-6">
+      <div className="flex items-center gap-2.5 px-2 pb-5 pt-6">
         <PlannerMark size="sm" />
         <span className="text-[15px] font-semibold tracking-tight">Suite Planner</span>
         {onClose !== undefined && (
@@ -72,57 +88,18 @@ function SidebarContent({
         )}
       </div>
 
-      <nav aria-label="Primary" className="flex flex-col gap-1 px-3">
-        {Object.values(views).map((destination) => {
-          const Icon = destination.icon;
-          return (
-            <NavItem
-              key={destination.id}
-              active={view === destination.id}
-              icon={<Icon size={15} />}
-              label={destination.label}
-              onClick={() => {
-                setView(destination.id);
-                if (destination.id === "today") setSelectedDate(todayKey());
-                onNavigate?.();
-              }}
-            />
-          );
-        })}
-      </nav>
+      <ListView
+        label="Views"
+        items={items}
+        selectedId={view}
+        onSelect={go}
+        onActivate={go}
+      />
 
       <div className="mt-auto space-y-3 border-t border-line p-4">
         <WorkspaceActions className="flex gap-2 md:hidden" grow />
         <PrivacyLine {...(workspacePath ? { where: workspacePath } : {})} />
       </div>
     </div>
-  );
-}
-
-function NavItem({
-  active,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? "page" : undefined}
-      className={
-        active
-          ? "flex items-center gap-2.5 rounded-lg bg-accent-soft px-3 py-2 text-sm font-medium text-ink touch"
-          : "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted transition-colors touch hover:bg-raised hover:text-ink"
-      }
-    >
-      {icon}
-      {label}
-    </button>
   );
 }

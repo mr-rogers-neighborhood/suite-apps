@@ -66,7 +66,7 @@ duration is a `var(--token)`, never a hex, `bg-black`, `rounded-2xl`, `shadow-lg
 
 | Export | What it is |
 | --- | --- |
-| `AppShell` | The pack's frame: a titled header with optional leading and trailing slots, an optional navigation region, and the content slot. Navigation stacks above content below 768px (`md`). |
+| `AppShell` | The pack's frame: a titled header with optional leading and trailing slots (or a caller's `header` bar), an optional navigation region, and the content slot. Navigation stacks above content below 768px (`md`). |
 | `ListView` | A single-select listbox: click or arrow/Home/End to select, Enter to open, optional sections, `EmptyState` when empty. |
 | `DetailView` | A detail pane: title, subtitle, header actions, scrolling body, optional sticky footer. |
 | `Button` | `primary · secondary · ghost · danger`, `sm · md`. One background class per variant, never two. |
@@ -112,6 +112,11 @@ frame rather than bending this one.
   />
 </AppShell>
 ```
+
+The default header is the page title. A pack that already draws the cross-app `MenuBar` passes it as
+`header` instead; the caller's bar then owns the heading order, and the shell adds no `<h1>` of its
+own. `navigationClassName` paints the navigation landmark, which is how Planner and Budget keep
+their rail on the panel surface rather than the canvas.
 
 The desktop navigation column is `--shell-nav-width` (default `14rem`). A pack that lets a person
 resize its rail sets that variable on the shell instead of forking the frame; Help's explorer does

@@ -76,4 +76,44 @@ describe("AppShell", () => {
     );
     expect(container.firstElementChild?.className).toContain("min-h-screen");
   });
+
+  it("takes a caller's bar in place of the default title header", () => {
+    render(
+      <AppShell
+        header={
+          <header aria-label="Menu bar">
+            <span>Suite Planner</span>
+          </header>
+        }
+      >
+        Content
+      </AppShell>,
+    );
+
+    expect(screen.getByRole("banner", { name: "Menu bar" })).toHaveTextContent("Suite Planner");
+    // The caller's bar owns the heading order; the shell adds no page heading of its own.
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+  });
+
+  it("marks the frame when a caller supplies its own bar", () => {
+    const { container } = render(
+      <AppShell header={<header aria-label="Menu bar">Bar</header>}>Content</AppShell>,
+    );
+    expect(container.firstElementChild).toHaveAttribute("data-has-header", "custom");
+  });
+
+  it("lets a caller paint the navigation landmark", () => {
+    render(
+      <AppShell
+        title="Household"
+        navigation={<span>Accounts</span>}
+        navigationClassName="bg-[var(--surface)]"
+      >
+        Content
+      </AppShell>,
+    );
+    expect(screen.getByRole("navigation", { name: "Navigation" })).toHaveClass(
+      "bg-[var(--surface)]",
+    );
+  });
 });

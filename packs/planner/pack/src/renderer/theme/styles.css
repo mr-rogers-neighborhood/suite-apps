@@ -104,7 +104,8 @@ body {
  * phone width and leaves a desktop pointer's dense rows alone.
  */
 @media (pointer: coarse), (max-width: 639px) {
-  .touch {
+  .touch,
+  [role="option"] {
     min-height: 44px;
     min-width: 44px;
   }
