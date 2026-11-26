@@ -76,7 +76,7 @@ export function DocsSection({ audience }: { audience: Audience }) {
       >
         Skip to content
       </a>
-      <header className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-3 border-b border-fd-border bg-fd-background/95 px-3 backdrop-blur">
+      <header className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-fd-border bg-fd-background/95 px-2 backdrop-blur sm:gap-3 sm:px-3">
         <button
           type="button"
           onClick={() => setNavigatorOpen((open) => !open)}
@@ -99,7 +99,7 @@ export function DocsSection({ audience }: { audience: Audience }) {
           </Link>
           <Link
             to="/explore?view=tours"
-            className="rounded-lg px-2 py-1.5 hover:bg-fd-accent hover:text-fd-foreground"
+            className="hidden rounded-lg px-2 py-1.5 hover:bg-fd-accent hover:text-fd-foreground sm:inline-flex"
           >
             Tours
           </Link>
@@ -108,7 +108,7 @@ export function DocsSection({ audience }: { audience: Audience }) {
             href="https://github.com/mrrnbhd/suite-apps"
             target="_blank"
             rel="noreferrer"
-            className="rounded-lg p-1.5 hover:bg-fd-accent"
+            className="hidden rounded-lg p-1.5 hover:bg-fd-accent sm:inline-flex"
             aria-label="GitHub"
           >
             <GitBranch className="size-4" />
@@ -130,7 +130,7 @@ export function DocsSection({ audience }: { audience: Audience }) {
           aria-label="Handbook contents"
           className={
             navigatorOpen
-              ? "fixed inset-y-14 left-0 z-40 w-[20rem] overflow-y-auto border-r border-fd-border bg-fd-background p-3 shadow-xl md:static md:z-auto md:block md:w-72 md:shrink-0 md:shadow-none"
+              ? "fixed inset-y-14 left-0 z-40 w-[min(20rem,85vw)] overflow-y-auto border-r border-fd-border bg-fd-background p-3 shadow-xl md:static md:z-auto md:block md:w-72 md:shrink-0 md:shadow-none"
               : "sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 overflow-y-auto border-r border-fd-border p-3 md:block"
           }
         >
@@ -168,7 +168,7 @@ export function DocsSection({ audience }: { audience: Audience }) {
           )}
         </aside>
 
-        <main id="handbook-main" className="min-w-0 flex-1">
+        <main id="handbook-main" className="min-w-0 flex-1 overflow-x-hidden">
           {docs.error !== null ? (
             <DocsError message={docs.error} />
           ) : docs.pages === null ? (
@@ -398,12 +398,12 @@ function SectionLanding({ audience, nodes }: { audience: Audience; nodes: readon
   }
 
   return (
-    <article className="mx-auto max-w-3xl px-6 py-8">
+    <article className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       <header className="space-y-3 border-b border-fd-border pb-6">
         <p className="text-xs uppercase tracking-widest text-fd-muted-foreground">
           {SECTION_TITLES[audience]}
         </p>
-        <h1 className="text-3xl font-bold tracking-tight">{SECTION_TITLES[audience]}</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{SECTION_TITLES[audience]}</h1>
         <p className="text-sm leading-6 text-fd-muted-foreground">{SECTION_INTROS[audience]}</p>
       </header>
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -436,12 +436,12 @@ function DocsArticle({
 }) {
   const Body = page.data.body;
   return (
-    <article className="mx-auto max-w-3xl px-6 py-8">
+    <article className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       <header className="space-y-3 border-b border-fd-border pb-6">
         <p className="text-xs uppercase tracking-widest text-fd-muted-foreground">
           {SECTION_TITLES[audience]}
         </p>
-        <h1 className="text-3xl font-bold tracking-tight">{page.data.title}</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{page.data.title}</h1>
         {page.data.description ? (
           <p className="text-sm leading-6 text-fd-muted-foreground">{page.data.description}</p>
         ) : null}
@@ -491,13 +491,23 @@ function MdxLink({ href = "", children, ...props }: ComponentPropsWithoutRef<"a"
   );
 }
 
+/** A wide table scrolls inside its own frame, so a long row never widens the article. */
+function MdxTable({ children, ...props }: ComponentPropsWithoutRef<"table">) {
+  return (
+    <div className="handbook-table">
+      <table {...props}>{children}</table>
+    </div>
+  );
+}
+
 const mdxComponents = {
   a: MdxLink,
+  table: MdxTable,
 };
 
 function DocsError({ message }: { message: string }) {
   return (
-    <div className="mx-auto max-w-2xl space-y-3 p-10">
+    <div className="mx-auto max-w-2xl space-y-3 p-4 sm:p-10">
       <h1 className="text-2xl font-semibold">The documentation index could not be loaded</h1>
       <p className="text-sm text-fd-muted-foreground">
         {message}. Run <code className="rounded bg-fd-muted px-1 py-0.5">pnpm docs:index</code> and{" "}
@@ -511,7 +521,7 @@ function DocsError({ message }: { message: string }) {
 function MissingPage({ audience }: { audience: Audience }) {
   const other = otherAudience(audience);
   return (
-    <div className="mx-auto max-w-2xl space-y-3 p-10">
+    <div className="mx-auto max-w-2xl space-y-3 p-4 sm:p-10">
       <h1 className="text-2xl font-semibold">This handbook page does not exist</h1>
       <p className="text-sm text-fd-muted-foreground">
         Run <code className="rounded bg-fd-muted px-1 py-0.5">pnpm docs:index</code> and{" "}

@@ -25,16 +25,16 @@ export function PayeesView() {
     snapshot.categories.find((category) => category.id === id)?.name ?? "—";
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex items-center gap-2">
+    <div className="p-4 md:p-6">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <div>
           <h1 className="text-[16px] font-semibold text-ink">Payees</h1>
           <p className="mt-0.5 text-[11px] text-faint">
             Remember the last category for a payee; learned rules live in Rules.
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="relative w-56">
+        <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+          <div className="relative w-full sm:w-56">
             <Search size={13} className="absolute left-2.5 top-2 text-faint" />
             <input
               value={search}
@@ -67,8 +67,8 @@ export function PayeesView() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-line bg-panel">
-          <div className="grid grid-cols-[1.4fr_1fr_1fr_100px_120px] border-b border-line bg-panel/60 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
+          <div className="grid min-w-[640px] grid-cols-[1.4fr_1fr_1fr_100px_120px] border-b border-line bg-panel/60 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
             <span>Name</span>
             <span>Default category</span>
             <span>Last used</span>
@@ -78,7 +78,7 @@ export function PayeesView() {
           {payees.map((payee) => (
             <div
               key={payee.id}
-              className="grid grid-cols-[1.4fr_1fr_1fr_100px_120px] items-center border-b border-line/50 px-4 py-2 text-[12px] last:border-0 hover:bg-raised/40"
+              className="grid min-w-[640px] grid-cols-[1.4fr_1fr_1fr_100px_120px] items-center border-b border-line/50 px-4 py-2 text-[12px] last:border-0 hover:bg-raised/40"
             >
               <button
                 type="button"

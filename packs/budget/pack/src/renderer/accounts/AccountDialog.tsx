@@ -154,7 +154,7 @@ export function AccountDialog() {
       }
     >
       <div className="grid gap-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Name">
             <TextInput value={name} autoFocus onChange={(event) => setName(event.target.value)} />
           </Field>
@@ -188,7 +188,7 @@ export function AccountDialog() {
           </Field>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Credit limit (optional)">
             <TextInput
               value={creditLimit}

@@ -46,14 +46,14 @@ export function MonthHeader({
 
   return (
     <div className="border-b border-line">
-      <div className="flex items-center gap-2 px-6 pb-3 pt-4">
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-3 pt-4 md:px-6">
         <IconButton label="Previous month" icon={<ChevronLeft size={16} />} onClick={onPrevious} />
-        <h1 className="min-w-44 text-[15px] font-semibold text-ink">{monthLabel(state.month)}</h1>
+        <h1 className="min-w-0 flex-1 text-[15px] font-semibold text-ink md:min-w-44 md:flex-none">{monthLabel(state.month)}</h1>
         <IconButton label="Next month" icon={<ChevronRight size={16} />} onClick={onNext} />
         <Button size="sm" variant="ghost" onClick={onToday}>
           Today
         </Button>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 md:ml-auto">
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <Button size="sm">
@@ -91,8 +91,8 @@ export function MonthHeader({
         </div>
       </div>
 
-      <div className="grid grid-cols-[1.4fr_repeat(3,1fr)] gap-3 px-6 pb-4">
-        <div className="rounded-xl border border-line bg-panel px-4 py-3">
+      <div className="grid grid-cols-2 gap-2 px-4 pb-4 md:grid-cols-[1.4fr_repeat(3,1fr)] md:gap-3 md:px-6">
+        <div className="col-span-2 rounded-xl border border-line bg-panel px-3 py-3 md:col-span-1 md:px-4">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-faint">
             Ready to Assign
           </p>
@@ -129,7 +129,7 @@ function Summary({
   tone?: "danger" | undefined;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-panel px-4 py-3">
+    <div className="rounded-xl border border-line bg-panel px-3 py-3 md:px-4">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-faint">{label}</p>
       <p
         className={`tnum mt-1 text-[17px] font-medium ${

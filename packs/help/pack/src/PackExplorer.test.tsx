@@ -85,7 +85,8 @@ describe("Help as a pack", () => {
     await screen.findByText(baseData.tours[0]?.intro ?? "");
 
     fireEvent.click(screen.getByRole("button", { name: "Modules" }));
-    fireEvent.click(await screen.findByRole("button", { name: /legacy\/help/u }));
+    // The page list is the shared listbox, so a module is an option rather than a button.
+    fireEvent.click(await screen.findByRole("option", { name: /legacy\/help/u }));
 
     expect(await screen.findByText("The documentation reader.")).toBeTruthy();
     expect(screen.getByText("The explorer is the structure.")).toBeTruthy();

@@ -53,18 +53,18 @@ export function CategoryRow({
   return (
     <div
       data-assign-row={index}
-      className={`group grid grid-cols-[minmax(180px,1fr)_120px_120px_140px] items-center border-t border-line/60 px-6 text-[13px] ${
+      className={`group grid grid-cols-2 items-center gap-x-3 border-t border-line/60 px-4 text-[13px] md:grid-cols-[minmax(180px,1fr)_120px_120px_140px] md:gap-0 md:px-6 ${
         entry.category.hidden ? "opacity-50" : ""
       }`}
     >
-      <div className="flex min-w-0 items-center gap-2 py-1">
+      <div className="col-span-2 flex min-w-0 items-center gap-2 py-1.5 md:col-span-1 md:py-1">
         <span className="truncate text-ink">{entry.category.name}</span>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button
               type="button"
               aria-label={`Actions for ${entry.category.name}`}
-              className="rounded p-0.5 text-faint opacity-0 transition-opacity hover:text-ink group-hover:opacity-100 focus-visible:opacity-100"
+              className="rounded p-0.5 text-faint opacity-100 transition-opacity hover:text-ink md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
             >
               <MoreHorizontal size={14} />
             </button>
@@ -91,7 +91,8 @@ export function CategoryRow({
         </DropdownMenu.Root>
       </div>
 
-      <div className="px-2">
+      <div className="px-0 py-0.5 md:px-2 md:py-0">
+        <p className="text-[10px] uppercase tracking-wider text-faint md:hidden">Assigned</p>
         <AmountInput
           ariaLabel={`Assigned to ${entry.category.name}`}
           valueMinor={entry.assignedMinor}
@@ -110,15 +111,19 @@ export function CategoryRow({
       </div>
 
       <div
-        className={`tnum px-2 text-right ${
+        className={`tnum py-0.5 text-muted md:px-2 md:py-0 md:text-right ${
           entry.activityMinor === 0 ? "text-faint" : "text-muted"
         }`}
       >
+        <span className="block text-[10px] uppercase tracking-wider text-faint md:hidden">
+          Activity
+        </span>
         {money(entry.activityMinor)}
       </div>
 
-      <div className="flex items-center justify-end gap-2 py-1">
-        <div className="min-w-0 text-right">
+      <div className="col-span-2 flex items-center justify-between gap-2 py-1.5 md:col-span-1 md:justify-end md:py-1">
+        <div className="min-w-0 text-left md:text-right">
+          <p className="text-[10px] uppercase tracking-wider text-faint md:hidden">Available</p>
           <p className={`tnum ${available < 0 ? "font-medium text-negative" : "text-ink"}`}>
             {money(available)}
           </p>
@@ -152,7 +157,7 @@ export function CategoryRow({
           <IconButton
             label={`Set a target for ${entry.category.name}`}
             icon={<Target size={14} />}
-            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
             onClick={() => onEditTarget(entry.category.id)}
           />
         )}

@@ -309,7 +309,7 @@ export function TransactionDialog() {
       }
     >
       <div className="grid gap-3">
-        <div className="grid grid-cols-[1fr_150px] gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_150px]">
           <Field label="Account">
             <select
               value={accountId}
@@ -334,7 +334,7 @@ export function TransactionDialog() {
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Payee">
             <TextInput
               value={payeeName}
@@ -364,7 +364,7 @@ export function TransactionDialog() {
         </div>
 
         {!splitMode ? (
-          <div className="grid grid-cols-[130px_1fr_1fr] gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[130px_1fr_1fr]">
             <Field label="Direction">
               <select
                 value={direction}
@@ -403,7 +403,7 @@ export function TransactionDialog() {
             </div>
             <div className="space-y-2">
               {splitRows.map((row, index) => (
-                <div key={row.key} className="grid grid-cols-[1fr_110px_1fr_28px] gap-2">
+                <div key={row.key} className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_110px_1fr_28px]">
                   <CategoryPicker
                     value={row.categoryId}
                     onChange={(value) =>
@@ -477,7 +477,7 @@ export function TransactionDialog() {
         )}
 
         {!existing?.transferId ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="flex items-center gap-2 text-[12px] text-muted">
               <input
                 type="checkbox"
@@ -510,7 +510,7 @@ export function TransactionDialog() {
         ) : null}
 
         {isTransfer ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Other account">
               <select
                 value={transferAccountId}
@@ -540,7 +540,7 @@ export function TransactionDialog() {
             </Field>
           </div>
         ) : (
-          <div className="grid grid-cols-[1fr_150px] gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_150px]">
             <Field label="Memo">
               <TextInput value={memo} onChange={(event) => setMemo(event.target.value)} />
             </Field>

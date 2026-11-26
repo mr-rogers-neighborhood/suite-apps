@@ -123,7 +123,7 @@ export function PlanView() {
 
   if (snapshot.accounts.length === 0) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <EmptyState
           title="Add the accounts your money lives in"
           body="Checking, savings, cash, a credit card, a loan. Only on-budget accounts fund the plan."
@@ -154,7 +154,7 @@ export function PlanView() {
       />
 
       {state.uncategorized.count > 0 ? (
-        <div className="flex items-center gap-3 border-b border-warn/30 bg-warn/10 px-6 py-2 text-[12px] text-warn">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-warn/30 bg-warn/10 px-4 py-2 text-[12px] text-warn md:px-6">
           <span>
             {state.uncategorized.count} transaction
             {state.uncategorized.count === 1 ? "" : "s"} need a category ·{" "}
@@ -174,7 +174,7 @@ export function PlanView() {
         </div>
       ) : null}
 
-      <div className="sticky top-0 z-10 grid grid-cols-[minmax(180px,1fr)_120px_120px_140px] border-b border-line bg-canvas px-6 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
+      <div className="sticky top-0 z-10 hidden grid-cols-[minmax(180px,1fr)_120px_120px_140px] border-b border-line bg-canvas px-6 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint md:grid">
         <span>Category</span>
         <span className="px-2 text-right">Assigned</span>
         <span className="px-2 text-right">Activity</span>
@@ -182,7 +182,7 @@ export function PlanView() {
       </div>
 
       {state.groups.length === 0 ? (
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           <EmptyState
             title="No categories yet"
             body="A group holds categories; a category is an envelope. Start with a template or add your own."
@@ -229,7 +229,7 @@ export function PlanView() {
         })
       )}
 
-      <div className="px-6 py-4">
+      <div className="px-4 py-4 md:px-6">
         <Button
           size="sm"
           variant="ghost"

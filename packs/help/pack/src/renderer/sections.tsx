@@ -23,7 +23,12 @@ export function SectionSwitch({ audience }: { audience: Audience }) {
       className="rounded-lg border border-fd-border px-2.5 py-1 text-xs text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
     >
       <span className="hidden sm:inline">{prompt} </span>
-      <span className="font-medium text-fd-foreground">{action}</span>
+      <span className="hidden font-medium text-fd-foreground sm:inline">{action}</span>
+      {/* A phone header has room for two words, not the whole sentence. The accessible name
+          above keeps the full prompt for a screen reader. */}
+      <span className="font-medium text-fd-foreground sm:hidden">
+        {target === "user" ? "User handbook" : "Developer docs"}
+      </span>
     </Link>
   );
 }

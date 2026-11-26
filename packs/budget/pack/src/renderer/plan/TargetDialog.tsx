@@ -160,7 +160,7 @@ export function TargetDialog() {
           {KINDS.find((item) => item.id === kind)?.hint}
         </p>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={kind === "savings_balance" ? "Target balance" : "Amount"}>
             <TextInput
               value={amount}

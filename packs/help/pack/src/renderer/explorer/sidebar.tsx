@@ -1,3 +1,4 @@
+import { ListView } from "@suite/ui";
 import { Boxes, ChevronRight, FolderTree, Route, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserTree } from "@/explorer/tree";
@@ -246,28 +247,36 @@ function SearchResults({
   }
 
   return (
-    <div className="py-1">
-      {results.map((entry) => (
-        <button
-          key={entry.id}
-          type="button"
-          onClick={() => onSelect(entry)}
-          className="flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-fd-accent"
-        >
-          <span className="mt-0.5 w-10 shrink-0 rounded bg-fd-muted text-center text-[9px] uppercase text-fd-muted-foreground">
-            {entry.kind}
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-xs">{entry.label}</span>
-            <span className="block truncate font-mono text-[10px] text-fd-muted-foreground">
-              {entry.moduleId && moduleById.get(entry.moduleId)
-                ? moduleById.get(entry.moduleId)?.title
-                : entry.path}
+    <ListView
+      label="Search results"
+      className="py-1"
+      items={results.map((entry) => ({
+        id: entry.id,
+        content: (
+          <span className="flex w-full items-start gap-2">
+            <span className="mt-0.5 w-10 shrink-0 rounded bg-fd-muted text-center text-[9px] uppercase text-fd-muted-foreground">
+              {entry.kind}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-xs">{entry.label}</span>
+              <span className="block truncate font-mono text-[10px] text-fd-muted-foreground">
+                {entry.moduleId && moduleById.get(entry.moduleId)
+                  ? moduleById.get(entry.moduleId)?.title
+                  : entry.path}
+              </span>
             </span>
           </span>
-        </button>
-      ))}
-    </div>
+        ),
+      }))}
+      onSelect={(id) => {
+        const entry = results.find((candidate) => candidate.id === id);
+        if (entry) onSelect(entry);
+      }}
+      onActivate={(id) => {
+        const entry = results.find((candidate) => candidate.id === id);
+        if (entry) onSelect(entry);
+      }}
+    />
   );
 }
 
@@ -327,61 +336,64 @@ function ModuleList({
           needs prose {gaps}
         </button>
       </div>
-      {["Apps", "Packages", "Tools", "Config"].map((group) => {
-        const items = groups
-          .get(group)
-          ?.filter((module) => !gapsOnly || (!module.summary?.trim() && module.noteCount === 0));
-        if (!items || items.length === 0) return null;
-        return (
-          <section key={group} className="mb-2">
-            <h2 className="px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-fd-muted-foreground">
-              {group}
-            </h2>
-            {items.map((module) => {
-              const nested = Boolean(module.parentId) || module.kind === "submodule";
-              return (
-                <button
-                  key={module.id}
-                  type="button"
-                  onClick={() => onSelect(module.id)}
-                  className={`flex w-full items-start gap-2 py-1.5 pr-3 text-left hover:bg-fd-accent ${
-                    selectedModule === module.id ? "bg-fd-accent text-fd-accent-foreground" : ""
-                  }`}
-                  style={{ paddingLeft: nested ? 24 : 12 }}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium">{module.title}</span>
-                    <span className="block truncate font-mono text-[10px] text-fd-muted-foreground">
-                      {module.id}
+      <ListView
+        label="Modules"
+        sections={["Apps", "Packages", "Tools", "Config"].flatMap((group) => {
+          const items = groups
+            .get(group)
+            ?.filter((module) => !gapsOnly || (!module.summary?.trim() && module.noteCount === 0));
+          if (!items || items.length === 0) return [];
+          return [
+            {
+              id: group,
+              title: group,
+              items: items.map((module) => {
+                const nested = Boolean(module.parentId) || module.kind === "submodule";
+                return {
+                  id: module.id,
+                  content: (
+                    <span className="flex w-full items-start gap-2">
+                      <span
+                        className="min-w-0 flex-1"
+                        style={{ paddingLeft: nested ? 12 : 0 }}
+                      >
+                        <span className="block truncate text-xs font-medium">{module.title}</span>
+                        <span className="block truncate font-mono text-[10px] text-fd-muted-foreground">
+                          {module.id}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 shrink-0 text-[10px] text-fd-muted-foreground">
+                        {module.fileCount}f
+                      </span>
+                      {module.tourCount > 0 ? (
+                        <span
+                          title={`${module.tourCount} tours`}
+                          className="mt-0.5 shrink-0 rounded bg-fd-primary/10 px-1 text-[9px] text-fd-primary"
+                        >
+                          {module.tourCount} tour{module.tourCount === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                      {module.noteCount > 0 ? (
+                        <span className="mt-0.5 shrink-0 rounded bg-amber-500/10 px-1 text-[9px] text-amber-500">
+                          {module.noteCount}
+                        </span>
+                      ) : null}
+                      {module.virtual ? (
+                        <span className="mt-0.5 shrink-0 text-[9px] uppercase text-fd-muted-foreground">
+                          v
+                        </span>
+                      ) : null}
                     </span>
-                  </span>
-                  <span className="mt-0.5 shrink-0 text-[10px] text-fd-muted-foreground">
-                    {module.fileCount}f
-                  </span>
-                  {module.tourCount > 0 ? (
-                    <span
-                      title={`${module.tourCount} tours`}
-                      className="mt-0.5 shrink-0 rounded bg-fd-primary/10 px-1 text-[9px] text-fd-primary"
-                    >
-                      {module.tourCount} tour{module.tourCount === 1 ? "" : "s"}
-                    </span>
-                  ) : null}
-                  {module.noteCount > 0 ? (
-                    <span className="mt-0.5 shrink-0 rounded bg-amber-500/10 px-1 text-[9px] text-amber-500">
-                      {module.noteCount}
-                    </span>
-                  ) : null}
-                  {module.virtual ? (
-                    <span className="mt-0.5 shrink-0 text-[9px] uppercase text-fd-muted-foreground">
-                      v
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </section>
-        );
-      })}
+                  ),
+                };
+              }),
+            },
+          ];
+        })}
+        selectedId={selectedModule}
+        onSelect={onSelect}
+        onActivate={onSelect}
+      />
     </div>
   );
 }

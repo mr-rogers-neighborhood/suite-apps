@@ -126,6 +126,37 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
+/*
+ * Phone and tablet: a control a person taps is 44px. The density tokens a touch host
+ * publishes already ask for that; this rule keeps the same floor when Budget opens
+ * outside Suite Go or a desktop preset is the one in effect.
+ */
+@media (max-width: 767.98px) {
+  #root button,
+  #root [role="button"],
+  #root [role="menuitem"],
+  #root [role="option"] {
+    min-height: 2.75rem;
+  }
+
+  #root input:not([type="checkbox"]):not([type="radio"]),
+  #root select,
+  #root textarea {
+    min-height: 2.75rem;
+  }
+
+  #root input[type="checkbox"],
+  #root input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  #root label:has(> input[type="checkbox"]),
+  #root label:has(> input[type="radio"]) {
+    min-height: 2.75rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

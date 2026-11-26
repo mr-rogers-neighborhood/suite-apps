@@ -9,7 +9,9 @@ and the authoring steps live in [the pack authoring reference](../../../docs/ref
   archive, writes no document, opens no file and opens no socket. The host grants it nothing beyond
   loading the bundle, and the entry's own CSP seals the network as well.
 - `src/renderer/` is the shared renderer: the explorer, the handbook reader and the desktop entry.
-  The desktop shell in `legacy/help` compiles the same files, so there is one copy.
+  The desktop shell in `legacy/help` compiles the same files, so there is one copy. It consumes
+  `@suite/ui` for the shared shells; `styles.css` scans that package's `dist/`, and both Vite
+  configs name one React copy because the package is linked by workspace path.
 - `src/main.tsx` is the pack entry. It mounts the shared `App` under `HashRouter`, because a host
   serves one entry file and answers only files that exist; the desktop entry beside the renderer
   keeps `BrowserRouter` and its SPA fallback.
@@ -25,6 +27,41 @@ and the authoring steps live in [the pack authoring reference](../../../docs/ref
 
 Nothing generated belongs here: `node scripts/pack-shape.mjs` fails the gate if a `dist/` or
 `node_modules/` appears under `pack/`.
+
+## Phone and the shared shells
+
+The reader is one document at every width. Nothing is hidden behind a breakpoint except the
+navigator, and the reading column keeps its source order.
+
+| At phone width (360–430px) | What happens |
+| --- | --- |
+| Explorer frame | `AppShell` from `@suite/ui` owns the header, the one `<h1>` and the content region. |
+| Navigator | A drawer from the header, with the same search, views, tree, modules and tours. Selecting anything closes it. |
+| Page list | `ListView` renders the module sections (Apps, Packages, Tools, Config) and the search results as a listbox: one tab stop, arrows, Home/End, Enter. |
+| Document pane | `DetailView` owns a file or symbol's title, breadcrumb subtitle, GitHub/Copy actions and scrolling body. |
+| Handbook | The page tree and search stay in a drawer; long tables scroll inside the article and code blocks scroll inside themselves. |
+| Targets | 44px for controls at `max-width: 767.98px`, including the header, drawer, explorer rows and handbook links. |
+
+The explorer's data and loading logic stay in `src/renderer/explorer/`; the shells take nodes and
+own no selection, route or domain type. `AppShell` gained one small extension for this: its
+desktop column reads `--shell-nav-width` (default `14rem`), so the explorer's existing resizable
+rail keeps working without forking the frame. The desktop shell compiles the same renderer; its
+`electron.vite.config.ts` is untouched.
+
+The pack still declares **no capability**. It reads the generated index and compiled pages inside
+its own archive and opens no file, document or socket. The mobile layout adds no fetch and no
+host call.
+
+## What still needs a person's device or window pass (#358)
+
+- Measure the 44px targets and the drawer with TalkBack on a real phone, including the code
+  viewer's inner horizontal scroll.
+- Open the handbook keyboard on a phone and confirm the search field, the page and the sticky
+  header do not overlap.
+- Resize a desktop window across 768px and confirm the rail/drawer swap keeps the selected node
+  and its scroll position.
+- Confirm the desktop Help window still builds and reads the same pages after the `@suite/ui`
+  adoption.
 
 ## The bundled corpus
 

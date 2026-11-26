@@ -87,7 +87,7 @@ export function ReconcileDialog() {
       }
     >
       <div className="grid gap-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Statement date">
             <input
               type="date"
@@ -105,7 +105,7 @@ export function ReconcileDialog() {
             />
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-2 rounded-lg border border-line bg-canvas/40 p-3 text-[12px]">
+        <div className="grid grid-cols-1 gap-2 rounded-lg sm:grid-cols-3 border border-line bg-canvas/40 p-3 text-[12px]">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-faint">Cleared</p>
             <p className="tnum mt-1 text-ink">{money(cleared)}</p>

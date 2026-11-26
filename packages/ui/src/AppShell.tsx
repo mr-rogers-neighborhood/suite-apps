@@ -18,6 +18,9 @@ import { EDGE, INK, SURFACE } from "./tokens.js";
  * Below the `md` breakpoint (768px) the navigation stops being a side column and becomes a
  * full-width region above the content. That is a layout change only: no state, no disclosure
  * control, and no hidden navigation on a narrow window.
+ *
+ * The desktop column is `--shell-nav-width` (default `14rem`). A caller that lets a person
+ * resize its navigator sets that variable on the shell instead of forking the frame.
  */
 export interface AppShellProps extends Omit<ComponentProps<"div">, "title" | "children"> {
   /** The screen's title. Rendered as the page's one `<h1>`. */
@@ -73,7 +76,7 @@ export function AppShell({
           <nav
             aria-label={navigationLabel}
             className={cx(
-              "shrink-0 overflow-y-auto border-b px-[var(--control-padding-x,0.75rem)] py-2 md:w-56 md:border-b-0 md:border-r",
+              "shrink-0 overflow-y-auto border-b px-[var(--control-padding-x,0.75rem)] py-2 md:w-[var(--shell-nav-width,14rem)] md:border-b-0 md:border-r",
               EDGE.hairline,
             )}
           >

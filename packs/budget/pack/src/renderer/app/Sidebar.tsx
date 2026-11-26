@@ -47,7 +47,7 @@ export function Sidebar({
   return (
     <aside
       aria-label="Navigation"
-      className="flex w-[236px] shrink-0 flex-col border-r border-line bg-panel"
+      className="hidden w-[236px] shrink-0 flex-col border-r border-line bg-panel md:flex"
     >
       <div className="flex items-center gap-2.5 px-4 pb-4 pt-5">
         <BudgetMark size="sm" />

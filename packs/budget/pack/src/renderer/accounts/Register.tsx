@@ -71,8 +71,8 @@ export function Register({ account }: { account: Account }) {
 
   return (
     <div className="flex min-h-0 flex-col">
-      <div className="flex items-center gap-2 px-6 py-2">
-        <div className="relative w-64">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2 md:px-6">
+        <div className="relative w-full sm:w-64">
           <Search size={13} className="absolute left-2.5 top-2 text-faint" />
           <input
             value={search}
@@ -87,7 +87,7 @@ export function Register({ account }: { account: Account }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-[96px_minmax(150px,1.4fr)_minmax(120px,1fr)_minmax(100px,1fr)_110px_110px_110px_64px] border-y border-line bg-panel/60 px-6 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
+      <div className="hidden grid-cols-[96px_minmax(150px,1.4fr)_minmax(120px,1fr)_minmax(100px,1fr)_110px_110px_110px_64px] border-y border-line bg-panel/60 px-6 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint md:grid">
         <span>Date</span>
         <span>Payee</span>
         <span>Category</span>
@@ -99,7 +99,7 @@ export function Register({ account }: { account: Account }) {
       </div>
 
       {visible.length === 0 ? (
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           <EmptyState
             title={search ? "Nothing matches" : "No transactions yet"}
             body={
@@ -186,14 +186,14 @@ export function Register({ account }: { account: Account }) {
         })
       )}
 
-      <div className="flex items-center gap-6 border-t border-line px-6 py-2 text-[11px] text-faint">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[11px] text-faint md:px-6">
         <span>
           Cleared <span className="tnum text-muted">{money(cleared)}</span>
         </span>
         <span>
           Working <span className="tnum text-muted">{money(running)}</span>
         </span>
-        <span className="ml-auto">
+        <span className="hidden md:ml-auto md:inline">
           Reconciled rows are read-only until the reconciliation is unlocked.
         </span>
       </div>
@@ -244,11 +244,11 @@ function Row({
           onClick();
         }
       }}
-      className={`grid cursor-default grid-cols-[96px_minmax(150px,1.4fr)_minmax(120px,1fr)_minmax(100px,1fr)_110px_110px_110px_64px] items-center border-b border-line/50 px-6 py-1 text-[12px] hover:bg-raised/50 ${
+      className={`grid cursor-default grid-cols-2 items-start gap-x-3 gap-y-0.5 border-b border-line/50 px-4 py-2 text-[12px] hover:bg-raised/50 md:grid-cols-[96px_minmax(150px,1.4fr)_minmax(120px,1fr)_minmax(100px,1fr)_110px_110px_110px_64px] md:items-center md:gap-0 md:px-6 md:py-1 ${
         child ? "bg-panel/30" : ""
       }`}
     >
-      <span className="text-faint">{shortDate(transaction.date)}</span>
+      <span className="text-[11px] text-faint">{shortDate(transaction.date)}</span>
       <span className={`flex min-w-0 items-center gap-1 ${child ? "pl-4" : ""}`}>
         {onToggleExpand ? (
           <button
@@ -277,13 +277,18 @@ function Row({
       </span>
       <span className="truncate text-muted">{category}</span>
       <span className="truncate text-faint">{transaction.memo}</span>
-      <span className="tnum text-right text-muted">
+      <span className="tnum text-muted md:text-right">
+        <span className="mr-1 text-[10px] uppercase tracking-wide text-faint md:hidden">Out</span>
         {transaction.amountMinor < 0 ? money(-transaction.amountMinor) : ""}
       </span>
-      <span className="tnum text-right text-positive">
+      <span className="tnum text-positive md:text-right">
+        <span className="mr-1 text-[10px] uppercase tracking-wide text-faint md:hidden">In</span>
         {transaction.amountMinor > 0 ? money(transaction.amountMinor) : ""}
       </span>
-      <span className="tnum text-right text-faint">{money(balance)}</span>
+      <span className="tnum text-faint md:text-right">
+        <span className="mr-1 text-[10px] uppercase tracking-wide text-faint md:hidden">Bal</span>
+        {money(balance)}
+      </span>
       <span className="flex justify-end">
         <button
           type="button"

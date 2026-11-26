@@ -148,15 +148,15 @@ export function RulesView() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex items-center gap-2">
+    <div className="p-4 md:p-6">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <div>
           <h1 className="text-[16px] font-semibold text-ink">Rules</h1>
           <p className="mt-0.5 text-[11px] text-faint">
             Rules run on import and when you ask. A specific rule runs after a broad one.
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 md:ml-auto">
           <Button size="sm" onClick={runRules} disabled={running}>
             <Play size={13} />
             {running ? "Running…" : "Run rules"}
@@ -183,7 +183,7 @@ export function RulesView() {
         <div className="space-y-2">
           {snapshot.rules.map((rule) => (
             <div key={rule.id} className="rounded-lg border border-line bg-panel px-4 py-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-line px-2 py-0.5 text-[10px] uppercase tracking-wider text-faint">
                   {rule.stage}
                 </span>
@@ -351,7 +351,7 @@ function RuleDialog({
             {conditions.map((condition, index) => (
               <div
                 key={`${condition.field}-${condition.op}-${condition.value}`}
-                className="grid grid-cols-[1fr_130px_1fr_28px] gap-2"
+                className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_130px_1fr_28px]"
               >
                 <select
                   value={condition.field}
@@ -437,7 +437,7 @@ function RuleDialog({
             {actions.map((action, index) => (
               <div
                 key={`${action.field}-${action.value}`}
-                className="grid grid-cols-[1fr_1.4fr_28px] gap-2"
+                className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1.4fr_28px]"
               >
                 <select
                   value={action.field}

@@ -1,3 +1,4 @@
+import { AppShell } from "@suite/ui";
 import { GitBranch, Menu, X } from "lucide-react";
 import type {
   CSSProperties,
@@ -13,6 +14,7 @@ import { loadBaseData } from "@/lib/explorer-data";
 import { docsPageUrl, readExplorerUrl } from "@/lib/explorer-routes";
 import type {
   BaseData,
+  FolderNode,
   ModuleData,
   ModuleSummary,
   SearchEntry,
@@ -52,6 +54,32 @@ function clampWidth(width: number) {
   return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width));
 }
 
+/**
+ * Whether the window is wide enough for the navigator column.
+ *
+ * The shared `AppShell` stacks its navigation above the content below `md`; the explorer
+ * needs a drawer instead, because a stacked rail would take half a phone screen and push
+ * the document off it. jsdom has no `matchMedia`, and a missing query is the desktop
+ * arrangement, which is the shape the existing tests describe.
+ */
+function useWideViewport(): boolean {
+  const query = "(min-width: 768px)";
+  const [wide, setWide] = useState(() =>
+    typeof window.matchMedia === "function" ? window.matchMedia(query).matches : true,
+  );
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia(query);
+    const update = () => setWide(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return wide;
+}
+
 export function Explorer() {
   const [data, setData] = useState<BaseData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +101,7 @@ export function Explorer() {
   const [overlayDismissed, setOverlayDismissed] = useState(false);
   const requestedModules = useRef(new Set<string>());
   const [hydrated, setHydrated] = useState(false);
+  const wide = useWideViewport();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -539,127 +568,122 @@ export function Explorer() {
     tourIndex >= 0 &&
     tourIndex < tour.steps.length - 1;
 
+  const navigator = (compact: boolean) => (
+    <>
+      <ExplorerSidebar
+        view={view}
+        onChangeView={changeView}
+        query={query}
+        onChangeQuery={setQuery}
+        search={data?.search ?? []}
+        searchById={searchById}
+        moduleById={moduleById}
+        modules={data?.modules ?? []}
+        tree={data?.tree ?? emptyTree}
+        tours={data?.tours ?? []}
+        tourNodes={tourNodes}
+        selectedNode={currentNodeId}
+        selectedModule={selectedModule}
+        tourId={tourId}
+        tourIndex={tourIndex}
+        expanded={expanded}
+        internalOpen={internalOpen}
+        compact={compact}
+        onSelectNode={selectNode}
+        onSelectModule={selectModule}
+        onToggle={toggle}
+        onToggleInternal={toggleInternal}
+        onSelectTour={selectTour}
+        onSelectTourStep={goToTourStep}
+        onSearchSelect={selectSearch}
+      />
+      {wide ? (
+        <hr
+          aria-orientation="vertical"
+          aria-label="Resize navigator"
+          aria-valuemin={SIDEBAR_MIN}
+          aria-valuemax={SIDEBAR_MAX}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
+          onPointerDown={beginResize}
+          onKeyDown={resizeKey}
+          onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT)}
+          className="absolute right-0 top-0 z-10 m-0 hidden h-full w-1.5 cursor-col-resize border-0 bg-transparent transition-colors hover:bg-fd-primary/40 focus:bg-fd-primary/40 focus:outline-none md:block"
+        />
+      ) : null}
+    </>
+  );
+
   return (
-    <div className="min-h-dvh bg-fd-background text-fd-foreground">
+    <>
       <a
         href="#explorer-main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[60] focus:rounded focus:bg-fd-background focus:px-3 focus:py-2 focus:text-sm focus:shadow"
       >
         Skip to content
       </a>
-      <header className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-3 border-b border-fd-border bg-fd-background/95 px-3 backdrop-blur">
-        <button
-          type="button"
-          onClick={() => setSidebarOpen((open) => !open)}
-          className="rounded-lg p-1.5 text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground md:hidden"
-          aria-label="Toggle navigator"
-          aria-controls="explorer-sidebar"
-          aria-expanded={sidebarOpen}
-        >
-          {sidebarOpen ? <X className="size-4" /> : <Menu className="size-4" />}
-        </button>
-        <Link to="/explore" className="font-semibold tracking-tight">
-          Suite Help
-        </Link>
-        <nav className="ml-auto flex items-center gap-1 text-xs text-fd-muted-foreground">
-          <Link
-            to="/handbook"
-            className="rounded-lg px-2 py-1.5 hover:bg-fd-accent hover:text-fd-foreground"
-          >
-            Handbook
-          </Link>
-          <Link
-            to="/explore?view=tours"
-            className="rounded-lg bg-fd-accent px-2 py-1.5 font-medium text-fd-accent-foreground"
-          >
-            Tours
-          </Link>
-          <SectionSwitch audience="developer" />
-          <a
-            href="https://github.com/mrrnbhd/suite-apps"
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg p-1.5 hover:bg-fd-accent"
-            aria-label="GitHub"
-          >
-            <GitBranch className="size-4" />
-          </a>
-        </nav>
-      </header>
-
-      <div className="pt-14">
-        {error ? (
-          <div className="p-8 text-sm text-red-500">
-            The index could not be loaded: {error}. Run <code>pnpm docs:index</code>.
-          </div>
-        ) : !data ? (
-          <div className="grid h-[calc(100dvh-3.5rem)] place-items-center text-sm text-fd-muted-foreground">
-            Loading the code index…
-          </div>
-        ) : (
-          <div className="flex h-[calc(100dvh-3.5rem)]">
-            {sidebarOpen ? (
-              <button
-                type="button"
-                aria-label="Close navigator"
-                onClick={() => setSidebarOpen(false)}
-                className="fixed inset-0 z-30 bg-black/40 md:hidden"
-              />
-            ) : null}
-            <aside
-              id="explorer-sidebar"
-              aria-label="Code navigator"
-              data-resizing={resizing}
-              style={{ "--explorer-sidebar": `${sidebarWidth}px` } as CSSProperties}
-              className={
-                sidebarOpen
-                  ? "fixed inset-y-14 left-0 z-40 w-[20rem] border-r border-fd-border bg-fd-background shadow-xl md:static md:z-auto md:shadow-none"
-                  : "relative hidden min-h-0 shrink-0 border-r border-fd-border md:block md:w-[var(--explorer-sidebar)]"
-              }
+      <AppShell
+        title="Suite Help"
+        navigationLabel="Code navigator"
+        leading={
+          wide ? undefined : (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen((open) => !open)}
+              className="rounded-lg p-1.5 text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
+              aria-label="Toggle navigator"
+              aria-controls="explorer-sidebar"
+              aria-expanded={sidebarOpen}
             >
-              <ExplorerSidebar
-                view={view}
-                onChangeView={changeView}
-                query={query}
-                onChangeQuery={setQuery}
-                search={data.search}
-                searchById={searchById}
-                moduleById={moduleById}
-                modules={data.modules}
-                tree={data.tree}
-                tours={data.tours}
-                tourNodes={tourNodes}
-                selectedNode={currentNodeId}
-                selectedModule={selectedModule}
-                tourId={tourId}
-                tourIndex={tourIndex}
-                expanded={expanded}
-                internalOpen={internalOpen}
-                compact={!sidebarOpen && sidebarWidth < SIDEBAR_COMPACT}
-                onSelectNode={selectNode}
-                onSelectModule={selectModule}
-                onToggle={toggle}
-                onToggleInternal={toggleInternal}
-                onSelectTour={selectTour}
-                onSelectTourStep={goToTourStep}
-                onSearchSelect={selectSearch}
-              />
-              <hr
-                aria-orientation="vertical"
-                aria-label="Resize navigator"
-                aria-valuemin={SIDEBAR_MIN}
-                aria-valuemax={SIDEBAR_MAX}
-                aria-valuenow={sidebarWidth}
-                tabIndex={0}
-                onPointerDown={beginResize}
-                onKeyDown={resizeKey}
-                onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT)}
-                className="absolute right-0 top-0 z-10 m-0 hidden h-full w-1.5 cursor-col-resize border-0 bg-transparent transition-colors hover:bg-fd-primary/40 focus:bg-fd-primary/40 focus:outline-none md:block"
-              />
-            </aside>
-
-            <main id="explorer-main" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              {sidebarOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+            </button>
+          )
+        }
+        actions={
+          <nav
+            aria-label="Help sections"
+            className="flex items-center gap-1 text-xs text-fd-muted-foreground"
+          >
+            <Link
+              to="/handbook"
+              className="rounded-lg px-2 py-1.5 hover:bg-fd-accent hover:text-fd-foreground"
+            >
+              Handbook
+            </Link>
+            <Link
+              to="/explore?view=tours"
+              className="hidden rounded-lg bg-fd-accent px-2 py-1.5 font-medium text-fd-accent-foreground sm:inline-flex"
+            >
+              Tours
+            </Link>
+            <SectionSwitch audience="developer" />
+            <a
+              href="https://github.com/mrrnbhd/suite-apps"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden rounded-lg p-1.5 hover:bg-fd-accent sm:inline-flex"
+              aria-label="GitHub"
+            >
+              <GitBranch className="size-4" />
+            </a>
+          </nav>
+        }
+        navigation={wide ? <div className="relative h-full">{navigator(sidebarWidth < SIDEBAR_COMPACT)}</div> : undefined}
+        style={wide ? ({ "--shell-nav-width": `${sidebarWidth}px` } as CSSProperties) : undefined}
+        className="h-dvh"
+      >
+        <div id="explorer-main" className="relative flex h-full min-h-0 flex-col">
+          {error ? (
+            <div className="p-4 text-sm text-red-500 sm:p-8">
+              The index could not be loaded: {error}. Run <code>pnpm docs:index</code>.
+            </div>
+          ) : !data ? (
+            <div className="grid h-full place-items-center text-sm text-fd-muted-foreground">
+              Loading the code index…
+            </div>
+          ) : (
+            <>
+              <div className="min-h-0 flex-1">
                 <DetailPane
                   view={view}
                   currentNodeId={currentNodeId}
@@ -703,13 +727,45 @@ export function Explorer() {
                 onNext={() => goToTourStep(tourIndex + 1)}
                 onTogglePlay={() => setPlaying((value) => !value)}
               />
-            </main>
-          </div>
-        )}
-      </div>
-    </div>
+            </>
+          )}
+        </div>
+      </AppShell>
+
+      {!wide && sidebarOpen ? (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button
+            type="button"
+            aria-label="Dismiss navigator"
+            onClick={() => setSidebarOpen(false)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <aside
+            id="explorer-sidebar"
+            aria-label="Code navigator"
+            data-resizing={resizing}
+            className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col border-r border-fd-border bg-fd-background shadow-xl"
+          >
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-fd-border px-3">
+              <span className="text-sm font-semibold">Navigator</span>
+              <button
+                type="button"
+                aria-label="Close navigator"
+                onClick={() => setSidebarOpen(false)}
+                className="rounded-lg p-1.5 text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1">{navigator(false)}</div>
+          </aside>
+        </div>
+      ) : null}
+    </>
   );
 }
+
+const emptyTree: FolderNode = { type: "folder", name: "", path: "", children: [] };
 
 function OverlayCard({
   overlay,
@@ -772,18 +828,20 @@ function StatusBar({
   onTogglePlay: () => void;
 }) {
   return (
-    <footer className="flex h-9 shrink-0 items-center gap-3 border-t border-fd-border px-3 text-[11px] text-fd-muted-foreground">
-      <span className="uppercase tracking-wide">{view}</span>
+    <footer className="flex min-h-9 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-fd-border px-2 py-1 text-[11px] text-fd-muted-foreground sm:px-3">
+      <span className="hidden uppercase tracking-wide sm:inline">{view}</span>
       {entry ? (
         <>
-          <span className="text-fd-border">/</span>
-          <span className="truncate">{entry.label}</span>
+          <span className="hidden text-fd-border sm:inline">/</span>
+          <span className="min-w-0 max-w-[50%] truncate sm:max-w-none">{entry.label}</span>
           {module && entry.kind !== "module" ? (
-            <span className="truncate text-fd-muted-foreground">· {module.title}</span>
+            <span className="hidden truncate text-fd-muted-foreground sm:inline">
+              · {module.title}
+            </span>
           ) : null}
         </>
       ) : module ? (
-        <span className="truncate">{module.title}</span>
+        <span className="min-w-0 max-w-[45%] truncate sm:max-w-none">{module.title}</span>
       ) : null}
       {view === "tours" && tour ? (
         <div className="ml-auto flex items-center gap-2">
