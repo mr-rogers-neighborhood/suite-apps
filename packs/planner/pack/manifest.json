@@ -13,6 +13,7 @@
       "id": "workspace",
       "format": "suite.planner",
       "version": 2,
+      "name": { "singular": "Planner", "plural": "Planners" },
       "mode": "multi",
       "projection": "reminders"
     }

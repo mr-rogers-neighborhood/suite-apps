@@ -13,6 +13,7 @@
       "id": "canvas",
       "format": "suite.canvas",
       "version": 6,
+      "name": { "singular": "Canvas", "plural": "Canvases" },
       "mode": "multi"
     }
   ]

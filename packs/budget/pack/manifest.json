@@ -14,6 +14,7 @@
       "id": "budget",
       "format": "suite.budget.snapshot",
       "version": 1,
+      "name": { "singular": "Budget", "plural": "Budgets" },
       "mode": "multi"
     }
   ]
