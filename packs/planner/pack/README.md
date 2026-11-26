@@ -40,5 +40,23 @@ becomes a drawer, and the `.touch` utility in `theme/styles.css` gives the pack'
 the 44px floor on a coarse pointer or a phone-width viewport. No action is hover-only; the row
 overflow menus and inbox buttons are always present.
 
+## Chrome and the shared shells
+
+The frame is `@suite/ui`'s, not Planner's:
+
+| Region | Owner |
+| --- | --- |
+| Frame, desktop rail column, content region | `AppShell`. The rail is `--shell-nav-width` (228px), so its width is the shared column's, not a second flex child. |
+| Top bar | The shared `MenuBar`, passed as `AppShell`'s `header`. It keeps the mark/home, workspace name, view menu, export/import and sync controls. |
+| View list (rail and drawer) | `ListView`, labelled "Views". Arrows, Home/End and Enter are the shared listbox pattern; selecting a view updates the store. |
+| Calendar side panel | `DetailView` with a title, the selected day as its subtitle, and the scrolling timeline as its body. |
+
+Below `md` the shell is asked for **no** navigation: `useWideViewport` omits the column and the
+drawer in `Sidebar.tsx` carries the same `ListView`, so a phone spends its width on the plan. The
+rail's brand, `WorkspaceActions` and `PrivacyLine`, the drawer itself, `ViewMenu` (a Radix menu
+over Planner's own view registry, not a listbox), the `DayCalendar` timeline, and every view stay
+app-specific. They compose the shared shell rather than redrawing it.
+
+
 Nothing generated belongs here: `node scripts/pack-shape.mjs` fails the gate if a `dist/` or
 `node_modules/` appears under `pack/`.

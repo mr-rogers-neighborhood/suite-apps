@@ -21,6 +21,25 @@ steps live in [the pack authoring reference](../../../docs/reference/pack-author
 Nothing generated belongs here: `node scripts/pack-shape.mjs` fails the gate if a `dist/` or
 `node_modules/` appears under `pack/`.
 
+## Chrome and the shared shells
+
+The frame is `@suite/ui`'s, not Budget's:
+
+| Region | Owner |
+| --- | --- |
+| Frame, desktop rail column, content region | `AppShell`. The rail is `--shell-nav-width` (236px), so the column's width is the shared shell's, not a local flex child. |
+| Top bar | The shared `MenuBar`, passed as `AppShell`'s `header`. The command bar, undo/redo, import, add transaction, save status and view menu stay where they were. |
+| Rail lists | `ListView` for the three everyday views, the on/off-budget accounts, the closed-account disclosure and the tools. One listbox pattern for views, account selection and tools. |
+| Phone bar and Tools sheet | Still Budget's own `MobileNav`: four primary tabs and one sheet for schedules, payees, rules, import and export. |
+
+Below `md` the shell is asked for **no** navigation: `useWideViewport` omits the rail and the bottom
+bar carries the phone's destinations, so a phone spends its height on the register and the plan.
+The rail's budget name, account balances, `Export` menu and `PrivacyLine`, the closed-account
+disclosure, `ViewMenu`, `MobileNav`, and every view remain app-specific. `DetailView` is not used:
+the selected account's header owns a responsive action row that the shared pane would put in its
+title bar, so that pane stays Budget's own shape rather than bending the shared one.
+
+
 ## Phone width (360–430px)
 
 The desktop layout is unchanged at `md` and above. Below it, the same views rearrange rather than

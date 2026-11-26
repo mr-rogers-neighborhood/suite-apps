@@ -1,39 +1,15 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import {
-  BarChart3,
-  CalendarClock,
-  Check,
-  ChevronDown,
-  LayoutGrid,
-  ListFilter,
-  Tags,
-  Wallet,
-} from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 
-import { useUiStore, type View } from "../store/uiStore";
-
-/** The three surfaces the bar offers; the rail's Tools section keeps the rest. */
-const PRIMARY_VIEWS = [
-  { id: "plan", label: "Plan", icon: LayoutGrid },
-  { id: "accounts", label: "Accounts", icon: Wallet },
-  { id: "reports", label: "Reports", icon: BarChart3 },
-] as const satisfies readonly { id: View; label: string; icon: typeof LayoutGrid }[];
-
-/** Every surface's name, so the trigger tells the truth while a Tools view is open. */
-const VIEW_CHROME: Record<View, { label: string; icon: typeof LayoutGrid }> = {
-  plan: { label: "Plan", icon: LayoutGrid },
-  accounts: { label: "Accounts", icon: Wallet },
-  reports: { label: "Reports", icon: BarChart3 },
-  rules: { label: "Rules", icon: ListFilter },
-  schedules: { label: "Schedules", icon: CalendarClock },
-  payees: { label: "Payees", icon: Tags },
-};
+import { useUiStore } from "../store/uiStore";
+import { PRIMARY_VIEWS, VIEW_CHROME } from "./views";
 
 /**
  * The bar's navigation takeover.
  *
- * It offers Plan, Accounts and Reports, the same three the rail leads with. Schedules, Payees
- * and Rules stay in the rail's Tools section rather than making the bar a second full index.
+ * It offers the same three views the rail leads with, from the one registry the rail reads.
+ * Schedules, Payees and Rules stay in the rail's Tools section rather than making the bar a
+ * second full index.
  */
 export function ViewMenu() {
   const view = useUiStore((state) => state.view);

@@ -38,12 +38,32 @@ function showView(id: string): void {
   useUiStore.setState({ view: id as unknown as ViewId });
 }
 
+function rail(): HTMLElement {
+  return screen.getByRole("navigation", { name: "Primary" });
+}
+
+function stubWide(wide: boolean): void {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: wide,
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  }));
+}
+
 describe("Shell navigation", () => {
   beforeEach(() => {
     useUiStore.setState({ view: "today", selectedDate: "2026-11-20" });
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it("should render a view added to the registry without a shell branch", () => {
     showView("probe");
@@ -51,9 +71,25 @@ describe("Shell navigation", () => {
     render(<Shell />);
 
     expect(screen.getByRole("region", { name: "Probe view" })).toBeInTheDocument();
-    expect(screen.getByRole("main", { name: "Planner" })).toContainElement(
+    expect(screen.getByRole("main")).toContainElement(
       screen.getByRole("region", { name: "Probe view" }),
     );
+  });
+
+  it("should put the rail in the shared frame's navigation landmark", () => {
+    render(<Shell />);
+
+    expect(within(rail()).getByRole("listbox", { name: "Views" })).toBeInTheDocument();
+    expect(within(rail()).getAllByRole("option")).toHaveLength(3);
+  });
+
+  it("should omit the desktop rail below the breakpoint and keep the drawer", () => {
+    stubWide(false);
+    render(<Shell />);
+
+    expect(screen.queryByRole("navigation", { name: "Primary" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open navigation" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Day plan" })).toBeInTheDocument();
   });
 
   it("should mark the rail entry for the active view", () => {
@@ -61,8 +97,14 @@ describe("Shell navigation", () => {
 
     render(<Shell />);
 
-    expect(screen.getByRole("button", { name: "Probe" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("button", { name: "Today" })).not.toHaveAttribute("aria-current");
+    expect(within(rail()).getByRole("option", { name: "Probe" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(within(rail()).getByRole("option", { name: "Today" })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
   });
 
   it("should open today when the stored view is not registered", () => {
@@ -71,6 +113,19 @@ describe("Shell navigation", () => {
     render(<Shell />);
 
     expect(screen.getByRole("region", { name: "Day plan" })).toBeInTheDocument();
+  });
+
+  it("should switch views from the rail's listbox", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+
+    await user.click(within(rail()).getByRole("option", { name: "Probe" }));
+
+    expect(await screen.findByRole("region", { name: "Probe view" })).toBeInTheDocument();
+    expect(within(rail()).getByRole("option", { name: "Probe" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("should open and close the mobile drawer from its named button", async () => {
@@ -96,7 +151,10 @@ describe("Shell navigation", () => {
     fireEvent.click(within(menu).getByText("Probe"));
 
     expect(await screen.findByRole("region", { name: "Probe view" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Probe" })).toHaveAttribute("aria-current", "page");
+    expect(within(rail()).getByRole("option", { name: "Probe" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("should trap focus in the drawer and give it back to the opener", async () => {
@@ -133,14 +191,14 @@ describe("Shell navigation", () => {
     await user.click(opener);
 
     const drawer = await screen.findByRole("dialog", { name: "Navigation" });
-    await user.click(within(drawer).getByRole("button", { name: "Probe" }));
+    await user.click(within(drawer).getByRole("option", { name: "Probe" }));
 
     expect(await screen.findByRole("region", { name: "Probe view" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull();
     expect(opener).toHaveFocus();
   });
 
-  it("should keep sync in the phone bar and navigation at a thumb target", async () => {
+  it("should keep sync in the phone bar and the drawer's views reachable", async () => {
     render(<Shell />);
 
     const sync = await screen.findByTestId("sync-status");
@@ -149,6 +207,10 @@ describe("Shell navigation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
     const drawer = await screen.findByRole("dialog", { name: "Navigation" });
-    expect(within(drawer).getByRole("button", { name: "Today" })).toHaveClass("touch");
+    expect(within(drawer).getByRole("listbox", { name: "Views" })).toBeInTheDocument();
+    expect(within(drawer).getByRole("option", { name: "Today" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 });
