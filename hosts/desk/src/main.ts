@@ -2085,16 +2085,20 @@ async function installFirstRunPack(id: string): Promise<FirstRunInstallResult> {
     // The review showed the catalogue's capability list. A file swapped between the scan and
     // this read may declare more, so remove it rather than record consent for a list nobody saw.
     if (!sameCapabilities(installed.capabilities, entry.capabilities)) {
-      await uninstallPackVersion(
+      const removed = await uninstallPackVersion(
         join(dataRootFor(), "packs"),
         installed.id,
         installed.version,
-      ).catch(() => undefined);
+      )
+        .then(() => true)
+        .catch(() => false);
       await refreshPacks();
       publishPackData();
       return {
         ok: false,
-        detail: "The archive's capabilities changed after the review; it was removed.",
+        detail: removed
+          ? "The archive's capabilities changed after the review; it was removed."
+          : "The archive's capabilities changed after the review and could not be removed. Remove it from the catalogue.",
       };
     }
     await recordInstallConsent(installed);

@@ -140,6 +140,22 @@ describe("FirstRun", () => {
     });
   });
 
+  it("keeps follow-the-system when another appearance choice changes", () => {
+    const onThemeChange = vi.fn();
+    renderFirstRun({
+      theme: { preset: "suite", mode: "system", density: "cozy" },
+      onThemeChange,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Compact" }));
+
+    expect(onThemeChange).toHaveBeenCalledWith({
+      preset: "suite",
+      mode: "system",
+      density: "compact",
+    });
+  });
+
   it("shows a completion failure instead of leaving the wizard silent", async () => {
     const onComplete = vi.fn(() => Promise.reject(new Error("The data root is read-only.")));
     renderFirstRun({ onComplete });

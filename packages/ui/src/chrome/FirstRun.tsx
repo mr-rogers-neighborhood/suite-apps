@@ -488,8 +488,8 @@ export function FirstRun({
 
         {step === "appearance" ? (
           <div className="mx-auto max-w-[980px]">
-            <div className="grid items-start gap-6 md:grid-cols-[1fr_340px]">
-              <div className="flex flex-col gap-5">
+            <div className="grid items-start gap-6 md:grid-cols-[1fr_340px] md:grid-rows-[auto_auto]">
+              <div className="flex flex-col gap-5 md:col-start-1 md:row-start-1">
                 <div>
                   <h1 className="text-[length:var(--text-display,34px)]">Make it yours.</h1>
                   <p className="mt-3 max-w-[62ch] text-[length:var(--text-body,13px)] leading-relaxed text-[var(--ink-muted)]">
@@ -498,18 +498,20 @@ export function FirstRun({
                   </p>
                 </div>
                 <Appearance theme={theme} onThemeChange={onThemeChange} />
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="primary" onClick={startInstall} disabled={busy}>
-                    {chosen.length === 0
-                      ? "Continue to Home"
-                      : `Install ${chosen.length === 1 ? "1 app" : `${chosen.length} apps`}`}
-                  </Button>
-                  <Button variant="ghost" onClick={() => setStep("apps")}>
-                    Back
-                  </Button>
-                </div>
               </div>
-              <InstallReview packs={chosen} />
+              <div className="md:col-start-2 md:row-span-2 md:row-start-1">
+                <InstallReview packs={chosen} />
+              </div>
+              <div className="flex flex-wrap gap-2 md:col-start-1 md:row-start-2">
+                <Button variant="primary" onClick={startInstall} disabled={busy}>
+                  {chosen.length === 0
+                    ? "Continue to Home"
+                    : `Install ${chosen.length === 1 ? "1 app" : `${chosen.length} apps`}`}
+                </Button>
+                <Button variant="ghost" onClick={() => setStep("apps")}>
+                  Back
+                </Button>
+              </div>
             </div>
           </div>
         ) : null}

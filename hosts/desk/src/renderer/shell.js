@@ -613,7 +613,7 @@ function firstRunPacks() {
   );
   const entries = new Map();
   for (const entry of state.catalogue ?? []) {
-    if (!entry.trusted) continue;
+    if (!entry.trusted || entry.publisher === null) continue;
     const existing = entries.get(entry.id);
     if (existing === undefined || compareVersions(entry.version, existing.version) > 0) {
       entries.set(entry.id, entry);
