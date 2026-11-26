@@ -37,18 +37,27 @@ const packs: readonly NewTabPack[] = [
     name: "Canvas",
     description: "Boards, cards and the book reader",
     icon: canvasIcon,
+    noun: { singular: "Canvas", plural: "Canvases" },
+    documents: [
+      { id: "q3", name: "Q3 board", openedAt: 1_795_600_000_000 },
+      { id: "reading", name: "Reading list" },
+    ],
   },
   {
     id: "planner",
     name: "Planner",
     description: "Plans, tasks and reminders",
     icon: plannerIcon,
+    noun: { singular: "Planner", plural: "Planners" },
+    documents: [{ id: "autumn", name: "Autumn plan", openedAt: 1_795_400_000_000 }],
   },
   {
     id: "budget",
     name: "Budget",
     description: "Envelopes, accounts and reports",
     icon: budgetIcon,
+    noun: { singular: "Budget", plural: "Budgets" },
+    documents: [{ id: "household", name: "Household budget" }],
   },
 ];
 
@@ -105,6 +114,22 @@ function HostShell({
     const screen = screens.find((row) => row.id === id);
     if (screen === undefined) return;
     openTab({ id: screen.id, title: screen.name, kind: "screen" });
+  }
+
+  function openDocument(packId: string, documentId: string) {
+    const pack = packs.find((row) => row.id === packId);
+    const document = pack?.documents?.find((row) => row.id === documentId);
+    if (pack === undefined || document === undefined) return;
+    // The real host keeps one tab per pack and loads the document inside it; the fixture names
+    // the tab after the document so the choice is visible in the bar.
+    openTab({ id: document.id, title: document.name, kind: "pack", icon: pack.icon });
+  }
+
+  function newDocument(packId: string) {
+    const pack = packs.find((row) => row.id === packId);
+    if (pack === undefined) return;
+    const noun = pack.noun?.singular ?? "document";
+    openTab({ id: `new-${pack.id}`, title: `New ${noun}`, kind: "pack", icon: pack.icon });
   }
 
   function newScreen() {
@@ -221,6 +246,8 @@ function HostShell({
         screens={screens}
         onClose={() => setPickerOpen(false)}
         onOpenPack={openPack}
+        onOpenDocument={openDocument}
+        onNewDocument={newDocument}
         onOpenScreen={openScreen}
         onNewScreen={newScreen}
         onOpenSettings={openSettings}
@@ -247,8 +274,11 @@ export const Default: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "New tab" }));
     const dialog = await screen.findByRole("dialog", { name: "New tab" });
     await userEvent.type(within(dialog).getByRole("combobox"), "budget");
+    // The pack row comes first; Enter opens its documents, and the first of those is the one
+    // the fixture recorded.
     await userEvent.keyboard("{Enter}");
-    await expect(canvas.getByRole("button", { name: "Budget" })).toHaveAttribute(
+    await userEvent.keyboard("{Enter}");
+    await expect(canvas.getByRole("button", { name: "Household budget" })).toHaveAttribute(
       "aria-current",
       "page",
     );
