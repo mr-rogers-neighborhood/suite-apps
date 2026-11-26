@@ -8,6 +8,7 @@
  * of an envelope and refuses its shape. If this interface ever grows a `parse`, the
  * container has started becoming the monolith.
  */
+import type { PackIdentityService } from "./identity.js";
 import type { SuiteGoModuleId } from "./module.js";
 
 /**
@@ -278,5 +279,13 @@ export interface ModuleHost {
   readonly recents: ModuleRecents;
   readonly files: FileService;
   readonly notifications: NotificationService;
+  /**
+   * The pack's own derived identity (S2.6, S4.7).
+   *
+   * A module that did not declare `identity.pack` gets a service that refuses
+   * both calls, so the interface is always present and a pack cannot tell
+   * whether the capability was declared by probing for `undefined`.
+   */
+  readonly identity: PackIdentityService;
   readonly theme: ThemeTokens;
 }

@@ -22,6 +22,11 @@
     margin: 0;
   }
 
+  #root {
+    display: flex;
+    flex-direction: column;
+  }
+
   body {
     background: var(--canvas);
     color: var(--ink);
@@ -52,10 +57,244 @@
 
   /* The shell's own page frame: padded for the notch, and centred like the desktop card. */
   .screen {
-    min-height: 100%;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     padding-block: calc(env(safe-area-inset-top, 0px) + 16px)
       calc(env(safe-area-inset-bottom, 0px) + 24px);
     padding-inline: 16px;
+  }
+
+  .module-host {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .module-host[hidden] {
+    display: none;
+  }
+
+  .suite-mark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: var(--ink-muted);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .suite-mark img {
+    border-radius: 8px;
+  }
+
+  /*
+   * The tab strip is one row on a phone: Home, the current app with its count,
+   * and `+`. The sheet is the full list. Swiping between tabs is the module's
+   * own gesture; the tab model does not need a second copy of it.
+   */
+  .tab-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 6px);
+    border-bottom: 1px solid var(--hairline);
+    background: var(--canvas);
+  }
+
+  .tab-bar-home,
+  .tab-bar-add {
+    flex: 0 0 auto;
+    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    background: transparent;
+    color: var(--ink);
+    font-size: 14px;
+    padding-inline: 12px;
+  }
+
+  .tab-bar-current {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    background: var(--surface-sunk);
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 500;
+    padding-inline: 12px;
+  }
+
+  .tab-bar-current-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tab-bar-count {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 12px;
+    line-height: 20px;
+    min-width: 20px;
+    text-align: center;
+    padding-inline: 6px;
+  }
+
+  .tab-sheet {
+    position: absolute;
+    inset-inline: 8px;
+    top: calc(100% + 6px);
+    z-index: 40;
+    border-radius: 14px;
+    border: 1px solid var(--hairline);
+    background: var(--canvas);
+    box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+    padding: 12px;
+  }
+
+  .tab-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .tab-sheet h2,
+  .tab-group h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  .tab-sheet-empty {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: var(--ink-muted);
+  }
+
+  .tab-group ul {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+  }
+
+  .tab-group li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tab-sheet-row {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: 15px;
+    text-align: left;
+  }
+
+  .tab-sheet-row[aria-current="page"] {
+    font-weight: 600;
+  }
+
+  .tab-sheet-close {
+    border: 0;
+    background: transparent;
+    color: var(--ink-muted);
+    font-size: 18px;
+  }
+
+  .shelf-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 8px 12px;
+  }
+
+  /* The index carries no app artwork yet, so the host draws a stable monogram
+     rather than loading a remote image into its own surface. */
+  .shelf-card-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .shelf-card details {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .shelf-card summary {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .shelf-card summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .shelf-card-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .shelf-card-meta,
+  .shelf-card-line,
+  .shelf-card-detail {
+    font-size: 13px;
+    color: var(--ink-muted);
+  }
+
+  .shelf-card-detail p {
+    margin: 6px 0 0;
+  }
+
+  .shelf-action {
+    flex: 0 0 auto;
+    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    background: transparent;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 500;
+    padding-inline: 12px;
+  }
+
+  .settings-app {
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+
+  .settings-app-reask {
+    border: 0;
+    background: transparent;
+    color: var(--accent);
   }
 
   .module {

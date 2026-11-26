@@ -1,4 +1,9 @@
-import { type ModuleHost, type PackManifest, requestFrameFlush } from "@suite/go";
+import {
+  type ModuleHost,
+  type PackCapability,
+  type PackManifest,
+  requestFrameFlush,
+} from "@suite/go";
 import { useEffect, useMemo, useRef } from "react";
 import { createPackFiles, packFilesScopeOf, releasePackFileLocks } from "../host/packFiles.js";
 import { resolveTheme } from "../host/theme.js";
@@ -23,6 +28,7 @@ export function IsolatedModule({
   entryUrl,
   title,
   manifest,
+  consent,
   onQuickCapture,
   onExport,
   onFrameReady,
@@ -31,6 +37,8 @@ export function IsolatedModule({
   readonly entryUrl: string;
   readonly title: string;
   readonly manifest: PackManifest;
+  /** Ask at the capability's tier before a request moves data (S4.2). */
+  readonly consent?: (capability: PackCapability) => Promise<boolean>;
   readonly onQuickCapture?: () => void;
   readonly onExport?: () => void;
   /**
@@ -68,6 +76,7 @@ export function IsolatedModule({
         const tokens = resolveTheme();
         return { scheme: tokens.scheme, density: tokens.density, variables: tokens.cssVariables };
       },
+      ...(consent === undefined ? {} : { consent }),
       target: () => frame.current?.contentWindow ?? null,
     });
 
@@ -84,7 +93,7 @@ export function IsolatedModule({
       // The frame is gone; anything it still held is stale.
       void releasePackFileLocks(packFilesScopeOf(manifest));
     };
-  }, [host, manifest, files, onFrameReady]);
+  }, [host, manifest, files, onFrameReady, consent]);
 
   return (
     <div className="module">

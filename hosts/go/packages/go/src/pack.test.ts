@@ -5,7 +5,9 @@ import {
   canonicalManifestBytes,
   checkNetworkPolicy,
   comparePackVersions,
+  connectSrcPolicy,
   isSafePackPath,
+  networkAllowlist,
   type PackManifest,
   packAllows,
   packDocumentSealsNetwork,
@@ -514,9 +516,24 @@ describe("the network a pack did not ask for", () => {
     expect(packDocumentSealsNetwork(escaped)).toBe(false);
   });
 
-  it("accepts a manifest that declares the capability, policy or not", async () => {
+  // spec: S4.4
+  it("refuses a declared capability with no allowlist (S4.4)", async () => {
     const manifest = await makeManifest({ capabilities: ["documents", "network"] });
+    const result = checkNetworkPolicy(manifest, {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("network.allow");
+  });
+
+  it("accepts a declared capability with an exact-origin allowlist", async () => {
+    const manifest = await makeManifest({
+      capabilities: ["documents", "network"],
+      network: { allow: ["https://example.com", "wss://relay.example.com"] },
+    });
     expect(checkNetworkPolicy(manifest, {})).toEqual({ ok: true });
+    expect(networkAllowlist(manifest)).toEqual(["https://example.com", "wss://relay.example.com"]);
+    expect(connectSrcPolicy(networkAllowlist(manifest))).toBe(
+      "connect-src https://example.com wss://relay.example.com",
+    );
   });
 
   it("refuses an undeclared pack whose entry does not seal the network", async () => {

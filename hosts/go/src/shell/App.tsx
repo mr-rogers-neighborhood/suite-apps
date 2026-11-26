@@ -1,16 +1,46 @@
 import { App as NativeApp } from "@capacitor/app";
-import type { CaptureIntent, ModuleHost, ModuleViewProps, SuiteGoModule } from "@suite/go";
-import { createModuleRegistry } from "@suite/go";
+import type {
+  CaptureIntent,
+  DeviceKey,
+  ModuleHost,
+  ModuleViewProps,
+  PackCapability,
+  SuiteGoModule,
+} from "@suite/go";
+import { FIRST_PARTY_PUBLISHER_ID } from "@suite/go";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type CatalogueEntry, createCatalogue } from "../host/catalogue.js";
+import {
+  CAPABILITY_REASONS,
+  ConsentRecord,
+  type ConsentView,
+  keyValueConsentStorage,
+} from "../host/consent.js";
 import { createDocumentStore } from "../host/documents.js";
 import { createFileService, mimeFor } from "../host/files.js";
 import { createNotifications } from "../host/notifications.js";
 import { createPackFiles, packFilesScopeOf } from "../host/packFiles.js";
+import {
+  createFilesystemIdentityStorage,
+  createPackIdentity,
+  openDeviceKey,
+  refusedPackIdentity,
+} from "../host/packIdentity.js";
 import { createPackStore, type InstalledPack } from "../host/packs.js";
 import { createPins, orderModules } from "../host/pins.js";
 import { createRecents, type RecentEntry } from "../host/recents.js";
+import { shelfFrom } from "../host/shelf.js";
 import { createKeyValueStore } from "../host/storage.js";
+import {
+  closeTab,
+  createTabStore,
+  EMPTY_TABS,
+  openTab,
+  removeTabs,
+  retainTabs,
+  showHome,
+  type TabState,
+} from "../host/tabs.js";
 import {
   setThemeChoice as applyThemeChoice,
   type GoThemeChoice,
@@ -19,45 +49,34 @@ import {
   resolveTheme,
   watchColorScheme,
 } from "../host/theme.js";
-import { canvasModule } from "../modules/canvas/index.js";
 import { scratchModule } from "../modules/scratch/index.js";
 import { Catalogue } from "./Catalogue.js";
+import { ConsentSheet } from "./ConsentSheet.js";
 import { Home } from "./Home.js";
 import { IsolatedModule } from "./IsolatedModule.js";
 import { MountedModule } from "./MountedModule.js";
 import { QuickCaptureSheet } from "./QuickCaptureSheet.js";
-import { SettingsSheet } from "./SettingsSheet.js";
+import { type SettingsApp, SettingsSheet } from "./SettingsSheet.js";
+import { TabBar } from "./TabBar.js";
 
 /**
  * The container.
  *
- * It holds a registry of declarations, one document store, and a route. It imports
- * exactly one module because the suite currently has exactly one reference module;
- * adding a domain is a line here and nothing else.
+ * It holds a registry of declarations, one document store, open-app tabs and a
+ * route. It imports one reference module (Scratch, development only); every
+ * other app arrives as an installed pack.
  *
  * There is no branch on a domain id anywhere in this file. If one appears, the
  * container has started learning a domain.
  */
-/**
- * A pack, as the container sees it.
- *
- * The container still knows nothing about what the pack does: it has an id, a name and an
- * entry URL. Every pack renders in its own document — the manifest refuses any other mode
- * (ADR-0003) — so there is no branch here to get wrong.
- */
+
 function packAsModule(
   pack: InstalledPack,
   onQuickCapture?: () => void,
   onExport?: (moduleId: string) => void,
+  onConsent?: (capability: PackCapability) => Promise<boolean>,
 ): SuiteGoModule {
   const { id, name } = pack.manifest;
-  /**
-   * The frame's flush, once it exists.
-   *
-   * The shell cannot write a pack's document — that is the container's first rule — so leaving and
-   * backgrounding can only ask. `undefined` before the frame mounts is honest: there is nothing
-   * pending in a pack that has not started.
-   */
   let flushFrame: () => Promise<void> = async () => undefined;
   const acceptFlush = (flush: () => Promise<void>) => {
     flushFrame = flush;
@@ -66,8 +85,6 @@ function packAsModule(
     try {
       await flushFrame();
     } catch (error) {
-      // A frame that is already gone has nothing to write. A failure the person can act on would
-      // have to be a storage error, and swallowing it would hide exactly that, so it is logged.
       console.error(`Suite Go: ${name} did not flush its document`, error);
     }
   };
@@ -86,6 +103,7 @@ function packAsModule(
           title={name}
           manifest={pack.manifest}
           onFrameReady={acceptFlush}
+          {...(onConsent ? { consent: onConsent } : {})}
           {...(onQuickCapture ? { onQuickCapture } : {})}
           {...(onExport ? { onExport: () => onExport(id) } : {})}
         />
@@ -95,6 +113,7 @@ function packAsModule(
     }),
   };
 }
+
 const documents = createDocumentStore();
 const shellStorage = createKeyValueStore("shell");
 const pins = createPins(shellStorage);
@@ -103,15 +122,17 @@ const files = createFileService();
 const packs = createPackStore();
 const catalogue = createCatalogue({ packs, store: createKeyValueStore("catalogue") });
 const notifications = createNotifications();
+const tabStore = createTabStore(shellStorage);
+const consentStorage = keyValueConsentStorage(shellStorage);
+const identityStorage = createFilesystemIdentityStorage();
 
 /**
  * Dev handles, for `pnpm android:eval`.
  *
- * The catalogue is the screen a person uses now. These remain for the device checks that call a
- * store directly — a signed file, a list, a removal — without walking the UI. They hold no
- * secret and only reach the same pack store the screen does.
+ * The catalogue is the screen a person uses now. These remain for device checks
+ * that call a store directly — a signed file, a list, a removal — without
+ * walking the UI.
  */
-/** Set by the App once mounted; the dev hook lives at module scope and cannot see a callback. */
 let reloadPacksFromDev: () => void = () => undefined;
 
 Object.assign(globalThis, {
@@ -131,24 +152,36 @@ Object.assign(globalThis, {
     uninstall: (id: string) => packs.uninstall(id),
   },
 });
-// Painted before the first render, so no frame flashes the browser's default palette.
 paintTheme();
 
 /**
- * How long a backgrounded module stays mounted before it is released and its edit flushed.
- *
- * A `let` so that `__suiteGoDev.setIdleRelease` can shorten it for a test; five minutes is
- * too long to verify by hand and an unverified timer is a timer that silently does nothing.
+ * How long an inactive tab stays mounted before it is released and its edit
+ * flushed. A `let` so `__suiteGoDev.setIdleRelease` can shorten it for a test.
  */
 let IDLE_RELEASE_MS = 5 * 60_000;
 
-type Route =
-  | { readonly kind: "home" }
-  | { readonly kind: "catalogue" }
-  | { readonly kind: "module"; readonly moduleId: string; readonly intent?: CaptureIntent };
+type Route = { readonly kind: "home" } | { readonly kind: "catalogue" };
+
+interface PendingConsent {
+  readonly packName: string;
+  readonly capability: PackCapability;
+  readonly reason: string;
+  readonly resolve: (granted: boolean) => void;
+}
+
+interface PackConsentIdentity {
+  readonly publisherId: string;
+  readonly packId: string;
+  readonly version: string;
+  readonly name: string;
+}
 
 export function App() {
   const [route, setRoute] = useState<Route>({ kind: "home" });
+  const [tabs, setTabs] = useState<TabState>(EMPTY_TABS);
+  const [mounted, setMounted] = useState<readonly string[]>([]);
+  const [restored, setRestored] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
   const [installed, setInstalled] = useState<readonly InstalledPack[]>([]);
   const [catalogueEntries, setCatalogueEntries] = useState<readonly CatalogueEntry[]>([]);
@@ -158,13 +191,23 @@ export function App() {
   const [pinned, setPinned] = useState<readonly string[]>([]);
   const [recent, setRecent] = useState<readonly RecentEntry[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // The theme is host profile state, so it lives here rather than in a pack.
   const [themeChoice, setThemeChoiceState] = useState<GoThemeChoice>(() => readThemeChoice());
   const [theme, setThemeTokens] = useState(() => resolveTheme());
-  const pendingCleanup = useRef<(() => Promise<void>) | null>(null);
-  const pendingFlush = useRef<(() => Promise<void>) | null>(null);
+  const [deviceKey, setDeviceKey] = useState<DeviceKey | null>(null);
+  const [consent, setConsent] = useState<ConsentRecord | null>(null);
+  const [consentVersion, setConsentVersion] = useState(0);
+  const [pendingConsent, setPendingConsent] = useState<PendingConsent | null>(null);
 
-  // A phone that dims at dusk repaints while "follow the system" is the choice.
+  const cleanups = useRef(new Map<string, () => Promise<void>>());
+  const flushes = useRef(new Map<string, () => Promise<void>>());
+  const idleTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  // The frame bridge is built once per pack, while consent state changes. The
+  // ref keeps the latest gate without rebuilding an installed pack's bridge.
+  const askConsentRef = useRef<(moduleId: string, capability: PackCapability) => Promise<boolean>>(
+    async () => false,
+  );
+  const exportDocumentRef = useRef<(moduleId: string) => void>(() => undefined);
+
   useEffect(() => watchColorScheme(setThemeTokens), []);
 
   const changeTheme = useCallback((choice: GoThemeChoice) => {
@@ -180,9 +223,9 @@ export function App() {
     setPinned(await pins.list());
     await refreshRecents();
     setInstalled(await packs.discover());
+    setLoaded(true);
   }, [refreshRecents]);
 
-  // A pack installed this session has to appear without a restart.
   const reloadPacks = useCallback(async () => {
     setInstalled(await packs.discover());
   }, []);
@@ -191,21 +234,26 @@ export function App() {
     reloadPacksFromDev = () => void reloadPacks();
   }, [reloadPacks]);
 
-  /**
-   * Fetch and verify the published index.
-   *
-   * A refusal keeps the rows already on screen and shows the sentence the verifier produced:
-   * clearing the list on a transient network failure would look like the catalogue emptied.
-   */
+  // The device key and the consent record are both async. Mounting a pack
+  // before either is ready would expose a host surface that cannot answer.
+  useEffect(() => {
+    void openDeviceKey(identityStorage)
+      .then(setDeviceKey)
+      .catch((error: unknown) => {
+        console.error("Suite Go: the device key could not be read", error);
+      });
+    void ConsentRecord.open(consentStorage).then(setConsent);
+  }, []);
+
   const refreshCatalogue = useCallback(async () => {
     setCatalogueLoading(true);
     try {
-      const loaded = await catalogue.load();
-      if (!loaded.ok) {
-        setCatalogueNotice(loaded.message);
+      const result = await catalogue.load();
+      if (!result.ok) {
+        setCatalogueNotice(result.message);
         return;
       }
-      setCatalogueEntries(loaded.entries);
+      setCatalogueEntries(result.entries);
       setCatalogueNotice(null);
     } catch (error) {
       setCatalogueNotice(error instanceof Error ? error.message : String(error));
@@ -230,6 +278,13 @@ export function App() {
       }
       await reloadPacks();
       await refreshCatalogue();
+      const manifest = result.outcome.pack.manifest;
+      const publisherId = manifest.publisher?.id ?? FIRST_PARTY_PUBLISHER_ID;
+      await consent?.recordInstall({
+        pack: { publisherId, packId: manifest.id, version: manifest.version },
+        capabilities: manifest.capabilities,
+      });
+      setConsentVersion((value) => value + 1);
       const verb =
         result.action === "install"
           ? "installed"
@@ -238,28 +293,9 @@ export function App() {
             : "reinstalled";
       setCatalogueNotice(`${entry.name} ${entry.version} ${verb}.`);
     },
-    [refreshCatalogue, reloadPacks],
+    [consent, refreshCatalogue, reloadPacks],
   );
 
-  const removeFromCatalogue = useCallback(
-    async (id: string) => {
-      const entry = catalogueEntries.find((candidate) => candidate.id === id);
-      setCatalogueNotice(null);
-      await catalogue.remove(id);
-      await reloadPacks();
-      await refreshCatalogue();
-      setCatalogueNotice(`${entry?.name ?? id} removed. Its documents stay on this device.`);
-    },
-    [catalogueEntries, refreshCatalogue, reloadPacks],
-  );
-
-  /**
-   * Install a pack from a file the person chooses.
-   *
-   * Every failure keeps its reason on screen rather than in a console: a pack that will not
-   * install has a specific cause — a signature, a contract version, a damaged file — and
-   * "something went wrong" would hide the one sentence that tells them what to do.
-   */
   const installFromFile = useCallback(async () => {
     setNotice(null);
     try {
@@ -271,96 +307,214 @@ export function App() {
         return;
       }
       await reloadPacks();
-      setNotice(`${outcome.pack.manifest.name} ${outcome.pack.manifest.version} installed.`);
+      const manifest = outcome.pack.manifest;
+      await consent?.recordInstall({
+        pack: {
+          publisherId: manifest.publisher?.id ?? FIRST_PARTY_PUBLISHER_ID,
+          packId: manifest.id,
+          version: manifest.version,
+        },
+        capabilities: manifest.capabilities,
+      });
+      setConsentVersion((value) => value + 1);
+      setNotice(`${manifest.name} ${manifest.version} installed.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     }
-  }, [reloadPacks]);
-
-  const removeDomain = useCallback(
-    async (moduleId: string) => {
-      await packs.uninstall(moduleId);
-      await reloadPacks();
-      setRoute({ kind: "home" });
-      setNotice("Removed. Its documents stay on this device.");
-    },
-    [reloadPacks],
-  );
+  }, [consent, reloadPacks]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  /**
-   * Leave a module only once its teardown has finished.
-   *
-   * A module's `dispose` flushes its last edit. Unmounting and routing home in the
-   * same tick would let the next module mount while that write was still in flight,
-   * so a heavy app could read a document that was halfway saved. Awaiting is the
-   * whole point of exposing the cleanup.
-   */
-  const closeModule = useCallback(async () => {
-    const cleanup = pendingCleanup.current;
-    pendingCleanup.current = null;
-    pendingFlush.current = null;
-    await cleanup?.();
-    setRoute({ kind: "home" });
-    await refresh();
-  }, [refresh]);
+  // Home's shadow shelf is the verified index, so it is fetched once at launch
+  // rather than only when someone opens the catalogue. A failed fetch leaves the
+  // shelf empty and the catalogue keeps its own refusal sentence.
+  useEffect(() => {
+    void refreshCatalogue();
+  }, [refreshCatalogue]);
 
-  const openModule = useCallback((moduleId: string, intent?: CaptureIntent) => {
-    setRoute(intent ? { kind: "module", moduleId, intent } : { kind: "module", moduleId });
+  // Installed packs from before the consent record existed get their install-tier
+  // rows written once. These are the capabilities the manifest already declared,
+  // so this records the standing install decision rather than inventing consent.
+  useEffect(() => {
+    if (consent === null || !loaded) return;
+    let changed = false;
+    void (async () => {
+      for (const pack of installed) {
+        const publisherId = pack.manifest.publisher?.id ?? FIRST_PARTY_PUBLISHER_ID;
+        const answers = consent.answersFor({ publisherId, packId: pack.manifest.id });
+        if (answers.length > 0) continue;
+        await consent.recordInstall({
+          pack: { publisherId, packId: pack.manifest.id, version: pack.manifest.version },
+          capabilities: pack.manifest.capabilities,
+          at: pack.installedAt > 0 ? pack.installedAt : Date.now(),
+        });
+        changed = true;
+      }
+      if (changed) setConsentVersion((value) => value + 1);
+    })();
+  }, [consent, installed, loaded]);
+
+  const modules = useMemo(() => {
+    // Scratch is the reference module, not a shipping app. A release build has no
+    // built-in domain; an installed pack is the only way in.
+    const builtIn = import.meta.env.DEV ? [scratchModule] : [];
+    const installedIds = new Set(installed.map((pack) => pack.manifest.id));
+    return [
+      // A built-in module yields to an installed pack with the same id: two
+      // declarations of one app would be two tabs and two document roots.
+      ...builtIn.filter((module) => !installedIds.has(module.id)),
+      ...installed.map((pack) =>
+        packAsModule(
+          pack,
+          () => setQuickCaptureOpen(true),
+          (id) => exportDocumentRef.current(id),
+          (capability) => askConsentRef.current(pack.manifest.id, capability),
+        ),
+      ),
+    ];
+  }, [installed]);
+
+  const ordered = useMemo(() => orderModules(modules, pinned), [modules, pinned]);
+  const captureTargets = ordered.filter((module) => module.capabilities.includes("capture"));
+  const captureTarget = captureTargets[0];
+  // Restore the strip once the installed packs are known, so a tab is not
+  // dropped merely because a pack had not been discovered yet.
+  useEffect(() => {
+    if (!loaded || restored) return;
+    let cancelled = false;
+    void tabStore.read().then((saved) => {
+      if (cancelled) return;
+      const next = retainTabs(
+        saved,
+        ordered.map((module) => module.id),
+      );
+      setTabs(next);
+      if (next.active !== null) setMounted([next.active]);
+      setRestored(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, restored, ordered]);
+
+  useEffect(() => {
+    if (!restored) return;
+    void tabStore.write(tabs);
+  }, [tabs, restored]);
+
+  const activate = useCallback((moduleId: string) => {
+    setTabs((state) => openTab(state, moduleId));
+    setMounted((ids) => (ids.includes(moduleId) ? ids : [...ids, moduleId]));
+    setRoute({ kind: "home" });
   }, []);
 
-  /**
-   * Background discipline.
-   *
-   * Leaving a module flushes it, because `dispose` saves. So the way to make backgrounding
-   * safe is to release the module after the person has been gone long enough to be done —
-   * not immediately, which would throw away a scroll position someone expects to return to.
-   *
-   * Five minutes is a deliberate middle: WeChat suspends a mini program's JS thread after
-   * five seconds and destroys it after thirty minutes, and we can afford neither the first
-   * (this module is the only thing holding an unsaved edit) nor the last (it shares a heap
-   * with everything else). The release path is the same `closeModule`, so there is one
-   * teardown rather than two that could disagree.
-   */
-  const idleRelease = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showHomeTab = useCallback(() => {
+    setTabs((state) => showHome(state));
+    setRoute({ kind: "home" });
+  }, []);
+
+  const flushModule = useCallback(async (moduleId: string) => {
+    try {
+      await flushes.current.get(moduleId)?.();
+    } catch (error) {
+      console.error(`Suite Go: ${moduleId} did not flush its document`, error);
+    }
+  }, []);
+
+  const releaseModule = useCallback(
+    async (moduleId: string) => {
+      const timer = idleTimers.current.get(moduleId);
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        idleTimers.current.delete(moduleId);
+      }
+      await flushModule(moduleId);
+      const cleanup = cleanups.current.get(moduleId);
+      cleanups.current.delete(moduleId);
+      flushes.current.delete(moduleId);
+      await cleanup?.();
+      setMounted((ids) => ids.filter((id) => id !== moduleId));
+    },
+    [flushModule],
+  );
+
+  const closeTabAction = useCallback(
+    async (moduleId: string) => {
+      const next = closeTab(tabs, moduleId);
+      await releaseModule(moduleId);
+      setTabs(next);
+      const nextActive = next.active;
+      if (nextActive !== null) {
+        setMounted((ids) => (ids.includes(nextActive) ? ids : [...ids, nextActive]));
+      }
+    },
+    [tabs, releaseModule],
+  );
+
+  const removePack = useCallback(
+    async (moduleId: string) => {
+      const closing = tabs.tabs.filter((id) => id === moduleId);
+      for (const id of closing) await releaseModule(id);
+      const next = removeTabs(tabs, closing);
+      setTabs(next);
+      await packs.uninstall(moduleId);
+      await consent?.clearForPack(moduleId);
+      setConsentVersion((value) => value + 1);
+      await reloadPacks();
+      setNotice("Removed. Its documents stay on this device.");
+    },
+    [consent, reloadPacks, releaseModule, tabs],
+  );
+
+  // Inactive tabs flush and unmount after a grace period; the tab remains and
+  // remounts on switch. Returning before the timer clears it, so a scroll
+  // position survives a quick trip to another app.
+  useEffect(() => {
+    for (const id of mounted) {
+      if (id === tabs.active) {
+        const timer = idleTimers.current.get(id);
+        if (timer !== undefined) {
+          clearTimeout(timer);
+          idleTimers.current.delete(id);
+        }
+        continue;
+      }
+      if (idleTimers.current.has(id)) continue;
+      idleTimers.current.set(
+        id,
+        setTimeout(() => {
+          idleTimers.current.delete(id);
+          void releaseModule(id);
+        }, IDLE_RELEASE_MS),
+      );
+    }
+  }, [mounted, tabs.active, releaseModule]);
 
   useEffect(() => {
     const subscription = NativeApp.addListener("appStateChange", ({ isActive }) => {
-      if (idleRelease.current) {
-        clearTimeout(idleRelease.current);
-        idleRelease.current = null;
-      }
-      if (!isActive && route.kind === "module") {
-        // Flush at the boundary rather than waiting for the release: a phone gives no warning
-        // before it kills a process, and the debounce leaves a window (ADR-0005).
-        void pendingFlush.current?.();
-        idleRelease.current = setTimeout(() => {
-          idleRelease.current = null;
-          void closeModule();
-        }, IDLE_RELEASE_MS);
-      }
+      if (isActive) return;
+      for (const id of mounted) void flushModule(id);
     });
     return () => {
-      if (idleRelease.current) clearTimeout(idleRelease.current);
       void subscription.then((handle) => handle.remove());
     };
-  }, [route.kind, closeModule]);
+  }, [mounted, flushModule]);
 
-  // Android's back button belongs to the container, not to a module: from a module
-  // it returns home, and from home it leaves the app.
+  // Android's back button belongs to the container: settings, then the
+  // catalogue, then from a tab to Home, then out of the app.
   useEffect(() => {
     const subscription = NativeApp.addListener("backButton", () => {
-      if (route.kind === "module") void closeModule();
+      if (settingsOpen) setSettingsOpen(false);
       else if (route.kind === "catalogue") setRoute({ kind: "home" });
+      else if (tabs.active !== null) showHomeTab();
       else void NativeApp.exitApp();
     });
     return () => {
       void subscription.then((handle) => handle.remove());
     };
-  }, [route.kind, closeModule]);
+  }, [settingsOpen, route.kind, tabs.active, showHomeTab]);
 
   const togglePin = useCallback((moduleId: string) => {
     setPinned((current) => {
@@ -372,59 +526,140 @@ export function App() {
     });
   }, []);
 
-  const host = useMemo<ModuleHost | null>(() => {
-    if (route.kind !== "module") return null;
-    const moduleId = route.moduleId;
-    // One store per mounted domain. An installed pack carries its publisher, so a
-    // different publisher under the same id inherits nothing; a built-in module
-    // keeps the first-party segment.
-    const installedManifest = installed.find((pack) => pack.manifest.id === moduleId)?.manifest;
-    const moduleFiles = createPackFiles(
-      installedManifest === undefined ? { packId: moduleId } : packFilesScopeOf(installedManifest),
-    );
-    return {
-      moduleId,
-      documents,
-      storage: createKeyValueStore(moduleId),
-      navigation: {
-        setTitle: () => {
-          // The frame shows the module's declared name. A module renaming itself is
-          // not a v0 need, and accepting it would mean the container tracking state
-          // nothing reads.
-        },
-        close: () => void closeModule(),
-      },
-      files: moduleFiles,
-      notifications,
-      recents: {
-        remember: (documentId, title) => {
-          // Update the list when the write lands, not when the route changes.
-          // Leaving a module disposes it asynchronously, so a refresh triggered by
-          // the route change can read the recents list before the final save has
-          // written to it — and the entry would be missing until the next visit.
-          void recents.remember({ documentId, moduleId, title }).then(refreshRecents);
-        },
-        forget: (documentId) => {
-          void recents.forget(documentId);
-        },
-      },
-      theme,
-    };
-  }, [route, closeModule, refreshRecents, theme, installed]);
+  const consentIdentity = useCallback(
+    (moduleId: string): PackConsentIdentity => {
+      const pack = installed.find((candidate) => candidate.manifest.id === moduleId);
+      const module = ordered.find((candidate) => candidate.id === moduleId);
+      return {
+        publisherId: pack?.manifest.publisher?.id ?? FIRST_PARTY_PUBLISHER_ID,
+        packId: moduleId,
+        version: pack?.manifest.version ?? "0.0.0",
+        name: pack?.manifest.name ?? module?.name ?? moduleId,
+      };
+    },
+    [installed, ordered],
+  );
 
-  const modules = [
-    ...createModuleRegistry([scratchModule, canvasModule]).modules,
-    ...installed.map((pack) =>
-      packAsModule(
-        pack,
-        () => setQuickCaptureOpen(true),
-        (id) => void exportActiveDocument(id),
-      ),
-    ),
-  ];
-  const ordered = orderModules(modules, pinned);
-  const captureTarget = ordered.find((module) => module.capabilities.includes("capture"));
-  const captureTargets = ordered.filter((module) => module.capabilities.includes("capture"));
+  const askConsent = useCallback(
+    async (moduleId: string, capability: PackCapability): Promise<boolean> => {
+      if (consent === null) return false;
+      const identity = consentIdentity(moduleId);
+      const reason = CAPABILITY_REASONS[capability] ?? capability;
+      return consent.ensure(
+        {
+          publisherId: identity.publisherId,
+          packId: identity.packId,
+          version: identity.version,
+          capability,
+          reason,
+        },
+        () =>
+          new Promise<boolean>((resolve) => {
+            setPendingConsent({
+              packName: identity.name,
+              capability,
+              reason,
+              resolve,
+            });
+          }),
+      );
+    },
+    [consent, consentIdentity],
+  );
+
+  useEffect(() => {
+    askConsentRef.current = askConsent;
+  }, [askConsent]);
+
+  const reaskConsent = useCallback(
+    async (app: SettingsApp, permission: ConsentView) => {
+      if (consent === null) return;
+      const identity = consentIdentity(app.id);
+      await consent.forget({
+        publisherId: identity.publisherId,
+        packId: identity.packId,
+        version: identity.version,
+        capability: permission.capability,
+        reason: permission.reason,
+      });
+      setConsentVersion((value) => value + 1);
+      const granted = await consent.ensure(
+        {
+          publisherId: identity.publisherId,
+          packId: identity.packId,
+          version: identity.version,
+          capability: permission.capability,
+          reason: permission.reason,
+        },
+        () =>
+          new Promise<boolean>((resolve) => {
+            setPendingConsent({
+              packName: app.name,
+              capability: permission.capability,
+              reason: permission.reason,
+              resolve,
+            });
+          }),
+      );
+      setConsentVersion((value) => value + 1);
+      if (!granted) setNotice(`${permission.capability} stays off for ${app.name}.`);
+    },
+    [consent, consentIdentity],
+  );
+
+  const hosts = useMemo(() => {
+    const map = new Map<string, ModuleHost>();
+    const host = (moduleId: string): ModuleHost => {
+      const existing = map.get(moduleId);
+      if (existing !== undefined) return existing;
+      const pack = installed.find((candidate) => candidate.manifest.id === moduleId);
+      const manifest = pack?.manifest;
+      const identityInfo = {
+        publisherId: manifest?.publisher?.id ?? FIRST_PARTY_PUBLISHER_ID,
+        packId: moduleId,
+      };
+      const declaredIdentity = manifest?.capabilities.includes("identity.pack") === true;
+      const identity =
+        declaredIdentity && deviceKey !== null
+          ? createPackIdentity(deviceKey, identityInfo.publisherId, identityInfo.packId)
+          : refusedPackIdentity(
+              declaredIdentity
+                ? `${manifest?.name ?? moduleId} declared "identity.pack", but this host has no usable device key.`
+                : `${manifest?.name ?? moduleId} did not declare "identity.pack"; this host has no key for it.`,
+            );
+      const moduleFiles = createPackFiles(
+        manifest === undefined ? { packId: moduleId } : packFilesScopeOf(manifest),
+      );
+      const next: ModuleHost = {
+        moduleId,
+        documents,
+        storage: createKeyValueStore(moduleId),
+        navigation: {
+          setTitle: () => {
+            // The frame shows the module's declared name. A module renaming itself is
+            // not a v0 need, and accepting it would mean tracking state nothing reads.
+          },
+          close: showHomeTab,
+        },
+        files: moduleFiles,
+        notifications,
+        identity,
+        recents: {
+          remember: (documentId, title) => {
+            void recents.remember({ documentId, moduleId, title }).then(refreshRecents);
+          },
+          forget: (documentId) => {
+            void recents.forget(documentId);
+          },
+        },
+        theme,
+      };
+      map.set(moduleId, next);
+      return next;
+    };
+    for (const module of ordered) host(module.id);
+    return map;
+  }, [ordered, installed, theme, deviceKey, refreshRecents, showHomeTab]);
 
   const exportActiveDocument = useCallback(async (moduleId: string) => {
     try {
@@ -453,78 +688,175 @@ export function App() {
     }
   }, []);
 
+  useEffect(() => {
+    exportDocumentRef.current = (moduleId) => void exportActiveDocument(moduleId);
+  }, [exportActiveDocument]);
+
+  // The intent is handed to the mounted module once. A tab already open keeps
+  // its instance, so the intent is stored beside the route rather than remounting.
+  const [captureDelivery, setCaptureDelivery] = useState<{
+    readonly moduleId: string;
+    readonly intent: CaptureIntent;
+    readonly nonce: number;
+  } | null>(null);
+  const captureNonce = useRef(0);
+  const setCaptureIntent = useCallback((intent: CaptureIntent, moduleId: string) => {
+    captureNonce.current += 1;
+    setCaptureDelivery({ moduleId, intent, nonce: captureNonce.current });
+  }, []);
+
+  // A capture is delivered once. Clearing it after the mounted module's effect
+  // has run means a tab released by the grace timer and remounted later does not
+  // replay the same text.
+  useEffect(() => {
+    if (captureDelivery === null) return;
+    const timer = setTimeout(() => setCaptureDelivery(null), 0);
+    return () => clearTimeout(timer);
+  }, [captureDelivery]);
+
   const handleCapture = useCallback(
     (body: string, targetModuleId?: string) => {
       const targetId = targetModuleId || captureTarget?.id;
       if (!targetId) return;
-      openModule(targetId, { kind: "text", body, source: "shell.capture" });
+      const intent: CaptureIntent = { kind: "text", body, source: "shell.capture" };
+      // Opening a tab that is already open focuses it; the mount effect receives
+      // the intent and delivers the capture without a second instance.
+      activate(targetId);
+      setCaptureIntent(intent, targetId);
     },
-    [captureTarget, openModule],
+    [activate, captureTarget, setCaptureIntent],
   );
+
+  const shelf = useMemo(() => shelfFrom(catalogueEntries), [catalogueEntries]);
+
+  // Deliberately not memoised: `consentVersion` is the re-render signal after an
+  // answer changes, and the record mutates in place.
+  void consentVersion;
+  const settingsApps: readonly SettingsApp[] = (() => {
+    if (consent === null) return [];
+    return installed.map((pack) => {
+      const publisher = pack.manifest.publisher?.id ?? FIRST_PARTY_PUBLISHER_ID;
+      return {
+        id: pack.manifest.id,
+        name: pack.manifest.name,
+        version: pack.manifest.version,
+        publisher,
+        sizeBytes: pack.bytes,
+        installedAt: pack.installedAt,
+        permissions: consent.viewsFor({
+          publisherId: publisher,
+          packId: pack.manifest.id,
+          version: pack.manifest.version,
+        }),
+      };
+    });
+  })();
+
+  const renderHome = route.kind === "home" && tabs.active === null;
 
   return (
     <>
-      {route.kind === "module" && host ? (
-        (() => {
-          const module = modules.find((candidate) => candidate.id === route.moduleId);
-          if (!module) return null;
-          return (
-            <MountedModule
-              module={module}
-              host={host}
-              {...(route.intent ? { intent: route.intent } : {})}
-              onClose={() => void closeModule()}
-              onQuickCapture={() => setQuickCaptureOpen(true)}
-              onExport={() => void exportActiveDocument(route.moduleId)}
-              onCleanupReady={(cleanup) => {
-                pendingCleanup.current = cleanup;
-              }}
-              onFlushReady={(flush) => {
-                pendingFlush.current = flush;
-              }}
-            />
-          );
-        })()
-      ) : route.kind === "catalogue" ? (
+      {route.kind === "home" ? (
+        <TabBar
+          tabs={tabs.tabs.map((id) => ({
+            id,
+            name: ordered.find((module) => module.id === id)?.name ?? id,
+          }))}
+          activeId={tabs.active}
+          onFocus={activate}
+          onClose={(id) => void closeTabAction(id)}
+          onHome={showHomeTab}
+          onCatalogue={openCatalogue}
+        />
+      ) : null}
+
+      {renderHome ? (
+        <Home
+          modules={ordered}
+          pinned={pinned}
+          recents={recent}
+          shelf={shelf.shadows}
+          onOpen={activate}
+          onCapture={(body) => handleCapture(body)}
+          onTogglePin={togglePin}
+          onCatalogue={openCatalogue}
+          onInstall={() => void installFromFile()}
+          onInstallEntry={(entry) => void installFromCatalogue(entry)}
+          onSettings={() => setSettingsOpen(true)}
+          onRemove={(moduleId) => void removePack(moduleId)}
+          removable={new Set(installed.map((pack) => pack.manifest.id))}
+          notice={notice}
+        />
+      ) : null}
+
+      {route.kind === "catalogue" ? (
         <Catalogue
           entries={catalogueEntries}
           notice={catalogueNotice}
           loading={catalogueLoading}
           onRefresh={() => void refreshCatalogue()}
           onInstall={(entry) => void installFromCatalogue(entry)}
-          onRemove={(id) => void removeFromCatalogue(id)}
+          onRemove={(id) => void removePack(id)}
           onClose={() => setRoute({ kind: "home" })}
         />
-      ) : (
-        <Home
-          modules={ordered}
-          pinned={pinned}
-          recents={recent}
-          onOpen={(moduleId) => openModule(moduleId)}
-          onCapture={(body) => handleCapture(body)}
-          onTogglePin={togglePin}
-          onCatalogue={openCatalogue}
-          onInstall={() => void installFromFile()}
-          onSettings={() => setSettingsOpen(true)}
-          onRemove={(moduleId) => void removeDomain(moduleId)}
-          removable={new Set(installed.map((pack) => pack.manifest.id))}
-          notice={notice}
-        />
-      )}
+      ) : null}
+
+      {mounted.map((moduleId) => {
+        const module = ordered.find((candidate) => candidate.id === moduleId);
+        const host = hosts.get(moduleId);
+        if (module === undefined || host === undefined) return null;
+        const delivery =
+          captureDelivery?.moduleId === moduleId ? captureDelivery.intent : undefined;
+        const hidden = route.kind !== "home" || tabs.active !== moduleId;
+        return (
+          <div key={moduleId} className="module-host" hidden={hidden}>
+            <MountedModule
+              module={module}
+              host={host}
+              {...(delivery ? { intent: delivery } : {})}
+              onClose={showHomeTab}
+              onQuickCapture={() => setQuickCaptureOpen(true)}
+              onExport={() => void exportActiveDocument(moduleId)}
+              onCleanupReady={(cleanup) => {
+                cleanups.current.set(moduleId, cleanup);
+              }}
+              onFlushReady={(flush) => {
+                flushes.current.set(moduleId, flush);
+              }}
+            />
+          </div>
+        );
+      })}
 
       <QuickCaptureSheet
         open={quickCaptureOpen}
         onClose={() => setQuickCaptureOpen(false)}
         onCapture={handleCapture}
         targets={captureTargets.map((m) => ({ id: m.id, name: m.name }))}
-        defaultTargetId={route.kind === "module" ? route.moduleId : captureTarget?.id}
+        defaultTargetId={tabs.active ?? captureTarget?.id}
       />
 
       <SettingsSheet
         open={settingsOpen}
         choice={themeChoice}
         onChange={changeTheme}
+        apps={settingsApps}
+        onRemoveApp={(id) => void removePack(id)}
+        onReask={(app, permission) => void reaskConsent(app, permission)}
         onClose={() => setSettingsOpen(false)}
+      />
+
+      <ConsentSheet
+        open={pendingConsent !== null}
+        packName={pendingConsent?.packName ?? ""}
+        capability={pendingConsent?.capability ?? null}
+        reason={pendingConsent?.reason ?? ""}
+        onAnswer={(granted) => {
+          const pending = pendingConsent;
+          setPendingConsent(null);
+          pending?.resolve(granted);
+          setConsentVersion((value) => value + 1);
+        }}
       />
     </>
   );

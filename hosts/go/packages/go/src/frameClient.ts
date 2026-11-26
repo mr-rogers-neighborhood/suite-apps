@@ -17,6 +17,7 @@ import {
   type FrameTheme,
   isFrameControl,
   isFrameReply,
+  MAX_FRAME_BYTES,
 } from "./frame.js";
 import type {
   DocumentRecord,
@@ -30,10 +31,34 @@ import type {
   PickedFile,
   ThemeTokens,
 } from "./host.js";
+import type { PackIdentityService, PackIdentityView, PackRecordPurpose } from "./identity.js";
 
 interface ReplyValue {
-  readonly bytes?: string;
+  readonly bytes?: Uint8Array | string;
   readonly [key: string]: unknown;
+}
+
+/**
+ * A document reply is bytes, never a string.
+ *
+ * The shell sends a `Uint8Array` through structured clone. A string here means
+ * the two sides disagree about the protocol version, and decoding it as base64
+ * would hide exactly the regression #149 removed.
+ */
+function documentBytes(value: unknown): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (value === undefined) return new Uint8Array(0);
+  throw new Error("the shell sent document bytes as a value that is not a Uint8Array");
+}
+
+/** Copy before transfer, so a caller's buffer is not detached by `postMessage`. */
+function transferable(bytes: Uint8Array): Uint8Array {
+  if (bytes.byteLength > MAX_FRAME_BYTES) {
+    throw new Error(
+      `this document is ${bytes.byteLength} bytes; the frame bridge carries at most ${MAX_FRAME_BYTES}`,
+    );
+  }
+  return new Uint8Array(bytes);
 }
 
 function toBase64(bytes: Uint8Array): string {
@@ -132,7 +157,11 @@ export function createFrameHost(options: FrameHostOptions): FrameHost {
   };
   globalThis.addEventListener("message", listener);
 
-  const send = (request: FrameRequest, payload?: string): Promise<ReplyValue> => {
+  const send = (
+    request: FrameRequest,
+    payload?: string,
+    bytes?: Uint8Array,
+  ): Promise<ReplyValue> => {
     const run = async (): Promise<ReplyValue> => {
       const id = nextId++;
       const answer = new Promise<FrameReply>((resolve, reject) => {
@@ -158,10 +187,18 @@ export function createFrameHost(options: FrameHostOptions): FrameHost {
           },
         });
       });
-      parent.postMessage(
-        { protocol: FRAME_PROTOCOL, id, request, ...(payload === undefined ? {} : { payload }) },
-        "*",
-      );
+      const envelope = {
+        protocol: FRAME_PROTOCOL,
+        id,
+        request,
+        ...(payload === undefined ? {} : { payload }),
+        ...(bytes === undefined ? {} : { bytes }),
+      };
+      // Structured clone copies a `Uint8Array` directly; the transfer list makes
+      // the document buffer move rather than be copied a second time. It is a
+      // copy of the caller's buffer, so transferring it cannot detach the pack's.
+      if (bytes === undefined) parent.postMessage(envelope, "*");
+      else parent.postMessage(envelope, "*", [bytes.buffer]);
       const reply = await answer;
       if (!reply.ok) throw new Error(reply.message);
       return (reply.value ?? {}) as ReplyValue;
@@ -182,21 +219,23 @@ export function createFrameHost(options: FrameHostOptions): FrameHost {
     },
     async create(input: { name: string }) {
       const value = await send({ method: "documents.create", name: input.name });
-      return { ...value, bytes: fromBase64(value.bytes ?? "") } as unknown as DocumentRecord;
+      return { ...value, bytes: documentBytes(value.bytes) } as unknown as DocumentRecord;
     },
     async open(id: string) {
       const value = await send({ method: "documents.open", id });
       if (Object.keys(value).length === 0) return null;
-      return { ...value, bytes: fromBase64(value.bytes ?? "") } as unknown as DocumentRecord;
+      return { ...value, bytes: documentBytes(value.bytes) } as unknown as DocumentRecord;
     },
     async save(id: string, input: { title?: string; bytes: Uint8Array }) {
+      // The document is the one payload that never becomes a string (#149).
       const value = await send(
         {
           method: "documents.save",
           id,
           ...(input.title === undefined ? {} : { title: input.title }),
         },
-        toBase64(input.bytes),
+        undefined,
+        transferable(input.bytes),
       );
       return value as never;
     },
@@ -226,7 +265,7 @@ export function createFrameHost(options: FrameHostOptions): FrameHost {
           ? { method: "files.read", path }
           : { method: "files.read", path, maxBytes: options.maxBytes },
       );
-      return fromBase64(value.bytes ?? "");
+      return fromBase64(typeof value.bytes === "string" ? value.bytes : "");
     },
     async write(path: string, bytes: Uint8Array, options) {
       const value = await send(
@@ -349,6 +388,23 @@ export function createFrameHost(options: FrameHostOptions): FrameHost {
         await send({ method: "notifications.cancelAll" });
       },
     },
+    identity: {
+      async pack() {
+        const value = await send({ method: "identity.pack" });
+        return value as unknown as PackIdentityView;
+      },
+      async sign(purpose: PackRecordPurpose, bytes: Uint8Array) {
+        const value = await send(
+          { method: "identity.sign", purpose },
+          undefined,
+          transferable(bytes),
+        );
+        if (typeof value.signature !== "string") {
+          throw new Error("the shell did not return a signature");
+        }
+        return value.signature;
+      },
+    } satisfies PackIdentityService,
     // The painted values live in the shell; `currentTheme()` asks for them. This static copy is
     // what a domain reads after awaiting it, so nothing has to remember to refresh.
     theme: { scheme: "light", density: "comfortable", cssVariables: {} },

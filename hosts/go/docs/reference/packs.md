@@ -91,11 +91,16 @@ asks once and says the documents stay.
 
 ## The capabilities a pack may declare
 
-Go serves `documents`, `storage`, `files`, `recents`, `notifications` and `network` to a pack. It
-does not serve `relay`, `commands` or `identity.pack`; a pack that asks for one of those is refused
-at install **and** on every load, and the sentence names the capability rather than hiding the pack.
-The desktop has its own list because it serves a different surface; both refuse a pack they cannot
-run instead of installing it.
+Go serves `documents`, `storage`, `files`, `recents`, `notifications`, `network` and `identity.pack`
+to a pack. It does not serve `relay` or `commands`; a pack that asks for one of those is refused at
+install **and** on every load, and the sentence names the capability rather than hiding the pack. The
+desktop has its own list because it serves a different surface; both refuse a pack they cannot run
+instead of installing it.
+
+`identity.pack` gives a mounted pack the public half of the key derived over `(publisher, pack)` and a
+host-mediated sign call for its own data; the device key and the derived secret stay in the host. A
+`network` pack must carry a non-empty `network.allow` list of exact `https://` or `wss://` origins;
+an empty list is refused, never read as permission to reach anything (S4.4).
 
 `files` is the pack's own scoped store plus the platform picker and share sheet. A pack sees relative
 paths inside its root; another pack's root, a climb and an absolute path are refused before a

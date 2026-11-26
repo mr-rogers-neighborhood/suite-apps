@@ -56,6 +56,8 @@ export function isPackRing(value: unknown): value is PackRing {
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 const SHA256_HEX = /^[0-9a-f]{64}$/u;
+/** An exact origin: no wildcard, path, query or fragment (S4.4). */
+export const NETWORK_ORIGIN = /^(https|wss):\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/u;
 // Host kinds are an open vocabulary: this only rejects malformed values, never
 // an unknown one. See `manifest.schema.json` in docs/spec.
 const PLATFORM_KIND = /^[a-z][a-z0-9-]{0,31}$/u;
@@ -97,6 +99,7 @@ export const PACK_CAPABILITIES = [
   "recents",
   "notifications",
   "network",
+  "identity.pack",
 ] as const;
 
 export type PackCapability = (typeof PACK_CAPABILITIES)[number];
@@ -114,11 +117,32 @@ export interface PackFile {
 }
 
 /** The part a signature covers. No signature field, and no host-specific fields. */
+/** Who published a pack. The id survives a key rotation; the key signs the manifest. */
+export interface PackPublisher {
+  /** Standard base64 Ed25519 public key. Required whenever `publisher` is present. */
+  readonly key: string;
+  /** The stable publisher id. Absent means the key's digest names it. */
+  readonly id?: string;
+}
+
+/**
+ * A pack's exact-origin network allowlist (S4.4).
+ *
+ * Every entry is an `https://` or `wss://` origin: no wildcard, path or fragment.
+ * The host derives `connect-src` from this list; a pack that declares `network`
+ * without one is refused rather than allowed to reach anything.
+ */
+export interface PackNetwork {
+  readonly allow: readonly string[];
+}
+
 export interface PackManifestCore {
   readonly format: typeof PACK_FORMAT;
   readonly id: string;
   readonly name: string;
   readonly version: string;
+  /** Who published the pack. Absent means the first-party `suite` publisher. */
+  readonly publisher?: PackPublisher;
   /** The module file to import, relative to the pack root. */
   readonly entry: string;
   /** The pack's own stability; absent means `stable` (S3.11). */
@@ -134,6 +158,8 @@ export interface PackManifestCore {
   readonly isolation: PackIsolation;
   /** What it may ask the host for. Empty means it may render and nothing else. */
   readonly capabilities: readonly PackCapability[];
+  /** The exact origins `network` may reach. Required when `network` is declared (S4.4). */
+  readonly network?: PackNetwork;
   /**
    * Host kinds this pack is meant for. Opaque values: an unknown kind parses and
    * simply matches no host. Absent means unknown, never universal.
@@ -320,6 +346,62 @@ export function parsePackManifest(value: unknown): PackParse {
     }
   }
 
+  let publisher: PackPublisher | undefined;
+  if (raw.publisher !== undefined) {
+    if (typeof raw.publisher !== "object" || raw.publisher === null) {
+      fail("publisher", "an object with an optional id and key");
+    } else {
+      const value = raw.publisher as Record<string, unknown>;
+      const id = value.id;
+      const key = value.key;
+      if (id !== undefined && (typeof id !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(id))) {
+        fail("publisher.id", "a lower-case publisher id");
+      }
+      if (typeof key !== "string" || key.length === 0) {
+        fail("publisher.key", "a base64 Ed25519 public key");
+      }
+      publisher = {
+        ...(typeof id === "string" ? { id } : {}),
+        key: typeof key === "string" ? key : "",
+      };
+    }
+  }
+
+  // S4.4: `network` is an exact-origin allowlist. A declared capability with no
+  // list would be permission to reach anything, so an empty list is refused here
+  // and the policy check refuses the pair as well.
+  let network: PackNetwork | undefined;
+  if (raw.network !== undefined) {
+    if (typeof raw.network !== "object" || raw.network === null) {
+      fail("network", "an object with a non-empty allow list");
+    } else {
+      const value = raw.network as Record<string, unknown>;
+      const allow: string[] = [];
+      if (!Array.isArray(value.allow)) {
+        fail("network.allow", "a non-empty array of origins");
+      } else {
+        const seen = new Set<string>();
+        value.allow.forEach((candidate, index) => {
+          if (typeof candidate !== "string" || !NETWORK_ORIGIN.test(candidate)) {
+            fail(
+              `network.allow.${index}`,
+              "an https:// or wss:// origin with no wildcard, path or fragment",
+            );
+            return;
+          }
+          if (seen.has(candidate)) {
+            fail(`network.allow.${index}`, `duplicate ${candidate}`);
+            return;
+          }
+          seen.add(candidate);
+          allow.push(candidate);
+        });
+        if (allow.length === 0) fail("network.allow", "at least one origin");
+      }
+      network = { allow };
+    }
+  }
+
   // Host kinds are opaque (S3.5). A kind this build has never heard of is still a
   // valid declaration; only the shape is checked, because rejecting it here would
   // make the pack uninstallable on every host.
@@ -379,6 +461,7 @@ export function parsePackManifest(value: unknown): PackParse {
       id,
       name,
       version,
+      ...(publisher === undefined ? {} : { publisher }),
       ...(raw.ring === undefined ? {} : { ring: raw.ring as PackRing }),
       entry,
       contractVersion,
@@ -389,6 +472,7 @@ export function parsePackManifest(value: unknown): PackParse {
       independent: raw.independent as boolean,
       isolation,
       capabilities,
+      ...(network === undefined ? {} : { network }),
       ...(platforms.length > 0 ? { platforms } : {}),
       files,
       ...(widgets.length > 0 ? { widgets } : {}),
@@ -410,6 +494,9 @@ export function canonicalManifestBytes(manifest: PackManifestCore): Uint8Array {
     id: manifest.id,
     name: manifest.name,
     version: manifest.version,
+    // Omitted when absent, so a manifest signed before publisher and network
+    // were carried keeps its canonical bytes and its signature.
+    ...(manifest.publisher === undefined ? {} : { publisher: manifest.publisher }),
     // New optional fields are omitted when absent, so a manifest signed before
     // S3.11 keeps the bytes and the signature it already had. `minimumHostVersion`
     // stays as it was written by this host's earlier canonical form.
@@ -421,6 +508,7 @@ export function canonicalManifestBytes(manifest: PackManifestCore): Uint8Array {
     independent: manifest.independent,
     isolation: manifest.isolation,
     capabilities: manifest.capabilities,
+    ...(manifest.network === undefined ? {} : { network: manifest.network }),
     // Omitted when absent, like every optional field: a manifest written before
     // host kinds were declared keeps the same canonical bytes and signature.
     ...(manifest.platforms !== undefined && manifest.platforms.length > 0
@@ -674,18 +762,45 @@ export type NetworkPolicyCheck =
   | { readonly ok: true }
   | { readonly ok: false; readonly message: string };
 
+/** The exact origins a pack may reach. Empty when it does not declare `network`. */
+export function networkAllowlist(
+  manifest: Pick<PackManifestCore, "network" | "capabilities">,
+): readonly string[] {
+  if (!manifest.capabilities.includes("network")) return [];
+  return manifest.network?.allow ?? [];
+}
+
+/** The `connect-src` value the host derives from a pack's allowlist (S4.4). */
+export function connectSrcPolicy(allow: readonly string[]): string {
+  return ["connect-src", ...allow].join(" ");
+}
+
 /**
- * Does this pack honour the capability it did not declare?
+ * Does this pack honour the network rule it declared?
  *
- * A pack that declares `network` may do as it likes; it asked, and a person installing it can be
- * told so. A pack that does not declare it has to prove it cannot reach the network, because the
- * alternative is a capability model where one of the five words means nothing.
+ * Two answers matter. A pack that declares `network` must carry a non-empty
+ * exact-origin allowlist; without one the declaration would mean "reach
+ * anything" and the install is refused. A pack that does not declare it has to
+ * prove it cannot reach the network, because the alternative is a capability
+ * model where one of the words means nothing.
  */
 export function checkNetworkPolicy(
   manifest: PackManifest,
   files: Readonly<Record<string, Uint8Array>>,
 ): NetworkPolicyCheck {
-  if (packAllows(manifest, "network")) return { ok: true };
+  if (packAllows(manifest, "network")) {
+    const allow = networkAllowlist(manifest);
+    if (allow.length === 0) {
+      return {
+        ok: false,
+        message:
+          `${manifest.name} declares the "network" capability but carries no network.allow list. ` +
+          "S4.4 makes network an exact-origin allowlist, so an empty list is refused rather than " +
+          "read as permission to reach anything.",
+      };
+    }
+    return { ok: true };
+  }
 
   const entry = files[manifest.entry];
   if (entry === undefined) {

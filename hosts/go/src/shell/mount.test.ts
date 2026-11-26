@@ -40,6 +40,14 @@ function host(): ModuleHost {
       exportFile: async () => ({ ok: true, uri: "file:///documents/x" }),
       share: async () => ({ ok: false, reason: "cancelled" }),
     },
+    identity: {
+      pack: async () => {
+        throw new Error("unused");
+      },
+      sign: async () => {
+        throw new Error("unused");
+      },
+    },
     theme: { scheme: "light", density: "comfortable", cssVariables: {} },
   };
 }

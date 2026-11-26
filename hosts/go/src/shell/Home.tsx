@@ -1,7 +1,9 @@
 import type { SuiteGoModule } from "@suite/go";
 import { EmptyState, IconButton, Launch, type LaunchRecent, PrivacyLine } from "@suite/ui";
 import { useState } from "react";
+import type { CatalogueEntry } from "../host/catalogue.js";
 import type { RecentEntry } from "../host/recents.js";
+import { ShelfCard } from "./ShelfCard.js";
 
 /**
  * The start screen.
@@ -16,11 +18,13 @@ export function Home({
   modules,
   pinned,
   recents,
+  shelf,
   onOpen,
   onCapture,
   onTogglePin,
   onCatalogue,
   onInstall,
+  onInstallEntry,
   onSettings,
   onRemove,
   removable,
@@ -29,11 +33,14 @@ export function Home({
   readonly modules: readonly SuiteGoModule[];
   readonly pinned: readonly string[];
   readonly recents: readonly RecentEntry[];
+  /** Verified index rows this phone has not installed, in the index's order. */
+  readonly shelf: readonly CatalogueEntry[];
   readonly onOpen: (moduleId: string) => void;
   readonly onCapture: (body: string) => void;
   readonly onTogglePin: (moduleId: string) => void;
   readonly onCatalogue: () => void;
   readonly onInstall: () => void;
+  readonly onInstallEntry: (entry: CatalogueEntry) => void;
   readonly onSettings: () => void;
   readonly onRemove: (moduleId: string) => void;
   /** Installed packs, which can be removed — as distinct from the domains that ship in the app. */
@@ -115,6 +122,11 @@ export function Home({
         }
         footer={<PrivacyLine sentence />}
       >
+        <div className="suite-mark">
+          <img src="suite-icon.png" alt="" width={28} height={28} />
+          <span>Suite Go</span>
+        </div>
+
         <form
           className="flex flex-wrap items-center gap-2"
           onSubmit={(event) => {
@@ -148,9 +160,29 @@ export function Home({
           </button>
         </form>
 
+        <section aria-labelledby="shelf-heading" className="flex flex-col gap-2">
+          <h2 id="shelf-heading" className="text-[13px] font-medium text-[var(--ink-muted)]">
+            Suite apps
+          </h2>
+          {shelf.length === 0 ? (
+            <p className="text-[14px] text-[var(--ink-muted)]">
+              No shadow to show: the catalogue is not loaded yet, or every app it offers for this
+              phone is installed.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {shelf.map((entry) => (
+                <li key={entry.id}>
+                  <ShelfCard entry={entry} onInstall={onInstallEntry} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <section aria-labelledby="apps-heading" className="flex flex-col gap-2">
           <h2 id="apps-heading" className="text-[13px] font-medium text-[var(--ink-muted)]">
-            Apps
+            Installed apps
           </h2>
           {modules.length === 0 ? (
             <EmptyState title="Apps you add will live here">

@@ -80,16 +80,44 @@ describe("the pack's half of the frame bridge", () => {
     expect(sent.at(-1)?.request).toEqual({ method: "documents.list" });
   });
 
-  it("decodes a document's bytes from base64 rather than handing back a string", async () => {
-    // A string that reached `LoroDoc.fromSnapshot` was the visible symptom: "Invalid import data".
+  it("hands back document bytes as a Uint8Array, not a base64 string (#149)", async () => {
     const host = frameHost();
     const pending = host.documents.open("doc-1");
     await Promise.resolve();
-    answerWith({ id: "doc-1", moduleId: "planner", bytes: "aGVsbG8=" });
+    answerWith({
+      id: "doc-1",
+      moduleId: "planner",
+      bytes: new TextEncoder().encode("hello"),
+    });
     const record = await pending;
 
     expect(record?.bytes).toBeInstanceOf(Uint8Array);
     expect(new TextDecoder().decode(record?.bytes)).toBe("hello");
+  });
+
+  it("refuses a string document reply instead of decoding it as base64", async () => {
+    const host = frameHost();
+    const pending = host.documents.open("doc-1");
+    await Promise.resolve();
+    answerWith({ id: "doc-1", moduleId: "planner", bytes: "aGVsbG8=" });
+
+    await expect(pending).rejects.toThrow(/not a Uint8Array/u);
+  });
+
+  it("sends document bytes in the envelope and leaves payload for files", async () => {
+    const host = frameHost();
+    const bytes = new TextEncoder().encode("snapshot");
+    const pending = host.documents.save("doc-1", { bytes });
+    await Promise.resolve();
+    answerWith({ id: "doc-1", moduleId: "planner", name: "p.planner", title: "p", savedAt: 1 });
+    await pending;
+
+    const sentEnvelope = sent.at(-1);
+    expect(sentEnvelope?.bytes).toBeInstanceOf(Uint8Array);
+    expect(sentEnvelope?.payload).toBeUndefined();
+    expect(new TextDecoder().decode(sentEnvelope?.bytes)).toBe("snapshot");
+    // The caller's buffer is not detached by the transfer.
+    expect(new TextDecoder().decode(bytes)).toBe("snapshot");
   });
 });
 

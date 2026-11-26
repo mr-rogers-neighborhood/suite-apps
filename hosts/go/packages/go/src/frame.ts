@@ -13,6 +13,15 @@ import type { ColorScheme, DocumentSummary, FileFilter, ThemeDensity } from "./h
 
 export const FRAME_PROTOCOL = "suite.frame.v1";
 
+/**
+ * The largest document payload the frame bridge will carry in one message.
+ *
+ * A snapshot is moved as bytes now, not as a string, and a bound is what keeps
+ * one pack from asking the shell to allocate an unbounded buffer. 64 MiB is
+ * generous for a phone document and small enough that a refusal is cheap.
+ */
+export const MAX_FRAME_BYTES = 64 * 1024 * 1024;
+
 /** What a pack may ask the shell for. One name per `ModuleHost` operation it needs. */
 export type FrameRequest =
   | { readonly method: "ready" }
@@ -28,8 +37,20 @@ export type FrameRequest =
   | { readonly method: "documents.list"; readonly moduleId?: string }
   | { readonly method: "documents.create"; readonly name: string }
   | { readonly method: "documents.open"; readonly id: string }
+  /**
+   * The document bytes travel in `FrameEnvelope.bytes` as a `Uint8Array`, not in
+   * a base64 `payload` (#149). `payload` is still how non-document file bytes
+   * cross the bridge; a document must not become a string on the way.
+   */
   | { readonly method: "documents.save"; readonly id: string; readonly title?: string }
   | { readonly method: "documents.remove"; readonly id: string }
+  /** The public half of the pack's derived identity (S4.7). */
+  | { readonly method: "identity.pack" }
+  /**
+   * Sign the pack's own data. `purpose` is checked by the host before Ed25519:
+   * a relay frame, a role record or a membership change is refused.
+   */
+  | { readonly method: "identity.sign"; readonly purpose: string }
   | { readonly method: "storage.get"; readonly key: string }
   | { readonly method: "storage.set"; readonly key: string; readonly value: string }
   | { readonly method: "storage.delete"; readonly key: string }
@@ -86,8 +107,16 @@ export interface FrameEnvelope {
   readonly protocol: typeof FRAME_PROTOCOL;
   readonly id: number;
   readonly request: FrameRequest;
-  /** Present on document writes: base64, because bytes do not survive structured clone intact in every path. */
+  /** File bytes, still base64: a file format decision, not a document path. */
   readonly payload?: string;
+  /**
+   * Document and identity bytes, structured-cloned as a `Uint8Array`.
+   *
+   * Bounded by `MAX_FRAME_BYTES` on both sides. A pack built before #149 sends
+   * `payload` for `documents.save`; the shell refuses it with a sentence rather
+   * than mis-parsing a string as bytes.
+   */
+  readonly bytes?: Uint8Array;
 }
 
 /**
@@ -139,9 +168,14 @@ export interface FrameTheme {
   readonly variables: Readonly<Record<string, string>>;
 }
 
-/** What `documents.list` and `documents.open` answer with. `bytes` is base64 when present. */
+/** What `documents.list` and `documents.open` answer with. `bytes` is the document itself. */
 export interface FrameDocument extends DocumentSummary {
-  readonly bytes?: string;
+  readonly bytes?: Uint8Array;
+}
+
+/** Whether an envelope's byte payload is the shape and size the bridge accepts. */
+export function isWithinFrameBytes(bytes: Uint8Array): boolean {
+  return bytes.byteLength <= MAX_FRAME_BYTES;
 }
 
 /**

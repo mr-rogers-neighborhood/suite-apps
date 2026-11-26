@@ -87,6 +87,14 @@ function hostWith(store: DocumentStore) {
       forget: () => undefined,
     },
     notifications: unsupportedNotifications(),
+    identity: {
+      pack: async () => {
+        throw new Error("unused");
+      },
+      sign: async () => {
+        throw new Error("unused");
+      },
+    },
     theme: { scheme: "light", density: "comfortable", cssVariables: {} },
   };
   return { host, remembered };
