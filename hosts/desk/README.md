@@ -270,6 +270,12 @@ its tab is active; switching tabs only hides the other views, so a half-typed do
 switch. Closing a pack tab destroys its view. A Screen tab is host chrome: no view is created for it,
 so hiding every pack view is what makes the composition visible.
 
+The tab strip is a **React island**. `shell.js` still draws the rest of the chrome, but the strip is
+`HostTabBar` from `@suite/ui`, built by `vite.island.config.ts` into `dist/renderer/tab-bar.js` and
+`tab-bar.css`. The island receives a snapshot from `shell.js` and calls back into it; tab state stays
+in the legacy page until the rest of the chrome moves. Tailwind is compiled for the island only,
+without preflight, so the page's own base styles are unchanged.
+
 The default container id is already in the data model: documents live under
 `documents/default/<pack>`, pack files under `files/<container>/<pack>`, a pack origin is
 `suite-pack://default.<pack>`, and its session is `persist:default:<pack>`. Adding more containers is
