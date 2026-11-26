@@ -6,9 +6,9 @@ audience: developer
 
 Every success criterion in WCAG 2.2, and what this project does about it.
 
-The point of this file is that `ACCESSIBILITY.md` should never claim something this table does not
-support. If a row says _manual_ and nobody has run the manual step, the statement cannot call it
-working.
+The point of this file is that the root [ACCESSIBILITY.md](../../../ACCESSIBILITY.md) and each app
+statement should never claim something this table does not support. If a row says _manual_ and nobody
+has run the manual step, the statement cannot call it working.
 
 **Target: Level AA.** That is 55 of the 86 criteria.
 
@@ -27,20 +27,22 @@ removes as obsolete. Levels: 31 A, 24 AA, 31 AAA.
 
 ## Machine checks by app
 
-| App | Gated check | Not gated |
+| App | Automated check | Not gated |
 | --- | --- | --- |
-| Canvas | `@suite/theme` contrast (suite-level); axe over the Storybook stories | Running-window contrast, focus order and screen-reader output |
-| Planner | `@suite/theme` contrast (suite-level); lint, types, unit tests, shape, knip and build | No axe in the gate; no manual pass recorded |
-| Budget | `@suite/theme` contrast (suite-level) | Storybook's a11y panel reports without failing the build; no axe against the running app; no manual pass recorded |
+| Canvas | `@suite/theme` contrast (suite-level, not gated); axe over the Storybook stories | Running-window contrast, focus order and screen-reader output |
+| Planner | lint, types, unit tests, shape, knip and build (gated); `@suite/theme` contrast (suite-level, not gated) | No axe in the gate; no manual pass recorded |
+| Budget | `@suite/theme` contrast (suite-level, not gated) | Storybook's a11y panel reports without failing the build; no axe against the running app; no manual pass recorded |
 | Sync | — | No desktop app UI. The relay serves a loopback console page: no axe, no manual pass, and it reloads every five seconds |
 
 The `@suite/theme` contrast test is one suite-level check, not one per app: it lives in
-`packages/theme/src/presets.test.ts` and runs in the root gate, for every app that draws its presets
-from that package. A **Gated** row is a check that fails the
-build; it is not a claim that every app runs every check named in it. A **Partial** row is gated in
-the app named in its How column and manual elsewhere. Help and Go have no accessibility statement and
-this table makes no claim about them; Canvas, Planner, Budget and Sync each have an
-`ACCESSIBILITY.md` that owns its detail.
+`packages/theme/src/presets.test.ts` and passes when run with
+`mise exec -- pnpm --filter @suite/theme test`. No gate row runs it today, so a palette regression
+would not fail the build. A **Gated** row is a check that fails the build; it is not a claim that
+every app runs every check named in it. A **Partial** row is gated in the app named in its How
+column and manual elsewhere. Desk, Help and Go have no accessibility statement
+and this table makes no claim about them; the root [ACCESSIBILITY.md](../../../ACCESSIBILITY.md) owns
+the target and summary, and Canvas, Planner, Budget and Sync each keep a statement that owns its
+detail.
 
 ## Principle 1: Perceivable
 
@@ -151,7 +153,8 @@ this table makes no claim about them; Canvas, Planner, Budget and Sync each have
 
 ## The gaps, in one place
 
-These are the honest list. Each is tracked, and none is claimed as working in `ACCESSIBILITY.md`.
+These are the honest list. Each is tracked, and none is claimed as working in the root or an app
+statement.
 
 | SC     | What is missing                                                |
 | ------ | -------------------------------------------------------------- |
@@ -159,8 +162,8 @@ These are the honest list. Each is tracked, and none is claimed as working in `A
 | 2.4.12 | AAA. Sticky regions may overlap focused content in edge cases. |
 | 2.5.5  | AAA. Targets are 24px, not 44px.                               |
 
-Order of work: **2.1.4 first** (A, and the only gap that is unambiguously real), then the three
-2.5.7 items above, then the AAA rows.
+Order of work: **2.1.4 first** (A, and the only gap that is unambiguously real), then the two AAA
+rows.
 
 For Canvas, Planner and Budget, 4.1.3 is a _verification_ gap rather than a known failure: the markup
 is right, and whether a reader hears it needs the screen-reader step to answer. Do not upgrade it to

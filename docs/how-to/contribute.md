@@ -25,8 +25,8 @@ from the other app. Do not change another app to make yours pass.
 
 Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`. Keep a commit to one
 intent. Do not commit a lockfile from a nested app or secrets. The shared packages under `packages/*`
-commit their `dist/` output on purpose, and a package's `build:verify` proves it has not drifted;
-other `dist/` directories stay out of git.
+commit their `dist/` output on purpose: rebuild the package and check `git diff --exit-code` before
+committing, and keep other `dist/` directories out of git.
 
 ## Issues
 
@@ -57,8 +57,8 @@ straight to `main`.
    is the last check.
 5. A direct push to `main` is only an explicit owner checkpoint.
 
-GitHub Actions runs the gate: a pull request runs the rows its diff can break, `main` runs the fresh
-gate, and the merge queue adds the e2e. The gate is the command in [Verify](#verify); a pull request
+GitHub Actions runs the gate: a pull request runs the rows its diff can break, `main` runs the
+prelude, and the merge queue adds the e2e. The gate is the command in [Verify](#verify); a pull request
 that names no command is not evidence.
 
 ## Documentation
@@ -94,7 +94,8 @@ Never renumber or delete a record.
 
 ## Security
 
-Report a vulnerability per the owning app's `SECURITY.md`. Do not open a public issue with details.
+Report a vulnerability privately through the root [SECURITY.md](../../SECURITY.md), never in a
+public issue with details. The owning app's `SECURITY.md` keeps that surface's threat model.
 
 ## Licence
 

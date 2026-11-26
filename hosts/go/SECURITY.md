@@ -1,8 +1,8 @@
-# Security
+# Suite Go security
 
 Suite Go is the mobile host. It installs a signed pack from the catalogue and renders it inside its
-own window; it holds no document parser and proxies no document bytes. The surface is the host
-itself:
+own window; it holds no document parser and proxies no document bytes. The reporting channel and
+supported state are in the root [security policy](../../SECURITY.md); the surface is the host itself:
 
 - A pack is verified before it is installed and its files are re-verified on load. A changed file is
   a refusal, not a running module.
@@ -14,7 +14,5 @@ itself:
 
 ## Reporting a vulnerability
 
-Use GitHub's private security advisory for
-[mrrnbhd/suite-apps](https://github.com/mrrnbhd/suite-apps/security/advisories/new).
-Do not open a public issue for a vulnerability. Include the version, the platform, and the smallest
-reproduction you can.
+Report privately through the root [security policy](../../SECURITY.md). Do not open a public issue
+for a deep link or a changed pack file that the host runs instead of refusing.
