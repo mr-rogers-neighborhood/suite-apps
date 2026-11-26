@@ -127,7 +127,7 @@ function Choice({
       aria-pressed={selected}
       onClick={onClick}
       className={cx(
-        "rounded-md border px-2.5 py-1.5 text-[length:var(--text-label,12px)]",
+        "inline-flex h-[var(--control-height-sm)] items-center rounded-md border px-[var(--control-padding-x-sm)] text-[length:var(--text-label,12px)]",
         selected
           ? "border-[var(--accent)] bg-[var(--surface-strong)] text-[var(--ink)]"
           : "border-[var(--hairline)] bg-[var(--surface)] text-[var(--ink-muted)]",
@@ -146,68 +146,53 @@ function Appearance({
   readonly onThemeChange: (theme: FirstRunTheme) => void;
 }) {
   return (
-    <div className="grid gap-5 md:grid-cols-[1fr_260px]">
-      <div className="flex flex-col gap-4">
-        <section>
-          <h2 className="text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]">Palette</h2>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {PRESET_OPTIONS.map((preset) => (
-              <Choice
-                key={preset.id}
-                label={preset.label}
-                selected={theme.preset === preset.id}
-                onClick={() => onThemeChange({ ...theme, preset: preset.id })}
-              />
-            ))}
-          </div>
-        </section>
-        <section>
-          <h2 className="text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]">Brightness</h2>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {MODES.map((mode) => (
-              <Choice
-                key={mode.id}
-                label={mode.label}
-                selected={theme.mode === mode.id}
-                onClick={() => onThemeChange({ ...theme, mode: mode.id })}
-              />
-            ))}
-          </div>
-        </section>
-        <section>
-          <h2 className="text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]">Density</h2>
-          <p className="mt-1 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]">
-            How much room controls and lists get. The type stays the same.
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {DENSITY_OPTIONS.map((density) => (
-              <Choice
-                key={density.id}
-                label={density.label}
-                selected={theme.density === density.id}
-                onClick={() => onThemeChange({ ...theme, density: density.id })}
-              />
-            ))}
-          </div>
-        </section>
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]">
+          Palette
+        </h2>
+        <div className="mt-2 flex flex-wrap gap-[var(--control-gap)]">
+          {PRESET_OPTIONS.map((preset) => (
+            <Choice
+              key={preset.id}
+              label={preset.label}
+              selected={theme.preset === preset.id}
+              onClick={() => onThemeChange({ ...theme, preset: preset.id })}
+            />
+          ))}
+        </div>
       </div>
-      <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-4">
-        <p className="text-[length:var(--text-caption,11px)] uppercase tracking-wide text-[var(--ink-faint)]">
-          Preview
-        </p>
-        <p className="mt-2 text-[length:var(--text-title,15px)] text-[var(--ink)]">
-          A calm place to work
-        </p>
+      <div>
+        <h2 className="text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]">
+          Brightness
+        </h2>
+        <div className="mt-2 flex flex-wrap gap-[var(--control-gap)]">
+          {MODES.map((mode) => (
+            <Choice
+              key={mode.id}
+              label={mode.label}
+              selected={theme.mode === mode.id}
+              onClick={() => onThemeChange({ ...theme, mode: mode.id })}
+            />
+          ))}
+        </div>
+      </div>
+      <div>
+        <h2 className="text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]">
+          Density
+        </h2>
         <p className="mt-1 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]">
-          Your files stay on this device.
+          How much room controls and lists get. The type stays the same.
         </p>
-        <div className="mt-3 flex gap-2">
-          <Button variant="primary" size="sm">
-            Continue
-          </Button>
-          <Button variant="ghost" size="sm">
-            Later
-          </Button>
+        <div className="mt-2 flex flex-wrap gap-[var(--control-gap)]">
+          {DENSITY_OPTIONS.map((density) => (
+            <Choice
+              key={density.id}
+              label={density.label}
+              selected={theme.density === density.id}
+              onClick={() => onThemeChange({ ...theme, density: density.id })}
+            />
+          ))}
         </div>
       </div>
     </div>
@@ -216,46 +201,64 @@ function Appearance({
 
 function InstallReview({ packs }: { readonly packs: readonly FirstRunPack[] }) {
   return (
-    <section className="mt-6" aria-label="What this installs">
+    <aside aria-label="What this installs" className="flex flex-col gap-[var(--control-gap)]">
       <h2 className="text-[length:var(--text-title,15px)] font-semibold normal-case text-[var(--ink)]">
         What this installs
       </h2>
-      {packs.length === 0 ? (
-        <p className="mt-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)]">
-          No apps selected. You can add them later from Home's Edit.
-        </p>
-      ) : (
-        <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
-          {packs.map((pack) => (
-            <li
-              key={pack.id}
-              className="rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-3 text-[length:var(--text-label,12px)]"
-            >
-              <p className="m-0 flex flex-wrap items-baseline gap-2">
-                <span className="text-[length:var(--text-title,15px)] text-[var(--ink)]">
-                  {pack.name}
-                </span>
-                <span className="text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
+      <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-[var(--control-padding-x)]">
+        {packs.length === 0 ? (
+          <p className="text-[length:var(--text-label,12px)] text-[var(--ink-muted)]">
+            No apps selected. You can add them later from Home&apos;s Edit.
+          </p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-[var(--control-gap)] p-0">
+            {packs.map((pack) => (
+              <li
+                key={pack.id}
+                className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-sunk)] p-[var(--control-padding-x)]"
+              >
+                <div className="flex items-center gap-[var(--control-gap)]">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-[var(--control-height-sm)] w-[var(--control-height-sm)] shrink-0 items-center justify-center rounded-md border border-[var(--hairline)] bg-[var(--surface)] text-[length:var(--text-label,12px)] text-[var(--accent)]"
+                  >
+                    {pack.name.trim().slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[length:var(--text-title,15px)] text-[var(--ink)]">
+                    {pack.name}
+                  </span>
+                  {pack.version === undefined ? null : (
+                    <span className="text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
+                      v{pack.version}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]">
                   {pack.id}
-                  {pack.version === undefined ? "" : ` · v${pack.version}`}
-                </span>
-              </p>
-              <p className="mt-1 text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]">
-                {pack.publisher === undefined
-                  ? "Publisher not shown by this catalogue."
-                  : `Publisher ${pack.publisher}`}
-              </p>
-              <p className="mt-0.5 text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]">
-                Needs:{" "}
-                {pack.capabilities === undefined || pack.capabilities.length === 0
-                  ? "no capabilities"
-                  : pack.capabilities.join(", ")}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+                  {pack.publisher === undefined ? "" : ` · ${pack.publisher}`}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-[var(--control-gap-sm)]">
+                  {(pack.capabilities ?? []).length === 0 ? (
+                    <span className="rounded-full border border-[var(--hairline)] px-[var(--control-padding-x-sm)] py-0.5 text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
+                      no capabilities
+                    </span>
+                  ) : (
+                    (pack.capabilities ?? []).map((capability) => (
+                      <span
+                        key={capability}
+                        className="rounded-full border border-[var(--hairline)] px-[var(--control-padding-x-sm)] py-0.5 text-[length:var(--text-caption,11px)] text-[var(--ink-muted)]"
+                      >
+                        {capability}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </aside>
   );
 }
 
@@ -274,11 +277,11 @@ function InstallList({
         return (
           <li
             key={row.id}
-            className="flex items-center gap-3 rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-3"
+            className="flex items-center gap-[var(--control-gap)] rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-[var(--control-padding-x)]"
           >
             <span
               aria-hidden="true"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--surface-sunk)] text-[length:var(--text-title,15px)] text-[var(--ink-muted)]"
+              className="flex h-[var(--control-height)] w-[var(--control-height)] shrink-0 items-center justify-center rounded-md bg-[var(--surface-sunk)] text-[length:var(--text-title,15px)] text-[var(--ink-muted)]"
             >
               {(pack?.name ?? row.id).slice(0, 1)}
             </span>
@@ -484,25 +487,29 @@ export function FirstRun({
         ) : null}
 
         {step === "appearance" ? (
-          <div className="mx-auto max-w-[860px]">
-            <h1 className="text-[length:var(--text-display,34px)]">Make it yours.</h1>
-            <p className="mt-3 max-w-[62ch] text-[length:var(--text-body,13px)] leading-relaxed text-[var(--ink-muted)]">
-              Pick a palette, a brightness and how much room controls get. The apps follow the
-              host, so this choice is the one every app opens in.
-            </p>
-            <div className="mt-6">
-              <Appearance theme={theme} onThemeChange={onThemeChange} />
-            </div>
-            <InstallReview packs={chosen} />
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button variant="primary" onClick={startInstall} disabled={busy}>
-                {chosen.length === 0
-                  ? "Continue to Home"
-                  : `Install ${chosen.length === 1 ? "1 app" : `${chosen.length} apps`}`}
-              </Button>
-              <Button variant="ghost" onClick={() => setStep("apps")}>
-                Back
-              </Button>
+          <div className="mx-auto max-w-[980px]">
+            <div className="grid items-start gap-6 md:grid-cols-[1fr_340px]">
+              <div className="flex flex-col gap-5">
+                <div>
+                  <h1 className="text-[length:var(--text-display,34px)]">Make it yours.</h1>
+                  <p className="mt-3 max-w-[62ch] text-[length:var(--text-body,13px)] leading-relaxed text-[var(--ink-muted)]">
+                    Pick a palette, a brightness and how much room controls get. The apps follow
+                    the host, so this choice is the one every app opens in.
+                  </p>
+                </div>
+                <Appearance theme={theme} onThemeChange={onThemeChange} />
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="primary" onClick={startInstall} disabled={busy}>
+                    {chosen.length === 0
+                      ? "Continue to Home"
+                      : `Install ${chosen.length === 1 ? "1 app" : `${chosen.length} apps`}`}
+                  </Button>
+                  <Button variant="ghost" onClick={() => setStep("apps")}>
+                    Back
+                  </Button>
+                </div>
+              </div>
+              <InstallReview packs={chosen} />
             </div>
           </div>
         ) : null}

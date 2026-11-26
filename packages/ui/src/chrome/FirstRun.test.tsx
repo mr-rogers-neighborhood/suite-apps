@@ -116,6 +116,17 @@ describe("FirstRun", () => {
     expect(onInstall).toHaveBeenLastCalledWith("planner");
   });
 
+  it("uses the install tiles and the real action as the theme preview", () => {
+    renderFirstRun();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(screen.getByRole("heading", { name: "What this installs" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Install 2 apps" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Later" })).not.toBeInTheDocument();
+    const tile = screen.getByText("Canvas").closest("li");
+    expect(tile?.className).toContain("--control-padding-x");
+  });
+
   it("keeps follow-the-system as a choice and sends it to the host", () => {
     const onThemeChange = vi.fn();
     renderFirstRun({ onThemeChange });

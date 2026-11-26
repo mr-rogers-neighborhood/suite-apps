@@ -86,6 +86,7 @@ test("opens Home Screen, creates a Screen document, and switches to it", {
       await expect(page.getByRole("heading", { name: "Welcome to Suite." })).toBeVisible();
       await captureProofScreenshot(page, proofDir, "00-first-run.png", testInfo);
       await page.getByRole("button", { name: "Skip choosing for now" }).click();
+      await captureProofScreenshot(page, proofDir, "00-first-run-look.png", testInfo);
       await page.getByRole("button", { name: "Continue to Home" }).click();
       await expect(page.locator("#first-run")).toBeHidden();
     });
