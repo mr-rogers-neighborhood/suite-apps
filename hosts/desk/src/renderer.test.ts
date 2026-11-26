@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const shell = readFileSync(join(here, "renderer", "shell.js"), "utf8");
+const islandCss = readFileSync(join(here, "renderer", "react", "tab-bar.css"), "utf8");
 
 /**
  * The chrome page cannot run in a Node test, so these checks read it.
@@ -103,5 +104,22 @@ describe("the Home composition", () => {
     expect(shell).not.toContain("localStorage");
     expect(shell).not.toContain("sessionStorage");
     expect(shell).not.toContain("indexedDB");
+  });
+});
+
+describe("the tab strip island", () => {
+  it("resets the browser's control defaults below the utilities", () => {
+    // The island deliberately skips Tailwind's preflight, which is unlayered here and would
+    // also reset the legacy chrome. Without this reset a tab button draws with the UA bevel
+    // (`border: 2px outset`) and the brand lockup is underlined, which is how the bar looked
+    // outside Storybook. Notes the layer order too: `base` must sit under `utilities` so a
+    // component's own `border`/`bg-*`/`px-*` still win.
+    expect(islandCss).toContain("@layer theme, base, components, legacy, utilities;");
+    expect(islandCss).not.toContain('@import "tailwindcss/preflight.css"');
+
+    const base = islandCss.slice(islandCss.indexOf("@layer base {"));
+    expect(base).toContain("button, input, select, textarea");
+    expect(base).toMatch(/border:\s*0;/);
+    expect(base).toMatch(/text-decoration:\s*none;/);
   });
 });

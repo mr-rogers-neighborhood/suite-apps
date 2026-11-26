@@ -149,13 +149,19 @@ export function resolveThemeView(choice: HostThemeChoice, shouldUseDarkColors: b
  * The sheet is complete on the first injection. A pack reload resolves the same choice again
  * and receives the same values, so there is no first paint that has the colours but not the
  * scale.
+ *
+ * Every declaration is `!important`, and that is the point rather than laziness. A pack ships
+ * its own `:root` fallback so it is legible before the host paints it, and an inserted sheet is
+ * ordinary author CSS: it loses to the pack's own `:root` on source order, whichever origin
+ * Electron inserts it in. Without `!important` a shipped pack keeps drawing its fallback
+ * palette and the host's theme never reaches the app.
  */
 export function themeCss(theme: ThemeView): string {
   const variables = { ...theme.values, ...theme.scale };
   const declarations = Object.entries(variables)
-    .map(([name, value]) => `${name}: ${value};`)
+    .map(([name, value]) => `${name}: ${value} !important;`)
     .join(" ");
-  return `:root { color-scheme: ${theme.mode}; ${declarations} }`;
+  return `:root { color-scheme: ${theme.mode} !important; ${declarations} }`;
 }
 
 /**

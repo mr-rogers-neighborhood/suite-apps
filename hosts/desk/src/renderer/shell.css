@@ -19,7 +19,7 @@
   --hue-rose: #e7a0a6;
   --hue-violet: #c0a6e0;
   --hue-slate: #a79d8f;
-  --tabbar: 56px;
+  --tabbar: 44px;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -39,9 +39,8 @@ body {
 }
 
 /*
- * The tab strip is a React island now. It keeps the legacy bar's height while the
- * rest of the chrome is still the vanilla page, so the Screen layout below does
- * not move; the token goes away with the last of shell.css.
+ * The tab strip is a React island now. Its height is the shared menu bar's, and
+ * `TAB_BAR_HEIGHT` in the main process keeps the pack views below it.
  */
 #host-bar {
   flex: 0 0 auto;
@@ -124,16 +123,6 @@ body {
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
-}
-
-.brand-mark {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  background:
-    radial-gradient(circle at 30% 25%, #ffffff 0 8%, transparent 9%),
-    linear-gradient(135deg, var(--accent), var(--accent-strong));
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
 }
 
 .content {

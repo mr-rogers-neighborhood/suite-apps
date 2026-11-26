@@ -16,3 +16,39 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 @source "../../../node_modules/@suite/ui/dist";
+
+/*
+ * The page's reset.
+ *
+ * Tailwind's preflight is not imported because it is unlayered in this setup and would
+ * also reset the legacy chrome. What the shared components need is the smaller set of
+ * browser defaults a control brings with it: no bevel, no inset padding, no underline.
+ * Without it a tab renders with `border: 2px outset` and the brand link is underlined,
+ * which is exactly how the bar looked outside Storybook.
+ *
+ * `base` sits below `utilities`, so a component's own `border`, `bg-*`, `px-*` and
+ * `text-*` still win. It also sits below `legacy`, and `shell.css` is unlayered, so every
+ * legacy control that declares its own border, background or padding keeps it. The scope
+ * is the document rather than the bar because `Modal` portals outside `#host-bar`.
+ */
+@layer base {
+  :is(button, input, select, textarea) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  :is(kbd, code) {
+    font-family: inherit;
+    font-size: inherit;
+  }
+}

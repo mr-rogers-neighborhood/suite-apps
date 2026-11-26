@@ -68,8 +68,8 @@ function packNoun(pack: PackInfo): { readonly singular: string; readonly plural:
   return null;
 }
 
-/** The chrome's own height. The chrome page uses the same number in its stylesheet. */
-export const TAB_BAR_HEIGHT = 56;
+/** The chrome's own height: the shared menu bar's 44px. The chrome page uses the same number. */
+export const TAB_BAR_HEIGHT = 44;
 
 const configuredPartitions = new Set<string>();
 

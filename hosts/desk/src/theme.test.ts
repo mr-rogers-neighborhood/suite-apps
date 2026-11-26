@@ -141,7 +141,7 @@ describe("resolving the choice", () => {
 
   it("stores the resolved preset in the stylesheet a pack receives", () => {
     const css = themeCss(resolveThemeView(themeChoice("warm", "light"), false));
-    expect(css.startsWith(":root { color-scheme: light;")).toBe(true);
+    expect(css.startsWith(":root { color-scheme: light !important;")).toBe(true);
     expect(css).toContain("--canvas:");
     expect(css).toContain("--ink:");
   });
@@ -155,15 +155,30 @@ describe("resolving the choice", () => {
     };
 
     for (const [name, value] of Object.entries(composed)) {
-      expect(css, `${name} should reach the pack sheet`).toContain(`${name}: ${value};`);
+      expect(css, `${name} should reach the pack sheet`).toContain(`${name}: ${value} !important;`);
     }
 
     // The values are the ones that shipped before the scale was published: this moves no
     // pixel for a host or pack that only knew the fallbacks.
-    expect(css).toContain("--control-height: 36px;");
-    expect(css).toContain("--text-body: 13px;");
-    expect(css).toContain("--radius-lg: 8px;");
-    expect(css).toContain("--duration-base: 150ms;");
+    expect(css).toContain("--control-height: 36px !important;");
+    expect(css).toContain("--text-body: 13px !important;");
+    expect(css).toContain("--radius-lg: 8px !important;");
+    expect(css).toContain("--duration-base: 150ms !important;");
+  });
+
+  it("outranks a pack's own :root fallback, which an inserted sheet otherwise loses to", () => {
+    // A pack ships fallbacks so it is legible before the host paints. Electron's
+    // `insertCSS` is ordinary author CSS, so the pack's later `:root` rule would win on
+    // source order and the host's palette would never show. Every declaration carries
+    // `!important`; a plain one here is a pack that ignores the host's theme.
+    const css = themeCss(resolveThemeView(themeChoice("catppuccin", "dark"), true));
+    const declarations = css.slice(css.indexOf("{") + 1, css.lastIndexOf("}"));
+    const plain = declarations
+      .split(";")
+      .map((declaration) => declaration.trim())
+      .filter((declaration) => declaration.length > 0 && !declaration.endsWith("!important"));
+
+    expect(plain).toEqual([]);
   });
 
   it("publishes the chosen density to packs and the chrome", () => {
@@ -171,7 +186,9 @@ describe("resolving the choice", () => {
     const compact = scaleVariables("compact");
     expect(view.density).toBe("compact");
     expect(view.scale["--control-height"]).toBe(compact["--control-height"]);
-    expect(themeCss(view)).toContain(`--control-height: ${compact["--control-height"]};`);
+    expect(themeCss(view)).toContain(
+      `--control-height: ${compact["--control-height"]} !important;`,
+    );
     expect(themeAttributesScript(view)).toContain('root.dataset.density = "compact";');
   });
 
@@ -252,8 +269,8 @@ describe("painting a pack view", () => {
     // sees it. A host restart resolves the same choice to the same sheet.
     expect(firstPaint).toEqual(reload);
     expect(firstPaint[0]).toBe(themeCss(first));
-    expect(firstPaint[0]).toContain("--control-height: 36px;");
-    expect(firstPaint[0]).toContain("--duration-base: 150ms;");
+    expect(firstPaint[0]).toContain("--control-height: 36px !important;");
+    expect(firstPaint[0]).toContain("--duration-base: 150ms !important;");
   });
 
   it("keeps the new sheet when Electron reuses a key", async () => {

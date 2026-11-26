@@ -1,4 +1,4 @@
-import { SyncPill } from "@suite/ui";
+import { AppMark, SyncPill } from "@suite/ui";
 import {
   FirstRun,
   type FirstRunInstall,
@@ -115,8 +115,8 @@ function TabBar({
         onTabMenu={actions.tabMenu}
         onNewTab={actions.newTab}
         mark={
-          <span className="flex min-h-6 items-center gap-2">
-            <span className="brand-mark" aria-hidden="true" />
+          <span className="flex items-center gap-2">
+            <AppMark viewBox="0 0 24 24" paths={["M12 2 22 12 12 22 2 12z"]} />
             <span>Suite</span>
           </span>
         }
@@ -134,7 +134,7 @@ function TabBar({
             aria-keyshortcuts="Meta+K Control+K"
             title={`${SEARCH_PLACEHOLDER} (${SEARCH_SHORTCUT})`}
             onClick={actions.openCommands}
-            className="flex h-7 w-56 shrink-0 items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas)]"
+            className="command-bar flex h-7 max-w-sm min-w-[88px] flex-1 items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)] transition-colors duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas)]"
           >
             <svg
               aria-hidden="true"
@@ -147,12 +147,12 @@ function TabBar({
               <circle cx="7" cy="7" r="4.5" />
               <path d="m10.5 10.5 3 3" />
             </svg>
-            <span className="min-w-0 flex-1 truncate text-left">
-              {SEARCH_PLACEHOLDER}{" "}
-              <kbd className="rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
-                {SEARCH_SHORTCUT}
-              </kbd>
+            <span className="command-bar__label min-w-0 flex-1 truncate text-left">
+              {SEARCH_PLACEHOLDER}
             </span>
+            <kbd className="command-bar__key shrink-0 rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
+              {SEARCH_SHORTCUT}
+            </kbd>
           </button>
         }
         sync={
