@@ -1,3 +1,4 @@
+import { DetailView } from "@suite/ui";
 import { ExternalLink, Link2, MousePointerClick } from "lucide-react";
 import { CodeView } from "@/explorer/code-view";
 import { Note } from "@/explorer/note";
@@ -146,7 +147,15 @@ function ToursHere({
   );
 }
 
-export function DetailPane({
+export function DetailPane(props: Props) {
+  return (
+    <div className="h-full overflow-y-auto">
+      <DetailPaneBody {...props} />
+    </div>
+  );
+}
+
+function DetailPaneBody({
   view,
   currentNodeId,
   selectedModule,
@@ -294,7 +303,7 @@ export function DetailPane({
               : "Pick a tour"}
         </p>
         <p className="text-sm text-fd-muted-foreground">
-          The left rail is the navigator. The right pane is the document.
+          The navigator is the rail — or the menu on a phone. This pane is the document.
         </p>
       </div>
     </div>
@@ -328,10 +337,10 @@ function TourIntro({
 }) {
   const chapters = tourOutline(tour, searchById);
   return (
-    <article className="mx-auto max-w-3xl space-y-6 p-8">
+    <article className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8">
       <header className="space-y-3 border-b border-fd-border pb-5">
         <p className="text-xs uppercase tracking-widest text-fd-muted-foreground">Tour</p>
-        <h1 className="text-3xl font-bold tracking-tight">{tour.title}</h1>
+        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{tour.title}</h2>
         <p className="text-sm leading-6 text-fd-muted-foreground">{tour.summary}</p>
         <div className="flex flex-wrap items-center gap-2">
           {tour.start ? <Badge>start here</Badge> : null}
@@ -400,10 +409,10 @@ function TourInterlude({
   onNext: () => void;
 }) {
   return (
-    <article className="mx-auto max-w-3xl space-y-5 p-8">
+    <article className="mx-auto max-w-3xl space-y-5 p-4 sm:p-8">
       <header className="space-y-2 border-b border-fd-border pb-5">
         <p className="text-xs uppercase tracking-widest text-fd-muted-foreground">Interlude</p>
-        <h1 className="text-3xl font-bold tracking-tight">{step.title}</h1>
+        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{step.title}</h2>
       </header>
       <Note>{step.body}</Note>
       <div className="flex items-center justify-between border-t border-fd-border pt-3 text-xs text-fd-muted-foreground">
@@ -464,7 +473,7 @@ function ModuleDetail({
     ...module.files.flatMap((file) => file.symbols.map((symbol) => symbol.id)),
   ];
   return (
-    <article className="mx-auto max-w-4xl space-y-6 p-8">
+    <article className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8">
       <header className="space-y-3 border-b border-fd-border pb-5">
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{module.kind}</Badge>
@@ -477,8 +486,8 @@ function ModuleDetail({
           ) : null}
           {module.tourCount > 0 ? <Badge>{module.tourCount} tours</Badge> : null}
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">{module.title}</h1>
-        <p className="font-mono text-xs text-fd-muted-foreground">{module.id}</p>
+        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{module.title}</h2>
+        <p className="break-all font-mono text-xs text-fd-muted-foreground">{module.id}</p>
         {module.summary ? <Note>{module.summary}</Note> : null}
         {module.note ? <Note>{module.note}</Note> : null}
         {tourStep?.note ? <Note>{tourStep.note}</Note> : null}
@@ -613,8 +622,23 @@ function NodeDetail({
       : [entry.id];
 
   return (
-    <article className="mx-auto max-w-5xl p-8">
-      <header className="space-y-3 border-b border-fd-border pb-5">
+    <DetailView
+      title={title}
+      subtitle={<span className="break-all font-mono">{entry.id}</span>}
+      actions={
+        <div className="flex items-center gap-1.5">
+          {file ? (
+            <LinkButton href={sourceUrl(file.id, activeSymbol?.startLine)}>
+              <ExternalLink className="size-3.5" />
+              GitHub
+            </LinkButton>
+          ) : null}
+          <CopyLink />
+        </div>
+      }
+    >
+      <div className="mx-auto max-w-5xl">
+      <header className="space-y-3 border-b border-fd-border pb-4">
         <nav className="flex flex-wrap items-center gap-1 text-xs text-fd-muted-foreground">
           {moduleId ? (
             <button
@@ -659,13 +683,11 @@ function NodeDetail({
           {file && file.tests.length > 0 ? <Badge>{file.tests.length} tests</Badge> : null}
         </div>
 
-        <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
         {symbol ? (
           <pre className="overflow-auto rounded-lg border border-fd-border bg-fd-muted p-3 font-mono text-xs text-fd-muted-foreground">
             {symbol.signature}
           </pre>
         ) : null}
-        <p className="font-mono text-xs text-fd-muted-foreground">{entry.id}</p>
       </header>
 
       <div className="mt-5 space-y-5">
@@ -718,16 +740,11 @@ function NodeDetail({
 
         {file ? (
           <section className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-fd-muted-foreground">
                 {activeSymbol ? "Definition" : "Source"}
               </h2>
               <div className="flex gap-2">
-                <LinkButton href={sourceUrl(file.id, activeSymbol?.startLine)}>
-                  <ExternalLink className="size-3.5" />
-                  GitHub
-                </LinkButton>
-                <CopyLink />
                 {view !== "browser" ? (
                   <button
                     type="button"
@@ -844,7 +861,8 @@ function NodeDetail({
           </div>
         ) : null}
       </div>
-    </article>
+      </div>
+    </DetailView>
   );
 }
 

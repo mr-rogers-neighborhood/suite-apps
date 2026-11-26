@@ -15,6 +15,9 @@ export default defineConfig({
   cacheDir: fileURLToPath(new URL("../.dev/vitest", import.meta.url)),
   plugins: [fumadocsMdx(), react()],
   resolve: {
+    // `@suite/ui` is a linked workspace package. It carries React as a peer, and its own
+    // install resolves a second copy, so name the reader's copy as the one copy to use.
+    dedupe: ["react", "react-dom"],
     alias: [
       {
         find: /^@\/lib\/source$/,

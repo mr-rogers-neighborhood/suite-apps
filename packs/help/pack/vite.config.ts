@@ -28,6 +28,8 @@ export default defineConfig({
   publicDir: fileURLToPath(new URL("../public", import.meta.url)),
   plugins: [fumadocsMdx(), react(), tailwindcss()],
   resolve: {
+    // One React instance across the renderer and the linked `@suite/ui` shell package.
+    dedupe: ["react", "react-dom"],
     alias: [
       // `defineDocs.dir` is relative to the Vite root (the pack). This thin loader is used only
       // because the shared renderer's root is one level deeper; both name the same docs.

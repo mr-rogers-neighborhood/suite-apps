@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
 /*
+ * The shared shells live in `node_modules`, which Tailwind does not scan by default.
+ * Without this line `AppShell`, `ListView` and `DetailView` compile to no styles at all,
+ * which reads like a layout bug rather than a build-configuration one.
+ */
+@source "../../../node_modules/@suite/ui/dist";
+
+/*
  * The fallback palette.
  *
  * In a host the pack receives every role as a `var(--<role>)` from Suite Desk or Suite Go,
@@ -140,6 +147,7 @@ body {
 /* The handbook's Markdown: Fumadocs' prose rhythm without the UI package. */
 .handbook-prose {
   color: var(--color-fd-foreground);
+  overflow-wrap: anywhere;
   font-size: 0.9375rem;
   line-height: 1.75;
 }
@@ -264,4 +272,41 @@ body {
   margin: 2rem 0;
   border: 0;
   border-top: 1px solid var(--color-fd-border);
+}
+
+/* A wide table scrolls inside its own frame rather than widening the page. */
+.handbook-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Long code lines keep their own scroll; the article never grows sideways. */
+.handbook-prose pre,
+.handbook-prose .handbook-table {
+  max-width: 100%;
+}
+
+/*
+ * Phone and tablet: a touch target is 44px, even where a desktop rail could afford 28.
+ * Scope this to the reader's controls, not to links inside prose.
+ */
+@media (max-width: 767.98px) {
+  button,
+  [role="option"],
+  [role="menuitem"],
+  [role="button"] {
+    min-height: 2.75rem;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 2.75rem;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
 }
