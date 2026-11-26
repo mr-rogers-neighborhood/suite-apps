@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Report a vulnerability per the owning app's `SECURITY.md`, never in a public issue.
+        Report a vulnerability privately per [SECURITY.md](https://github.com/mrrnbhd/suite-apps/blob/main/SECURITY.md), never in a public issue.
   - type: textarea
     id: what
     attributes:

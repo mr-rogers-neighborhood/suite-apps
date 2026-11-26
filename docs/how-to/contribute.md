@@ -94,7 +94,8 @@ Never renumber or delete a record.
 
 ## Security
 
-Report a vulnerability per the owning app's `SECURITY.md`. Do not open a public issue with details.
+Report a vulnerability privately through the root [SECURITY.md](../../SECURITY.md), never in a
+public issue with details. The owning app's `SECURITY.md` keeps that surface's threat model.
 
 ## Licence
 

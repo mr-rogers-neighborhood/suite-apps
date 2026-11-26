@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/mrrnbhd/suite-apps/blob/main/docs/how-to/contribute.md
     about: Read this before filing; it says which gate a change must pass.
   - name: Security
-    url: https://github.com/mrrnbhd/suite-apps/blob/main/legacy/canvas/SECURITY.md
+    url: https://github.com/mrrnbhd/suite-apps/blob/main/SECURITY.md
     about: Report a vulnerability privately, not in an issue.

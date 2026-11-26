@@ -71,6 +71,8 @@ one copy is already wrong.
 | The shared top bar and its takeover rule | [Menu bar](reference/menu-bar.md) |
 | App renderer bridge contracts | [Bridges](reference/bridges.md) |
 | WCAG 2.2 coverage and manual tests | [Accessibility](reference/accessibility/wcag-22-map.md) |
+| The accessibility target and current state | [Root accessibility statement](../ACCESSIBILITY.md) |
+| Vulnerability reporting and supported state | [Security policy](../SECURITY.md) |
 | Commands and the gate | [Commands](reference/commands.md) |
 | Desktop Proof of Changes (`@proof`) | [Desktop proof](reference/desktop-proof.md) |
 | Flatpak, Android APK, update ownership | [Packaging channels](reference/packaging-channels.md) |

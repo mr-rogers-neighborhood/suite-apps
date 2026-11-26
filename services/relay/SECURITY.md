@@ -1,7 +1,8 @@
-# Security
+# Suite Sync security
 
 Suite Sync is the protocol and the user-run sync server. The document stays a file the app owns; the
-server is a role a person runs on a device they control.
+server is a role a person runs on a device they control. The reporting channel and supported state
+are in the root [security policy](../../SECURITY.md); this page owns what the relay protects.
 
 ## What is protected today, and what is not
 
@@ -33,7 +34,6 @@ The accepted metadata, retention window and remaining risks are in
 
 ## Reporting a vulnerability
 
-Use GitHub's private security advisory for
-[mrrnbhd/suite-apps](https://github.com/mrrnbhd/suite-apps/security/advisories/new).
-Do not open a public issue for a vulnerability. Include the version, the platform, and the smallest
-reproduction you can.
+Report privately through the root [security policy](../../SECURITY.md). Do not open a public issue
+for a frame, role record or membership change the relay accepts without the signature or membership
+the section above requires.

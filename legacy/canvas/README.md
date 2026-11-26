@@ -91,12 +91,13 @@ The apps, the hub and the sync server share one repository and one gate. Start w
 
 ## Contributing
 
-Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) is the short version and
-[docs/how-to/contribute.md](docs/how-to/contribute.md) the full one; `pnpm check` is the gate a change
-runs against, and [AGENTS.md](AGENTS.md) holds the rules for human and AI contributors.
+Issues and pull requests are welcome. The root [CONTRIBUTING.md](../../CONTRIBUTING.md) is the entry
+point, [docs/how-to/contribute.md](docs/how-to/contribute.md) the full guide, and [AGENTS.md](AGENTS.md)
+holds the rules for human and AI contributors; `pnpm check` is the gate a Canvas change runs against.
 
-Report a vulnerability per [SECURITY.md](SECURITY.md). Participation is covered by
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Report a vulnerability privately through the root [SECURITY.md](../../SECURITY.md). Participation is
+covered by the root [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md). Canvas's own
+[SECURITY.md](SECURITY.md) keeps its access model.
 
 ## Licence
 

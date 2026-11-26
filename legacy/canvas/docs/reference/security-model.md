@@ -48,4 +48,5 @@ reachable plaintext host needs an explicit flag on the relay and is never the de
 
 ## Reporting
 
-Report a vulnerability per [SECURITY.md](../../SECURITY.md). Do not open a public issue for one.
+Report a vulnerability privately as the root [SECURITY.md](../../../../SECURITY.md) describes. Do not
+open a public issue for one.

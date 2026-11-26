@@ -101,5 +101,6 @@ hand, because there is no CI service to open a pull request and nothing could ga
 ## Security and conduct
 
 Never commit a secret, a licence private key, a webhook secret or real customer data. Report a
-vulnerability privately through [SECURITY.md](../../SECURITY.md) rather than in a public issue.
-Participation is covered by [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md).
+vulnerability privately through the root [SECURITY.md](../../../../SECURITY.md) rather than in a
+public issue. Participation is covered by the root
+[CODE_OF_CONDUCT.md](../../../../CODE_OF_CONDUCT.md).
