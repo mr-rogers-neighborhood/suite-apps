@@ -8,6 +8,20 @@ a release is tagged `canvas-v<version>`. See
 
 No changes yet.
 
+## [0.1.14] - 2026-11-26
+
+### Added
+
+- **Canvas collaborates inside the pack.** The pack declares the host relay as an optional
+  capability and runs its existing protocol through the host's pinned socket. Identity, recovery
+  kit, keys and contacts live in the pack's own files, and the host sees one address, one pin and
+  opaque frames. A host that does not serve relay installs Canvas and shows the local-only state.
+
+- **Canvas fits a phone and a tablet.** One mobile sheet: the dynamic viewport for the page, a
+  wrapping title bar, the dock as a bottom action bar, the library and inspector as sheets, and a
+  focused card that takes the page. A coarse pointer gets the 44px floor on toolbar, dialog, menu
+  and board controls, and the library row menu stays visible instead of appearing on hover.
+
 ## [0.1.13] - 2026-11-24
 
 ### Added

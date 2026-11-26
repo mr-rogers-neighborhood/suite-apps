@@ -6,6 +6,19 @@ underneath enough to matter.
 Versions here are Suite Help's own. It ships through Flatpak, so the deployment version follows
 this file and there is no AppImage release tag.
 
+## [0.1.4] - 2026-11-26
+
+### Added
+
+- **Help fits a phone.** At phone width the explorer's navigator opens as a drawer and closes back
+  to the page a person was reading; above the breakpoint the desktop navigator stays in the shell.
+
+### Changed
+
+- **Help owns its renderer and documentation generator.** The explorer, handbook reader and index
+  generator build from the pack's own source, so the pack and the frozen desktop app compile one
+  copy.
+
 ## [0.1.3] - 2026-11-24
 
 ### Added

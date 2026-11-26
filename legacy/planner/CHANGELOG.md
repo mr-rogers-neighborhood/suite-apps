@@ -6,6 +6,27 @@ underneath enough to matter.
 Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 [Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
 
+## [0.5.3] - 2026-11-26
+
+### Added
+
+- **Planner syncs through the host.** The pack owns its sync identity and stores, and the host opens
+  one pinned socket over the optional relay: keys, contacts, the group, cursors and pending joins
+  live in the pack's own files, never in host state or browser storage. A host that does not serve
+  relay installs the pack and runs it local-only.
+
+- **Planner answers the Command Surface.** Quick task, Open Today and Open Inbox are commands the
+  host can list and invoke after the one-time grant. A host without the optional `commands`
+  capability still installs the pack.
+
+- **Planner opens a recent document by id and declares recents.** The launcher reads the host's
+  recents rows instead of scanning for files, and the pack says so in its signed manifest.
+
+### Changed
+
+- **Planner's phone layout gains a touch floor.** The layout's own controls are at least 44px, and
+  no phone action is reachable only by hover.
+
 ## [0.5.2] - 2026-11-24
 
 ### Added
