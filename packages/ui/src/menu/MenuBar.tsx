@@ -284,11 +284,12 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
             <path d="m10.5 10.5 3 3" />
           </svg>
           <span className="command-bar__label min-w-0 flex-1 truncate text-left">
-            {searchPlaceholder}{" "}
-            <kbd className="command-bar__key rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
-              {searchShortcut}
-            </kbd>
+            {searchPlaceholder}
           </span>
+          <span aria-hidden="true"> </span>
+          <kbd className="command-bar__key shrink-0 rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
+            {searchShortcut}
+          </kbd>
         </button>
       ) : null}
 
