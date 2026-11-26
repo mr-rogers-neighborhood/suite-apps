@@ -734,6 +734,126 @@
       ]
     },
     {
+      "id": "components-pack-card--available",
+      "title": "Components/Pack card",
+      "name": "Available",
+      "importPath": "src/chrome/PackCard.stories.tsx",
+      "module": "packages/ui/src/chrome/PackCard.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-pack-card--installed",
+      "title": "Components/Pack card",
+      "name": "Installed",
+      "importPath": "src/chrome/PackCard.stories.tsx",
+      "module": "packages/ui/src/chrome/PackCard.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-pack-card--no-icon",
+      "title": "Components/Pack card",
+      "name": "No Icon",
+      "importPath": "src/chrome/PackCard.stories.tsx",
+      "module": "packages/ui/src/chrome/PackCard.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-pack-card--selected",
+      "title": "Components/Pack card",
+      "name": "Selected",
+      "importPath": "src/chrome/PackCard.stories.tsx",
+      "module": "packages/ui/src/chrome/PackCard.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-pack-card--unavailable",
+      "title": "Components/Pack card",
+      "name": "Unavailable",
+      "importPath": "src/chrome/PackCard.stories.tsx",
+      "module": "packages/ui/src/chrome/PackCard.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-pack-card--update-available",
+      "title": "Components/Pack card",
+      "name": "Update Available",
+      "importPath": "src/chrome/PackCard.stories.tsx",
+      "module": "packages/ui/src/chrome/PackCard.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-pack-rail--available",
+      "title": "Components/Pack rail",
+      "name": "Available",
+      "importPath": "src/chrome/PackRail.stories.tsx",
+      "module": "packages/ui/src/chrome/PackRail.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-pack-rail--installed",
+      "title": "Components/Pack rail",
+      "name": "Installed",
+      "importPath": "src/chrome/PackRail.stories.tsx",
+      "module": "packages/ui/src/chrome/PackRail.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-pack-rail--no-selection",
+      "title": "Components/Pack rail",
+      "name": "No Selection",
+      "importPath": "src/chrome/PackRail.stories.tsx",
+      "module": "packages/ui/src/chrome/PackRail.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-pack-rail--unavailable",
+      "title": "Components/Pack rail",
+      "name": "Unavailable",
+      "importPath": "src/chrome/PackRail.stories.tsx",
+      "module": "packages/ui/src/chrome/PackRail.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
       "id": "components-privacyline--default",
       "title": "Components/PrivacyLine",
       "name": "Default",

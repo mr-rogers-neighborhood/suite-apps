@@ -8,4 +8,6 @@
  */
 export { HostTabBar, } from "./HostTabBar.js";
 export { NewTabPicker, } from "./NewTabPicker.js";
+export { PackCard, } from "./PackCard.js";
+export { PackRail, } from "./PackRail.js";
 //# sourceMappingURL=index.js.map
