@@ -85,4 +85,20 @@ describe("DayView", () => {
     expect(screen.getByText("Nothing planned yet")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open inbox · 1 waiting" })).toBeInTheDocument();
   });
+
+  it("should keep phone controls at a thumb target and never hide them behind hover", () => {
+    const { doc, replica } = makeReplica();
+    doc.createTask({ title: "Phone task", scheduledFor: DATE, estimateMinutes: 20 });
+
+    renderDay(replica);
+
+    for (const control of [
+      screen.getByRole("checkbox", { name: "Complete Phone task" }),
+      screen.getByRole("button", { name: "Phone task" }),
+      screen.getByRole("button", { name: "Actions for Phone task" }),
+    ]) {
+      expect(control).toHaveClass("touch");
+      expect(control.className).not.toMatch(/opacity-0/u);
+    }
+  });
 });

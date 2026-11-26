@@ -188,7 +188,7 @@ function TaskDetailDialog({
     <Modal open onClose={onClose} label="Task details" size="lg">
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-[15px] font-semibold tracking-tight">Task details</h2>
-        <IconButton label="Close task details" onClick={onClose}>
+        <IconButton label="Close task details" className="touch" onClick={onClose}>
           <X size={16} />
         </IconButton>
       </div>
@@ -271,7 +271,7 @@ function TaskDetailDialog({
           ) : (
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-2">
               {tags.map((tag) => (
-                <label key={tag.id} className="flex items-center gap-2 text-[12px] text-muted">
+                <label key={tag.id} className="flex items-center gap-2 text-[12px] text-muted touch">
                   <input
                     type="checkbox"
                     checked={task.tagIds.includes(tag.id)}
@@ -342,6 +342,7 @@ function TaskDetailDialog({
                   </span>
                   <IconButton
                     label={`Remove ${item.title}`}
+                    className="touch"
                     onClick={() => removeChecklistItem(item.id)}
                   >
                     <Trash2 size={14} />
@@ -362,7 +363,7 @@ function TaskDetailDialog({
                 }
               }}
               placeholder="Add a step"
-              className="h-[var(--control-height-sm,2rem)] w-full rounded-md border border-line bg-panel px-2.5 text-[12px] text-ink placeholder:text-faint focus:outline-none"
+              className="h-[var(--control-height-sm,2rem)] w-full rounded-md border border-line bg-panel px-2.5 text-[12px] text-ink placeholder:text-faint focus:outline-none touch"
             />
             <Button size="sm" icon={<Plus size={13} />} onClick={addChecklistItem}>
               Add

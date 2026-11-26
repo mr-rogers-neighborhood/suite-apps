@@ -46,7 +46,7 @@ export function SyncControl() {
         label={syncLabel(status)}
         peerCount={status.state === "off" ? undefined : syncPeople(info)}
         onClick={() => setOpen(true)}
-        className="hidden sm:inline-flex"
+        className="touch"
       />
       <SyncDialog open={open} onClose={() => setOpen(false)} info={info} onInfo={setInfo} />
     </>
@@ -207,7 +207,7 @@ function SyncDialog({
     <Modal open={open} onClose={onClose} label="Sync" size="md">
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-[15px] font-semibold tracking-tight">Sync</h2>
-        <IconButton label="Close sync" onClick={onClose}>
+        <IconButton label="Close sync" className="touch" onClick={onClose}>
           <X size={16} />
         </IconButton>
       </div>

@@ -117,8 +117,8 @@ function NavItem({
       aria-current={active ? "page" : undefined}
       className={
         active
-          ? "flex items-center gap-2.5 rounded-lg bg-accent-soft px-3 py-2 text-sm font-medium text-ink"
-          : "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-raised hover:text-ink"
+          ? "flex items-center gap-2.5 rounded-lg bg-accent-soft px-3 py-2 text-sm font-medium text-ink touch"
+          : "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted transition-colors touch hover:bg-raised hover:text-ink"
       }
     >
       {icon}

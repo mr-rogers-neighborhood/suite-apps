@@ -22,6 +22,11 @@ The rules that shape the Suite host.
   `commands` are in the shared vocabulary but are refused at discovery until their service exists.
   A manifest never widens the bridge by asking. `relay` is not a general socket: the host supervises
   the relay child and gives a pack one pinned connection to it, and only while that relay is ready.
+- `capabilities` is the required list and `optionalCapabilities` is what a pack may use when the
+  host serves it. A missing required capability refuses the pack; a missing optional one degrades.
+  The loaded summary carries both lists, so `packAllows` grants a served optional service while the
+  pack still loads where that service is absent. Planner's `relay` is the first use: Desk syncs,
+  and a host without the transport runs the same pack as a local-only planner (S4.1, S7.1).
 - Browser storage is not the `storage` capability. Every pack has its own persistent session
   partition, so `localStorage` and IndexedDB are pack-local; `storage` names a host key-value service
   that this spike does not implement.

@@ -151,12 +151,13 @@ function ProjectRow({ project, openCount }: { project: Project; openCount: numbe
         </p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+      <div className="flex shrink-0 items-center gap-1">
         <Button
           size="sm"
           variant="ghost"
           aria-label={`Rename ${project.name}`}
           onClick={startRename}
+          className="touch"
         >
           Rename
         </Button>
@@ -169,6 +170,7 @@ function ProjectRow({ project, openCount }: { project: Project; openCount: numbe
               archivedAt: project.archivedAt ? null : new Date().toISOString(),
             })
           }
+          className="touch"
         >
           {project.archivedAt ? "Unarchive" : "Archive"}
         </Button>

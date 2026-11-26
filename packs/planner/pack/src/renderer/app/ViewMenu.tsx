@@ -29,7 +29,7 @@ export function ViewMenu() {
         <button
           type="button"
           aria-label={`Switch view (${active.label})`}
-          className="flex h-7 min-w-0 max-w-40 items-center gap-1.5 rounded-md border border-line bg-panel px-2 text-[12px] text-ink transition-colors hover:bg-raised"
+          className="flex h-7 min-w-0 max-w-40 items-center gap-1.5 rounded-md border border-line bg-panel px-2 text-[12px] text-ink transition-colors touch hover:bg-raised"
         >
           <ActiveIcon size={14} />
           <span className="min-w-0 flex-1 truncate text-left">{active.label}</span>

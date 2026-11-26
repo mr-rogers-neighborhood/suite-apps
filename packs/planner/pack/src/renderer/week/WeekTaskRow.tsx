@@ -51,16 +51,13 @@ export function WeekTaskRow({ entry, project, movable, onMove, onOpenDay }: Week
               ? `${entry.task.title} — Alt+Left or Alt+Right moves it one day`
               : entry.task.title
           }
-          className="min-w-0 flex-1 truncate text-left text-[13px] leading-5 text-ink"
+          className="min-w-0 flex-1 truncate text-left text-[13px] leading-5 text-ink touch"
         >
           {entry.task.title}
         </button>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <IconButton
-              label={`Actions for ${entry.task.title}`}
-              className="h-6 w-6 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
-            >
+            <IconButton label={`Actions for ${entry.task.title}`} className="touch">
               <MoreHorizontal size={14} />
             </IconButton>
           </DropdownMenu.Trigger>

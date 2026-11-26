@@ -14,6 +14,7 @@ import manifestText from "../manifest.json?raw";
 const manifest = JSON.parse(manifestText) as {
   readonly version: string;
   readonly capabilities: readonly string[];
+  readonly optionalCapabilities?: readonly string[];
   readonly documents?: readonly {
     readonly id: string;
     readonly format: string;
@@ -37,9 +38,17 @@ describe("Planner's declared document", () => {
   });
 
   it("asks the host only for what it uses", () => {
-    // `documents` holds the workspace; `files` is the picker export and import cross; and
-    // `notifications` lets the host invoke the reminder projection and deliver the rows. Sync,
-    // recents and commands are still host gaps, not capabilities this pack can claim.
-    expect(manifest.capabilities).toEqual(["documents", "files", "notifications"]);
+    // `documents` holds the workspace; `files` is the picker and the pack's own sync
+    // state; `notifications` lets the host invoke the reminder projection; and
+    // `recents` lists this pack's other documents. Sync is optional (S7.1): the host
+    // serves the `relay` frame transport on Desk, and a phone without one runs the
+    // same pack as a local-only planner. It never asks for a general network.
+    expect(manifest.capabilities).toEqual([
+      "documents",
+      "files",
+      "notifications",
+      "recents",
+    ]);
+    expect(manifest.optionalCapabilities).toEqual(["relay"]);
   });
 });

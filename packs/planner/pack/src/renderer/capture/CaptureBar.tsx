@@ -91,7 +91,7 @@ export function CaptureBar({ target }: { target: CaptureTarget }) {
               ? "Add a task for this day — tomorrow ~45m #Planner"
               : "Add to the inbox — friday @deep-work !1"
           }
-          className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint focus:outline-none touch"
         />
         <kbd className="hidden shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] text-faint sm:block">
           Ctrl N
@@ -99,7 +99,7 @@ export function CaptureBar({ target }: { target: CaptureTarget }) {
         <button
           type="submit"
           aria-label="Add task"
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent transition-colors hover:bg-accent hover:text-white"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent transition-colors touch hover:bg-accent hover:text-white"
         >
           <CornerDownLeft size={13} />
         </button>

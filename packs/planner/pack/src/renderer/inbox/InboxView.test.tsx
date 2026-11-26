@@ -82,4 +82,18 @@ describe("InboxView labels and actions", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(opener).toHaveFocus();
   });
+
+  it("should leave schedule and details visible at phone width with a thumb target", () => {
+    const { doc, replica } = makeReplica();
+    doc.createTask({ title: "A task" });
+    renderInbox(replica);
+
+    for (const control of [
+      screen.getByRole("button", { name: "Schedule A task for Today" }),
+      screen.getByRole("button", { name: "Open details for A task" }),
+    ]) {
+      expect(control).toHaveClass("touch");
+      expect(control.className).not.toMatch(/opacity-0/u);
+    }
+  });
 });
