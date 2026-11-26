@@ -27,6 +27,7 @@ const elements = {
   screensNote: document.querySelector("#screens-note"),
   screenNewName: document.querySelector("#screen-new-name"),
   createScreen: document.querySelector("#create-screen"),
+  importScreen: document.querySelector("#import-screen"),
   editBar: document.querySelector("#edit-bar"),
   widgetChoice: document.querySelector("#widget-choice"),
   addWidget: document.querySelector("#add-widget"),
@@ -165,6 +166,12 @@ function sizeLabel(size) {
   if (size === "full") return "Full row";
   if (size === "2x1") return "2 × 1";
   return "1 × 1";
+}
+
+/** Every registry id one placement draws, including the children of a row. */
+function entryRegistryIds(entry) {
+  if (entry.kind !== "row") return [entry.registryId];
+  return entry.items.map((item) => item.widget.registryId);
 }
 
 function nextSize(size) {
@@ -677,12 +684,15 @@ function editControls(widget, index, total) {
   return controls;
 }
 
-function widgetTile(widget, index, total) {
+function widgetTile(widget, index, total, embedded = false) {
   const tile = element("section", `widget widget-${widget.size} widget-${widget.source}`);
   tile.dataset.registryId = widget.registryId;
   tile.setAttribute("role", "group");
-  tile.setAttribute("aria-label", `${widget.title}, ${sizeLabel(widget.size)}`);
-  if (editing) tile.tabIndex = 0;
+  tile.setAttribute(
+    "aria-label",
+    embedded ? `${widget.title}, in a row` : `${widget.title}, ${sizeLabel(widget.size)}`,
+  );
+  if (editing && !embedded) tile.tabIndex = 0;
 
   const head = element("div", "widget-head");
   const title = element("h2", "widget-title", widget.title);
@@ -716,7 +726,7 @@ function widgetTile(widget, index, total) {
   }
   tile.append(body);
 
-  if (editing) {
+  if (editing && !embedded) {
     tile.append(editControls(widget, index, total));
     tile.addEventListener("keydown", (event) => {
       if (event.target !== tile) return;
@@ -744,10 +754,38 @@ function widgetTile(widget, index, total) {
   return tile;
 }
 
+/**
+ * Draw one row or carousel.
+ *
+ * The children are ordinary widget tiles in document order, so keyboard and screen
+ * reader order are the visual order and no child traps focus. The CSS turns the track
+ * into one snapping line at phone width, which is the responsive half the shared
+ * layout model promises.
+ */
+function rowTile(row) {
+  const section = element("section", `widget-row widget-${row.size}`);
+  section.dataset.layout = row.layout;
+  section.dataset.mode = row.mode;
+  section.setAttribute("role", "group");
+  section.setAttribute("aria-label", `Row of ${row.items.length} widgets`);
+
+  const track = element("div", "widget-row-track");
+  for (const item of row.items) {
+    const tile = widgetTile(item.widget, 0, 0, true);
+    tile.classList.add("widget-row-item");
+    tile.style.setProperty("--row-weight", String(item.weight));
+    track.append(tile);
+  }
+  section.append(track);
+  return section;
+}
+
 function renderWidgets(view) {
   const fragment = document.createDocumentFragment();
-  view.widgets.forEach((widget, index) => {
-    fragment.append(widgetTile(widget, index, view.widgets.length));
+  view.widgets.forEach((entry, index) => {
+    fragment.append(
+      entry.kind === "row" ? rowTile(entry) : widgetTile(entry, index, view.widgets.length),
+    );
   });
   if (view.widgets.length === 0) {
     fragment.append(element("p", "empty", "This Screen has no widgets. Choose Edit to add one."));
@@ -756,7 +794,7 @@ function renderWidgets(view) {
 }
 
 function renderChoices(view) {
-  const placed = new Set(view.widgets.map((widget) => widget.registryId));
+  const placed = new Set(view.widgets.flatMap(entryRegistryIds));
   const choices = view.choices.filter((choice) => !placed.has(choice.registryId));
   elements.widgetChoice.replaceChildren();
   for (const choice of choices) {
@@ -808,6 +846,9 @@ function renderScreensPanel() {
     const duplicate = actionButton("Duplicate", () => runAction(api.duplicateScreen(screen.id)));
     duplicate.setAttribute("aria-label", `Duplicate ${screen.name}`);
 
+    const exportScreen = actionButton("Export", () => runAction(api.exportScreen(screen.id)));
+    exportScreen.setAttribute("aria-label", `Export ${screen.name} as a .screen file`);
+
     const remove = actionButton(
       "Delete",
       () => runAction(api.deleteScreen(screen.id, null)),
@@ -820,7 +861,7 @@ function renderScreensPanel() {
       last ? `Delete ${screen.name} (the last Screen cannot be deleted)` : `Delete ${screen.name}`,
     );
 
-    tools.append(open, home, duplicate, remove);
+    tools.append(open, home, duplicate, exportScreen, remove);
     row.append(tools);
 
     const rename = element("div", "screen-rename");
@@ -1026,6 +1067,8 @@ function bindChrome() {
     runAction(api.createScreen(name));
     elements.screenNewName.value = "";
   });
+
+  elements.importScreen.addEventListener("click", () => runAction(api.importScreen()));
 
   elements.addWidget.addEventListener("click", () => {
     const registryId = elements.widgetChoice.value;

@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isScreenRow, type ScreenEntry, screenEntryRegistryIds } from "@suite/screens";
 import { LoroDoc } from "loro-crdt";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DESK_APPS_WIDGET, HOME_SCREEN_ID, HOME_SCREEN_NAME } from "./home.js";
@@ -9,6 +10,14 @@ import { SCREENS_INDEX_FILENAME, ScreenSet, ScreenStore } from "./screens.js";
 
 let root: string;
 let path: string;
+
+function entryIds(widgets: readonly ScreenEntry[]): string[] {
+  return widgets.flatMap(screenEntryRegistryIds);
+}
+
+function entryId(entry: ScreenEntry | undefined): string | undefined {
+  return entry === undefined || isScreenRow(entry) ? undefined : entry.registryId;
+}
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "suite-desk-screens-"));
@@ -25,7 +34,7 @@ describe("the Home screen", () => {
 
     expect(store.state()).toEqual({
       format: "suite.screen",
-      version: 1,
+      version: 2,
       id: HOME_SCREEN_ID,
       name: HOME_SCREEN_NAME,
       widgets: [{ registryId: DESK_APPS_WIDGET, size: "full" }],
@@ -84,7 +93,7 @@ describe("the Home screen", () => {
     const doc = new LoroDoc();
     const header = doc.getMap("screen");
     header.set("format", "suite.screen");
-    header.set("version", 2);
+    header.set("version", 3);
     header.set("id", HOME_SCREEN_ID);
     header.set("name", HOME_SCREEN_NAME);
     doc.getList("order").push(DESK_APPS_WIDGET);
@@ -107,14 +116,14 @@ describe("editing a Screen", () => {
     await expect(store.add({ registryId: "welcome.notes", size: "2x1" })).resolves.toBe(false);
     await store.add({ registryId: "scratch.board", size: "1x1" });
 
-    expect(store.state().widgets.map((widget) => widget.registryId)).toEqual([
+    expect(entryIds(store.state().widgets)).toEqual([
       DESK_APPS_WIDGET,
       "welcome.notes",
       "scratch.board",
     ]);
 
     await expect(store.moveBy("scratch.board", "earlier")).resolves.toBe(true);
-    expect(store.state().widgets.map((widget) => widget.registryId)).toEqual([
+    expect(entryIds(store.state().widgets)).toEqual([
       DESK_APPS_WIDGET,
       "scratch.board",
       "welcome.notes",
@@ -122,16 +131,17 @@ describe("editing a Screen", () => {
 
     await expect(store.moveBy(DESK_APPS_WIDGET, "earlier")).resolves.toBe(false);
     await expect(store.moveBy("scratch.board", "later")).resolves.toBe(true);
-    expect(store.state().widgets.at(-1)?.registryId).toBe("scratch.board");
+    expect(entryId(store.state().widgets.at(-1))).toBe("scratch.board");
 
     await expect(store.resize("welcome.notes", "full")).resolves.toBe(true);
-    expect(store.state().widgets.find((w) => w.registryId === "welcome.notes")?.size).toBe("full");
+    expect(
+      store
+        .state()
+        .widgets.find((entry) => !isScreenRow(entry) && entry.registryId === "welcome.notes")?.size,
+    ).toBe("full");
 
     await expect(store.remove("scratch.board")).resolves.toBe(true);
-    expect(store.state().widgets.map((widget) => widget.registryId)).toEqual([
-      DESK_APPS_WIDGET,
-      "welcome.notes",
-    ]);
+    expect(entryIds(store.state().widgets)).toEqual([DESK_APPS_WIDGET, "welcome.notes"]);
   });
 
   it("moves a placement with the keyboard's earlier and later actions", async () => {
@@ -140,14 +150,14 @@ describe("editing a Screen", () => {
     await store.add({ registryId: "scratch.board", size: "1x1" });
 
     await store.moveBy("welcome.notes", "later");
-    expect(store.state().widgets.map((widget) => widget.registryId)).toEqual([
+    expect(entryIds(store.state().widgets)).toEqual([
       DESK_APPS_WIDGET,
       "scratch.board",
       "welcome.notes",
     ]);
 
     await store.moveBy("welcome.notes", "earlier");
-    expect(store.state().widgets.map((widget) => widget.registryId)).toEqual([
+    expect(entryIds(store.state().widgets)).toEqual([
       DESK_APPS_WIDGET,
       "welcome.notes",
       "scratch.board",
@@ -255,5 +265,134 @@ describe("the Screens set", () => {
     expect(set.screen(HOME_SCREEN_ID)?.widgets).toEqual([
       { registryId: DESK_APPS_WIDGET, size: "full" },
     ]);
+  });
+});
+
+describe("the portable .screen file", () => {
+  async function setAt(directory: string): Promise<ScreenSet> {
+    return ScreenSet.open({
+      directory: join(directory, "screens"),
+      indexFile: join(directory, SCREENS_INDEX_FILENAME),
+    });
+  }
+
+  function withHeaderVersion(bytes: Uint8Array, version: number): Uint8Array {
+    const magicLength = 12;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const headerLength = view.getUint32(magicLength + 2);
+    const headerStart = magicLength + 6;
+    const headerEnd = headerStart + headerLength;
+    const header = JSON.parse(
+      new TextDecoder().decode(bytes.subarray(headerStart, headerEnd)),
+    ) as Record<string, unknown>;
+    header.version = version;
+    const body = new TextEncoder().encode(JSON.stringify(header));
+    const payload = bytes.subarray(headerEnd);
+    const out = new Uint8Array(headerStart + body.byteLength + payload.byteLength);
+    out.set(bytes.subarray(0, magicLength), 0);
+    const next = new DataView(out.buffer);
+    next.setUint16(magicLength, 1);
+    next.setUint32(magicLength + 2, body.byteLength);
+    out.set(body, headerStart);
+    out.set(payload, headerStart + body.byteLength);
+    return out;
+  }
+
+  it("restores order, size, settings, a row, an unknown widget and Home on a clean host", async () => {
+    const source = await setAt(join(root, "source"));
+    const work = await source.create("Work");
+    const store = source.store(work);
+    expect(store).not.toBeNull();
+    if (store === null) return;
+
+    await store.add({ registryId: "welcome.notes", size: "2x1", settings: { project: "inbox" } });
+    await store.add({ registryId: "ghost.notes", size: "1x1", settings: { future: "kept" } });
+    await store.addRow({
+      kind: "row",
+      size: "full",
+      layout: "row",
+      items: [
+        { registryId: "planner.quick-task", weight: 2, settings: { project: "work" } },
+        { registryId: "budget.saved-views", weight: 1 },
+      ],
+    });
+    await source.setHome(work);
+
+    const bytes = source.exportScreen(work);
+    expect(bytes).not.toBeNull();
+    if (bytes === null) return;
+
+    const target = await setAt(join(root, "clean"));
+    const imported = await target.importScreen(bytes);
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+
+    expect(imported.name).toBe("Work");
+    expect(imported.home).toBe(true);
+    expect(target.homeId).toBe(imported.id);
+    expect(target.screen(imported.id)).toEqual(source.screen(work));
+    expect(target.screen(imported.id)?.widgets).toHaveLength(3);
+    expect(target.screen(imported.id)?.widgets[1]).toEqual({
+      registryId: "ghost.notes",
+      size: "1x1",
+      settings: { future: "kept" },
+    });
+  });
+
+  it("imports a colliding id as a new Screen and leaves the existing one alone", async () => {
+    const target = await setAt(join(root, "collision"));
+    const original = await target.create("Work");
+    await target.store(original)?.add({ registryId: "welcome.notes", size: "2x1" });
+    const before = target.screen(original);
+
+    const source = await setAt(join(root, "collision-source"));
+    const other = await source.create("Work");
+    await source.store(other)?.add({ registryId: "ghost.notes", size: "1x1" });
+    const bytes = source.exportScreen(other);
+    expect(bytes).not.toBeNull();
+    if (bytes === null) return;
+
+    const imported = await target.importScreen(bytes);
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.id).not.toBe(original);
+    expect(target.screen(original)).toEqual(before);
+    expect(target.screen(imported.id)?.widgets).toEqual([
+      { registryId: "ghost.notes", size: "1x1" },
+    ]);
+  });
+
+  it("refuses a newer version and leaves every Screen and Home untouched", async () => {
+    const set = await setAt(join(root, "refusal"));
+    const work = await set.create("Work");
+    await set.store(work)?.add({ registryId: "welcome.notes", size: "2x1" });
+    await set.setHome(work);
+
+    const bytes = set.exportScreen(work);
+    expect(bytes).not.toBeNull();
+    if (bytes === null) return;
+
+    const beforeSummaries = set.summaries();
+    const beforeScreen = set.screen(work);
+    const refused = await set.importScreen(withHeaderVersion(bytes, 99));
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+
+    expect(refused.reason).toBe("newer");
+    expect(refused.message).toContain("Update Suite Desk");
+    expect(set.homeId).toBe(work);
+    expect(set.summaries()).toEqual(beforeSummaries);
+    expect(set.screen(work)).toEqual(beforeScreen);
+  });
+
+  it("refuses a malformed file and leaves the set untouched", async () => {
+    const set = await setAt(join(root, "malformed"));
+    const before = set.summaries();
+
+    const refused = await set.importScreen(new Uint8Array([1, 2, 3]));
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.message).toContain("not a Suite screen file");
+    expect(set.summaries()).toEqual(before);
   });
 });

@@ -225,6 +225,7 @@ export class ShellWindow {
    */
   #screenViews(spaceState: SpaceState): readonly ScreenView[] {
     const registry = shellWidgetRegistry(this.#packs);
+    const width = this.window.getContentBounds().width;
     const views: ScreenView[] = [];
     const seen = new Set<string>();
 
@@ -233,7 +234,7 @@ export class ShellWindow {
       seen.add(tab.screenId);
       const screen = this.#screens.screen(tab.screenId);
       if (screen !== null) {
-        views.push(screenView(screen, this.#packs, registry));
+        views.push(screenView(screen, this.#packs, registry, width));
         continue;
       }
       views.push({

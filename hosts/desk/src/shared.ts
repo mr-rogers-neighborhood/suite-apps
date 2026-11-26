@@ -39,6 +39,8 @@ export const CHROME_IPC = {
   deleteScreen: "suite:shell:delete-screen",
   setHomeScreen: "suite:shell:set-home-screen",
   openScreen: "suite:shell:open-screen",
+  exportScreen: "suite:shell:export-screen",
+  importScreen: "suite:shell:import-screen",
   relayStart: "suite:shell:relay-start",
   relayStop: "suite:shell:relay-stop",
 } as const;
@@ -282,6 +284,7 @@ export interface ScreenWidgetSettingView {
 }
 
 export interface ScreenWidgetView {
+  readonly kind: "widget";
   readonly registryId: string;
   readonly size: SuiteWidgetSize;
   readonly source: ScreenWidgetSource;
@@ -298,6 +301,24 @@ export interface ScreenWidgetView {
   readonly issues: readonly string[];
 }
 
+/** One row child: a widget view plus the share of the row it asks for. */
+export interface ScreenRowItemView {
+  readonly weight: number;
+  readonly widget: ScreenWidgetView;
+}
+
+/** A row or carousel the document placed. The host draws its children in order. */
+export interface ScreenRowView {
+  readonly kind: "row";
+  readonly size: SuiteWidgetSize;
+  readonly layout: "row" | "carousel";
+  readonly mode: "wrap" | "scroll";
+  readonly items: readonly ScreenRowItemView[];
+}
+
+/** One placement in a Screen: a widget, or a row of widgets one level deep. */
+export type ScreenEntryView = ScreenWidgetView | ScreenRowView;
+
 /** One widget the edit surface offers to add. */
 export interface ScreenChoiceView {
   readonly registryId: string;
@@ -313,7 +334,7 @@ export interface ScreenView {
   readonly id: string;
   readonly name: string;
   readonly available: boolean;
-  readonly widgets: readonly ScreenWidgetView[];
+  readonly widgets: readonly ScreenEntryView[];
   readonly choices: readonly ScreenChoiceView[];
 }
 

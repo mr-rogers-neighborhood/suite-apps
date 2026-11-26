@@ -3,11 +3,16 @@ import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 
 import { dirname, join } from "node:path";
 import type { SuiteWidgetSize } from "@suite/contracts";
 import {
+  exportScreenFile,
+  isScreenRow,
+  parseScreenFile,
   type Screen,
   ScreenDocument,
   type ScreenPlacement,
+  type ScreenRefusal,
   SUITE_SCREEN_FORMAT,
   SUITE_SCREEN_VERSION,
+  type SuiteScreenRow,
   type SuiteScreenWidget,
 } from "@suite/screens";
 import { defaultHomeScreen, HOME_SCREEN_ID } from "./home.js";
@@ -105,6 +110,10 @@ export class ScreenStore {
     return this.#mutate(this.#document.add(widget));
   }
 
+  async addRow(row: SuiteScreenRow): Promise<boolean> {
+    return this.#mutate(this.#document.addRow(row));
+  }
+
   async remove(registryId: string): Promise<boolean> {
     return this.#mutate(this.#document.remove(registryId));
   }
@@ -116,16 +125,10 @@ export class ScreenStore {
   /**
    * Move one placement one step earlier or later.
    *
-   * This is the edit-mode keyboard action; the document's own `move` takes an anchor,
-   * so the neighbour is computed here where the current order is known.
+   * The document owns the order entries, so a row next to a widget is a valid step.
    */
   async moveBy(registryId: string, direction: WidgetDirection): Promise<boolean> {
-    const ids = this.state().widgets.map((widget) => widget.registryId);
-    const index = ids.indexOf(registryId);
-    if (index < 0) return false;
-    const anchor = direction === "earlier" ? ids[index - 1] : ids[index + 1];
-    if (anchor === undefined) return false;
-    return this.move(registryId, direction === "earlier" ? { before: anchor } : { after: anchor });
+    return this.#mutate(this.#document.moveBy(registryId, direction));
   }
 
   async resize(registryId: string, size: SuiteWidgetSize): Promise<boolean> {
@@ -142,6 +145,11 @@ export class ScreenStore {
 
   async flush(): Promise<void> {
     await this.#save();
+  }
+
+  /** The current Screen wrapped in the portable `.screen` envelope. */
+  exportFile(home = false): Uint8Array {
+    return exportScreenFile(this.#document, { home });
   }
 
   async #mutate(changed: boolean): Promise<boolean> {
@@ -170,6 +178,24 @@ async function writeSnapshot(path: string, snapshot: Uint8Array): Promise<void> 
   const temporary = `${path}.tmp-${randomUUID()}`;
   try {
     await writeFile(temporary, snapshot);
+    await rename(temporary, path);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
+  }
+}
+
+/**
+ * Write one portable `.screen` file to the path the person chose.
+ *
+ * The file is the person's, not the store's: there is no backup beside it, and a
+ * failure removes the temporary sibling rather than touching an existing file.
+ */
+export async function writeScreenFile(path: string, bytes: Uint8Array): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, bytes);
     await rename(temporary, path);
   } catch (error) {
     await rm(temporary, { force: true });
@@ -236,6 +262,18 @@ export type ScreenRemoval =
       readonly message: string;
       readonly choices: readonly ScreenSummary[];
     };
+
+/** The result of importing one `.screen` file. A refusal writes nothing. */
+export type ScreenImport =
+  | {
+      readonly ok: true;
+      readonly id: string;
+      readonly name: string;
+      readonly home: boolean;
+      /** The Screen version in the file, before the shared migration chain. */
+      readonly fromVersion: number;
+    }
+  | ScreenRefusal;
 
 export interface ScreenSetOptions {
   /** `<dataRoot>/screens`: one `.loro` per Screen. */
@@ -330,6 +368,45 @@ export class ScreenSet {
     return this.#stores.get(id) ?? null;
   }
 
+  /** One Screen as the bytes of a portable `.screen` file. */
+  exportScreen(id: string): Uint8Array | null {
+    const store = this.#stores.get(id);
+    if (store === undefined) return null;
+    return store.exportFile(id === this.#homeId);
+  }
+
+  /**
+   * Import one portable file as a new Screen.
+   *
+   * The file is parsed before anything is written. A refusal returns the sentence and
+   * leaves every existing Screen and the Home choice untouched. A colliding id becomes
+   * a new id rather than replacing the Screen already there; a file that was Home on
+   * the writer's device becomes Home here, which is what makes a round trip restore
+   * the role as well as the composition.
+   */
+  async importScreen(bytes: Uint8Array): Promise<ScreenImport> {
+    const parsed = parseScreenFile(bytes);
+    if (!parsed.ok) return parsed;
+
+    const taken = new Set(this.#stores.keys());
+    const id = taken.has(parsed.screen.id)
+      ? screenIdFor(parsed.screen.name, taken)
+      : parsed.screen.id;
+    const screen: Screen = { ...parsed.screen, id };
+    const store = await ScreenStore.create(this.#file(id), screen);
+    this.#stores.set(id, store);
+    if (parsed.home) await this.setHome(id);
+    this.#refreshSummaries();
+
+    return {
+      ok: true,
+      id,
+      name: screen.name,
+      home: this.#homeId === id,
+      fromVersion: parsed.fromVersion,
+    };
+  }
+
   /** Create an empty Screen and answer its id. A new Screen is a blank slate. */
   async create(name: string): Promise<string> {
     const taken = new Set(this.#stores.keys());
@@ -373,10 +450,20 @@ export class ScreenSet {
       ...screen,
       id: screenIdFor(name, taken),
       name,
-      widgets: screen.widgets.map((widget) => ({
-        ...widget,
-        ...(widget.settings === undefined ? {} : { settings: { ...widget.settings } }),
-      })),
+      widgets: screen.widgets.map((entry) =>
+        isScreenRow(entry)
+          ? {
+              ...entry,
+              items: entry.items.map((item) => ({
+                ...item,
+                ...(item.settings === undefined ? {} : { settings: { ...item.settings } }),
+              })),
+            }
+          : {
+              ...entry,
+              ...(entry.settings === undefined ? {} : { settings: { ...entry.settings } }),
+            },
+      ),
     };
     const store = await ScreenStore.create(this.#file(copy.id), copy);
     this.#stores.set(copy.id, store);

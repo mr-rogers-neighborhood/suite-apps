@@ -1,4 +1,15 @@
 export {
+  exportScreenFile,
+  parseScreenFile,
+  SCREEN_FILE_ENVELOPE_VERSION,
+  SCREEN_FILE_EXTENSION,
+  SCREEN_FILE_MAGIC,
+  SCREEN_FILE_MAX_BYTES,
+  SCREEN_FILE_MEDIA_TYPE,
+  type ScreenFileHeader,
+  type ScreenFileParse,
+} from "./codec.js";
+export {
   createScreenDocument,
   SCREEN_FORMAT,
   SCREEN_VERSION,
@@ -6,6 +17,24 @@ export {
   type ScreenDocumentOpen,
   type ScreenPlacement,
 } from "./document.js";
+export {
+  flattenScreenEntries,
+  SCREEN_LAYOUT_COLUMNS,
+  SCREEN_LAYOUT_NARROW_WIDTH,
+  type ScreenEntryLayout,
+  type ScreenLayout,
+  type ScreenLayoutViewport,
+  type ScreenRowItemLayout,
+  type ScreenRowPlacement,
+  type ScreenWidgetLayout,
+  screenLayout,
+} from "./layout.js";
+export {
+  migrateScreen,
+  SCREEN_MIGRATIONS,
+  type ScreenMigration,
+  type ScreenMigrationStep,
+} from "./migration.js";
 export {
   buildWidgetCapture,
   createWidgetRegistry,
@@ -22,18 +51,31 @@ export {
   widgetSettingDefaults,
 } from "./registry.js";
 export {
+  corruptScreenRefusal,
+  isScreenRow,
+  MAX_SCREEN_PLACEMENTS,
   parseScreen,
+  SCREEN_ROW_LAYOUTS,
   type Screen,
+  type ScreenEntry,
   type ScreenParse,
   type ScreenRefusal,
   type ScreenRefusalReason,
+  type ScreenRowLayout,
   SUITE_SCREEN_FORMAT,
   SUITE_SCREEN_VERSION,
+  type SuiteScreenRow,
+  type SuiteScreenRowItem,
   type SuiteScreenWidget,
   screenCorruption,
+  screenEntryRegistryIds,
+  suiteScreenEntrySchema,
   suiteScreenIdSchema,
   suiteScreenNameSchema,
   suiteScreenRegistryIdSchema,
+  suiteScreenRowItemSchema,
+  suiteScreenRowLayoutSchema,
+  suiteScreenRowSchema,
   suiteScreenSchema,
   suiteScreenSettingsSchema,
   suiteScreenWidgetSchema,

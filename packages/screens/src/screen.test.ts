@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { parseScreen, type Screen, SUITE_SCREEN_FORMAT, SUITE_SCREEN_VERSION } from "./screen.js";
+import {
+  isScreenRow,
+  parseScreen,
+  type Screen,
+  SUITE_SCREEN_FORMAT,
+  SUITE_SCREEN_VERSION,
+} from "./screen.js";
 
 const screen: Screen = {
   format: "suite.screen",
-  version: 1,
+  version: 2,
   id: "home",
   name: "Home",
   widgets: [
@@ -114,9 +120,110 @@ describe("the Screen shape", () => {
   });
 
   it("refuses an unknown size class", () => {
+    expect(parseScreen({ ...screen, widgets: [{ registryId: "desk.apps", size: "3x1" }] }).ok).toBe(
+      false,
+    );
+  });
+
+  it("parses a row of weighted widgets and keeps its settings", () => {
+    const parsed = parseScreen({
+      ...screen,
+      widgets: [
+        {
+          kind: "row",
+          size: "full",
+          layout: "row",
+          items: [
+            { registryId: "planner.quick-task", weight: 2, settings: { project: "work" } },
+            { registryId: "unknown.widget", weight: 1, settings: { "future-setting": "kept" } },
+          ],
+        },
+      ],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const row = parsed.value.widgets[0];
+    expect(row).toMatchObject({ kind: "row", size: "full", layout: "row" });
+    if (row === undefined || !isScreenRow(row)) return;
+    expect(row.items[1]).toEqual({
+      registryId: "unknown.widget",
+      weight: 1,
+      settings: { "future-setting": "kept" },
+    });
+  });
+
+  it("refuses a row that nests a row, has one item, or repeats a registry id", () => {
     expect(
-      parseScreen({ ...screen, widgets: [{ registryId: "desk.apps", size: "3x1" }] }).ok,
+      parseScreen({
+        ...screen,
+        widgets: [
+          {
+            kind: "row",
+            size: "full",
+            items: [
+              { registryId: "desk.apps", weight: 1 },
+              {
+                kind: "row",
+                size: "full",
+                items: [
+                  { registryId: "planner.quick-task", weight: 1 },
+                  { registryId: "budget.month", weight: 1 },
+                ],
+              },
+            ],
+          },
+        ],
+      }).ok,
     ).toBe(false);
+
+    expect(
+      parseScreen({
+        ...screen,
+        widgets: [
+          {
+            kind: "row",
+            size: "full",
+            items: [{ registryId: "desk.apps", weight: 1 }],
+          },
+        ],
+      }).ok,
+    ).toBe(false);
+
+    expect(
+      parseScreen({
+        ...screen,
+        widgets: [
+          {
+            kind: "row",
+            size: "full",
+            items: [
+              { registryId: "desk.apps", weight: 1 },
+              { registryId: "desk.apps", weight: 1 },
+            ],
+          },
+        ],
+      }).ok,
+    ).toBe(false);
+  });
+
+  it("refuses a weight that is not a bounded whole number", () => {
+    for (const weight of [0, 13, 1.5, "2"]) {
+      expect(
+        parseScreen({
+          ...screen,
+          widgets: [
+            {
+              kind: "row",
+              size: "full",
+              items: [
+                { registryId: "desk.apps", weight },
+                { registryId: "planner.quick-task", weight: 1 },
+              ],
+            },
+          ],
+        }).ok,
+      ).toBe(false);
+    }
   });
 
   it("exports the format and version it parsed", () => {

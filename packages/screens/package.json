@@ -1,7 +1,7 @@
 {
   "name": "@suite/screens",
   "version": "0.1.0",
-  "description": "The shared Screens contract: the suite.screen v1 shape, its Loro document and the host-side widget registry. No React, Electron, DOM or file IO.",
+  "description": "The shared Screens contract: the suite.screen v2 shape, its Loro document, row layout, portable codec and host-side widget registry. No React, Electron, DOM or file IO.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

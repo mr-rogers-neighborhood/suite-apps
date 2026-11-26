@@ -263,9 +263,16 @@ The rules that shape the Suite host.
   `@suite/screens` as `<pack id>.<widget id>`. The host draws the declared title, fields and resolved
   settings with its own components; the pack supplies data, never DOM. An unknown registry id is a
   named placeholder with a sentence, and the placement and its saved settings stay in the document.
+- A row is composition, not a page builder. A `kind: "row"` entry groups 2–8 widgets one level deep;
+  each child declares a `weight` and the row has its own size class and `row` or `carousel` layout.
+  The shared `screenLayout` turns the weights into shared widths on a wide window; at phone width the
+  row becomes one horizontal, snapping line instead of squeezing its children. Children keep document
+  order for keyboard and screen-reader users, and a host that cannot draw the row flattens it to a
+  stacked list rather than dropping placements.
 - Edit mode is host chrome: named buttons and named keys add, remove, move earlier/later and change
   the size, which stays exactly `1x1`, `2x1` or `full`. The renderer holds no document state; an
-  action names a registry id and the main process answers with the new state.
+  action names a registry id and the main process answers with the new state. Rows are drawn in this
+  slice and are not edited inline yet; their placements and saved settings survive every flat edit.
 - The screen store writes a snapshot through a temporary file and rename, keeps the previous good
   snapshot as `<id>.loro.bak`, and quarantines an unreadable, oversized or newer file as
   `<id>.loro.corrupt-<time>` before starting a fresh Home. It never deletes the only copy and never
@@ -273,8 +280,20 @@ The rules that shape the Suite host.
 - Capture delivery is not in this slice. An app widget says a capture is not available yet rather
   than offering a button that cannot work. The registry's capture build stays unused until the
   delivery path exists.
-- A Screen is local to this device. The Screens manager creates, renames, duplicates and deletes a
-  Screen and sets Home; a portable `.screen` file, export/import and sync are later slices.
+- A Screen is portable as a `.screen` file the person owns: a Loro snapshot in a small envelope with
+  the magic `SUITE-SCREEN`, a separate envelope version, and a canonical JSON header that names the
+  Screen `version`, `id`, `name`, whether it was Home, and the payload length. The extension is
+  `.screen` and the media type is `application/vnd.suite.screen`. Export from the Screens manager
+  writes a temporary sibling and renames it into the path the person chose.
+- Import reads and validates before it writes. It refuses a file that is not a Suite screen, an
+  envelope or Screen version newer than this build, a header that does not match its bytes, a shape
+  with an unknown size, a bad widget id, a duplicate placement or more than 64 placements. The
+  refusal is a sentence that names the next action, and the existing Screens and Home choice are
+  untouched. A valid import always creates a new Screen; a colliding id gets a new one rather than
+  replacing it, and a file that was Home on the writer's device becomes Home here. Unknown widget ids
+  and settings remain as named placeholders, so a round trip restores order, size, settings and Home.
+- Sync is still later (#199). A `.screen` file is a manual copy; the host has no Screen sync
+  transport, and a pack never reads or writes a Screen document.
 
 ## Channels
 
@@ -402,7 +421,7 @@ The rules that shape the Suite host.
 ## What this spike deliberately leaves out
 
 - app-widget capture delivery (app widgets render; captures are not sent);
-- a portable `.screen` file with export/import;
+- Screen sync across devices (#199; a portable `.screen` file is manual);
 - per-document keys, relay frame verification, the header index and gap recovery (S7.2–S7.6, #304);
 - packaging the relay child inside the Flatpak;
 - a user-visible space document file, export and backup;

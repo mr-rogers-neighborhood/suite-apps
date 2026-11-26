@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/desktop";
 import { isPublisherKeyTrusted, type PackDocument, SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isPackCapability, type PackCapability } from "@suite/pack/capabilities";
+import { SCREEN_FILE_EXTENSION, SCREEN_FILE_MAX_BYTES, SUITE_SCREEN_VERSION } from "@suite/screens";
 import {
   app,
   dialog,
@@ -106,7 +107,7 @@ import {
   ReminderQueue,
   ReminderScheduler,
 } from "./reminders.js";
-import { SCREENS_INDEX_FILENAME, ScreenSet } from "./screens.js";
+import { SCREENS_INDEX_FILENAME, ScreenSet, writeScreenFile } from "./screens.js";
 import { type PackSender, packSender } from "./senders.js";
 import {
   type CatalogueEntry,
@@ -1034,6 +1035,15 @@ function registerIpc(): void {
     if (typeof screenId !== "string") return;
     await window?.openScreen(screenId);
   });
+  onChrome(CHROME_IPC.exportScreen, async (screenId) => {
+    if (typeof screenId !== "string") return undefined;
+    await exportScreenToFile(screenId);
+    return window?.state();
+  });
+  onChrome(CHROME_IPC.importScreen, async () => {
+    await importScreenFromFile();
+    return window?.state();
+  });
   onChrome(CHROME_IPC.relayStart, () => {
     if (relaySupervisor === null) return undefined;
     relaySupervisor.start();
@@ -1310,6 +1320,92 @@ function externalDialog(): ExternalDialog {
       return selection.filePaths[0] ?? null;
     },
   };
+}
+
+/**
+ * Ask for a destination and write one portable `.screen` file.
+ *
+ * The picker and the path stay in the main process. The file is the person's copy;
+ * the host keeps its own document and its backups exactly as they were.
+ */
+async function exportScreenToFile(screenId: string): Promise<void> {
+  if (window === null || screenStore === null) return;
+  const current = window;
+  const bytes = screenStore.exportScreen(screenId);
+  if (bytes === null) {
+    current.setNotice("That Screen is no longer here.");
+    return;
+  }
+
+  const selection = await dialog.showSaveDialog(current.window, {
+    title: "Export a Screen",
+    buttonLabel: "Export",
+    defaultPath: `${screenId}${SCREEN_FILE_EXTENSION}`,
+    properties: ["createDirectory", "showOverwriteConfirmation"],
+    filters: [{ name: "Suite screen", extensions: [SCREEN_FILE_EXTENSION.slice(1)] }],
+  });
+  if (selection.canceled) return;
+  const chosen = selection.filePath;
+  if (chosen === undefined) return;
+  const file = chosen.endsWith(SCREEN_FILE_EXTENSION)
+    ? chosen
+    : `${chosen}${SCREEN_FILE_EXTENSION}`;
+
+  try {
+    await writeScreenFile(file, bytes);
+    current.setNotice(`Exported ${screenId} as a .screen file.`);
+  } catch (error) {
+    console.warn("[desk] the screen file could not be written", error);
+    current.setNotice("The Screen could not be written there.");
+  }
+}
+
+/**
+ * Ask for one portable `.screen` file and import it as a new Screen.
+ *
+ * The file is validated before the store is touched. A refusal is the sentence the
+ * package produced and leaves every Screen and the Home choice alone. A success opens
+ * the imported Screen, or Home when the file was the writer's Home.
+ */
+async function importScreenFromFile(): Promise<void> {
+  if (window === null || screenStore === null) return;
+  const current = window;
+
+  const selection = await dialog.showOpenDialog(current.window, {
+    title: "Import a Screen",
+    buttonLabel: "Import",
+    properties: ["openFile"],
+    filters: [{ name: "Suite screen", extensions: [SCREEN_FILE_EXTENSION.slice(1)] }],
+  });
+  if (selection.canceled) return;
+  const file = selection.filePaths[0];
+  if (file === undefined) return;
+
+  let bytes: Uint8Array;
+  try {
+    const metadata = await stat(file);
+    if (!metadata.isFile() || metadata.size > SCREEN_FILE_MAX_BYTES) {
+      current.setNotice("That file is too large to be a Suite screen file.");
+      return;
+    }
+    bytes = new Uint8Array(await readFile(file));
+  } catch {
+    current.setNotice("The screen file could not be read.");
+    return;
+  }
+
+  const imported = await screenStore.importScreen(bytes);
+  if (!imported.ok) {
+    current.setNotice(imported.message);
+    return;
+  }
+
+  current.setNotice(
+    imported.fromVersion < SUITE_SCREEN_VERSION
+      ? `Imported ${imported.name} from Screen version ${imported.fromVersion} and updated it to this version.`
+      : null,
+  );
+  await current.openScreen(imported.id);
 }
 
 /**

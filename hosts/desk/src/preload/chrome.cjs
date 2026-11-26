@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld("suiteShell", {
     ipcRenderer.invoke("suite:shell:delete-screen", screenId, replacementId),
   setHomeScreen: (screenId) => ipcRenderer.invoke("suite:shell:set-home-screen", screenId),
   openScreen: (screenId) => ipcRenderer.invoke("suite:shell:open-screen", screenId),
+  exportScreen: (screenId) => ipcRenderer.invoke("suite:shell:export-screen", screenId),
+  importScreen: () => ipcRenderer.invoke("suite:shell:import-screen"),
   relayStart: () => ipcRenderer.invoke("suite:shell:relay-start"),
   relayStop: () => ipcRenderer.invoke("suite:shell:relay-stop"),
   onState: (listener) => {
