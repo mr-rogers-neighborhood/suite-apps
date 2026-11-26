@@ -3,8 +3,9 @@
 ## Supported state
 
 Suite is pre-1.0: Suite Desk is alpha and Suite Go is v0. There is no long-term support window; the
-newest published build, and the branch it was cut from, is what gets fixes. An older build is
-expected to be replaced, not patched.
+newest published build of a maintained surface, and the branch it was cut from, is what gets fixes.
+An older build is expected to be replaced, not patched; a frozen app keeps the artifact it last
+published.
 
 A pack is signed data, and the host treats it as untrusted even after verification. The host checks
 the manifest signature and every listed file hash against the pinned key before a pack is installed

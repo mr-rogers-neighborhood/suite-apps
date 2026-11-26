@@ -2,8 +2,8 @@
 
 Suite is alpha and pre-1.0. This page owns the suite target and the honest current state: what is
 checked by machine, what still needs a person, and where each app records its own evidence. Canvas,
-Planner, Budget and Sync keep app statements; Desk, Go and Help have no separate statement, and this
-page makes no claim about them.
+Planner, Budget and Sync keep app statements; Desk, Go and Help have no app-specific statement, and
+this page makes no app-specific claim about them.
 
 ## Target
 
@@ -15,8 +15,9 @@ map supports.
 ## What is machine-checked, and what is not
 
 One suite-level check holds every `@suite/theme` preset to 4.5:1 for text and 3:1 for focus rings and
-component boundaries. It lives in `packages/theme/src/presets.test.ts` and runs in the root gate for
-every app that draws its presets from that package. It measures the palette, not the painted window.
+component boundaries. It lives in `packages/theme/src/presets.test.ts` and passes when run with
+`mise exec -- pnpm --filter @suite/theme test`. No gate row runs it today, so a palette regression
+would not fail the build. It measures the palette, not the painted window.
 
 Beyond that, coverage is uneven:
 
@@ -42,21 +43,24 @@ not coverage of the interface.
 ## Known gaps
 
 These are real and tracked; none is claimed as working. The [criterion map](docs/reference/accessibility/wcag-22-map.md#the-gaps-in-one-place)
-is the full record and names the order of work.
+records each criterion's status and names the order of work; the app bullets below gather detail the
+map keeps per surface. Where the map says **Manual**, the item is unverified rather than proven
+broken.
 
 - **SC 2.1.4 (A):** Canvas single-key shortcuts are not remappable or disableable.
 - **SC 2.4.12 (AAA):** a sticky region may overlap focused content in edge cases.
 - **SC 2.5.5 (AAA):** targets are 24px, not the 44px the enhanced criterion asks for.
-- **Canvas:** the board has no complete keyboard model for moving between cards, and three drag
-  actions lack a non-drag path: arbitrary section resize, section link endpoints and connector bend
-  handles. Status-message markup is correct but unlistened.
-- **Planner:** whether a screen reader hears a `Toast` confirmation has not been listened to.
-- **Budget:** no screen-reader pass; nested controls in a register row, split child rows and the
-  reconciliation blocks still need a reader's judgment; zoom and reflow are unmeasured.
-- **Sync:** the console reloads every five seconds and cannot be paused (SC 2.2.2); contrast and
-  reflow are unmeasured; there is no axe run and no manual pass.
+- **Canvas (unverified, 2.1.1 and 2.5.7):** the board has no complete keyboard model for moving
+  between cards, and three drag actions lack a non-drag path: arbitrary section resize, section link
+  endpoints and connector bend handles. Status-message markup is correct but unlistened.
+- **Planner (unverified, 4.1.3):** whether a screen reader hears a `Toast` confirmation has not been
+  listened to.
+- **Budget (unverified, 4.1.3):** no screen-reader pass; nested controls in a register row, split child
+  rows and the reconciliation blocks still need a reader's judgment; zoom and reflow are unmeasured.
+- **Sync (unverified, 2.2.2):** the console reloads every five seconds and cannot be paused; contrast
+  and reflow are unmeasured; there is no axe run and no manual pass.
 
-The map puts SC 2.1.4 first, then the three remaining 2.5.7 items, then the AAA rows.
+The map puts SC 2.1.4 first, then the two AAA rows.
 
 ## What does not apply
 

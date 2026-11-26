@@ -32,7 +32,7 @@ mise exec -- node scripts/gate.mjs --no-e2e     # skip the row's e2e suite
 ```
 
 `--only` takes a row name from [AGENTS.md](AGENTS.md): `canvas`, `planner`, `budget`, `go`, `sync`,
-`help` or `desk`. `--fresh` proves the commit rather than the working tree. The gate runs a row's e2e
+`help`, `desk` or `ui`. `--fresh` proves the commit rather than the working tree. The gate runs a row's e2e
 suite after its checks, under `xvfb-run` when there is no display; no row marks one today. Read
 [Commands](docs/reference/commands.md) before running a heavy check.
 
@@ -40,8 +40,9 @@ suite after its checks, under `xvfb-run` when there is no display; no row marks 
 
 Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`. Keep a commit and a
 branch to one intent. Branch from `main`; do not commit a lockfile from a nested app, a secret or a
-private path. The shared packages under `packages/*` commit their `dist/` output on purpose, and a
-package's `build:verify` proves it has not drifted; other `dist/` directories stay out of git.
+private path. The shared packages under `packages/*` commit their `dist/` output on purpose: rebuild
+the package and check `git diff --exit-code` before committing, and keep other `dist/` directories
+out of git.
 
 ## Pull requests and review
 

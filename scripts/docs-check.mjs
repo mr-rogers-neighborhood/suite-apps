@@ -42,6 +42,10 @@ const ROOT_PAGES = [
   "README.md",
   "AGENTS.md",
   "RELEASES.md",
+  "SECURITY.md",
+  "CONTRIBUTING.md",
+  "ACCESSIBILITY.md",
+  "CODE_OF_CONDUCT.md",
   ...APPS.map((app) => `${app}/README.md`),
 ];
 const BANNED = [

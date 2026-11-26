@@ -60,8 +60,11 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement through
-GitHub's [report abuse form](https://github.com/contact/report-abuse).
-All complaints will be reviewed and investigated promptly and fairly.
+GitHub's [report abuse form](https://github.com/contact/report-abuse). The form
+files with GitHub Trust & Safety, which can contact the maintainers; while the
+project has a single maintainer, that person is the whole enforcement body and
+there is no further escalation. All complaints will be reviewed and investigated
+promptly and fairly.
 
 A project address will replace the form once mail on the project domain is
 live; this section will name it then.
