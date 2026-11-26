@@ -1,0 +1,208 @@
+/*
+ * Phone and tablet layout (#387).
+ *
+ * Canvas was drawn at a window's width. Suite Go hands it a phone, so the same shell has to
+ * stay usable when a title bar, a dock, a drawer and a dialog all compete for 390px. The
+ * rules here are layout, not a second design: the same controls, the same tokens, a thumb
+ * instead of a pointer.
+ *
+ * The touch floor is `pointer: coarse`, not a width, because a tablet is wider than this
+ * breakpoint and still has no mouse. Hover-only affordances are switched on permanently for
+ * the same reason: a row menu that appears on hover is a row menu half the readers never find.
+ */
+
+@media (pointer: coarse) {
+  .app-bar button,
+  .app-bar a,
+  .board-nav-button,
+  .portal-back,
+  .dock-button,
+  .library-tab,
+  .library-action,
+  .library-row-menu,
+  .library-close,
+  .card-focus__button,
+  [role="dialog"] button,
+  [role="menu"] [role="menuitem"],
+  [role="menu"] [role="menuitemcheckbox"],
+  [data-testid="format-toolbar"] button,
+  [data-testid="card-menu"],
+  [data-testid="card-pin"],
+  .react-flow__controls-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .app-bar button,
+  .dock-button,
+  .library-row,
+  .library-tab,
+  .library-action,
+  .card-focus__button,
+  [role="dialog"] button,
+  .react-flow__controls-button {
+    touch-action: manipulation;
+  }
+
+  /* A row's menu was hover-only. On a touch screen it is always the visible door. */
+  .library-row-menu {
+    opacity: 1;
+  }
+
+  /* The row is a list row before it is a drag handle: a vertical swipe scrolls the list. */
+  .library-row {
+    touch-action: pan-y;
+  }
+
+  /* A colour dot is 20px by design. On a thumb it keeps the dot and grows the hit area. */
+  .colour-strip button,
+  [data-testid^="context-menu-swatch"],
+  [data-testid^="colour-"] {
+    position: relative;
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* The page is the window, including the strip a phone's browser keeps for itself. */
+  .app-canvas {
+    height: 100dvh;
+    width: 100%;
+  }
+
+  /*
+   * One bar becomes two rows: identity and the current board first, search and actions
+   * second. Nothing is removed; a control that was beside another is now below it.
+   */
+  .app-bar {
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 8px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 6px);
+  }
+
+  .app-bar > * {
+    min-width: 0;
+  }
+
+  .app-bar .command-bar {
+    order: 10;
+    flex: 1 1 100%;
+    max-width: none;
+    height: 44px;
+  }
+
+  .workspace-name {
+    max-width: 42vw;
+  }
+
+  .board-tabs {
+    max-width: calc(100vw - 16px);
+  }
+
+  /* The dock becomes a bottom action bar, clear of the home indicator. */
+  .dock {
+    left: 8px;
+    right: 8px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    justify-content: center;
+    transform: none;
+    border-radius: 14px;
+  }
+
+  .dock-button {
+    flex: 1 1 auto;
+    justify-content: center;
+    gap: 8px;
+    padding-inline: 12px;
+  }
+
+  /* The drawer is the list on a phone: nearly full-height, never wider than the screen. */
+  .library-drawer {
+    left: 8px;
+    right: 8px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+    width: auto;
+    max-height: min(70dvh, 560px);
+    transform: none;
+    border-radius: 14px;
+  }
+
+  .library-drawer[data-full="true"] {
+    inset: 0 0 calc(env(safe-area-inset-bottom, 0px) + 64px) 0;
+    border-radius: 0;
+  }
+
+  .library-list {
+    max-height: none;
+  }
+
+  /* The inspector is a sheet over the board, above the dock, never a 320px column. */
+  .card-inspector {
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+    width: auto;
+    max-height: 62dvh;
+  }
+
+  /* A focused card takes the page; its header keeps the way out at a thumb's height. */
+  .card-focus {
+    padding: 0;
+  }
+
+  .card-focus__sheet {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .card-focus__header {
+    min-height: 52px;
+    padding-inline: 8px;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .card-focus__body .card-panel {
+    max-width: none;
+    padding-inline: 12px;
+  }
+
+  /* A dialog is a sheet, and its controls are a thumb's height apart. */
+  [role="dialog"] {
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+  }
+
+  [data-testid="sync-dialog"],
+  [data-testid="dialog"] {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  }
+
+  /* iOS zooms a form field under 16px, which moves the whole page under the keyboard. */
+  [role="dialog"] input,
+  [role="dialog"] textarea,
+  [role="dialog"] [contenteditable="true"],
+  .ProseMirror,
+  .node-card-editor,
+  .card-title-editor p {
+    font-size: 16px;
+  }
+
+  /* The board's own controls sit above the dock rather than under it. */
+  .react-flow__controls {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+  }
+
+  /* A miniature of a board this size is decoration; the outline is the navigation. */
+  .react-flow__minimap {
+    display: none;
+  }
+}

@@ -20,6 +20,7 @@ import "./styles/route.css";
 import "./styles/tour.css";
 import "./styles/library-selection.css";
 import "./styles/purpose.css";
+import "./styles/mobile.css";
 import "./styles/cursor.css";
 // Registering the composing field kinds (rating, group, list) is a side effect
 // of importing them; the panel finds them through the registry (ADR-0057).
