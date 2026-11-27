@@ -140,7 +140,12 @@ export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTa
     useEffect(() => {
         if (!foldOpen)
             return;
-        const target = foldMenu.current?.querySelector("[role='menuitem']:not([disabled]), [role='menuitemradio']:not([disabled]), [role='menuitemcheckbox']:not([disabled])");
+        // Open on the current choice when the folded rows include one, otherwise the first
+        // usable row. A single comma-list query would return document order and land on an
+        // unchecked option.
+        const panel = foldMenu.current;
+        const target = panel?.querySelector("[aria-checked='true']:not([disabled])") ??
+            panel?.querySelector("[role='menuitem']:not([disabled]), [role='menuitemradio']:not([disabled]), [role='menuitemcheckbox']:not([disabled])");
         target?.focus();
         const onPointerDown = (event) => {
             const inside = foldTrigger.current?.contains(event.target) === true ||

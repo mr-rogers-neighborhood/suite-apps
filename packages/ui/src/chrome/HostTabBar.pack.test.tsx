@@ -158,4 +158,40 @@ describe("a pack row that does not fit", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "More controls" })).toHaveFocus();
   });
+
+  it("opens on the checked choice when the folded rows contain one", () => {
+    const choicePack = packMenuZones(
+      {
+        format: "suite.menu-slots",
+        title: "Autumn plan",
+        navigation: [
+          {
+            kind: "menu",
+            id: "planner.view",
+            label: "View",
+            items: [{ id: "planner.view.today", label: "Today", checked: true }],
+          },
+          {
+            kind: "tabs",
+            id: "planner.open",
+            label: "Open plans",
+            items: [
+              { id: "planner.plan.a", label: "Today", active: false },
+              { id: "planner.plan.b", label: "This week", active: true },
+            ],
+          },
+        ],
+        actions: [],
+      },
+      onChoose,
+    );
+
+    render(
+      <HostTabBar tabs={tabs} activeTabId="planner" mark={<span>Suite</span>} pack={choicePack} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "More controls" }));
+
+    // The first tab is unchecked; a comma-list query would have focused it.
+    expect(screen.getByRole("menuitemradio", { name: /This week/u })).toHaveFocus();
+  });
 });
