@@ -97,12 +97,16 @@ function SlotMenu({
 	label,
 	items,
 	glyph,
+	help,
 	onChoose,
 }: {
 	readonly id: string;
 	readonly label: string;
 	readonly items: readonly MenuRow[];
 	readonly glyph?: string | undefined;
+	readonly help?:
+		| { readonly title: string; readonly body?: string }
+		| undefined;
 	readonly onChoose: (action: MenuSlotAction) => void;
 }) {
 	const [open, setOpen] = useState(false);
@@ -166,7 +170,7 @@ function SlotMenu({
 				aria-haspopup="menu"
 				aria-expanded={open}
 				aria-label={label}
-				title={label}
+				title={help?.body ?? help?.title ?? label}
 				data-slot-id={id}
 				onClick={() => {
 					if (!open) place();
@@ -281,6 +285,7 @@ function SlotTabs({
 	id,
 	label,
 	items,
+	help,
 	onChoose,
 }: {
 	readonly id: string;
@@ -290,6 +295,9 @@ function SlotTabs({
 		readonly label: string;
 		readonly active: boolean;
 	}[];
+	readonly help?:
+		| { readonly title: string; readonly body?: string }
+		| undefined;
 	readonly onChoose: (action: MenuSlotAction) => void;
 }) {
 	const buttons = useRef(new Map<string, HTMLButtonElement>());
@@ -313,6 +321,7 @@ function SlotTabs({
 		<div
 			role="tablist"
 			aria-label={label}
+			title={help?.body ?? help?.title ?? label}
 			className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 		>
 			{items.map((item, index) => (
@@ -532,13 +541,20 @@ function SlotSegmented({
 /** A group of icon buttons: undo/redo, history, outline. */
 function SlotButtons({
 	buttons,
+	help,
 	onChoose,
 }: {
 	readonly buttons: readonly MenuButton[];
+	readonly help?:
+		| { readonly title: string; readonly body?: string }
+		| undefined;
 	readonly onChoose: (action: MenuSlotAction) => void;
 }) {
 	return (
-		<span className="flex shrink-0 items-center gap-0.5">
+		<span
+			className="flex shrink-0 items-center gap-0.5"
+			title={help === undefined ? undefined : (help.body ?? help.title)}
+		>
 			{buttons.map((button) => (
 				<button
 					key={button.id}
@@ -584,6 +600,7 @@ function renderControl(
 					id={control.id}
 					label={control.label}
 					items={control.items}
+					help={control.help}
 					onChoose={onChoose}
 				/>
 			);
@@ -612,6 +629,7 @@ function renderControl(
 					id={control.id}
 					label={control.label}
 					items={control.items}
+					help={control.help}
 					onChoose={onChoose}
 				/>
 			);
@@ -666,7 +684,13 @@ function renderControl(
 			return { key: control.id, label: control.label, node, rows };
 		}
 		case "buttons": {
-			const node = <SlotButtons buttons={control.items} onChoose={onChoose} />;
+			const node = (
+				<SlotButtons
+					buttons={control.items}
+					help={control.help}
+					onChoose={onChoose}
+				/>
+			);
 			const rows = control.items.map(
 				(item): PackMenuFoldRow => ({
 					key: item.id,

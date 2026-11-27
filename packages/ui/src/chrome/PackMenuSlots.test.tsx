@@ -303,6 +303,44 @@ describe("the pack's zones", () => {
 		).toHaveAttribute("title", "Gathers a selection into a context.");
 	});
 
+	it("honours help on menus, tabs and button groups too", () => {
+		renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "menu",
+					id: "canvas.boards",
+					label: "Boards",
+					items: [],
+					help: { title: "Boards", body: "Switch board" },
+				},
+				{
+					kind: "tabs",
+					id: "canvas.open-boards",
+					label: "Open boards",
+					items: [],
+					help: { title: "Open boards", body: "Your open boards" },
+				},
+				{
+					kind: "buttons",
+					id: "canvas.history",
+					items: [],
+					help: { title: "History", body: "Undo and redo" },
+				},
+			],
+		});
+
+		expect(screen.getByRole("button", { name: "Boards" })).toHaveAttribute(
+			"title",
+			"Switch board",
+		);
+		expect(screen.getByRole("tablist", { name: "Open boards" })).toHaveAttribute(
+			"title",
+			"Your open boards",
+		);
+		expect(screen.getByTitle("Undo and redo")).toBeInTheDocument();
+	});
+
 	it("renders a label as text, never as markup", () => {
 		renderZones({
 			...slots,
