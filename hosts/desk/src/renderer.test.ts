@@ -59,11 +59,19 @@ describe("the Home composition", () => {
     expect(catalogue).toContain("tile.append(disclosure)");
   });
 
-  it("labels refused actions with actual reasons in words and keeps raw codes in disclosure", () => {
+  it("labels refused actions with actual reasons in words and keeps catalogueCard uninstalled-only", () => {
     expect(shell).toContain('"Publisher not trusted"');
     expect(shell).toContain('"Needs a newer Suite Desk"');
     expect(shell).toContain('"Not available on this host"');
-    expect(shell).toContain('element("p", "card-code"');
+    expect(shell).not.toContain("card-code");
+
+    const catalogueStart = shell.indexOf("function catalogueCard");
+    const refreshStart = shell.indexOf("function refreshApps");
+    const catalogue = shell.slice(catalogueStart, refreshStart);
+    expect(catalogue).toContain("Install v${entry.version}");
+    expect(catalogue).not.toContain("Reinstall v");
+    expect(catalogue).not.toContain("Update to v");
+    expect(catalogue).not.toContain("Installed v");
   });
 
   it("deduplicates catalogue entries for installed pack ids and counts unique ids", () => {
@@ -118,18 +126,32 @@ describe("the Home composition", () => {
 
   it("picks the highest trusted update strictly newer than the installed version", () => {
     const catalogue = [
-      { id: "canvas", version: "0.11.0", trusted: false },
-      { id: "canvas", version: "0.2.0", trusted: true },
-      { id: "canvas", version: "0.10.0", trusted: true },
-      { id: "canvas", version: "0.9.0", trusted: true },
+      { id: "canvas", version: "0.11.0", trusted: false, platform: { state: "available" } },
+      { id: "canvas", version: "0.2.0", trusted: true, platform: { state: "available" } },
+      { id: "canvas", version: "0.10.0", trusted: true, platform: { state: "available" } },
+      { id: "canvas", version: "0.9.0", trusted: true, platform: { state: "available" } },
     ];
     expect(highestTrustedUpdate(catalogue, { id: "canvas", version: "0.9.0" })).toEqual({
       id: "canvas",
       version: "0.10.0",
       trusted: true,
+      platform: { state: "available" },
     });
     expect(highestTrustedUpdate(catalogue, { id: "canvas", version: "0.10.0" })).toBeUndefined();
     expect(highestTrustedUpdate(catalogue, { id: "planner", version: "0.1.0" })).toBeUndefined();
+  });
+
+  it("skips unavailable updates and selects the highest compatible update", () => {
+    const catalogue = [
+      { id: "canvas", version: "1.2.0", trusted: true, platform: { state: "unavailable" } },
+      { id: "canvas", version: "1.1.0", trusted: true, platform: { state: "available" } },
+    ];
+    expect(highestTrustedUpdate(catalogue, { id: "canvas", version: "1.0.0" })).toEqual({
+      id: "canvas",
+      version: "1.1.0",
+      trusted: true,
+      platform: { state: "available" },
+    });
   });
 
   it("routes desk.apps to the host widget body", () => {

@@ -36,7 +36,7 @@ export function highestCatalogueEntries(catalogue, installedIds) {
 export function highestTrustedUpdate(catalogue, pack) {
   let best;
   for (const entry of catalogue ?? []) {
-    if (entry.id !== pack.id || !entry.trusted) continue;
+    if (entry.id !== pack.id || !entry.trusted || entry.platform?.state === "unavailable") continue;
     if (best === undefined || compareVersions(entry.version, best.version) > 0) {
       best = entry;
     }

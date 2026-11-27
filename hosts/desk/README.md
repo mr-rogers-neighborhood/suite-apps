@@ -144,7 +144,7 @@ SHA-256 the index displayed. A trusted entry offers **Install**, **Update** or *
 state requires; a refused entry stays visible with its refusal sentence and cannot be installed.
 Listing never extracts
 an archive, so a refusal leaves nothing behind. Each card body shows the mark, name, sentence,
-capabilities and status, with the publisher id, key fingerprint and any refusal code kept behind a
+capabilities and status, with the publisher id and key fingerprint kept behind a
 keyboard-accessible disclosure.
 
 The trust store is `<dataRoot>/trust/publishers.json` (`SUITE_DESK_TRUST` moves it). It is created

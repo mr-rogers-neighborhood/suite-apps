@@ -415,7 +415,7 @@ The rules that shape the Suite host.
   archive still lists with its refusal sentence and can never be installed. Listing extracts nothing.
 - Home's `desk.apps` merges installed packs and the catalogue into a single library grid under "Packs",
   installed first. Card bodies show the mark, name, sentence, capabilities and status pill; technical
-  records (publisher id, key fingerprint, raw refusal codes) sit behind a keyboard-accessible disclosure.
+  records (publisher id and key fingerprint) sit behind a keyboard-accessible disclosure.
   Refused entries state the actual reason in words ("Publisher not trusted", "Needs a newer Suite Desk",
   "Not available on this host") on their disabled actions.
 - An install is `<dataRoot>/packs/<id>/<version>/`, written to a temporary sibling and renamed into

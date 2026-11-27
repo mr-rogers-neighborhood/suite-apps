@@ -568,15 +568,6 @@ section:not(.widget):not(.widget-row):not(.home-empty) {
   margin-top: 6px;
 }
 
-.card-code {
-  margin: 4px 0 0;
-  color: var(--ink-faint);
-  font-family: var(--font-mono, monospace);
-  font-size: 10px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
 .card-meta {
   display: flex;
   flex-wrap: wrap;

@@ -920,46 +920,27 @@ function consentLabel(capability) {
   return CONSENT_LABELS[capability] ?? capability;
 }
 
-function cardDisclosure(publisher, rawCode = null) {
-  if (!publisher && !rawCode) return null;
+function cardDisclosure(publisher) {
+  if (!publisher) return null;
   const details = element("details", "card-details");
   const summary = element("summary", "", "More details");
-  details.append(summary);
-
-  if (publisher) {
-    details.append(
-      element("p", "card-publisher", `Publisher ${publisher.id} · key ${publisher.fingerprint}`),
-    );
-  }
-  if (rawCode) {
-    details.append(element("p", "card-code", `Code: ${rawCode}`));
-  }
+  details.append(
+    summary,
+    element("p", "card-publisher", `Publisher ${publisher.id} · key ${publisher.fingerprint}`),
+  );
   return details;
 }
 
 function refusalActionLabel(entry) {
-  const code = entry.reason ?? entry.refusalCode ?? entry.code ?? "";
   const refusal = entry.refusal ?? "";
 
-  if (
-    code === "platform" ||
-    entry.platform?.state === "unavailable" ||
-    /not available on this host/i.test(refusal)
-  ) {
+  if (entry.platform?.state === "unavailable" || /not available on this host/i.test(refusal)) {
     return "Not available on this host";
   }
-  if (
-    code === "host" ||
-    code === "contract" ||
-    /needs (?:host|pack contract)/i.test(refusal) ||
-    /newer Suite Desk/i.test(refusal)
-  ) {
+  if (/needs (?:host|pack contract)/i.test(refusal) || /newer Suite Desk/i.test(refusal)) {
     return "Needs a newer Suite Desk";
   }
   if (
-    code === "publisher" ||
-    code === "unknown-publisher" ||
-    code === "untrusted" ||
     /publisher/i.test(refusal) ||
     /trust store/i.test(refusal) ||
     /not signed by/i.test(refusal)
@@ -1021,7 +1002,7 @@ function installedCard(pack) {
   card.addEventListener("click", () => run(api.openPack(pack.id)));
   tile.append(card);
 
-  const disclosure = cardDisclosure(pack.publisher, null);
+  const disclosure = cardDisclosure(pack.publisher);
   if (disclosure !== null) tile.append(disclosure);
 
   const actions = element("div", "tile-actions");
@@ -1084,24 +1065,11 @@ function catalogueCard(entry) {
   const card = element("div", "card card-static");
   const name = entry.name.length > 0 ? entry.name : entry.id;
 
-  const active = state.installedVersions.find(
-    (version) => version.id === entry.id && version.current,
-  );
-  const exactInstalled = state.installedVersions.some(
-    (version) => version.id === entry.id && version.version === entry.version,
-  );
-  const installedCurrent =
-    exactInstalled && active !== undefined && active.version === entry.version;
-  const updateAvailable = entry.updateAvailable === true;
   const labelled = !entry.trusted
     ? { className: "pill pill-refused", text: "refused" }
     : entry.platform.state === "unavailable"
       ? { className: "pill pill-refused", text: "unavailable" }
-      : installedCurrent
-        ? { className: "pill pill-installed", text: "installed" }
-        : updateAvailable
-          ? { className: "pill pill-update", text: "update" }
-          : { className: "pill pill-available", text: "available" };
+      : { className: "pill pill-available", text: "available" };
 
   const top = element("div", "card-top");
   const dot = element("span", "card-dot");
@@ -1151,8 +1119,7 @@ function catalogueCard(entry) {
 
   tile.append(card);
 
-  const rawCode = entry.reason ?? entry.refusalCode ?? entry.code ?? null;
-  const disclosure = cardDisclosure(entry.publisher, rawCode);
+  const disclosure = cardDisclosure(entry.publisher);
   if (disclosure !== null) tile.append(disclosure);
 
   const actions = element("div", "tile-actions");
@@ -1166,16 +1133,8 @@ function catalogueCard(entry) {
     unavailable.disabled = true;
     actions.append(unavailable);
   } else {
-    const label = installedCurrent
-      ? `Reinstall v${entry.version}`
-      : updateAvailable
-        ? `Update to v${entry.version}`
-        : exactInstalled
-          ? `Installed v${entry.version}`
-          : `Install v${entry.version}`;
-    const inert = exactInstalled && !installedCurrent;
     const button = actionButton(
-      label,
+      `Install v${entry.version}`,
       () => {
         button.disabled = true;
         Promise.resolve(api.installCataloguePack(entry.id, entry.version))
@@ -1183,12 +1142,11 @@ function catalogueCard(entry) {
             showNotice(error instanceof Error ? error.message : "The host refused that action.");
           })
           .finally(() => {
-            button.disabled = inert;
+            button.disabled = false;
           });
       },
       "action-primary",
     );
-    button.disabled = inert;
     actions.append(button);
   }
   tile.append(actions);
