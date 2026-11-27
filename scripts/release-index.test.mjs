@@ -417,6 +417,72 @@ describe("release catalogue index refusals", () => {
     );
   });
 
+  // spec: S12.2 — a version names its bytes; the archive URL is cached immutably.
+  it("refuses to republish a version with different bytes", async () => {
+    const root = workspace();
+    const operator = await generatePackKeyPair();
+    const outDir = join(root, "out");
+    const first = await fixturePack(root, { description: "The first build." });
+    await prepareIndex({
+      builds: [first.build],
+      packsDir: first.packsDir,
+      outDir,
+      privateKey: operator.secretKeyBase64,
+      expectedFingerprint: await publisherKeyFingerprint(operator.publicKeyBase64),
+      now: GENERATED_AT,
+      log: () => {},
+    });
+
+    // Same id and version, different manifest, so the archive digest changes.
+    const secondRoot = workspace();
+    const changed = await fixturePack(secondRoot, { description: "Changed without a bump." });
+    await assert.rejects(
+      prepareIndex({
+        builds: [changed.build],
+        packsDir: changed.packsDir,
+        outDir: join(root, "next"),
+        privateKey: operator.secretKeyBase64,
+        expectedFingerprint: await publisherKeyFingerprint(operator.publicKeyBase64),
+        priorIndex: readFileSync(join(outDir, "index.json"), "utf8"),
+        now: new Date("2026-06-02T00:00:00.000Z"),
+        log: () => {},
+      }),
+      /bump the pack version/u,
+    );
+  });
+
+  // spec: S12.2
+  it("refuses to publish a pack version below the one already published", async () => {
+    const root = workspace();
+    const operator = await generatePackKeyPair();
+    const outDir = join(root, "out");
+    const first = await fixturePack(root, { version: "0.2.0" });
+    await prepareIndex({
+      builds: [first.build],
+      packsDir: first.packsDir,
+      outDir,
+      privateKey: operator.secretKeyBase64,
+      expectedFingerprint: await publisherKeyFingerprint(operator.publicKeyBase64),
+      now: GENERATED_AT,
+      log: () => {},
+    });
+
+    const older = await fixturePack(workspace(), { version: "0.1.0" });
+    await assert.rejects(
+      prepareIndex({
+        builds: [older.build],
+        packsDir: older.packsDir,
+        outDir: join(root, "next"),
+        privateKey: operator.secretKeyBase64,
+        expectedFingerprint: await publisherKeyFingerprint(operator.publicKeyBase64),
+        priorIndex: readFileSync(join(outDir, "index.json"), "utf8"),
+        now: new Date("2026-06-02T00:00:00.000Z"),
+        log: () => {},
+      }),
+      /never moves a pack backwards/u,
+    );
+  });
+
   // spec: S12.2
   it("refuses a build list that produced no archive", async () => {
     const root = workspace();

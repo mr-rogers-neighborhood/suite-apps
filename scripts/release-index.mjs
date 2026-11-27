@@ -187,7 +187,58 @@ async function priorState(text, publicKey) {
   return {
     sequence: parsed.value.sequence,
     digest: await packIndexDigest(parsed.value),
+    entries: parsed.value.entries.map((entry) => ({
+      id: entry.id,
+      version: entry.version,
+      sha256: entry.archive.sha256,
+    })),
   };
+}
+
+/** Compare two dotted numeric versions; a prerelease tag never sorts above its release. */
+export function comparePackVersions(left, right) {
+  const a = String(left).split("-")[0].split(".").map(Number);
+  const b = String(right).split("-")[0].split(".").map(Number);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const one = a[index] ?? 0;
+    const two = b[index] ?? 0;
+    if (one !== two) return one < two ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * A pack version names its bytes, because the archive URL is cached as
+ * immutable. Publishing different bytes under a published version leaves every
+ * cached client refusing an archive the index says it should accept, and moving
+ * backwards re-offers something a rollback already retired.
+ *
+ * The build is deterministic, so an unchanged source produces the same digest;
+ * a difference here means the pack changed without a version bump.
+ */
+export function packVersionProblems(priorEntries, nextEntries) {
+  const published = new Map(priorEntries.map((entry) => [entry.id, entry]));
+  const problems = [];
+  for (const next of nextEntries) {
+    const before = published.get(next.id);
+    if (before === undefined) continue;
+    const order = comparePackVersions(next.version, before.version);
+    if (order < 0) {
+      problems.push(
+        `${next.id} ${next.version} is older than the published ${before.version}; ` +
+          "a catalogue publish never moves a pack backwards",
+      );
+      continue;
+    }
+    if (order === 0 && next.archive.sha256 !== before.sha256) {
+      problems.push(
+        `${next.id} ${next.version} is already published with different bytes ` +
+          `(${before.sha256.slice(0, 12)} -> ${next.archive.sha256.slice(0, 12)}); ` +
+          "bump the pack version before publishing",
+      );
+    }
+  }
+  return problems;
 }
 
 /**
@@ -277,6 +328,15 @@ export async function prepareIndex({
     privateKeys: [seed],
     outPath: indexPath,
   });
+
+  if (prior !== null) {
+    const problems = packVersionProblems(prior.entries, built.index.entries);
+    if (problems.length > 0) {
+      throw new Error(
+        `the catalogue cannot publish these packs:\n  ${problems.join("\n  ")}`,
+      );
+    }
+  }
 
   // A detached signature over the exact file bytes lets a mirror prove the
   // download before it parses it; the document's own signatures verify the

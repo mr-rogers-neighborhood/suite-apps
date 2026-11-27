@@ -6,6 +6,14 @@ underneath enough to matter.
 Versions here are Planner's own, tagged `planner-v<version>`. The rules are in
 [Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
 
+## [0.5.4] - 2026-11-27
+
+### Changed
+
+- **Planner shares the host's bar and theme.** The view controls, actions and sync status are
+  published into the host's one menu bar instead of drawing a second band, and a disabled control
+  says why. Planner follows the host's palette, brightness and density.
+
 ## [0.5.3] - 2026-11-26
 
 ### Added

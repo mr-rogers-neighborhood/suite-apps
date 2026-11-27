@@ -6,6 +6,14 @@ underneath enough to matter.
 Versions here are Budget's own, tagged `budget-v<version>`. The rules are in
 [Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
 
+## [0.4.4] - 2026-11-27
+
+### Changed
+
+- **Budget shares the host's bar and theme.** The title, actions and view controls are published into
+  the host's one menu bar instead of drawing a second band, and a control that is unavailable now
+  says why. Budget follows the host's palette, brightness and density rather than carrying its own.
+
 ## [0.4.3] - 2026-11-26
 
 ### Added
