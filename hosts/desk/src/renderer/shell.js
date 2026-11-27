@@ -988,6 +988,13 @@ function installedCard(pack) {
     ? pack.consent.filter((entry) => entry.answer === "denied")
     : [];
 
+  const updateEntry = state.catalogue.find(
+    (entry) =>
+      entry.id === pack.id &&
+      entry.trusted &&
+      (entry.updateAvailable === true || compareVersions(entry.version, pack.version) > 0),
+  );
+
   const top = element("div", "card-top");
   const dot = element("span", "card-dot");
   dot.style.background = colorFor(pack.id);
@@ -997,6 +1004,8 @@ function installedCard(pack) {
     const dev = element("span", "pill pill-dev", "dev");
     dev.title = "Loaded from an unsigned development directory";
     top.append(dev);
+  } else if (updateEntry !== undefined) {
+    top.append(element("span", "pill pill-update", "update"));
   } else {
     top.append(element("span", "pill pill-installed", "installed"));
   }
@@ -1031,6 +1040,23 @@ function installedCard(pack) {
   if (disclosure !== null) tile.append(disclosure);
 
   const actions = element("div", "tile-actions");
+  if (updateEntry !== undefined) {
+    const updateButton = actionButton(
+      `Update to v${updateEntry.version}`,
+      () => {
+        updateButton.disabled = true;
+        Promise.resolve(api.installCataloguePack(updateEntry.id, updateEntry.version))
+          .catch((error) => {
+            showNotice(error instanceof Error ? error.message : "The host refused that action.");
+          })
+          .finally(() => {
+            updateButton.disabled = false;
+          });
+      },
+      "action-primary",
+    );
+    actions.append(updateButton);
+  }
   for (const consent of denials) {
     actions.append(
       actionButton(`Ask again about ${consentLabel(consent.capability)}`, () =>
@@ -1193,11 +1219,19 @@ function refreshApps() {
   const installedMatches = state.packs.filter((pack) =>
     matchesQuery(pack.name, pack.id, pack.description),
   );
-  const catalogueMatches = state.catalogue.filter((entry) =>
-    matchesQuery(entry.name, entry.id, entry.description),
-  );
+  const installedIds = new Set(state.packs.map((p) => p.id));
+  const seen = new Set(installedIds);
+  const catalogueMatches = [];
+  for (const entry of state.catalogue) {
+    if (seen.has(entry.id)) continue;
+    if (matchesQuery(entry.name, entry.id, entry.description)) {
+      catalogueMatches.push(entry);
+      seen.add(entry.id);
+    }
+  }
 
-  const total = state.packs.length + state.catalogue.length;
+  const allIds = new Set([...state.packs.map((p) => p.id), ...state.catalogue.map((e) => e.id)]);
+  const total = allIds.size;
   if (appsView.packCount !== null) {
     appsView.packCount.textContent = countLabel(total, "pack");
   }

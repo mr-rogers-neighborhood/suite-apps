@@ -64,6 +64,38 @@ describe("the Home composition", () => {
     expect(shell).toContain('element("p", "card-code"');
   });
 
+  it("deduplicates catalogue entries for installed pack ids and counts unique ids", () => {
+    const refreshStart = shell.indexOf("function refreshApps");
+    const refreshEnd = shell.indexOf("function renderAppsWidget");
+    expect(refreshStart).toBeGreaterThan(-1);
+    expect(refreshEnd).toBeGreaterThan(refreshStart);
+
+    const refresh = shell.slice(refreshStart, refreshEnd);
+
+    // Installed packs win: catalogue matches skip installed pack ids
+    expect(refresh).toContain("installedIds");
+    expect(refresh).toMatch(/seen\.has\(entry\.id\)/);
+
+    // packCount counts unique ids rather than array sums
+    expect(refresh).not.toContain("state.packs.length + state.catalogue.length");
+    expect(refresh).toContain("allIds.size");
+  });
+
+  it("offers an update action on the installed card when catalogue has a newer version", () => {
+    const installedStart = shell.indexOf("function installedCard");
+    const formatBytesStart = shell.indexOf("function formatBytes");
+    expect(installedStart).toBeGreaterThan(-1);
+
+    const installed = shell.slice(installedStart, formatBytesStart);
+
+    // Looks up newer version in state.catalogue and provides update button
+    expect(installed).toContain("state.catalogue");
+    expect(installed).toContain("updateEntry");
+    expect(installed).toContain("Update to v");
+    expect(installed).toContain("api.installCataloguePack");
+    expect(installed).toContain("pill pill-update");
+  });
+
   it("routes desk.apps to the host widget body", () => {
     expect(shell).toContain('widget.registryId === "desk.apps"');
   });
