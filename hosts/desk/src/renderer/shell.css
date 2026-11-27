@@ -545,6 +545,29 @@ section:not(.widget):not(.widget-row):not(.home-empty) {
   overflow-wrap: anywhere;
 }
 
+.card-details {
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--surface-strong);
+  font-size: 11px;
+}
+
+.card-details summary {
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-weight: 500;
+  user-select: none;
+}
+
+.card-details summary:hover {
+  color: var(--ink);
+}
+
+.card-details .card-publisher {
+  margin-top: 6px;
+}
+
 .card-meta {
   display: flex;
   flex-wrap: wrap;
@@ -572,6 +595,7 @@ section:not(.widget):not(.widget-row):not(.home-empty) {
   font-size: 13px;
 }
 
+.apps-widget .muted,
 .available .muted {
   max-width: 620px;
   margin: 0;

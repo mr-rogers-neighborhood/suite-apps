@@ -2,9 +2,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { highestCatalogueEntries, highestTrustedUpdate } from "./renderer/catalogueReducer.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const shell = readFileSync(join(here, "renderer", "shell.js"), "utf8");
+const reducer = readFileSync(join(here, "renderer", "catalogueReducer.js"), "utf8");
 const islandCss = readFileSync(join(here, "renderer", "react", "tab-bar.css"), "utf8");
 
 /**
@@ -15,7 +17,7 @@ const islandCss = readFileSync(join(here, "renderer", "react", "tab-bar.css"), "
  * stay a read-only view rather than a second copy of the document.
  */
 describe("the Home composition", () => {
-  it("draws the installed pack grid, catalogue and Add pack inside desk.apps", () => {
+  it("draws the merged library grid, catalogue and Add pack inside desk.apps", () => {
     const start = shell.indexOf("function renderAppsWidget");
     const end = shell.indexOf("function appWidgetBody");
     expect(start).toBeGreaterThan(-1);
@@ -23,14 +25,133 @@ describe("the Home composition", () => {
 
     const apps = shell.slice(start, end);
     expect(apps).toContain("refreshApps");
-    expect(apps).toContain('"Installed"');
-    expect(apps).toContain('"Available"');
+    expect(apps).toContain('"Packs"');
+    expect(apps).not.toContain('"Installed"');
+    expect(apps).not.toContain('"Available"');
     expect(apps).toContain('"Add pack…"');
     expect(apps).toContain("api.installPack");
 
-    // The grids it fills are the installed-pack cards and the catalogue entries.
+    // The grid it fills has the installed-pack cards and the catalogue entries.
     expect(shell).toContain("fragment.append(installedCard(pack))");
     expect(shell).toContain("fragment.append(catalogueCard(entry))");
+  });
+
+  it("moves publisher and key behind a disclosure outside the card body", () => {
+    const installedStart = shell.indexOf("function installedCard");
+    const catalogueStart = shell.indexOf("function catalogueCard");
+    const refreshStart = shell.indexOf("function refreshApps");
+
+    const installed = shell.slice(installedStart, catalogueStart);
+    const catalogue = shell.slice(catalogueStart, refreshStart);
+
+    // The disclosure exists with a details element and a summary
+    expect(shell).toContain('element("details"');
+    expect(shell).toContain('element("summary"');
+
+    // No card body contains Publisher or key text directly
+    expect(installed).not.toMatch(/card\.append\([^)]*Publisher/);
+    expect(installed).not.toMatch(/card\.append\([^)]*key/);
+    expect(catalogue).not.toMatch(/card\.append\([^)]*Publisher/);
+    expect(catalogue).not.toMatch(/card\.append\([^)]*key/);
+
+    // Both functions append the disclosure to the tile outside the card body
+    expect(installed).toContain("tile.append(disclosure)");
+    expect(catalogue).toContain("tile.append(disclosure)");
+  });
+
+  it("labels refused actions with actual reasons in words and keeps catalogueCard uninstalled-only", () => {
+    expect(shell).toContain('"Publisher not trusted"');
+    expect(shell).toContain('"Needs a newer Suite Desk"');
+    expect(shell).toContain('"Not available on this host"');
+    expect(shell).not.toContain("card-code");
+
+    const catalogueStart = shell.indexOf("function catalogueCard");
+    const refreshStart = shell.indexOf("function refreshApps");
+    const catalogue = shell.slice(catalogueStart, refreshStart);
+    expect(catalogue).toContain("Install v${entry.version}");
+    expect(catalogue).not.toContain("Reinstall v");
+    expect(catalogue).not.toContain("Update to v");
+    expect(catalogue).not.toContain("Installed v");
+  });
+
+  it("deduplicates catalogue entries for installed pack ids and counts unique ids", () => {
+    const refreshStart = shell.indexOf("function refreshApps");
+    const refreshEnd = shell.indexOf("function renderAppsWidget");
+    expect(refreshStart).toBeGreaterThan(-1);
+    expect(refreshEnd).toBeGreaterThan(refreshStart);
+
+    const refresh = shell.slice(refreshStart, refreshEnd);
+
+    // Installed packs win and catalogue entries reduce via compareVersions
+    expect(refresh).toContain("installedIds");
+    expect(refresh).toContain("highestCatalogueEntries(state.catalogue, installedIds)");
+    expect(reducer).toContain("compareVersions(entry.version, kept.version) > 0");
+
+    // packCount counts unique ids rather than array sums
+    expect(refresh).not.toContain("state.packs.length + state.catalogue.length");
+    expect(refresh).toContain("allIds.size");
+  });
+
+  it("offers an update action on the installed card when catalogue has a newer version", () => {
+    const installedStart = shell.indexOf("function installedCard");
+    const formatBytesStart = shell.indexOf("function formatBytes");
+    expect(installedStart).toBeGreaterThan(-1);
+
+    const installed = shell.slice(installedStart, formatBytesStart);
+
+    // Looks up highest trusted newer version via highestTrustedUpdate
+    expect(installed).toContain("highestTrustedUpdate(state.catalogue, pack)");
+    expect(installed).toContain("updateEntry");
+    expect(installed).toContain("Update to v");
+    expect(installed).toContain("api.installCataloguePack");
+    expect(installed).toContain("pill pill-update");
+    expect(reducer).toContain("compareVersions(best.version, pack.version) > 0");
+  });
+
+  it("reduces catalogue entries by id to the highest version and skips installed ids", () => {
+    const entries = [
+      { id: "canvas", version: "0.9.0" },
+      { id: "planner", version: "0.10.0" },
+      { id: "planner", version: "0.2.0" },
+      { id: "planner", version: "0.9.0" },
+      { id: "budget", version: "0.2.0" },
+      { id: "budget", version: "0.10.0" },
+    ];
+    const reduced = highestCatalogueEntries(entries, new Set(["canvas"]));
+    expect(reduced).toEqual([
+      { id: "planner", version: "0.10.0" },
+      { id: "budget", version: "0.10.0" },
+    ]);
+  });
+
+  it("picks the highest trusted update strictly newer than the installed version", () => {
+    const catalogue = [
+      { id: "canvas", version: "0.11.0", trusted: false, platform: { state: "available" } },
+      { id: "canvas", version: "0.2.0", trusted: true, platform: { state: "available" } },
+      { id: "canvas", version: "0.10.0", trusted: true, platform: { state: "available" } },
+      { id: "canvas", version: "0.9.0", trusted: true, platform: { state: "available" } },
+    ];
+    expect(highestTrustedUpdate(catalogue, { id: "canvas", version: "0.9.0" })).toEqual({
+      id: "canvas",
+      version: "0.10.0",
+      trusted: true,
+      platform: { state: "available" },
+    });
+    expect(highestTrustedUpdate(catalogue, { id: "canvas", version: "0.10.0" })).toBeUndefined();
+    expect(highestTrustedUpdate(catalogue, { id: "planner", version: "0.1.0" })).toBeUndefined();
+  });
+
+  it("skips unavailable updates and selects the highest compatible update", () => {
+    const catalogue = [
+      { id: "canvas", version: "1.2.0", trusted: true, platform: { state: "unavailable" } },
+      { id: "canvas", version: "1.1.0", trusted: true, platform: { state: "available" } },
+    ];
+    expect(highestTrustedUpdate(catalogue, { id: "canvas", version: "1.0.0" })).toEqual({
+      id: "canvas",
+      version: "1.1.0",
+      trusted: true,
+      platform: { state: "available" },
+    });
   });
 
   it("routes desk.apps to the host widget body", () => {
