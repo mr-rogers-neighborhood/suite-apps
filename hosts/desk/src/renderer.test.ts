@@ -224,7 +224,7 @@ describe("the Home composition", () => {
     expect(shell).toContain("widget-size-select");
     expect(shell).toContain("function requestRemove");
     expect(shell).toContain('button.textContent = "Remove?"');
-    expect(shell).toContain("matchesQuery(widgetQuery");
+    expect(shell).toContain("matchesWidgetQuery(choice)");
   });
 
   it("draws the relay state the tray app used to own", () => {
