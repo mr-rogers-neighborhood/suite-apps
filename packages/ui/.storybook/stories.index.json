@@ -904,6 +904,240 @@
       ]
     },
     {
+      "id": "components-pack-slots--budget-pack",
+      "title": "Components/Pack slots",
+      "name": "Budget Pack",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--canvas-pack",
+      "title": "Components/Pack slots",
+      "name": "Canvas Pack",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--planner-pack",
+      "title": "Components/Pack slots",
+      "name": "Planner Pack",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-buttons-undo-redo",
+      "title": "Components/Pack slots",
+      "name": "Slot Buttons Undo Redo",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-menu-checked-choice",
+      "title": "Components/Pack slots",
+      "name": "Slot Menu Checked Choice",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-menu-command",
+      "title": "Components/Pack slots",
+      "name": "Slot Menu Command",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-menu-disabled-row",
+      "title": "Components/Pack slots",
+      "name": "Slot Menu Disabled Row",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-menu-open-keyboard-focus",
+      "title": "Components/Pack slots",
+      "name": "Slot Menu Open Keyboard Focus",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-menu-separator",
+      "title": "Components/Pack slots",
+      "name": "Slot Menu Separator",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-tabs-active",
+      "title": "Components/Pack slots",
+      "name": "Slot Tabs Active",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-tabs-keyboard",
+      "title": "Components/Pack slots",
+      "name": "Slot Tabs Keyboard",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-tabs-overflow",
+      "title": "Components/Pack slots",
+      "name": "Slot Tabs Overflow",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-toggle-not-pressed",
+      "title": "Components/Pack slots",
+      "name": "Slot Toggle Not Pressed",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--slot-toggle-pressed",
+      "title": "Components/Pack slots",
+      "name": "Slot Toggle Pressed",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--status-danger-alert",
+      "title": "Components/Pack slots",
+      "name": "Status Danger Alert",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--status-ok",
+      "title": "Components/Pack slots",
+      "name": "Status Ok",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--status-quiet",
+      "title": "Components/Pack slots",
+      "name": "Status Quiet",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-pack-slots--status-warn",
+      "title": "Components/Pack slots",
+      "name": "Status Warn",
+      "importPath": "src/chrome/PackMenuSlots.stories.tsx",
+      "module": "packages/ui/src/chrome/PackMenuSlots.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
       "id": "components-privacyline--default",
       "title": "Components/PrivacyLine",
       "name": "Default",
@@ -940,6 +1174,19 @@
       ]
     },
     {
+      "id": "components-syncpill--long-label",
+      "title": "Components/SyncPill",
+      "name": "Long Label",
+      "importPath": "src/menu/SyncPill.stories.tsx",
+      "module": "packages/ui/src/menu/SyncPill.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready",
+        "play-fn"
+      ]
+    },
+    {
       "id": "components-syncpill--offline",
       "title": "Components/SyncPill",
       "name": "Offline",
@@ -949,6 +1196,19 @@
         "pack:suite",
         "layer:primitive",
         "status:ready"
+      ]
+    },
+    {
+      "id": "components-syncpill--peer-count",
+      "title": "Components/SyncPill",
+      "name": "Peer Count",
+      "importPath": "src/menu/SyncPill.stories.tsx",
+      "module": "packages/ui/src/menu/SyncPill.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:primitive",
+        "status:ready",
+        "play-fn"
       ]
     },
     {
