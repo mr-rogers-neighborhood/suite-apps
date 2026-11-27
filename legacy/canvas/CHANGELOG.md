@@ -8,6 +8,15 @@ a release is tagged `canvas-v<version>`. See
 
 No changes yet.
 
+## [0.1.15] - 2026-11-27
+
+### Changed
+
+- **Canvas shares the host's bar and theme.** The board tabs, the explain toggle and the status
+  readout are published into the host's one menu bar instead of drawing a second band, and the tabs
+  slot names itself for assistive technology. Canvas follows the host's palette, brightness and
+  density.
+
 ## [0.1.14] - 2026-11-26
 
 ### Added

@@ -7,6 +7,20 @@ the Android build reads; `package.json` and Gradle repeat it because the build n
 release is tagged `go-v<version>`; the APK itself is attached to the rolling Suite release. The rules
 are in [Version ownership](../../docs/how-to/package-and-release.md#version-ownership).
 
+## [0.3.0] - 2026-11-27
+
+### Added
+
+- **Go gets the host-parity shell.** Identity, consent and the shell's navigation now follow the same
+  model as Suite Desk: install, choose packs and answer a capability question the same way on the
+  phone. The version code moves so an installed 0.2.0 updates instead of sitting beside the new
+  build.
+
+### Changed
+
+- **Go follows the host's theme and density.** The palette, brightness and density chosen in the
+  phone's settings reach each pack frame, and the settings sheet exposes the scale.
+
 ## [0.2.0] - 2026-11-24
 
 ### Added
