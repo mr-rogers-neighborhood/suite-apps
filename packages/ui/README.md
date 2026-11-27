@@ -12,6 +12,12 @@ had considered, that is **2.53:1** and **3.47:1** against a floor of 4.5.
 
 A shared primitive is where `on-accent` gets _enforced_ rather than remembered.
 
+## UI inspirations
+
+The look references — Sunsama, Fumadocs and Heptabase — and exactly what we take from each live
+in the workbench page **Workbench → UI inspirations**
+([source](.storybook/workbench/Inspirations.mdx)). Borrow the property, not the brand.
+
 ## The chosen base
 
 **Radix primitives + Tailwind + CSS-variable tokens.** No Mantine: its theme is a JavaScript object
