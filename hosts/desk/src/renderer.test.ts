@@ -123,3 +123,26 @@ describe("the tab strip island", () => {
     expect(base).toMatch(/text-decoration:\s*none;/);
   });
 });
+
+describe("the chrome's keyboard", () => {
+  it("opens a new Home tab on Mod+T, which used to throw", () => {
+    // `openHome` is the `#open-home` element, not a function, so the shortcut raised
+    // `ReferenceError: openHome is not defined` and did nothing. It has to call the
+    // handler the launcher button uses.
+    const handler = shell.slice(shell.indexOf('event.key.toLowerCase() === "t"'));
+    expect(handler.slice(0, 220)).toContain("openHomeTab()");
+    expect(handler.slice(0, 220)).not.toMatch(/openHome\(\)/);
+  });
+
+  it("gives focus back after a widget edit rebuilds the tree", () => {
+    // `renderWidgets` replaces every tile, so the focused element was destroyed and the
+    // next keypress went to the body. The renderer records the focused tile's registry id
+    // and restores it.
+    const render = shell.slice(
+      shell.indexOf("function renderWidgets"),
+      shell.indexOf("function renderChoices"),
+    );
+    expect(render).toContain("focusedRegistryId");
+    expect(render).toContain("restored?.focus()");
+  });
+});

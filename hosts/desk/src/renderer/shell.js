@@ -1466,7 +1466,28 @@ function renderWidgets(view) {
       fragment.append(element("p", "empty", "This Screen has no widgets. Choose Edit to add one."));
     }
   }
+  /*
+   * Keep the person's place across the rebuild.
+   *
+   * Every edit used to destroy the whole widget tree, so the focused tile vanished and the
+   * next keypress went to the body: keyboard editing was unusable after one action. The
+   * tile that was focused is recorded by registry id and given focus back below, so a run
+   * of ↑ ↑ → Delete works without reaching for the mouse.
+   */
+  const focused = document.activeElement;
+  const focusedRegistryId =
+    focused instanceof HTMLElement && elements.widgets.contains(focused)
+      ? (focused.closest(".widget")?.dataset.registryId ?? null)
+      : null;
+
   elements.widgets.replaceChildren(fragment);
+
+  if (focusedRegistryId !== null && editing) {
+    const restored = [...elements.widgets.querySelectorAll(".widget")].find(
+      (tile) => tile.dataset.registryId === focusedRegistryId,
+    );
+    restored?.focus();
+  }
 }
 
 function renderChoices(view) {
@@ -1820,7 +1841,7 @@ function bindChrome() {
 
     if (event.key.toLowerCase() === "t") {
       event.preventDefault();
-      openHome();
+      openHomeTab();
     } else if (event.key.toLowerCase() === "w" && state.activeTabId !== null) {
       event.preventDefault();
       run(api.closeTab(state.activeTabId));

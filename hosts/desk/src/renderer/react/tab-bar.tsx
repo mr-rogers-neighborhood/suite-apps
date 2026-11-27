@@ -77,8 +77,17 @@ function TabBar({
   const [picker, setPicker] = useState<PickerData | null>(null);
 
   // The active pack's zones. A pack that published nothing, or a Screen tab, leaves the
-  // bar with only the host's own material.
+  // bar with only the host's own material: `packMenuZones` returns a null takeover and no
+  // actions, and the bar is not given a pack at all, so no divider is drawn for it.
   const packZones = packMenuZones(snapshot.packMenu, actions.packMenuAction);
+  const pack =
+    packZones.navigation === null && packZones.actions === undefined
+      ? undefined
+      : {
+          ...(packZones.context === undefined ? {} : { context: packZones.context }),
+          navigation: packZones.navigation,
+          ...(packZones.actions === undefined ? {} : { actions: packZones.actions }),
+        };
 
   const openPicker = useCallback(async () => {
     setPickOpen(true);
@@ -130,7 +139,7 @@ function TabBar({
         }
         onHome={actions.home}
         homeLabel="Home"
-        pack={packZones}
+        {...(pack === undefined ? {} : { pack })}
         search={
           <button
             type="button"

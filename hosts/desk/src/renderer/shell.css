@@ -259,12 +259,21 @@ body {
   border-color: var(--focus);
 }
 
+/*
+ * Three sizes that actually differ.
+ *
+ * In a two-column grid, `span 2` *is* the whole row, so `2x1` and `full` rendered
+ * identically and one of the three sizes was decorative. A `2x1` now means "two columns
+ * wide and two rows tall" — a large square tile — and `full` keeps the whole row at one
+ * row's height. That is what the names have been promising all along.
+ */
 .widget-full {
   grid-column: 1 / -1;
 }
 
 .widget-2x1 {
   grid-column: span 2;
+  grid-row: span 2;
 }
 
 .widget-1x1 {
@@ -438,7 +447,13 @@ body {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
 }
 
-section {
+/*
+ * Spacing between the pieces of a widget's own body. It used to be a bare `section` rule,
+ * which also matched every `.widget` and `.widget-row` tile — the widgets are `<section>`
+ * elements — and added 28px of margin *inside* a 14px grid. The widgets grid now sets its
+ * own spacing, so this only applies to a section that is not a tile.
+ */
+section:not(.widget):not(.widget-row):not(.home-empty) {
   margin-top: 28px;
 }
 
@@ -698,6 +713,9 @@ section {
 }
 
 .home-empty {
+  /* It is appended inside the widgets grid, so it has to claim the whole row: without
+     this the empty Home occupied one of two columns and centred itself in half the page. */
+  grid-column: 1 / -1;
   max-width: 720px;
   margin: 48px auto;
   display: flex;
