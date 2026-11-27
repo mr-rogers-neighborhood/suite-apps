@@ -1,7 +1,12 @@
 import type { Node } from "fumadocs-core/page-tree";
 import { ChevronRight, ExternalLink, GitBranch, Search, X } from "lucide-react";
 import { type ComponentPropsWithoutRef, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useLocation } from "react-router";
+import { Link, Navigate, useLocation, useNavigate } from "react-router";
+import {
+  type MenuBarBridge,
+  useMenuAction,
+  useMenuSlots,
+} from "@suite/ui";
 import {
   type Audience,
   type DocsPage,
@@ -15,6 +20,11 @@ import {
 import { filterHandbookSearch, type HandbookSearchEntry } from "@/lib/handbook-search";
 import { sources } from "@/lib/source";
 import { SectionSwitch } from "@/sections";
+import { useHostedMenuBar, useWideViewport } from "../hosted";
+
+const GITHUB_URL = "https://github.com/mrrnbhd/suite-apps";
+
+type HelpSlots = Parameters<MenuBarBridge["setSlots"]>[0] | null;
 
 /**
  * One section of the docs, rendered from the one tree.
@@ -28,6 +38,9 @@ import { SectionSwitch } from "@/sections";
  */
 export function DocsSection({ audience }: { audience: Audience }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const hosted = useHostedMenuBar();
+  const wide = useWideViewport();
   const base = SECTION_BASES[audience];
   const source = sources[audience];
   const slugs = location.pathname
@@ -57,6 +70,76 @@ export function DocsSection({ audience }: { audience: Audience }) {
   const isSectionRoot = slugs.length === 0;
   const belongsHere = page !== undefined && allowed?.has(page.url) === true;
 
+  const pageTitle =
+    isSectionRoot
+      ? SECTION_TITLES[audience]
+      : (page?.data.title ?? SECTION_TITLES[audience]);
+  const slots: HelpSlots =
+    hosted === null
+      ? null
+      : {
+          format: "suite.menu-slots",
+          title: pageTitle,
+          navigation: [
+            ...(wide
+              ? []
+              : [
+                  {
+                    kind: "toggle" as const,
+                    id: "help.contents",
+                    label: "Contents",
+                    pressed: navigatorOpen,
+                    glyph: "\u2630",
+                    help: {
+                      title: "Contents",
+                      body: "Shows this section's pages beside the document.",
+                    },
+                  },
+                ]),
+            {
+              kind: "menu" as const,
+              id: "help.sections",
+              label: "Help sections",
+              items: [
+                { id: "help.sections.explorer", label: "Code explorer" },
+                { id: "help.sections.tours", label: "Tours" },
+                {
+                  id: "help.sections.other",
+                  label: SECTION_TITLES[otherAudience(audience)],
+                  separatorBefore: true,
+                },
+                {
+                  id: "help.sections.github",
+                  label: "GitHub",
+                  description: "Opens the suite-apps repository.",
+                },
+              ],
+              help: {
+                title: "Help sections",
+                body: "Moves between the handbook, the tours and the source.",
+              },
+            },
+          ],
+          actions: [],
+        };
+  useMenuSlots(hosted, slots);
+  useMenuAction(hosted, (action) => {
+    if (action.id === "help.contents") {
+      setNavigatorOpen((open) => !open);
+      return;
+    }
+    if (action.id !== "help.sections") return;
+    if (action.item === "help.sections.explorer") {
+      navigate("/explore");
+    } else if (action.item === "help.sections.tours") {
+      navigate("/explore?view=tours");
+    } else if (action.item === "help.sections.other") {
+      navigate(SECTION_BASES[otherAudience(audience)]);
+    } else if (action.item === "help.sections.github") {
+      window.open(GITHUB_URL, "_blank", "noreferrer");
+    }
+  });
+
   useEffect(() => {
     setNavigatorOpen(false);
   }, []);
@@ -76,7 +159,11 @@ export function DocsSection({ audience }: { audience: Audience }) {
       >
         Skip to content
       </a>
-      <header className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-fd-border bg-fd-background/95 px-2 backdrop-blur sm:gap-3 sm:px-3">
+      {hosted === null ? (
+      <header
+        data-handbook-region="handbook-header"
+        className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-fd-border bg-fd-background/95 px-2 backdrop-blur sm:gap-3 sm:px-3"
+      >
         <button
           type="button"
           onClick={() => setNavigatorOpen((open) => !open)}
@@ -115,8 +202,9 @@ export function DocsSection({ audience }: { audience: Audience }) {
           </a>
         </nav>
       </header>
+      ) : null}
 
-      <div className="flex min-h-[calc(100dvh-3.5rem)] pt-14">
+      <div className={hosted === null ? "flex min-h-[calc(100dvh-3.5rem)] pt-14" : "flex min-h-dvh"}>
         {navigatorOpen ? (
           <button
             type="button"
@@ -130,8 +218,8 @@ export function DocsSection({ audience }: { audience: Audience }) {
           aria-label="Handbook contents"
           className={
             navigatorOpen
-              ? "fixed inset-y-14 left-0 z-40 w-[min(20rem,85vw)] overflow-y-auto border-r border-fd-border bg-fd-background p-3 shadow-xl md:static md:z-auto md:block md:w-72 md:shrink-0 md:shadow-none"
-              : "sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 overflow-y-auto border-r border-fd-border p-3 md:block"
+              ? `fixed ${hosted === null ? "inset-y-14" : "inset-y-0"} left-0 z-40 w-[min(20rem,85vw)] overflow-y-auto border-r border-fd-border bg-fd-background p-3 shadow-xl md:static md:z-auto md:block md:w-72 md:shrink-0 md:shadow-none`
+              : `sticky ${hosted === null ? "top-14 h-[calc(100dvh-3.5rem)]" : "top-0 h-dvh"} hidden w-72 shrink-0 overflow-y-auto border-r border-fd-border p-3 md:block`
           }
         >
           <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-widest text-fd-muted-foreground">

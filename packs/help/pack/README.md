@@ -35,8 +35,8 @@ navigator, and the reading column keeps its source order.
 
 | At phone width (360–430px) | What happens |
 | --- | --- |
-| Explorer frame | `AppShell` from `@suite/ui` owns the header, the one `<h1>` and the content region. |
-| Navigator | A drawer from the header, with the same search, views, tree, modules and tours. Selecting anything closes it. |
+| Explorer frame | Under a host, the host draws the one bar and Help publishes its sections into it; standalone, `AppShell` from `@suite/ui` owns the header, the one `<h1>` and the content region. |
+| Navigator | A drawer from the header (standalone) or the host's Contents toggle (hosted), with the same search, views, tree, modules and tours. Selecting anything closes it. |
 | Page list | `ListView` renders the module sections (Apps, Packages, Tools, Config) and the search results as a listbox: one tab stop, arrows, Home/End, Enter. |
 | Document pane | `DetailView` owns a file or symbol's title, breadcrumb subtitle, GitHub/Copy actions and scrolling body. |
 | Handbook | The page tree and search stay in a drawer; long tables scroll inside the article and code blocks scroll inside themselves. |
@@ -47,6 +47,13 @@ own no selection, route or domain type. `AppShell` gained one small extension fo
 desktop column reads `--shell-nav-width` (default `14rem`), so the explorer's existing resizable
 rail keeps working without forking the frame. The desktop shell compiles the same renderer; its
 `electron.vite.config.ts` is untouched.
+
+When Suite Desk drives Help, both the reader and the explorer detect the host's menu bridge and
+publish their material instead of drawing a header: the current page name, a **Help sections**
+menu (explorer, tours, the other section, GitHub) and, below `md`, a **Contents** toggle. The
+reader drops its fixed 56px band and its `pt-14` offset, and the explorer passes `header={null}` to
+`AppShell`; the visible page `<h1>` stays in the document in both cases. Standalone, nothing
+changes: no bridge means the pack draws its own header exactly as before.
 
 The pack still declares **no capability**. It reads the generated index and compiled pages inside
 its own archive and opens no file, document or socket. The mobile layout adds no fetch and no

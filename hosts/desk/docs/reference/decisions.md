@@ -246,6 +246,9 @@ The rules that shape the Suite host.
   radiogroup. The host still receives values and ids only, never a pack's meaning. When the pack row
   does not fit, the host folds the controls after the first into its own `…` menu built from the same
   descriptors; the nodes stay mounted so no control is lost, and nothing is injected into host chrome.
+- Help is the fourth pack on the same rule. Both its reader and its explorer detect the bridge and
+  draw no header when hosted, publishing the page name, a **Help sections** menu and, below `md`, a
+  **Contents** toggle. Standalone, no bridge means the pack keeps its own header unchanged.
 - Theme is host state, not pack state. Suite Desk owns the preset, brightness and density on desktop
   (Suite Go owns them on mobile), stores the choice at `<dataRoot>/theme.json`, and paints every pack
   view with the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A
