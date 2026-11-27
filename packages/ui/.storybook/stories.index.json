@@ -398,6 +398,18 @@
       ]
     },
     {
+      "id": "components-hosttabbar--home-is-one-row",
+      "title": "Components/HostTabBar",
+      "name": "Home Is One Row",
+      "importPath": "src/chrome/HostTabBar.stories.tsx",
+      "module": "packages/ui/src/chrome/HostTabBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
       "id": "components-hosttabbar--many-tabs",
       "title": "Components/HostTabBar",
       "name": "Many Tabs",
@@ -407,6 +419,44 @@
         "pack:suite",
         "layer:host",
         "status:experimental"
+      ]
+    },
+    {
+      "id": "components-hosttabbar--switch-list-open",
+      "title": "Components/HostTabBar",
+      "name": "Switch List Open",
+      "importPath": "src/chrome/HostTabBar.stories.tsx",
+      "module": "packages/ui/src/chrome/HostTabBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental",
+        "play-fn"
+      ]
+    },
+    {
+      "id": "components-hosttabbar--two-rows",
+      "title": "Components/HostTabBar",
+      "name": "Two Rows",
+      "importPath": "src/chrome/HostTabBar.stories.tsx",
+      "module": "packages/ui/src/chrome/HostTabBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental"
+      ]
+    },
+    {
+      "id": "components-hosttabbar--two-rows-with-menu",
+      "title": "Components/HostTabBar",
+      "name": "Two Rows With Menu",
+      "importPath": "src/chrome/HostTabBar.stories.tsx",
+      "module": "packages/ui/src/chrome/HostTabBar.stories.tsx",
+      "tags": [
+        "pack:suite",
+        "layer:host",
+        "status:experimental",
+        "play-fn"
       ]
     },
     {
