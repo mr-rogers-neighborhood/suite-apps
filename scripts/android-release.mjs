@@ -329,7 +329,9 @@ export function readPublishedManifest(tag, gh) {
   }
   if (result.status !== 0) {
     const text = result.stderr.trim();
-    if (/no assets match|release not found|not found|HTTP 404/iu.test(text)) return null;
+    if (/no assets (?:match|to download)|release not found|not found|HTTP 404/iu.test(text)) {
+      return null;
+    }
     throw ghFailure(`could not download ${RELEASE_MANIFEST_ASSET} from ${tag}`, result);
   }
   try {
