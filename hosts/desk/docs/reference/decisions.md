@@ -224,6 +224,14 @@ The rules that shape the Suite host.
   "explain mode" or "view" means. That is deliberate — one explain/tutorial layer that works in
   every app cannot rely on the host understanding each app's vocabulary, which is why every control
   may carry a `help` sentence in the contract.
+- A `tabs` slot carries its own accessible `label` ("Open boards"), because the host cannot name a
+  pack's surfaces. A row with `checked` is a `menuitemradio`, not a plain item, so the current choice
+  is announced; a disabled row may carry `disabledReason` and the host shows that sentence rather
+  than a silent grey control. The host still learns no vocabulary from either.
+- A dropdown opens in a portal positioned from its trigger's box. The bar scrolls horizontally, so a
+  menu drawn inside it would be clipped to the bar's height. Arrow keys belong to the composite that
+  has focus — the tab strip, a pack's tablist, an open menu — and a plain header does not claim them;
+  only a `role="menubar"` gets horizontal traversal from the bar.
 - Theme is host state, not pack state. Suite Desk owns the preset, brightness and density on desktop
   (Suite Go owns them on mobile), stores the choice at `<dataRoot>/theme.json`, and paints every pack
   view with the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A

@@ -82,6 +82,13 @@ export interface MenuRow {
 	readonly label: string;
 	readonly checked?: boolean;
 	readonly disabled?: boolean;
+	/**
+	 * Why the row cannot be used, in the pack's own words.
+	 *
+	 * A disabled row that says nothing is a dead control; this is how a pack answers "why is
+	 * this greyed out" without the host having to guess.
+	 */
+	readonly disabledReason?: string;
 	readonly shortcut?: string;
 	readonly separatorBefore?: boolean;
 	readonly help?: MenuHelp;
@@ -93,6 +100,7 @@ const rowSchema = z
 		label: z.string().min(1).max(MENU_SLOT_LABEL_MAX),
 		checked: z.boolean().optional(),
 		disabled: z.boolean().optional(),
+		disabledReason: z.string().min(1).max(160).optional(),
 		shortcut: z.string().min(1).max(24).optional(),
 		separatorBefore: z.boolean().optional(),
 		help: helpSchema.optional(),
@@ -161,6 +169,8 @@ export type MenuNavControl =
 	| {
 			readonly kind: "tabs";
 			readonly id: string;
+			/** The tablist's accessible name, e.g. "Open boards". Never the host's word. */
+			readonly label: string;
 			readonly items: readonly MenuTab[];
 			readonly help?: MenuHelp;
 	  }
@@ -194,6 +204,7 @@ const navControlSchema = z.discriminatedUnion("kind", [
 		.object({
 			kind: z.literal("tabs"),
 			id: z.string().refine(isMenuSlotId, "not a menu slot id"),
+			label: z.string().min(1).max(MENU_SLOT_LABEL_MAX),
 			items: z.array(tabSchema).max(MENU_SLOTS_MAX_ITEMS),
 			help: helpSchema.optional(),
 		})

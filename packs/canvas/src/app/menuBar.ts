@@ -127,6 +127,7 @@ export function canvasMenuSlots(input: {
 						{
 							kind: "tabs" as const,
 							id: MENU_IDS.board,
+							label: "Open boards",
 							items: input.boards.map((board, index) => ({
 								id: `${BOARD_PREFIX}${index}`,
 								label: board.name,

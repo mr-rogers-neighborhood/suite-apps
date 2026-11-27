@@ -42,13 +42,17 @@ Every zone takes a `ReactNode`. The bar decides nothing about what an app puts t
 `menuKeys.ts` holds the behaviour and its tests:
 
 - The container is a `role="menubar"` with `menuBarKeyDown` for keyboard input and
-  `handleMenuBarKeyDown` for the same traversal driven programmatically.
+  `handleMenuBarKeyDown` for the same traversal driven programmatically. Horizontal traversal is
+  only attached when the container actually declares `role="menubar"`; a plain header leaves the
+  arrows to the composite inside it, such as the tab strip or a text field.
 - `ArrowRight` and `ArrowLeft` move through the items cyclically, including across the ends.
 - `Home` and `End` move to the first and last item.
 - Arrow traversal steps aside while the person is typing in a text input, so it does not fight inline
   renaming.
 - `menuKeyDown` and `focusFirstMenuItem` handle a nested `role="menu"`, including skipping its rows
   during menubar traversal and returning focus to the trigger when the menu closes from inside.
+- A slot dropdown is drawn in a portal positioned from its trigger's box, because the bar scrolls
+  horizontally and would otherwise clip the menu to the bar's height.
 
 ## Adoption
 
@@ -100,9 +104,13 @@ packs actually draw rather than a general UI language:
 | `kind` | What it is | Who uses it |
 | --- | --- | --- |
 | `menu` | A dropdown of rows, optionally checked | Canvas's boards, Planner's and Budget's views |
-| `tabs` | A row of tabs, one active | Canvas's open boards |
+| `tabs` | A row of tabs, one active, carrying its own accessible `label` | Canvas's open boards |
 | `toggle` | A mode control, on or off | Canvas's explain and interaction mode |
 | `buttons` | A group of icon buttons | Undo/redo, history, outline, the drawer toggle |
+
+A row with `checked` is drawn as a `menuitemradio`, not a plain item, so the chosen value is
+announced rather than just marked. A disabled row may carry `disabledReason`, and the host shows that
+sentence instead of a silent grey control.
 
 ### Ids are opaque, and `help` is the seam
 

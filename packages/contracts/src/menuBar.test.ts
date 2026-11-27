@@ -26,6 +26,7 @@ const canvasSlots = {
 		{
 			kind: "tabs",
 			id: "canvas.open-boards",
+			label: "Open boards",
 			items: [
 				{ id: "canvas.board.q3", label: "Q3 board", active: true },
 				{ id: "canvas.board.roadmap", label: "Roadmap", active: false },
