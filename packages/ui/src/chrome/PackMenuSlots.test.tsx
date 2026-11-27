@@ -268,6 +268,30 @@ describe("the dropdown's keyboard", () => {
 		);
 	});
 
+	it("focuses the checked row even when it is not the first", () => {
+		// `querySelector` with a comma list returns the first match in document order, not
+		// the first selector's match. The checked row was second here, and the old single
+		// selector focused the unchecked first row.
+		renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "menu",
+					id: "canvas.boards",
+					label: "Boards",
+					items: [
+						{ id: "canvas.board.1", label: "Roadmap", checked: false },
+						{ id: "canvas.board.0", label: "Q3 board", checked: true },
+					],
+				},
+			],
+		});
+		openBoards();
+		expect(document.activeElement).toBe(
+			screen.getByRole("menuitemradio", { name: /Q3 board/u }),
+		);
+	});
+
 	it("walks rows with the arrow keys, and stops at the ends with Home/End", () => {
 		renderZones(slots);
 		openBoards();

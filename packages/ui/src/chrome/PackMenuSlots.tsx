@@ -94,12 +94,14 @@ function SlotMenu({
 	useEffect(() => {
 		if (!open) return;
 		// Focus the current choice, or the first row, the way a menu is expected to open.
-		// A choice row is a `menuitemradio`, so it must be in the selector too: a menu whose
-		// rows all report a choice has no plain `menuitem`, and used to open with nothing
-		// focused, leaving the arrow keys dead until the first Tab.
-		const target = menu.current?.querySelector<HTMLElement>(
-			"[aria-checked='true']:not([disabled]), [role='menuitemradio']:not([disabled]), [role='menuitem']:not([disabled])",
-		);
+		// A single compound selector would return the first row in *document order*, not the
+		// checked one, so the checked query has to stand alone and fall back to a plain row.
+		const panel = menu.current;
+		const target =
+			panel?.querySelector<HTMLElement>("[aria-checked='true']:not([disabled])") ??
+			panel?.querySelector<HTMLElement>(
+				"[role='menuitemradio']:not([disabled]), [role='menuitem']:not([disabled])",
+			);
 		target?.focus();
 
 		const onPointerDown = (event: PointerEvent) => {
