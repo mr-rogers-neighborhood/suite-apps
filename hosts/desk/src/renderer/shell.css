@@ -487,6 +487,11 @@ body {
   background: color-mix(in srgb, var(--focus) 8%, transparent);
 }
 
+.widgets[data-narrow="true"] .widget-drag,
+.widgets[data-narrow="true"] .widget-resize {
+  display: none;
+}
+
 .action-confirm {
   border-color: var(--danger);
   color: var(--danger);
