@@ -171,6 +171,36 @@ describe("the pack's zones", () => {
 		).toHaveAttribute("aria-pressed", "true");
 	});
 
+	it("keeps a mode's word beside its glyph, and names an icon-only command", () => {
+		// The vocabulary the bar agreed: a mode is icon + label + aria-pressed, a document
+		// command is an icon with its name in `aria-label`, and an action is icon + label.
+		renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "toggle",
+					id: "canvas.interaction-mode",
+					label: "Select mode",
+					pressed: true,
+					glyph: "\u25c8",
+				},
+				{
+					kind: "buttons",
+					id: "canvas.history",
+					items: [{ id: "canvas.undo", label: "Undo", glyph: "\u21b6" }],
+				},
+			],
+		});
+
+		const mode = screen.getByRole("button", { name: "Select mode" });
+		expect(mode).toHaveTextContent("Select mode");
+		expect(mode).toHaveTextContent("\u25c8");
+
+		const command = screen.getByRole("button", { name: "Undo" });
+		expect(command).toHaveTextContent("\u21b6");
+		expect(command).not.toHaveTextContent("Undo");
+	});
+
 	it("keeps a disabled control visible and refuses it", () => {
 		const { onChoose } = renderZones(slots);
 		const undo = screen.getByRole("button", { name: "Undo" });

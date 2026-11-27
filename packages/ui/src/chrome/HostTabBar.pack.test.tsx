@@ -51,17 +51,21 @@ describe("the host's one bar", () => {
     expect(document.querySelectorAll("header.app-bar")).toHaveLength(1);
   });
 
-  it("keeps the tab strip and the pack's takeover in the same bar", () => {
+  it("puts the pack's material in its own row under the host's", () => {
     renderBar(true);
     const header = screen.getByRole("banner");
+    const packRow = screen.getByTestId("host-tab-bar-pack");
     expect(header).toContainElement(screen.getByRole("navigation", { name: "Open tabs" }));
-    expect(header).toContainElement(screen.getByRole("button", { name: "View" }));
-    // The pack's material is inside the one bar, not a second one below it.
-    expect(header).toContainElement(screen.getByRole("button", { name: "Export" }));
+    // The host's row keeps the tabs; the pack's context, takeover and actions get the
+    // second, thinner row, so neither has to squeeze the other.
+    expect(packRow).toContainElement(screen.getByRole("button", { name: "View" }));
+    expect(packRow).toContainElement(screen.getByRole("button", { name: "Export" }));
+    expect(header).not.toContainElement(screen.getByRole("button", { name: "View" }));
   });
 
-  it("draws no pack material when the active surface published none", () => {
+  it("draws no pack row when the active surface published none", () => {
     renderBar(false);
+    expect(screen.queryByTestId("host-tab-bar-pack")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "View" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
   });

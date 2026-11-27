@@ -58,6 +58,15 @@ export declare const FOCUS_RING = "focus-visible:outline-none focus-visible:ring
  * could never slow or quicken it.
  */
 export declare const MOTION = "transition-colors duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))]";
+/**
+ * The same transition for a surface that moves instead of only changing colour.
+ *
+ * A tab's selected indicator is a shadow and a row's entrance is opacity and position;
+ * `transition-colors` cannot animate either, which is why they used to snap. Motion is
+ * written behind `motion-safe`, so a person who asks for less motion gets the final state
+ * with no transition at all.
+ */
+export declare const MOTION_ALL = "motion-safe:transition-[color,background-color,border-color,box-shadow,opacity,transform] motion-safe:duration-[var(--duration-base,150ms)] motion-safe:ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))]";
 /** Shared by every pressable thing: no text selection, no pointer events when disabled. */
 export declare const PRESSABLE = "inline-flex select-none items-center justify-center font-medium transition-colors duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))] disabled:pointer-events-none disabled:opacity-50";
 //# sourceMappingURL=tokens.d.ts.map

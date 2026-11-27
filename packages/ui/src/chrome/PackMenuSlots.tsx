@@ -51,7 +51,7 @@ const ROW =
 const CONTROL =
 	"flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[length:var(--text-label,12px)]";
 const MENU_BOX =
-	"fixed z-50 overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-[var(--shadow-xl)]";
+	"fixed z-50 overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-[var(--shadow-xl)] starting:scale-95 starting:opacity-0 motion-safe:transition-[opacity,transform] motion-safe:duration-[var(--duration-fast,100ms)] motion-safe:ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))]";
 
 /** A small dropdown, opened from one control in the takeover row. */
 function SlotMenu({
@@ -354,13 +354,14 @@ function SlotToggle({
 				FOCUS_RING,
 			)}
 		>
-			{glyph === undefined ? (
-				<span className="min-w-0 truncate">{label}</span>
-			) : (
+			{glyph === undefined ? null : (
 				<span aria-hidden="true" className="shrink-0">
 					{glyph}
 				</span>
 			)}
+			{/* A mode keeps its word. An icon alone leaves "which mode" to a guess, and the
+			    plan's vocabulary is icon + label + aria-pressed. */}
+			<span className="min-w-0 truncate">{label}</span>
 		</button>
 	);
 }

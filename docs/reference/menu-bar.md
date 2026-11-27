@@ -95,6 +95,12 @@ A pack asks `menuBarBridge()` from `@suite/ui` which case it is in. The answer i
 own. Nothing has to be passed down or configured, which is what makes the same bundle work in both
 places.
 
+A host with an active pack can spend two thin rows instead of one crowded one: the host's own row
+(mark, open tabs, search, sync, window controls) and the pack's row (document name, takeover,
+actions). The pack row is omitted when the active surface published nothing. Row height follows the
+host's density scale, and a native host reports the measured total to its window so pack content
+starts below the real bar.
+
 ### What a pack publishes
 
 `MenuSlots` — a title, an optional title menu, a takeover row, actions and an optional status

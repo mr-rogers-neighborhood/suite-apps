@@ -1,15 +1,33 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import {
+	type CSSProperties,
+	type KeyboardEvent,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { cx } from "../cx.js";
 import { MenuBar } from "../menu/MenuBar.js";
-import { FOCUS_RING, MOTION } from "../tokens.js";
+import { menuKeyDown } from "../menu/menuKeys.js";
+import { FOCUS_RING, MOTION, MOTION_ALL } from "../tokens.js";
 
 /**
  * The host's tab strip on the shared `MenuBar`.
  *
  * Every host draws the same question: which surfaces are open, which one is in front, and how do
  * I open another. The strip owns that question and nothing else: the host keeps the tab list, the
- * active id and the pack frames, and hands them in. It is the navigation zone of the one menu bar,
- * so a pack that draws a `MenuBar` inside its own surface is not asked to draw a second strip.
+ * active id and the pack frames, and hands them in. It is the navigation zone of the menu bar, so
+ * a pack that draws a `MenuBar` inside its own surface is not asked to draw a second strip.
+ *
+ * ## Two rows, on purpose
+ *
+ * One row cannot hold the host's question and the active pack's material without squeezing both.
+ * The host's own row keeps the marks, the tabs, search and the window controls; the pack's row is
+ * a second, thinner band with the document it is showing and what that document can do. The pack
+ * row does not exist when the active surface published nothing — Home costs one row, a document
+ * costs two. Each row follows the host's density (`--control-height`) instead of a fixed 44px.
  *
  * A tab is a label button plus a separate close button. They are siblings rather than a button
  * inside a button, so the close control has its own accessible name and does not fire activation.
@@ -50,17 +68,29 @@ export interface HostTabBarProps {
 	/**
 	 * The active pack's zones, from `packMenuZones`.
 	 *
-	 * The pack fills the middle of this bar; the host keeps the marks at each end. A pack's
-	 * takeover lands after the tab strip, because the tabs say which surface is open and the
-	 * takeover says what that surface is showing.
+	 * The pack fills its own row under the host's: the context says which document is in
+	 * front, the navigation says what it is showing, and the actions are what it can do. A
+	 * pack that published nothing passes no `pack`, so the row is absent rather than empty.
 	 */
 	readonly pack?: {
 		readonly context?: ReactNode;
 		readonly navigation: ReactNode;
 		readonly actions?: ReactNode;
 	};
+	/**
+	 * Identifies the active surface, so the pack row can play its entrance again when the
+	 * person switches to a different pack. Without it the row is reused and only its
+	 * contents swap, which reads as a flicker rather than a change.
+	 */
+	readonly packKey?: string;
 	readonly "data-testid"?: string;
 }
+
+const SWITCH_WIDTH = 240;
+
+/** A menu row: the switch list's one entry per open tab. */
+const SWITCH_ROW =
+	"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[length:var(--text-label,12px)] outline-none text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]";
 
 export function HostTabBar({
 	tabs,
@@ -79,10 +109,15 @@ export function HostTabBar({
 	searchPlaceholder,
 	searchShortcut,
 	pack,
+	packKey,
 	"data-testid": testId = "host-tab-bar",
 }: HostTabBarProps): ReactNode {
 	const tabButtons = useRef(new Map<string, HTMLButtonElement>());
 	const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId);
+	const switchTrigger = useRef<HTMLButtonElement | null>(null);
+	const switchMenu = useRef<HTMLDivElement | null>(null);
+	const [switchOpen, setSwitchOpen] = useState(false);
+	const [switchAt, setSwitchAt] = useState<{ left: number; top: number } | null>(null);
 
 	/**
 	 * Keep the active tab visible in a crowded strip.
@@ -145,8 +180,55 @@ export function HostTabBar({
 		}
 	}
 
-	const navigation = (
-		<div className="flex min-w-0 items-center gap-2">
+	/**
+	 * The switch list, positioned from its trigger.
+	 *
+	 * It is a portal for the same reason a pack's dropdown is: the strip scrolls
+	 * horizontally, and a menu drawn inside it would be clipped to the bar's height.
+	 */
+	const placeSwitch = useCallback(() => {
+		const trigger = switchTrigger.current?.getBoundingClientRect();
+		if (trigger === undefined) return;
+		const left = Math.max(8, Math.min(trigger.right - SWITCH_WIDTH, window.innerWidth - SWITCH_WIDTH - 8));
+		setSwitchAt({ left, top: trigger.bottom + 4 });
+	}, []);
+
+	function closeSwitch(returnFocus: boolean) {
+		setSwitchOpen(false);
+		setSwitchAt(null);
+		if (returnFocus) switchTrigger.current?.focus();
+	}
+
+	useEffect(() => {
+		if (!switchOpen) return;
+		// Focus the tab in front, so the list opens where the person's attention already is.
+		const target = switchMenu.current?.querySelector<HTMLElement>(
+			"[aria-checked='true']:not([disabled]), [role='menuitemradio']:not([disabled])",
+		);
+		target?.focus();
+
+		const onPointerDown = (event: PointerEvent) => {
+			const inside =
+				switchTrigger.current?.contains(event.target as Node) === true ||
+				switchMenu.current?.contains(event.target as Node) === true;
+			if (!inside) {
+				setSwitchOpen(false);
+				setSwitchAt(null);
+			}
+		};
+		const onReposition = () => placeSwitch();
+		window.addEventListener("pointerdown", onPointerDown, true);
+		window.addEventListener("resize", onReposition);
+		window.addEventListener("scroll", onReposition, true);
+		return () => {
+			window.removeEventListener("pointerdown", onPointerDown, true);
+			window.removeEventListener("resize", onReposition);
+			window.removeEventListener("scroll", onReposition, true);
+		};
+	}, [switchOpen, placeSwitch]);
+
+	const rowOne = (
+		<div className="flex min-w-0 flex-1 items-center gap-2">
 			{tabs.length === 0 ? (
 				<span className="hidden whitespace-nowrap text-[length:var(--text-caption,11px)] text-[var(--ink-faint)] sm:inline">
 					No open tabs
@@ -203,7 +285,7 @@ export function HostTabBar({
 										selected
 											? "bg-[var(--surface)] text-[var(--ink)] shadow-[inset_0_-2px_0_var(--accent)]"
 											: "text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]",
-										MOTION,
+										MOTION_ALL,
 										FOCUS_RING,
 									)}
 								>
@@ -265,36 +347,115 @@ export function HostTabBar({
 					<span aria-hidden="true">+</span>
 				</button>
 			)}
-			{/*
-        The active pack's takeover, after the tabs. The strip answers "which surface is
-        open"; the takeover answers "what is that surface showing", so it reads second and
-        moves with the tab rather than beside the mark.
-      */}
-			{pack === undefined ? null : (
-				<div className="flex min-w-0 items-center overflow-x-auto border-l border-[var(--hairline)] pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-					{pack.navigation}
-				</div>
-			)}
+			{tabs.length > 1 ? (
+				<button
+					ref={switchTrigger}
+					type="button"
+					aria-haspopup="menu"
+					aria-expanded={switchOpen}
+					aria-label="All tabs"
+					title="All tabs"
+					onClick={() => {
+						if (!switchOpen) placeSwitch();
+						setSwitchOpen(!switchOpen);
+					}}
+					className={cx(
+						"flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[length:var(--text-body,13px)] text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]",
+						MOTION,
+						FOCUS_RING,
+					)}
+				>
+					<span aria-hidden="true">{"\u25be"}</span>
+				</button>
+			) : null}
 		</div>
 	);
 
 	return (
-		<MenuBar
-			data-testid={testId}
-			aria-label="Suite"
-			{...(mark === undefined ? {} : { mark })}
-			{...(pack?.context === undefined ? {} : { context: pack.context })}
-			{...(onHome === undefined
-				? {}
-				: { onNavigateHome: onHome, homeAriaLabel: homeLabel })}
-			navigation={navigation}
-			{...(search === undefined ? {} : { search })}
-			{...(onOpenSearch === undefined ? {} : { onOpenSearch })}
-			{...(searchPlaceholder === undefined ? {} : { searchPlaceholder })}
-			{...(searchShortcut === undefined ? {} : { searchShortcut })}
-			{...(sync === undefined ? {} : { sync })}
-			{...(pack?.actions === undefined ? {} : { actions: pack.actions })}
-			{...(controls === undefined ? {} : { controls })}
-		/>
+		<div className="flex flex-col">
+			<MenuBar
+				data-testid={testId}
+				aria-label="Suite"
+				style={{ "--menu-bar-height": "var(--control-height, 36px)" } as CSSProperties}
+				{...(mark === undefined ? {} : { mark })}
+				{...(onHome === undefined
+					? {}
+					: { onNavigateHome: onHome, homeAriaLabel: homeLabel })}
+				navigation={rowOne}
+				{...(search === undefined ? {} : { search })}
+				{...(onOpenSearch === undefined ? {} : { onOpenSearch })}
+				{...(searchPlaceholder === undefined ? {} : { searchPlaceholder })}
+				{...(searchShortcut === undefined ? {} : { searchShortcut })}
+				{...(sync === undefined ? {} : { sync })}
+				{...(controls === undefined ? {} : { controls })}
+			/>
+			{pack === undefined ? null : (
+				<div
+					// Remounting on a surface change replays the entrance, so switching packs
+					// reads as a change rather than a flicker of the same row's contents.
+					key={packKey ?? "pack"}
+					data-testid={`${testId}-pack`}
+					data-handbook-region="pack-bar"
+					className={cx(
+						"flex h-[var(--control-height,36px)] shrink-0 items-center gap-2 border-t border-[var(--hairline)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] px-4 text-[length:var(--text-label,12px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md starting:translate-y-1 starting:opacity-0",
+						MOTION_ALL,
+					)}
+				>
+					<div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+						{pack.context}
+						{pack.navigation}
+					</div>
+					{pack.actions === undefined ? null : (
+						<div className="flex shrink-0 items-center gap-1">{pack.actions}</div>
+					)}
+				</div>
+			)}
+			{switchOpen && switchAt !== null
+				? createPortal(
+						<div
+							ref={switchMenu}
+							role="menu"
+							aria-label="All tabs"
+							className="fixed z-50 overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-[var(--shadow-xl)] starting:scale-95 starting:opacity-0 motion-safe:transition-[opacity,transform] motion-safe:duration-[var(--duration-fast,100ms)] motion-safe:ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))]"
+							style={{ left: switchAt.left, top: switchAt.top, minWidth: SWITCH_WIDTH }}
+							onKeyDown={(event) => {
+								if (event.key === "Escape") {
+									event.preventDefault();
+									closeSwitch(true);
+									return;
+								}
+								menuKeyDown(event);
+							}}
+						>
+							{tabs.map((tab) => (
+								<button
+									key={tab.id}
+									type="button"
+									role="menuitemradio"
+									aria-checked={tab.id === activeTabId}
+									data-tab-id={tab.id}
+									onClick={() => {
+										closeSwitch(true);
+										onActivate?.(tab.id);
+									}}
+									className={cx(SWITCH_ROW, MOTION, FOCUS_RING)}
+								>
+									<span
+										aria-hidden="true"
+										className="w-3 shrink-0 text-[var(--accent)]"
+									>
+										{tab.id === activeTabId ? "\u2713" : ""}
+									</span>
+									<span className="min-w-0 flex-1 truncate">{tab.title}</span>
+									<span className="shrink-0 text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
+										{tab.kind}
+									</span>
+								</button>
+							))}
+						</div>,
+						document.body,
+					)
+				: null}
+		</div>
 	);
 }
