@@ -86,7 +86,8 @@ export interface PackMenuFoldRow {
 /** One takeover control, with both its inline node and its folded rows. */
 export interface PackMenuControl {
 	readonly key: string;
-	readonly label: string;
+	/** The control's own name, when it published one, used as the fold group heading. */
+	readonly group?: string;
 	readonly node: ReactNode;
 	readonly rows: readonly PackMenuFoldRow[];
 }
@@ -621,7 +622,7 @@ function renderControl(
 					choose: () => onChoose({ id: control.id, item: item.id }),
 				}),
 			);
-			return { key: control.id, label: control.label, node, rows };
+			return { key: control.id, group: control.label, node, rows };
 		}
 		case "tabs": {
 			const node = (
@@ -643,7 +644,7 @@ function renderControl(
 					choose: () => onChoose({ id: control.id, item: item.id }),
 				}),
 			);
-			return { key: control.id, label: control.label, node, rows };
+			return { key: control.id, group: control.label, node, rows };
 		}
 		case "toggle": {
 			const node = (
@@ -681,7 +682,12 @@ function renderControl(
 					choose: () => onChoose({ id: control.id }),
 				},
 			];
-			return { key: control.id, label: control.label, node, rows };
+			return {
+				key: control.id,
+				...(control.help?.title === undefined ? {} : { group: control.help.title }),
+				node,
+				rows,
+			};
 		}
 		case "buttons": {
 			const node = (
@@ -708,7 +714,7 @@ function renderControl(
 			);
 			return {
 				key: control.id,
-				label: control.help?.title ?? "Actions",
+				...(control.help?.title === undefined ? {} : { group: control.help.title }),
 				node,
 				rows,
 			};
@@ -734,7 +740,7 @@ function renderControl(
 					choose: () => onChoose({ id: control.id, item: option.id }),
 				}),
 			);
-			return { key: control.id, label: control.label, node, rows };
+			return { key: control.id, group: control.label, node, rows };
 		}
 	}
 }

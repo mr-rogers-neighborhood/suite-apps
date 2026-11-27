@@ -532,7 +532,13 @@ export function HostTabBar({
 							}}
 						>
 							{foldControls.map((control) => (
-								<div key={control.key} role="group" aria-label={control.label}>
+								<div
+									key={control.key}
+									role="group"
+									{...(control.group === undefined
+										? {}
+										: { "aria-label": control.group })}
+								>
 									{control.rows.map((row) => (
 										<button
 											key={row.key}

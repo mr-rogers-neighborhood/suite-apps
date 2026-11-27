@@ -226,7 +226,9 @@ export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTa
                             return;
                         }
                         menuKeyDown(event);
-                    }, children: foldControls.map((control) => (_jsx("div", { role: "group", "aria-label": control.label, children: control.rows.map((row) => (_jsxs("button", { type: "button", role: foldRowName(row), "aria-checked": row.role === "command" ? undefined : row.checked === true, disabled: row.disabled === true, title: row.disabledReason ?? row.description ?? row.label, "data-slot-id": row.key, onClick: () => {
+                    }, children: foldControls.map((control) => (_jsx("div", { role: "group", ...(control.group === undefined
+                            ? {}
+                            : { "aria-label": control.group }), children: control.rows.map((row) => (_jsxs("button", { type: "button", role: foldRowName(row), "aria-checked": row.role === "command" ? undefined : row.checked === true, disabled: row.disabled === true, title: row.disabledReason ?? row.description ?? row.label, "data-slot-id": row.key, onClick: () => {
                                 closeFold(true);
                                 row.choose();
                             }, className: cx("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[length:var(--text-label,12px)] text-[var(--ink-muted)] outline-none hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)] disabled:opacity-40", MOTION, FOCUS_RING), children: [_jsx("span", { "aria-hidden": "true", className: "w-3 shrink-0 text-[var(--accent)]", children: row.checked === true ? "\u2713" : "" }), row.glyph === undefined ? null : (_jsx("span", { "aria-hidden": "true", className: "shrink-0", children: row.glyph })), _jsxs("span", { className: "min-w-0 flex-1", children: [_jsx("span", { className: "block truncate", children: row.label }), row.description === undefined ? null : (_jsx("span", { className: "block truncate text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: row.description }))] })] }, row.key))) }, control.key))) }), document.body)
