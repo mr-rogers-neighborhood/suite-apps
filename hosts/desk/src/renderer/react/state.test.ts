@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import type { RelayView, ShellTab } from "../../shared.js";
-import { colorFor, syncPresentation, toHostTabs } from "./state.js";
+import { colorFor, syncPresentation, toHostPack, toHostTabs } from "./state.js";
 
 const tabs: readonly ShellTab[] = [
   { kind: "pack", id: "tab-1", packId: "canvas", title: "Canvas", entry: "index.html" },
@@ -55,5 +55,24 @@ describe("the host bar's state mapping", () => {
     expect(syncPresentation(relay({ state: "crashed", lastError: "no bus" })).label).toBe(
       "Sync failed",
     );
+  });
+
+  it("gives the pack a row whenever it published anything, including only a title", () => {
+    // A pack with a document name and no controls used to be treated as nothing, so its
+    // title vanished. Every published zone counts as material.
+    expect(toHostPack({ navigation: null })).toBeUndefined();
+    expect(toHostPack({ navigation: null, context: "Autumn plan" })).toEqual({
+      context: "Autumn plan",
+      navigation: null,
+    });
+    expect(toHostPack({ navigation: null, actions: "Export" })).toEqual({
+      navigation: null,
+      actions: "Export",
+    });
+    expect(toHostPack({ navigation: "View", context: "Autumn plan", actions: "Export" })).toEqual({
+      context: "Autumn plan",
+      navigation: "View",
+      actions: "Export",
+    });
   });
 });

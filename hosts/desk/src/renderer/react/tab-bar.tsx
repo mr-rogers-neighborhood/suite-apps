@@ -12,7 +12,12 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { PickerData } from "../../shared.js";
-import { type HostBarSnapshot, syncPresentation, toHostTabs } from "./state.js";
+import {
+  type HostBarSnapshot,
+  syncPresentation,
+  toHostPack,
+  toHostTabs,
+} from "./state.js";
 import "./tab-bar.css";
 
 export { colorFor } from "./state.js";
@@ -77,17 +82,10 @@ function TabBar({
   const [picker, setPicker] = useState<PickerData | null>(null);
 
   // The active pack's zones. A pack that published nothing, or a Screen tab, leaves the
-  // bar with only the host's own material: `packMenuZones` returns a null takeover and no
-  // actions, and the bar is not given a pack at all, so no divider is drawn for it.
-  const packZones = packMenuZones(snapshot.packMenu, actions.packMenuAction);
-  const pack =
-    packZones.navigation === null && packZones.actions === undefined
-      ? undefined
-      : {
-          ...(packZones.context === undefined ? {} : { context: packZones.context }),
-          navigation: packZones.navigation,
-          ...(packZones.actions === undefined ? {} : { actions: packZones.actions }),
-        };
+  // bar with only the host's own material: `toHostPack` returns undefined and the bar is
+  // not given a pack at all, so no row is drawn for it. A pack that published only its
+  // document name still gets a row.
+  const pack = toHostPack(packMenuZones(snapshot.packMenu, actions.packMenuAction));
 
   const openPicker = useCallback(async () => {
     setPickOpen(true);
