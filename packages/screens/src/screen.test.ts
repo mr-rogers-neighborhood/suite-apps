@@ -9,14 +9,14 @@ import {
 
 const screen: Screen = {
   format: "suite.screen",
-  version: 2,
+  version: 3,
   id: "home",
   name: "Home",
   widgets: [
-    { registryId: "desk.apps", size: "full" },
+    { registryId: "desk.apps", size: "full", x: 0, y: 0 },
     {
       registryId: "planner.quick-task",
-      size: "2x1",
+      size: "2x1", x: 0, y: 1,
       settings: { project: "inbox" },
     },
   ],
@@ -37,7 +37,7 @@ describe("the Screen shape", () => {
       widgets: [
         {
           registryId: "future.unknown-widget",
-          size: "1x1",
+          size: "1x1", x: 0, y: 0,
           settings: { "future-setting": "kept" },
         },
       ],
@@ -46,7 +46,7 @@ describe("the Screen shape", () => {
     if (!parsed.ok) return;
     expect(parsed.value.widgets[0]).toEqual({
       registryId: "future.unknown-widget",
-      size: "1x1",
+      size: "1x1", x: 0, y: 0,
       settings: { "future-setting": "kept" },
     });
   });
@@ -79,7 +79,7 @@ describe("the Screen shape", () => {
     expect(
       parseScreen({
         ...screen,
-        widgets: [{ registryId: "desk.apps", size: "full", [key]: "widget.js" }],
+        widgets: [{ registryId: "desk.apps", size: "full", x: 0, y: 0, [key]: "widget.js" }],
       }).ok,
     ).toBe(false);
   });
@@ -88,7 +88,7 @@ describe("the Screen shape", () => {
     expect(
       parseScreen({
         ...screen,
-        widgets: [{ registryId: "desk.apps", size: "full", settings: { project: 7 } }],
+        widgets: [{ registryId: "desk.apps", size: "full", x: 0, y: 0, settings: { project: 7 } }],
       }).ok,
     ).toBe(false);
   });
@@ -125,13 +125,32 @@ describe("the Screen shape", () => {
     );
   });
 
+  it("accepts the five size classes and refuses one that runs past the grid", () => {
+    for (const size of ["1x1", "1x2", "2x1", "2x2"] as const) {
+      expect(
+        parseScreen({
+          ...screen,
+          widgets: [{ registryId: "desk.apps", size, x: 0, y: 0 }],
+        }).ok,
+      ).toBe(true);
+    }
+
+    // A full-width tile cannot start at column 1: four cells need x = 0.
+    expect(
+      parseScreen({
+        ...screen,
+        widgets: [{ registryId: "desk.apps", size: "full", x: 1, y: 0 }],
+      }).ok,
+    ).toBe(false);
+  });
+
   it("parses a row of weighted widgets and keeps its settings", () => {
     const parsed = parseScreen({
       ...screen,
       widgets: [
         {
           kind: "row",
-          size: "full",
+          size: "full", x: 0, y: 0,
           layout: "row",
           items: [
             { registryId: "planner.quick-task", weight: 2, settings: { project: "work" } },
@@ -143,7 +162,7 @@ describe("the Screen shape", () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     const row = parsed.value.widgets[0];
-    expect(row).toMatchObject({ kind: "row", size: "full", layout: "row" });
+    expect(row).toMatchObject({ kind: "row", size: "full", x: 0, y: 0, layout: "row" });
     if (row === undefined || !isScreenRow(row)) return;
     expect(row.items[1]).toEqual({
       registryId: "unknown.widget",
@@ -159,12 +178,12 @@ describe("the Screen shape", () => {
         widgets: [
           {
             kind: "row",
-            size: "full",
+            size: "full", x: 0, y: 0,
             items: [
               { registryId: "desk.apps", weight: 1 },
               {
                 kind: "row",
-                size: "full",
+                size: "full", x: 0, y: 0,
                 items: [
                   { registryId: "planner.quick-task", weight: 1 },
                   { registryId: "budget.month", weight: 1 },
@@ -182,7 +201,7 @@ describe("the Screen shape", () => {
         widgets: [
           {
             kind: "row",
-            size: "full",
+            size: "full", x: 0, y: 0,
             items: [{ registryId: "desk.apps", weight: 1 }],
           },
         ],
@@ -195,7 +214,7 @@ describe("the Screen shape", () => {
         widgets: [
           {
             kind: "row",
-            size: "full",
+            size: "full", x: 0, y: 0,
             items: [
               { registryId: "desk.apps", weight: 1 },
               { registryId: "desk.apps", weight: 1 },
@@ -214,7 +233,7 @@ describe("the Screen shape", () => {
           widgets: [
             {
               kind: "row",
-              size: "full",
+              size: "full", x: 0, y: 0,
               items: [
                 { registryId: "desk.apps", weight },
                 { registryId: "planner.quick-task", weight: 1 },

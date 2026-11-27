@@ -13,15 +13,23 @@ import type { Screen } from "./screen.js";
 
 const screen: Screen = {
   format: "suite.screen",
-  version: 2,
+  version: 3,
   id: "work",
   name: "Work",
   widgets: [
-    { registryId: "desk.apps", size: "full" },
-    { registryId: "ghost.notes", size: "2x1", settings: { "future-setting": "kept" } },
+    { registryId: "desk.apps", size: "full", x: 0, y: 0 },
+    {
+      registryId: "ghost.notes",
+      size: "2x1",
+      x: 0,
+      y: 1,
+      settings: { "future-setting": "kept" },
+    },
     {
       kind: "row",
       size: "full",
+      x: 0,
+      y: 2,
       layout: "row",
       items: [
         { registryId: "planner.quick-task", weight: 2, settings: { project: "work" } },
@@ -74,7 +82,7 @@ describe("the portable .screen file", () => {
     if (!parsed.ok) return;
 
     expect(parsed.home).toBe(true);
-    expect(parsed.fromVersion).toBe(2);
+    expect(parsed.fromVersion).toBe(3);
     expect(parsed.screen).toEqual(screen);
     expect(parsed.document.state()).toEqual(screen);
   });
@@ -93,7 +101,7 @@ describe("the portable .screen file", () => {
     );
     expect(header).toEqual({
       format: "suite.screen",
-      version: 2,
+      version: 3,
       id: "work",
       name: "Work",
       home: false,
@@ -186,7 +194,7 @@ describe("the portable .screen file", () => {
         payload,
         header: {
           format: "suite.screen",
-          version: 2,
+          version: 3,
           id: "other",
           name: "Work",
           home: false,

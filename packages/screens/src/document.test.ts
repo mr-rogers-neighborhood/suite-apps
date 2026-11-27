@@ -1,7 +1,13 @@
 import { LoroDoc } from "loro-crdt";
 import { describe, expect, it } from "vitest";
 import { ScreenDocument } from "./document.js";
-import { isScreenRow, type Screen, type ScreenEntry, screenEntryRegistryIds } from "./screen.js";
+import {
+  isScreenRow,
+  type Screen,
+  type ScreenEntry,
+  screenEntryRegistryIds,
+  SUITE_SCREEN_VERSION,
+} from "./screen.js";
 
 function entryIds(entries: readonly ScreenEntry[]): string[] {
   return entries.flatMap(screenEntryRegistryIds);
@@ -13,17 +19,25 @@ function entryId(entry: ScreenEntry | undefined): string | undefined {
 
 const initial: Screen = {
   format: "suite.screen",
-  version: 2,
+  version: 3,
   id: "home",
   name: "Home",
   widgets: [
-    { registryId: "desk.apps", size: "full" },
+    { registryId: "desk.apps", size: "full", x: 0, y: 0 },
     {
       registryId: "planner.quick-task",
       size: "2x1",
+      x: 0,
+      y: 1,
       settings: { project: "inbox" },
     },
-    { registryId: "future.unknown-widget", size: "1x1", settings: { "future-setting": "kept" } },
+    {
+      registryId: "future.unknown-widget",
+      size: "1x1",
+      x: 2,
+      y: 1,
+      settings: { "future-setting": "kept" },
+    },
   ],
 };
 
@@ -136,6 +150,8 @@ describe("ScreenDocument", () => {
     expect(opened.document.state().widgets[2]).toEqual({
       registryId: "future.unknown-widget",
       size: "1x1",
+      x: 2,
+      y: 1,
       settings: { "future-setting": "kept" },
     });
   });
@@ -152,7 +168,7 @@ describe("ScreenDocument", () => {
     const doc = new LoroDoc();
     const header = doc.getMap("screen");
     header.set("format", "suite.screen");
-    header.set("version", 3);
+    header.set("version", SUITE_SCREEN_VERSION + 1);
     header.set("id", "home");
     header.set("name", "Home");
     doc.getList("order").push("desk.apps");
@@ -297,6 +313,8 @@ describe("ScreenDocument", () => {
         {
           kind: "row",
           size: "full",
+          x: 0,
+          y: 0,
           layout: "row",
           items: [
             { registryId: "ghost.notes", weight: 1, settings: { "future-setting": "kept" } },

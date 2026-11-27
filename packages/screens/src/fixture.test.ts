@@ -6,7 +6,7 @@ import { isScreenRow } from "./screen.js";
 describe("the shared Home fixture", () => {
   it("is a valid Screen with one row composition", () => {
     expect(homeScreen().id).toBe("home");
-    expect(homeScreen().version).toBe(2);
+    expect(homeScreen().version).toBe(3);
     expect(
       homeScreen().widgets.map((entry) => (isScreenRow(entry) ? entry.kind : entry.registryId)),
     ).toEqual(["desk.apps", "row"]);

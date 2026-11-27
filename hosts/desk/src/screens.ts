@@ -5,6 +5,8 @@ import type { SuiteWidgetSize } from "@suite/contracts";
 import {
   exportScreenFile,
   isScreenRow,
+  type NewScreenRow,
+  type NewScreenWidget,
   parseScreenFile,
   type Screen,
   ScreenDocument,
@@ -12,8 +14,6 @@ import {
   type ScreenRefusal,
   SUITE_SCREEN_FORMAT,
   SUITE_SCREEN_VERSION,
-  type SuiteScreenRow,
-  type SuiteScreenWidget,
 } from "@suite/screens";
 import { defaultHomeScreen, HOME_SCREEN_ID } from "./home.js";
 
@@ -106,11 +106,11 @@ export class ScreenStore {
     return this.#document.state();
   }
 
-  async add(widget: SuiteScreenWidget): Promise<boolean> {
+  async add(widget: NewScreenWidget): Promise<boolean> {
     return this.#mutate(this.#document.add(widget));
   }
 
-  async addRow(row: SuiteScreenRow): Promise<boolean> {
+  async addRow(row: NewScreenRow): Promise<boolean> {
     return this.#mutate(this.#document.addRow(row));
   }
 

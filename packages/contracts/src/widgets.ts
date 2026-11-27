@@ -29,10 +29,11 @@ export const suiteWidgetIdSchema = z
 /**
  * The size classes a layout may place a widget at.
  *
- * Three classes, because a host surface is a grid: one cell, two cells, or the whole row.
- * `full` is what the app grid uses by default.
+ * The Screen is a four-cell-wide grid: one or two cells in each direction, or the whole
+ * row. `full` is what the app grid uses by default. A widget declares the subset it can
+ * draw, so adding a class here never forces a widget to support it.
  */
-export const SUITE_WIDGET_SIZES = ["1x1", "2x1", "full"] as const;
+export const SUITE_WIDGET_SIZES = ["1x1", "1x2", "2x1", "2x2", "full"] as const;
 export const suiteWidgetSizeSchema = z.enum(SUITE_WIDGET_SIZES);
 export type SuiteWidgetSize = (typeof SUITE_WIDGET_SIZES)[number];
 

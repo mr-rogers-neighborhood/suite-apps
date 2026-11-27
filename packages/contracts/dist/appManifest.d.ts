@@ -67,7 +67,9 @@ export declare const suiteAppManifestSchema: z.ZodObject<{
         title: z.ZodString;
         size: z.ZodEnum<{
             "1x1": "1x1";
+            "1x2": "1x2";
             "2x1": "2x1";
+            "2x2": "2x2";
             full: "full";
         }>;
         capabilities: z.ZodArray<z.ZodEnum<{

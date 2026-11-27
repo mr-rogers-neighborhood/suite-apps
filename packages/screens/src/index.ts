@@ -11,6 +11,8 @@ export {
 } from "./codec.js";
 export {
   createScreenDocument,
+  type NewScreenRow,
+  type NewScreenWidget,
   SCREEN_FORMAT,
   SCREEN_VERSION,
   ScreenDocument,
@@ -52,9 +54,12 @@ export {
 } from "./registry.js";
 export {
   corruptScreenRefusal,
+  findFreePlacement,
   isScreenRow,
   MAX_SCREEN_PLACEMENTS,
+  type OccupiedPlacement,
   parseScreen,
+  SCREEN_GRID_COLUMNS,
   SCREEN_ROW_LAYOUTS,
   type Screen,
   type ScreenEntry,
@@ -62,6 +67,7 @@ export {
   type ScreenRefusal,
   type ScreenRefusalReason,
   type ScreenRowLayout,
+  sizeCells,
   SUITE_SCREEN_FORMAT,
   SUITE_SCREEN_VERSION,
   type SuiteScreenRow,

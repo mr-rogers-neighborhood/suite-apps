@@ -69,7 +69,7 @@ describe("the default Home", () => {
   it("is an empty Screen named Home", () => {
     expect(defaultHomeScreen()).toEqual({
       format: "suite.screen",
-      version: 2,
+      version: 3,
       id: HOME_SCREEN_ID,
       name: HOME_SCREEN_NAME,
       widgets: [],
@@ -83,7 +83,7 @@ describe("drawing a Screen", () => {
     const registry = shellWidgetRegistry([fakeDesk]);
     const oldHome = {
       ...defaultHomeScreen(),
-      widgets: [{ registryId: DESK_APPS_WIDGET, size: "full" as const }],
+      widgets: [{ registryId: DESK_APPS_WIDGET, size: "full" as const, x: 0, y: 0 }],
     };
     const view = screenView(oldHome, [fakeDesk], registry);
 
@@ -102,8 +102,14 @@ describe("drawing a Screen", () => {
     const screen = {
       ...defaultHomeScreen(),
       widgets: [
-        { registryId: DESK_APPS_WIDGET, size: "full" as const },
-        { registryId: "planner.quick-task", size: "2x1" as const, settings: { project: "work" } },
+        { registryId: DESK_APPS_WIDGET, size: "full" as const, x: 0, y: 0 },
+        {
+          registryId: "planner.quick-task",
+          size: "2x1" as const,
+          x: 0,
+          y: 0,
+          settings: { project: "work" },
+        },
       ],
     };
 
@@ -128,8 +134,8 @@ describe("drawing a Screen", () => {
     const screen = {
       ...defaultHomeScreen(),
       widgets: [
-        { registryId: DESK_APPS_WIDGET, size: "full" as const },
-        { registryId: "planner.quick-task", size: "2x1" as const },
+        { registryId: DESK_APPS_WIDGET, size: "full" as const, x: 0, y: 0 },
+        { registryId: "planner.quick-task", size: "2x1" as const, x: 0, y: 0 },
       ],
     };
 
@@ -143,8 +149,14 @@ describe("drawing a Screen", () => {
     const screen = {
       ...defaultHomeScreen(),
       widgets: [
-        { registryId: DESK_APPS_WIDGET, size: "full" as const },
-        { registryId: "ghost.notes", size: "1x1" as const, settings: { project: "inbox" } },
+        { registryId: DESK_APPS_WIDGET, size: "full" as const, x: 0, y: 0 },
+        {
+          registryId: "ghost.notes",
+          size: "1x1" as const,
+          x: 0,
+          y: 0,
+          settings: { project: "inbox" },
+        },
       ],
     };
 
@@ -167,6 +179,8 @@ describe("drawing a Screen", () => {
         {
           kind: "row" as const,
           size: "full" as const,
+          x: 0,
+          y: 0,
           layout: "row" as const,
           items: [
             { registryId: "planner.quick-task", weight: 2, settings: { project: "work" } },

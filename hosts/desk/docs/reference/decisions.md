@@ -322,9 +322,11 @@ The rules that shape the Suite host.
   order for keyboard and screen-reader users, and a host that cannot draw the row flattens it to a
   stacked list rather than dropping placements.
 - Edit mode is host chrome: named buttons and named keys add, remove, move earlier/later and change
-  the size, which stays exactly `1x1`, `2x1` or `full`. The renderer holds no document state; an
-  action names a registry id and the main process answers with the new state. Rows are drawn in this
-  slice and are not edited inline yet; their placements and saved settings survive every flat edit.
+  the size, which is one of `1x1`, `1x2`, `2x1`, `2x2` or `full`. A placement carries `x` and `y` on
+  a four-cell grid, and `size` is the single source of its width and height; `full` is four cells.
+  The renderer holds no document state; an action names a registry id and the main process answers
+  with the new state. Rows are drawn in this slice and are not edited inline yet; their placements
+  and saved settings survive every flat edit.
 - The screen store writes a snapshot through a temporary file and rename, keeps the previous good
   snapshot as `<id>.loro.bak`, and quarantines an unreadable, oversized or newer file as
   `<id>.loro.corrupt-<time>` before starting a fresh Home. It never deletes the only copy and never

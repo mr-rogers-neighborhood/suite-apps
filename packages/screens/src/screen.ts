@@ -5,6 +5,7 @@ import {
   splitWidgetRegistryId,
   suiteWidgetIdSchema,
   suiteWidgetSizeSchema,
+  type SuiteWidgetSize,
 } from "@suite/contracts";
 import { z } from "zod";
 
@@ -28,10 +29,88 @@ import { z } from "zod";
 export const SUITE_SCREEN_FORMAT = "suite.screen";
 
 /** Bumped when the shape changes; an older reader refuses rather than guesses. */
-export const SUITE_SCREEN_VERSION = 2;
+export const SUITE_SCREEN_VERSION = 3;
 
 /** The placement budget, rows included. Keeps one Screen bounded on every host. */
 export const MAX_SCREEN_PLACEMENTS = 64;
+
+/** The Screen is a four-cell-wide grid; `x + w` may never exceed it. */
+export const SCREEN_GRID_COLUMNS = 4;
+
+/**
+ * How many cells a size class claims.
+ *
+ * The class is the one source of truth for a placement's dimensions; `x` and `y` say
+ * where it starts. Keeping `w`/`h` derived from the class avoids two truths that can
+ * disagree after an edit or a hand-written file.
+ */
+export function sizeCells(size: SuiteWidgetSize): { readonly w: number; readonly h: number } {
+	switch (size) {
+		case "1x1":
+			return { w: 1, h: 1 };
+		case "1x2":
+			return { w: 1, h: 2 };
+		case "2x1":
+			return { w: 2, h: 1 };
+		case "2x2":
+			return { w: 2, h: 2 };
+		case "full":
+			return { w: SCREEN_GRID_COLUMNS, h: 1 };
+	}
+}
+
+/** Where a placement starts, bounded to the grid. */
+const placementFields = {
+	x: z.number().int().min(0).max(SCREEN_GRID_COLUMNS - 1),
+	y: z.number().int().min(0).max(MAX_SCREEN_PLACEMENTS),
+};
+
+/** The cells one placement already claims. */
+export interface OccupiedPlacement {
+	readonly x: number;
+	readonly y: number;
+	readonly size: SuiteWidgetSize;
+}
+
+/**
+ * The first free cell for a new placement, scanning left to right and top to bottom.
+ *
+ * A new widget has no coordinates until it is placed. The host asks for the first cell
+ * that fits, which is what keeps "Add widget" deterministic and non-overlapping. The
+ * fallback appends below every occupied row rather than refusing the add.
+ */
+export function findFreePlacement(
+	occupied: readonly OccupiedPlacement[],
+	size: SuiteWidgetSize,
+): { readonly x: number; readonly y: number } {
+	const taken = new Set<string>();
+	let deepest = 0;
+	for (const entry of occupied) {
+		const cells = sizeCells(entry.size);
+		deepest = Math.max(deepest, entry.y + cells.h);
+		for (let dy = 0; dy < cells.h; dy += 1) {
+			for (let dx = 0; dx < cells.w; dx += 1) {
+				taken.add(`${entry.y + dy}:${entry.x + dx}`);
+			}
+		}
+	}
+	const cells = sizeCells(size);
+	for (let y = 0; y <= deepest; y += 1) {
+		for (let x = 0; x + cells.w <= SCREEN_GRID_COLUMNS; x += 1) {
+			let free = true;
+			for (let dy = 0; dy < cells.h && free; dy += 1) {
+				for (let dx = 0; dx < cells.w; dx += 1) {
+					if (taken.has(`${y + dy}:${x + dx}`)) {
+						free = false;
+						break;
+					}
+				}
+			}
+			if (free) return { x, y };
+		}
+	}
+	return { x: 0, y: deepest };
+}
 
 /** A Screen's own id. The host chooses the file path; this is never a path itself. */
 const SCREEN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
@@ -62,6 +141,7 @@ export const suiteScreenWidgetSchema = z
   .object({
     registryId: suiteScreenRegistryIdSchema,
     size: suiteWidgetSizeSchema,
+    ...placementFields,
     settings: suiteScreenSettingsSchema.optional(),
   })
   .strict();
@@ -101,6 +181,7 @@ export const suiteScreenRowSchema = z
   .object({
     kind: z.literal("row"),
     size: suiteWidgetSizeSchema,
+    ...placementFields,
     layout: suiteScreenRowLayoutSchema.default("row"),
     items: z.array(suiteScreenRowItemSchema).min(2).max(8),
   })
@@ -146,6 +227,15 @@ export const suiteScreenSchema = z
     let placements = 0;
 
     screen.widgets.forEach((entry, index) => {
+      const cells = sizeCells(entry.size);
+      if (entry.x + cells.w > SCREEN_GRID_COLUMNS) {
+        context.addIssue({
+          code: "custom",
+          path: ["widgets", index, "x"],
+          message: `a ${entry.size} tile does not fit at column ${entry.x}`,
+        });
+      }
+
       const items = isScreenRow(entry) ? entry.items : [entry];
       placements += items.length;
 

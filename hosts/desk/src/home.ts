@@ -116,12 +116,14 @@ export function screenView(
   viewportWidth = 1024,
 ): ScreenView {
   const layout = screenLayout(screen, { width: viewportWidth });
+  // The layout is in visual order; `index` maps it back to the document entry.
+  const byIndex = new Map(layout.entries.map((entry) => [entry.index, entry]));
   return {
     id: screen.id,
     name: screen.name,
     available: true,
     widgets: screen.widgets.map((entry, index) =>
-      screenEntryView(entry, layout.entries[index], packs, registry),
+      screenEntryView(entry, byIndex.get(index), packs, registry),
     ),
     choices: screenChoices(packs, registry),
   };
@@ -166,7 +168,9 @@ function rowItemWidgetView(
 }
 
 function screenWidgetView(
-  placement: SuiteScreenWidget,
+  placement: Pick<SuiteScreenWidget, "registryId" | "size"> & {
+    readonly settings?: Record<string, string> | undefined;
+  },
   packs: readonly PackInfo[],
   registry: WidgetRegistry,
 ): ScreenWidgetView {
