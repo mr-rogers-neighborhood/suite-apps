@@ -285,10 +285,12 @@ describe("loading a verified index", () => {
     expect(loaded.message).toContain("cannot rewrite a sequence");
   });
 
-  it("refuses a previous that names another index", async () => {
-    // spec: S12.2
+  it("accepts a forward index whose previous names one this host never held", async () => {
+    // spec: S12.2 — a catalogue is published more often than a person opens the
+    // app, so a gap must not strand the client. The signature and the increasing
+    // sequence carry the trust; `previous` is the audit link.
     const operator = await generatePackKeyPair();
-    const { core } = await fixture({ sequence: 2, previous: "c".repeat(64) });
+    const { core } = await fixture({ sequence: 5, previous: "c".repeat(64) });
     const index = signPackIndex(core, [operator.secretKeyBase64]);
     const headRoot = await temporaryRoot();
     await writeCatalogueIndexHead(headRoot, { sequence: 1, digest: "b".repeat(64) });
@@ -301,9 +303,11 @@ describe("loading a verified index", () => {
       fetch: fetcher({ [INDEX_URL]: JSON.stringify(index) }),
     });
 
-    expect(loaded).toMatchObject({ ok: false, reason: "refused" });
-    if (loaded.ok) return;
-    expect(loaded.message).toContain("does not name the digest");
+    expect(loaded).toMatchObject({ ok: true, sequence: 5 });
+    expect(await readCatalogueIndexHead(headRoot)).toEqual({
+      sequence: 5,
+      digest: await packIndexDigest(index),
+    });
   });
 
   it("refuses an archive whose bytes do not match the verified entry before extraction", async () => {

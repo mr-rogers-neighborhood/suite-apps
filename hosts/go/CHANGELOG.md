@@ -21,6 +21,13 @@ are in [Version ownership](../../docs/how-to/package-and-release.md#version-owne
 - **Go follows the host's theme and density.** The palette, brightness and density chosen in the
   phone's settings reach each pack frame, and the settings sheet exposes the scale.
 
+### Fixed
+
+- **Browse apps catches up after a missed publication.** The catalogue accepted only an index whose
+  `previous` digest matched the head the phone had stored, so skipping a nightly or preview left the
+  catalogue empty until the app's data was cleared. A higher sequence is now accepted on its
+  signature; a lower or rewritten sequence is still refused.
+
 ## [0.2.0] - 2026-11-24
 
 ### Added

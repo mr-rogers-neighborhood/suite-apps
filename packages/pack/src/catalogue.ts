@@ -31,8 +31,11 @@ import { isPublisherKey, isSafePublisherId } from "./trust.js";
  * Rollback is refused by construction: `sequence` must not decrease (an equal
  * sequence is the index this host already trusts, accepted only when its digest
  * matches; the same sequence with different bytes is an equivocation and is
- * refused), `previous` names the digest of the canonical bytes of the index
- * being replaced, and an index whose `expires` has passed is refused.
+ * refused), `previous` names the digest of the canonical bytes of the index the
+ * publisher replaced, and an index whose `expires` has passed is refused. The
+ * host does not require `previous` to equal its own head, because it may have
+ * missed publications; the signature and the increasing sequence carry the
+ * trust, and `previous` is the audit link.
  * `threshold` is inside the signed bytes, so an attacker cannot lower the number
  * of operator signatures a host needs.
  */
@@ -700,13 +703,14 @@ export async function verifyPackIndex(
       }
       return { ok: true, index, digest };
     }
-    if (index.previous !== head.digest) {
-      return {
-        ok: false,
-        reason: "chain",
-        message: "This index does not name the digest of the index it would replace.",
-      };
-    }
+    // A higher sequence is accepted on its signature alone, even when the host
+    // missed publications. `previous` links an index to the one its publisher
+    // replaced, but the host may never have held that one: a catalogue is
+    // published more often than a person opens the app, and requiring equality
+    // with the host's head strands every client that skipped a publication
+    // until its head is deleted by hand. Rollback stays refused by `sequence`;
+    // rewriting a sequence stays refused above; `previous` remains in the
+    // signed bytes as the audit link.
   }
 
   return { ok: true, index, digest };

@@ -42,6 +42,11 @@ shipped host.
 
 ### Fixed
 
+- **The catalogue catches up after a missed publication.** A host that had not opened the app since
+  an older index refused every newer one, because the index's `previous` digest no longer matched
+  the head it had stored. A higher sequence is now accepted on its signature, so a person who skips
+  a nightly or preview still sees the catalogue; a lower sequence and a rewritten sequence are
+  still refused.
 - **The bar's keyboard order.** A checked menu row takes focus, tabs and the dropdown complete with
   arrows, Home and End, and a control's help text reaches menu rows, tabs and buttons.
 - **The widget grid.** A tile cannot run past the fourth column, a row keeps at least two items, and
