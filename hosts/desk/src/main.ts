@@ -1,6 +1,7 @@
 import { mkdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { isMenuSlotAction, parseMenuSlots } from "@suite/contracts";
 import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/desktop";
 import { isPublisherKeyTrusted, type PackDocument, SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isPackCapability, type PackCapability } from "@suite/pack/capabilities";
@@ -1139,6 +1140,19 @@ function registerIpc(): void {
     if (typeof tabId !== "string") return;
     window?.reloadTab(tabId);
   });
+  /**
+   * A press on the bar's pack zones, on its way back to the pack.
+   *
+   * The chrome names the active tab and the id the pack itself published; the host adds
+   * nothing and interprets nothing. The tab is checked against the active one so a stale
+   * click cannot drive a background pack.
+   */
+  onChrome(CHROME_IPC.packMenuAction, (action) => {
+    if (!isMenuSlotAction(action)) return;
+    const state = window?.state();
+    if (state === undefined || state.activeTabId === null) return;
+    window?.packMenuAction(state.activeTabId, action);
+  });
   onChrome(CHROME_IPC.openExternal, (url) => {
     if (typeof url === "string") window?.openExternal(url);
   });
@@ -1516,6 +1530,30 @@ function registerIpc(): void {
     void window?.setTabTitle(sender.tabId, title).catch((error: unknown) => {
       console.warn("[desk] could not persist a tab title", error);
     });
+  });
+
+  /**
+   * A hosted pack publishes the material for the host's one menu bar.
+   *
+   * The pack is not trusted, so the value is parsed here rather than at render time: a
+   * malformed publish is dropped and the bar keeps what it had. The host never reads an
+   * id's meaning, which is what lets the same descriptors be explained in any app later.
+   */
+  ipcMain.on(PACK_IPC.setMenuSlots, (event, value) => {
+    const sender = packSender(event.sender.id);
+    if (sender === undefined) return;
+    if (!isTrustedSender(event.senderFrame?.url, [packOrigin(sender.packId, sender.containerId)])) {
+      return;
+    }
+    const parsed = parseMenuSlots(value);
+    if (!parsed.ok) {
+      const first = parsed.issues[0];
+      console.warn(
+        `[desk] ${sender.packId} published menu slots that were refused: ${first?.path ?? ""} ${first?.message ?? "invalid"}`.trim(),
+      );
+      return;
+    }
+    window?.setPackMenu(sender.tabId, parsed.value);
   });
 }
 

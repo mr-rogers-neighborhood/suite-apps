@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { MenuSlotAction, MenuSlots } from "@suite/contracts";
 import { originKey } from "@suite/desktop";
 import { SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isWidgetRegistryId } from "@suite/screens";
@@ -41,6 +42,7 @@ import {
   CHROME_STATE,
   type InstalledVersionView,
   PACK_EVENT,
+  PACK_IPC,
   type PackLaunchContext,
   type PackShellTab,
   type PickerData,
@@ -110,6 +112,14 @@ export class ShellWindow {
     string,
     { readonly packId: string; readonly documentId: string }
   >();
+  /**
+   * The bar material each pack published, keyed by tab.
+   *
+   * Kept per tab rather than as one value so switching tabs restores each pack's own bar
+   * immediately, without waiting for the pack to render and publish again. Cleared with the
+   * tab, so a closed pack cannot leave its title behind on the next one.
+   */
+  readonly #packMenus = new Map<string, MenuSlots>();
   readonly #listDocuments: (
     packId: string,
   ) => Promise<readonly { readonly id: string; readonly name: string }[]>;
@@ -273,6 +283,10 @@ export class ShellWindow {
       notice: this.#notice,
       reminderStatus: this.#reminderStatus,
       relay: this.#relay,
+      packMenu:
+        spaceState.activeTabId === null
+          ? null
+          : (this.#packMenus.get(spaceState.activeTabId) ?? null),
     };
   }
 
@@ -549,6 +563,7 @@ export class ShellWindow {
     const next = await this.#spaces.closeTab(tabId);
     this.#launchContexts.delete(tabId);
     this.#tabDocuments.delete(tabId);
+    this.#packMenus.delete(tabId);
     const view = this.#views.get(tabId);
     if (view !== undefined) {
       this.#views.delete(tabId);
@@ -789,6 +804,31 @@ export class ShellWindow {
     this.broadcast();
   }
 
+  /**
+   * Hold the bar material one pack published.
+   *
+   * The value was validated at the IPC boundary; this records it against the tab the
+   * sender was mapped to and repaints the chrome. Only the active tab's slots reach the
+   * bar, so a background pack publishing does not move the bar.
+   */
+  setPackMenu(tabId: string, slots: MenuSlots): void {
+    this.#packMenus.set(tabId, slots);
+    this.broadcast();
+  }
+
+  /**
+   * Send a press on the bar back to the pack that published the control.
+   *
+   * The host never interprets the id, so it stays the pack's own word for its own
+   * behaviour. A view that is gone, or a pack that published nothing, simply gets nothing:
+   * a stale press is not an error worth a notice.
+   */
+  packMenuAction(tabId: string, action: MenuSlotAction): void {
+    const view = this.#views.get(tabId);
+    if (view === undefined || view.webContents.isDestroyed()) return;
+    view.webContents.send(PACK_IPC.menuAction, action);
+  }
+
   setTheme(theme: ThemeView): void {
     this.#theme = theme;
     const canvas = theme.values["--canvas"] ?? "#1b1917";
@@ -961,6 +1001,10 @@ export class ShellWindow {
       // A reload or a same-origin navigation replaces the document that held
       // the tab's locks. Same-document navigation keeps that page alive.
       if (!navigationReleasesLocks(details.isMainFrame, details.isSameDocument)) return;
+      // The bar's material belonged to the document that is being replaced. Dropping it
+      // now means the bar shows the host's own zones until the new page publishes, rather
+      // than keeping the previous page's controls live over a page they cannot reach.
+      this.#packMenus.delete(tab.id);
       this.#onViewClosed?.(tab.id);
     });
     view.webContents.on("render-process-gone", (_event, details) => {

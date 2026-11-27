@@ -217,6 +217,13 @@ The rules that shape the Suite host.
 - The host renders pack-declared contributions: commands, menus, toolbar items, status items,
   keybindings and widgets. Contributions are data, not DOM. The host validates and renders them.
 - A pack owns only its content. It never renders into host chrome, and the host never imports pack UI.
+- **One menu bar, and the host draws it.** The active pack draws no bar of its own; it publishes a
+  `MenuSlots` value to `window.suite.menuBar`, and the host renders it in the tab strip's one
+  physical bar. The pack keeps its own `MenuBar` only when it runs standalone. The host treats a
+  slot's `id` as opaque: it draws the descriptor and echoes the id back, so it never learns what
+  "explain mode" or "view" means. That is deliberate — one explain/tutorial layer that works in
+  every app cannot rely on the host understanding each app's vocabulary, which is why every control
+  may carry a `help` sentence in the contract.
 - Theme is host state, not pack state. Suite Desk owns the preset, brightness and density on desktop
   (Suite Go owns them on mobile), stores the choice at `<dataRoot>/theme.json`, and paints every pack
   view with the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A

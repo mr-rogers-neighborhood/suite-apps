@@ -1,4 +1,4 @@
-import { AppShell, Button, IconButton, MenuBar, PrivacyLine } from "@suite/ui";
+import { AppShell, Button, IconButton, MenuBar, type MenuBarBridge, menuBarBridge, PrivacyLine } from "@suite/ui";
 import {
   BarChart3,
   CalendarClock,
@@ -34,6 +34,7 @@ import { SchedulesView } from "../schedules/SchedulesView";
 import { useReplica, useWorkspaceSnapshot } from "../store/snapshotStore";
 import { useUiStore, type View } from "../store/uiStore";
 import { BudgetMark } from "./BudgetMark";
+import { useBudgetMenuBar } from "./menuBar";
 import { Sidebar } from "./Sidebar";
 import { useWideViewport } from "./useWideViewport";
 import { ViewMenu } from "./ViewMenu";
@@ -56,6 +57,7 @@ export function Shell({
   const selectTransaction = useUiStore((state) => state.selectTransaction);
   const setView = useUiStore((state) => state.setView);
   const wide = useWideViewport();
+  const [hosted] = useState<MenuBarBridge | null>(() => menuBarBridge(globalThis));
 
   function addTransaction(): void {
     const account =
@@ -70,93 +72,102 @@ export function Shell({
     setNewTransactionOpen(true);
   }
 
+  useBudgetMenuBar(hosted, {
+    onOpenPalette: () => setPaletteOpen(true),
+    onAddTransaction: addTransaction,
+  });
+
   return (
     <>
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-canvas text-ink">
         <AppShell
-          header={
-            <>
-              <MenuBar
-                mark={<BudgetMark size="sm" />}
-                homeAriaLabel="Back to all budgets"
-                onNavigateHome={onCloseBudget}
-                context={
-                  <div className="hidden min-w-0 items-center lg:flex">
-                    <span
-                      className="max-w-56 truncate text-[13px] font-medium"
-                      title={snapshot.meta.name}
-                    >
-                      {snapshot.meta.name}
-                    </span>
-                  </div>
-                }
-                navigation={
-                  <div className="hidden min-w-0 items-center md:flex">
-                    <ViewMenu />
-                  </div>
-                }
-                search={
-                  <button
-                    type="button"
-                    data-testid="command-bar"
-                    aria-label="Search or run a command"
-                    aria-keyshortcuts="Meta+K Control+K"
-                    title="Search or run a command (⌘K)"
-                    onClick={() => setPaletteOpen(true)}
-                    className="hidden h-7 min-w-0 flex-1 max-w-sm items-center gap-1.5 rounded-md border border-line bg-raised px-2 text-[12px] text-muted transition-colors hover:text-ink md:flex"
-                  >
-                    <Command size={13} aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate text-left">Search</span>
-                    <kbd className="rounded border border-line px-1 py-0.5 text-[10px] opacity-70">
-                      ⌘K
-                    </kbd>
-                  </button>
-                }
-                actions={
-                  <div className="flex items-center gap-1">
-                    <div className="hidden md:block">
-                      <SaveStatus />
-                    </div>
-                    <div className="hidden items-center gap-1 md:flex">
-                      <IconButton
-                        label="Undo"
-                        onClick={() => replica.undo()}
-                        disabled={!replica.canUndo()}
-                      >
-                        <Undo2 size={15} />
-                      </IconButton>
-                      <IconButton
-                        label="Redo"
-                        onClick={() => replica.redo()}
-                        disabled={!replica.canRedo()}
-                      >
-                        <Redo2 size={15} />
-                      </IconButton>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label="Import"
-                        onClick={() => setImportOpen(true)}
-                      >
-                        <Upload size={13} />
-                        <span className="hidden xl:inline">Import</span>
-                      </Button>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      aria-label="Add transaction"
-                      onClick={addTransaction}
-                    >
-                      <Plus size={13} />
-                      <span className="hidden xl:inline">Add transaction</span>
-                    </Button>
-                  </div>
-                }
-              />
-              <ScheduleAutoEnterNotice />
-            </>
-          }
+          {...(hosted === null
+            ? {
+                header: (
+                  <>
+                    <MenuBar
+                      mark={<BudgetMark size="sm" />}
+                      homeAriaLabel="Back to all budgets"
+                      onNavigateHome={onCloseBudget}
+                      context={
+                        <div className="hidden min-w-0 items-center lg:flex">
+                          <span
+                            className="max-w-56 truncate text-[13px] font-medium"
+                            title={snapshot.meta.name}
+                          >
+                            {snapshot.meta.name}
+                          </span>
+                        </div>
+                      }
+                      navigation={
+                        <div className="hidden min-w-0 items-center md:flex">
+                          <ViewMenu />
+                        </div>
+                      }
+                      search={
+                        <button
+                          type="button"
+                          data-testid="command-bar"
+                          aria-label="Search or run a command"
+                          aria-keyshortcuts="Meta+K Control+K"
+                          title="Search or run a command (⌘K)"
+                          onClick={() => setPaletteOpen(true)}
+                          className="hidden h-7 min-w-0 flex-1 max-w-sm items-center gap-1.5 rounded-md border border-line bg-raised px-2 text-[12px] text-muted transition-colors hover:text-ink md:flex"
+                        >
+                          <Command size={13} aria-hidden="true" />
+                          <span className="min-w-0 flex-1 truncate text-left">Search</span>
+                          <kbd className="rounded border border-line px-1 py-0.5 text-[10px] opacity-70">
+                            ⌘K
+                          </kbd>
+                        </button>
+                      }
+                      actions={
+                        <div className="flex items-center gap-1">
+                          <div className="hidden md:block">
+                            <SaveStatus />
+                          </div>
+                          <div className="hidden items-center gap-1 md:flex">
+                            <IconButton
+                              label="Undo"
+                              onClick={() => replica.undo()}
+                              disabled={!replica.canUndo()}
+                            >
+                              <Undo2 size={15} />
+                            </IconButton>
+                            <IconButton
+                              label="Redo"
+                              onClick={() => replica.redo()}
+                              disabled={!replica.canRedo()}
+                            >
+                              <Redo2 size={15} />
+                            </IconButton>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label="Import"
+                              onClick={() => setImportOpen(true)}
+                            >
+                              <Upload size={13} />
+                              <span className="hidden xl:inline">Import</span>
+                            </Button>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            aria-label="Add transaction"
+                            onClick={addTransaction}
+                          >
+                            <Plus size={13} />
+                            <span className="hidden xl:inline">Add transaction</span>
+                          </Button>
+                        </div>
+                      }
+                    />
+                    <ScheduleAutoEnterNotice />
+                  </>
+                ),
+              }
+            : {})}
           navigation={
             wide ? (
               <Sidebar

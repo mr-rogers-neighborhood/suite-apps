@@ -1,3 +1,4 @@
+import type { MenuSlotAction } from "@suite/contracts";
 import { AppMark, SyncPill } from "@suite/ui";
 import {
   FirstRun,
@@ -6,6 +7,7 @@ import {
   type FirstRunTheme,
   HostTabBar,
   NewTabPicker,
+  packMenuZones,
 } from "@suite/ui/chrome";
 import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -45,6 +47,8 @@ export interface TabBarActions {
   readonly settings: (section?: string) => void;
   readonly openCommands: () => void;
   readonly toggleSync: () => void;
+  /** Send a press on the pack's zones back to the pack that published them. */
+  readonly packMenuAction: (action: MenuSlotAction) => void;
 }
 
 export interface TabBarHandle {
@@ -71,6 +75,10 @@ function TabBar({
   const sync = syncPresentation(snapshot.relay);
   const [pickOpen, setPickOpen] = useState(false);
   const [picker, setPicker] = useState<PickerData | null>(null);
+
+  // The active pack's zones. A pack that published nothing, or a Screen tab, leaves the
+  // bar with only the host's own material.
+  const packZones = packMenuZones(snapshot.packMenu, actions.packMenuAction);
 
   const openPicker = useCallback(async () => {
     setPickOpen(true);
@@ -122,6 +130,7 @@ function TabBar({
         }
         onHome={actions.home}
         homeLabel="Home"
+        pack={packZones}
         search={
           <button
             type="button"
@@ -150,7 +159,7 @@ function TabBar({
             <span className="command-bar__label min-w-0 flex-1 truncate text-left">
               {SEARCH_PLACEHOLDER}
             </span>
-            <kbd className="command-bar__key shrink-0 rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
+            <kbd className="command-bar__key hidden shrink-0 rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)] lg:inline">
               {SEARCH_SHORTCUT}
             </kbd>
           </button>

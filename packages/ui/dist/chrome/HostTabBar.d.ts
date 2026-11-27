@@ -41,7 +41,19 @@ export interface HostTabBarProps {
     readonly onOpenSearch?: () => void;
     readonly searchPlaceholder?: string;
     readonly searchShortcut?: string;
+    /**
+     * The active pack's zones, from `packMenuZones`.
+     *
+     * The pack fills the middle of this bar; the host keeps the marks at each end. A pack's
+     * takeover lands after the tab strip, because the tabs say which surface is open and the
+     * takeover says what that surface is showing.
+     */
+    readonly pack?: {
+        readonly context?: ReactNode;
+        readonly navigation: ReactNode;
+        readonly actions?: ReactNode;
+    };
     readonly "data-testid"?: string;
 }
-export declare function HostTabBar({ tabs, activeTabId, onActivate, onClose, onTabMenu, onNewTab, mark, onHome, homeLabel, sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId, }: HostTabBarProps): ReactNode;
+export declare function HostTabBar({ tabs, activeTabId, onActivate, onClose, onTabMenu, onNewTab, mark, onHome, homeLabel, sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, pack, "data-testid": testId, }: HostTabBarProps): ReactNode;
 //# sourceMappingURL=HostTabBar.d.ts.map

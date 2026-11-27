@@ -598,6 +598,9 @@ function updateHostBar() {
         syncOpen = !syncOpen;
         paint();
       },
+      // The pack's own control was used. The id is the pack's word for it, so the host
+      // forwards it unchanged and never decides what it means.
+      packMenuAction: (action) => api.packMenuAction(action),
     });
   }
   tabBar.update({
@@ -606,6 +609,7 @@ function updateHostBar() {
     syncOpen,
     commandOpen,
     relay: { ...EMPTY_RELAY, ...(state.relay ?? {}) },
+    packMenu: state.packMenu ?? null,
   });
 }
 

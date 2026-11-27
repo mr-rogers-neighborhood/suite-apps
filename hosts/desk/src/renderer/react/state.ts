@@ -1,3 +1,4 @@
+import type { MenuSlots } from "@suite/contracts";
 import type { SyncSituation } from "@suite/ui";
 import type { HostTab } from "@suite/ui/chrome";
 import { createElement } from "react";
@@ -17,6 +18,8 @@ export interface HostBarSnapshot {
   /** The command surface is a host-owned dialog; the trigger reports its state. */
   readonly commandOpen: boolean;
   readonly relay: RelayView;
+  /** The active pack's bar material, or null for a Screen tab or a pack that published none. */
+  readonly packMenu: MenuSlots | null;
 }
 
 export interface SyncPresentation {

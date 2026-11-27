@@ -5,7 +5,7 @@
  * `channels.test.ts` reads them and fails if a channel name drifts. Types are
  * duplicated nowhere: both sides of IPC use these shapes.
  */
-import type { SuiteWidgetFieldType, SuiteWidgetSize } from "@suite/contracts";
+import type { MenuSlots, SuiteWidgetFieldType, SuiteWidgetSize } from "@suite/contracts";
 import { PACK_CAPABILITIES, type PackCapability } from "@suite/pack/capabilities";
 import type { FileHandleInfo } from "@suite/pack-runtime";
 import type { Density } from "@suite/theme";
@@ -29,6 +29,8 @@ export const CHROME_IPC = {
   newDocument: "suite:shell:new-document",
   reloadTab: "suite:shell:reload-tab",
   openExternal: "suite:shell:open-external",
+  /** Forward a press on the bar's pack zones to the pack, as its own id. */
+  packMenuAction: "suite:shell:pack-menu-action",
   installPack: "suite:shell:install-pack",
   installCataloguePack: "suite:shell:install-catalogue-pack",
   installFirstRunPack: "suite:shell:install-first-run-pack",
@@ -137,6 +139,10 @@ export const PACK_IPC = {
   relayClose: "suite:relay:close",
   setTitle: "suite:pack:set-title",
   openExternal: "suite:pack:open-external",
+  /** A hosted pack publishes the material for the host's one menu bar. */
+  setMenuSlots: "suite:pack:set-menu-slots",
+  /** The host sends back the id the pack put on the control that was used. */
+  menuAction: "suite:pack:menu-action",
 } as const;
 
 /**
@@ -480,6 +486,14 @@ export interface ShellState {
   /** A host sentence about reminders, such as a denied permission. Null is the quiet state. */
   readonly reminderStatus: string | null;
   readonly relay: RelayView;
+  /**
+   * The active pack's menu-bar material, or null when it publishes none.
+   *
+   * Only the active tab's slots are here: the bar draws one pack at a time, and carrying
+   * every tab's would let a background pack's title reach the bar. A Screen tab and a pack
+   * that has not published both read as null, which is the bar with only the host's zones.
+   */
+  readonly packMenu: MenuSlots | null;
 }
 
 /** A document as the host lists it. `id` is a file name inside the pack's root. */

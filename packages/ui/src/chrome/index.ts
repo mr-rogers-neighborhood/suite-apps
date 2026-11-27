@@ -21,6 +21,7 @@ export {
   type HostTabBarProps,
   type HostTabKind,
 } from "./HostTabBar.js";
+export { packMenuZones, type PackMenuZones } from "./PackMenuSlots.js";
 export {
   NewTabPicker,
   type NewTabPack,

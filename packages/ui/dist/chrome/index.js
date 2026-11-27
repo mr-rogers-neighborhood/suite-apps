@@ -8,6 +8,7 @@
  */
 export { FirstRun, } from "./FirstRun.js";
 export { HostTabBar, } from "./HostTabBar.js";
+export { packMenuZones } from "./PackMenuSlots.js";
 export { NewTabPicker, } from "./NewTabPicker.js";
 export { PackCard, } from "./PackCard.js";
 export { PackRail, } from "./PackRail.js";

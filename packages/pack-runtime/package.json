@@ -18,6 +18,12 @@
       "import": "./dist/bridge.js",
       "default": "./dist/bridge.js"
     },
+    "./menu-bar": {
+      "types": "./dist/menuBar.d.ts",
+      "development": "./src/menuBar.ts",
+      "import": "./dist/menuBar.js",
+      "default": "./dist/menuBar.js"
+    },
     "./testing": {
       "types": "./dist/testing/fakeHost.d.ts",
       "development": "./src/testing/fakeHost.ts",

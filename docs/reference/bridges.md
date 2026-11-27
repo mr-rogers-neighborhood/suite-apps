@@ -143,30 +143,36 @@ Nothing in this repository prescribes how that adapter is written. What this doc
 the four assumptions above so an adapter author knows which parts of a bridge are load-bearing and
 which are Electron ceremony.
 
-## Specified but not built: MenuBar & capsule bridge (`menuBar`)
+## The MenuBar bridge (`menuBar`)
 
-Mini-apps delegate top chrome to `@suite/ui/MenuBar`; the zones and takeover rule are in
-[the menu bar reference](menu-bar.md). In a multi-app container such as `suite-go` or Suite Desk
-tabs, the host would control the physical application bar while the active mini-app populated
-semantic slots through these hooks. **No preload exposes this bridge and no host consumes it yet.**
-The shape below is the specification, not a shipped contract:
+Mini-apps delegate top chrome to the host; the zones, the takeover rule and the vocabulary are in
+[the menu bar reference](menu-bar.md). In a multi-app container such as Suite Desk tabs, the host
+controls the physical application bar and the active mini-app populates semantic slots through this
+bridge. **Desk's pack preload exposes it, and Desk consumes it.** Suite Go does not: it has no pack
+tabs, so its shell draws its own bar.
+
+The shipped shape is typed in `@suite/contracts/menu-bar`:
 
 ```ts
 interface MenuBarBridge {
-  /** Informs the container shell of active mini-app slots (title, takeover tabs, actions). */
-  setSlots(slots: {
-    title?: string;
-    navigation?: unknown;
-    actions?: readonly { id: string; label: string; icon?: string }[];
-  }): void;
-  /** Listens for contextual actions triggered from container chrome or mobile capsule buttons. */
-  onAction(listener: (actionId: string) => void): () => void;
+  /** Informs the container shell of active mini-app slots. */
+  setSlots(slots: MenuSlots): void;
+  /** Listens for a press on one of those slots. */
+  onAction(listener: (action: MenuSlotAction) => void): () => void;
 }
 ```
 
-A standalone app renders `<MenuBar>` directly. A mounted module in a container shell would project its
-takeover navigation and action descriptors through `menuBar.setSlots` into the host's container
-capsule; that path does not exist yet.
+Two additions to the sketch this section used to carry, both learned from the packs:
+
+- **`navigation` is a typed array of controls, not `unknown`.** A `unknown` slot would have meant the
+  host learning each app's rendering, which is exactly the coupling the opaque ids avoid.
+- **Every control may carry `help`.** It is the sentence a future explainer reads, and the reason the
+  host must not interpret an id: one explainer that works in every app cannot rely on a host that
+  knows what "explain mode" means.
+
+A pack in a container publishes and draws nothing; a standalone pack renders `<MenuBar>` directly.
+`menuBarBridge()` in `@suite/ui` answers which case it is in, from the presence of
+`window.suite.menuBar`.
 
 ## Known inconsistencies worth resolving later
 

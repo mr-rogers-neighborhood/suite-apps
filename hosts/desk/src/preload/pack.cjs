@@ -261,6 +261,19 @@ contextBridge.exposeInMainWorld("suite", {
   },
   setTitle: (title) => ipcRenderer.send("suite:pack:set-title", title),
   openExternal: (url) => ipcRenderer.invoke("suite:pack:open-external", url),
+  // The menu bar the host draws. A pack publishes its bar material and receives the id it
+  // put on a control; it never sees the host's bar or renders into it. Absent in a
+  // standalone window, which is how a pack tells the two apart and draws its own bar.
+  menuBar: {
+    setSlots: (slots) => ipcRenderer.send("suite:pack:set-menu-slots", slots),
+    onAction: (listener) => {
+      const handler = (_event, action) => {
+        listener(action);
+      };
+      ipcRenderer.on("suite:pack:menu-action", handler);
+      return () => ipcRenderer.removeListener("suite:pack:menu-action", handler);
+    },
+  },
   // The narrow relay capability: the host opens a pinned socket to the relay it
   // supervises and forwards opaque frames. The token is a closure here, never a
   // property of the connection the pack receives, so another tab cannot replay it.

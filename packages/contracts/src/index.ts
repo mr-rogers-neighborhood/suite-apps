@@ -99,6 +99,27 @@ export {
   suiteHubScopeSchema,
 } from "./hub.js";
 export {
+  emptyMenuSlots,
+  isMenuSlotAction,
+  isMenuSlotId,
+  MENU_SLOTS_MAX_CONTROLS,
+  MENU_SLOTS_MAX_ITEMS,
+  MENU_SLOT_GLYPH_MAX,
+  MENU_SLOT_ID_MAX,
+  MENU_SLOT_LABEL_MAX,
+  type MenuButton,
+  type MenuHelp,
+  type MenuNavControl,
+  type MenuRow,
+  type MenuSlotAction,
+  type MenuSlots,
+  type MenuSlotsInput,
+  type MenuStatus,
+  type MenuTab,
+  parseMenuSlots,
+  SUITE_MENU_SLOTS_FORMAT,
+} from "./menuBar.js";
+export {
   type ContractIssue,
   type ContractParse,
   describeIssues,

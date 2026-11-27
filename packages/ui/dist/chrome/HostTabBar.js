@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { cx } from "../cx.js";
 import { MenuBar } from "../menu/MenuBar.js";
 import { FOCUS_RING, MOTION } from "../tokens.js";
-export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTabMenu, onNewTab, mark, onHome, homeLabel = "Home", sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, "data-testid": testId = "host-tab-bar", }) {
+export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTabMenu, onNewTab, mark, onHome, homeLabel = "Home", sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, pack, "data-testid": testId = "host-tab-bar", }) {
     const tabButtons = useRef(new Map());
     const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId);
     function moveTo(index) {
@@ -65,7 +65,8 @@ export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTa
                                     onTabMenu(tab.id);
                                 }, onKeyDown: (event) => {
                                     if (onTabMenu !== undefined &&
-                                        (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10"))) {
+                                        (event.key === "ContextMenu" ||
+                                            (event.shiftKey && event.key === "F10"))) {
                                         event.preventDefault();
                                         event.stopPropagation();
                                         onTabMenu(tab.id);
@@ -74,11 +75,15 @@ export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTa
                                     tabKeyDown(event, index, tab.id);
                                 }, className: cx("flex h-7 max-w-[220px] items-center gap-1.5 rounded-md pl-2 text-[length:var(--text-label,12px)]", selected
                                     ? "bg-[var(--surface)] text-[var(--ink)] shadow-[inset_0_-2px_0_var(--accent)]"
-                                    : "text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: [tab.icon === undefined ? (_jsx("span", { "aria-hidden": "true", className: cx("h-1.5 w-1.5 shrink-0 rounded-full", tab.kind === "pack" ? "bg-[var(--accent)]" : "bg-[var(--ink-faint)]") })) : (_jsx("span", { "aria-hidden": "true", className: "flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-sm [&_img]:h-full [&_img]:w-full [&_img]:object-contain", children: tab.icon })), _jsx("span", { className: "min-w-0 truncate", children: tab.title })] }), onClose === undefined ? null : (_jsx("button", { type: "button", "aria-label": `Close ${tab.title}`, title: `Close ${tab.title}`, onClick: (event) => {
+                                    : "text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: [tab.icon === undefined ? (_jsx("span", { "aria-hidden": "true", className: cx("h-1.5 w-1.5 shrink-0 rounded-full", tab.kind === "pack"
+                                            ? "bg-[var(--accent)]"
+                                            : "bg-[var(--ink-faint)]") })) : (_jsx("span", { "aria-hidden": "true", className: "flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-sm [&_img]:h-full [&_img]:w-full [&_img]:object-contain", children: tab.icon })), _jsx("span", { className: "min-w-0 truncate", children: tab.title })] }), onClose === undefined ? null : (_jsx("button", { type: "button", "aria-label": `Close ${tab.title}`, title: `Close ${tab.title}`, onClick: (event) => {
                                     event.stopPropagation();
                                     onClose(tab.id);
                                 }, className: cx("mr-1 flex h-5 w-5 items-center justify-center rounded-sm text-[var(--ink-faint)] opacity-0 hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)] focus-visible:opacity-100 group-hover/tab:opacity-100 [@media(pointer:coarse)]:opacity-100", MOTION, FOCUS_RING), children: _jsx("span", { "aria-hidden": "true", children: "\u00d7" }) }))] }, tab.id));
-                }) })), onNewTab === undefined ? null : (_jsx("button", { type: "button", "aria-label": "New tab", title: "New tab", onClick: onNewTab, className: cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[length:var(--text-body,13px)] text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: _jsx("span", { "aria-hidden": "true", children: "+" }) }))] }));
-    return (_jsx(MenuBar, { "data-testid": testId, "aria-label": "Suite", ...(mark === undefined ? {} : { mark }), ...(onHome === undefined ? {} : { onNavigateHome: onHome, homeAriaLabel: homeLabel }), navigation: navigation, ...(search === undefined ? {} : { search }), ...(onOpenSearch === undefined ? {} : { onOpenSearch }), ...(searchPlaceholder === undefined ? {} : { searchPlaceholder }), ...(searchShortcut === undefined ? {} : { searchShortcut }), ...(sync === undefined ? {} : { sync }), ...(controls === undefined ? {} : { controls }) }));
+                }) })), onNewTab === undefined ? null : (_jsx("button", { type: "button", "aria-label": "New tab", title: "New tab", onClick: onNewTab, className: cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[length:var(--text-body,13px)] text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: _jsx("span", { "aria-hidden": "true", children: "+" }) })), pack === undefined ? null : (_jsx("div", { className: "flex min-w-0 items-center overflow-x-auto border-l border-[var(--hairline)] pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", children: pack.navigation }))] }));
+    return (_jsx(MenuBar, { "data-testid": testId, "aria-label": "Suite", ...(mark === undefined ? {} : { mark }), ...(pack?.context === undefined ? {} : { context: pack.context }), ...(onHome === undefined
+            ? {}
+            : { onNavigateHome: onHome, homeAriaLabel: homeLabel }), navigation: navigation, ...(search === undefined ? {} : { search }), ...(onOpenSearch === undefined ? {} : { onOpenSearch }), ...(searchPlaceholder === undefined ? {} : { searchPlaceholder }), ...(searchShortcut === undefined ? {} : { searchShortcut }), ...(sync === undefined ? {} : { sync }), ...(pack?.actions === undefined ? {} : { actions: pack.actions }), ...(controls === undefined ? {} : { controls }) }));
 }
 //# sourceMappingURL=HostTabBar.js.map

@@ -30,6 +30,12 @@
       "import": "./dist/deployment.js",
       "default": "./dist/deployment.js"
     },
+    "./menu-bar": {
+      "types": "./dist/menuBar.d.ts",
+      "development": "./src/menuBar.ts",
+      "import": "./dist/menuBar.js",
+      "default": "./dist/menuBar.js"
+    },
     "./deep-link": {
       "types": "./dist/deepLink.d.ts",
       "development": "./src/deepLink.ts",

@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("suiteShell", {
     ipcRenderer.invoke("suite:shell:open-document", packId, documentId),
   newDocument: (packId) => ipcRenderer.invoke("suite:shell:new-document", packId),
   reloadTab: (tabId) => ipcRenderer.invoke("suite:shell:reload-tab", tabId),
+  packMenuAction: (action) => ipcRenderer.invoke("suite:shell:pack-menu-action", action),
   openExternal: (url) => ipcRenderer.invoke("suite:shell:open-external", url),
   installPack: () => ipcRenderer.invoke("suite:shell:install-pack"),
   installCataloguePack: (id, version) =>

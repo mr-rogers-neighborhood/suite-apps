@@ -17,6 +17,7 @@
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-select": "^2.2.6",
     "@suite/budget-core": "workspace:*",
+    "@suite/contracts": "workspace:*",
     "@suite/document-runtime": "workspace:*",
     "@suite/pack-runtime": "workspace:*",
     "@suite/ui": "workspace:*",
