@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld("suiteShell", {
     ipcRenderer.invoke("suite:shell:move-widget", registryId, direction),
   resizeWidget: (registryId, size) =>
     ipcRenderer.invoke("suite:shell:resize-widget", registryId, size),
+  placeWidget: (registryId, x, y) =>
+    ipcRenderer.invoke("suite:shell:place-widget", registryId, x, y),
   createScreen: (name) => ipcRenderer.invoke("suite:shell:create-screen", name),
   renameScreen: (screenId, name) => ipcRenderer.invoke("suite:shell:rename-screen", screenId, name),
   duplicateScreen: (screenId) => ipcRenderer.invoke("suite:shell:duplicate-screen", screenId),

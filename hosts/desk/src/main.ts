@@ -1221,6 +1221,13 @@ function registerIpc(): void {
     await window?.resizeScreenWidget(registryId, size);
     return window?.state();
   });
+  onChrome(CHROME_IPC.placeWidget, async (registryId, x, y) => {
+    if (typeof registryId !== "string" || typeof x !== "number" || typeof y !== "number") {
+      return undefined;
+    }
+    await window?.placeScreenWidget(registryId, x, y);
+    return window?.state();
+  });
   onChrome(CHROME_IPC.createScreen, async (name) => {
     if (typeof name !== "string") return undefined;
     await window?.createScreen(name);

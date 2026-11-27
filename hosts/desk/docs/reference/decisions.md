@@ -324,9 +324,10 @@ The rules that shape the Suite host.
 - Edit mode is host chrome: named buttons and named keys add, remove, move earlier/later and change
   the size, which is one of `1x1`, `1x2`, `2x1`, `2x2` or `full`. A placement carries `x` and `y` on
   a four-cell grid, and `size` is the single source of its width and height; `full` is four cells.
-  The renderer holds no document state; an action names a registry id and the main process answers
-  with the new state. Rows are drawn in this slice and are not edited inline yet; their placements
-  and saved settings survive every flat edit.
+  A tile is dragged by its handle and resized by its bottom-right grip or the size picker; removing
+  asks once. Focus survives the rebuild, and a row child is focusable and removable while the row
+  keeps at least two items. The renderer holds no document state; an action names a registry id and
+  the main process answers with the new state.
 - The screen store writes a snapshot through a temporary file and rename, keeps the previous good
   snapshot as `<id>.loro.bak`, and quarantines an unreadable, oversized or newer file as
   `<id>.loro.corrupt-<time>` before starting a fresh Home. It never deletes the only copy and never

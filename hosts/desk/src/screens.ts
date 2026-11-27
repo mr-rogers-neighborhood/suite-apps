@@ -135,6 +135,10 @@ export class ScreenStore {
     return this.#mutate(this.#document.resize(registryId, size));
   }
 
+  async place(registryId: string, x: number, y: number): Promise<boolean> {
+    return this.#mutate(this.#document.place(registryId, x, y));
+  }
+
   async setSetting(registryId: string, fieldId: string, value: string): Promise<boolean> {
     return this.#mutate(this.#document.setSetting(registryId, fieldId, value));
   }

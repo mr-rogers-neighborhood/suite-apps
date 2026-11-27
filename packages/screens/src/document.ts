@@ -331,16 +331,38 @@ export class ScreenDocument {
     return true;
   }
 
-  /** Remove one flat instance. A row is removed only by removing its child entries. */
+  /** Remove one instance. A row child is removed from its row; a row keeps 2–8 items. */
   remove(registryId: string): boolean {
     const ids = this.#order();
     const index = ids.indexOf(registryId);
-    if (index < 0) return false;
+    if (index >= 0) {
+      this.#table().delete(registryId);
+      this.#doc.getList(ORDER).delete(index, 1);
+      this.#commit();
+      return true;
+    }
 
-    this.#table().delete(registryId);
-    this.#doc.getList(ORDER).delete(index, 1);
-    this.#commit();
-    return true;
+    const table = this.#table();
+    for (const key of ids) {
+      const value: unknown = table.get(key);
+      if (typeof value !== "object" || value === null) continue;
+      const entry = value as LoroMap;
+      if (entry.get("kind") !== "row") continue;
+      const items = entry.get("items");
+      if (!Array.isArray(items)) continue;
+      const position = items.findIndex(
+        (item) => isRecord(item) && item.registryId === registryId,
+      );
+      if (position < 0) continue;
+      if (items.length <= 2) return false;
+      entry.set(
+        "items",
+        items.filter((_, itemIndex) => itemIndex !== position),
+      );
+      this.#commit();
+      return true;
+    }
+    return false;
   }
 
   /** Move one instance before or after another. An unknown anchor is a no-op. */
@@ -429,6 +451,20 @@ export class ScreenDocument {
       const maxX = SCREEN_GRID_COLUMNS - sizeCells(size).w;
       if (x > maxX) entry.set("x", maxX);
     }
+    this.#commit();
+    return true;
+  }
+
+  /** Move an instance to a cell on the four-cell grid. */
+  place(registryId: string, x: number, y: number): boolean {
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) return false;
+    const entry = this.#widget(registryId);
+    if (entry === undefined) return false;
+    const size = entry.get("size");
+    if (typeof size !== "string") return false;
+    if (x + sizeCells(size as SuiteWidgetSize).w > SCREEN_GRID_COLUMNS) return false;
+    entry.set("x", x);
+    entry.set("y", y);
     this.#commit();
     return true;
   }
