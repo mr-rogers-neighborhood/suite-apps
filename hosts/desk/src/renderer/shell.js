@@ -140,10 +140,7 @@ let settingsSection = "appearance";
 let shouldFocusSearch = true;
 let appsView = {
   grid: null,
-  packs: null,
   packCount: null,
-  catalogue: null,
-  catalogueCount: null,
   catalogueSource: null,
   search: null,
 };
@@ -934,7 +931,9 @@ function cardDisclosure(publisher) {
 function refusalActionLabel(entry) {
   const refusal = entry.refusal ?? "";
 
-  if (entry.platform?.state === "unavailable" || /not available on this host/i.test(refusal)) {
+  // The refusal sentence wins over platform state: an entry can be both untrusted and
+  // incompatible, and "publisher not trusted" is the reason that blocks it first.
+  if (/not available on this host/i.test(refusal)) {
     return "Not available on this host";
   }
   if (/needs (?:host|pack contract)/i.test(refusal) || /newer Suite Desk/i.test(refusal)) {
@@ -959,7 +958,10 @@ function installedCard(pack) {
     ? pack.consent.filter((entry) => entry.answer === "denied")
     : [];
 
-  const updateEntry = highestTrustedUpdate(state.catalogue, pack);
+  // A development directory wins the id; installing a signed copy cannot change what
+  // loads, so an update action there would promise something it cannot do.
+  const updateEntry =
+    pack.source === "development" ? undefined : highestTrustedUpdate(state.catalogue, pack);
 
   const top = element("div", "card-top");
   const dot = element("span", "card-dot");
@@ -1283,10 +1285,7 @@ function renderAppsWidget(body) {
   body.append(section);
   appsView = {
     grid,
-    packs: grid,
-    catalogue: grid,
     packCount,
-    catalogueCount: packCount,
     catalogueSource,
     search: input,
   };
@@ -1703,10 +1702,7 @@ function renderScreen() {
     managingScreens = false;
     appsView = {
       grid: null,
-      packs: null,
       packCount: null,
-      catalogue: null,
-      catalogueCount: null,
       catalogueSource: null,
       search: null,
     };

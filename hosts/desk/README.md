@@ -127,9 +127,10 @@ after the index verified; the archive it names is still read and verified before
 again before install.
 
 The catalogue is in **Settings → Packs**, the same installed-pack and catalogue widget a Screen can
-hold; it can also be added to any Screen from **Edit**. A trusted entry offers **Install**,
-**Update** or **Reinstall** as its state requires; a refused entry stays visible with the sentence
-that explains it and cannot be installed. A `.suitepack` file can also be opened on its own.
+hold; it can also be added to any Screen from **Edit**. A trusted entry offers **Install**; an
+installed pack with a newer trusted catalogue version offers **Update**. A refused entry stays
+visible with the sentence that explains it and cannot be installed. A `.suitepack` file can also be
+opened on its own, which is how a reinstall replaces an installed version.
 Removing a pack leaves its documents and files on disk until the person removes them.
 
 The index refusals are named, not silent: an index changed after signing, an unsigned index, an
@@ -140,8 +141,9 @@ unreachable, the local directory stays usable and the widget says why the publis
 use (S12.1). Every archive is read with the shared archive reader and verified: the publisher key in
 the manifest against the local trust store, the manifest signature with that key, the host contract
 and capability list, and every file hash. An indexed entry must also match the id, version, size and
-SHA-256 the index displayed. A trusted entry offers **Install**, **Update** or **Reinstall** as its
-state requires; a refused entry stays visible with its refusal sentence and cannot be installed.
+SHA-256 the index displayed. A trusted entry offers **Install**; an installed pack with a newer
+trusted catalogue version offers **Update**. A refused entry stays visible with its refusal sentence
+and cannot be installed.
 Listing never extracts
 an archive, so a refusal leaves nothing behind. Each card body shows the mark, name, sentence,
 capabilities and status, with the publisher id and key fingerprint kept behind a
