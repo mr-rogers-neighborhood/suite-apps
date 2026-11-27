@@ -11,6 +11,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("suiteShell", {
   state: () => ipcRenderer.invoke("suite:shell:state"),
+  chromeHeight: (height) => ipcRenderer.invoke("suite:shell:chrome-height", height),
   openPack: (packId) => ipcRenderer.invoke("suite:shell:open-pack", packId),
   activateTab: (tabId) => ipcRenderer.invoke("suite:shell:activate-tab", tabId),
   closeTab: (tabId) => ipcRenderer.invoke("suite:shell:close-tab", tabId),

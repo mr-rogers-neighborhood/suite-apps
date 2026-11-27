@@ -18,6 +18,8 @@ export const PACK_SCHEME = "suite-pack";
 
 export const CHROME_IPC = {
   state: "suite:shell:state",
+  /** The renderer's measured bar height, so pack views sit below the real chrome. */
+  chromeHeight: "suite:shell:chrome-height",
   openPack: "suite:shell:open-pack",
   activateTab: "suite:shell:activate-tab",
   closeTab: "suite:shell:close-tab",

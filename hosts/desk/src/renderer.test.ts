@@ -146,3 +146,25 @@ describe("the chrome's keyboard", () => {
     expect(render).toContain("restored?.focus()");
   });
 });
+
+describe("the chrome's height", () => {
+  it("reports the measured bar height instead of assuming 44px", () => {
+    // The bar is one row on a Screen and two when a pack published material, and both
+    // rows follow density, so the main process has to be told what the bar really is.
+    const report = shell.slice(
+      shell.indexOf("function reportChromeHeight"),
+      shell.indexOf("function updateHostBar"),
+    );
+    expect(report).toContain("getBoundingClientRect().height");
+    expect(report).toContain("api.chromeHeight(height)");
+    expect(shell).toContain("new ResizeObserver(reportChromeHeight)");
+  });
+
+  it("does not send the same height twice", () => {
+    const report = shell.slice(
+      shell.indexOf("function reportChromeHeight"),
+      shell.indexOf("function updateHostBar"),
+    );
+    expect(report).toContain("height === reportedChromeHeight");
+  });
+});

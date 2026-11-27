@@ -1105,6 +1105,10 @@ function registerIpc(): void {
   registerProjectionChannels();
   registerCommandChannels();
   onChrome(CHROME_IPC.state, () => window?.state());
+  onChrome(CHROME_IPC.chromeHeight, (height) => {
+    if (typeof height !== "number") return;
+    window?.setChromeHeight(height);
+  });
   onChrome(CHROME_IPC.openPack, async (packId) => {
     if (typeof packId !== "string") return;
     await window?.openPack(packId);

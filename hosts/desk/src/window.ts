@@ -143,6 +143,14 @@ export class ShellWindow {
     lastError: null,
   };
   #closed = false;
+  /**
+   * How tall the chrome actually is right now.
+   *
+   * The host bar is one row on a Screen and two when a pack has material to show, and each
+   * row follows the density scale. The renderer measures the bar and reports the number, so
+   * pack views sit under whatever the bar really occupies instead of a fixed 44px.
+   */
+  #chromeHeight = TAB_BAR_HEIGHT;
 
   constructor(options: {
     readonly packs: readonly PackInfo[];
@@ -191,6 +199,9 @@ export class ShellWindow {
       show: false,
       title: "Suite Desk",
       backgroundColor: canvas,
+      // The bar is the visible menu; the template stays installed so its accelerators
+      // (⌘W, ⌘K, ⌘S) keep working. Planner and Budget already hide the native band.
+      autoHideMenuBar: true,
     });
 
     this.#chrome = new WebContentsView({
@@ -1034,10 +1045,25 @@ export class ShellWindow {
     if (this.#closed) return;
     const { width, height } = this.window.getContentBounds();
     this.#chrome.setBounds({ x: 0, y: 0, width, height });
-    const contentHeight = Math.max(0, height - TAB_BAR_HEIGHT);
+    const contentHeight = Math.max(0, height - this.#chromeHeight);
     for (const view of this.#views.values()) {
-      view.setBounds({ x: 0, y: TAB_BAR_HEIGHT, width, height: contentHeight });
+      view.setBounds({ x: 0, y: this.#chromeHeight, width, height: contentHeight });
     }
+  }
+
+  /**
+   * Report the chrome's measured height.
+   *
+   * The bar is one row on a Screen and two when the active pack published material, and
+   * the rows follow density, so the main process cannot assume 44px. The chrome page is
+   * trusted host code; the value is still clamped to a sane band.
+   */
+  setChromeHeight(height: number): void {
+    if (!Number.isFinite(height)) return;
+    const next = Math.min(Math.max(Math.round(height), 0), 240);
+    if (next === this.#chromeHeight) return;
+    this.#chromeHeight = next;
+    this.#layout();
   }
 
   #hideViews(): void {

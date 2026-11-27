@@ -232,6 +232,15 @@ The rules that shape the Suite host.
   menu drawn inside it would be clipped to the bar's height. Arrow keys belong to the composite that
   has focus — the tab strip, a pack's tablist, an open menu — and a plain header does not claim them;
   only a `role="menubar"` gets horizontal traversal from the bar.
+- **The host bar is two thin rows.** The first is the host's: mark, open tabs, search, sync and the
+  window controls. The second is the active pack's: the document's name, its takeover and its
+  actions. The pack row is absent when the active surface published nothing, so Home costs one row
+  and a document costs two. Both rows follow the density scale (`--control-height`) instead of a
+  fixed 44px, and the renderer reports the measured total to the main process so pack views sit
+  below the real bar rather than a guessed constant.
+- Desk hides the native menu bar (`autoHideMenuBar`), as Planner and Budget already do. The template
+  stays installed, so its accelerators (⌘W, ⌘K, ⌘S) keep working; it is no longer a third permanent
+  band above the two host rows.
 - Theme is host state, not pack state. Suite Desk owns the preset, brightness and density on desktop
   (Suite Go owns them on mobile), stores the choice at `<dataRoot>/theme.json`, and paints every pack
   view with the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A

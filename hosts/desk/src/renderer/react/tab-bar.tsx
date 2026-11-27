@@ -140,6 +140,7 @@ function TabBar({
         onHome={actions.home}
         homeLabel="Home"
         {...(pack === undefined ? {} : { pack })}
+        packKey={snapshot.activeTabId ?? "none"}
         search={
           <button
             type="button"
@@ -165,10 +166,10 @@ function TabBar({
               <circle cx="7" cy="7" r="4.5" />
               <path d="m10.5 10.5 3 3" />
             </svg>
-            <span className="command-bar__label min-w-0 flex-1 truncate text-left">
+            <span className="command-bar__label min-w-0 flex-1 truncate text-left @max-3xl:hidden">
               {SEARCH_PLACEHOLDER}
             </span>
-            <kbd className="command-bar__key hidden shrink-0 rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)] lg:inline">
+            <kbd className="command-bar__key hidden shrink-0 rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)] @min-5xl:inline">
               {SEARCH_SHORTCUT}
             </kbd>
           </button>

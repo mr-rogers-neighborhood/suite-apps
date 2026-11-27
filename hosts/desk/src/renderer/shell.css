@@ -39,15 +39,16 @@ body {
 }
 
 /*
- * The tab strip is a React island now. Its height is the shared menu bar's, and
- * `TAB_BAR_HEIGHT` in the main process keeps the pack views below it.
+ * The tab strip is a React island now. Its first row follows the shared menu bar's
+ * height, which follows density; the optional pack row sits under it and the renderer
+ * reports the total to the main process so pack views stay below both.
  */
 #host-bar {
   flex: 0 0 auto;
 }
 
 #host-bar header {
-  height: var(--tabbar);
+  height: var(--menu-bar-height, var(--tabbar));
 }
 
 #first-run {

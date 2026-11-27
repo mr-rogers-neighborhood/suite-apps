@@ -126,6 +126,9 @@ let managingScreens = false;
 let syncOpen = false;
 let tabBar = null;
 let firstRunWizard = null;
+/** Reports the real bar height to the main process, which keeps pack views below it. */
+let chromeHeightObserver = null;
+let reportedChromeHeight = 0;
 /** The host Settings surface is chrome state, like the Screens manager. */
 let settingsOpen = false;
 let settingsSection = "appearance";
@@ -569,6 +572,15 @@ function composeScreen() {
   elements.screenNewName?.focus();
 }
 
+/** Tell the main process how tall the chrome really is. */
+function reportChromeHeight() {
+  if (elements.hostBar === null) return;
+  const height = Math.ceil(elements.hostBar.getBoundingClientRect().height);
+  if (!Number.isFinite(height) || height <= 0 || height === reportedChromeHeight) return;
+  reportedChromeHeight = height;
+  void api.chromeHeight(height);
+}
+
 /** Mount the React strip once, then hand it the host's snapshot on every paint. */
 function updateHostBar() {
   if (elements.hostBar === null) return;
@@ -611,6 +623,13 @@ function updateHostBar() {
     relay: { ...EMPTY_RELAY, ...(state.relay ?? {}) },
     packMenu: state.packMenu ?? null,
   });
+  // The pack row is present or absent per surface, and both rows follow density, so the
+  // bar's height changes while the app runs. Watch the element instead of assuming 44px.
+  if (chromeHeightObserver === null && typeof ResizeObserver === "function") {
+    chromeHeightObserver = new ResizeObserver(reportChromeHeight);
+    chromeHeightObserver.observe(elements.hostBar);
+  }
+  reportChromeHeight();
 }
 
 /** Compare dotted versions for the chooser; an unreadable segment sorts low. */
