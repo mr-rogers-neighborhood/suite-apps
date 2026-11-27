@@ -29,8 +29,9 @@ import {
  * `https://flatpak.suite.run/index.json`, and the same `@suite/pack` verifier. Go does not parse
  * or check the index itself. `parsePackIndexJson` refuses an oversized file, a duplicate key and a
  * malformed entry; `verifyPackIndex` refuses an unsigned index, a changed one, one signed by a key
- * this host does not pin, an expired one, a lower `sequence` and a `previous` that names another
- * index. Only after all of that does a row become visible.
+ * this host does not pin, an expired one and a lower `sequence`. A higher sequence is accepted on
+ * its signature even when the host missed publications, so a gap cannot strand the catalogue;
+ * `previous` stays the audit link. Only after all of that does a row become visible.
  *
  * What this module adds is a host-side head record: the last verified `sequence` and digest, kept
  * in the app's own key-value store so a replay is refused on the next launch too. The head is

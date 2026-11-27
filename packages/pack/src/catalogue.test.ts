@@ -272,21 +272,23 @@ describe("catalogue index", () => {
     });
     expect(advanced.ok).toBe(true);
 
-    const wrongParent = signPackIndex(
+    // A host that missed publications accepts the next signed index even though
+    // `previous` names one it never held; requiring equality would strand a
+    // client that skipped a publish until its head file was deleted by hand.
+    const skipped = signPackIndex(
       core({
-        sequence: 3,
+        sequence: 5,
         previous: "b".repeat(64),
         generatedAt: "2026-03-01T00:00:00.000Z",
       }),
       [operator.secretKeyBase64],
     );
-    const brokenChain = await verifyPackIndex(wrongParent, {
+    const caughtUp = await verifyPackIndex(skipped, {
       operatorKeys: [operator.publicKeyBase64],
       now: NOW,
       head,
     });
-    expect(brokenChain.ok).toBe(false);
-    expect((brokenChain as { reason: string }).reason).toBe("chain");
+    expect(caughtUp.ok).toBe(true);
 
     const noParent = parsePackIndex({
       ...next,

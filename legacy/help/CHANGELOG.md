@@ -6,6 +6,14 @@ underneath enough to matter.
 Versions here are Suite Help's own. It ships through Flatpak, so the deployment version follows
 this file and there is no AppImage release tag.
 
+## [0.1.7] - 2026-11-27
+
+### Changed
+
+- **Help is rebuilt from today's tree.** The pack is a snapshot, so the catalogue catch-up fix and
+  the release notes that describe it change the archive again. The previous versions stay
+  published and installable.
+
 ## [0.1.6] - 2026-11-27
 
 ### Changed

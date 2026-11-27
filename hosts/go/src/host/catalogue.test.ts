@@ -332,16 +332,26 @@ describe("loading a catalogue index", () => {
     expect(loaded.ok ? "" : loaded.message).toContain("cannot rewrite a sequence");
   });
 
-  it("refuses an index whose previous does not name the trusted digest", async () => {
+  it("accepts a forward index whose previous names one this host never held", async () => {
+    // A catalogue is published more often than the app opens, so a gap must not
+    // strand the client. The signature and the increasing sequence carry the
+    // trust; `previous` is the audit link.
     const head = JSON.stringify({ version: 1, sequence: 3, digest: "b".repeat(64) });
-    const text = signedText([entry()], { sequence: 4, previous: "c".repeat(64) });
+    const text = signedText([entry()], { sequence: 6, previous: "c".repeat(64) });
 
-    const loaded = await catalogueFor(text, {}, fakePacks().packs, {
+    const { catalogue, values } = catalogueFor(text, {}, fakePacks().packs, {
       [INDEX_HEAD_KEY]: head,
-    }).catalogue.load();
+    });
 
-    expect(loaded).toMatchObject({ ok: false, reason: "refused" });
-    expect(loaded.ok ? "" : loaded.message).toContain("does not name the digest");
+    const loaded = await catalogue.load();
+
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.sequence).toBe(6);
+    const recorded = JSON.parse(values.get(INDEX_HEAD_KEY) as string) as {
+      sequence: number;
+    };
+    expect(recorded.sequence).toBe(6);
   });
 
   it("accepts the next index in the chain and records its digest", async () => {
