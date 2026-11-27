@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
 import { cx } from "../cx.js";
 import { MenuBar } from "../menu/MenuBar.js";
 import { FOCUS_RING, MOTION } from "../tokens.js";
@@ -83,6 +83,20 @@ export function HostTabBar({
 }: HostTabBarProps): ReactNode {
 	const tabButtons = useRef(new Map<string, HTMLButtonElement>());
 	const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId);
+
+	/**
+	 * Keep the active tab visible in a crowded strip.
+	 *
+	 * The host changes `activeTabId` from outside the strip — opening a document, restoring
+	 * a session, activating a tab from the picker — so nothing here is focused when it
+	 * happens. Without this the selected tab can be scrolled out of reach and the switch
+	 * looks like it did nothing. `nearest` scrolls only when it is actually off-screen, so a
+	 * click on a visible tab does not jump the strip.
+	 */
+	useEffect(() => {
+		if (activeTabId === null) return;
+		tabButtons.current.get(activeTabId)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+	}, [activeTabId]);
 
 	function moveTo(index: number) {
 		if (tabs.length === 0) return;

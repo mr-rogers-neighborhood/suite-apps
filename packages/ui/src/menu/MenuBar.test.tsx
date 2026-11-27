@@ -246,6 +246,23 @@ describe("WAI-ARIA menubar keyboard traversal", () => {
     expect(screen.getByRole("menubar")).toBeInTheDocument();
   });
 
+  it("leaves the arrow keys alone on a plain header, so a tab strip or field keeps them", () => {
+    // The bug this guards: a header-level ArrowRight handler walked every control in the
+    // bar, so a tab strip inside it, or a text field, lost the arrows to the bar.
+    render(
+      <MenuBar
+        title="Workspace"
+        onOpenSearch={() => {}}
+        actions={<button type="button" data-testid="bar-action">Actions</button>}
+      />,
+    );
+
+    const titleBtn = screen.getByTestId("menubar-title");
+    titleBtn.focus();
+    fireEvent.keyDown(titleBtn, { key: "ArrowRight" });
+    expect(titleBtn).toHaveFocus();
+  });
+
   it("traverses items horizontally with ArrowRight and cycles from end to start", () => {
     render(<BarWithItems />);
     const item1 = screen.getByTestId("item-1");
@@ -319,6 +336,7 @@ describe("WAI-ARIA menubar keyboard traversal", () => {
   it("navigates directly within a MenuBar and skips items inside nested role=menu submenus", () => {
     render(
       <MenuBar
+        role="menubar"
         title="Workspace"
         onOpenSearch={() => {}}
         sync={<SyncPill situation="synced" label="Saved" />}

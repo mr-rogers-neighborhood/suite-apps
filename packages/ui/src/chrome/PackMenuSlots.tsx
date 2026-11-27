@@ -6,8 +6,10 @@ import type {
 	MenuSlots,
 	MenuStatus,
 } from "@suite/contracts";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cx } from "../cx.js";
+import { menuKeyDown } from "../menu/menuKeys.js";
 import { FOCUS_RING, MOTION } from "../tokens.js";
 
 /**
@@ -38,8 +40,8 @@ import { FOCUS_RING, MOTION } from "../tokens.js";
 export interface PackMenuZones {
 	/** The document's name, and its switcher menu when the pack publishes one. */
 	readonly context?: React.ReactNode;
-	/** The takeover row. */
-	readonly navigation: React.ReactNode;
+	/** The takeover row. Null when the pack published no controls, so the host can omit the zone. */
+	readonly navigation: React.ReactNode | null;
 	/** The pack's actions and status readout. */
 	readonly actions?: React.ReactNode;
 }
@@ -49,7 +51,7 @@ const ROW =
 const CONTROL =
 	"flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[length:var(--text-label,12px)]";
 const MENU_BOX =
-	"absolute left-0 top-full z-50 mt-1 min-w-44 overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-[var(--shadow-xl)]";
+	"fixed z-50 overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-[var(--shadow-xl)]";
 
 /** A small dropdown, opened from one control in the takeover row. */
 function SlotMenu({
@@ -67,23 +69,55 @@ function SlotMenu({
 }) {
 	const [open, setOpen] = useState(false);
 	const root = useRef<HTMLDivElement | null>(null);
+	const menu = useRef<HTMLDivElement | null>(null);
+	// The panel is positioned from the trigger's box, not `absolute` inside it: the bar is
+	// an `overflow-x-auto` container, which would clip a dropdown to the bar's own height.
+	const [at, setAt] = useState<{ left: number; top: number; minWidth: number } | null>(null);
 	const checked = items.find((item) => item.checked === true);
+
+	const place = useCallback(() => {
+		const trigger = root.current?.getBoundingClientRect();
+		if (trigger === undefined) return;
+		setAt({
+			left: Math.max(8, Math.min(trigger.left, window.innerWidth - 240)),
+			top: trigger.bottom + 4,
+			minWidth: Math.max(176, trigger.width),
+		});
+	}, []);
+
+	function close(returnFocus: boolean) {
+		setOpen(false);
+		setAt(null);
+		if (returnFocus) root.current?.querySelector("button")?.focus();
+	}
 
 	useEffect(() => {
 		if (!open) return;
+		// Focus the current choice, or the first row, the way a menu is expected to open.
+		// A choice row is a `menuitemradio`, so it must be in the selector too: a menu whose
+		// rows all report a choice has no plain `menuitem`, and used to open with nothing
+		// focused, leaving the arrow keys dead until the first Tab.
+		const target = menu.current?.querySelector<HTMLElement>(
+			"[aria-checked='true']:not([disabled]), [role='menuitemradio']:not([disabled]), [role='menuitem']:not([disabled])",
+		);
+		target?.focus();
+
 		const onPointerDown = (event: PointerEvent) => {
-			if (!root.current?.contains(event.target as Node)) setOpen(false);
+			const inside =
+				root.current?.contains(event.target as Node) === true ||
+				menu.current?.contains(event.target as Node) === true;
+			if (!inside) close(false);
 		};
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") setOpen(false);
-		};
+		const onReposition = () => place();
 		window.addEventListener("pointerdown", onPointerDown, true);
-		window.addEventListener("keydown", onKeyDown);
+		window.addEventListener("resize", onReposition);
+		window.addEventListener("scroll", onReposition, true);
 		return () => {
 			window.removeEventListener("pointerdown", onPointerDown, true);
-			window.removeEventListener("keydown", onKeyDown);
+			window.removeEventListener("resize", onReposition);
+			window.removeEventListener("scroll", onReposition, true);
 		};
-	}, [open]);
+	}, [open, place]);
 
 	return (
 		<div className="relative shrink-0" ref={root}>
@@ -94,7 +128,10 @@ function SlotMenu({
 				aria-label={label}
 				title={label}
 				data-slot-id={id}
-				onClick={() => setOpen((value) => !value)}
+				onClick={() => {
+					if (!open) place();
+					setOpen(!open);
+				}}
 				className={cx(
 					CONTROL,
 					"bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--surface-sunk)]",
@@ -114,47 +151,82 @@ function SlotMenu({
 					{"\u25be"}
 				</span>
 			</button>
-			{open ? (
-				<div role="menu" aria-label={label} className={MENU_BOX}>
-					{items.map((item) => (
-						<button
-							key={item.id}
-							type="button"
-							role="menuitem"
-							aria-current={item.checked === true ? "true" : undefined}
-							disabled={item.disabled === true}
-							title={item.help?.body ?? item.help?.title ?? item.label}
-							data-slot-item={item.id}
-							onClick={() => {
-								setOpen(false);
-								onChoose({ id, item: item.id });
+			{open && at !== null
+				? createPortal(
+						<div
+							ref={menu}
+							role="menu"
+							aria-label={label}
+							className={MENU_BOX}
+							style={{ left: at.left, top: at.top, minWidth: at.minWidth }}
+							onKeyDown={(event) => {
+								if (event.key === "Escape") {
+									event.preventDefault();
+									close(true);
+									return;
+								}
+								// Arrow/Home/End/typeahead behaviour is the one shared helper, so a
+								// menu in the bar behaves like a menu anywhere else in the suite.
+								menuKeyDown(event);
 							}}
-							className={cx(
-								ROW,
-								"hover:bg-[var(--surface-sunk)] disabled:opacity-40",
-								item.checked === true
-									? "text-[var(--ink)]"
-									: "text-[var(--ink-muted)]",
-								MOTION,
-								FOCUS_RING,
-							)}
 						>
-							<span
-								aria-hidden="true"
-								className="w-3 shrink-0 text-[var(--accent)]"
-							>
-								{item.checked === true ? "\u2713" : ""}
-							</span>
-							<span className="min-w-0 flex-1 truncate">{item.label}</span>
-							{item.shortcut === undefined ? null : (
-								<kbd className="shrink-0 text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
-									{item.shortcut}
-								</kbd>
-							)}
-						</button>
-					))}
-				</div>
-			) : null}
+							{items.map((item) => (
+								<Fragment key={item.id}>
+									{item.separatorBefore === true && item.checked !== true ? (
+										<div
+											role="separator"
+											className="my-1 h-px bg-[var(--hairline)]"
+										/>
+									) : null}
+									<button
+										type="button"
+										// A row that reports a choice is a radio, not a plain item: that is
+										// what `menuKeys.ts` selects for and what `checked` means.
+										role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+										aria-checked={item.checked}
+										disabled={item.disabled === true}
+										title={
+											item.disabledReason ??
+											item.help?.body ??
+											item.help?.title ??
+											item.label
+										}
+										data-slot-item={item.id}
+										onClick={() => {
+											close(true);
+											onChoose({ id, item: item.id });
+										}}
+										className={cx(
+											ROW,
+											"hover:bg-[var(--surface-sunk)] disabled:opacity-40",
+											item.checked === true
+												? "text-[var(--ink)]"
+												: "text-[var(--ink-muted)]",
+											MOTION,
+											FOCUS_RING,
+										)}
+									>
+										<span
+											aria-hidden="true"
+											className="w-3 shrink-0 text-[var(--accent)]"
+										>
+											{item.checked === true ? "\u2713" : ""}
+										</span>
+										<span className="min-w-0 flex-1 truncate">
+											{item.label}
+										</span>
+										{item.shortcut === undefined ? null : (
+											<kbd className="shrink-0 text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
+												{item.shortcut}
+											</kbd>
+										)}
+									</button>
+								</Fragment>
+							))}
+						</div>,
+						document.body,
+					)
+				: null}
 		</div>
 	);
 }
@@ -162,10 +234,12 @@ function SlotMenu({
 /** A row of tabs, one of which is the surface being shown. */
 function SlotTabs({
 	id,
+	label,
 	items,
 	onChoose,
 }: {
 	readonly id: string;
+	readonly label: string;
 	readonly items: readonly {
 		readonly id: string;
 		readonly label: string;
@@ -173,21 +247,56 @@ function SlotTabs({
 	}[];
 	readonly onChoose: (action: MenuSlotAction) => void;
 }) {
+	const buttons = useRef(new Map<string, HTMLButtonElement>());
+	const activeIndex = items.findIndex((item) => item.active);
+
+	/**
+	 * One tab stop, arrows move and activate — the tab pattern this markup claims.
+	 *
+	 * Without it every tab was its own stop and the arrows were taken by whatever
+	 * container was above, so a pack's tab row could not be walked at all.
+	 */
+	function moveTo(index: number) {
+		if (items.length === 0) return;
+		const next = items[(index + items.length) % items.length];
+		if (next === undefined) return;
+		buttons.current.get(next.id)?.focus();
+		onChoose({ id, item: next.id });
+	}
+
 	return (
 		<div
 			role="tablist"
-			aria-label="Open boards"
+			aria-label={label}
 			className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 		>
-			{items.map((item) => (
+			{items.map((item, index) => (
 				<button
 					key={item.id}
+					ref={(node) => {
+						if (node === null) buttons.current.delete(item.id);
+						else buttons.current.set(item.id, node);
+					}}
 					type="button"
 					role="tab"
 					aria-selected={item.active}
+					tabIndex={item.active || (activeIndex < 0 && index === 0) ? 0 : -1}
 					data-slot-id={id}
 					data-slot-item={item.id}
 					onClick={() => onChoose({ id, item: item.id })}
+					onKeyDown={(event) => {
+						const keys: Record<string, number> = {
+							ArrowRight: index + 1,
+							ArrowLeft: index - 1,
+							Home: 0,
+							End: items.length - 1,
+						};
+						const target = keys[event.key];
+						if (target === undefined) return;
+						event.preventDefault();
+						event.stopPropagation();
+						moveTo(target);
+					}}
 					className={cx(
 						CONTROL,
 						"max-w-[180px]",
@@ -330,7 +439,8 @@ export function packMenuZones(
 			</div>
 		);
 
-	const navigation = (
+	const navigation =
+		slots.navigation.length === 0 ? null : (
 		<div className="flex min-w-0 flex-initial items-center gap-1">
 			{slots.navigation.map((control: MenuNavControl) => {
 				switch (control.kind) {
@@ -349,6 +459,7 @@ export function packMenuZones(
 							<SlotTabs
 								key={control.id}
 								id={control.id}
+								label={control.label}
 								items={control.items}
 								onChoose={onChoose}
 							/>

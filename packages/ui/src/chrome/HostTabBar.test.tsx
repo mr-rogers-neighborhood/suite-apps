@@ -46,6 +46,19 @@ describe("HostTabBar", () => {
     expect(onActivate).toHaveBeenCalledWith("planner");
   });
 
+  it("keeps the active tab in view when it is chosen from outside the strip", () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+    renderBar({ activeTabId: "home" });
+
+    // The host changes `activeTabId` itself when a document opens, so the strip has to
+    // bring the newly chosen tab into view rather than leave it scrolled off the edge.
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(
+      screen.getByRole("button", { name: "Home" }),
+    );
+    scrollIntoView.mockRestore();
+  });
+
   it("moves and activates with the arrow keys, wrapping at the ends", () => {
     const onActivate = vi.fn();
     renderBar({ onActivate });

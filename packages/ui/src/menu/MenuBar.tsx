@@ -163,7 +163,11 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
       role={role}
       aria-label={ariaLabel}
       data-handbook-region={props["data-handbook-region"] ?? "title-bar"}
-      onKeyDown={onKeyDown ?? menuBarKeyDown}
+      // Horizontal arrow traversal is a *menubar* behaviour. On a plain header it would
+      // hijack the arrows from every control inside it — a text field, a tab strip, a
+      // dropdown — which is the bug this gate removes. Composites that want their own
+      // arrows (the tab strip, a pack's tablist) keep them and stop propagation.
+      onKeyDown={onKeyDown ?? (role === "menubar" ? menuBarKeyDown : undefined)}
       className={cx(
         "app-bar relative z-20 flex h-11 shrink-0 items-center gap-3 bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] px-4 text-[length:var(--text-body,13px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md",
         className,

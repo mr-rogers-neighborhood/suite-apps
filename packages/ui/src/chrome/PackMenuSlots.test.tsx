@@ -93,16 +93,65 @@ describe("the pack's zones", () => {
 		});
 	});
 
-	it("marks the chosen row and leaves the menu after a press", () => {
+	it("marks the chosen row as a checked radio, and leaves the menu after a press", () => {
 		renderZones(slots);
 
 		fireEvent.click(screen.getByRole("button", { name: "Boards" }));
-		expect(screen.getByRole("menuitem", { name: /Q3 board/u })).toHaveAttribute(
-			"aria-current",
-			"true",
-		);
-		fireEvent.click(screen.getByRole("menuitem", { name: /Q3 board/u }));
+		// A row that reports a choice is a radio, not a plain item: that is what `checked`
+		// means in the contract and what the shared menu helpers select for.
+		const chosen = screen.getByRole("menuitemradio", { name: /Q3 board/u });
+		expect(chosen).toHaveAttribute("aria-checked", "true");
+		expect(screen.queryByRole("menuitem", { name: /Q3 board/u })).not.toBeInTheDocument();
+
+		fireEvent.click(chosen);
 		expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+	});
+
+	it("draws a separator where the pack asked for one", () => {
+		renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "menu",
+					id: "canvas.boards",
+					label: "Boards",
+					items: [
+						{ id: "canvas.board.0", label: "Q3 board", checked: true },
+						{ id: "canvas.new-board", label: "New board", separatorBefore: true },
+					],
+				},
+			],
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Boards" }));
+		expect(screen.getByRole("separator")).toBeInTheDocument();
+	});
+
+	it("says why a row is refused instead of leaving it silently greyed out", () => {
+		renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "menu",
+					id: "canvas.boards",
+					label: "Boards",
+					items: [
+						{
+							id: "canvas.board.locked",
+							label: "Locked board",
+							disabled: true,
+							disabledReason: "This board is read-only.",
+						},
+					],
+				},
+			],
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Boards" }));
+		expect(screen.getByRole("menuitem", { name: /Locked board/u })).toHaveAttribute(
+			"title",
+			"This board is read-only.",
+		);
 	});
 
 	it("reports a pressed mode as pressed, so the control says which way it is", () => {
@@ -152,5 +201,72 @@ describe("the pack's zones", () => {
 		});
 		expect(screen.queryByRole("img")).not.toBeInTheDocument();
 		expect(screen.getByText("<b>Share</b>")).toBeInTheDocument();
+	});
+});
+
+describe("the dropdown's keyboard", () => {
+	const openBoards = () => fireEvent.click(screen.getByRole("button", { name: "Boards" }));
+
+	it("moves focus into the menu when it opens", () => {
+		renderZones(slots);
+		openBoards();
+		expect(document.activeElement).toBe(
+			screen.getByRole("menuitemradio", { name: /Q3 board/u }),
+		);
+	});
+
+	it("still focuses the first choice when no row is checked yet", () => {
+		// Every row here is a choice in a picker that has no current value. The first item
+		// has to take focus, or arrow keys do nothing until the person presses Tab.
+		renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "menu",
+					id: "canvas.boards",
+					label: "Boards",
+					items: [
+						{ id: "canvas.board.0", label: "Q3 board", checked: false },
+						{ id: "canvas.board.1", label: "Roadmap", checked: false },
+					],
+				},
+			],
+		});
+		openBoards();
+		expect(document.activeElement).toBe(
+			screen.getByRole("menuitemradio", { name: /Q3 board/u }),
+		);
+	});
+
+	it("walks rows with the arrow keys, and stops at the ends with Home/End", () => {
+		renderZones(slots);
+		openBoards();
+		const menu = screen.getByRole("menu", { name: "Boards" });
+		const first = screen.getByRole("menuitemradio", { name: /Q3 board/u });
+		const second = screen.getByRole("menuitem", { name: /Roadmap/u });
+
+		fireEvent.keyDown(menu, { key: "ArrowDown" });
+		expect(document.activeElement).toBe(second);
+		fireEvent.keyDown(menu, { key: "ArrowDown" });
+		expect(document.activeElement).toBe(first);
+		fireEvent.keyDown(menu, { key: "End" });
+		expect(document.activeElement).toBe(second);
+		fireEvent.keyDown(menu, { key: "Home" });
+		expect(document.activeElement).toBe(first);
+	});
+
+	it("closes on Escape and hands focus back to the trigger", () => {
+		renderZones(slots);
+		openBoards();
+		fireEvent.keyDown(screen.getByRole("menu", { name: "Boards" }), { key: "Escape" });
+		expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+		expect(document.activeElement).toBe(screen.getByRole("button", { name: "Boards" }));
+	});
+
+	it("closes on a press outside, without moving focus", () => {
+		renderZones(slots);
+		openBoards();
+		fireEvent.pointerDown(document.body);
+		expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 	});
 });

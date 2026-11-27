@@ -1,11 +1,25 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { cx } from "../cx.js";
 import { MenuBar } from "../menu/MenuBar.js";
 import { FOCUS_RING, MOTION } from "../tokens.js";
 export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTabMenu, onNewTab, mark, onHome, homeLabel = "Home", sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, pack, "data-testid": testId = "host-tab-bar", }) {
     const tabButtons = useRef(new Map());
     const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId);
+    /**
+     * Keep the active tab visible in a crowded strip.
+     *
+     * The host changes `activeTabId` from outside the strip — opening a document, restoring
+     * a session, activating a tab from the picker — so nothing here is focused when it
+     * happens. Without this the selected tab can be scrolled out of reach and the switch
+     * looks like it did nothing. `nearest` scrolls only when it is actually off-screen, so a
+     * click on a visible tab does not jump the strip.
+     */
+    useEffect(() => {
+        if (activeTabId === null)
+            return;
+        tabButtons.current.get(activeTabId)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }, [activeTabId]);
     function moveTo(index) {
         if (tabs.length === 0)
             return;
