@@ -42,6 +42,10 @@ const SLOT_ID = /^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*$/u;
 export const MENU_SLOT_ID_MAX = 96;
 export const MENU_SLOT_LABEL_MAX = 80;
 export const MENU_SLOT_GLYPH_MAX = 4;
+/** A short readout a control can display, such as "3 selected" or "12 items". */
+export const MENU_SLOT_VALUE_MAX = 32;
+/** The one extra sentence a menu row can carry under its label. */
+export const MENU_SLOT_DESCRIPTION_MAX = 160;
 export const MENU_SLOTS_MAX_CONTROLS = 24;
 export const MENU_SLOTS_MAX_ITEMS = 60;
 
@@ -89,6 +93,8 @@ export interface MenuRow {
 	 * this greyed out" without the host having to guess.
 	 */
 	readonly disabledReason?: string;
+	/** A second line under the label, in the pack's words, when the label is terse. */
+	readonly description?: string;
 	readonly shortcut?: string;
 	readonly separatorBefore?: boolean;
 	readonly help?: MenuHelp;
@@ -100,7 +106,8 @@ const rowSchema = z
 		label: z.string().min(1).max(MENU_SLOT_LABEL_MAX),
 		checked: z.boolean().optional(),
 		disabled: z.boolean().optional(),
-		disabledReason: z.string().min(1).max(160).optional(),
+		disabledReason: z.string().min(1).max(MENU_SLOT_DESCRIPTION_MAX).optional(),
+		description: z.string().min(1).max(MENU_SLOT_DESCRIPTION_MAX).optional(),
 		shortcut: z.string().min(1).max(24).optional(),
 		separatorBefore: z.boolean().optional(),
 		help: helpSchema.optional(),
@@ -153,10 +160,10 @@ const tabSchema = z
 /**
  * One control in the takeover row.
  *
- * The four kinds are the union of what Canvas, Planner and Budget actually draw:
- * a dropdown (`Canvas`'s board switcher, `Planner`'s view menu), a tab row (Canvas's
- * open boards), a toggle (Canvas's explain purpose, its interaction mode), and a group
- * of icon buttons (undo/redo, history, outline, views).
+ * The five kinds are the union of what Canvas, Planner and Budget draw plus the readouts a
+ * richer bar needs: a dropdown (`Canvas`'s board switcher, `Planner`'s view menu), a tab row
+ * (Canvas's open boards), a toggle (a mode, with an optional value), a group of icon buttons
+ * (undo/redo, history, outline, views), and a segmented readout for a small closed set.
  */
 export type MenuNavControl =
 	| {
@@ -180,6 +187,12 @@ export type MenuNavControl =
 			readonly label: string;
 			readonly pressed: boolean;
 			readonly glyph?: string;
+			/** A short value shown beside the label, such as "3 selected". */
+			readonly value?: string;
+			/** A role name for the value's ink, never a colour. */
+			readonly tone?: MenuStatus["tone"];
+			readonly disabled?: boolean;
+			readonly disabledReason?: string;
 			readonly title?: string;
 			readonly help?: MenuHelp;
 	  }
@@ -187,6 +200,19 @@ export type MenuNavControl =
 			readonly kind: "buttons";
 			readonly id: string;
 			readonly items: readonly MenuButton[];
+			readonly help?: MenuHelp;
+	  }
+	| {
+			readonly kind: "segmented";
+			readonly id: string;
+			/** The group's accessible name, e.g. "Group by". */
+			readonly label: string;
+			/** The id of the option currently chosen. */
+			readonly value: string;
+			readonly options: readonly {
+				readonly id: string;
+				readonly label: string;
+			}[];
 			readonly help?: MenuHelp;
 	  };
 
@@ -216,6 +242,10 @@ const navControlSchema = z.discriminatedUnion("kind", [
 			label: z.string().min(1).max(MENU_SLOT_LABEL_MAX),
 			pressed: z.boolean(),
 			glyph: z.string().min(1).max(MENU_SLOT_GLYPH_MAX).optional(),
+			value: z.string().min(1).max(MENU_SLOT_VALUE_MAX).optional(),
+			tone: z.enum(["quiet", "ok", "warn", "danger"]).optional(),
+			disabled: z.boolean().optional(),
+			disabledReason: z.string().min(1).max(MENU_SLOT_DESCRIPTION_MAX).optional(),
 			title: z.string().min(1).max(160).optional(),
 			help: helpSchema.optional(),
 		})
@@ -228,6 +258,30 @@ const navControlSchema = z.discriminatedUnion("kind", [
 			help: helpSchema.optional(),
 		})
 		.strict(),
+	z
+		.object({
+			kind: z.literal("segmented"),
+			id: z.string().refine(isMenuSlotId, "not a menu slot id"),
+			label: z.string().min(1).max(MENU_SLOT_LABEL_MAX),
+			value: z.string().refine(isMenuSlotId, "not a menu slot id"),
+			options: z
+				.array(
+					z
+						.object({
+							id: z.string().refine(isMenuSlotId, "not a menu slot id"),
+							label: z.string().min(1).max(MENU_SLOT_LABEL_MAX),
+						})
+						.strict(),
+				)
+				.min(1)
+				.max(MENU_SLOTS_MAX_ITEMS),
+			help: helpSchema.optional(),
+		})
+		.strict()
+		.refine(
+			(control) => control.options.some((option) => option.id === control.value),
+			"segmented value must match one of the declared options",
+		),
 ]);
 
 /**

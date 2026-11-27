@@ -171,6 +171,86 @@ describe("the pack's zones", () => {
 		).toHaveAttribute("aria-pressed", "true");
 	});
 
+	it("shows a mode's value beside its label and a refusal as its title", () => {
+		renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "toggle",
+					id: "canvas.selection",
+					label: "Selection",
+					pressed: true,
+					value: "3 selected",
+				},
+				{
+					kind: "toggle",
+					id: "canvas.locked",
+					label: "Lock",
+					pressed: false,
+					disabled: true,
+					disabledReason: "The board is read-only.",
+				},
+			],
+		});
+
+		expect(screen.getByRole("button", { name: /Selection/u })).toHaveTextContent("3 selected");
+		const locked = screen.getByRole("button", { name: "Lock" });
+		expect(locked).toBeDisabled();
+		expect(locked).toHaveAttribute("title", "The board is read-only.");
+	});
+
+	it("draws a segmented readout as a radiogroup and reports the chosen option", () => {
+		const { onChoose } = renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "segmented",
+					id: "planner.group",
+					label: "Group by",
+					value: "planner.group.day",
+					options: [
+						{ id: "planner.group.day", label: "Day" },
+						{ id: "planner.group.week", label: "Week" },
+					],
+				},
+			],
+		});
+
+		expect(screen.getByRole("radiogroup", { name: "Group by" })).toBeInTheDocument();
+		expect(screen.getByRole("radio", { name: "Day" })).toHaveAttribute("aria-checked", "true");
+
+		fireEvent.keyDown(screen.getByRole("radio", { name: "Day" }), { key: "ArrowRight" });
+		expect(onChoose).toHaveBeenLastCalledWith({
+			id: "planner.group",
+			item: "planner.group.week",
+		});
+		expect(screen.getByRole("radio", { name: "Week" })).toHaveFocus();
+	});
+
+	it("shows a menu row's description under its label", () => {
+		renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "menu",
+					id: "canvas.boards",
+					label: "Boards",
+					items: [
+						{
+							id: "canvas.board.q3",
+							label: "Q3 board",
+							checked: true,
+							description: "Strategy and quarterly goals",
+						},
+					],
+				},
+			],
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Boards" }));
+		expect(screen.getByText("Strategy and quarterly goals")).toBeInTheDocument();
+	});
+
 	it("keeps a mode's word beside its glyph, and names an icon-only command", () => {
 		// The vocabulary the bar agreed: a mode is icon + label + aria-pressed, a document
 		// command is an icon with its name in `aria-label`, and an action is icon + label.
@@ -221,6 +301,44 @@ describe("the pack's zones", () => {
 		expect(
 			screen.getByRole("button", { name: "Explain mode" }),
 		).toHaveAttribute("title", "Gathers a selection into a context.");
+	});
+
+	it("honours help on menus, tabs and button groups too", () => {
+		renderZones({
+			...slots,
+			navigation: [
+				{
+					kind: "menu",
+					id: "canvas.boards",
+					label: "Boards",
+					items: [],
+					help: { title: "Boards", body: "Switch board" },
+				},
+				{
+					kind: "tabs",
+					id: "canvas.open-boards",
+					label: "Open boards",
+					items: [],
+					help: { title: "Open boards", body: "Your open boards" },
+				},
+				{
+					kind: "buttons",
+					id: "canvas.history",
+					items: [],
+					help: { title: "History", body: "Undo and redo" },
+				},
+			],
+		});
+
+		expect(screen.getByRole("button", { name: "Boards" })).toHaveAttribute(
+			"title",
+			"Switch board",
+		);
+		expect(screen.getByRole("tablist", { name: "Open boards" })).toHaveAttribute(
+			"title",
+			"Your open boards",
+		);
+		expect(screen.getByTitle("Undo and redo")).toBeInTheDocument();
 	});
 
 	it("renders a label as text, never as markup", () => {

@@ -176,6 +176,28 @@ export const TwoRowsWithMenu: Story = {
   },
 };
 
+/**
+ * The same pack row in a narrow panel: the document switcher stays inline and the
+ * remaining controls move into the host's `…` menu. The nodes are still mounted, so no
+ * pack control is lost and nothing from the pack renders into the host's menu.
+ */
+export const FoldedPackRow: Story = {
+  args: { pack: canvasPack, packKey: "canvas" },
+  decorators: [
+    (Story) => (
+      <div style={{ width: 760 }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async () => {
+    await userEvent.click(screen.getByRole("button", { name: "More controls" }));
+    const menu = await screen.findByRole("menu", { name: "More controls" });
+    await expect(within(menu).getByRole("menuitem", { name: /Version history/u })).toBeInTheDocument();
+    await expect(within(menu).getByRole("menuitemradio", { name: /Roadmap/u })).toBeInTheDocument();
+  },
+};
+
 export const Unavailable: Story = {
   args: {
     tabs: [

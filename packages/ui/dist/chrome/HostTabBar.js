@@ -6,6 +6,7 @@ import { MenuBar } from "../menu/MenuBar.js";
 import { menuKeyDown } from "../menu/menuKeys.js";
 import { FOCUS_RING, MOTION, MOTION_ALL } from "../tokens.js";
 const SWITCH_WIDTH = 240;
+const FOLD_BOX = "fixed z-50 overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-[var(--shadow-xl)] starting:scale-95 starting:opacity-0 motion-safe:transition-[opacity,transform] motion-safe:duration-[var(--duration-fast,100ms)] motion-safe:ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))]";
 /** A menu row: the switch list's one entry per open tab. */
 const SWITCH_ROW = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[length:var(--text-label,12px)] outline-none text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]";
 export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTabMenu, onNewTab, mark, onHome, homeLabel = "Home", sync, controls, search, onOpenSearch, searchPlaceholder, searchShortcut, pack, packKey, "data-testid": testId = "host-tab-bar", }) {
@@ -116,6 +117,61 @@ export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTa
             window.removeEventListener("scroll", onReposition, true);
         };
     }, [switchOpen, placeSwitch]);
+    const packControls = pack?.controls ?? [];
+    const foldControls = packControls.length > 1 ? packControls.slice(1) : [];
+    const foldTrigger = useRef(null);
+    const foldMenu = useRef(null);
+    const [foldOpen, setFoldOpen] = useState(false);
+    const [foldAt, setFoldAt] = useState(null);
+    const placeFold = useCallback(() => {
+        const trigger = foldTrigger.current?.getBoundingClientRect();
+        if (trigger === undefined)
+            return;
+        const width = 240;
+        const left = Math.max(8, Math.min(trigger.left, window.innerWidth - width - 8));
+        setFoldAt({ left, top: trigger.bottom + 4 });
+    }, []);
+    function closeFold(returnFocus) {
+        setFoldOpen(false);
+        setFoldAt(null);
+        if (returnFocus)
+            foldTrigger.current?.focus();
+    }
+    useEffect(() => {
+        if (!foldOpen)
+            return;
+        // Open on the current choice when the folded rows include one, otherwise the first
+        // usable row. A single comma-list query would return document order and land on an
+        // unchecked option.
+        const panel = foldMenu.current;
+        const target = panel?.querySelector("[aria-checked='true']:not([disabled])") ??
+            panel?.querySelector("[role='menuitem']:not([disabled]), [role='menuitemradio']:not([disabled]), [role='menuitemcheckbox']:not([disabled])");
+        target?.focus();
+        const onPointerDown = (event) => {
+            const inside = foldTrigger.current?.contains(event.target) === true ||
+                foldMenu.current?.contains(event.target) === true;
+            if (!inside) {
+                setFoldOpen(false);
+                setFoldAt(null);
+            }
+        };
+        const onReposition = () => placeFold();
+        window.addEventListener("pointerdown", onPointerDown, true);
+        window.addEventListener("resize", onReposition);
+        window.addEventListener("scroll", onReposition, true);
+        return () => {
+            window.removeEventListener("pointerdown", onPointerDown, true);
+            window.removeEventListener("resize", onReposition);
+            window.removeEventListener("scroll", onReposition, true);
+        };
+    }, [foldOpen, placeFold]);
+    function foldRowName(row) {
+        if (row.role === "choice")
+            return "menuitemradio";
+        if (row.role === "toggle")
+            return "menuitemcheckbox";
+        return "menuitem";
+    }
     const rowOne = (_jsxs("div", { className: "flex min-w-0 flex-1 items-center gap-2", children: [tabs.length === 0 ? (_jsx("span", { className: "hidden whitespace-nowrap text-[length:var(--text-caption,11px)] text-[var(--ink-faint)] sm:inline", children: "No open tabs" })) : (_jsx("nav", { "aria-label": "Open tabs", className: "flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", children: tabs.map((tab, index) => {
                     const selected = tab.id === activeTabId;
                     const reachable = selected || (activeIndex < 0 && index === 0);
@@ -154,7 +210,34 @@ export function HostTabBar({ tabs, activeTabId = null, onActivate, onClose, onTa
                 }, className: cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[length:var(--text-body,13px)] text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: _jsx("span", { "aria-hidden": "true", children: "\u25be" }) })) : null] }));
     return (_jsxs("div", { className: "flex flex-col", children: [_jsx(MenuBar, { "data-testid": testId, "aria-label": "Suite", style: { "--menu-bar-height": "var(--control-height, 36px)" }, ...(mark === undefined ? {} : { mark }), ...(onHome === undefined
                     ? {}
-                    : { onNavigateHome: onHome, homeAriaLabel: homeLabel }), navigation: rowOne, ...(search === undefined ? {} : { search }), ...(onOpenSearch === undefined ? {} : { onOpenSearch }), ...(searchPlaceholder === undefined ? {} : { searchPlaceholder }), ...(searchShortcut === undefined ? {} : { searchShortcut }), ...(sync === undefined ? {} : { sync }), ...(controls === undefined ? {} : { controls }) }), pack === undefined ? null : (_jsxs("div", { "data-testid": `${testId}-pack`, "data-handbook-region": "pack-bar", className: cx("flex h-[var(--control-height,36px)] shrink-0 items-center gap-2 border-t border-[var(--hairline)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] px-4 text-[length:var(--text-label,12px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md starting:translate-y-1 starting:opacity-0", MOTION_ALL), children: [_jsxs("div", { className: "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", children: [pack.context, pack.navigation] }), pack.actions === undefined ? null : (_jsx("div", { className: "flex shrink-0 items-center gap-1", children: pack.actions }))] }, packKey ?? "pack")), switchOpen && switchAt !== null
+                    : { onNavigateHome: onHome, homeAriaLabel: homeLabel }), navigation: rowOne, ...(search === undefined ? {} : { search }), ...(onOpenSearch === undefined ? {} : { onOpenSearch }), ...(searchPlaceholder === undefined ? {} : { searchPlaceholder }), ...(searchShortcut === undefined ? {} : { searchShortcut }), ...(sync === undefined ? {} : { sync }), ...(controls === undefined ? {} : { controls }) }), pack === undefined ? null : (_jsxs("div", { "data-testid": `${testId}-pack`, "data-handbook-region": "pack-bar", className: cx("@container flex h-[var(--control-height,36px)] shrink-0 items-center gap-2 border-t border-[var(--hairline)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] px-4 text-[length:var(--text-label,12px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md starting:translate-y-1 starting:opacity-0", MOTION_ALL), children: [_jsxs("div", { className: "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", children: [pack.context, packControls.length === 0
+                                ? pack.navigation
+                                : packControls.map((control, index) => (_jsx("div", { className: cx("flex shrink-0 items-center", 
+                                    // Below the row's own width, everything after the
+                                    // first control moves into the `…` menu. The nodes
+                                    // stay mounted but not rendered, so no control is
+                                    // lost and no pack React is touched.
+                                    index > 0 && foldControls.length > 0
+                                        ? "@max-5xl:hidden"
+                                        : undefined), children: control.node }, control.key))), foldControls.length === 0 ? null : (_jsx("div", { className: "hidden shrink-0 @max-5xl:flex", children: _jsx("button", { ref: foldTrigger, type: "button", "aria-haspopup": "menu", "aria-expanded": foldOpen, "aria-label": "More controls", title: "More controls", onClick: () => {
+                                        if (!foldOpen)
+                                            placeFold();
+                                        setFoldOpen(!foldOpen);
+                                    }, className: cx("flex h-7 w-7 items-center justify-center rounded-md text-[length:var(--text-body,13px)] text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]", MOTION, FOCUS_RING), children: _jsx("span", { "aria-hidden": "true", children: "\u22ef" }) }) }))] }), pack.actions === undefined ? null : (_jsx("div", { className: "flex shrink-0 items-center gap-1", children: pack.actions }))] }, packKey ?? "pack")), foldOpen && foldAt !== null
+                ? createPortal(_jsx("div", { ref: foldMenu, role: "menu", "aria-label": "More controls", className: FOLD_BOX, style: { left: foldAt.left, top: foldAt.top, minWidth: SWITCH_WIDTH }, onKeyDown: (event) => {
+                        if (event.key === "Escape") {
+                            event.preventDefault();
+                            closeFold(true);
+                            return;
+                        }
+                        menuKeyDown(event);
+                    }, children: foldControls.map((control) => (_jsx("div", { role: "group", ...(control.group === undefined
+                            ? {}
+                            : { "aria-label": control.group }), children: control.rows.map((row) => (_jsxs("button", { type: "button", role: foldRowName(row), "aria-checked": row.role === "command" ? undefined : row.checked === true, disabled: row.disabled === true, title: row.disabledReason ?? row.description ?? row.label, "data-slot-id": row.key, onClick: () => {
+                                closeFold(true);
+                                row.choose();
+                            }, className: cx("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[length:var(--text-label,12px)] text-[var(--ink-muted)] outline-none hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)] disabled:opacity-40", MOTION, FOCUS_RING), children: [_jsx("span", { "aria-hidden": "true", className: "w-3 shrink-0 text-[var(--accent)]", children: row.checked === true ? "\u2713" : "" }), row.glyph === undefined ? null : (_jsx("span", { "aria-hidden": "true", className: "shrink-0", children: row.glyph })), _jsxs("span", { className: "min-w-0 flex-1", children: [_jsx("span", { className: "block truncate", children: row.label }), row.description === undefined ? null : (_jsx("span", { className: "block truncate text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]", children: row.description }))] })] }, row.key))) }, control.key))) }), document.body)
+                : null, switchOpen && switchAt !== null
                 ? createPortal(_jsx("div", { ref: switchMenu, role: "menu", "aria-label": "All tabs", className: "fixed z-50 overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-[var(--shadow-xl)] starting:scale-95 starting:opacity-0 motion-safe:transition-[opacity,transform] motion-safe:duration-[var(--duration-fast,100ms)] motion-safe:ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))]", style: { left: switchAt.left, top: switchAt.top, minWidth: SWITCH_WIDTH }, onKeyDown: (event) => {
                         if (event.key === "Escape") {
                             event.preventDefault();

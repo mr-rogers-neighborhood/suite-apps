@@ -1,6 +1,6 @@
 import type { MenuSlots } from "@suite/contracts";
 import type { SyncSituation } from "@suite/ui";
-import type { HostTab } from "@suite/ui/chrome";
+import type { HostTab, PackMenuControl } from "@suite/ui/chrome";
 import { createElement, type ReactNode } from "react";
 import type { RelayView, ShellTab } from "../../shared.js";
 
@@ -69,11 +69,13 @@ export function toHostPack(zones: {
   readonly context?: ReactNode;
   readonly navigation: ReactNode | null;
   readonly actions?: ReactNode;
+  readonly controls?: readonly PackMenuControl[];
 }):
   | {
       readonly context?: ReactNode;
       readonly navigation: ReactNode;
       readonly actions?: ReactNode;
+      readonly controls?: readonly PackMenuControl[];
     }
   | undefined {
   if (zones.navigation === null && zones.actions === undefined && zones.context === undefined) {
@@ -83,6 +85,7 @@ export function toHostPack(zones: {
     ...(zones.context === undefined ? {} : { context: zones.context }),
     navigation: zones.navigation,
     ...(zones.actions === undefined ? {} : { actions: zones.actions }),
+    ...(zones.controls === undefined ? {} : { controls: zones.controls }),
   };
 }
 

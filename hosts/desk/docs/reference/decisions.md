@@ -241,6 +241,11 @@ The rules that shape the Suite host.
 - Desk hides the native menu bar (`autoHideMenuBar`), as Planner and Budget already do. The template
   stays installed, so its accelerators (⌘W, ⌘K, ⌘S) keep working; it is no longer a third permanent
   band above the two host rows.
+- A pack control may report **state as well as commands**: a toggle carries an optional `value` and
+  `tone`, a row carries an optional `description`, and a `segmented` kind draws a closed set as a
+  radiogroup. The host still receives values and ids only, never a pack's meaning. When the pack row
+  does not fit, the host folds the controls after the first into its own `…` menu built from the same
+  descriptors; the nodes stay mounted so no control is lost, and nothing is injected into host chrome.
 - Theme is host state, not pack state. Suite Desk owns the preset, brightness and density on desktop
   (Suite Go owns them on mobile), stores the choice at `<dataRoot>/theme.json`, and paints every pack
   view with the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A

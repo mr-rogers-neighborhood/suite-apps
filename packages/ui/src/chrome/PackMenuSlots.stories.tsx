@@ -790,3 +790,99 @@ export const BudgetPack: Story = {
     });
   },
 };
+
+/** A mode can carry a short value beside its word, without the host knowing the count. */
+export const SlotToggleValue: Story = {
+  args: {
+    slots: {
+      format: "suite.menu-slots",
+      title: null,
+      navigation: [
+        {
+          kind: "toggle",
+          id: "canvas.selection",
+          label: "Selection",
+          pressed: true,
+          glyph: "\u25c8",
+          value: "3 selected",
+          tone: "ok",
+          help: {
+            title: "Selection",
+            body: "Explain mode has three cards in its context.",
+          },
+        },
+      ],
+      actions: [],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggle = canvas.getByRole("button", { name: /Selection/u });
+    await expect(toggle).toHaveTextContent("3 selected");
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  },
+};
+
+/** A control that cannot be used says why, instead of leaving a silent grey square. */
+export const SlotToggleRefused: Story = {
+  args: {
+    slots: {
+      format: "suite.menu-slots",
+      title: null,
+      navigation: [
+        {
+          kind: "toggle",
+          id: "canvas.lock",
+          label: "Lock board",
+          pressed: false,
+          disabled: true,
+          disabledReason: "This board is read-only.",
+        },
+      ],
+      actions: [],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggle = canvas.getByRole("button", { name: "Lock board" });
+    await expect(toggle).toBeDisabled();
+    await expect(toggle).toHaveAttribute("title", "This board is read-only.");
+  },
+};
+
+/** A small closed set draws as a radiogroup, not as a row of independent buttons. */
+export const SlotSegmented: Story = {
+  args: {
+    slots: {
+      format: "suite.menu-slots",
+      title: null,
+      navigation: [
+        {
+          kind: "segmented",
+          id: "planner.group",
+          label: "Group by",
+          value: "planner.group.day",
+          options: [
+            { id: "planner.group.day", label: "Day" },
+            { id: "planner.group.week", label: "Week" },
+            { id: "planner.group.month", label: "Month" },
+          ],
+        },
+      ],
+      actions: [],
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const group = canvas.getByRole("radiogroup", { name: "Group by" });
+    await expect(within(group).getByRole("radio", { name: "Day" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await userEvent.click(within(group).getByRole("radio", { name: "Week" }));
+    await expect(args.onChoose).toHaveBeenCalledWith({
+      id: "planner.group",
+      item: "planner.group.week",
+    });
+  },
+};
