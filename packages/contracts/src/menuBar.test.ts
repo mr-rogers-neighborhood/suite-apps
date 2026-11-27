@@ -81,6 +81,114 @@ describe("menu-bar slots", () => {
 		expect(toggle?.help?.body).toContain("context");
 	});
 
+	it("accepts a value, a tone and a refusal reason on a mode", () => {
+		const parsed = parseMenuSlots({
+			...canvasSlots,
+			navigation: [
+				{
+					kind: "toggle",
+					id: "canvas.selection",
+					label: "Selection",
+					pressed: true,
+					value: "3 selected",
+					tone: "warn",
+					disabledReason: "The board is read-only.",
+				},
+			],
+		});
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) return;
+		const toggle = parsed.value.navigation[0];
+		expect(toggle?.kind === "toggle" && toggle.value).toBe("3 selected");
+		expect(toggle?.kind === "toggle" && toggle.tone).toBe("warn");
+	});
+
+	it("accepts a segmented readout and its chosen option", () => {
+		const parsed = parseMenuSlots({
+			...canvasSlots,
+			navigation: [
+				{
+					kind: "segmented",
+					id: "planner.group",
+					label: "Group by",
+					value: "planner.group.day",
+					options: [
+						{ id: "planner.group.day", label: "Day" },
+						{ id: "planner.group.week", label: "Week" },
+					],
+				},
+			],
+		});
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) return;
+		expect(parsed.value.navigation[0]?.kind).toBe("segmented");
+	});
+
+	it("refuses a segmented readout with no options or an unknown selected id", () => {
+		const noOptions = parseMenuSlots({
+			...canvasSlots,
+			navigation: [
+				{
+					kind: "segmented",
+					id: "planner.group",
+					label: "Group by",
+					value: "planner.group.day",
+					options: [],
+				},
+			],
+		});
+		expect(noOptions.ok).toBe(false);
+
+		const badValue = parseMenuSlots({
+			...canvasSlots,
+			navigation: [
+				{
+					kind: "segmented",
+					id: "planner.group",
+					label: "Group by",
+					value: "Group by day",
+					options: [{ id: "planner.group.day", label: "Day" }],
+				},
+			],
+		});
+		expect(badValue.ok).toBe(false);
+	});
+
+	it("bounds a value and a row description", () => {
+		const longValue = parseMenuSlots({
+			...canvasSlots,
+			navigation: [
+				{
+					kind: "toggle",
+					id: "canvas.selection",
+					label: "Selection",
+					pressed: false,
+					value: "x".repeat(80),
+				},
+			],
+		});
+		expect(longValue.ok).toBe(false);
+
+		const longDescription = parseMenuSlots({
+			...canvasSlots,
+			navigation: [
+				{
+					kind: "menu",
+					id: "canvas.boards",
+					label: "Boards",
+					items: [
+						{
+							id: "canvas.board.q3",
+							label: "Q3",
+							description: "x".repeat(400),
+						},
+					],
+				},
+			],
+		});
+		expect(longDescription.ok).toBe(false);
+	});
+
 	it("describes an empty bar without any pack material", () => {
 		expect(parseMenuSlots(emptyMenuSlots()).ok).toBe(true);
 		const empty = emptyMenuSlots();

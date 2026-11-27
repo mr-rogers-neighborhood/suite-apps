@@ -101,6 +101,12 @@ actions). The pack row is omitted when the active surface published nothing. Row
 host's density scale, and a native host reports the measured total to its window so pack content
 starts below the real bar.
 
+When the pack row is narrower than the controls it carries, the host keeps the first control inline
+and moves the rest into its own `…` menu. The host builds that menu from the same descriptors it
+drew inline, so the fold is the host's presentation choice, not a second pack surface. The folded
+rows keep their role (`menuitem`, `menuitemradio`, `menuitemcheckbox`), their disabled reason and
+their group heading.
+
 ### What a pack publishes
 
 `MenuSlots` — a title, an optional title menu, a takeover row, actions and an optional status
@@ -111,12 +117,15 @@ packs actually draw rather than a general UI language:
 | --- | --- | --- |
 | `menu` | A dropdown of rows, optionally checked | Canvas's boards, Planner's and Budget's views |
 | `tabs` | A row of tabs, one active, carrying its own accessible `label` | Canvas's open boards |
-| `toggle` | A mode control, on or off | Canvas's explain and interaction mode |
+| `toggle` | A mode control, on or off, with an optional value | Canvas's explain and interaction mode |
 | `buttons` | A group of icon buttons | Undo/redo, history, outline, the drawer toggle |
+| `segmented` | A small closed set drawn as a radiogroup | A group-by or view switch |
 
 A row with `checked` is drawn as a `menuitemradio`, not a plain item, so the chosen value is
 announced rather than just marked. A disabled row may carry `disabledReason`, and the host shows that
-sentence instead of a silent grey control.
+sentence instead of a silent grey control. A row may also carry `description`, one short sentence
+under its label. A toggle may carry `value` ("3 selected") and `tone`, and a refused toggle carries
+`disabledReason`, so a mode can report state without the host knowing what the number means.
 
 ### Ids are opaque, and `help` is the seam
 
