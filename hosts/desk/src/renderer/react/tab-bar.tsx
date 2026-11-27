@@ -12,12 +12,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { PickerData } from "../../shared.js";
-import {
-  type HostBarSnapshot,
-  syncPresentation,
-  toHostPack,
-  toHostTabs,
-} from "./state.js";
+import { type HostBarSnapshot, syncPresentation, toHostPack, toHostTabs } from "./state.js";
 import "./tab-bar.css";
 
 export { colorFor } from "./state.js";

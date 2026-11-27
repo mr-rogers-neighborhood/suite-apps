@@ -76,11 +76,7 @@ export function toHostPack(zones: {
       readonly actions?: ReactNode;
     }
   | undefined {
-  if (
-    zones.navigation === null &&
-    zones.actions === undefined &&
-    zones.context === undefined
-  ) {
+  if (zones.navigation === null && zones.actions === undefined && zones.context === undefined) {
     return undefined;
   }
   return {
