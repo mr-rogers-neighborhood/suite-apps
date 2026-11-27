@@ -68,10 +68,24 @@ describe("the Home composition", () => {
     const catalogueStart = shell.indexOf("function catalogueCard");
     const refreshStart = shell.indexOf("function refreshApps");
     const catalogue = shell.slice(catalogueStart, refreshStart);
-    expect(catalogue).toContain("Install v${entry.version}");
+    expect(catalogue).toMatch(/Install v\$\{entry\.version\}/u);
     expect(catalogue).not.toContain("Reinstall v");
     expect(catalogue).not.toContain("Update to v");
     expect(catalogue).not.toContain("Installed v");
+  });
+
+  it("keeps the update action off development packs and lets the refusal win", () => {
+    const installedStart = shell.indexOf("function installedCard");
+    const catalogueStart = shell.indexOf("function catalogueCard");
+    const installed = shell.slice(installedStart, catalogueStart);
+    // A dev directory wins the id, so installing a signed copy cannot change what loads.
+    expect(installed).toContain('pack.source === "development" ? undefined');
+
+    const refusalStart = shell.indexOf("function refusalActionLabel");
+    const refusal = shell.slice(refusalStart, installedStart);
+    // An entry can be both untrusted and incompatible; the refusal sentence names the
+    // reason that blocks it first, so the label must not check platform state.
+    expect(refusal).not.toContain("platform?.state");
   });
 
   it("deduplicates catalogue entries for installed pack ids and counts unique ids", () => {
@@ -90,6 +104,10 @@ describe("the Home composition", () => {
     // packCount counts unique ids rather than array sums
     expect(refresh).not.toContain("state.packs.length + state.catalogue.length");
     expect(refresh).toContain("allIds.size");
+
+    // The merged grid keeps only the views it reads.
+    expect(shell).not.toContain("appsView.packs");
+    expect(shell).not.toContain("catalogueCount");
   });
 
   it("offers an update action on the installed card when catalogue has a newer version", () => {
