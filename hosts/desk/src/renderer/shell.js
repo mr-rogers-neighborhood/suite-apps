@@ -10,6 +10,11 @@
  * file, keeps no document state, and calls host actions that answer with the new state.
  */
 
+import {
+  compareVersions,
+  highestCatalogueEntries,
+  highestTrustedUpdate,
+} from "./catalogueReducer.js";
 import { colorFor, mountFirstRun, mountTabBar } from "./tab-bar.js";
 
 const api = globalThis.suiteShell;
@@ -633,21 +638,6 @@ function updateHostBar() {
   reportChromeHeight();
 }
 
-/** Compare dotted versions for the chooser; an unreadable segment sorts low. */
-function compareVersions(left, right) {
-  const a = String(left).split(/[.+-]/u);
-  const b = String(right).split(/[.+-]/u);
-  const length = Math.max(a.length, b.length);
-  for (let index = 0; index < length; index += 1) {
-    const one = Number.parseInt(a[index] ?? "0", 10);
-    const two = Number.parseInt(b[index] ?? "0", 10);
-    const first = Number.isFinite(one) ? one : 0;
-    const second = Number.isFinite(two) ? two : 0;
-    if (first !== second) return first < second ? -1 : 1;
-  }
-  return 0;
-}
-
 /**
  * The catalogue as the wizard sees it.
  *
@@ -988,12 +978,7 @@ function installedCard(pack) {
     ? pack.consent.filter((entry) => entry.answer === "denied")
     : [];
 
-  const updateEntry = state.catalogue.find(
-    (entry) =>
-      entry.id === pack.id &&
-      entry.trusted &&
-      (entry.updateAvailable === true || compareVersions(entry.version, pack.version) > 0),
-  );
+  const updateEntry = highestTrustedUpdate(state.catalogue, pack);
 
   const top = element("div", "card-top");
   const dot = element("span", "card-dot");
@@ -1220,15 +1205,9 @@ function refreshApps() {
     matchesQuery(pack.name, pack.id, pack.description),
   );
   const installedIds = new Set(state.packs.map((p) => p.id));
-  const seen = new Set(installedIds);
-  const catalogueMatches = [];
-  for (const entry of state.catalogue) {
-    if (seen.has(entry.id)) continue;
-    if (matchesQuery(entry.name, entry.id, entry.description)) {
-      catalogueMatches.push(entry);
-      seen.add(entry.id);
-    }
-  }
+  const catalogueMatches = highestCatalogueEntries(state.catalogue, installedIds).filter((entry) =>
+    matchesQuery(entry.name, entry.id, entry.description),
+  );
 
   const allIds = new Set([...state.packs.map((p) => p.id), ...state.catalogue.map((e) => e.id)]);
   const total = allIds.size;

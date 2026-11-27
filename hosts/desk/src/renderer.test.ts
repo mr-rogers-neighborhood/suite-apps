@@ -2,9 +2,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { highestCatalogueEntries, highestTrustedUpdate } from "./renderer/catalogueReducer.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const shell = readFileSync(join(here, "renderer", "shell.js"), "utf8");
+const reducer = readFileSync(join(here, "renderer", "catalogueReducer.js"), "utf8");
 const islandCss = readFileSync(join(here, "renderer", "react", "tab-bar.css"), "utf8");
 
 /**
@@ -72,9 +74,10 @@ describe("the Home composition", () => {
 
     const refresh = shell.slice(refreshStart, refreshEnd);
 
-    // Installed packs win: catalogue matches skip installed pack ids
+    // Installed packs win and catalogue entries reduce via compareVersions
     expect(refresh).toContain("installedIds");
-    expect(refresh).toMatch(/seen\.has\(entry\.id\)/);
+    expect(refresh).toContain("highestCatalogueEntries(state.catalogue, installedIds)");
+    expect(reducer).toContain("compareVersions(entry.version, kept.version) > 0");
 
     // packCount counts unique ids rather than array sums
     expect(refresh).not.toContain("state.packs.length + state.catalogue.length");
@@ -88,12 +91,45 @@ describe("the Home composition", () => {
 
     const installed = shell.slice(installedStart, formatBytesStart);
 
-    // Looks up newer version in state.catalogue and provides update button
-    expect(installed).toContain("state.catalogue");
+    // Looks up highest trusted newer version via highestTrustedUpdate
+    expect(installed).toContain("highestTrustedUpdate(state.catalogue, pack)");
     expect(installed).toContain("updateEntry");
     expect(installed).toContain("Update to v");
     expect(installed).toContain("api.installCataloguePack");
     expect(installed).toContain("pill pill-update");
+    expect(reducer).toContain("compareVersions(best.version, pack.version) > 0");
+  });
+
+  it("reduces catalogue entries by id to the highest version and skips installed ids", () => {
+    const entries = [
+      { id: "canvas", version: "0.9.0" },
+      { id: "planner", version: "0.10.0" },
+      { id: "planner", version: "0.2.0" },
+      { id: "planner", version: "0.9.0" },
+      { id: "budget", version: "0.2.0" },
+      { id: "budget", version: "0.10.0" },
+    ];
+    const reduced = highestCatalogueEntries(entries, new Set(["canvas"]));
+    expect(reduced).toEqual([
+      { id: "planner", version: "0.10.0" },
+      { id: "budget", version: "0.10.0" },
+    ]);
+  });
+
+  it("picks the highest trusted update strictly newer than the installed version", () => {
+    const catalogue = [
+      { id: "canvas", version: "0.11.0", trusted: false },
+      { id: "canvas", version: "0.2.0", trusted: true },
+      { id: "canvas", version: "0.10.0", trusted: true },
+      { id: "canvas", version: "0.9.0", trusted: true },
+    ];
+    expect(highestTrustedUpdate(catalogue, { id: "canvas", version: "0.9.0" })).toEqual({
+      id: "canvas",
+      version: "0.10.0",
+      trusted: true,
+    });
+    expect(highestTrustedUpdate(catalogue, { id: "canvas", version: "0.10.0" })).toBeUndefined();
+    expect(highestTrustedUpdate(catalogue, { id: "planner", version: "0.1.0" })).toBeUndefined();
   });
 
   it("routes desk.apps to the host widget body", () => {
