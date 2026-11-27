@@ -143,8 +143,9 @@ and capability list, and every file hash. An indexed entry must also match the i
 SHA-256 the index displayed. A trusted entry offers **Install**, **Update** or **Reinstall** as its
 state requires; a refused entry stays visible with its refusal sentence and cannot be installed.
 Listing never extracts
-an archive, so a refusal leaves nothing behind. Each card shows the version, archive size, publisher
-id and key fingerprint, plus the declared capabilities.
+an archive, so a refusal leaves nothing behind. Each card body shows the mark, name, sentence,
+capabilities and status, with the publisher id, key fingerprint and any refusal code kept behind a
+keyboard-accessible disclosure.
 
 The trust store is `<dataRoot>/trust/publishers.json` (`SUITE_DESK_TRUST` moves it). It is created
 with the first-party Suite key preinstalled; that pin always wins, even if the file is edited. Another

@@ -134,6 +134,7 @@ let settingsOpen = false;
 let settingsSection = "appearance";
 let shouldFocusSearch = true;
 let appsView = {
+  grid: null,
   packs: null,
   packCount: null,
   catalogue: null,
@@ -929,6 +930,55 @@ function consentLabel(capability) {
   return CONSENT_LABELS[capability] ?? capability;
 }
 
+function cardDisclosure(publisher, rawCode = null) {
+  if (!publisher && !rawCode) return null;
+  const details = element("details", "card-details");
+  const summary = element("summary", "", "More details");
+  details.append(summary);
+
+  if (publisher) {
+    details.append(
+      element("p", "card-publisher", `Publisher ${publisher.id} · key ${publisher.fingerprint}`),
+    );
+  }
+  if (rawCode) {
+    details.append(element("p", "card-code", `Code: ${rawCode}`));
+  }
+  return details;
+}
+
+function refusalActionLabel(entry) {
+  const code = entry.reason ?? entry.refusalCode ?? entry.code ?? "";
+  const refusal = entry.refusal ?? "";
+
+  if (
+    code === "platform" ||
+    entry.platform?.state === "unavailable" ||
+    /not available on this host/i.test(refusal)
+  ) {
+    return "Not available on this host";
+  }
+  if (
+    code === "host" ||
+    code === "contract" ||
+    /needs (?:host|pack contract)/i.test(refusal) ||
+    /newer Suite Desk/i.test(refusal)
+  ) {
+    return "Needs a newer Suite Desk";
+  }
+  if (
+    code === "publisher" ||
+    code === "unknown-publisher" ||
+    code === "untrusted" ||
+    /publisher/i.test(refusal) ||
+    /trust store/i.test(refusal) ||
+    /not signed by/i.test(refusal)
+  ) {
+    return "Publisher not trusted";
+  }
+  return "Cannot install";
+}
+
 function installedCard(pack) {
   const tile = element("div", "tile");
   const card = element("button", "card");
@@ -947,6 +997,8 @@ function installedCard(pack) {
     const dev = element("span", "pill pill-dev", "dev");
     dev.title = "Loaded from an unsigned development directory";
     top.append(dev);
+  } else {
+    top.append(element("span", "pill pill-installed", "installed"));
   }
   top.append(element("span", "card-version", `v${pack.version}`));
 
@@ -956,21 +1008,13 @@ function installedCard(pack) {
     pack.description ?? "A sandboxed Suite pack.",
   );
 
-  const publisher = pack.publisher
-    ? element(
-        "p",
-        "card-publisher",
-        `Publisher ${pack.publisher.id} · key ${pack.publisher.fingerprint}`,
-      )
-    : null;
-
   const meta = element("div", "card-meta");
   for (const capability of pack.capabilities) {
     meta.append(element("span", "pill", capability));
   }
   if (pack.capabilities.length === 0) meta.append(element("span", "pill", "no capabilities"));
 
-  card.append(top, description, ...(publisher === null ? [] : [publisher]), meta);
+  card.append(top, description, meta);
   for (const consent of denials) {
     card.append(
       element(
@@ -982,6 +1026,9 @@ function installedCard(pack) {
   }
   card.addEventListener("click", () => run(api.openPack(pack.id)));
   tile.append(card);
+
+  const disclosure = cardDisclosure(pack.publisher, null);
+  if (disclosure !== null) tile.append(disclosure);
 
   const actions = element("div", "tile-actions");
   for (const consent of denials) {
@@ -1067,15 +1114,6 @@ function catalogueCard(entry) {
   );
   card.append(top, description);
 
-  if (entry.publisher) {
-    card.append(
-      element(
-        "p",
-        "card-publisher",
-        `Publisher ${entry.publisher.id} · key ${entry.publisher.fingerprint}`,
-      ),
-    );
-  }
   if (Array.isArray(entry.capabilities) && entry.capabilities.length > 0) {
     const meta = element("div", "card-meta");
     for (const capability of entry.capabilities) {
@@ -1101,13 +1139,19 @@ function catalogueCard(entry) {
   }
 
   tile.append(card);
+
+  const rawCode = entry.reason ?? entry.refusalCode ?? entry.code ?? null;
+  const disclosure = cardDisclosure(entry.publisher, rawCode);
+  if (disclosure !== null) tile.append(disclosure);
+
   const actions = element("div", "tile-actions");
   if (!entry.trusted) {
-    const refused = actionButton("Cannot install", () => {});
+    const label = refusalActionLabel(entry);
+    const refused = actionButton(label, () => {});
     refused.disabled = true;
     actions.append(refused);
   } else if (entry.platform.state === "unavailable") {
-    const unavailable = actionButton("Not available here", () => {});
+    const unavailable = actionButton("Not available on this host", () => {});
     unavailable.disabled = true;
     actions.append(unavailable);
   } else {
@@ -1140,41 +1184,32 @@ function catalogueCard(entry) {
   return tile;
 }
 
-function renderPacks() {
-  if (appsView.packs === null) return;
-  const matches = state.packs.filter((pack) => matchesQuery(pack.name, pack.id, pack.description));
-  appsView.packCount.textContent = countLabel(state.packs.length, "pack");
-
-  if (matches.length === 0) {
-    appsView.packs.replaceChildren(
-      element(
-        "p",
-        "empty",
-        state.packs.length === 0
-          ? "No packs are installed. Add a signed pack or install one from the catalogue below."
-          : `No pack matches “${query.trim()}”.`,
-      ),
-    );
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-  for (const pack of matches) fragment.append(installedCard(pack));
-  appsView.packs.replaceChildren(fragment);
-}
-
-function renderCatalogue() {
-  if (appsView.catalogue === null) return;
+function refreshApps() {
+  if (appsView.grid === null) return;
   if (appsView.catalogueSource !== null) {
     appsView.catalogueSource.textContent = state.catalogueSource;
   }
-  const matches = state.catalogue.filter((entry) =>
+
+  const installedMatches = state.packs.filter((pack) =>
+    matchesQuery(pack.name, pack.id, pack.description),
+  );
+  const catalogueMatches = state.catalogue.filter((entry) =>
     matchesQuery(entry.name, entry.id, entry.description),
   );
-  appsView.catalogueCount.textContent = countLabel(state.catalogue.length, "archive");
 
-  if (state.catalogue.length === 0) {
-    appsView.catalogue.replaceChildren(
+  const total = state.packs.length + state.catalogue.length;
+  if (appsView.packCount !== null) {
+    appsView.packCount.textContent = countLabel(total, "pack");
+  }
+
+  const isQuery = query.trim().length > 0;
+  if (isQuery && installedMatches.length === 0 && catalogueMatches.length === 0) {
+    appsView.grid.replaceChildren(element("p", "empty", `No pack matches “${query.trim()}”.`));
+    return;
+  }
+
+  if (!isQuery && total === 0) {
+    appsView.grid.replaceChildren(
       element(
         "p",
         "empty",
@@ -1183,25 +1218,37 @@ function renderCatalogue() {
     );
     return;
   }
-  if (matches.length === 0) {
-    appsView.catalogue.replaceChildren(
-      element("p", "empty", `No catalogue archive matches “${query.trim()}”.`),
-    );
-    return;
-  }
 
   const fragment = document.createDocumentFragment();
-  for (const entry of matches) fragment.append(catalogueCard(entry));
-  appsView.catalogue.replaceChildren(fragment);
-}
 
-function refreshApps() {
-  renderPacks();
-  renderCatalogue();
+  if (!isQuery && state.packs.length === 0) {
+    fragment.append(
+      element(
+        "p",
+        "empty",
+        "No packs are installed. Add a signed pack or install one from the catalogue below.",
+      ),
+    );
+  }
+
+  for (const pack of installedMatches) fragment.append(installedCard(pack));
+
+  if (!isQuery && state.catalogue.length === 0) {
+    fragment.append(
+      element(
+        "p",
+        "empty",
+        "No packs are available from the catalogue. Use Add pack… to install a signed .suitepack file.",
+      ),
+    );
+  }
+
+  for (const entry of catalogueMatches) fragment.append(catalogueCard(entry));
+  appsView.grid.replaceChildren(fragment);
 }
 
 /**
- * The `desk.apps` host widget: the installed pack grid and the local catalogue.
+ * The `desk.apps` host widget: the merged library grid and catalogue.
  *
  * It is the launcher's content, drawn inside the Screen rather than beside it, so Home
  * replaces the bare launcher instead of duplicating it.
@@ -1230,24 +1277,17 @@ function renderAppsWidget(body) {
   search.append(hidden, input);
   body.append(search);
 
-  const installed = element("section");
-  const installedHead = element("div", "section-head");
+  const section = element("section");
+  const sectionHead = element("div", "section-head");
   const packCount = element("span", "count");
-  installedHead.append(element("h2", "", "Installed"), packCount);
-  const packs = element("div", "grid");
-  installed.append(installedHead, packs);
-
-  const available = element("section", "available");
-  const availableHead = element("div", "section-head");
-  const catalogueCount = element("span", "count");
-  availableHead.append(element("h2", "", "Available"), catalogueCount);
+  sectionHead.append(element("h2", "", "Packs"), packCount);
   const muted = element(
     "p",
     "muted",
     "Packs arrive from the signed catalogue or as a .suitepack file. Installing adds one to this device, updating keeps the old version until you remove it, and reinstalling replaces the install while keeping its documents. A new app opens right away; restart Suite to run a new version of an app that is already open.",
   );
-  const catalogue = element("div", "grid");
   const catalogueSource = element("p", "muted catalogue-source");
+  const grid = element("div", "grid");
   const install = element("button", "install", "Add pack…");
   install.type = "button";
   install.addEventListener("click", () => {
@@ -1267,10 +1307,18 @@ function renderAppsWidget(body) {
   const revoke = trustAction(api.importRevocation, "Add revocation…");
   const actions = element("div", "trust-actions");
   actions.append(install, rotate, revoke);
-  available.append(availableHead, muted, catalogueSource, catalogue, actions);
+  section.append(sectionHead, muted, catalogueSource, grid, actions);
 
-  body.append(installed, available);
-  appsView = { packs, packCount, catalogue, catalogueCount, catalogueSource, search: input };
+  body.append(section);
+  appsView = {
+    grid,
+    packs: grid,
+    catalogue: grid,
+    packCount,
+    catalogueCount: packCount,
+    catalogueSource,
+    search: input,
+  };
   refreshApps();
 }
 
@@ -1683,6 +1731,7 @@ function renderScreen() {
     editing = false;
     managingScreens = false;
     appsView = {
+      grid: null,
       packs: null,
       packCount: null,
       catalogue: null,
