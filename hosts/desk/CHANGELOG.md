@@ -3,6 +3,50 @@
 Written for people, not commits. This app is a spike; its version is its own until it becomes the
 shipped host.
 
+## [0.5.0] - 2026-11-27
+
+### Release
+
+- **Screens are a grid you can edit.** A Screen is four cells wide. Drag a tile by its handle, resize
+  it from the corner, pick a size class (`1×1`, `1×2`, `2×1`, `2×2`, full row), and remove it with one
+  confirmation. The widget browser has a search field and names each widget's source and default size.
+  On a narrow window the grid returns to one column and the editing handles hide.
+- **The chrome is one host-drawn bar.** Desk draws the menu bar from the pack's own slots instead of
+  each pack drawing a second band. A crowded pack row folds into the host's `…` menu, and Help stops
+  drawing a header when a host is already drawing one.
+- **The first run is a wizard, not a default tab.** Choose apps, palette, brightness and density, watch
+  the selected apps install concurrently, and land on an empty Home.
+- **The pack library is one grid.** Installed packs come first, each id appears once at its highest
+  version, and an installed pack offers an update only when a newer trusted version is available on
+  this host.
+- **Suite Go stays at 0.2.0 (versionCode 3);** this release does not bump it.
+
+### Added
+
+- **A new tab asks two questions.** First the surface — Recents, Packs, Screens, Open a file…,
+  Settings — then the document inside it, with **New \<noun\>** where a pack declares one.
+- **Settings, a tab menu and the pack rail.** A pack's page shows its mark, description and one
+  primary action; publisher, key, capabilities and signature sit behind **More details**.
+- **Bar descriptors.** A control can report its value and tone, a refused control says why, and a
+  closed set of choices draws as a real radiogroup.
+- **Theme choices.** Catppuccin joins the palette set, Suite and Warm are separate, and density
+  reaches the hosts and the packs.
+
+### Changed
+
+- **Screen documents are schema v3.** Every placement carries `x` and `y`; the size class remains the
+  single source of width and height. A v2 document migrates in place, packing its entries in order
+  into the first free cells without dropping one.
+- **The catalogue is declarative.** A pack publishes its card, descriptor and slots; the host draws
+  them, and a publish that does not parse is dropped at the boundary rather than half-drawn.
+
+### Fixed
+
+- **The bar's keyboard order.** A checked menu row takes focus, tabs and the dropdown complete with
+  arrows, Home and End, and a control's help text reaches menu rows, tabs and buttons.
+- **The widget grid.** A tile cannot run past the fourth column, a row keeps at least two items, and
+  Backspace no longer removes a widget.
+
 ## [0.4.0] - 2026-11-25
 
 ### Release
