@@ -1,10 +1,12 @@
 import { mkdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { isMenuSlotAction, parseMenuSlots } from "@suite/contracts";
 import { desktopCsp, isTrustedSender, resolveProtocolAsset } from "@suite/desktop";
 import { isPublisherKeyTrusted, type PackDocument, SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isPackCapability, type PackCapability } from "@suite/pack/capabilities";
 import { SCREEN_FILE_EXTENSION, SCREEN_FILE_MAX_BYTES, SUITE_SCREEN_VERSION } from "@suite/screens";
+import { DENSITIES, DENSITY_LABELS } from "@suite/theme";
 import {
   app,
   dialog,
@@ -43,7 +45,7 @@ import { DocumentMigrations, findDocument } from "./documentMigrations.js";
 import { DocumentStore, declaredDocumentSchemaVersion } from "./documents.js";
 import { type ExternalDialog, ExternalFilesService } from "./external.js";
 import { type FilesScope, filesScope, PackFilesService } from "./files.js";
-import { openHomeScreen } from "./home.js";
+import { migrateHome } from "./home.js";
 import { catalogueIndexUrlFor, loadCatalogueIndex } from "./indexTrust.js";
 import {
   checkPackArchive,
@@ -62,6 +64,12 @@ import {
 } from "./installedPacks.js";
 import { type LibraryScope, LibraryWatch, revealDocument } from "./library.js";
 import { planUninstall } from "./lifecycle.js";
+import {
+  completeOnboarding,
+  isFirstRun,
+  needsHomeAppsMigration,
+  recordHomeAppsMigration,
+} from "./onboarding.js";
 import { documentScopeLabel, documentsRootFor } from "./packIdentity.js";
 import {
   type DeviceKey,
@@ -123,6 +131,7 @@ import {
   type FileReadOptions,
   type FileRemoveOptions,
   type FileWriteOptions,
+  type FirstRunInstallResult,
   type InstalledVersionView,
   PACK_EVENT,
   PACK_IPC,
@@ -138,6 +147,7 @@ import { SpaceStore } from "./spaces.js";
 import {
   DEFAULT_THEME_CHOICE,
   type HostThemeChoice,
+  isHostThemeChoice,
   loadThemeChoice,
   presetFor,
   resolveThemeView,
@@ -194,6 +204,8 @@ let commandRecency: CommandRecency | null = null;
  * whenever the View menu changes it, so every pack opened later starts in the same theme.
  */
 let themeChoice: HostThemeChoice = DEFAULT_THEME_CHOICE;
+/** The first-run wizard replaces the chrome until this data root records completion. */
+let firstRun = true;
 /**
  * One document store per publisher. The first-party publisher keeps the
  * `documents/<container>/<pack>` layout; any other publisher has its own root,
@@ -310,6 +322,7 @@ async function bootstrap(): Promise<void> {
   // The theme is profile state, like the device key: one answer for every pack this host
   // opens, including a pack installed after the choice was made.
   themeChoice = await loadThemeChoice(dataRoot);
+  firstRun = await isFirstRun(dataRoot);
   nativeTheme.themeSource = themeChoice.mode;
   installApplicationMenu();
   // The device key is host data, not pack data. A missing file is a first run
@@ -359,14 +372,17 @@ async function bootstrap(): Promise<void> {
   await refreshPacks();
   await migrateLegacyConsentRecords();
   spaceStore = await SpaceStore.open(join(dataRoot, "spaces.loro"));
-  // The host's own Screens. Home is created here and opened before any pack view
-  // exists, so the first window a person sees is the host's composition rather
-  // than an empty launcher.
+  // The host's own Screens. Home is a role, so launch does not force a Home tab: a restored
+  // session keeps the tabs it saved, and a fresh data root shows the first-run wizard instead.
+  // Opening Home is the Suite mark, the picker, or the wizard's last step.
   screenStore = await ScreenSet.open({
     directory: join(dataRoot, "screens"),
     indexFile: join(dataRoot, SCREENS_INDEX_FILENAME),
   });
-  await openHomeScreen(screenStore, spaceStore);
+  if (await needsHomeAppsMigration(dataRoot)) {
+    await migrateHome(screenStore);
+    await recordHomeAppsMigration(dataRoot);
+  }
   // One store per (container, pack) under the publisher's root. This is host
   // data, deliberately separate from the pack's code root.
   const fileService = new PackFilesService(join(dataRoot, "files"));
@@ -798,8 +814,19 @@ async function refreshCatalogue(): Promise<void> {
  * Verified installs under the data root are the load path. An unsigned directory
  * beside the checkout is added only when the dev switch opened; its issues are
  * logged, not shown, because a development directory is not a user install.
+ *
+ * Concurrent first-run installs each ask for a refresh. They queue instead of scanning over
+ * each other, so the last scan sees every install that finished before it.
  */
-async function refreshPacks(): Promise<void> {
+let packRefreshChain: Promise<void> = Promise.resolve();
+
+function refreshPacks(): Promise<void> {
+  const next = packRefreshChain.then(() => scanPacks());
+  packRefreshChain = next.catch(() => undefined);
+  return next;
+}
+
+async function scanPacks(): Promise<void> {
   const scan = await loadInstalledPacks(join(dataRootFor(), "packs"), packTrustOptions());
   for (const issue of scan.issues) {
     const label = [issue.id ?? "unknown", issue.version ?? ""].join(" ").trim();
@@ -866,6 +893,12 @@ function installApplicationMenu(): void {
     checked: themeChoice.preset === theme.id,
     click: () => void chooseTheme({ preset: theme.id }),
   }));
+  const densityItems: MenuItemConstructorOptions[] = DENSITIES.map((density) => ({
+    label: DENSITY_LABELS[density],
+    type: "radio",
+    checked: themeChoice.density === density,
+    click: () => void chooseTheme({ density }),
+  }));
 
   const template: MenuItemConstructorOptions[] = [
     ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
@@ -874,11 +907,18 @@ function installApplicationMenu(): void {
     {
       label: "View",
       submenu: [
+        {
+          label: "Settings…",
+          accelerator: process.platform === "darwin" ? "Cmd+," : "Ctrl+,",
+          click: () => window?.openSettings(),
+        },
+        { type: "separator" },
         modeItem("light", "Light"),
         modeItem("dark", "Dark"),
         modeItem("system", "Follow the system"),
         { type: "separator" },
         { label: "Theme", submenu: presetItems },
+        { label: "Density", submenu: densityItems },
         { type: "separator" },
         { role: "reload" },
         { role: "toggleDevTools" },
@@ -895,8 +935,15 @@ async function chooseTheme(next: Partial<HostThemeChoice>): Promise<void> {
   const choice: HostThemeChoice = {
     preset: presetFor(next.preset ?? themeChoice.preset),
     mode: next.mode ?? themeChoice.mode,
+    density: next.density ?? themeChoice.density,
   };
-  if (choice.preset === themeChoice.preset && choice.mode === themeChoice.mode) return;
+  if (
+    choice.preset === themeChoice.preset &&
+    choice.mode === themeChoice.mode &&
+    choice.density === themeChoice.density
+  ) {
+    return;
+  }
   themeChoice = choice;
   nativeTheme.themeSource = choice.mode;
   installApplicationMenu();
@@ -921,6 +968,7 @@ function openWindow(): void {
     spaces: spaceStore,
     screens: screenStore,
     theme: themeView(),
+    firstRun,
     relay: currentRelayView(),
     listDocuments: async (packId) => {
       const pack = packViews().find((candidate) => candidate.id === packId);
@@ -1057,6 +1105,10 @@ function registerIpc(): void {
   registerProjectionChannels();
   registerCommandChannels();
   onChrome(CHROME_IPC.state, () => window?.state());
+  onChrome(CHROME_IPC.chromeHeight, (height) => {
+    if (typeof height !== "number") return;
+    window?.setChromeHeight(height);
+  });
   onChrome(CHROME_IPC.openPack, async (packId) => {
     if (typeof packId !== "string") return;
     await window?.openPack(packId);
@@ -1068,6 +1120,10 @@ function registerIpc(): void {
   onChrome(CHROME_IPC.closeTab, async (tabId) => {
     if (typeof tabId !== "string") return;
     await window?.closeTab(tabId);
+  });
+  onChrome(CHROME_IPC.tabMenu, (tabId) => {
+    if (typeof tabId !== "string") return;
+    window?.showTabMenu(tabId);
   });
   onChrome(CHROME_IPC.newTab, async () => {
     await window?.newTab();
@@ -1088,6 +1144,19 @@ function registerIpc(): void {
     if (typeof tabId !== "string") return;
     window?.reloadTab(tabId);
   });
+  /**
+   * A press on the bar's pack zones, on its way back to the pack.
+   *
+   * The chrome names the active tab and the id the pack itself published; the host adds
+   * nothing and interprets nothing. The tab is checked against the active one so a stale
+   * click cannot drive a background pack.
+   */
+  onChrome(CHROME_IPC.packMenuAction, (action) => {
+    if (!isMenuSlotAction(action)) return;
+    const state = window?.state();
+    if (state === undefined || state.activeTabId === null) return;
+    window?.packMenuAction(state.activeTabId, action);
+  });
   onChrome(CHROME_IPC.openExternal, (url) => {
     if (typeof url === "string") window?.openExternal(url);
   });
@@ -1097,6 +1166,18 @@ function registerIpc(): void {
   onChrome(CHROME_IPC.installCataloguePack, async (id, version) => {
     if (typeof id !== "string" || typeof version !== "string") return;
     await installPackFromCatalogue(id, version);
+  });
+  onChrome(CHROME_IPC.setTheme, async (choice) => {
+    if (!isHostThemeChoice(choice)) return;
+    await chooseTheme(choice);
+  });
+  onChrome(CHROME_IPC.installFirstRunPack, async (id) => {
+    if (typeof id !== "string") return { ok: false, detail: "No app was named." };
+    if (!firstRun) return { ok: false, detail: "The first-run wizard is closed." };
+    return installFirstRunPack(id);
+  });
+  onChrome(CHROME_IPC.completeFirstRun, async () => {
+    await completeFirstRun();
   });
   onChrome(CHROME_IPC.reaskConsent, async (id, capability) => {
     if (typeof id !== "string" || !isPackCapability(capability)) return;
@@ -1453,6 +1534,30 @@ function registerIpc(): void {
     void window?.setTabTitle(sender.tabId, title).catch((error: unknown) => {
       console.warn("[desk] could not persist a tab title", error);
     });
+  });
+
+  /**
+   * A hosted pack publishes the material for the host's one menu bar.
+   *
+   * The pack is not trusted, so the value is parsed here rather than at render time: a
+   * malformed publish is dropped and the bar keeps what it had. The host never reads an
+   * id's meaning, which is what lets the same descriptors be explained in any app later.
+   */
+  ipcMain.on(PACK_IPC.setMenuSlots, (event, value) => {
+    const sender = packSender(event.sender.id);
+    if (sender === undefined) return;
+    if (!isTrustedSender(event.senderFrame?.url, [packOrigin(sender.packId, sender.containerId)])) {
+      return;
+    }
+    const parsed = parseMenuSlots(value);
+    if (!parsed.ok) {
+      const first = parsed.issues[0];
+      console.warn(
+        `[desk] ${sender.packId} published menu slots that were refused: ${first?.path ?? ""} ${first?.message ?? "invalid"}`.trim(),
+      );
+      return;
+    }
+    window?.setPackMenu(sender.tabId, parsed.value);
   });
 }
 
@@ -2000,6 +2105,75 @@ async function installPackFromCatalogue(id: string, version: string): Promise<vo
   } catch (error) {
     current.setNotice(installRefusal(error));
   }
+}
+
+/**
+ * Install one catalogue app from the first-run wizard.
+ *
+ * The wizard's explicit selection is the consent: the person saw the catalogue cards and chose
+ * the app, so the host verifies and installs without a second per-app dialog. The archive is
+ * still re-read and re-verified by the installer, and only a trusted catalogue entry is named.
+ */
+async function installFirstRunPack(id: string): Promise<FirstRunInstallResult> {
+  const entry = catalogue.find((candidate) => candidate.id === id && candidate.trusted);
+  if (entry === undefined) {
+    return { ok: false, detail: `No trusted ${id} is in the catalogue.` };
+  }
+  if (entry.publisher === null) {
+    return { ok: false, detail: `No publisher was resolved for ${id}.` };
+  }
+  const previous = packs.find((pack) => pack.id === id) ?? null;
+  if (previous !== null && previous.version === entry.version) {
+    return { ok: true, detail: "Already installed" };
+  }
+  const action = catalogueActionFor(id, entry.version, previous);
+  try {
+    const installed = await installCataloguePack(
+      entry,
+      join(dataRootFor(), "packs"),
+      packTrustOptions(),
+      { replace: action === "reinstall" },
+    );
+    // The review showed the catalogue's capability list. A file swapped between the scan and
+    // this read may declare more, so remove it rather than record consent for a list nobody saw.
+    if (!sameCapabilities(installed.capabilities, entry.capabilities)) {
+      const removed = await uninstallPackVersion(
+        join(dataRootFor(), "packs"),
+        installed.id,
+        installed.version,
+      )
+        .then(() => true)
+        .catch(() => false);
+      await refreshPacks();
+      publishPackData();
+      return {
+        ok: false,
+        detail: removed
+          ? "The archive's capabilities changed after the review; it was removed."
+          : "The archive's capabilities changed after the review and could not be removed. Remove it from the catalogue.",
+      };
+    }
+    await recordInstallConsent(installed);
+    await refreshPacks();
+    publishPackData();
+    return { ok: true, detail: "Installed" };
+  } catch (error) {
+    return { ok: false, detail: installRefusal(error) };
+  }
+}
+
+function sameCapabilities(left: readonly string[], right: readonly string[]): boolean {
+  return [...left].sort().join("\u0000") === [...right].sort().join("\u0000");
+}
+
+/** Record that the person finished the first-run wizard and show the chrome. */
+async function completeFirstRun(): Promise<void> {
+  await completeOnboarding(dataRootFor());
+  // The wizard covers the chrome, so Home can be opened behind it; the completion paint
+  // then reveals an empty Home instead of the launcher in the same frame.
+  await window?.openHome().catch(() => undefined);
+  window?.setFirstRun(false);
+  firstRun = false;
 }
 
 /**

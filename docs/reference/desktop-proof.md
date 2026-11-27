@@ -17,7 +17,7 @@ Each desktop row in `scripts/lib/pipeline.mjs` (`desktop: true`) has one `proof.
 
 | App | Spec | What it proves |
 | --- | --- | --- |
-| `desk` | `hosts/desk/e2e/proof.spec.ts` | Opens the Home Screen, creates a `Focus` Screen document, and switches to it |
+| `desk` | `hosts/desk/e2e/proof.spec.ts` | Finishes the first run, opens the empty Home, creates a `Focus` Screen document, and switches to it |
 | `help` | `legacy/help/e2e/proof.spec.ts` | Opens the user handbook at the root, opens the code explorer, searches the handbook, and renders an article |
 | `canvas` | `legacy/canvas/e2e/tests/desktop/proof.spec.ts` | Creates a `.canvas` workspace document, adds a card, and renders it on the board |
 | `planner` | `legacy/planner/e2e/proof.spec.ts` | Opens a `.planner` document, captures a task, and shows it on the day plan |

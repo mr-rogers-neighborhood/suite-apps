@@ -5,8 +5,10 @@ import {
   DEFAULT_DENSITY,
   defaultTheme,
   DENSITIES,
+  DENSITY_LABELS,
   type Density,
   isThemeMode,
+  PRESETS,
   presetById,
   type ThemeMode,
 } from "@suite/theme";
@@ -54,11 +56,7 @@ const preview: Preview = {
       description: "Theme preset",
       toolbar: {
         icon: "paintbrush",
-        items: [
-          { value: "suite", title: "Suite" },
-          { value: "solarized", title: "Solarized" },
-          { value: "warm", title: "Warm" },
-        ],
+        items: PRESETS.map((theme) => ({ value: theme.id, title: theme.name })),
         dynamicTitle: true,
       },
     },
@@ -77,11 +75,7 @@ const preview: Preview = {
       description: "Control density",
       toolbar: {
         icon: "ruler",
-        items: [
-          { value: "compact", title: "Compact" },
-          { value: "cozy", title: "Cozy" },
-          { value: "comfortable", title: "Comfortable" },
-        ],
+        items: DENSITIES.map((value) => ({ value, title: DENSITY_LABELS[value] })),
         dynamicTitle: true,
       },
     },

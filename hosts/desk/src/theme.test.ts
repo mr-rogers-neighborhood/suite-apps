@@ -5,6 +5,7 @@ import { cssVariables, DEFAULT_DENSITY, defaultTheme, PRESETS, scaleVariables } 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_THEME_CHOICE,
+  type HostThemeChoice,
   isHostThemeChoice,
   isThemeSource,
   loadThemeChoice,
@@ -17,6 +18,12 @@ import {
   themeCss,
   themeOptions,
 } from "./theme.js";
+
+const themeChoice = (
+  preset: string,
+  mode: HostThemeChoice["mode"],
+  density: HostThemeChoice["density"] = DEFAULT_DENSITY,
+): HostThemeChoice => ({ preset, mode, density });
 
 const roots: string[] = [];
 
@@ -33,29 +40,49 @@ afterEach(async () => {
 describe("theme choice", () => {
   it("starts on Suite, following the desktop", async () => {
     expect(await loadThemeChoice(await profileRoot())).toEqual(DEFAULT_THEME_CHOICE);
-    expect(DEFAULT_THEME_CHOICE).toEqual({ preset: "suite", mode: "system" });
+    expect(DEFAULT_THEME_CHOICE).toEqual({
+      preset: "suite",
+      mode: "system",
+      density: DEFAULT_DENSITY,
+    });
   });
 
   it("writes what it read, under the host profile", async () => {
     const root = await profileRoot();
-    await saveThemeChoice(root, { preset: "warm", mode: "dark" });
-    expect(await loadThemeChoice(root)).toEqual({ preset: "warm", mode: "dark" });
+    await saveThemeChoice(root, themeChoice("warm", "dark", "comfortable"));
+    expect(await loadThemeChoice(root)).toEqual(themeChoice("warm", "dark", "comfortable"));
     expect(JSON.parse(await readFile(join(root, "theme.json"), "utf8"))).toEqual({
       preset: "warm",
       mode: "dark",
+      density: "comfortable",
     });
   });
 
   it("maps a stored logseq selection to Warm instead of a missing theme", async () => {
     const root = await profileRoot();
     await writeFile(join(root, "theme.json"), JSON.stringify({ preset: "logseq", mode: "dark" }));
-    expect(await loadThemeChoice(root)).toEqual({ preset: "warm", mode: "dark" });
+    expect(await loadThemeChoice(root)).toEqual(themeChoice("warm", "dark"));
   });
 
   it("keeps the mode from a record written before presets existed", async () => {
     const root = await profileRoot();
     await writeFile(join(root, "theme.json"), JSON.stringify({ mode: "light" }));
-    expect(await loadThemeChoice(root)).toEqual({ preset: "suite", mode: "light" });
+    expect(await loadThemeChoice(root)).toEqual(themeChoice("suite", "light"));
+  });
+
+  it("keeps a chosen density and defaults an older record to cozy", async () => {
+    const root = await profileRoot();
+    await writeFile(
+      join(root, "theme.json"),
+      JSON.stringify({ preset: "suite", mode: "light", density: "comfortable" }),
+    );
+    expect(await loadThemeChoice(root)).toEqual(themeChoice("suite", "light", "comfortable"));
+
+    await writeFile(
+      join(root, "theme.json"),
+      JSON.stringify({ preset: "suite", mode: "light", density: "enormous" }),
+    );
+    expect(await loadThemeChoice(root)).toEqual(themeChoice("suite", "light"));
   });
 
   it("answers the default for a file it cannot read", async () => {
@@ -71,49 +98,56 @@ describe("theme choice", () => {
     expect(presetFor(null)).toBe("suite");
   });
 
-  it("accepts only the three brightness choices", () => {
+  it("accepts only the three brightness choices and the three densities", () => {
     expect(isThemeSource("system")).toBe(true);
     expect(isThemeSource("sepia")).toBe(false);
-    expect(isHostThemeChoice({ preset: "suite", mode: "system" })).toBe(true);
-    expect(isHostThemeChoice({ preset: "suite", mode: "sepia" })).toBe(false);
+    expect(isHostThemeChoice(themeChoice("suite", "system"))).toBe(true);
+    expect(isHostThemeChoice({ preset: "suite", mode: "system" })).toBe(false);
+    expect(isHostThemeChoice({ preset: "suite", mode: "system", density: "enormous" })).toBe(false);
     expect(isHostThemeChoice("dark")).toBe(false);
   });
 
-  it("offers the package's three names in the package's order", () => {
+  it("offers the package's preset names in the package's order", () => {
     expect(themeOptions()).toEqual([...PRESETS]);
-    expect(themeOptions().map((theme) => theme.name)).toEqual(["Suite", "Warm", "Solarized"]);
+    expect(themeOptions().map((theme) => theme.name)).toEqual([
+      "Suite",
+      "Warm",
+      "Solarized",
+      "Catppuccin",
+    ]);
   });
 });
 
 describe("resolving the choice", () => {
   it("follows the desktop for system and obeys an explicit choice", () => {
-    expect(resolveMode({ preset: "suite", mode: "system" }, true)).toBe("dark");
-    expect(resolveMode({ preset: "suite", mode: "system" }, false)).toBe("light");
-    expect(resolveMode({ preset: "suite", mode: "light" }, true)).toBe("light");
-    expect(resolveMode({ preset: "suite", mode: "dark" }, false)).toBe("dark");
+    expect(resolveMode(themeChoice("suite", "system"), true)).toBe("dark");
+    expect(resolveMode(themeChoice("suite", "system"), false)).toBe("light");
+    expect(resolveMode(themeChoice("suite", "light"), true)).toBe("light");
+    expect(resolveMode(themeChoice("suite", "dark"), false)).toBe("dark");
   });
 
   it("paints every role as a variable, with a resolved preset id", () => {
-    const view = resolveThemeView({ preset: "logseq", mode: "system" }, true);
+    const view = resolveThemeView(themeChoice("logseq", "system"), true);
     expect(view.preset).toBe("warm");
     expect(view.mode).toBe("dark");
+    expect(view.source).toBe("system");
     expect(view.values["--canvas"]).toBeTruthy();
     expect(view.values["--ink"]).toBeTruthy();
   });
 
   it("falls back to Suite when the stored preset is unknown", () => {
-    expect(resolveThemeView({ preset: "neon", mode: "light" }, false).preset).toBe("suite");
+    expect(resolveThemeView(themeChoice("neon", "light"), false).preset).toBe("suite");
   });
 
   it("stores the resolved preset in the stylesheet a pack receives", () => {
-    const css = themeCss(resolveThemeView({ preset: "warm", mode: "light" }, false));
-    expect(css.startsWith(":root { color-scheme: light;")).toBe(true);
+    const css = themeCss(resolveThemeView(themeChoice("warm", "light"), false));
+    expect(css.startsWith(":root { color-scheme: light !important;")).toBe(true);
     expect(css).toContain("--canvas:");
     expect(css).toContain("--ink:");
   });
 
   it("publishes every variable in the composed record, colour and scale", () => {
-    const view = resolveThemeView({ preset: "suite", mode: "light" }, false);
+    const view = resolveThemeView(themeChoice("suite", "light"), false);
     const css = themeCss(view);
     const composed = {
       ...cssVariables(defaultTheme(), "light"),
@@ -121,21 +155,45 @@ describe("resolving the choice", () => {
     };
 
     for (const [name, value] of Object.entries(composed)) {
-      expect(css, `${name} should reach the pack sheet`).toContain(`${name}: ${value};`);
+      expect(css, `${name} should reach the pack sheet`).toContain(`${name}: ${value} !important;`);
     }
 
     // The values are the ones that shipped before the scale was published: this moves no
     // pixel for a host or pack that only knew the fallbacks.
-    expect(css).toContain("--control-height: 36px;");
-    expect(css).toContain("--text-body: 13px;");
-    expect(css).toContain("--radius-lg: 8px;");
-    expect(css).toContain("--duration-base: 150ms;");
+    expect(css).toContain("--control-height: 36px !important;");
+    expect(css).toContain("--text-body: 13px !important;");
+    expect(css).toContain("--radius-lg: 8px !important;");
+    expect(css).toContain("--duration-base: 150ms !important;");
+  });
+
+  it("outranks a pack's own :root fallback, which an inserted sheet otherwise loses to", () => {
+    // A pack ships fallbacks so it is legible before the host paints. Electron's
+    // `insertCSS` is ordinary author CSS, so the pack's later `:root` rule would win on
+    // source order and the host's palette would never show. Every declaration carries
+    // `!important`; a plain one here is a pack that ignores the host's theme.
+    const css = themeCss(resolveThemeView(themeChoice("catppuccin", "dark"), true));
+    const declarations = css.slice(css.indexOf("{") + 1, css.lastIndexOf("}"));
+    const plain = declarations
+      .split(";")
+      .map((declaration) => declaration.trim())
+      .filter((declaration) => declaration.length > 0 && !declaration.endsWith("!important"));
+
+    expect(plain).toEqual([]);
+  });
+
+  it("publishes the chosen density to packs and the chrome", () => {
+    const view = resolveThemeView(themeChoice("suite", "light", "compact"), false);
+    const compact = scaleVariables("compact");
+    expect(view.density).toBe("compact");
+    expect(view.scale["--control-height"]).toBe(compact["--control-height"]);
+    expect(themeCss(view)).toContain(
+      `--control-height: ${compact["--control-height"]} !important;`,
+    );
+    expect(themeAttributesScript(view)).toContain('root.dataset.density = "compact";');
   });
 
   it("marks the pack document dark so class-based styles follow the host", () => {
-    const script = themeAttributesScript(
-      resolveThemeView({ preset: "solarized", mode: "dark" }, true),
-    );
+    const script = themeAttributesScript(resolveThemeView(themeChoice("solarized", "dark"), true));
     expect(script).toContain('root.dataset.theme = "solarized";');
     expect(script).toContain('root.dataset.themeMode = "dark";');
     expect(script).toContain('root.classList.toggle("dark", true);');
@@ -167,13 +225,13 @@ describe("painting a pack view", () => {
 
     const first = await paintThemeSurface(
       surface,
-      resolveThemeView({ preset: "warm", mode: "dark" }, true),
+      resolveThemeView(themeChoice("warm", "dark"), true),
     );
     expect(first).toBe("sheet-1");
 
     const second = await paintThemeSurface(
       surface,
-      resolveThemeView({ preset: "suite", mode: "light" }, false),
+      resolveThemeView(themeChoice("suite", "light"), false),
       first,
     );
 
@@ -189,7 +247,7 @@ describe("painting a pack view", () => {
   });
 
   it("gives a reload the same complete sheet as a host restart", async () => {
-    const choice = { preset: "warm", mode: "dark" } as const;
+    const choice = themeChoice("warm", "dark");
     const first = resolveThemeView(choice, true);
     const restart = resolveThemeView(choice, true);
 
@@ -211,8 +269,8 @@ describe("painting a pack view", () => {
     // sees it. A host restart resolves the same choice to the same sheet.
     expect(firstPaint).toEqual(reload);
     expect(firstPaint[0]).toBe(themeCss(first));
-    expect(firstPaint[0]).toContain("--control-height: 36px;");
-    expect(firstPaint[0]).toContain("--duration-base: 150ms;");
+    expect(firstPaint[0]).toContain("--control-height: 36px !important;");
+    expect(firstPaint[0]).toContain("--duration-base: 150ms !important;");
   });
 
   it("keeps the new sheet when Electron reuses a key", async () => {
@@ -223,7 +281,7 @@ describe("painting a pack view", () => {
     };
     const key = await paintThemeSurface(
       surface,
-      resolveThemeView({ preset: "suite", mode: "dark" }, true),
+      resolveThemeView(themeChoice("suite", "dark"), true),
       "same-key",
     );
     expect(key).toBe("same-key");

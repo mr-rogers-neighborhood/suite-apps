@@ -37,6 +37,7 @@ export { Modal } from "./Modal.js";
 export { MenuBar } from "./menu/MenuBar.js";
 export { focusFirstMenuItem, handleMenuBarKeyDown, menuBarKeyDown, menuItemsIn, menuKeyDown, } from "./menu/menuKeys.js";
 export { SyncPill } from "./menu/SyncPill.js";
+export { menuBarBridge, useMenuAction, useMenuSlots, } from "./menu/useMenuSlots.js";
 export { PrivacyLine } from "./PrivacyLine.js";
 export { TextInput } from "./TextInput.js";
 export { Toast } from "./Toast.js";

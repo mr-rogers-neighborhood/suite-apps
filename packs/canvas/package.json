@@ -19,6 +19,7 @@
     "@noble/ciphers": "^2.4.0",
     "@noble/ed25519": "^3.2.0",
     "@noble/hashes": "^2.4.0",
+    "@suite/contracts": "workspace:*",
     "@suite/graph": "workspace:*",
     "@suite/import-obsidian": "workspace:*",
     "@suite/pack-runtime": "workspace:*",

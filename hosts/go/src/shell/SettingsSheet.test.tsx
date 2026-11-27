@@ -9,7 +9,9 @@ describe("SettingsSheet", () => {
         <SettingsSheet
           open={false}
           choice={{ preset: "suite", mode: "system" }}
+          density="cozy"
           onChange={vi.fn()}
+          onDensityChange={vi.fn()}
           apps={[]}
           onRemoveApp={vi.fn()}
           onReask={vi.fn()}
@@ -24,7 +26,9 @@ describe("SettingsSheet", () => {
       <SettingsSheet
         open
         choice={{ preset: "suite", mode: "system" }}
+        density="cozy"
         onChange={vi.fn()}
+        onDensityChange={vi.fn()}
         apps={[]}
         onRemoveApp={vi.fn()}
         onReask={vi.fn()}
@@ -51,7 +55,9 @@ describe("SettingsSheet", () => {
       <SettingsSheet
         open
         choice={{ preset: "warm", mode: "dark" }}
+        density="cozy"
         onChange={vi.fn()}
+        onDensityChange={vi.fn()}
         apps={[]}
         onRemoveApp={vi.fn()}
         onReask={vi.fn()}
@@ -67,7 +73,9 @@ describe("SettingsSheet", () => {
       <SettingsSheet
         open
         choice={{ preset: "suite", mode: "system" }}
+        density="cozy"
         onChange={vi.fn()}
+        onDensityChange={vi.fn()}
         apps={[
           {
             id: "planner",

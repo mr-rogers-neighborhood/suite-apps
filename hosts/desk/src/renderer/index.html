@@ -13,6 +13,7 @@
   </head>
   <body data-surface="launcher">
     <div id="host-bar"></div>
+    <div id="first-run" hidden></div>
 
     <section id="sync-panel" class="sync-panel" aria-label="Sync relay" hidden>
       <div class="sync-heading">
@@ -116,6 +117,55 @@
           <span id="command-hint">↑↓ to choose · Enter to run · Esc to close</span>
           <button id="command-clear-recents" class="action" type="button">Clear recents</button>
         </footer>
+      </div>
+    </section>
+
+    <section
+      id="settings-surface"
+      class="command-surface settings-surface"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+      hidden
+    >
+      <div class="command-box settings-box">
+        <header class="command-head settings-head">
+          <p class="eyebrow">Host settings</p>
+          <h1 id="settings-title">Settings</h1>
+          <button id="settings-close" class="command-close" type="button" aria-label="Close settings">
+            ×
+          </button>
+        </header>
+
+        <nav id="settings-nav" class="settings-nav" aria-label="Settings sections">
+          <button type="button" data-section="appearance" aria-pressed="true">Appearance</button>
+          <button type="button" data-section="home" aria-pressed="false">Home</button>
+          <button type="button" data-section="packs" aria-pressed="false">Packs</button>
+        </nav>
+
+        <section id="settings-appearance" class="settings-section" aria-label="Appearance">
+          <h2>Palette</h2>
+          <div id="settings-presets" class="settings-choices"></div>
+          <h2>Brightness</h2>
+          <div id="settings-modes" class="settings-choices"></div>
+          <h2>Density</h2>
+          <div id="settings-densities" class="settings-choices"></div>
+          <p class="settings-note">
+            The host applies this to every open app. A pack installed later opens in the same
+            choice.
+          </p>
+        </section>
+
+        <section id="settings-home" class="settings-section" aria-label="Home" hidden>
+          <p class="settings-note">
+            Home is a role, not a fixed tab. The Suite mark opens the Screen chosen here.
+          </p>
+          <ul id="settings-screens" class="settings-screens"></ul>
+        </section>
+
+        <section id="settings-packs" class="settings-section" aria-label="Packs" hidden>
+          <div id="settings-apps"></div>
+        </section>
       </div>
     </section>
 

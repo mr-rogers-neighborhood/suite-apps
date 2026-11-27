@@ -10,12 +10,25 @@
  * file, keeps no document state, and calls host actions that answer with the new state.
  */
 
-import { colorFor, mountTabBar } from "./tab-bar.js";
+import { colorFor, mountFirstRun, mountTabBar } from "./tab-bar.js";
 
 const api = globalThis.suiteShell;
 
 const elements = {
   hostBar: document.querySelector("#host-bar"),
+  firstRun: document.querySelector("#first-run"),
+  content: document.querySelector(".content"),
+  settings: document.querySelector("#settings-surface"),
+  settingsClose: document.querySelector("#settings-close"),
+  settingsNav: document.querySelectorAll("#settings-nav button"),
+  settingsAppearance: document.querySelector("#settings-appearance"),
+  settingsHome: document.querySelector("#settings-home"),
+  settingsPacks: document.querySelector("#settings-packs"),
+  settingsPresets: document.querySelector("#settings-presets"),
+  settingsModes: document.querySelector("#settings-modes"),
+  settingsDensities: document.querySelector("#settings-densities"),
+  settingsScreens: document.querySelector("#settings-screens"),
+  settingsApps: document.querySelector("#settings-apps"),
   screen: document.querySelector("#screen"),
   screenName: document.querySelector("#screen-name"),
   screenEyebrow: document.querySelector(".screen-title .eyebrow"),
@@ -85,6 +98,7 @@ let state = {
   tabs: [],
   activeTabId: null,
   surface: "launcher",
+  firstRun: false,
   screens: [],
   screenList: [],
   homeScreenId: "",
@@ -93,7 +107,15 @@ let state = {
   catalogue: [],
   catalogueSource: "",
   installedVersions: [],
-  theme: { preset: "suite", mode: "dark", values: {} },
+  theme: {
+    preset: "suite",
+    mode: "dark",
+    source: "system",
+    density: "cozy",
+    values: {},
+    scale: {},
+  },
+  themeChoices: [],
   notice: null,
   reminderStatus: null,
   relay: { ...EMPTY_RELAY },
@@ -103,6 +125,13 @@ let editing = false;
 let managingScreens = false;
 let syncOpen = false;
 let tabBar = null;
+let firstRunWizard = null;
+/** Reports the real bar height to the main process, which keeps pack views below it. */
+let chromeHeightObserver = null;
+let reportedChromeHeight = 0;
+/** The host Settings surface is chrome state, like the Screens manager. */
+let settingsOpen = false;
+let settingsSection = "appearance";
 let shouldFocusSearch = true;
 let appsView = {
   packs: null,
@@ -504,8 +533,12 @@ function applyTheme() {
   root.style.colorScheme = state.theme.mode;
   root.dataset.theme = state.theme.preset;
   root.dataset.themeMode = state.theme.mode;
+  root.dataset.density = state.theme.density;
   root.classList.toggle("dark", state.theme.mode === "dark");
-  for (const [name, value] of Object.entries(state.theme.values)) {
+  for (const [name, value] of Object.entries({
+    ...state.theme.values,
+    ...state.theme.scale,
+  })) {
     root.style.setProperty(name, value);
   }
 }
@@ -539,6 +572,15 @@ function composeScreen() {
   elements.screenNewName?.focus();
 }
 
+/** Tell the main process how tall the chrome really is. */
+function reportChromeHeight() {
+  if (elements.hostBar === null) return;
+  const height = Math.ceil(elements.hostBar.getBoundingClientRect().height);
+  if (!Number.isFinite(height) || height <= 0 || height === reportedChromeHeight) return;
+  reportedChromeHeight = height;
+  void api.chromeHeight(height);
+}
+
 /** Mount the React strip once, then hand it the host's snapshot on every paint. */
 function updateHostBar() {
   if (elements.hostBar === null) return;
@@ -546,6 +588,9 @@ function updateHostBar() {
     tabBar = mountTabBar(elements.hostBar, {
       activate: (id) => run(api.activateTab(id)),
       close: (id) => run(api.closeTab(id)),
+      tabMenu: (id) => {
+        void api.tabMenu(id);
+      },
       newTab: () => run(api.newTab()),
       home: openHomeTab,
       picker: {
@@ -556,6 +601,7 @@ function updateHostBar() {
         openScreen: (id) => run(api.openScreen(id)),
         newScreen: composeScreen,
       },
+      settings: (section) => openSettings(section),
       openCommands: () => {
         if (commandOpen) closeCommandSurface();
         else openCommandSurface();
@@ -564,6 +610,9 @@ function updateHostBar() {
         syncOpen = !syncOpen;
         paint();
       },
+      // The pack's own control was used. The id is the pack's word for it, so the host
+      // forwards it unchanged and never decides what it means.
+      packMenuAction: (action) => api.packMenuAction(action),
     });
   }
   tabBar.update({
@@ -572,7 +621,268 @@ function updateHostBar() {
     syncOpen,
     commandOpen,
     relay: { ...EMPTY_RELAY, ...(state.relay ?? {}) },
+    packMenu: state.packMenu ?? null,
   });
+  // The pack row is present or absent per surface, and both rows follow density, so the
+  // bar's height changes while the app runs. Watch the element instead of assuming 44px.
+  if (chromeHeightObserver === null && typeof ResizeObserver === "function") {
+    chromeHeightObserver = new ResizeObserver(reportChromeHeight);
+    chromeHeightObserver.observe(elements.hostBar);
+  }
+  reportChromeHeight();
+}
+
+/** Compare dotted versions for the chooser; an unreadable segment sorts low. */
+function compareVersions(left, right) {
+  const a = String(left).split(/[.+-]/u);
+  const b = String(right).split(/[.+-]/u);
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    const one = Number.parseInt(a[index] ?? "0", 10);
+    const two = Number.parseInt(b[index] ?? "0", 10);
+    const first = Number.isFinite(one) ? one : 0;
+    const second = Number.isFinite(two) ? two : 0;
+    if (first !== second) return first < second ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * The catalogue as the wizard sees it.
+ *
+ * One row per app id: a catalogue that still lists two versions offers the highest one, so the
+ * person never sees duplicate rows or starts two installs for one id. Status comes from the
+ * active install, which also keeps a resumed wizard from calling an installed app "available".
+ */
+function firstRunPacks() {
+  const current = new Map(
+    (state.installedVersions ?? [])
+      .filter((version) => version.current)
+      .map((version) => [version.id, version.version]),
+  );
+  const entries = new Map();
+  for (const entry of state.catalogue ?? []) {
+    if (!entry.trusted || entry.publisher === null) continue;
+    const existing = entries.get(entry.id);
+    if (existing === undefined || compareVersions(entry.version, existing.version) > 0) {
+      entries.set(entry.id, entry);
+    }
+  }
+
+  return [...entries.values()].map((entry) => {
+    const installed = current.get(entry.id);
+    const status =
+      installed === undefined
+        ? "available"
+        : compareVersions(entry.version, installed) > 0
+          ? "update"
+          : "installed";
+    return {
+      id: entry.id,
+      name: entry.name,
+      ...(entry.description === null ? {} : { description: entry.description }),
+      version: entry.version,
+      status,
+      ...(entry.publisher === null
+        ? {}
+        : { publisher: `${entry.publisher.id} · key ${entry.publisher.fingerprint}` }),
+      capabilities: entry.capabilities ?? [],
+    };
+  });
+}
+
+function firstRunTheme() {
+  const theme = state.theme ?? {};
+  return {
+    preset: theme.preset ?? "suite",
+    // Keep "follow the system" as a choice; the resolved light/dark is only what is painted now.
+    mode: theme.source ?? (theme.mode === "dark" ? "dark" : "light"),
+    density: theme.density ?? "cozy",
+  };
+}
+
+/**
+ * The first-run wizard replaces the chrome until the host records completion.
+ *
+ * It owns the pack selection and the install rows; the host owns the catalogue, the theme and
+ * the installer. The wizard is mounted once and updated with the host's current snapshot.
+ */
+function updateFirstRun() {
+  const firstRun = state.firstRun === true;
+  if (firstRun) settingsOpen = false;
+  if (elements.firstRun !== null) elements.firstRun.hidden = !firstRun;
+  if (elements.content !== null) elements.content.hidden = firstRun;
+  if (elements.hostBar !== null) elements.hostBar.hidden = firstRun;
+  if (elements.screen !== null) elements.screen.hidden = firstRun;
+  if (elements.empty !== null) elements.empty.hidden = firstRun || state.surface !== "launcher";
+  if (elements.syncPanel !== null) elements.syncPanel.hidden = firstRun || !syncOpen;
+  if (elements.commandSurface !== null) {
+    elements.commandSurface.hidden = firstRun || !commandOpen;
+  }
+  if (!firstRun) {
+    if (firstRunWizard !== null) {
+      firstRunWizard.unmount();
+      firstRunWizard = null;
+    }
+    return;
+  }
+  if (elements.firstRun === null) return;
+  if (firstRunWizard === null) {
+    firstRunWizard = mountFirstRun(elements.firstRun, {
+      packs: firstRunPacks(),
+      theme: firstRunTheme(),
+      onThemeChange: (theme) => run(api.setTheme(theme)),
+      onInstall: async (id) => {
+        const result = await api.installFirstRunPack(id);
+        return {
+          id,
+          ok: result?.ok === true,
+          detail: typeof result?.detail === "string" ? result.detail : "The install was refused.",
+        };
+      },
+      onComplete: () => api.completeFirstRun(),
+    });
+  }
+  firstRunWizard.update(firstRunPacks(), firstRunTheme());
+}
+
+const SETTINGS_SECTIONS = ["appearance", "home", "packs"];
+
+/** Apply one Settings choice: merge it with the resolved theme the host already draws. */
+function chooseTheme(patch) {
+  const theme = state.theme ?? {};
+  run(
+    api.setTheme({
+      preset: theme.preset ?? "suite",
+      mode: theme.source ?? "system",
+      density: theme.density ?? "cozy",
+      ...patch,
+    }),
+  );
+}
+
+function settingsChoice(label, selected, onClick) {
+  const button = actionButton(
+    label,
+    onClick,
+    selected ? "settings-choice is-selected" : "settings-choice",
+  );
+  button.setAttribute("aria-pressed", String(selected));
+  return button;
+}
+
+function renderSettingsAppearance() {
+  const theme = state.theme ?? {};
+  const presets = state.themeChoices ?? [];
+  const mode = theme.source ?? theme.mode ?? "system";
+  const density = theme.density ?? "cozy";
+
+  elements.settingsPresets.replaceChildren(
+    ...presets.map((preset) =>
+      settingsChoice(preset.name, theme.preset === preset.id, () =>
+        chooseTheme({ preset: preset.id }),
+      ),
+    ),
+  );
+  elements.settingsModes.replaceChildren(
+    ...[
+      ["light", "Light"],
+      ["dark", "Dark"],
+      ["system", "Follow the system"],
+    ].map(([value, label]) =>
+      settingsChoice(label, mode === value, () => chooseTheme({ mode: value })),
+    ),
+  );
+  elements.settingsDensities.replaceChildren(
+    ...[
+      ["compact", "Compact"],
+      ["cozy", "Cozy"],
+      ["comfortable", "Comfortable"],
+    ].map(([value, label]) =>
+      settingsChoice(label, density === value, () => chooseTheme({ density: value })),
+    ),
+  );
+}
+
+function renderSettingsHome() {
+  const screens = state.screenList ?? [];
+  if (screens.length === 0) {
+    elements.settingsScreens.replaceChildren(element("p", "empty", "No Screens on this device."));
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const screen of screens) {
+    const row = element("li", "settings-screen");
+    const name = element("div", "settings-screen-name");
+    name.append(element("span", "", screen.name));
+    if (screen.home) name.append(element("span", "screen-badge", "Home"));
+    if (screen.open) name.append(element("span", "screen-badge", "Open"));
+    if (screen.readable === false) name.append(element("span", "screen-badge", "Unavailable"));
+    row.append(name);
+
+    const tools = element("div", "settings-screen-tools");
+    const open = actionButton("Open", () => run(api.openScreen(screen.id)));
+    open.setAttribute("aria-label", `Open ${screen.name}`);
+    const home = actionButton(screen.home ? "This is Home" : "Set as Home", () =>
+      run(api.setHomeScreen(screen.id)),
+    );
+    home.disabled = screen.home || screen.readable === false;
+    home.setAttribute("aria-label", `Make ${screen.name} the Home Screen`);
+    tools.append(open, home);
+    row.append(tools);
+    fragment.append(row);
+  }
+  elements.settingsScreens.replaceChildren(fragment);
+}
+
+function renderSettingsPacks() {
+  elements.settingsApps.replaceChildren();
+  renderAppsWidget(elements.settingsApps);
+}
+
+/**
+ * The host Settings surface.
+ *
+ * Appearance is host state, Home is a role over the Screen set, and Packs is the same
+ * catalogue widget a Screen can hold. The page reads `state` and calls host actions; it
+ * never keeps a preference or a document here.
+ */
+function renderSettings() {
+  const surface = elements.settings;
+  if (surface === null) return;
+  const visible = settingsOpen && state.firstRun !== true;
+  surface.hidden = !visible;
+  if (!visible) return;
+
+  for (const button of elements.settingsNav) {
+    button.setAttribute("aria-pressed", String(button.dataset.section === settingsSection));
+  }
+  elements.settingsAppearance.hidden = settingsSection !== "appearance";
+  elements.settingsHome.hidden = settingsSection !== "home";
+  elements.settingsPacks.hidden = settingsSection !== "packs";
+
+  if (settingsSection === "appearance") renderSettingsAppearance();
+  else if (settingsSection === "home") renderSettingsHome();
+  else renderSettingsPacks();
+}
+
+function openSettings(section) {
+  settingsOpen = true;
+  if (typeof section === "string" && SETTINGS_SECTIONS.includes(section)) {
+    settingsSection = section;
+  }
+  paint();
+  const active = [...elements.settingsNav].find(
+    (button) => button.dataset.section === settingsSection,
+  );
+  active?.focus();
+}
+
+function closeSettings() {
+  if (!settingsOpen) return;
+  settingsOpen = false;
+  paint();
 }
 
 function matchesQuery(name, id, description) {
@@ -580,7 +890,6 @@ function matchesQuery(name, id, description) {
   if (needle.length === 0) return true;
   return `${name} ${id} ${description ?? ""}`.toLowerCase().includes(needle);
 }
-
 function actionButton(label, onClick, className) {
   const button = element("button", className ? `action ${className}` : "action", label);
   button.type = "button";
@@ -1141,9 +1450,63 @@ function renderWidgets(view) {
     );
   });
   if (view.widgets.length === 0) {
-    fragment.append(element("p", "empty", "This Screen has no widgets. Choose Edit to add one."));
+    if (view.id === state.homeScreenId) {
+      const empty = element("section", "home-empty");
+      empty.setAttribute("aria-label", "Empty Home");
+      empty.append(element("p", "eyebrow", "Home"));
+      empty.append(element("h2", "", "A clean start."));
+      const packs = state.packs ?? [];
+      const first = packs.find((pack) => pack.id === "canvas") ?? packs[0] ?? null;
+      empty.append(
+        element(
+          "p",
+          "lede",
+          first === null
+            ? "No apps are installed yet. Add one, then make a document or add a widget."
+            : "Your apps are installed. Open one to make a document, or add a new widget.",
+        ),
+      );
+      const actions = element("div", "home-empty-actions");
+      if (first === null) {
+        actions.append(
+          actionButton("Install from a file…", () => run(api.installPack()), "action-primary"),
+        );
+        actions.append(actionButton("Choose an app", () => run(api.newTab())));
+      } else {
+        actions.append(
+          actionButton(`Open ${first.name}`, () => run(api.openPack(first.id)), "action-primary"),
+        );
+        actions.append(actionButton("Create a document", () => run(api.newDocument(first.id))));
+        actions.append(actionButton("Choose an app", () => run(api.newTab())));
+      }
+      empty.append(actions);
+      fragment.append(empty);
+    } else {
+      fragment.append(element("p", "empty", "This Screen has no widgets. Choose Edit to add one."));
+    }
   }
+  /*
+   * Keep the person's place across the rebuild.
+   *
+   * Every edit used to destroy the whole widget tree, so the focused tile vanished and the
+   * next keypress went to the body: keyboard editing was unusable after one action. The
+   * tile that was focused is recorded by registry id and given focus back below, so a run
+   * of ↑ ↑ → Delete works without reaching for the mouse.
+   */
+  const focused = document.activeElement;
+  const focusedRegistryId =
+    focused instanceof HTMLElement && elements.widgets.contains(focused)
+      ? (focused.closest(".widget")?.dataset.registryId ?? null)
+      : null;
+
   elements.widgets.replaceChildren(fragment);
+
+  if (focusedRegistryId !== null && editing) {
+    const restored = [...elements.widgets.querySelectorAll(".widget")].find(
+      (tile) => tile.dataset.registryId === focusedRegistryId,
+    );
+    restored?.focus();
+  }
 }
 
 function renderChoices(view) {
@@ -1372,6 +1735,8 @@ function paint() {
   renderSync();
   renderScreen();
   renderCommandSurface();
+  renderSettings();
+  updateFirstRun();
 
   const active = state.tabs.find((tab) => tab.id === state.activeTabId);
   document.body.dataset.surface = state.surface;
@@ -1388,6 +1753,19 @@ function bindChrome() {
   elements.commandSurface.addEventListener("click", (event) => {
     if (event.target === elements.commandSurface) closeCommandSurface();
   });
+
+  elements.settingsClose?.addEventListener("click", closeSettings);
+  elements.settings?.addEventListener("click", (event) => {
+    if (event.target === elements.settings) closeSettings();
+  });
+  for (const button of elements.settingsNav) {
+    button.addEventListener("click", () => {
+      const section = button.dataset.section;
+      if (section === undefined || section === settingsSection) return;
+      settingsSection = section;
+      paint();
+    });
+  }
   for (const button of elements.commandModes) {
     button.addEventListener("click", () => {
       if (commandMode === button.dataset.mode) return;
@@ -1467,6 +1845,11 @@ function bindChrome() {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && settingsOpen) {
+      event.preventDefault();
+      closeSettings();
+      return;
+    }
     if (event.key === "Escape" && commandOpen) {
       event.preventDefault();
       closeCommandSurface();
@@ -1477,7 +1860,7 @@ function bindChrome() {
 
     if (event.key.toLowerCase() === "t") {
       event.preventDefault();
-      openHome();
+      openHomeTab();
     } else if (event.key.toLowerCase() === "w" && state.activeTabId !== null) {
       event.preventDefault();
       run(api.closeTab(state.activeTabId));
@@ -1500,6 +1883,7 @@ async function start() {
   bindChrome();
   let received = false;
   api.onPick?.(() => tabBar?.showPicker());
+  api.onOpenSettings?.((section) => openSettings(section));
   api.onState((next) => {
     if (!next) return;
     received = true;

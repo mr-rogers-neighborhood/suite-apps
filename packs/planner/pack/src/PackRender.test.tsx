@@ -56,9 +56,7 @@ describe("Planner as a pack", () => {
 
     const { replica, created } = await bootDocument();
     expect(created).toBe(true);
-    render(<App replica={replica} created={created} />);
-
-    fireEvent.click(await screen.findByRole("button", { name: /new planner/i }));
+    render(<App replica={replica} />);
 
     const capture = await screen.findByLabelText("Capture a task");
     fireEvent.change(capture, { target: { value: "Write the pack" } });

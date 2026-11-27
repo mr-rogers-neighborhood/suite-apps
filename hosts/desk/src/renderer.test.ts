@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const shell = readFileSync(join(here, "renderer", "shell.js"), "utf8");
+const islandCss = readFileSync(join(here, "renderer", "react", "tab-bar.css"), "utf8");
 
 /**
  * The chrome page cannot run in a Node test, so these checks read it.
@@ -53,6 +54,15 @@ describe("the Home composition", () => {
     expect(shell).not.toContain("screens.json");
   });
 
+  it("draws Settings over the same catalogue and calls the host's theme and Home actions", () => {
+    expect(shell).toContain("function renderSettings");
+    expect(shell).toContain("renderAppsWidget(elements.settingsApps)");
+    expect(shell).toContain("api.setTheme");
+    expect(shell).toContain("api.setHomeScreen");
+    expect(shell).toContain('settingsSection = "appearance"');
+    expect(shell).not.toContain("localStorage");
+  });
+
   it("draws a row in document order and leaves its children outside the edit controls", () => {
     expect(shell).toContain("function rowTile");
     expect(shell).toContain("widget-row-track");
@@ -94,5 +104,67 @@ describe("the Home composition", () => {
     expect(shell).not.toContain("localStorage");
     expect(shell).not.toContain("sessionStorage");
     expect(shell).not.toContain("indexedDB");
+  });
+});
+
+describe("the tab strip island", () => {
+  it("resets the browser's control defaults below the utilities", () => {
+    // The island deliberately skips Tailwind's preflight, which is unlayered here and would
+    // also reset the legacy chrome. Without this reset a tab button draws with the UA bevel
+    // (`border: 2px outset`) and the brand lockup is underlined, which is how the bar looked
+    // outside Storybook. Notes the layer order too: `base` must sit under `utilities` so a
+    // component's own `border`/`bg-*`/`px-*` still win.
+    expect(islandCss).toContain("@layer theme, base, components, legacy, utilities;");
+    expect(islandCss).not.toContain('@import "tailwindcss/preflight.css"');
+
+    const base = islandCss.slice(islandCss.indexOf("@layer base {"));
+    expect(base).toContain("button, input, select, textarea");
+    expect(base).toMatch(/border:\s*0;/);
+    expect(base).toMatch(/text-decoration:\s*none;/);
+  });
+});
+
+describe("the chrome's keyboard", () => {
+  it("opens a new Home tab on Mod+T, which used to throw", () => {
+    // `openHome` is the `#open-home` element, not a function, so the shortcut raised
+    // `ReferenceError: openHome is not defined` and did nothing. It has to call the
+    // handler the launcher button uses.
+    const handler = shell.slice(shell.indexOf('event.key.toLowerCase() === "t"'));
+    expect(handler.slice(0, 220)).toContain("openHomeTab()");
+    expect(handler.slice(0, 220)).not.toMatch(/openHome\(\)/);
+  });
+
+  it("gives focus back after a widget edit rebuilds the tree", () => {
+    // `renderWidgets` replaces every tile, so the focused element was destroyed and the
+    // next keypress went to the body. The renderer records the focused tile's registry id
+    // and restores it.
+    const render = shell.slice(
+      shell.indexOf("function renderWidgets"),
+      shell.indexOf("function renderChoices"),
+    );
+    expect(render).toContain("focusedRegistryId");
+    expect(render).toContain("restored?.focus()");
+  });
+});
+
+describe("the chrome's height", () => {
+  it("reports the measured bar height instead of assuming 44px", () => {
+    // The bar is one row on a Screen and two when a pack published material, and both
+    // rows follow density, so the main process has to be told what the bar really is.
+    const report = shell.slice(
+      shell.indexOf("function reportChromeHeight"),
+      shell.indexOf("function updateHostBar"),
+    );
+    expect(report).toContain("getBoundingClientRect().height");
+    expect(report).toContain("api.chromeHeight(height)");
+    expect(shell).toContain("new ResizeObserver(reportChromeHeight)");
+  });
+
+  it("does not send the same height twice", () => {
+    const report = shell.slice(
+      shell.indexOf("function reportChromeHeight"),
+      shell.indexOf("function updateHostBar"),
+    );
+    expect(report).toContain("height === reportedChromeHeight");
   });
 });

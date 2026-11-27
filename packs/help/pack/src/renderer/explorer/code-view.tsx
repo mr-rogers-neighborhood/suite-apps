@@ -101,7 +101,7 @@ export function CodeView({ fileId, source, startLine, endLine, highlight = true 
               ref={active && number === startLine ? selected : undefined}
               className={
                 active
-                  ? "flex border-l-2 border-amber-400 bg-amber-400/10"
+                  ? "flex border-l-2 border-warning bg-warning/10"
                   : "flex border-l-2 border-transparent"
               }
             >

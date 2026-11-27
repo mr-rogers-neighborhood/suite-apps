@@ -54,7 +54,7 @@ export function LineChart({
           x2={width - padding.right}
           y1={zeroY}
           y2={zeroY}
-          stroke="var(--line)"
+          stroke="var(--hairline)"
           strokeWidth={1}
         />
         <path d={area} fill={color} opacity={0.12} />
@@ -153,7 +153,7 @@ export function BarChart({
           x2={width - padding.right}
           y1={zeroY}
           y2={zeroY}
-          stroke="var(--line)"
+          stroke="var(--hairline)"
           strokeWidth={1}
         />
         {labels.map((label, groupIndex) =>

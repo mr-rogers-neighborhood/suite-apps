@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HostTabBar, type HostTab } from "./HostTabBar.js";
 
@@ -44,6 +44,19 @@ describe("HostTabBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Planner" }));
 
     expect(onActivate).toHaveBeenCalledWith("planner");
+  });
+
+  it("keeps the active tab in view when it is chosen from outside the strip", () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+    renderBar({ activeTabId: "home" });
+
+    // The host changes `activeTabId` itself when a document opens, so the strip has to
+    // bring the newly chosen tab into view rather than leave it scrolled off the edge.
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(
+      screen.getByRole("button", { name: "Home" }),
+    );
+    scrollIntoView.mockRestore();
   });
 
   it("moves and activates with the arrow keys, wrapping at the ends", () => {
@@ -94,6 +107,18 @@ describe("HostTabBar", () => {
     expect(onClose).toHaveBeenCalledWith("planner");
   });
 
+  it("opens a tab menu from the context menu or the keyboard", () => {
+    const onTabMenu = vi.fn();
+    renderBar({ onTabMenu });
+    const home = screen.getByRole("button", { name: "Home" });
+
+    fireEvent.contextMenu(home);
+    expect(onTabMenu).toHaveBeenLastCalledWith("home");
+
+    fireEvent.keyDown(home, { key: "F10", shiftKey: true });
+    expect(onTabMenu).toHaveBeenCalledTimes(2);
+  });
+
   it("opens a new tab and the command surface", () => {
     const onNewTab = vi.fn();
     const onOpenSearch = vi.fn();
@@ -125,5 +150,52 @@ describe("HostTabBar", () => {
       "true",
     );
     expect(screen.getByRole("button", { name: "Close Retired app" })).toBeInTheDocument();
+  });
+});
+
+describe("the tab switch list", () => {
+  const openSwitch = () => fireEvent.click(screen.getByRole("button", { name: "All tabs" }));
+
+  it("lists every open tab and marks the one in front", () => {
+    renderBar();
+    openSwitch();
+
+    const menu = screen.getByRole("menu", { name: "All tabs" });
+    expect(within(menu).getAllByRole("menuitemradio")).toHaveLength(3);
+    expect(within(menu).getByRole("menuitemradio", { name: /Canvas/u })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(within(menu).getByRole("menuitemradio", { name: /Planner/u })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+  });
+
+  it("activates the chosen tab and returns focus to the trigger", () => {
+    const onActivate = vi.fn();
+    renderBar({ onActivate });
+    openSwitch();
+
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /Home/u }));
+
+    expect(onActivate).toHaveBeenCalledWith("home");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All tabs" })).toHaveFocus();
+  });
+
+  it("closes on Escape and hands focus back", () => {
+    renderBar();
+    openSwitch();
+
+    fireEvent.keyDown(screen.getByRole("menu", { name: "All tabs" }), { key: "Escape" });
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All tabs" })).toHaveFocus();
+  });
+
+  it("is absent when there is only one tab", () => {
+    renderBar({ tabs: [tabs[0]!], activeTabId: "canvas" });
+    expect(screen.queryByRole("button", { name: "All tabs" })).not.toBeInTheDocument();
   });
 });

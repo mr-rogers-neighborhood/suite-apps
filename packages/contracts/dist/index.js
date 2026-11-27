@@ -5,6 +5,7 @@ export { CONTRACT_VERSION, compareSemver, isContractCompatible, parseSemver, } f
 export { DEFAULT_APP_IDS, deepLinkPrefix, formatDeepLink, parseDeepLink, SUITE_PROTOCOL, WORKSPACE_SEGMENT, workspaceLink, workspaceTarget, } from "./deepLink.js";
 export { deploymentAllows, parseDeployment, relayFor, SUITE_DEPLOYMENT_FORMAT, SUITE_DEPLOYMENT_FORMAT_VERSION, sellsPlans, suiteDeploymentAuthSchema, suiteDeploymentFeaturesSchema, suiteDeploymentSchema, } from "./deployment.js";
 export { hubReportPath, parseHubState, SUITE_HUB_FILE, SUITE_HUB_FORMAT, suiteHubSchema, suiteHubScopeSchema, } from "./hub.js";
+export { emptyMenuSlots, isMenuSlotAction, isMenuSlotId, MENU_SLOTS_MAX_CONTROLS, MENU_SLOTS_MAX_ITEMS, MENU_SLOT_GLYPH_MAX, MENU_SLOT_ID_MAX, MENU_SLOT_LABEL_MAX, parseMenuSlots, SUITE_MENU_SLOTS_FORMAT, } from "./menuBar.js";
 export { describeIssues, parseWith, } from "./parse.js";
 export { joinPath, suiteApplicationsRoot, suitePaths, } from "./paths.js";
 export { appDocumentsFolder, SUITE_APPS, suiteDocumentsRoot, } from "./suiteApps.js";

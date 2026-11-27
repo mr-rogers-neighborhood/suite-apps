@@ -328,7 +328,7 @@ function ModuleList({
           onClick={() => setGapsOnly((value) => !value)}
           className={`rounded border px-1.5 py-0.5 text-[10px] ${
             gapsOnly
-              ? "border-amber-500/50 bg-amber-500/10 text-amber-600"
+              ? "border-warning/50 bg-warning/10 text-warning"
               : "border-fd-border text-fd-muted-foreground hover:text-fd-foreground"
           }`}
           aria-pressed={gapsOnly}
@@ -374,7 +374,7 @@ function ModuleList({
                         </span>
                       ) : null}
                       {module.noteCount > 0 ? (
-                        <span className="mt-0.5 shrink-0 rounded bg-amber-500/10 px-1 text-[9px] text-amber-500">
+                        <span className="mt-0.5 shrink-0 rounded bg-warning/10 px-1 text-[9px] text-warning">
                           {module.noteCount}
                         </span>
                       ) : null}

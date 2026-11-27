@@ -1,13 +1,14 @@
 import type { SuiteTheme } from "../theme.js";
 /**
- * Suite — the palette the apps ship today.
+ * Suite — warm neutral paper, near-black ink, a monochrome accent.
  *
- * Taken from Canvas's tokens rather than invented, because Canvas is the app whose look the
- * others are being brought to. Every value here is one already on screen: the surfaces are
- * the light greys and the near-black, the ink is the near-black and near-white, and the six
- * hues are the ones a section or a card can already wear.
+ * The default borrows macOS's quiet, layered neutrals and Heptabase's monochrome shell: the
+ * action is an ink-black button, not a coloured one, and the warmth comes from the paper and
+ * the ink rather than from an accent hue. The six section hues stay muted so a card can wear
+ * one without turning the page into a rainbow.
  *
- * This is the default, so a reader who never opens the theme picker sees no change at all.
+ * Warm carries the burnt-orange version of this look; Catppuccin and Solarized are the two
+ * named palettes.
  */
 export declare const suite: SuiteTheme;
 //# sourceMappingURL=suite.d.ts.map

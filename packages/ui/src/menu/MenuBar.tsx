@@ -163,9 +163,13 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
       role={role}
       aria-label={ariaLabel}
       data-handbook-region={props["data-handbook-region"] ?? "title-bar"}
-      onKeyDown={onKeyDown ?? menuBarKeyDown}
+      // Horizontal arrow traversal is a *menubar* behaviour. On a plain header it would
+      // hijack the arrows from every control inside it — a text field, a tab strip, a
+      // dropdown — which is the bug this gate removes. Composites that want their own
+      // arrows (the tab strip, a pack's tablist) keep them and stop propagation.
+      onKeyDown={onKeyDown ?? (role === "menubar" ? menuBarKeyDown : undefined)}
       className={cx(
-        "app-bar relative z-20 flex h-11 shrink-0 items-center gap-3 bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] px-4 text-[length:var(--text-body,13px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md",
+        "app-bar @container relative z-20 flex h-[var(--menu-bar-height,44px)] shrink-0 items-center gap-3 bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] px-4 text-[length:var(--text-body,13px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md",
         className,
       )}
       {...props}
@@ -176,7 +180,7 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
           <a
             href={homeHref}
             aria-label={homeAriaLabel}
-            className="flex shrink-0 items-center transition-opacity duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))] hover:opacity-70"
+            className="flex shrink-0 items-center text-[var(--ink)] transition-opacity duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))] hover:opacity-70"
             onClick={handleHomeClick}
           >
             {mark}
@@ -283,11 +287,11 @@ export const MenuBar = forwardRef<HTMLElement, MenuBarProps>(function MenuBar(
             <circle cx="7" cy="7" r="4.5" />
             <path d="m10.5 10.5 3 3" />
           </svg>
-          <span className="command-bar__label min-w-0 flex-1 truncate text-left">
+          <span className="command-bar__label min-w-0 flex-1 truncate text-left @max-3xl:hidden">
             {searchPlaceholder}
           </span>
           <span aria-hidden="true"> </span>
-          <kbd className="command-bar__key shrink-0 rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
+          <kbd className="command-bar__key hidden shrink-0 rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)] @min-5xl:inline">
             {searchShortcut}
           </kbd>
         </button>

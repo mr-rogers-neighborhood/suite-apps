@@ -35,7 +35,14 @@ export const Default: Story = {};
 // the host does and what a pack's `@theme` aliases resolve against.
 export const SuiteLight: Story = { globals: { theme: "suite", mode: "light" } };
 export const SuiteDark: Story = { globals: { theme: "suite", mode: "dark" } };
+export const CatppuccinLight: Story = { globals: { theme: "catppuccin", mode: "light" } };
+export const CatppuccinDark: Story = { globals: { theme: "catppuccin", mode: "dark" } };
 export const SolarizedLight: Story = { globals: { theme: "solarized", mode: "light" } };
 export const SolarizedDark: Story = { globals: { theme: "solarized", mode: "dark" } };
 export const WarmLight: Story = { globals: { theme: "warm", mode: "light" } };
 export const WarmDark: Story = { globals: { theme: "warm", mode: "dark" } };
+
+// Density is the second axis: the surface reads the same tokens, with more or less room.
+export const Compact: Story = { globals: { density: "compact" } };
+export const Cozy: Story = { globals: { density: "cozy" } };
+export const Comfortable: Story = { globals: { density: "comfortable" } };

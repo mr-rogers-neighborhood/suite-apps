@@ -198,10 +198,10 @@ The rules that shape the Suite host.
   at all. A remembered denial never opens the dialog again, which is what makes a pack unable to
   nag; the pack's card is the only deliberate re-ask.
 - Tiers are a property of the capability, not a caller's choice. `documents`, `files`, `network` and
-  `identity.pack` are install-tier: the install confirmation showed them, so they are recorded then
-  and never asked per use. `recents` is first-use. `notifications` is a token, re-asked when thirty
-  days pass. Every-use is implemented for the media capabilities the spec names, which this host
-  does not serve yet.
+  `identity.pack` are install-tier: the install confirmation or the first-run review showed them, so
+  they are recorded then and never asked per use. `recents` is first-use. `notifications` is a token,
+  re-asked when thirty days pass. Every-use is implemented for the media capabilities the spec names,
+  which this host does not serve yet.
 - Keying by version is deliberate: an update that adds a capability has no answer for the new
   version and pauses on a fresh consent, while a removed capability is no longer read because the
   pack no longer declares it. Removing a pack's last version clears its rows.
@@ -217,14 +217,39 @@ The rules that shape the Suite host.
 - The host renders pack-declared contributions: commands, menus, toolbar items, status items,
   keybindings and widgets. Contributions are data, not DOM. The host validates and renders them.
 - A pack owns only its content. It never renders into host chrome, and the host never imports pack UI.
-- Theme is host state, not pack state. Suite Desk owns the preset and brightness on desktop (Suite
-  Go owns them on mobile), stores the pair at `<dataRoot>/theme.json`, and paints every pack view with
-  the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A pack has no
-  picker and no stored choice; a change repaints open views through `ShellWindow.setTheme` and a pack
-  installed later starts in the same theme. The two controls are in the **View** menu: light, dark or
-  follow-the-system, and Suite, Warm or Solarized. `logseq` is kept as a stored-id alias for `warm`, so
-  an old selection resolves to the warm palette rather than to a missing theme. Per-pack palettes and
-  user-authored themes remain out of scope.
+- **One menu bar, and the host draws it.** The active pack draws no bar of its own; it publishes a
+  `MenuSlots` value to `window.suite.menuBar`, and the host renders it in the tab strip's one
+  physical bar. The pack keeps its own `MenuBar` only when it runs standalone. The host treats a
+  slot's `id` as opaque: it draws the descriptor and echoes the id back, so it never learns what
+  "explain mode" or "view" means. That is deliberate — one explain/tutorial layer that works in
+  every app cannot rely on the host understanding each app's vocabulary, which is why every control
+  may carry a `help` sentence in the contract.
+- A `tabs` slot carries its own accessible `label` ("Open boards"), because the host cannot name a
+  pack's surfaces. A row with `checked` is a `menuitemradio`, not a plain item, so the current choice
+  is announced; a disabled row may carry `disabledReason` and the host shows that sentence rather
+  than a silent grey control. The host still learns no vocabulary from either.
+- A dropdown opens in a portal positioned from its trigger's box. The bar scrolls horizontally, so a
+  menu drawn inside it would be clipped to the bar's height. Arrow keys belong to the composite that
+  has focus — the tab strip, a pack's tablist, an open menu — and a plain header does not claim them;
+  only a `role="menubar"` gets horizontal traversal from the bar.
+- **The host bar is two thin rows.** The first is the host's: mark, open tabs, search, sync and the
+  window controls. The second is the active pack's: the document's name, its takeover and its
+  actions. The pack row is absent when the active surface published nothing, so Home costs one row
+  and a document costs two. Both rows follow the density scale (`--control-height`) instead of a
+  fixed 44px, and the renderer reports the measured total to the main process so pack views sit
+  below the real bar rather than a guessed constant.
+- Desk hides the native menu bar (`autoHideMenuBar`), as Planner and Budget already do. The template
+  stays installed, so its accelerators (⌘W, ⌘K, ⌘S) keep working; it is no longer a third permanent
+  band above the two host rows.
+- Theme is host state, not pack state. Suite Desk owns the preset, brightness and density on desktop
+  (Suite Go owns them on mobile), stores the choice at `<dataRoot>/theme.json`, and paints every pack
+  view with the resolved CSS variables plus `data-theme`, `data-theme-mode` and the `dark` class. A
+  pack has no picker and no stored choice; a change repaints open views through
+  `ShellWindow.setTheme` and a pack installed later starts in the same theme. The controls are in the
+  **View** menu — light, dark or follow-the-system, Suite, Warm, Solarized or Catppuccin, and compact,
+  cozy or comfortable — in the first-run wizard's appearance step, and in **Settings → Appearance**.
+  `logseq` is kept as a stored-id alias for `warm`, so an old selection resolves to the warm palette
+  rather than to a missing theme. Per-pack palettes and user-authored themes remain out of scope.
 - A shared component kit is optional, not a requirement; Canvas must be able to be a canvas.
 - Documents are first-class in the launcher and recents, but tabs are app sessions. The host indexes
   metadata and opens the owning pack through a deep link. Recents are local; space entries are
@@ -248,17 +273,36 @@ The rules that shape the Suite host.
 ## Home and Screens
 
 - Home is a Screen named Home (`desk-home`), the host's own Loro document at
-  `<dataRoot>/screens/desk-home.loro`. It is created and opened before any pack view exists, first in
-  the tab strip, and active on a first run. The brand and `+` open it again, so closing its tab is
-  safe. A restored session keeps its own active tab and gains Home at the front.
+  `<dataRoot>/screens/desk-home.loro`. It is a role, not a permanent tab: launch restores the saved
+  session, and the brand and `+` open it again, so closing its tab is safe. A fresh data root shows
+  the first-run wizard; its last step opens Home. A Home that has never been edited is empty and
+  offers the first installed app, **Create a document** and **Choose an app**; with no apps it offers
+  **Install from a file…** and **Choose an app**.
+- A Screen tab's context menu, also reachable with `Shift+F10`, offers **Set as Home**; the same
+  action is in **Settings → Home**. Settings is host chrome, not a pack and not a Screen: it draws
+  appearance, the Home choice and the catalogue, and it opens from the new-tab picker, the View
+  menu's **Settings…** item, or a tab's menu. It keeps no state on the page; every control calls a
+  host action and repaints from the next snapshot.
+- The first-run wizard is host chrome, not a pack and not a Screen. It lists the trusted catalogue,
+  selects every app by default, chooses palette, brightness and density, and installs the selected
+  apps concurrently. The appearance step names each chosen app's publisher id, key fingerprint, pack
+  id, version and capabilities before **Install**; that review is the install consent, so the host
+  calls the same verified installer without a second per-app dialog. Completion is recorded per data
+  root at `<dataRoot>/onboarding.json`; a missing, unreadable or older record repeats the wizard, and
+  only a completed record reveals the chrome. A root that already has a space document or a Screen is
+  an upgrade, not a first run. While the wizard is showing, no pack view is painted, even for a
+  restored or deep-linked tab.
 - A screen tab is host chrome. It creates no `WebContentsView`; activating one hides every pack view,
   which exposes the chrome's composition in the same content area. A pack tab hides the composition
   and shows that pack's view. Closing the last tab shows an empty state, not a second copy of the
   pack grid.
-- The host widget table belongs to the host and is keyed by registry id. `desk.apps` is host chrome:
-  it has no capture action and no app behind it, and it draws the installed-pack grid, the local
-  catalogue and **Add pack…**. Host widgets resolve before the pack registry, so an installed pack
-  cannot shadow `desk.apps`.
+- The host widget table belongs to the host and is keyed by registry id. `desk.apps` is optional host
+  chrome: it has no capture action and no app behind it, and it draws the installed-pack grid, the
+  local catalogue and **Add pack…**. A new Home does not include it, and the first launch on an
+  upgraded root removes the old default placement once, because the picker and the catalogue are host
+  surfaces rather than a widget the person has to dismiss. A recorded migration keeps a person who
+  adds it back from losing it again; it remains addable from **Edit**. Host widgets resolve before the
+  pack registry, so an installed pack cannot shadow `desk.apps`.
 - App widgets are declared by installed pack manifests (`widgets`) and resolved through
   `@suite/screens` as `<pack id>.<widget id>`. The host draws the declared title, fields and resolved
   settings with its own components; the pack supplies data, never DOM. An unknown registry id is a
@@ -339,8 +383,8 @@ The rules that shape the Suite host.
   another key only after seeing its fingerprint; the install refusal shows the fingerprint, and the
   unknown-publisher dialog adds the key only from that display. A malformed store is ignored rather
   than guessed at, so it trusts the first-party key and nothing else.
-- Install and update show the publisher id, key fingerprint, pack id, version and capability list
-  before anything is written, and the result notice repeats them.
+- Install and update — and the first-run review — show the publisher id, key fingerprint, pack id,
+  version and capability list before anything is written, and the result notice repeats them.
 - The install identity is `(publisher id, pack id)`. The active publisher is recorded beside the
   version directories. A different publisher under an existing id is refused without the explicit
   migration. A different key under the same id is refused unless a rotation statement retired the
@@ -397,9 +441,11 @@ The rules that shape the Suite host.
 - A link opens or focuses the pack's tab and loads the pack's current installed entry. The chrome's
   own link opening is unchanged, and a pack still needs `network` to hand a link to the OS browser.
 - The host stores a launch context per tab and derives the tab from the sender. A pack calls
-  `window.suite.launch()` and receives `{ kind: "launcher" }` for an ordinary open or
-  `{ kind: "deep-link", url }` for a link; it never parses a launch out of a URL and never names
-  another tab.
+  `window.suite.launch()` and receives `{ kind: "document", documentId }`, `{ kind: "create" }`,
+  `{ kind: "launcher" }` or `{ kind: "deep-link", url }`; it never parses a launch out of a URL and
+  never names another tab. A pack with documents is never opened on a start page: an ordinary open
+  resolves to the most recent document, then any document, then a new one. The pack's own launcher
+  pages and prompts were removed; the host picker owns that choice.
 - Unsigned directory packs are an explicit development path: `SUITE_DESK_DEV_PACKS=1` in an
   unpackaged checkout. The switch is ignored in a packaged build. In that mode a development pack wins
   a collision with an installed pack of the same id, because the person is iterating on the directory;

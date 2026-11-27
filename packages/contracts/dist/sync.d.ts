@@ -116,8 +116,8 @@ export type SuiteSyncFrame = Uint8Array;
 /** What a caller was asking for when it failed. A document is never the answer. */
 export declare const suiteSyncOperationSchema: z.ZodEnum<{
     join: "join";
-    members: "members";
     status: "status";
+    members: "members";
     enable: "enable";
     disable: "disable";
     invite: "invite";
@@ -161,8 +161,8 @@ export declare const suiteSyncErrorSchema: z.ZodObject<{
     }>;
     operation: z.ZodEnum<{
         join: "join";
-        members: "members";
         status: "status";
+        members: "members";
         enable: "enable";
         disable: "disable";
         invite: "invite";

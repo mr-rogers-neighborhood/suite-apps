@@ -58,7 +58,7 @@ async function captureProofScreenshot(
   });
 }
 
-test("opens Home Screen, creates a Screen document, and switches to it", {
+test("opens Home, visits Settings and creates a Screen document", {
   tag: "@proof",
 }, async () => {
   const testInfo = test.info();
@@ -82,10 +82,37 @@ test("opens Home Screen, creates a Screen document, and switches to it", {
   await page.context().tracing.start({ screenshots: true, snapshots: true });
 
   try {
-    await test.step("Open the Home Screen document", async () => {
+    await test.step("Finish the first run", async () => {
+      await expect(page.getByRole("heading", { name: "Welcome to Suite." })).toBeVisible();
+      await captureProofScreenshot(page, proofDir, "00-first-run.png", testInfo);
+      await page.getByRole("button", { name: "Skip choosing for now" }).click();
+      await captureProofScreenshot(page, proofDir, "00-first-run-look.png", testInfo);
+      await page.getByRole("button", { name: "Continue to Home" }).click();
+      await expect(page.locator("#first-run")).toBeHidden();
+    });
+
+    await test.step("Open the empty Home Screen", async () => {
       await expect(page.locator("#screen-name")).toHaveText("Home");
-      await expect(page.locator('[data-registry-id="desk.apps"]')).toBeVisible();
+      await expect(page.locator(".home-empty")).toBeVisible();
+      await expect(
+        page.getByText("No apps are installed yet. Add one, then make a document or add a widget."),
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Install from a file…" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Choose an app" })).toBeVisible();
       await captureProofScreenshot(page, proofDir, "01-home-screen.png", testInfo);
+    });
+
+    await test.step("Open Settings from the picker and change Home", async () => {
+      await page.getByRole("button", { name: "Choose an app" }).click();
+      await page.getByRole("option", { name: /^Settings/u }).click();
+      await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+
+      await page.locator('#settings-nav button[data-section="home"]').click();
+      await expect(page.locator("#settings-screens .settings-screen").first()).toBeVisible();
+      await captureProofScreenshot(page, proofDir, "02-settings-home.png", testInfo);
+
+      await page.getByRole("button", { name: "Close settings" }).click();
+      await expect(page.locator("#settings-surface")).toBeHidden();
     });
 
     await test.step("Create and open a Focus Screen document", async () => {
@@ -101,7 +128,7 @@ test("opens Home Screen, creates a Screen document, and switches to it", {
       const screenFiles = await readdir(join(dataDir, "screens"));
       expect(screenFiles.filter((file) => file.endsWith(".loro")).length).toBeGreaterThanOrEqual(1);
 
-      await captureProofScreenshot(page, proofDir, "02-focus-screen.png", testInfo);
+      await captureProofScreenshot(page, proofDir, "03-focus-screen.png", testInfo);
     });
   } finally {
     const tracePath = join(proofDir, "trace.zip");

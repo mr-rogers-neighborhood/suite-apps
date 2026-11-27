@@ -6,6 +6,7 @@ import type {
   ModuleViewProps,
   PackCapability,
   SuiteGoModule,
+  ThemeDensity,
 } from "@suite/go";
 import { FIRST_PARTY_PUBLISHER_ID } from "@suite/go";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -42,9 +43,11 @@ import {
   type TabState,
 } from "../host/tabs.js";
 import {
+  applyDensity,
   setThemeChoice as applyThemeChoice,
   type GoThemeChoice,
   paintTheme,
+  readDensity,
   readThemeChoice,
   resolveTheme,
   watchColorScheme,
@@ -192,6 +195,7 @@ export function App() {
   const [recent, setRecent] = useState<readonly RecentEntry[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeChoice, setThemeChoiceState] = useState<GoThemeChoice>(() => readThemeChoice());
+  const [density, setDensityState] = useState<ThemeDensity>(() => readDensity());
   const [theme, setThemeTokens] = useState(() => resolveTheme());
   const [deviceKey, setDeviceKey] = useState<DeviceKey | null>(null);
   const [consent, setConsent] = useState<ConsentRecord | null>(null);
@@ -213,6 +217,12 @@ export function App() {
   const changeTheme = useCallback((choice: GoThemeChoice) => {
     setThemeChoiceState(choice);
     setThemeTokens(applyThemeChoice(choice));
+  }, []);
+
+  const changeDensity = useCallback((next: ThemeDensity) => {
+    setDensityState(next);
+    applyDensity(next);
+    setThemeTokens(resolveTheme(next));
   }, []);
 
   const refreshRecents = useCallback(async () => {
@@ -839,7 +849,9 @@ export function App() {
       <SettingsSheet
         open={settingsOpen}
         choice={themeChoice}
+        density={density}
         onChange={changeTheme}
+        onDensityChange={changeDensity}
         apps={settingsApps}
         onRemoveApp={(id) => void removePack(id)}
         onReask={(app, permission) => void reaskConsent(app, permission)}

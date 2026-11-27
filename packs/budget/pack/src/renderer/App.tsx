@@ -1,17 +1,15 @@
-import type { CreateBudgetInput, LibraryEntry, OpenBudgetInfo } from "@suite/budget-core";
+import type { CreateBudgetInput, OpenBudgetInfo } from "@suite/budget-core";
 import { Button } from "@suite/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Shell } from "./app/Shell";
 import { Toast } from "./app/Toast";
 import { Modal } from "./components/Modal";
-import { BudgetLauncher } from "./launcher/BudgetLauncher";
 import { NewBudgetDialog } from "./launcher/NewBudgetDialog";
 import { getBridge } from "./platform/bridge";
 import { bootDocument, type DocumentReplica, WorkspaceContext } from "./store/snapshotStore";
 import { useUiStore } from "./store/uiStore";
 
 export function App() {
-  const [library, setLibrary] = useState<LibraryEntry[]>([]);
   const [openInfo, setOpenInfo] = useState<OpenBudgetInfo | null>(null);
   const [replica, setReplica] = useState<DocumentReplica | null>(null);
   const [busy, setBusy] = useState(false);
@@ -21,17 +19,39 @@ export function App() {
   const replicaRef = useRef<DocumentReplica | null>(null);
   const openRef = useRef<OpenBudgetInfo | null>(null);
 
-  const refreshLibrary = useCallback(async () => {
+  const openBudget = useCallback(async (id: string) => {
+    setBusy(true);
     try {
-      setLibrary(await getBridge().listBudgets());
+      setOpenInfo(await getBridge().openBudget(id));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
     }
   }, []);
 
   useEffect(() => {
-    void refreshLibrary();
-  }, [refreshLibrary]);
+    const launch = (
+      globalThis as {
+        __suiteBudgetLaunch?: Promise<{
+          readonly kind: string;
+          readonly documentId?: string;
+        }>;
+      }
+    ).__suiteBudgetLaunch;
+    if (launch === undefined) return;
+    void launch
+      .then((context) => {
+        if (context.kind === "document" && typeof context.documentId === "string") {
+          void openBudget(context.documentId);
+        } else if (context.kind === "create") {
+          useUiStore.getState().setNewBudgetOpen(true);
+        }
+      })
+      .catch((cause: unknown) => {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      });
+  }, [openBudget]);
 
   useEffect(() => {
     openRef.current = openInfo;
@@ -73,30 +93,13 @@ export function App() {
     };
   }, [replica]);
 
-  const openBudget = useCallback(
-    async (id: string) => {
-      setBusy(true);
-      try {
-        const info = await getBridge().openBudget(id);
-        setOpenInfo(info);
-        await refreshLibrary();
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : String(cause));
-      } finally {
-        setBusy(false);
-      }
-    },
-    [refreshLibrary],
-  );
-
   const closeBudget = useCallback(async () => {
     try {
       await getBridge().closeBudget();
     } finally {
       setOpenInfo(null);
-      await refreshLibrary();
     }
-  }, [refreshLibrary]);
+  }, []);
 
   const createBudget = useCallback(
     async (input: CreateBudgetInput) => {
@@ -105,14 +108,13 @@ export function App() {
         const info = await getBridge().createBudget(input);
         useUiStore.getState().setNewBudgetOpen(false);
         setOpenInfo(info);
-        await refreshLibrary();
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
         setBusy(false);
       }
     },
-    [refreshLibrary],
+    [],
   );
 
   const importBudget = useCallback(async () => {
@@ -120,37 +122,12 @@ export function App() {
     try {
       const result = await getBridge().importBudget();
       if (result.opened) setOpenInfo(result.opened);
-      await refreshLibrary();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
     }
-  }, [refreshLibrary]);
-
-  const removeBudget = useCallback(
-    async (id: string) => {
-      try {
-        await getBridge().removeBudget(id);
-        await refreshLibrary();
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : String(cause));
-      }
-    },
-    [refreshLibrary],
-  );
-
-  const revealBudget = useCallback(async (id: string) => {
-    await getBridge().revealBudget(id);
   }, []);
-
-  const renameBudget = useCallback(
-    async (id: string, name: string) => {
-      await getBridge().renameBudget(id, name);
-      await refreshLibrary();
-    },
-    [refreshLibrary],
-  );
 
   const exportBudget = useCallback(async () => {
     if (!openRef.current) {
@@ -180,7 +157,6 @@ export function App() {
     const bridge = getBridge();
     const offOpened = bridge.onBudgetOpened((info) => {
       setOpenInfo(info);
-      void refreshLibrary();
     });
     const offCommand = bridge.onCommand((command) => {
       const ui = useUiStore.getState();
@@ -206,7 +182,7 @@ export function App() {
       offOpened();
       offCommand();
     };
-  }, [closeBudget, exportBudget, exportRecords, importBudget, refreshLibrary]);
+  }, [closeBudget, exportBudget, exportRecords, importBudget]);
 
   return (
     <>
@@ -218,17 +194,7 @@ export function App() {
             onExportRecords={(format) => void exportRecords(format)}
           />
         </WorkspaceContext.Provider>
-      ) : (
-        <BudgetLauncher
-          entries={library}
-          busy={busy}
-          onOpen={(id) => void openBudget(id)}
-          onImport={() => void importBudget()}
-          onRemove={(id) => void removeBudget(id)}
-          onReveal={(id) => void revealBudget(id)}
-          onRename={(id, name) => void renameBudget(id, name)}
-        />
-      )}
+      ) : null}
 
       <NewBudgetDialog
         open={newBudgetOpen}

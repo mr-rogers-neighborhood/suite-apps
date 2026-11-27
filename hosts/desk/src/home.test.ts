@@ -66,22 +66,26 @@ function widgetEntry(view: ScreenView, index: number): ScreenWidgetView {
 }
 
 describe("the default Home", () => {
-  it("is a Screen named Home with the host app grid", () => {
+  it("is an empty Screen named Home", () => {
     expect(defaultHomeScreen()).toEqual({
       format: "suite.screen",
       version: 2,
       id: HOME_SCREEN_ID,
       name: HOME_SCREEN_NAME,
-      widgets: [{ registryId: DESK_APPS_WIDGET, size: "full" }],
+      widgets: [],
     });
   });
 });
 
 describe("drawing a Screen", () => {
-  it("resolves the host app grid before the pack registry", () => {
+  it("still resolves the old host app grid for an existing Home", () => {
     const fakeDesk = pack("desk", "Not the host", [quickTask({ id: "apps", title: "Fake" })]);
     const registry = shellWidgetRegistry([fakeDesk]);
-    const view = screenView(defaultHomeScreen(), [fakeDesk], registry);
+    const oldHome = {
+      ...defaultHomeScreen(),
+      widgets: [{ registryId: DESK_APPS_WIDGET, size: "full" as const }],
+    };
+    const view = screenView(oldHome, [fakeDesk], registry);
 
     expect(view.widgets[0]).toMatchObject({
       registryId: DESK_APPS_WIDGET,

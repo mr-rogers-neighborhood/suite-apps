@@ -11,9 +11,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("suiteShell", {
   state: () => ipcRenderer.invoke("suite:shell:state"),
+  chromeHeight: (height) => ipcRenderer.invoke("suite:shell:chrome-height", height),
   openPack: (packId) => ipcRenderer.invoke("suite:shell:open-pack", packId),
   activateTab: (tabId) => ipcRenderer.invoke("suite:shell:activate-tab", tabId),
   closeTab: (tabId) => ipcRenderer.invoke("suite:shell:close-tab", tabId),
+  tabMenu: (tabId) => ipcRenderer.invoke("suite:shell:tab-menu", tabId),
   newTab: () => ipcRenderer.invoke("suite:shell:new-tab"),
   home: () => ipcRenderer.invoke("suite:shell:home"),
   picker: () => ipcRenderer.invoke("suite:shell:picker"),
@@ -21,10 +23,14 @@ contextBridge.exposeInMainWorld("suiteShell", {
     ipcRenderer.invoke("suite:shell:open-document", packId, documentId),
   newDocument: (packId) => ipcRenderer.invoke("suite:shell:new-document", packId),
   reloadTab: (tabId) => ipcRenderer.invoke("suite:shell:reload-tab", tabId),
+  packMenuAction: (action) => ipcRenderer.invoke("suite:shell:pack-menu-action", action),
   openExternal: (url) => ipcRenderer.invoke("suite:shell:open-external", url),
   installPack: () => ipcRenderer.invoke("suite:shell:install-pack"),
   installCataloguePack: (id, version) =>
     ipcRenderer.invoke("suite:shell:install-catalogue-pack", id, version),
+  installFirstRunPack: (id) => ipcRenderer.invoke("suite:shell:install-first-run-pack", id),
+  completeFirstRun: () => ipcRenderer.invoke("suite:shell:complete-first-run"),
+  setTheme: (choice) => ipcRenderer.invoke("suite:shell:set-theme", choice),
   reaskConsent: (packId, capability) =>
     ipcRenderer.invoke("suite:shell:reask-consent", packId, capability),
   importRevocation: () => ipcRenderer.invoke("suite:shell:import-revocation"),
@@ -66,5 +72,8 @@ contextBridge.exposeInMainWorld("suiteShell", {
   },
   onPick: (listener) => {
     ipcRenderer.on("suite:shell:pick", () => listener());
+  },
+  onOpenSettings: (listener) => {
+    ipcRenderer.on("suite:shell:open-settings", (_event, section) => listener(section));
   },
 });

@@ -1,6 +1,7 @@
+import type { MenuSlots } from "@suite/contracts";
 import type { SyncSituation } from "@suite/ui";
 import type { HostTab } from "@suite/ui/chrome";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import type { RelayView, ShellTab } from "../../shared.js";
 
 /**
@@ -17,6 +18,8 @@ export interface HostBarSnapshot {
   /** The command surface is a host-owned dialog; the trigger reports its state. */
   readonly commandOpen: boolean;
   readonly relay: RelayView;
+  /** The active pack's bar material, or null for a Screen tab or a pack that published none. */
+  readonly packMenu: MenuSlots | null;
 }
 
 export interface SyncPresentation {
@@ -54,6 +57,33 @@ export function toHostTabs(tabs: readonly ShellTab[]): readonly HostTab[] {
     kind: tab.kind,
     icon: tabIcon(tab),
   }));
+}
+
+/**
+ * Decide whether the active pack published a row at all.
+ *
+ * A pack can publish only its document name and no controls. Treating that as "nothing"
+ * silently dropped the title, so all three zones count as material.
+ */
+export function toHostPack(zones: {
+  readonly context?: ReactNode;
+  readonly navigation: ReactNode | null;
+  readonly actions?: ReactNode;
+}):
+  | {
+      readonly context?: ReactNode;
+      readonly navigation: ReactNode;
+      readonly actions?: ReactNode;
+    }
+  | undefined {
+  if (zones.navigation === null && zones.actions === undefined && zones.context === undefined) {
+    return undefined;
+  }
+  return {
+    ...(zones.context === undefined ? {} : { context: zones.context }),
+    navigation: zones.navigation,
+    ...(zones.actions === undefined ? {} : { actions: zones.actions }),
+  };
 }
 
 /** The relay lifecycle as the shared pill names it. */

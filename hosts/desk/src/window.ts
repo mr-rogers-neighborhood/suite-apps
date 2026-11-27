@@ -1,8 +1,17 @@
 import { join } from "node:path";
+import type { MenuSlotAction, MenuSlots } from "@suite/contracts";
 import { originKey } from "@suite/desktop";
 import { SUITE_PUBLISHER_ID } from "@suite/pack";
 import { isWidgetRegistryId } from "@suite/screens";
-import { app, BaseWindow, session, shell, WebContentsView } from "electron";
+import {
+  app,
+  BaseWindow,
+  Menu,
+  type MenuItemConstructorOptions,
+  session,
+  shell,
+  WebContentsView,
+} from "electron";
 import { clearCommandEntries } from "./commandInvocation.js";
 import { DEFAULT_CONTAINER_ID } from "./container.js";
 import { LAUNCHER_CONTEXT, parseSuiteLink } from "./deepLink.js";
@@ -29,9 +38,11 @@ import {
   type CatalogueEntry,
   CHROME_ORIGIN,
   CHROME_PICK,
+  CHROME_SETTINGS,
   CHROME_STATE,
   type InstalledVersionView,
   PACK_EVENT,
+  PACK_IPC,
   type PackLaunchContext,
   type PackShellTab,
   type PickerData,
@@ -42,7 +53,7 @@ import {
   type ThemeView,
 } from "./shared.js";
 import type { SpaceState, SpaceStore } from "./spaces.js";
-import { paintThemeSurface } from "./theme.js";
+import { paintThemeSurface, themeOptions } from "./theme.js";
 
 /**
  * What a pack calls one of its documents.
@@ -59,8 +70,8 @@ function packNoun(pack: PackInfo): { readonly singular: string; readonly plural:
   return null;
 }
 
-/** The chrome's own height. The chrome page uses the same number in its stylesheet. */
-export const TAB_BAR_HEIGHT = 56;
+/** The chrome's own height: the shared menu bar's 44px. The chrome page uses the same number. */
+export const TAB_BAR_HEIGHT = 44;
 
 const configuredPartitions = new Set<string>();
 
@@ -101,6 +112,14 @@ export class ShellWindow {
     string,
     { readonly packId: string; readonly documentId: string }
   >();
+  /**
+   * The bar material each pack published, keyed by tab.
+   *
+   * Kept per tab rather than as one value so switching tabs restores each pack's own bar
+   * immediately, without waiting for the pack to render and publish again. Cleared with the
+   * tab, so a closed pack cannot leave its title behind on the next one.
+   */
+  readonly #packMenus = new Map<string, MenuSlots>();
   readonly #listDocuments: (
     packId: string,
   ) => Promise<readonly { readonly id: string; readonly name: string }[]>;
@@ -110,6 +129,7 @@ export class ShellWindow {
     readonly openedAt: number;
   }[];
   #theme: ThemeView;
+  #firstRun: boolean;
   #notice: string | null = null;
   #reminderStatus: string | null = null;
   #relay: RelayView = {
@@ -123,6 +143,14 @@ export class ShellWindow {
     lastError: null,
   };
   #closed = false;
+  /**
+   * How tall the chrome actually is right now.
+   *
+   * The host bar is one row on a Screen and two when a pack has material to show, and each
+   * row follows the density scale. The renderer measures the bar and reports the number, so
+   * pack views sit under whatever the bar really occupies instead of a fixed 44px.
+   */
+  #chromeHeight = TAB_BAR_HEIGHT;
 
   constructor(options: {
     readonly packs: readonly PackInfo[];
@@ -132,6 +160,7 @@ export class ShellWindow {
     readonly spaces: SpaceStore;
     readonly screens: ScreenSet;
     readonly theme: ThemeView;
+    readonly firstRun?: boolean;
     readonly relay?: RelayView;
     readonly containerId?: string;
     /** The pack's documents, read from the store on each picker open. */
@@ -158,7 +187,9 @@ export class ShellWindow {
     this.#recentRows = options.recentRows ?? (() => []);
     this.#onViewClosed = options.onViewClosed;
     this.#theme = options.theme;
+    this.#firstRun = options.firstRun ?? false;
     this.#relay = options.relay ?? this.#relay;
+    const canvas = options.theme.values["--canvas"] ?? "#1b1917";
 
     this.window = new BaseWindow({
       width: 1280,
@@ -167,7 +198,10 @@ export class ShellWindow {
       minHeight: 520,
       show: false,
       title: "Suite Desk",
-      backgroundColor: "#0b0d12",
+      backgroundColor: canvas,
+      // The bar is the visible menu; the template stays installed so its accelerators
+      // (⌘W, ⌘K, ⌘S) keep working. Planner and Budget already hide the native band.
+      autoHideMenuBar: true,
     });
 
     this.#chrome = new WebContentsView({
@@ -180,7 +214,7 @@ export class ShellWindow {
         spellcheck: false,
       },
     });
-    this.#chrome.setBackgroundColor("#0b0d12");
+    this.#chrome.setBackgroundColor(canvas);
     this.window.contentView.addChildView(this.#chrome);
     this.window.on("resize", () => this.#layout());
     this.window.on("closed", () => {
@@ -230,6 +264,7 @@ export class ShellWindow {
       tabs: spaceState.tabs,
       activeTabId: spaceState.activeTabId,
       surface: shellSurface(spaceState),
+      firstRun: this.#firstRun,
       screens: this.#screenViews(spaceState),
       screenList: this.#screens.summaries().map((screen) => ({
         id: screen.id,
@@ -255,9 +290,14 @@ export class ShellWindow {
       catalogueSource: this.#catalogueSource,
       installedVersions: this.#installedVersions,
       theme: this.#theme,
+      themeChoices: themeOptions().map((theme) => ({ id: theme.id, name: theme.name })),
       notice: this.#notice,
       reminderStatus: this.#reminderStatus,
       relay: this.#relay,
+      packMenu:
+        spaceState.activeTabId === null
+          ? null
+          : (this.#packMenus.get(spaceState.activeTabId) ?? null),
     };
   }
 
@@ -306,6 +346,26 @@ export class ShellWindow {
     if (pack === undefined) {
       this.#notice = `No pack named ${packId} is installed.`;
       this.broadcast();
+      return;
+    }
+
+    // A document pack is never opened on its own start page: the host owns the picker.
+    // An ordinary open is the most recent document, then any document, then a new one.
+    if (launch.kind === "launcher" && (pack.documents?.length ?? 0) > 0) {
+      const recent = this.#recentRows()
+        .filter((row) => row.packId === packId)
+        .sort((left, right) => right.openedAt - left.openedAt)[0];
+      if (recent !== undefined) {
+        await this.openDocument(packId, recent.documentId);
+        return;
+      }
+      const documents = await this.#listDocuments(packId).catch(() => []);
+      const first = documents[0];
+      if (first !== undefined) {
+        await this.openDocument(packId, first.id);
+        return;
+      }
+      await this.newDocument(packId);
       return;
     }
 
@@ -469,6 +529,16 @@ export class ShellWindow {
       return;
     }
 
+    // The wizard is the only surface until the host records completion. Keeping a restored
+    // pack view hidden means an upgrade cannot show a pack over setup with no tab strip to
+    // leave it. Completion activates the tab that is current again.
+    if (this.#firstRun) {
+      this.#hideViews();
+      this.#chrome.webContents.focus();
+      this.broadcast();
+      return;
+    }
+
     // A screen tab is host chrome, not a pack view. The chrome page draws the
     // composition in the same content area; hiding every pack view is what makes it
     // visible, because a pack view is layered over that area.
@@ -504,6 +574,7 @@ export class ShellWindow {
     const next = await this.#spaces.closeTab(tabId);
     this.#launchContexts.delete(tabId);
     this.#tabDocuments.delete(tabId);
+    this.#packMenus.delete(tabId);
     const view = this.#views.get(tabId);
     if (view !== undefined) {
       this.#views.delete(tabId);
@@ -669,6 +740,61 @@ export class ShellWindow {
     this.broadcast();
   }
 
+  /**
+   * The context menu for one tab.
+   *
+   * A Screen tab can become Home; a pack tab can reload. Both close, and Close is the menu's
+   * last item so the destructive choice is not where a hurried click lands first.
+   */
+  showTabMenu(tabId: string): void {
+    const tab = this.#spaces.state().tabs.find((entry) => entry.id === tabId);
+    if (tab === undefined) return;
+    const items: MenuItemConstructorOptions[] = [];
+
+    if (tab.kind === "screen") {
+      const isHome = tab.screenId === this.#screens.homeId;
+      items.push({
+        label: isHome ? "This is Home" : "Set as Home",
+        enabled: !isHome,
+        click: () => {
+          void this.setHomeScreen(tab.screenId);
+        },
+      });
+    } else {
+      items.push({
+        label: "Reload Tab",
+        click: () => {
+          this.reloadTab(tab.id);
+        },
+      });
+    }
+
+    items.push(
+      {
+        label: "Settings…",
+        click: () => {
+          this.openSettings(tab.kind === "screen" ? "home" : "appearance");
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Close Tab",
+        accelerator: process.platform === "darwin" ? "Cmd+W" : "Ctrl+W",
+        click: () => {
+          void this.closeTab(tab.id);
+        },
+      },
+    );
+
+    Menu.buildFromTemplate(items).popup({ window: this.window });
+  }
+
+  /** Ask the chrome to draw Settings; the page owns the surface and its section. */
+  openSettings(section?: "appearance" | "home" | "packs"): void {
+    if (this.#closed) return;
+    this.#chrome.webContents.send(CHROME_SETTINGS, section ?? null);
+  }
+
   /** Keep a renamed Screen's tab title in step with its document. */
   async #retitleScreenTab(screenId: string): Promise<void> {
     const screen = this.#screens.screen(screenId);
@@ -689,12 +815,61 @@ export class ShellWindow {
     this.broadcast();
   }
 
+  /**
+   * Hold the bar material one pack published.
+   *
+   * The value was validated at the IPC boundary; this records it against the tab the
+   * sender was mapped to and repaints the chrome. Only the active tab's slots reach the
+   * bar, so a background pack publishing does not move the bar.
+   */
+  setPackMenu(tabId: string, slots: MenuSlots): void {
+    this.#packMenus.set(tabId, slots);
+    this.broadcast();
+  }
+
+  /**
+   * Send a press on the bar back to the pack that published the control.
+   *
+   * The host never interprets the id, so it stays the pack's own word for its own
+   * behaviour. A view that is gone, or a pack that published nothing, simply gets nothing:
+   * a stale press is not an error worth a notice.
+   */
+  packMenuAction(tabId: string, action: MenuSlotAction): void {
+    const view = this.#views.get(tabId);
+    if (view === undefined || view.webContents.isDestroyed()) return;
+    view.webContents.send(PACK_IPC.menuAction, action);
+  }
+
   setTheme(theme: ThemeView): void {
     this.#theme = theme;
+    const canvas = theme.values["--canvas"] ?? "#1b1917";
+    this.window.setBackgroundColor(canvas);
+    this.#chrome.setBackgroundColor(canvas);
+    for (const view of this.#views.values()) view.setBackgroundColor(canvas);
     this.broadcast();
     // A theme is host state, so every open pack moves with it instead of waiting for a
     // reload. The chrome is repainted by the broadcast above.
     for (const [tabId, view] of this.#views) this.#paintPackTheme(tabId, view);
+  }
+
+  setFirstRun(firstRun: boolean): void {
+    if (this.#firstRun === firstRun) return;
+    this.#firstRun = firstRun;
+    if (!firstRun) {
+      // Completion may have opened Home behind the wizard, or a restored/deep-linked pack may
+      // still be the active tab. Activating it now is what paints a view for the first time.
+      const active = this.#spaces.state().activeTabId;
+      if (active !== null) {
+        void this.activateTab(active).catch((error: unknown) => {
+          console.warn("[desk] could not activate the tab after first run", error);
+          // The onboarding write already succeeded; reveal the chrome even if the saved
+          // tab cannot be painted, rather than leaving the wizard up with no way forward.
+          this.broadcast();
+        });
+        return;
+      }
+    }
+    this.broadcast();
   }
 
   /**
@@ -794,7 +969,7 @@ export class ShellWindow {
       },
     });
     const webContentsId = view.webContents.id;
-    view.setBackgroundColor("#0b0d12");
+    view.setBackgroundColor(this.#theme.values["--canvas"] ?? "#1b1917");
     this.window.contentView.addChildView(view);
     this.#views.set(tab.id, view);
     setPackSender(webContentsId, {
@@ -837,6 +1012,10 @@ export class ShellWindow {
       // A reload or a same-origin navigation replaces the document that held
       // the tab's locks. Same-document navigation keeps that page alive.
       if (!navigationReleasesLocks(details.isMainFrame, details.isSameDocument)) return;
+      // The bar's material belonged to the document that is being replaced. Dropping it
+      // now means the bar shows the host's own zones until the new page publishes, rather
+      // than keeping the previous page's controls live over a page they cannot reach.
+      this.#packMenus.delete(tab.id);
       this.#onViewClosed?.(tab.id);
     });
     view.webContents.on("render-process-gone", (_event, details) => {
@@ -866,10 +1045,25 @@ export class ShellWindow {
     if (this.#closed) return;
     const { width, height } = this.window.getContentBounds();
     this.#chrome.setBounds({ x: 0, y: 0, width, height });
-    const contentHeight = Math.max(0, height - TAB_BAR_HEIGHT);
+    const contentHeight = Math.max(0, height - this.#chromeHeight);
     for (const view of this.#views.values()) {
-      view.setBounds({ x: 0, y: TAB_BAR_HEIGHT, width, height: contentHeight });
+      view.setBounds({ x: 0, y: this.#chromeHeight, width, height: contentHeight });
     }
+  }
+
+  /**
+   * Report the chrome's measured height.
+   *
+   * The bar is one row on a Screen and two when the active pack published material, and
+   * the rows follow density, so the main process cannot assume 44px. The chrome page is
+   * trusted host code; the value is still clamped to a sane band.
+   */
+  setChromeHeight(height: number): void {
+    if (!Number.isFinite(height)) return;
+    const next = Math.min(Math.max(Math.round(height), 0), 240);
+    if (next === this.#chromeHeight) return;
+    this.#chromeHeight = next;
+    this.#layout();
   }
 
   #hideViews(): void {

@@ -7,11 +7,21 @@
  * import is visible in review.
  */
 export {
+  FirstRun,
+  type FirstRunInstall,
+  type FirstRunPack,
+  type FirstRunProps,
+  type FirstRunRow,
+  type FirstRunStep,
+  type FirstRunTheme,
+} from "./FirstRun.js";
+export {
   HostTabBar,
   type HostTab,
   type HostTabBarProps,
   type HostTabKind,
 } from "./HostTabBar.js";
+export { packMenuZones, type PackMenuZones } from "./PackMenuSlots.js";
 export {
   NewTabPicker,
   type NewTabPack,

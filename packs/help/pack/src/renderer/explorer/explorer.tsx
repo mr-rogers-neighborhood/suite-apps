@@ -674,7 +674,7 @@ export function Explorer() {
       >
         <div id="explorer-main" className="relative flex h-full min-h-0 flex-col">
           {error ? (
-            <div className="p-4 text-sm text-red-500 sm:p-8">
+            <div className="p-4 text-sm text-danger sm:p-8">
               The index could not be loaded: {error}. Run <code>pnpm docs:index</code>.
             </div>
           ) : !data ? (
@@ -738,7 +738,7 @@ export function Explorer() {
             type="button"
             aria-label="Dismiss navigator"
             onClick={() => setSidebarOpen(false)}
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-[color-mix(in_srgb,var(--ink)_35%,transparent)]"
           />
           <aside
             id="explorer-sidebar"
@@ -780,7 +780,7 @@ function OverlayCard({
       aria-live="polite"
       className={`absolute bottom-12 left-3 right-3 z-20 max-h-[45%] overflow-y-auto rounded-xl border p-3 shadow-lg sm:left-auto sm:w-96 ${
         overlay.tone === "warning"
-          ? "border-amber-500/40 bg-amber-500/10"
+          ? "border-warning/40 bg-warning/10"
           : "border-fd-border bg-fd-background"
       }`}
     >

@@ -161,6 +161,20 @@ Recorded 2026-11-25.
 - Host-only chrome is the `@suite/ui/chrome` subpath (`HostTabBar`, `NewTabPicker`). A pack imports
   the pack-safe `@suite/ui` entry; Desk and Go import the subpath. The package exports make the
   boundary visible in review, and `src/chrome/boundary.test.ts` fails if a pack crosses it.
+- **A host that skips preflight owes the controls its own reset.** The shared components are Tailwind
+  class names, so a host must give Tailwind their source, and Desk's legacy page cannot take the
+  unlayered preflight that Go and the packs import. The first version skipped preflight and replaced
+  nothing, so the island kept the browser's control defaults — an outset tab button, a grey Sync pill,
+  an underlined brand link — and only Storybook, which has preflight, looked right. The host declares
+  the small reset it needs (`button`/`input`/`select`/`textarea` unstyled, no anchor underline) in the
+  `base` layer, below `utilities` and below the unlayered legacy rules, so a control that styles
+  itself still wins. A workbench story is not proof a host renders correctly; the proof run is.
+- **The host's theme sheet is `!important`, and that is the contract.** A pack ships its own `:root`
+  fallbacks so it is legible before the host paints it. Electron's `insertCSS` is ordinary author CSS,
+  so it loses to the pack's own `:root` on source order and the shipped palette won for every installed
+  pack. The resolved sheet therefore declares every role and scale value `!important`; anything less
+  is a pack that silently ignores the host's theme. Go does not share the bug because it paints inline
+  style properties on the frame's root, which already outrank the document.
 - A new tab asks two questions: which surface, then which document. The picker lists the five most
   recent documents first and opens a pack's second level when it declares documents; a pack that
   declares none opens directly. The word for a document is the pack's (`name.singular` /

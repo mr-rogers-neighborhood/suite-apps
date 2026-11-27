@@ -38,6 +38,7 @@ export { Modal, type ModalProps } from "./Modal.js";
 export { MenuBar, type MenuBarProps } from "./menu/MenuBar.js";
 export { focusFirstMenuItem, handleMenuBarKeyDown, menuBarKeyDown, menuItemsIn, menuKeyDown, } from "./menu/menuKeys.js";
 export { SyncPill, type SyncPillProps, type SyncSituation } from "./menu/SyncPill.js";
+export { type MenuBarBridge, menuBarBridge, useMenuAction, useMenuSlots, } from "./menu/useMenuSlots.js";
 export { PrivacyLine, type PrivacyLineProps } from "./PrivacyLine.js";
 export { TextInput, type TextInputProps } from "./TextInput.js";
 export { Toast, type ToastNotice, type ToastProps } from "./Toast.js";

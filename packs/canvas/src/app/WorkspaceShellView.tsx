@@ -49,9 +49,11 @@ import { readRecentWorkspaces, workspaceUrl } from "../session/workspaceTransfer
 import { LoadingPlaceholder } from "../shell/LoadingPlaceholder";
 import type { SyncInfo } from "../store/useCanvasStore";
 import { type LibraryTab, useUiStore } from "../store/useUiStore";
+import { menuBarBridge, type MenuBarBridge } from "@suite/ui";
 import { viewsEnabled } from "../views/availability";
 import { ViewsLayer } from "../views/ViewsLayer";
 import { AppearanceHost } from "./AppearanceHost";
+import { useCanvasMenuBar } from "./menuBar";
 import { BlueprintInstallHost } from "./BlueprintInstallHost";
 import { HistoryPanelHost } from "./HistoryPanelHost";
 import { documentLabel } from "./workspacePaint";
@@ -285,6 +287,14 @@ export function WorkspaceShellView({
     y: number;
   } | null>(null);
   const [syncOpen, setSyncOpen] = useState(false);
+  /**
+   * The host's bar bridge, when this canvas is running inside one.
+   *
+   * Read once: a host either drives this page for its whole life or it does not. Under a
+   * host the canvas draws no `TitleBar` and publishes the same material through slots
+   * instead, so there is exactly one bar on screen.
+   */
+  const [hosted] = useState<MenuBarBridge | null>(() => menuBarBridge(globalThis));
   // Read from the document rather than the projection. A board created through
   // the portal flow reached the document (the portal rendered it) but never
   // reached `snapshot.boards`, so the switcher offered one board and the other
@@ -326,6 +336,22 @@ export function WorkspaceShellView({
     return counts;
   }, [snapshot.placements]);
 
+  // The bar material, published to the host instead of drawn here.
+  useCanvasMenuBar(hosted, {
+    boards,
+    activeBoardId,
+    title: workspaceName,
+    readOnly,
+    canCreateBoards,
+    historyOpen,
+    outlineOpen,
+    onSelectBoard: activateBoard,
+    onNewBoard: createBoard,
+    onToggleHistory: toggleHistory,
+    onToggleOutline: toggleOutline,
+    onOpenSearch: () => setPaletteOpen(true),
+  });
+
   return (
     <SurfacePaintProvider.Provider value={{ palette, roles, mode }}>
       <div
@@ -334,7 +360,8 @@ export function WorkspaceShellView({
         data-ready={ready && synced}
         data-leaving={leaving ? "true" : undefined}
       >
-        <TitleBar
+        {hosted === null ? (
+          <TitleBar
           onNavigateHome={requestLeave}
           onOpenSearch={() => setPaletteOpen(true)}
           // A build with no main process has no transport at all, so "Syncing" would be a
@@ -538,6 +565,7 @@ export function WorkspaceShellView({
             </>
           ) : null}
         </TitleBar>
+        ) : null}
 
         <main
           ref={boardRef}

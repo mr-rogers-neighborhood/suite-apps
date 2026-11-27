@@ -1,18 +1,14 @@
 import type { SuiteTheme } from "../theme.js";
 /**
- * Warm — warm charcoal, amber accent.
+ * Warm — warm paper, near-black ink and one burnt-orange accent.
  *
- * Not a copy of Logseq's stylesheet, and named for the resemblance rather than the source: a
- * warm near-neutral background with a single amber accent is the thing being borrowed, not
- * specific hex values. It is here because the suite's own palette is a cool grey, and a
- * reader who likes a warm dark theme had no way to say so.
+ * The palette borrows Sunsama's warm paper field and the Heptabase habit of letting one warm
+ * mark carry the action. The six hues stay distinguishable for sections and charts; they are
+ * muted so the accent is still the loudest colour on the page. The light variant is paper, not
+ * white, so the two modes read as one theme.
  *
- * The id used to be `logseq`, after the app it resembles. The display name was always "Warm",
- * so the id now agrees with the name; `THEME_ID_ALIASES` in `./index.ts` keeps an existing
- * stored selection on this palette rather than on a missing theme.
- *
- * The light variant is the same warmth at daylight: a paper tone rather than white, so the
- * two modes read as one theme instead of a dark theme with a light fallback.
+ * The id used to be `logseq`. `THEME_ID_ALIASES` keeps an existing stored selection on this
+ * id rather than on a missing theme.
  */
 export declare const warm: SuiteTheme;
 //# sourceMappingURL=warm.d.ts.map

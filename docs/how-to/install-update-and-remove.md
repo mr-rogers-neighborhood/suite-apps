@@ -30,10 +30,11 @@ same unpacked tree into the local store.
 
 ## Install a pack
 
-Home's `desk.apps` widget shows the catalogue. A trusted entry offers **Install**, **Update** or
-**Reinstall** as its state requires; a refused entry stays visible with the sentence that explains it
-and cannot be installed. A `.suitepack` file can also be opened on its own. Removing a pack leaves its
-documents and files on disk until the person removes them.
+The catalogue is **Settings → Packs**, and the same installed-pack and catalogue widget can be added
+to a Screen from **Edit**. A trusted entry offers **Install**, **Update** or **Reinstall** as its
+state requires; a refused entry stays visible with the sentence that explains it and cannot be
+installed. A `.suitepack` file can also be opened on its own. Removing a pack leaves its documents
+and files on disk until the person removes them.
 
 ## Install a frozen Flatpak
 

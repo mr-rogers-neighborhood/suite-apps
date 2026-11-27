@@ -13,4 +13,10 @@ import { afterEach } from "vitest";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// jsdom has no layout, so it does not implement `scrollIntoView`. Chrome uses it to keep the
+// active tab in view; without a stub every render of `HostTabBar` throws.
+if (typeof Element.prototype.scrollIntoView !== "function") {
+	Element.prototype.scrollIntoView = () => {};
+}
+
 afterEach(() => cleanup());

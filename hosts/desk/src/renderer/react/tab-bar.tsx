@@ -1,9 +1,18 @@
-import { SyncPill } from "@suite/ui";
-import { HostTabBar, NewTabPicker } from "@suite/ui/chrome";
+import type { MenuSlotAction } from "@suite/contracts";
+import { AppMark, SyncPill } from "@suite/ui";
+import {
+  FirstRun,
+  type FirstRunInstall,
+  type FirstRunPack,
+  type FirstRunTheme,
+  HostTabBar,
+  NewTabPicker,
+  packMenuZones,
+} from "@suite/ui/chrome";
 import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { PickerData } from "../../shared.js";
-import { type HostBarSnapshot, syncPresentation, toHostTabs } from "./state.js";
+import { type HostBarSnapshot, syncPresentation, toHostPack, toHostTabs } from "./state.js";
 import "./tab-bar.css";
 
 export { colorFor } from "./state.js";
@@ -28,12 +37,18 @@ export interface PickerBridge {
 export interface TabBarActions {
   readonly activate: (id: string) => void;
   readonly close: (id: string) => void;
+  /** The host's context menu for one tab: Set as Home, Reload, Close. */
+  readonly tabMenu: (id: string) => void;
   /** A new tab is the picker: which surface, and which document inside it. */
   readonly newTab: () => void;
   readonly home: () => void;
   readonly picker: PickerBridge;
+  /** Open the host Settings surface, optionally on one section. */
+  readonly settings: (section?: string) => void;
   readonly openCommands: () => void;
   readonly toggleSync: () => void;
+  /** Send a press on the pack's zones back to the pack that published them. */
+  readonly packMenuAction: (action: MenuSlotAction) => void;
 }
 
 export interface TabBarHandle {
@@ -60,6 +75,12 @@ function TabBar({
   const sync = syncPresentation(snapshot.relay);
   const [pickOpen, setPickOpen] = useState(false);
   const [picker, setPicker] = useState<PickerData | null>(null);
+
+  // The active pack's zones. A pack that published nothing, or a Screen tab, leaves the
+  // bar with only the host's own material: `toHostPack` returns undefined and the bar is
+  // not given a pack at all, so no row is drawn for it. A pack that published only its
+  // document name still gets a row.
+  const pack = toHostPack(packMenuZones(snapshot.packMenu, actions.packMenuAction));
 
   const openPicker = useCallback(async () => {
     setPickOpen(true);
@@ -101,15 +122,18 @@ function TabBar({
         activeTabId={snapshot.activeTabId}
         onActivate={actions.activate}
         onClose={actions.close}
+        onTabMenu={actions.tabMenu}
         onNewTab={actions.newTab}
         mark={
-          <span className="flex min-h-6 items-center gap-2">
-            <span className="brand-mark" aria-hidden="true" />
+          <span className="flex items-center gap-2">
+            <AppMark viewBox="0 0 24 24" paths={["M12 2 22 12 12 22 2 12z"]} />
             <span>Suite</span>
           </span>
         }
         onHome={actions.home}
         homeLabel="Home"
+        {...(pack === undefined ? {} : { pack })}
+        packKey={snapshot.activeTabId ?? "none"}
         search={
           <button
             type="button"
@@ -122,7 +146,7 @@ function TabBar({
             aria-keyshortcuts="Meta+K Control+K"
             title={`${SEARCH_PLACEHOLDER} (${SEARCH_SHORTCUT})`}
             onClick={actions.openCommands}
-            className="flex h-7 w-56 shrink-0 items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas)]"
+            className="command-bar flex h-7 max-w-sm min-w-[88px] flex-1 items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] px-2 text-[length:var(--text-label,12px)] text-[var(--ink-muted)] transition-colors duration-[var(--duration-base,150ms)] ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas)]"
           >
             <svg
               aria-hidden="true"
@@ -135,12 +159,12 @@ function TabBar({
               <circle cx="7" cy="7" r="4.5" />
               <path d="m10.5 10.5 3 3" />
             </svg>
-            <span className="min-w-0 flex-1 truncate text-left">
-              {SEARCH_PLACEHOLDER}{" "}
-              <kbd className="rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)]">
-                {SEARCH_SHORTCUT}
-              </kbd>
+            <span className="command-bar__label min-w-0 flex-1 truncate text-left @max-3xl:hidden">
+              {SEARCH_PLACEHOLDER}
             </span>
+            <kbd className="command-bar__key hidden shrink-0 rounded-sm border border-[var(--hairline)] px-1 py-0.5 text-[length:var(--text-caption,11px)] @min-5xl:inline">
+              {SEARCH_SHORTCUT}
+            </kbd>
           </button>
         }
         sync={
@@ -171,10 +195,9 @@ function TabBar({
           setPickOpen(false);
           actions.picker.newScreen();
         }}
-        onOpenSettings={() => {
+        onOpenSettings={(section) => {
           setPickOpen(false);
-          // Settings has no surface yet; Home is where appearance and the catalogue live today.
-          actions.home();
+          actions.settings(section);
         }}
       />
     </>
@@ -193,6 +216,40 @@ export function mountTabBar(container: HTMLElement, actions: TabBarActions): Tab
     },
     showPicker() {
       open?.();
+    },
+    unmount() {
+      root.unmount();
+    },
+  };
+}
+
+export interface FirstRunActions {
+  readonly packs: readonly FirstRunPack[];
+  readonly theme: FirstRunTheme;
+  readonly onThemeChange: (theme: FirstRunTheme) => void;
+  readonly onInstall: (id: string) => Promise<FirstRunInstall>;
+  readonly onComplete: () => void;
+}
+
+export interface FirstRunHandle {
+  update(packs: readonly FirstRunPack[], theme: FirstRunTheme): void;
+  unmount(): void;
+}
+
+/** Mount the first-run wizard once; the shell hands it the catalogue and the theme on paint. */
+export function mountFirstRun(container: HTMLElement, actions: FirstRunActions): FirstRunHandle {
+  const root = createRoot(container);
+  return {
+    update(packs, theme) {
+      root.render(
+        <FirstRun
+          packs={packs}
+          theme={theme}
+          onThemeChange={actions.onThemeChange}
+          onInstall={actions.onInstall}
+          onComplete={actions.onComplete}
+        />,
+      );
     },
     unmount() {
       root.unmount();

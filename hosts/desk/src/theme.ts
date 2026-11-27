@@ -5,6 +5,8 @@ import {
   cssVariables,
   DEFAULT_DENSITY,
   DEFAULT_THEME_ID,
+  DENSITIES,
+  type Density,
   defaultTheme,
   PRESETS,
   presetById,
@@ -31,17 +33,24 @@ export interface HostThemeChoice {
   /** A preset id from `@suite/theme`. */
   readonly preset: string;
   readonly mode: ThemeSource;
+  /** How much room controls and lists get; the type scale is separate. */
+  readonly density: Density;
 }
 
 export const DEFAULT_THEME_CHOICE: HostThemeChoice = {
   preset: DEFAULT_THEME_ID,
   mode: "system",
+  density: DEFAULT_DENSITY,
 };
 
 const THEME_FILENAME = "theme.json";
 
 export function isThemeSource(value: unknown): value is ThemeSource {
   return value === "system" || value === "light" || value === "dark";
+}
+
+export function isDensity(value: unknown): value is Density {
+  return typeof value === "string" && (DENSITIES as readonly string[]).includes(value);
 }
 
 /**
@@ -59,7 +68,9 @@ export function presetFor(id: string | null | undefined): string {
 export function isHostThemeChoice(value: unknown): value is HostThemeChoice {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.preset === "string" && isThemeSource(record.mode);
+  return (
+    typeof record.preset === "string" && isThemeSource(record.mode) && isDensity(record.density)
+  );
 }
 
 /** The palette list the dropdown shows, in the order the package lists it. */
@@ -78,10 +89,12 @@ export async function loadThemeChoice(dataRoot: string): Promise<HostThemeChoice
     const raw = JSON.parse(await readFile(join(dataRoot, THEME_FILENAME), "utf8")) as {
       preset?: unknown;
       mode?: unknown;
+      density?: unknown;
     };
     return {
       preset: presetFor(typeof raw.preset === "string" ? raw.preset : null),
       mode: isThemeSource(raw.mode) ? raw.mode : DEFAULT_THEME_CHOICE.mode,
+      density: isDensity(raw.density) ? raw.density : DEFAULT_THEME_CHOICE.density,
     };
   } catch {
     return DEFAULT_THEME_CHOICE;
@@ -117,7 +130,10 @@ export function resolveThemeView(choice: HostThemeChoice, shouldUseDarkColors: b
   return {
     preset: preset.id,
     mode,
+    source: choice.mode,
+    density: choice.density,
     values: { ...cssVariables(preset, mode) },
+    scale: { ...scaleVariables(choice.density) },
   };
 }
 
@@ -133,13 +149,19 @@ export function resolveThemeView(choice: HostThemeChoice, shouldUseDarkColors: b
  * The sheet is complete on the first injection. A pack reload resolves the same choice again
  * and receives the same values, so there is no first paint that has the colours but not the
  * scale.
+ *
+ * Every declaration is `!important`, and that is the point rather than laziness. A pack ships
+ * its own `:root` fallback so it is legible before the host paints it, and an inserted sheet is
+ * ordinary author CSS: it loses to the pack's own `:root` on source order, whichever origin
+ * Electron inserts it in. Without `!important` a shipped pack keeps drawing its fallback
+ * palette and the host's theme never reaches the app.
  */
 export function themeCss(theme: ThemeView): string {
-  const variables = { ...theme.values, ...scaleVariables(DEFAULT_DENSITY) };
+  const variables = { ...theme.values, ...theme.scale };
   const declarations = Object.entries(variables)
-    .map(([name, value]) => `${name}: ${value};`)
+    .map(([name, value]) => `${name}: ${value} !important;`)
     .join(" ");
-  return `:root { color-scheme: ${theme.mode}; ${declarations} }`;
+  return `:root { color-scheme: ${theme.mode} !important; ${declarations} }`;
 }
 
 /**
@@ -188,6 +210,7 @@ export function themeAttributesScript(theme: ThemeView): string {
     "const root = document.documentElement;",
     `root.dataset.theme = ${JSON.stringify(theme.preset)};`,
     `root.dataset.themeMode = ${JSON.stringify(theme.mode)};`,
+    `root.dataset.density = ${JSON.stringify(theme.density)};`,
     `root.classList.toggle("dark", ${theme.mode === "dark" ? "true" : "false"});`,
     `root.style.colorScheme = ${JSON.stringify(theme.mode)};`,
     "})();",

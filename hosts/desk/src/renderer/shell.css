@@ -1,25 +1,25 @@
 :root {
   color-scheme: dark;
-  --canvas: #0b0d12;
-  --surface: #141821;
-  --surface-sunk: #0f131b;
-  --surface-strong: #1d2430;
-  --accent: #7c9cff;
-  --accent-strong: #5f86ff;
-  --ink: #e9edf7;
-  --ink-muted: #a8b1c4;
-  --ink-faint: #6f7a8f;
-  --hairline: #242b38;
-  --border-strong: #354055;
-  --focus: #9db4ff;
-  --on-accent: #0b0d12;
-  --hue-blue: #7c9cff;
-  --hue-green: #6fd39a;
-  --hue-amber: #e7c46c;
-  --hue-rose: #e79ab3;
-  --hue-violet: #b79bff;
-  --hue-slate: #9aa7bd;
-  --tabbar: 56px;
+  --canvas: #1b1917;
+  --surface: #24211e;
+  --surface-sunk: #12100e;
+  --surface-strong: #2c2824;
+  --accent: #f3efe9;
+  --accent-strong: #ffffff;
+  --ink: #f3efe9;
+  --ink-muted: #b7afa5;
+  --ink-faint: #9c9388;
+  --hairline: #36312b;
+  --border-strong: #8a8072;
+  --focus: #f3efe9;
+  --on-accent: #1b1917;
+  --hue-blue: #8db8d9;
+  --hue-green: #9ccf9e;
+  --hue-amber: #e8b87a;
+  --hue-rose: #e7a0a6;
+  --hue-violet: #c0a6e0;
+  --hue-slate: #a79d8f;
+  --tabbar: 44px;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -39,16 +39,28 @@ body {
 }
 
 /*
- * The tab strip is a React island now. It keeps the legacy bar's height while the
- * rest of the chrome is still the vanilla page, so the Screen layout below does
- * not move; the token goes away with the last of shell.css.
+ * The tab strip is a React island now. Its first row follows the shared menu bar's
+ * height, which follows density; the optional pack row sits under it and the renderer
+ * reports the total to the main process so pack views stay below both.
  */
 #host-bar {
   flex: 0 0 auto;
 }
 
 #host-bar header {
-  height: var(--tabbar);
+  height: var(--menu-bar-height, var(--tabbar));
+}
+
+#first-run {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: block;
+  padding: 16px;
+}
+
+#first-run[hidden] {
+  display: none;
 }
 
 body {
@@ -81,6 +93,25 @@ body {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
+
+  /* Element defaults for the vanilla Screen. The first-run island sets its own type with
+     utilities, which must win over these. */
+  h1 {
+    margin: 0;
+    max-width: 760px;
+    font-size: clamp(28px, 3.4vw, 40px);
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+  }
 }
 
 .visually-hidden {
@@ -95,22 +126,21 @@ body {
   border: 0;
 }
 
-.brand-mark {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  background:
-    radial-gradient(circle at 30% 25%, #ffffff 0 8%, transparent 9%),
-    linear-gradient(135deg, var(--accent), var(--hue-violet));
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
-}
-
 .content {
   flex: 1 1 auto;
   overflow: auto;
   background:
-    radial-gradient(1100px 520px at 12% -10%, rgb(124 156 255 / 16%), transparent 60%),
-    radial-gradient(900px 420px at 90% 0%, rgb(183 155 255 / 10%), transparent 55%), var(--canvas);
+    radial-gradient(
+      1100px 520px at 12% -10%,
+      color-mix(in srgb, var(--accent) 10%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 420px at 90% 0%,
+      color-mix(in srgb, var(--hue-amber) 8%, transparent),
+      transparent 55%
+    ),
+    var(--canvas);
 }
 
 .screen {
@@ -137,14 +167,6 @@ body {
   font-weight: 650;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-h1 {
-  margin: 0;
-  max-width: 760px;
-  font-size: clamp(28px, 3.4vw, 40px);
-  line-height: 1.08;
-  letter-spacing: -0.035em;
 }
 
 .lede {
@@ -178,7 +200,7 @@ h1 {
   padding: 10px 12px;
   border: 1px solid var(--hue-amber);
   border-radius: 10px;
-  background: rgb(231 196 108 / 9%);
+  background: color-mix(in srgb, var(--hue-amber) 9%, transparent);
   color: var(--ink);
   font-size: 13px;
 }
@@ -188,7 +210,7 @@ h1 {
   padding: 12px 14px;
   border: 1px dashed var(--border-strong);
   border-radius: 12px;
-  background: rgb(124 156 255 / 5%);
+  background: color-mix(in srgb, var(--hue-blue) 5%, transparent);
 }
 
 .edit-add {
@@ -238,12 +260,21 @@ h1 {
   border-color: var(--focus);
 }
 
+/*
+ * Three sizes that actually differ.
+ *
+ * In a two-column grid, `span 2` *is* the whole row, so `2x1` and `full` rendered
+ * identically and one of the three sizes was decorative. A `2x1` now means "two columns
+ * wide and two rows tall" — a large square tile — and `full` keeps the whole row at one
+ * row's height. That is what the names have been promising all along.
+ */
 .widget-full {
   grid-column: 1 / -1;
 }
 
 .widget-2x1 {
   grid-column: span 2;
+  grid-row: span 2;
 }
 
 .widget-1x1 {
@@ -414,10 +445,16 @@ h1 {
 .search input:focus {
   border-color: var(--focus);
   outline: none;
-  box-shadow: 0 0 0 3px rgb(157 180 255 / 18%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
 }
 
-section {
+/*
+ * Spacing between the pieces of a widget's own body. It used to be a bare `section` rule,
+ * which also matched every `.widget` and `.widget-row` tile — the widgets are `<section>`
+ * elements — and added 28px of margin *inside* a 14px grid. The widgets grid now sets its
+ * own spacing, so this only applies to a section that is not a tile.
+ */
+section:not(.widget):not(.widget-row):not(.home-empty) {
   margin-top: 28px;
 }
 
@@ -430,15 +467,6 @@ section {
   align-items: baseline;
   gap: 10px;
   margin-bottom: 12px;
-}
-
-h2 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
 }
 
 .count {
@@ -632,7 +660,7 @@ h2 {
   padding: 7px 9px;
   border: 1px solid var(--hue-rose);
   border-radius: 8px;
-  background: rgb(231 154 179 / 9%);
+  background: color-mix(in srgb, var(--hue-rose) 9%, transparent);
   color: var(--ink-muted);
   font-size: 12px;
   line-height: 1.4;
@@ -683,6 +711,38 @@ h2 {
 
 .empty-state h1 {
   font-size: clamp(28px, 3.4vw, 40px);
+}
+
+.home-empty {
+  /* It is appended inside the widgets grid, so it has to claim the whole row: without
+     this the empty Home occupied one of two columns and centred itself in half the page. */
+  grid-column: 1 / -1;
+  max-width: 720px;
+  margin: 48px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-empty h2 {
+  margin: 0;
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.home-empty .lede {
+  margin: 0;
+}
+
+.home-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 @media (max-width: 760px) {
@@ -895,7 +955,7 @@ h2 {
   display: grid;
   place-items: start center;
   padding: 32px 16px;
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  background: color-mix(in srgb, var(--canvas) 72%, transparent);
   backdrop-filter: blur(3px);
 }
 
@@ -957,7 +1017,7 @@ h2 {
 
 .command-mode[aria-pressed="true"] {
   background: var(--ink);
-  color: var(--bg);
+  color: var(--canvas);
 }
 
 .command-close {
@@ -987,7 +1047,7 @@ h2 {
   padding: 6px 8px;
   border: 1px solid var(--hairline);
   border-radius: 8px;
-  background: var(--bg);
+  background: var(--canvas);
   color: var(--ink);
   font: inherit;
 }
@@ -998,7 +1058,7 @@ h2 {
   padding: 11px 12px;
   border: 1px solid var(--hairline);
   border-radius: 10px;
-  background: var(--bg);
+  background: var(--canvas);
   color: var(--ink);
   font: inherit;
   font-size: 15px;
@@ -1035,7 +1095,7 @@ h2 {
 
 .command-result[aria-selected="true"] {
   border-color: var(--hairline);
-  background: var(--bg);
+  background: var(--canvas);
 }
 
 .command-result-source {
@@ -1090,7 +1150,7 @@ h2 {
 
 .command-item:hover {
   border-color: var(--hairline);
-  background: var(--bg);
+  background: var(--canvas);
 }
 
 .command-item-done {
@@ -1114,4 +1174,118 @@ h2 {
 
 .command-foot span {
   flex: 1 1 auto;
+}
+
+/* Host Settings. Appearance, Home and the catalogue in one surface. */
+
+.settings-box {
+  width: min(860px, 100%);
+  max-height: min(80vh, 720px);
+}
+
+.settings-head h1 {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: clamp(22px, 2.4vw, 28px);
+  letter-spacing: -0.02em;
+}
+
+.settings-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.settings-nav button {
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-nav button:hover {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+.settings-nav button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--surface-strong);
+  color: var(--ink);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-section[hidden] {
+  display: none;
+}
+
+.settings-section h2 {
+  margin: 10px 0 0;
+  color: var(--ink);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.settings-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-choice.is-selected {
+  border-color: var(--accent);
+  background: var(--surface-strong);
+}
+
+.settings-note {
+  max-width: 64ch;
+  margin: 6px 0 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.settings-screens {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-screen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.settings-screen-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-screen-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
