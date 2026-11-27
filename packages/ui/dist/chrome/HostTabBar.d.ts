@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import type { PackMenuControl } from "./PackMenuSlots.js";
 /**
  * The host's tab strip on the shared `MenuBar`.
  *
@@ -60,6 +61,11 @@ export interface HostTabBarProps {
         readonly context?: ReactNode;
         readonly navigation: ReactNode;
         readonly actions?: ReactNode;
+        /**
+         * The same material as a model, one entry per navigation control. When present,
+         * `HostTabBar` can fold the controls that do not fit into its own `…` menu.
+         */
+        readonly controls?: readonly PackMenuControl[];
     };
     /**
      * Identifies the active surface, so the pack row can play its entrance again when the

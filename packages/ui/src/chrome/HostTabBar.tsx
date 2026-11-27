@@ -12,6 +12,7 @@ import { cx } from "../cx.js";
 import { MenuBar } from "../menu/MenuBar.js";
 import { menuKeyDown } from "../menu/menuKeys.js";
 import { FOCUS_RING, MOTION, MOTION_ALL } from "../tokens.js";
+import type { PackMenuControl, PackMenuFoldRow } from "./PackMenuSlots.js";
 
 /**
  * The host's tab strip on the shared `MenuBar`.
@@ -76,6 +77,11 @@ export interface HostTabBarProps {
 		readonly context?: ReactNode;
 		readonly navigation: ReactNode;
 		readonly actions?: ReactNode;
+		/**
+		 * The same material as a model, one entry per navigation control. When present,
+		 * `HostTabBar` can fold the controls that do not fit into its own `…` menu.
+		 */
+		readonly controls?: readonly PackMenuControl[];
 	};
 	/**
 	 * Identifies the active surface, so the pack row can play its entrance again when the
@@ -87,6 +93,9 @@ export interface HostTabBarProps {
 }
 
 const SWITCH_WIDTH = 240;
+
+const FOLD_BOX =
+	"fixed z-50 overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-[var(--shadow-xl)] starting:scale-95 starting:opacity-0 motion-safe:transition-[opacity,transform] motion-safe:duration-[var(--duration-fast,100ms)] motion-safe:ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))]";
 
 /** A menu row: the switch list's one entry per open tab. */
 const SWITCH_ROW =
@@ -226,6 +235,60 @@ export function HostTabBar({
 			window.removeEventListener("scroll", onReposition, true);
 		};
 	}, [switchOpen, placeSwitch]);
+
+	const packControls = pack?.controls ?? [];
+	const foldControls = packControls.length > 1 ? packControls.slice(1) : [];
+	const foldTrigger = useRef<HTMLButtonElement | null>(null);
+	const foldMenu = useRef<HTMLDivElement | null>(null);
+	const [foldOpen, setFoldOpen] = useState(false);
+	const [foldAt, setFoldAt] = useState<{ left: number; top: number } | null>(null);
+
+	const placeFold = useCallback(() => {
+		const trigger = foldTrigger.current?.getBoundingClientRect();
+		if (trigger === undefined) return;
+		const width = 240;
+		const left = Math.max(8, Math.min(trigger.left, window.innerWidth - width - 8));
+		setFoldAt({ left, top: trigger.bottom + 4 });
+	}, []);
+
+	function closeFold(returnFocus: boolean) {
+		setFoldOpen(false);
+		setFoldAt(null);
+		if (returnFocus) foldTrigger.current?.focus();
+	}
+
+	useEffect(() => {
+		if (!foldOpen) return;
+		const target = foldMenu.current?.querySelector<HTMLElement>(
+			"[role='menuitem']:not([disabled]), [role='menuitemradio']:not([disabled]), [role='menuitemcheckbox']:not([disabled])",
+		);
+		target?.focus();
+
+		const onPointerDown = (event: PointerEvent) => {
+			const inside =
+				foldTrigger.current?.contains(event.target as Node) === true ||
+				foldMenu.current?.contains(event.target as Node) === true;
+			if (!inside) {
+				setFoldOpen(false);
+				setFoldAt(null);
+			}
+		};
+		const onReposition = () => placeFold();
+		window.addEventListener("pointerdown", onPointerDown, true);
+		window.addEventListener("resize", onReposition);
+		window.addEventListener("scroll", onReposition, true);
+		return () => {
+			window.removeEventListener("pointerdown", onPointerDown, true);
+			window.removeEventListener("resize", onReposition);
+			window.removeEventListener("scroll", onReposition, true);
+		};
+	}, [foldOpen, placeFold]);
+
+	function foldRowName(row: PackMenuFoldRow): string {
+		if (row.role === "choice") return "menuitemradio";
+		if (row.role === "toggle") return "menuitemcheckbox";
+		return "menuitem";
+	}
 
 	const rowOne = (
 		<div className="flex min-w-0 flex-1 items-center gap-2">
@@ -397,19 +460,127 @@ export function HostTabBar({
 					data-testid={`${testId}-pack`}
 					data-handbook-region="pack-bar"
 					className={cx(
-						"flex h-[var(--control-height,36px)] shrink-0 items-center gap-2 border-t border-[var(--hairline)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] px-4 text-[length:var(--text-label,12px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md starting:translate-y-1 starting:opacity-0",
+						"@container flex h-[var(--control-height,36px)] shrink-0 items-center gap-2 border-t border-[var(--hairline)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] px-4 text-[length:var(--text-label,12px)] text-[var(--ink)] shadow-[inset_0_-1px_0_var(--hairline)] backdrop-blur-md starting:translate-y-1 starting:opacity-0",
 						MOTION_ALL,
 					)}
 				>
 					<div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 						{pack.context}
-						{pack.navigation}
+						{packControls.length === 0
+							? pack.navigation
+							: packControls.map((control, index) => (
+									<div
+										key={control.key}
+										className={cx(
+											"flex shrink-0 items-center",
+											// Below the row's own width, everything after the
+											// first control moves into the `…` menu. The nodes
+											// stay mounted but not rendered, so no control is
+											// lost and no pack React is touched.
+											index > 0 && foldControls.length > 0
+												? "@max-5xl:hidden"
+												: undefined,
+										)}
+									>
+										{control.node}
+									</div>
+								))}
+						{foldControls.length === 0 ? null : (
+							<div className="hidden shrink-0 @max-5xl:flex">
+								<button
+									ref={foldTrigger}
+									type="button"
+									aria-haspopup="menu"
+									aria-expanded={foldOpen}
+									aria-label="More controls"
+									title="More controls"
+									onClick={() => {
+										if (!foldOpen) placeFold();
+										setFoldOpen(!foldOpen);
+									}}
+									className={cx(
+										"flex h-7 w-7 items-center justify-center rounded-md text-[length:var(--text-body,13px)] text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]",
+										MOTION,
+										FOCUS_RING,
+									)}
+								>
+									<span aria-hidden="true">{"\u22ef"}</span>
+								</button>
+							</div>
+						)}
 					</div>
 					{pack.actions === undefined ? null : (
 						<div className="flex shrink-0 items-center gap-1">{pack.actions}</div>
 					)}
 				</div>
 			)}
+			{foldOpen && foldAt !== null
+				? createPortal(
+						<div
+							ref={foldMenu}
+							role="menu"
+							aria-label="More controls"
+							className={FOLD_BOX}
+							style={{ left: foldAt.left, top: foldAt.top, minWidth: SWITCH_WIDTH }}
+							onKeyDown={(event) => {
+								if (event.key === "Escape") {
+									event.preventDefault();
+									closeFold(true);
+									return;
+								}
+								menuKeyDown(event);
+							}}
+						>
+							{foldControls.map((control) => (
+								<div key={control.key} role="group" aria-label={control.label}>
+									{control.rows.map((row) => (
+										<button
+											key={row.key}
+											type="button"
+											role={foldRowName(row)}
+											aria-checked={
+												row.role === "command" ? undefined : row.checked === true
+											}
+											disabled={row.disabled === true}
+											title={row.disabledReason ?? row.description ?? row.label}
+											data-slot-id={row.key}
+											onClick={() => {
+												closeFold(true);
+												row.choose();
+											}}
+											className={cx(
+												"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[length:var(--text-label,12px)] text-[var(--ink-muted)] outline-none hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)] disabled:opacity-40",
+												MOTION,
+												FOCUS_RING,
+											)}
+										>
+											<span
+												aria-hidden="true"
+												className="w-3 shrink-0 text-[var(--accent)]"
+											>
+												{row.checked === true ? "\u2713" : ""}
+											</span>
+											{row.glyph === undefined ? null : (
+												<span aria-hidden="true" className="shrink-0">
+													{row.glyph}
+												</span>
+											)}
+											<span className="min-w-0 flex-1">
+												<span className="block truncate">{row.label}</span>
+												{row.description === undefined ? null : (
+													<span className="block truncate text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
+														{row.description}
+													</span>
+												)}
+											</span>
+										</button>
+									))}
+								</div>
+							))}
+						</div>,
+						document.body,
+					)
+				: null}
 			{switchOpen && switchAt !== null
 				? createPortal(
 						<div

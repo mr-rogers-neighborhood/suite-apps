@@ -8,7 +8,7 @@
  */
 export { FirstRun, type FirstRunInstall, type FirstRunPack, type FirstRunProps, type FirstRunRow, type FirstRunStep, type FirstRunTheme, } from "./FirstRun.js";
 export { HostTabBar, type HostTab, type HostTabBarProps, type HostTabKind, } from "./HostTabBar.js";
-export { packMenuZones, type PackMenuZones } from "./PackMenuSlots.js";
+export { packMenuZones, type PackMenuControl, type PackMenuFoldRow, type PackMenuZones, } from "./PackMenuSlots.js";
 export { NewTabPicker, type NewTabPack, type NewTabPickerProps, type NewTabScreen, } from "./NewTabPicker.js";
 export { PackCard, type PackCardProps, type PackStatus, } from "./PackCard.js";
 export { PackRail, type PackRailAction, type PackRailDetail, type PackRailPack, type PackRailProps, type PackRailScreenshot, } from "./PackRail.js";

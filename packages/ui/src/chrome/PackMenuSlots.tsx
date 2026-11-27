@@ -6,7 +6,7 @@ import type {
 	MenuSlots,
 	MenuStatus,
 } from "@suite/contracts";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../cx.js";
 import { menuKeyDown } from "../menu/menuKeys.js";
@@ -44,6 +44,8 @@ export interface PackMenuZones {
 	readonly navigation: React.ReactNode | null;
 	/** The pack's actions and status readout. */
 	readonly actions?: React.ReactNode;
+	/** The navigation controls in order, each with an inline node and folded rows. */
+	readonly controls: readonly PackMenuControl[];
 }
 
 const ROW =
@@ -52,6 +54,42 @@ const CONTROL =
 	"flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[length:var(--text-label,12px)]";
 const MENU_BOX =
 	"fixed z-50 overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface)] p-1 shadow-[var(--shadow-xl)] starting:scale-95 starting:opacity-0 motion-safe:transition-[opacity,transform] motion-safe:duration-[var(--duration-fast,100ms)] motion-safe:ease-[var(--ease-standard,cubic-bezier(0.4,0,0.2,1))]";
+
+const TONE: Record<MenuStatus["tone"], string> = {
+	quiet: "text-[var(--ink-faint)]",
+	ok: "text-[var(--ink-muted)]",
+	warn: "text-[var(--warning)]",
+	danger: "text-[var(--danger)]",
+};
+
+/**
+ * One row of the host's overflow menu for a pack row that does not fit.
+ *
+ * The fold menu is the host's own surface: a pack publishes descriptors, the host decides
+ * where they go. `choose` closes over the pack's published id, so the host still never
+ * learns what the row means.
+ */
+export interface PackMenuFoldRow {
+	readonly key: string;
+	readonly label: string;
+	readonly glyph?: string;
+	readonly description?: string;
+	readonly role: "command" | "choice" | "toggle";
+	readonly checked?: boolean;
+	readonly disabled?: boolean;
+	readonly disabledReason?: string;
+	/** A heading for the rows of one control, when the menu mixes controls. */
+	readonly group?: string;
+	readonly choose: () => void;
+}
+
+/** One takeover control, with both its inline node and its folded rows. */
+export interface PackMenuControl {
+	readonly key: string;
+	readonly label: string;
+	readonly node: ReactNode;
+	readonly rows: readonly PackMenuFoldRow[];
+}
 
 /** A small dropdown, opened from one control in the takeover row. */
 function SlotMenu({
@@ -214,8 +252,13 @@ function SlotMenu({
 										>
 											{item.checked === true ? "\u2713" : ""}
 										</span>
-										<span className="min-w-0 flex-1 truncate">
-											{item.label}
+										<span className="min-w-0 flex-1">
+											<span className="block truncate">{item.label}</span>
+											{item.description === undefined ? null : (
+												<span className="block truncate text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
+													{item.description}
+												</span>
+											)}
 										</span>
 										{item.shortcut === undefined ? null : (
 											<kbd className="shrink-0 text-[length:var(--text-caption,11px)] text-[var(--ink-faint)]">
@@ -322,6 +365,10 @@ function SlotToggle({
 	label,
 	pressed,
 	glyph,
+	value,
+	tone,
+	disabled,
+	disabledReason,
 	title,
 	help,
 	onChoose,
@@ -330,28 +377,42 @@ function SlotToggle({
 	readonly label: string;
 	readonly pressed: boolean;
 	readonly glyph?: string | undefined;
+	readonly value?: string | undefined;
+	readonly tone?: MenuStatus["tone"] | undefined;
+	readonly disabled?: boolean | undefined;
+	readonly disabledReason?: string | undefined;
 	readonly title?: string | undefined;
 	readonly help?:
 		| { readonly title: string; readonly body?: string }
 		| undefined;
 	readonly onChoose: (action: MenuSlotAction) => void;
 }) {
+	const valueTone =
+		disabled === true
+			? "text-[var(--ink-faint)]"
+			: pressed
+				? "text-[var(--on-accent)]"
+				: TONE[tone ?? "quiet"];
 	return (
 		<button
 			type="button"
 			aria-pressed={pressed}
-			aria-label={label}
+			aria-disabled={disabled === true ? true : undefined}
+			disabled={disabled === true}
 			// The pack's own sentence, when it wrote one, is the better description: it is the
-			// text an explainer would say, so showing it on hover makes the two agree.
-			title={title ?? help?.body ?? help?.title ?? label}
+			// text an explainer would say, so showing it on hover makes the two agree. A refusal
+			// wins, because it explains a control that cannot be used at all.
+			title={disabledReason ?? title ?? help?.body ?? help?.title ?? label}
 			data-slot-id={id}
 			data-slot-pressed={pressed ? "true" : "false"}
+			data-slot-value={value}
 			onClick={() => onChoose({ id })}
 			className={cx(
 				CONTROL,
 				pressed
 					? "bg-[var(--accent)] text-[var(--on-accent)]"
 					: "text-[var(--ink-muted)] hover:bg-[var(--surface-sunk)] hover:text-[var(--ink)]",
+				disabled === true ? "opacity-40" : undefined,
 				MOTION,
 				FOCUS_RING,
 			)}
@@ -364,7 +425,107 @@ function SlotToggle({
 			{/* A mode keeps its word. An icon alone leaves "which mode" to a guess, and the
 			    plan's vocabulary is icon + label + aria-pressed. */}
 			<span className="min-w-0 truncate">{label}</span>
+			{value === undefined ? null : (
+				<span
+					className={cx(
+						"shrink-0 text-[length:var(--text-caption,11px)] tabular-nums",
+						valueTone,
+					)}
+				>
+					{value}
+				</span>
+			)}
 		</button>
+	);
+}
+
+/**
+ * A small closed set, drawn as one segmented control.
+ *
+ * It is a `radiogroup`, not a row of pressed buttons: exactly one option is chosen, and
+ * arrows move through it with the same roving tab stop the tab list uses.
+ */
+function SlotSegmented({
+	id,
+	label,
+	value,
+	options,
+	help,
+	onChoose,
+}: {
+	readonly id: string;
+	readonly label: string;
+	readonly value: string;
+	readonly options: readonly {
+		readonly id: string;
+		readonly label: string;
+	}[];
+	readonly help?:
+		| { readonly title: string; readonly body?: string }
+		| undefined;
+	readonly onChoose: (action: MenuSlotAction) => void;
+}) {
+	const buttons = useRef(new Map<string, HTMLButtonElement>());
+	const activeIndex = options.findIndex((option) => option.id === value);
+
+	function moveTo(index: number) {
+		if (options.length === 0) return;
+		const next = options[(index + options.length) % options.length];
+		if (next === undefined) return;
+		buttons.current.get(next.id)?.focus();
+		onChoose({ id, item: next.id });
+	}
+
+	return (
+		<div
+			role="radiogroup"
+			aria-label={label}
+			title={help?.body ?? help?.title ?? label}
+			className="flex shrink-0 items-center gap-0.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-sunk)] p-0.5"
+		>
+			{options.map((option, index) => {
+				const selected = option.id === value;
+				return (
+					<button
+						key={option.id}
+						ref={(node) => {
+							if (node === null) buttons.current.delete(option.id);
+							else buttons.current.set(option.id, node);
+						}}
+						type="button"
+						role="radio"
+						aria-checked={selected}
+						tabIndex={selected || (activeIndex < 0 && index === 0) ? 0 : -1}
+						data-slot-id={id}
+						data-slot-item={option.id}
+						onClick={() => onChoose({ id, item: option.id })}
+						onKeyDown={(event) => {
+							const keys: Record<string, number> = {
+								ArrowRight: index + 1,
+								ArrowLeft: index - 1,
+								Home: 0,
+								End: options.length - 1,
+							};
+							const target = keys[event.key];
+							if (target === undefined) return;
+							event.preventDefault();
+							event.stopPropagation();
+							moveTo(target);
+						}}
+						className={cx(
+							"flex h-6 shrink-0 items-center rounded-[var(--radius-sm)] px-2 text-[length:var(--text-caption,11px)]",
+							selected
+								? "bg-[var(--surface)] text-[var(--ink)]"
+								: "text-[var(--ink-muted)] hover:text-[var(--ink)]",
+							MOTION,
+							FOCUS_RING,
+						)}
+					>
+						{option.label}
+					</button>
+				);
+			})}
+		</div>
 	);
 }
 
@@ -411,24 +572,162 @@ function SlotButtons({
 	);
 }
 
-const TONE: Record<MenuStatus["tone"], string> = {
-	quiet: "text-[var(--ink-faint)]",
-	ok: "text-[var(--ink-muted)]",
-	warn: "text-[var(--warning)]",
-	danger: "text-[var(--danger)]",
-};
+/** Build the inline node and the fold rows for one published control. */
+function renderControl(
+	control: MenuNavControl,
+	onChoose: (action: MenuSlotAction) => void,
+): PackMenuControl {
+	switch (control.kind) {
+		case "menu": {
+			const node = (
+				<SlotMenu
+					id={control.id}
+					label={control.label}
+					items={control.items}
+					onChoose={onChoose}
+				/>
+			);
+			const rows = control.items.map(
+				(item): PackMenuFoldRow => ({
+					key: `${control.id}.${item.id}`,
+					label: item.label,
+					...(item.description === undefined
+						? {}
+						: { description: item.description }),
+					role: item.checked === undefined ? "command" : "choice",
+					...(item.checked === undefined ? {} : { checked: item.checked }),
+					...(item.disabled === true ? { disabled: true } : {}),
+					...(item.disabledReason === undefined
+						? {}
+						: { disabledReason: item.disabledReason }),
+					group: control.label,
+					choose: () => onChoose({ id: control.id, item: item.id }),
+				}),
+			);
+			return { key: control.id, label: control.label, node, rows };
+		}
+		case "tabs": {
+			const node = (
+				<SlotTabs
+					id={control.id}
+					label={control.label}
+					items={control.items}
+					onChoose={onChoose}
+				/>
+			);
+			const rows = control.items.map(
+				(item): PackMenuFoldRow => ({
+					key: `${control.id}.${item.id}`,
+					label: item.label,
+					role: "choice",
+					checked: item.active,
+					group: control.label,
+					choose: () => onChoose({ id: control.id, item: item.id }),
+				}),
+			);
+			return { key: control.id, label: control.label, node, rows };
+		}
+		case "toggle": {
+			const node = (
+				<SlotToggle
+					id={control.id}
+					label={control.label}
+					pressed={control.pressed}
+					glyph={control.glyph}
+					value={control.value}
+					tone={control.tone}
+					disabled={control.disabled}
+					disabledReason={control.disabledReason}
+					title={control.title}
+					help={control.help}
+					onChoose={onChoose}
+				/>
+			);
+			const rows: PackMenuFoldRow[] = [
+				{
+					key: control.id,
+					label:
+						control.value === undefined
+							? control.label
+							: `${control.label} (${control.value})`,
+					...(control.glyph === undefined ? {} : { glyph: control.glyph }),
+					...(control.disabledReason === undefined
+						? {}
+						: { disabledReason: control.disabledReason }),
+					role: "toggle",
+					checked: control.pressed,
+					...(control.disabled === true ? { disabled: true } : {}),
+					...(control.help?.title === undefined
+						? {}
+						: { group: control.help.title }),
+					choose: () => onChoose({ id: control.id }),
+				},
+			];
+			return { key: control.id, label: control.label, node, rows };
+		}
+		case "buttons": {
+			const node = <SlotButtons buttons={control.items} onChoose={onChoose} />;
+			const rows = control.items.map(
+				(item): PackMenuFoldRow => ({
+					key: item.id,
+					label: item.label,
+					...(item.glyph === undefined ? {} : { glyph: item.glyph }),
+					role: item.pressed === undefined ? "command" : "toggle",
+					...(item.pressed === undefined ? {} : { checked: item.pressed }),
+					...(item.disabled === true ? { disabled: true } : {}),
+					...(item.title === undefined ? {} : { description: item.title }),
+					...(control.help?.title === undefined
+						? {}
+						: { group: control.help.title }),
+					choose: () => onChoose({ id: item.id }),
+				}),
+			);
+			return {
+				key: control.id,
+				label: control.help?.title ?? "Actions",
+				node,
+				rows,
+			};
+		}
+		case "segmented": {
+			const node = (
+				<SlotSegmented
+					id={control.id}
+					label={control.label}
+					value={control.value}
+					options={control.options}
+					help={control.help}
+					onChoose={onChoose}
+				/>
+			);
+			const rows = control.options.map(
+				(option): PackMenuFoldRow => ({
+					key: `${control.id}.${option.id}`,
+					label: option.label,
+					role: "choice",
+					checked: option.id === control.value,
+					group: control.label,
+					choose: () => onChoose({ id: control.id, item: option.id }),
+				}),
+			);
+			return { key: control.id, label: control.label, node, rows };
+		}
+	}
+}
 
 /**
- * Turn the pack's publication into the three zones the bar has room for.
+ * Turn the pack's publication into the zones the bar has room for.
  *
  * Returned as nodes rather than rendered in place, so `HostTabBar` keeps ownership of the
  * bar's layout: the host decides where a zone sits, and a pack only decides what is in it.
+ * `controls` is the same material as a model, which is what lets the host fold a row that
+ * does not fit without reaching into a pack's React tree.
  */
 export function packMenuZones(
 	slots: MenuSlots | null,
 	onChoose: (action: MenuSlotAction) => void,
 ): PackMenuZones {
-	if (slots === null) return { navigation: null };
+	if (slots === null) return { navigation: null, controls: [] };
 
 	const context =
 		slots.title === null ? null : (
@@ -442,56 +741,15 @@ export function packMenuZones(
 			</div>
 		);
 
+	const controls = slots.navigation.map((control) => renderControl(control, onChoose));
 	const navigation =
-		slots.navigation.length === 0 ? null : (
-		<div className="flex min-w-0 flex-initial items-center gap-1">
-			{slots.navigation.map((control: MenuNavControl) => {
-				switch (control.kind) {
-					case "menu":
-						return (
-							<SlotMenu
-								key={control.id}
-								id={control.id}
-								label={control.label}
-								items={control.items}
-								onChoose={onChoose}
-							/>
-						);
-					case "tabs":
-						return (
-							<SlotTabs
-								key={control.id}
-								id={control.id}
-								label={control.label}
-								items={control.items}
-								onChoose={onChoose}
-							/>
-						);
-					case "toggle":
-						return (
-							<SlotToggle
-								key={control.id}
-								id={control.id}
-								label={control.label}
-								pressed={control.pressed}
-								glyph={control.glyph}
-								title={control.title}
-								help={control.help}
-								onChoose={onChoose}
-							/>
-						);
-					case "buttons":
-						return (
-							<SlotButtons
-								key={control.id}
-								buttons={control.items}
-								onChoose={onChoose}
-							/>
-						);
-				}
-			})}
-		</div>
-	);
+		controls.length === 0 ? null : (
+			<div className="flex min-w-0 flex-initial items-center gap-1">
+				{controls.map((control) => (
+					<Fragment key={control.key}>{control.node}</Fragment>
+				))}
+			</div>
+		);
 
 	const status =
 		slots.status === undefined ? null : (
@@ -547,6 +805,7 @@ export function packMenuZones(
 	return {
 		...(context === null ? {} : { context }),
 		navigation,
+		controls,
 		...(actions === null ? {} : { actions }),
 	};
 }

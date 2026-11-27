@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { HostTabBar, type HostTab } from "./HostTabBar.js";
 import { packMenuZones } from "./PackMenuSlots.js";
@@ -93,5 +93,69 @@ describe("the host's one bar", () => {
     expect(header).toContainElement(screen.getByText("Suite"));
     expect(header).toContainElement(screen.getByText("Local only"));
     expect(header).toContainElement(screen.getByRole("button", { name: "Settings" }));
+  });
+});
+
+describe("a pack row that does not fit", () => {
+  const full = packMenuZones(
+    {
+      format: "suite.menu-slots",
+      title: "Autumn plan",
+      navigation: [
+        {
+          kind: "menu",
+          id: "planner.view",
+          label: "View",
+          items: [{ id: "planner.view.today", label: "Today", checked: true }],
+        },
+        {
+          kind: "buttons",
+          id: "planner.history",
+          items: [
+            { id: "planner.undo", label: "Undo", glyph: "\u21b6" },
+            { id: "planner.export", label: "Export" },
+          ],
+        },
+      ],
+      actions: [],
+    },
+    onChoose,
+  );
+
+  function renderFull() {
+    onChoose.mockClear();
+    return render(
+      <HostTabBar tabs={tabs} activeTabId="planner" mark={<span>Suite</span>} pack={full} />,
+    );
+  }
+
+  it("moves the controls after the first into a More controls menu", () => {
+    renderFull();
+    fireEvent.click(screen.getByRole("button", { name: "More controls" }));
+
+    const menu = screen.getByRole("menu", { name: "More controls" });
+    expect(within(menu).getByRole("menuitem", { name: /Undo/u })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Export/u })).toBeInTheDocument();
+    // The first control stays inline and is not duplicated in the fold.
+    expect(within(menu).queryByRole("menuitem", { name: /Today/u })).not.toBeInTheDocument();
+  });
+
+  it("sends a folded press as the pack's own id", () => {
+    renderFull();
+    fireEvent.click(screen.getByRole("button", { name: "More controls" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Export/u }));
+
+    expect(onChoose).toHaveBeenCalledWith({ id: "planner.export" });
+  });
+
+  it("keeps the first control inline, and Escape returns focus to the trigger", () => {
+    renderFull();
+    expect(screen.getByRole("button", { name: "View" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "More controls" }));
+    fireEvent.keyDown(screen.getByRole("menu", { name: "More controls" }), { key: "Escape" });
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More controls" })).toHaveFocus();
   });
 });
