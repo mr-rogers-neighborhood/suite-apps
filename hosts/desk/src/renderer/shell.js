@@ -50,6 +50,7 @@ const elements = {
   importScreen: document.querySelector("#import-screen"),
   editBar: document.querySelector("#edit-bar"),
   widgetChoice: document.querySelector("#widget-choice"),
+  widgetSearch: document.querySelector("#widget-search"),
   addWidget: document.querySelector("#add-widget"),
   empty: document.querySelector("#empty"),
   openHome: document.querySelector("#open-home"),
@@ -128,6 +129,7 @@ let state = {
 let query = "";
 let editing = false;
 let managingScreens = false;
+let widgetQuery = "";
 let syncOpen = false;
 let tabBar = null;
 let firstRunWizard = null;
@@ -1339,42 +1341,189 @@ function appWidgetBody(widget) {
   return fragment;
 }
 
-function editControls(widget, index, total) {
+function sizeForCells(w, h) {
+  if (w >= 4) return "full";
+  if (w >= 2 && h >= 2) return "2x2";
+  if (w >= 2) return "2x1";
+  if (h >= 2) return "1x2";
+  return "1x1";
+}
+
+let pendingRemove = null;
+
+/** Remove asks once: a second press within four seconds is the confirmation. */
+function requestRemove(registryId, button) {
+  if (pendingRemove !== null) {
+    clearTimeout(pendingRemove.timer);
+    if (pendingRemove.registryId === registryId) {
+      pendingRemove = null;
+      runAction(api.removeWidget(registryId));
+      return;
+    }
+    pendingRemove.button.textContent = "Remove";
+    pendingRemove.button.classList.remove("action-confirm");
+  }
+  const timer = window.setTimeout(() => {
+    button.textContent = "Remove";
+    button.classList.remove("action-confirm");
+    if (pendingRemove?.registryId === registryId) pendingRemove = null;
+  }, 4000);
+  pendingRemove = { registryId, button, timer };
+  button.textContent = "Remove?";
+  button.classList.add("action-confirm");
+}
+
+function beginDrag(event, tile, widget) {
+  if (!editing || event.button !== 0) return;
+  const grid = elements.widgets;
+  const rect = grid.getBoundingClientRect();
+  if (rect.width === 0) return;
+  const cellW = rect.width / 4;
+  const cellH = tile.offsetHeight + 14;
+  const w = widget.w ?? 1;
+  const h = widget.h ?? 1;
+  const marker = element("div", "drop-marker");
+  marker.setAttribute("aria-hidden", "true");
+  grid.append(marker);
+  tile.classList.add("dragging");
+  let target = { x: widget.x ?? 0, y: widget.y ?? 0 };
+  let done = false;
+
+  const move = (moveEvent) => {
+    const x = Math.max(0, Math.min(4 - w, Math.round((moveEvent.clientX - rect.left) / cellW)));
+    const y = Math.max(0, Math.round((moveEvent.clientY - rect.top) / cellH));
+    target = { x, y };
+    marker.style.gridColumn = `${x + 1} / span ${w}`;
+    marker.style.gridRow = `${y + 1} / span ${h}`;
+  };
+  const end = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+    marker.remove();
+    tile.classList.remove("dragging");
+    if (target.x !== (widget.x ?? 0) || target.y !== (widget.y ?? 0)) {
+      runAction(api.placeWidget(widget.registryId, target.x, target.y));
+    }
+  };
+
+  move(event);
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
+  event.preventDefault();
+}
+
+function beginResize(event, tile, widget) {
+  if (!editing || event.button !== 0) return;
+  const grid = elements.widgets;
+  const rect = grid.getBoundingClientRect();
+  if (rect.width === 0) return;
+  const cellW = rect.width / 4;
+  const cellH = tile.offsetHeight + 14;
+  const x = widget.x ?? 0;
+  const y = widget.y ?? 0;
+  const marker = element("div", "drop-marker");
+  marker.setAttribute("aria-hidden", "true");
+  grid.append(marker);
+  tile.classList.add("dragging");
+  let target = widget.size;
+  let done = false;
+
+  const move = (moveEvent) => {
+    const w = Math.max(1, Math.min(4 - x, Math.round((moveEvent.clientX - rect.left) / cellW) - x));
+    const h = Math.max(1, Math.min(2, Math.round((moveEvent.clientY - rect.top) / cellH) - y));
+    target = sizeForCells(w, h);
+    marker.style.gridColumn = `${x + 1} / span ${w}`;
+    marker.style.gridRow = `${y + 1} / span ${h}`;
+  };
+  const end = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+    marker.remove();
+    tile.classList.remove("dragging");
+    if (target !== widget.size) runAction(api.resizeWidget(widget.registryId, target));
+  };
+
+  move(event);
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
+  event.preventDefault();
+}
+
+function editControls(widget, index, total, embedded, tile) {
   const controls = element("div", "widget-edit");
 
-  const earlier = actionButton("Move earlier", () =>
-    runAction(api.moveWidget(widget.registryId, "earlier")),
-  );
-  earlier.disabled = index === 0;
+  if (!embedded) {
+    const drag = actionButton("\u28ff", () => {}, "widget-drag");
+    drag.setAttribute("aria-label", `Move ${widget.title}`);
+    drag.title = "Drag to move";
+    drag.addEventListener("pointerdown", (event) => beginDrag(event, tile, widget));
+    controls.append(drag);
 
-  const later = actionButton("Move later", () =>
-    runAction(api.moveWidget(widget.registryId, "later")),
-  );
-  later.disabled = index === total - 1;
+    const earlier = actionButton("Move earlier", () =>
+      runAction(api.moveWidget(widget.registryId, "earlier")),
+    );
+    earlier.disabled = index === 0;
 
-  const size = actionButton(`Size: ${sizeLabel(widget.size)}`, () =>
-    runAction(api.resizeWidget(widget.registryId, nextSize(widget.size))),
-  );
+    const later = actionButton("Move later", () =>
+      runAction(api.moveWidget(widget.registryId, "later")),
+    );
+    later.disabled = index === total - 1;
+
+    const size = element("select", "widget-size-select");
+    size.setAttribute("aria-label", `Size for ${widget.title}`);
+    for (const optionSize of SIZES) {
+      const option = element("option", "", sizeLabel(optionSize));
+      option.value = optionSize;
+      option.selected = optionSize === widget.size;
+      size.append(option);
+    }
+    size.addEventListener("change", () => {
+      runAction(api.resizeWidget(widget.registryId, size.value));
+    });
+
+    controls.append(earlier, later, size);
+  }
 
   const remove = actionButton(
     "Remove",
-    () => runAction(api.removeWidget(widget.registryId)),
+    () => requestRemove(widget.registryId, remove),
     "action-danger",
   );
 
-  controls.append(earlier, later, size, remove);
+  controls.append(remove);
   return controls;
 }
 
-function widgetTile(widget, index, total, embedded = false) {
+/**
+ * Place one tile on the four-cell grid.
+ *
+ * On a phone the layout is one column and every entry reports x/y 0; positioning there
+ * would stack them all in row 1, so the renderer lets the grid flow instead.
+ */
+function placeTile(tile, entry, narrow) {
+  if (narrow || entry.x === undefined || entry.y === undefined) return;
+  tile.style.gridColumn = `${entry.x + 1} / span ${entry.w ?? 1}`;
+  tile.style.gridRow = `${entry.y + 1} / span ${entry.h ?? 1}`;
+}
+
+function widgetTile(widget, index, total, embedded = false, narrow = false) {
   const tile = element("section", `widget widget-${widget.size} widget-${widget.source}`);
   tile.dataset.registryId = widget.registryId;
+  placeTile(tile, widget, embedded || narrow);
   tile.setAttribute("role", "group");
   tile.setAttribute(
     "aria-label",
     embedded ? `${widget.title}, in a row` : `${widget.title}, ${sizeLabel(widget.size)}`,
   );
-  if (editing && !embedded) tile.tabIndex = 0;
+  if (editing) tile.tabIndex = 0;
 
   const head = element("div", "widget-head");
   const title = element("h2", "widget-title", widget.title);
@@ -1408,10 +1557,24 @@ function widgetTile(widget, index, total, embedded = false) {
   }
   tile.append(body);
 
-  if (editing && !embedded) {
-    tile.append(editControls(widget, index, total));
+  if (editing) {
+    tile.append(editControls(widget, index, total, embedded, tile));
+    if (!embedded) {
+      const grip = element("div", "widget-resize");
+      grip.setAttribute("aria-hidden", "true");
+      grip.title = "Drag to resize";
+      grip.addEventListener("pointerdown", (event) => beginResize(event, tile, widget));
+      tile.append(grip);
+    }
     tile.addEventListener("keydown", (event) => {
       if (event.target !== tile) return;
+      const removeButton = tile.querySelector(".action-danger");
+      if (event.key === "Delete") {
+        event.preventDefault();
+        if (removeButton !== null) requestRemove(widget.registryId, removeButton);
+        return;
+      }
+      if (embedded) return;
       if (event.key === "ArrowUp") {
         event.preventDefault();
         runAction(api.moveWidget(widget.registryId, "earlier"));
@@ -1426,9 +1589,6 @@ function widgetTile(widget, index, total, embedded = false) {
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
         runAction(api.resizeWidget(widget.registryId, nextSize(widget.size)));
-      } else if (event.key === "Delete" || event.key === "Backspace") {
-        event.preventDefault();
-        runAction(api.removeWidget(widget.registryId));
       }
     });
   }
@@ -1444,12 +1604,13 @@ function widgetTile(widget, index, total, embedded = false) {
  * into one snapping line at phone width, which is the responsive half the shared
  * layout model promises.
  */
-function rowTile(row) {
+function rowTile(row, narrow = false) {
   const section = element("section", `widget-row widget-${row.size}`);
   section.dataset.layout = row.layout;
   section.dataset.mode = row.mode;
   section.setAttribute("role", "group");
   section.setAttribute("aria-label", `Row of ${row.items.length} widgets`);
+  placeTile(section, row, narrow);
 
   const track = element("div", "widget-row-track");
   for (const item of row.items) {
@@ -1466,7 +1627,9 @@ function renderWidgets(view) {
   const fragment = document.createDocumentFragment();
   view.widgets.forEach((entry, index) => {
     fragment.append(
-      entry.kind === "row" ? rowTile(entry) : widgetTile(entry, index, view.widgets.length),
+      entry.kind === "row"
+        ? rowTile(entry, view.narrow)
+        : widgetTile(entry, index, view.widgets.length, false, view.narrow),
     );
   });
   if (view.widgets.length === 0) {
@@ -1531,11 +1694,30 @@ function renderWidgets(view) {
 
 function renderChoices(view) {
   const placed = new Set(view.widgets.flatMap(entryRegistryIds));
-  const choices = view.choices.filter((choice) => !placed.has(choice.registryId));
+  const choices = view.choices.filter(
+    (choice) =>
+      !placed.has(choice.registryId) &&
+      matchesQuery(widgetQuery, choice.title, choice.appId, choice.appName),
+  );
   elements.widgetChoice.replaceChildren();
   for (const choice of choices) {
-    const option = element("option", "", `${choice.title} — ${choice.appName}`);
+    const option = element(
+      "option",
+      "",
+      `${choice.title} — ${choice.appName} · ${sizeLabel(choice.size)}`,
+    );
     option.value = choice.registryId;
+    elements.widgetChoice.append(option);
+  }
+  if (choices.length === 0) {
+    const option = element(
+      "option",
+      "",
+      widgetQuery.trim().length === 0
+        ? "Every available widget is already here"
+        : `No widget matches “${widgetQuery.trim()}”`,
+    );
+    option.disabled = true;
     elements.widgetChoice.append(option);
   }
   elements.addWidget.disabled = choices.length === 0;
@@ -1855,6 +2037,18 @@ function bindChrome() {
   });
 
   elements.importScreen.addEventListener("click", () => runAction(api.importScreen()));
+
+  elements.widgetSearch.addEventListener("input", () => {
+    widgetQuery = elements.widgetSearch.value;
+    paint();
+  });
+  elements.widgetSearch.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    elements.widgetSearch.value = "";
+    widgetQuery = "";
+    paint();
+  });
 
   elements.addWidget.addEventListener("click", () => {
     const registryId = elements.widgetChoice.value;

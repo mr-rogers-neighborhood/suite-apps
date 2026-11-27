@@ -46,6 +46,7 @@ export const CHROME_IPC = {
   removeWidget: "suite:shell:remove-widget",
   moveWidget: "suite:shell:move-widget",
   resizeWidget: "suite:shell:resize-widget",
+  placeWidget: "suite:shell:place-widget",
   createScreen: "suite:shell:create-screen",
   renameScreen: "suite:shell:rename-screen",
   duplicateScreen: "suite:shell:duplicate-screen",
@@ -363,6 +364,11 @@ export interface ScreenWidgetView {
   readonly kind: "widget";
   readonly registryId: string;
   readonly size: SuiteWidgetSize;
+  /** Grid cells on a wide window; absent for a child inside a row. */
+  readonly x?: number;
+  readonly y?: number;
+  readonly w?: number;
+  readonly h?: number;
   readonly source: ScreenWidgetSource;
   readonly title: string;
   readonly appId: string | null;
@@ -387,6 +393,10 @@ export interface ScreenRowItemView {
 export interface ScreenRowView {
   readonly kind: "row";
   readonly size: SuiteWidgetSize;
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
   readonly layout: "row" | "carousel";
   readonly mode: "wrap" | "scroll";
   readonly items: readonly ScreenRowItemView[];
@@ -410,6 +420,7 @@ export interface ScreenView {
   readonly id: string;
   readonly name: string;
   readonly available: boolean;
+  readonly narrow: boolean;
   readonly widgets: readonly ScreenEntryView[];
   readonly choices: readonly ScreenChoiceView[];
 }

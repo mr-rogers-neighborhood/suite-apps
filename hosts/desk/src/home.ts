@@ -10,6 +10,7 @@ import {
   type SuiteScreenRowItem,
   type SuiteScreenWidget,
   screenLayout,
+  sizeCells,
   type WidgetRegistry,
 } from "@suite/screens";
 import type { PackInfo } from "./packs.js";
@@ -122,6 +123,7 @@ export function screenView(
     id: screen.id,
     name: screen.name,
     available: true,
+    narrow: layout.narrow,
     widgets: screen.widgets.map((entry, index) =>
       screenEntryView(entry, byIndex.get(index), packs, registry),
     ),
@@ -135,11 +137,15 @@ function screenEntryView(
   packs: readonly PackInfo[],
   registry: WidgetRegistry,
 ): ScreenEntryView {
-  if (!isScreenRow(entry)) return screenWidgetView(entry, packs, registry);
+  if (!isScreenRow(entry)) return screenWidgetView(entry, packs, registry, layout);
 
   const view: ScreenRowView = {
     kind: "row",
     size: entry.size,
+    x: layout?.x ?? entry.x,
+    y: layout?.y ?? entry.y,
+    w: layout?.w ?? sizeCells(entry.size).w,
+    h: layout?.h ?? sizeCells(entry.size).h,
     layout: entry.layout,
     mode: layout?.kind === "row" ? layout.mode : "wrap",
     items: entry.items.map((item) => ({
@@ -173,10 +179,13 @@ function screenWidgetView(
   },
   packs: readonly PackInfo[],
   registry: WidgetRegistry,
+  layout?: ScreenEntryLayout,
 ): ScreenWidgetView {
+  const cells = layout === undefined ? {} : { x: layout.x, y: layout.y, w: layout.w, h: layout.h };
   const host = hostWidget(placement.registryId);
   if (host !== undefined) {
     return {
+      ...cells,
       kind: "widget",
       registryId: placement.registryId,
       size: placement.size,
@@ -195,6 +204,7 @@ function screenWidgetView(
   const resolved = registry.resolve(placement.registryId);
   if (resolved === undefined) {
     return {
+      ...cells,
       kind: "widget",
       registryId: placement.registryId,
       size: placement.size,
@@ -215,6 +225,7 @@ function screenWidgetView(
   const resolution = registry.settings(placement.registryId, placement.settings ?? {});
 
   return {
+    ...cells,
     kind: "widget",
     registryId: placement.registryId,
     size: placement.size,

@@ -6,6 +6,7 @@ import { highestCatalogueEntries, highestTrustedUpdate } from "./renderer/catalo
 
 const here = dirname(fileURLToPath(import.meta.url));
 const shell = readFileSync(join(here, "renderer", "shell.js"), "utf8");
+const shellCss = readFileSync(join(here, "renderer", "shell.css"), "utf8");
 const reducer = readFileSync(join(here, "renderer", "catalogueReducer.js"), "utf8");
 const islandCss = readFileSync(join(here, "renderer", "react", "tab-bar.css"), "utf8");
 
@@ -202,11 +203,28 @@ describe("the Home composition", () => {
     expect(shell).not.toContain("localStorage");
   });
 
-  it("draws a row in document order and leaves its children outside the edit controls", () => {
+  it("draws a row in document order and gives its children a removal control", () => {
     expect(shell).toContain("function rowTile");
     expect(shell).toContain("widget-row-track");
     expect(shell).toContain("--row-weight");
-    expect(shell).toContain('entry.kind === "row" ? rowTile(entry)');
+    expect(shell).toContain('entry.kind === "row"');
+    expect(shell).toContain("rowTile(entry, view.narrow)");
+    expect(shell).toContain("editControls(widget, index, total, embedded, tile)");
+  });
+
+  it("places tiles on the four-cell grid and folds drag, resize and remove into edit mode", () => {
+    expect(shellCss).toContain("repeat(4, minmax(0, 1fr))");
+    expect(shell).toContain("function placeTile");
+    expect(shell).toContain("if (narrow || entry.x === undefined");
+    expect(shell).toContain("gridColumn");
+    expect(shell).toContain("function beginDrag");
+    expect(shell).toContain("function beginResize");
+    expect(shell).toContain("api.placeWidget");
+    expect(shell).toContain("drop-marker");
+    expect(shell).toContain("widget-size-select");
+    expect(shell).toContain("function requestRemove");
+    expect(shell).toContain('button.textContent = "Remove?"');
+    expect(shell).toContain("matchesQuery(widgetQuery");
   });
 
   it("draws the relay state the tray app used to own", () => {

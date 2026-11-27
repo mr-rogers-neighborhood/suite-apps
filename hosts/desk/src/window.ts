@@ -325,6 +325,7 @@ export class ShellWindow {
         id: tab.screenId,
         name: tab.title,
         available: false,
+        narrow: false,
         widgets: [],
         choices: [],
       });
@@ -682,6 +683,14 @@ export class ShellWindow {
     if (!isWidgetRegistryId(registryId)) return;
     if (!isWidgetSize(size)) return;
     await this.#activeScreenStore()?.resize(registryId, size);
+    this.broadcast();
+  }
+
+  /** Move a placement to a cell on the Screen's four-cell grid. */
+  async placeScreenWidget(registryId: string, x: number, y: number): Promise<void> {
+    if (!isWidgetRegistryId(registryId)) return;
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) return;
+    await this.#activeScreenStore()?.place(registryId, x, y);
     this.broadcast();
   }
 

@@ -202,12 +202,20 @@
 
         <div id="edit-bar" class="edit-bar" hidden>
           <div class="edit-add">
-            <label for="widget-choice">Add widget</label>
-            <select id="widget-choice"></select>
+            <label for="widget-search">Add widget</label>
+            <input
+              id="widget-search"
+              class="field"
+              type="search"
+              placeholder="Search widgets…"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <select id="widget-choice" aria-label="Widgets to add"></select>
             <button id="add-widget" class="action action-primary" type="button">Add</button>
           </div>
           <p class="hint">
-            Keys on a widget: ↑ earlier · ↓ later · ← smaller · → larger · Delete removes.
+            Drag a tile by its handle, or use the size picker. Delete asks once before it removes.
           </p>
         </div>
 

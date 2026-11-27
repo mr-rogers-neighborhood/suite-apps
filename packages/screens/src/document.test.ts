@@ -181,6 +181,37 @@ describe("ScreenDocument", () => {
     expect(opened.reason).toBe("newer");
   });
 
+  it("moves a placement to a cell and refuses one that runs past the grid", () => {
+    const document = ScreenDocument.create(initial);
+    expect(document.place("desk.apps", 0, 2)).toBe(true);
+    expect(document.state().widgets[0]).toMatchObject({ x: 0, y: 2 });
+    // A full tile is four cells wide, so column 1 cannot hold it.
+    expect(document.place("desk.apps", 1, 0)).toBe(false);
+    expect(document.place("desk.apps", 0, -1)).toBe(false);
+  });
+
+  it("removes a row child but keeps at least two items in the row", () => {
+    const document = ScreenDocument.create(initial);
+    expect(
+      document.addRow({
+        kind: "row",
+        size: "full",
+        layout: "row",
+        items: [
+          { registryId: "welcome.notes", weight: 1 },
+          { registryId: "budget.saved-views", weight: 1 },
+          { registryId: "canvas.recent-cards", weight: 1 },
+        ],
+      }),
+    ).toBe(true);
+
+    expect(document.remove("welcome.notes")).toBe(true);
+    const row = document.state().widgets.find((entry) => isScreenRow(entry));
+    expect(row !== undefined && isScreenRow(row) ? row.items.length : 0).toBe(2);
+    // Removing one more would leave a row of one, which the schema refuses.
+    expect(document.remove("budget.saved-views")).toBe(false);
+  });
+
   it("creates from JSON and refuses JSON that is not a Screen", () => {
     const created = ScreenDocument.fromJson(initial);
     expect(created.ok).toBe(true);
