@@ -6,6 +6,14 @@ underneath enough to matter.
 Versions here are Suite Help's own. It ships through Flatpak, so the deployment version follows
 this file and there is no AppImage release tag.
 
+## [0.1.5] - 2026-11-27
+
+### Changed
+
+- **Help fits the host's bar.** When Suite Desk is drawing the window, Help publishes its sections
+  into the host's menu bar and no longer draws a second header of its own. Opened outside a host it
+  keeps its own bar. The pack's bytes changed, so the signed catalogue gets a new version.
+
 ## [0.1.4] - 2026-11-26
 
 ### Added
