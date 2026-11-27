@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { ReactRouterProvider } from "fumadocs-core/framework/react-router";
 import { StrictMode } from "react";
 import { HashRouter } from "react-router";
@@ -56,6 +56,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  delete (window as unknown as { suite?: unknown }).suite;
 });
 
 describe("Help as a pack", () => {
@@ -103,5 +104,64 @@ describe("Help as a pack", () => {
     for (const url of vi.mocked(fetch).mock.calls.map(([input]) => String(input))) {
       expect(url.startsWith("/data/")).toBe(true);
     }
+  });
+});
+
+interface StubSlots {
+  title: string | null;
+  navigation: Array<
+    | { kind: "menu"; id: string; items: Array<{ id: string }> }
+    | { kind: "toggle"; id: string }
+  >;
+}
+
+function stubHostBar() {
+  const setSlots = vi.fn<(slots: StubSlots) => void>();
+  const listeners: Array<(action: { id: string; item?: string }) => void> = [];
+  (window as unknown as { suite?: unknown }).suite = {
+    menuBar: {
+      setSlots,
+      onAction: (listener: (action: { id: string; item?: string }) => void) => {
+        listeners.push(listener);
+        return () => {};
+      },
+    },
+  };
+  return {
+    setSlots,
+    send: async (action: { id: string; item?: string }) => {
+      await act(async () => {
+        for (const listener of listeners) listener(action);
+      });
+    },
+  };
+}
+
+describe("Help under a host bar", () => {
+  it("publishes its sections and drops its own header", async () => {
+    const host = stubHostBar();
+    renderPack("/");
+
+    await screen.findByRole("heading", { name: "User handbook", level: 1 });
+    // The host owns the one bar; the pack must not draw its own header band.
+    expect(document.querySelector('[data-handbook-region="handbook-header"]')).toBeNull();
+    expect(host.setSlots).toHaveBeenCalled();
+
+    const slots = host.setSlots.mock.calls.at(-1)?.[0];
+    expect(slots?.title).toBe("User handbook");
+    const menu = slots?.navigation.find((control) => control.kind === "menu");
+    expect(menu?.kind === "menu" ? menu.items.map((item) => item.id) : []).toContain(
+      "help.sections.explorer",
+    );
+  });
+
+  it("navigates when the host echoes a press", async () => {
+    const host = stubHostBar();
+    renderPack("/");
+    await screen.findByRole("heading", { name: "User handbook", level: 1 });
+
+    await host.send({ id: "help.sections", item: "help.sections.explorer" });
+
+    expect(window.location.hash.startsWith("#/explore")).toBe(true);
   });
 });

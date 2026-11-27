@@ -73,6 +73,12 @@ has neither, so those zones render nothing. Each app keeps its rail or sidebar a
 the takeover is the compact one. Below `md` the wide zones hide rather than scroll, so the bar adds no
 horizontal overflow at phone widths.
 
+Help is the fourth pack to publish into the host bar, and the one whose own chrome was the most
+custom. Both its reader and its code explorer detect the bridge and draw no header when hosted: the
+reader drops its fixed top band, and the explorer passes an empty header to `AppShell`. They publish
+the current page name, a **Help sections** menu and, below `md`, a **Contents** toggle. The page's own
+`<h1>` stays visible, so removing the header removes a band, not the document outline.
+
 Both Planner and Budget auto-hide the native menu on Linux and Windows (`autoHideMenuBar`). The bar is
 the visible menu in that case; the native accelerators still fire, and the two do not show two copies
 of the same commands.

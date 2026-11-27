@@ -1,4 +1,4 @@
-import { AppShell } from "@suite/ui";
+import { AppShell, type MenuBarBridge, useMenuAction, useMenuSlots } from "@suite/ui";
 import { GitBranch, Menu, X } from "lucide-react";
 import type {
   CSSProperties,
@@ -12,6 +12,7 @@ import { Note } from "@/explorer/note";
 import { ExplorerSidebar } from "@/explorer/sidebar";
 import { loadBaseData } from "@/lib/explorer-data";
 import { docsPageUrl, readExplorerUrl } from "@/lib/explorer-routes";
+import { useHostedMenuBar, useWideViewport } from "../hosted";
 import type {
   BaseData,
   FolderNode,
@@ -24,6 +25,15 @@ import type {
   View,
 } from "@/lib/explorer-types";
 import { SectionSwitch } from "@/sections";
+
+const GITHUB_URL = "https://github.com/mrrnbhd/suite-apps";
+const VIEW_TITLES: Record<View, string> = {
+  browser: "Code explorer",
+  modules: "Modules",
+  tours: "Tours",
+};
+
+type HelpSlots = Parameters<MenuBarBridge["setSlots"]>[0] | null;
 
 function targetNodeId(target: TourTarget): string | null {
   if (
@@ -54,32 +64,6 @@ function clampWidth(width: number) {
   return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width));
 }
 
-/**
- * Whether the window is wide enough for the navigator column.
- *
- * The shared `AppShell` stacks its navigation above the content below `md`; the explorer
- * needs a drawer instead, because a stacked rail would take half a phone screen and push
- * the document off it. jsdom has no `matchMedia`, and a missing query is the desktop
- * arrangement, which is the shape the existing tests describe.
- */
-function useWideViewport(): boolean {
-  const query = "(min-width: 768px)";
-  const [wide, setWide] = useState(() =>
-    typeof window.matchMedia === "function" ? window.matchMedia(query).matches : true,
-  );
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const media = window.matchMedia(query);
-    const update = () => setWide(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return wide;
-}
-
 export function Explorer() {
   const [data, setData] = useState<BaseData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +86,7 @@ export function Explorer() {
   const requestedModules = useRef(new Set<string>());
   const [hydrated, setHydrated] = useState(false);
   const wide = useWideViewport();
+  const hosted = useHostedMenuBar();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -247,6 +232,71 @@ export function Explorer() {
       : view === "tours" && currentStep?.kind === "node" && currentStep.target.kind === "module"
         ? currentStep.target.id
         : (currentEntry?.moduleId ?? null);
+
+  const pageTitle = moduleById.get(activeModuleId ?? "")?.title ?? VIEW_TITLES[view];
+  const slots: HelpSlots =
+    hosted === null
+      ? null
+      : {
+          format: "suite.menu-slots",
+          title: pageTitle,
+          navigation: [
+            ...(wide
+              ? []
+              : [
+                  {
+                    kind: "toggle" as const,
+                    id: "help.navigator",
+                    label: "Navigator",
+                    pressed: sidebarOpen,
+                    glyph: "\u2630",
+                    help: {
+                      title: "Navigator",
+                      body: "Shows the file and module tree beside the page.",
+                    },
+                  },
+                ]),
+            {
+              kind: "menu" as const,
+              id: "help.sections",
+              label: "Help sections",
+              items: [
+                {
+                  id: "help.sections.handbook",
+                  label: "User handbook",
+                  description: "The reader for people using the suite.",
+                },
+                { id: "help.sections.tours", label: "Tours" },
+                {
+                  id: "help.sections.github",
+                  label: "GitHub",
+                  separatorBefore: true,
+                  description: "Opens the suite-apps repository.",
+                },
+              ],
+              help: {
+                title: "Help sections",
+                body: "Moves between the handbook, the tours and the source.",
+              },
+            },
+          ],
+          actions: [],
+        };
+  useMenuSlots(hosted, slots);
+  useMenuAction(hosted, (action) => {
+    if (action.id === "help.navigator") {
+      setSidebarOpen((open) => !open);
+      return;
+    }
+    if (action.id !== "help.sections") return;
+    if (action.item === "help.sections.handbook") {
+      navigate("/handbook");
+    } else if (action.item === "help.sections.tours") {
+      navigate("/explore?view=tours");
+    } else if (action.item === "help.sections.github") {
+      window.open(GITHUB_URL, "_blank", "noreferrer");
+    }
+  });
 
   useEffect(() => {
     if (!activeModuleId) return;
@@ -623,55 +673,58 @@ export function Explorer() {
         Skip to content
       </a>
       <AppShell
-        title="Suite Help"
+        {...(hosted === null
+          ? {
+              title: "Suite Help",
+              leading: wide ? undefined : (
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen((open) => !open)}
+                  className="rounded-lg p-1.5 text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
+                  aria-label="Toggle navigator"
+                  aria-controls="explorer-sidebar"
+                  aria-expanded={sidebarOpen}
+                >
+                  {sidebarOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+                </button>
+              ),
+              actions: (
+                <nav
+                  aria-label="Help sections"
+                  className="flex items-center gap-1 text-xs text-fd-muted-foreground"
+                >
+                  <Link
+                    to="/handbook"
+                    className="rounded-lg px-2 py-1.5 hover:bg-fd-accent hover:text-fd-foreground"
+                  >
+                    Handbook
+                  </Link>
+                  <Link
+                    to="/explore?view=tours"
+                    className="hidden rounded-lg bg-fd-accent px-2 py-1.5 font-medium text-fd-accent-foreground sm:inline-flex"
+                  >
+                    Tours
+                  </Link>
+                  <SectionSwitch audience="developer" />
+                  <a
+                    href="https://github.com/mrrnbhd/suite-apps"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hidden rounded-lg p-1.5 hover:bg-fd-accent sm:inline-flex"
+                    aria-label="GitHub"
+                  >
+                    <GitBranch className="size-4" />
+                  </a>
+                </nav>
+              ),
+            }
+          : { header: null })}
         navigationLabel="Code navigator"
-        leading={
-          wide ? undefined : (
-            <button
-              type="button"
-              onClick={() => setSidebarOpen((open) => !open)}
-              className="rounded-lg p-1.5 text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
-              aria-label="Toggle navigator"
-              aria-controls="explorer-sidebar"
-              aria-expanded={sidebarOpen}
-            >
-              {sidebarOpen ? <X className="size-4" /> : <Menu className="size-4" />}
-            </button>
-          )
-        }
-        actions={
-          <nav
-            aria-label="Help sections"
-            className="flex items-center gap-1 text-xs text-fd-muted-foreground"
-          >
-            <Link
-              to="/handbook"
-              className="rounded-lg px-2 py-1.5 hover:bg-fd-accent hover:text-fd-foreground"
-            >
-              Handbook
-            </Link>
-            <Link
-              to="/explore?view=tours"
-              className="hidden rounded-lg bg-fd-accent px-2 py-1.5 font-medium text-fd-accent-foreground sm:inline-flex"
-            >
-              Tours
-            </Link>
-            <SectionSwitch audience="developer" />
-            <a
-              href="https://github.com/mrrnbhd/suite-apps"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden rounded-lg p-1.5 hover:bg-fd-accent sm:inline-flex"
-              aria-label="GitHub"
-            >
-              <GitBranch className="size-4" />
-            </a>
-          </nav>
-        }
         navigation={wide ? <div className="relative h-full">{navigator(sidebarWidth < SIDEBAR_COMPACT)}</div> : undefined}
         style={wide ? ({ "--shell-nav-width": `${sidebarWidth}px` } as CSSProperties) : undefined}
         className="h-dvh"
       >
+        {hosted === null ? null : <h1 className="sr-only">Suite Help — {pageTitle}</h1>}
         <div id="explorer-main" className="relative flex h-full min-h-0 flex-col">
           {error ? (
             <div className="p-4 text-sm text-danger sm:p-8">
