@@ -8,16 +8,19 @@ import { LoroDoc, type LoroMap } from "loro-crdt";
 import { migrateScreen } from "./migration.js";
 import {
   isScreenRow,
+  findFreePlacement,
   parseScreen,
   type Screen,
   type ScreenEntry,
   type ScreenParse,
   type ScreenRefusal,
+  SCREEN_GRID_COLUMNS,
   SUITE_SCREEN_FORMAT,
   SUITE_SCREEN_VERSION,
   type SuiteScreenRow,
   type SuiteScreenWidget,
   screenCorruption,
+  sizeCells,
   suiteScreenRowSchema,
   suiteScreenWidgetSchema,
 } from "./screen.js";
@@ -52,6 +55,18 @@ const MAX_SETTING_LENGTH = 500;
 
 /** Where one instance goes relative to another. */
 export type ScreenPlacement = { readonly before: string } | { readonly after: string };
+
+/** A new flat widget: the host may omit where it goes, and the document finds a cell. */
+export type NewScreenWidget = Omit<SuiteScreenWidget, "x" | "y"> & {
+  readonly x?: number;
+  readonly y?: number;
+};
+
+/** A new row: the same free-cell rule as a flat widget. */
+export type NewScreenRow = Omit<SuiteScreenRow, "x" | "y"> & {
+  readonly x?: number;
+  readonly y?: number;
+};
 
 export type ScreenDocumentOpen =
   | {
@@ -103,12 +118,19 @@ function readEntry(key: string, entry: unknown): ScreenEntry | ScreenRefusal {
     return {
       kind: "row",
       size: entry.size,
+      x: entry.x,
+      y: entry.y,
       layout: entry.layout ?? "row",
       items,
     } as unknown as SuiteScreenRow;
   }
 
-  const widget: Record<string, unknown> = { registryId: key, size: entry.size };
+  const widget: Record<string, unknown> = {
+    registryId: key,
+    size: entry.size,
+    x: entry.x,
+    y: entry.y,
+  };
   if (SETTINGS in entry) widget.settings = entry[SETTINGS];
   return widget as unknown as SuiteScreenWidget;
 }
@@ -151,6 +173,8 @@ function readScreen(doc: LoroDoc): ScreenRead {
 function writeWidget(table: LoroMap, widget: SuiteScreenWidget): void {
   const entry = table.ensureMergeableMap(widget.registryId);
   entry.set("size", widget.size);
+  entry.set("x", widget.x);
+  entry.set("y", widget.y);
   const settings = widget.settings;
   if (settings !== undefined && Object.keys(settings).length > 0) {
     const values = entry.ensureMergeableMap(SETTINGS);
@@ -162,6 +186,8 @@ function writeRow(table: LoroMap, key: string, row: SuiteScreenRow): void {
   const entry = table.ensureMergeableMap(key);
   entry.set("kind", "row");
   entry.set("size", row.size);
+  entry.set("x", row.x);
+  entry.set("y", row.y);
   entry.set("layout", row.layout);
   entry.set(
     "items",
@@ -270,16 +296,17 @@ export class ScreenDocument {
    * Add one instance. A duplicate registry id is refused: the Screen shape has one
    * placement per widget.
    */
-  add(widget: SuiteScreenWidget, placement?: ScreenPlacement): boolean {
-    if (!suiteScreenWidgetSchema.safeParse(widget).success) return false;
-    if (this.#hasRegistryId(widget.registryId)) return false;
+  add(widget: NewScreenWidget, placement?: ScreenPlacement): boolean {
+    const placed = { ...widget, ...this.#freePlacement(widget) };
+    if (!suiteScreenWidgetSchema.safeParse(placed).success) return false;
+    if (this.#hasRegistryId(placed.registryId)) return false;
 
     const ids = this.#order();
     const index = placement === undefined ? ids.length : this.#target(ids, placement);
     if (index === null) return false;
 
-    writeWidget(this.#table(), widget);
-    this.#doc.getList(ORDER).insert(index, widget.registryId);
+    writeWidget(this.#table(), placed);
+    this.#doc.getList(ORDER).insert(index, placed.registryId);
     this.#commit();
     return true;
   }
@@ -288,16 +315,17 @@ export class ScreenDocument {
    * Add a row of widgets. Its children occupy the same registry-id namespace as the
    * flat placements, so one Screen still places each widget at most once.
    */
-  addRow(row: SuiteScreenRow, placement?: ScreenPlacement): boolean {
-    if (!suiteScreenRowSchema.safeParse(row).success) return false;
-    if (row.items.some((item) => this.#hasRegistryId(item.registryId))) return false;
+  addRow(row: NewScreenRow, placement?: ScreenPlacement): boolean {
+    const placed = { ...row, ...this.#freePlacement(row) };
+    if (!suiteScreenRowSchema.safeParse(placed).success) return false;
+    if (placed.items.some((item) => this.#hasRegistryId(item.registryId))) return false;
 
     const ids = this.#order();
     const index = placement === undefined ? ids.length : this.#target(ids, placement);
     if (index === null) return false;
 
     const key = this.#nextRowKey();
-    writeRow(this.#table(), key, row);
+    writeRow(this.#table(), key, placed);
     this.#doc.getList(ORDER).insert(index, key);
     this.#commit();
     return true;
@@ -345,6 +373,43 @@ export class ScreenDocument {
 
     const to = direction === "earlier" ? from - 1 : from + 1;
     if (to < 0 || to >= ids.length) return false;
+    const fromId = ids[from];
+    const toId = ids[to];
+    if (fromId === undefined || toId === undefined) return false;
+
+    // The grid, not the order list, is what the person sees. Swapping the two
+    // placements' cells is what makes "earlier" and "later" still move the tile.
+    const table = this.#table();
+    const first = table.get(fromId) as LoroMap | undefined;
+    const second = table.get(toId) as LoroMap | undefined;
+    if (first !== undefined && second !== undefined) {
+      const ax = first.get("x");
+      const ay = first.get("y");
+      const bx = second.get("x");
+      const by = second.get("y");
+      const aSize = first.get("size");
+      const bSize = second.get("size");
+      // Swap cells only when each tile still fits where the other sat. A full-width
+      // tile cannot take a quarter-column cell, and a swap that would not fit is a
+      // refused move rather than an invalid document.
+      const fits = (size: unknown, x: unknown): boolean =>
+        typeof size === "string" &&
+        typeof x === "number" &&
+        x + sizeCells(size as SuiteWidgetSize).w <= SCREEN_GRID_COLUMNS;
+      if (
+        typeof ax === "number" &&
+        typeof ay === "number" &&
+        typeof bx === "number" &&
+        typeof by === "number" &&
+        fits(aSize, bx) &&
+        fits(bSize, ax)
+      ) {
+        first.set("x", bx);
+        first.set("y", by);
+        second.set("x", ax);
+        second.set("y", ay);
+      }
+    }
 
     const order = this.#doc.getList(ORDER);
     order.delete(from, 1);
@@ -359,6 +424,11 @@ export class ScreenDocument {
     const entry = this.#widget(registryId);
     if (entry === undefined) return false;
     entry.set("size", size);
+    const x = entry.get("x");
+    if (typeof x === "number") {
+      const maxX = SCREEN_GRID_COLUMNS - sizeCells(size).w;
+      if (x > maxX) entry.set("x", maxX);
+    }
     this.#commit();
     return true;
   }
@@ -438,6 +508,25 @@ export class ScreenDocument {
     const value: unknown = this.#table().get(registryId);
     if (typeof value !== "object" || value === null) return undefined;
     return "set" in value ? (value as LoroMap) : undefined;
+  }
+
+  /** A new placement's cell: the caller's, or the first free one. */
+  #freePlacement(entry: {
+    readonly size: SuiteWidgetSize;
+    readonly x?: number;
+    readonly y?: number;
+  }): { readonly x: number; readonly y: number } {
+    if (entry.x !== undefined && entry.y !== undefined) {
+      return { x: entry.x, y: entry.y };
+    }
+    return findFreePlacement(
+      this.state().widgets.map((placed) => ({
+        x: placed.x,
+        y: placed.y,
+        size: placed.size,
+      })),
+      entry.size,
+    );
   }
 
   #target(ids: readonly string[], placement: ScreenPlacement): number | null {

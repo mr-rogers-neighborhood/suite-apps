@@ -49,18 +49,20 @@ describe("the Screen migration chain", () => {
     const parsed = parseScreen(migrated.value);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.value.version).toBe(2);
+    expect(parsed.value.version).toBe(3);
     expect(parsed.value.widgets).toEqual([
-      { registryId: "desk.apps", size: "full" },
+      { registryId: "desk.apps", size: "full", x: 0, y: 0 },
       {
         registryId: "planner.quick-task",
         size: "1x1",
+        x: 0,
+        y: 1,
         settings: { project: "inbox" },
       },
     ]);
   });
 
-  it("accepts the current fixture unchanged", () => {
+  it("migrates the version-2 fixture onto the four-cell grid", () => {
     const migrated = migrateScreen(v2Fixture);
     expect(migrated.ok).toBe(true);
     if (!migrated.ok) return;
@@ -69,7 +71,11 @@ describe("the Screen migration chain", () => {
     const parsed = parseScreen(migrated.value);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.value).toEqual(v2Fixture);
+    expect(parsed.value.version).toBe(3);
+    expect(parsed.value.widgets).toEqual([
+      { registryId: "desk.apps", size: "full", x: 0, y: 0 },
+      { ...v2Fixture.widgets[1], x: 0, y: 1 },
+    ]);
   });
 
   it("migrates a stored version-1 snapshot on open", () => {
@@ -77,13 +83,15 @@ describe("the Screen migration chain", () => {
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;
     expect(opened.fromVersion).toBe(1);
-    expect(opened.document.state().version).toBe(2);
+    expect(opened.document.state().version).toBe(3);
     expect(opened.document.state()).toMatchObject({
       widgets: [
-        { registryId: "desk.apps", size: "full" },
+        { registryId: "desk.apps", size: "full", x: 0, y: 0 },
         {
           registryId: "planner.quick-task",
           size: "1x1",
+          x: 0,
+          y: 1,
           settings: { project: "inbox" },
         },
       ],
@@ -95,7 +103,32 @@ describe("the Screen migration chain", () => {
     expect(created.ok).toBe(true);
     if (!created.ok) return;
     expect(created.fromVersion).toBe(1);
-    expect(created.document.state().version).toBe(2);
+    expect(created.document.state().version).toBe(3);
+  });
+
+  it("fills the four-cell grid and wraps to the next row", () => {
+    const migrated = migrateScreen({
+      format: "suite.screen",
+      version: 2,
+      id: "wrap",
+      name: "Wrap",
+      widgets: Array.from({ length: 5 }, (_, index) => ({
+        registryId: `ghost.note-${index}`,
+        size: "1x1",
+      })),
+    });
+    expect(migrated.ok).toBe(true);
+    if (!migrated.ok) return;
+    const parsed = parseScreen(migrated.value);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.widgets.map((entry) => [entry.x, entry.y])).toEqual([
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [3, 0],
+      [0, 1],
+    ]);
   });
 
   it("refuses a version with no migration step and names the action", () => {

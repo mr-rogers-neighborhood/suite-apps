@@ -77,7 +77,7 @@ const elements = {
   commandModes: [...document.querySelectorAll(".command-mode")],
 };
 
-const SIZES = ["1x1", "2x1", "full"];
+const SIZES = ["1x1", "1x2", "2x1", "2x2", "full"];
 
 const RELAY_LABELS = {
   off: "Off",
@@ -549,6 +549,8 @@ function applyTheme() {
 function sizeLabel(size) {
   if (size === "full") return "Full row";
   if (size === "2x1") return "2 × 1";
+  if (size === "1x2") return "1 × 2";
+  if (size === "2x2") return "2 × 2";
   return "1 × 1";
 }
 

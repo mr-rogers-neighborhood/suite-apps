@@ -27,12 +27,15 @@ The decision is [Widgets and Screens](../../docs/reference/decisions.md#widgets-
 }
 ```
 
-`format` is `suite.screen` and `version` is `2`. `id` is a lower kebab-case screen id;
+`format` is `suite.screen` and `version` is `3`. `id` is a lower kebab-case screen id;
 the host chooses the file path and derives nothing from it. `name` is the label a person
 sees. `widgets` is ordered. Each entry is either a widget or a row:
 
+- Every entry carries `x` and `y` on a four-cell-wide grid. `size` is the single source
+  of its dimensions: `1x1`, `1x2`, `2x1`, `2x2` or `full` (four cells wide). Coordinates
+  say where it starts; `x + width` may not exceed four.
 - A widget entry names its descriptor as `<app id>.<widget id>`, uses one of the
-  contract's sizes (`1x1`, `2x1`, `full`) and may carry instance `settings`, a record of
+  contract's sizes and may carry instance `settings`, a record of
   strings keyed by the descriptor's settings field id.
 - A row entry has `kind: "row"`, its own `size`, a `layout` of `row` or `carousel`, and
   2–8 `items`. Each item declares a `weight` (1–12, its share of the row) and optional

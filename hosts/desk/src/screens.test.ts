@@ -34,7 +34,7 @@ describe("the Home screen", () => {
 
     expect(store.state()).toEqual({
       format: "suite.screen",
-      version: 2,
+      version: 3,
       id: HOME_SCREEN_ID,
       name: HOME_SCREEN_NAME,
       widgets: [],
@@ -71,7 +71,9 @@ describe("the Home screen", () => {
     await first.resize("welcome.notes", "1x1");
 
     const second = await ScreenStore.open(path);
-    expect(second.state().widgets).toEqual([{ registryId: "welcome.notes", size: "1x1" }]);
+    expect(second.state().widgets).toEqual([
+      { registryId: "welcome.notes", size: "1x1", x: 0, y: 0 },
+    ]);
   });
 
   it("keeps a backup of the previous snapshot beside the document", async () => {
@@ -169,6 +171,8 @@ describe("editing a Screen", () => {
     await store.add({
       registryId: "ghost.notes",
       size: "2x1",
+      x: 0,
+      y: 0,
       settings: { project: "inbox" },
     });
     await store.moveBy("ghost.notes", "earlier");
@@ -177,6 +181,8 @@ describe("editing a Screen", () => {
     expect(reopened.state().widgets[0]).toEqual({
       registryId: "ghost.notes",
       size: "2x1",
+      x: 0,
+      y: 0,
       settings: { project: "inbox" },
     });
   });
@@ -213,7 +219,9 @@ describe("the Screens set", () => {
     const copy = await set.duplicate(work);
     expect(copy).not.toBeNull();
     expect(set.screen(copy ?? "")?.name).toBe("Deep work copy");
-    expect(set.screen(copy ?? "")?.widgets).toEqual([{ registryId: "welcome.notes", size: "2x1" }]);
+    expect(set.screen(copy ?? "")?.widgets).toEqual([
+      { registryId: "welcome.notes", size: "2x1", x: 0, y: 0 },
+    ]);
     expect(
       set
         .summaries()
@@ -303,11 +311,25 @@ describe("the portable .screen file", () => {
     expect(store).not.toBeNull();
     if (store === null) return;
 
-    await store.add({ registryId: "welcome.notes", size: "2x1", settings: { project: "inbox" } });
-    await store.add({ registryId: "ghost.notes", size: "1x1", settings: { future: "kept" } });
+    await store.add({
+      registryId: "welcome.notes",
+      size: "2x1",
+      x: 0,
+      y: 0,
+      settings: { project: "inbox" },
+    });
+    await store.add({
+      registryId: "ghost.notes",
+      size: "1x1",
+      x: 0,
+      y: 0,
+      settings: { future: "kept" },
+    });
     await store.addRow({
       kind: "row",
       size: "full",
+      x: 0,
+      y: 0,
       layout: "row",
       items: [
         { registryId: "planner.quick-task", weight: 2, settings: { project: "work" } },
@@ -333,6 +355,8 @@ describe("the portable .screen file", () => {
     expect(target.screen(imported.id)?.widgets[1]).toEqual({
       registryId: "ghost.notes",
       size: "1x1",
+      x: 0,
+      y: 0,
       settings: { future: "kept" },
     });
   });
@@ -356,7 +380,7 @@ describe("the portable .screen file", () => {
     expect(imported.id).not.toBe(original);
     expect(target.screen(original)).toEqual(before);
     expect(target.screen(imported.id)?.widgets).toEqual([
-      { registryId: "ghost.notes", size: "1x1" },
+      { registryId: "ghost.notes", size: "1x1", x: 0, y: 0 },
     ]);
   });
 

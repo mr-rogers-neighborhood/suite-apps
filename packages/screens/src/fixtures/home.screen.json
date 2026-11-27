@@ -1,13 +1,15 @@
 {
   "format": "suite.screen",
-  "version": 2,
+  "version": 3,
   "id": "home",
   "name": "Home",
   "widgets": [
-    { "registryId": "desk.apps", "size": "full" },
+    { "registryId": "desk.apps", "size": "full", "x": 0, "y": 0 },
     {
       "kind": "row",
       "size": "full",
+      "x": 0,
+      "y": 1,
       "layout": "row",
       "items": [
         {

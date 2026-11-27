@@ -597,7 +597,7 @@ deliberately. It stays in [Ideas](ideas.md), not in this contract.
   and the host registers it as `<app id>.<widget id>` — `planner.quick-task` — so an app cannot
   claim a host id. A host widget uses the same registry-id shape under the host's own app id, but it
   resolves through the host's own table: `desk.apps` is not an app declaration, and the registry is
-  for app declarations. `size` is one of `1x1`, `2x1`, `full`. Go reuses
+  for app declarations. `size` is one of `1x1`, `1x2`, `2x1`, `2x2`, `full`. Go reuses
   this descriptor in its launcher and an Android home-screen widget is a native adapter over it; Go
   does not get a second descriptor.
 - `settings` is a list of instance fields: `{ id, label, type, default?, required?, maxLength? }`,

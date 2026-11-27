@@ -261,19 +261,30 @@ body {
 }
 
 /*
- * Three sizes that actually differ.
+ * The five size classes, on the renderer's two-column grid.
  *
- * In a two-column grid, `span 2` *is* the whole row, so `2x1` and `full` rendered
- * identically and one of the three sizes was decorative. A `2x1` now means "two columns
- * wide and two rows tall" — a large square tile — and `full` keeps the whole row at one
- * row's height. That is what the names have been promising all along.
+ * `size` is the source of a placement's width and height; `full` is the whole row.
+ * `2x2` is the large square, and `1x2` is a tall narrow tile. The Screen's own
+ * coordinates are carried by the document and the shared layout; this grid still
+ * follows document order until the editing surface uses them.
  */
 .widget-full {
   grid-column: 1 / -1;
+  grid-row: span 1;
+}
+
+.widget-2x2 {
+  grid-column: span 2;
+  grid-row: span 2;
 }
 
 .widget-2x1 {
   grid-column: span 2;
+  grid-row: span 1;
+}
+
+.widget-1x2 {
+  grid-column: span 1;
   grid-row: span 2;
 }
 
@@ -779,9 +790,12 @@ section:not(.widget):not(.widget-row):not(.home-empty) {
   }
 
   .widget-full,
+  .widget-2x2,
   .widget-2x1,
+  .widget-1x2,
   .widget-1x1 {
     grid-column: 1 / -1;
+    grid-row: span 1;
   }
 
   /* A row never squeezes: at phone width it is one horizontal, snapping line. */

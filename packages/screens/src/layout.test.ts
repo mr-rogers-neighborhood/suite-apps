@@ -4,24 +4,28 @@ import type { Screen } from "./screen.js";
 
 const screen: Screen = {
   format: "suite.screen",
-  version: 2,
+  version: 3,
   id: "work",
   name: "Work",
   widgets: [
-    { registryId: "desk.apps", size: "full" },
+    { registryId: "desk.apps", size: "full", x: 0, y: 0 },
     {
       kind: "row",
       size: "2x1",
+      x: 0,
+      y: 1,
       layout: "row",
       items: [
         { registryId: "planner.quick-task", weight: 2, settings: { project: "work" } },
         { registryId: "budget.saved-views", weight: 1 },
       ],
     },
-    { registryId: "canvas.recent-cards", size: "1x1" },
+    { registryId: "canvas.recent-cards", size: "1x1", x: 2, y: 1 },
     {
       kind: "row",
       size: "full",
+      x: 0,
+      y: 2,
       layout: "carousel",
       items: [
         { registryId: "ghost.notes", weight: 1 },
@@ -32,13 +36,19 @@ const screen: Screen = {
 };
 
 describe("the Screen layout", () => {
-  it("keeps document order and computes row weights on a wide window", () => {
+  it("orders by the grid and computes row weights on a wide window", () => {
     const layout = screenLayout(screen, { width: 1200 });
 
     expect(layout.narrow).toBe(false);
-    expect(layout.columns).toBe(2);
+    expect(layout.columns).toBe(4);
     expect(layout.entries.map((entry) => entry.kind)).toEqual(["widget", "row", "widget", "row"]);
     expect(layout.entries.map((entry) => entry.index)).toEqual([0, 1, 2, 3]);
+    expect(layout.entries.map((entry) => [entry.x, entry.y, entry.w, entry.h])).toEqual([
+      [0, 0, 4, 1],
+      [0, 1, 2, 1],
+      [2, 1, 1, 1],
+      [0, 2, 4, 1],
+    ]);
 
     const row = layout.entries[1];
     expect(row).toMatchObject({ kind: "row", mode: "wrap", size: "2x1" });
@@ -64,6 +74,7 @@ describe("the Screen layout", () => {
     expect(layout.columns).toBe(1);
     expect(layout.entries.map((entry) => entry.kind)).toEqual(["widget", "row", "widget", "row"]);
     for (const entry of layout.entries) {
+      expect(entry).toMatchObject({ x: 0, y: 0, w: 1, h: 1 });
       if (entry.kind === "widget") expect(entry.span).toBe(1);
       else expect(entry.mode).toBe("scroll");
     }
@@ -76,12 +87,25 @@ describe("the Screen layout", () => {
 
   it("spans a wide widget by its size class and a narrow one by one column", () => {
     const wide = screenLayout(screen, { width: 1200 });
-    expect(wide.entries[0]).toMatchObject({ kind: "widget", size: "full", span: 2 });
-    expect(wide.entries[2]).toMatchObject({ kind: "widget", size: "1x1", span: 1 });
+    expect(wide.entries[0]).toMatchObject({ kind: "widget", size: "full", span: 4, w: 4 });
+    expect(wide.entries[2]).toMatchObject({ kind: "widget", size: "1x1", span: 1, w: 1 });
 
     const narrow = screenLayout(screen, { width: 600 });
-    expect(narrow.entries[0]).toMatchObject({ kind: "widget", span: 1 });
-    expect(narrow.entries[2]).toMatchObject({ kind: "widget", span: 1 });
+    expect(narrow.entries[0]).toMatchObject({ kind: "widget", span: 1, w: 1 });
+    expect(narrow.entries[2]).toMatchObject({ kind: "widget", span: 1, w: 1 });
+  });
+
+  it("lays out by coordinates, not by the order the entries were written", () => {
+    const moved: Screen = {
+      ...screen,
+      widgets: [
+        { registryId: "desk.apps", size: "full", x: 0, y: 1 },
+        { registryId: "canvas.recent-cards", size: "1x1", x: 0, y: 0 },
+      ],
+    };
+    const layout = screenLayout(moved, { width: 1200 });
+    expect(layout.entries.map((entry) => entry.index)).toEqual([1, 0]);
+    expect(layout.entries[0]).toMatchObject({ kind: "widget", index: 1, y: 0 });
   });
 
   it("flattens a row for a host that cannot draw it, keeping order and settings", () => {
@@ -102,6 +126,8 @@ describe("the Screen layout", () => {
       registryId: "planner.quick-task",
       size: "2x1",
       settings: { project: "work" },
+      x: 0,
+      y: 1,
     });
   });
 

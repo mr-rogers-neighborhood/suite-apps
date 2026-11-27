@@ -1,5 +1,11 @@
 import type { SuiteWidgetSize } from "@suite/contracts";
-import { isScreenRow, type Screen, type ScreenEntry } from "./screen.js";
+import {
+  isScreenRow,
+  SCREEN_GRID_COLUMNS,
+  type Screen,
+  type ScreenEntry,
+  sizeCells,
+} from "./screen.js";
 
 /**
  * The Screen's responsive composition, without a DOM.
@@ -16,20 +22,30 @@ import { isScreenRow, type Screen, type ScreenEntry } from "./screen.js";
 /** The width below which the host uses one column and scrolls rows. */
 export const SCREEN_LAYOUT_NARROW_WIDTH = 760;
 
-/** The wide layout is a two-column grid; a row spans it by its size class. */
-export const SCREEN_LAYOUT_COLUMNS = 2;
+/** The wide layout is the document's four-cell grid; a row spans it by its size. */
+export const SCREEN_LAYOUT_COLUMNS = SCREEN_GRID_COLUMNS;
 
 export interface ScreenLayoutViewport {
   readonly width: number;
 }
 
-export interface ScreenWidgetLayout {
+/** Where one entry sits, in grid cells, before the phone fallback. */
+export interface ScreenPlacementCells {
+  readonly x: number;
+  readonly y: number;
+  /** Cells wide on a wide window; always 1 on a narrow window. */
+  readonly w: number;
+  /** Cells tall on a wide window; always 1 on a narrow window. */
+  readonly h: number;
+}
+
+export interface ScreenWidgetLayout extends ScreenPlacementCells {
   readonly kind: "widget";
   readonly index: number;
   readonly registryId: string;
   readonly size: SuiteWidgetSize;
-  /** Grid columns out of `SCREEN_LAYOUT_COLUMNS`; always 1 on a narrow window. */
-  readonly span: 1 | 2;
+  /** `w`, kept as the name older renderers read. */
+  readonly span: number;
 }
 
 export interface ScreenRowItemLayout {
@@ -39,7 +55,7 @@ export interface ScreenRowItemLayout {
   readonly basis: string;
 }
 
-export interface ScreenRowPlacement {
+export interface ScreenRowPlacement extends ScreenPlacementCells {
   readonly kind: "row";
   readonly index: number;
   readonly size: SuiteWidgetSize;
@@ -54,14 +70,9 @@ export interface ScreenRowPlacement {
 export type ScreenEntryLayout = ScreenWidgetLayout | ScreenRowPlacement;
 
 export interface ScreenLayout {
-  readonly columns: 1 | 2;
+  readonly columns: 1 | typeof SCREEN_GRID_COLUMNS;
   readonly narrow: boolean;
   readonly entries: readonly ScreenEntryLayout[];
-}
-
-function spanFor(size: SuiteWidgetSize, narrow: boolean): 1 | 2 {
-  if (narrow || size === "1x1") return 1;
-  return 2;
 }
 
 function rowMode(entry: ScreenEntry, narrow: boolean): "wrap" | "scroll" {
@@ -84,9 +95,22 @@ function rowItems(entry: ScreenEntry): readonly ScreenRowItemLayout[] {
 export function screenLayout(screen: Screen, viewport: ScreenLayoutViewport): ScreenLayout {
   const narrow = viewport.width < SCREEN_LAYOUT_NARROW_WIDTH;
   const columns = narrow ? 1 : SCREEN_LAYOUT_COLUMNS;
-  const entries = screen.widgets.map((entry, index): ScreenEntryLayout => {
+  // Visual order on a wide window is the grid, not the document array: an entry may
+  // have been moved to an earlier row. `index` keeps its document identity.
+  const ordered = screen.widgets
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => a.entry.y - b.entry.y || a.entry.x - b.entry.x || a.index - b.index);
+  const entries = ordered.map(({ entry, index }): ScreenEntryLayout => {
+    const cells = sizeCells(entry.size);
+    const placement = {
+      x: narrow ? 0 : entry.x,
+      y: narrow ? 0 : entry.y,
+      w: narrow ? 1 : cells.w,
+      h: narrow ? 1 : cells.h,
+    };
     if (isScreenRow(entry)) {
       return {
+        ...placement,
         kind: "row",
         index,
         size: entry.size,
@@ -95,11 +119,12 @@ export function screenLayout(screen: Screen, viewport: ScreenLayoutViewport): Sc
       };
     }
     return {
+      ...placement,
       kind: "widget",
       index,
       registryId: entry.registryId,
       size: entry.size,
-      span: spanFor(entry.size, narrow),
+      span: placement.w,
     };
   });
 
@@ -123,6 +148,8 @@ export function flattenScreenEntries(screen: Screen): readonly ScreenEntry[] {
       entries.push({
         registryId: item.registryId,
         size: entry.size,
+        x: entry.x,
+        y: entry.y,
         ...(item.settings === undefined ? {} : { settings: item.settings }),
       });
     }

@@ -1,9 +1,35 @@
 import {
   type ScreenRefusal,
+  findFreePlacement,
+  type OccupiedPlacement,
   SUITE_SCREEN_FORMAT,
   SUITE_SCREEN_VERSION,
   screenCorruption,
 } from "./screen.js";
+import type { SuiteWidgetSize } from "@suite/contracts";
+
+const KNOWN_SIZES = new Set<string>(["1x1", "1x2", "2x1", "2x2", "full"]);
+
+/**
+ * Pack version-2 entries into the four-cell grid in document order.
+ *
+ * Version 2 had order and size but no coordinates. The first free cell, scanning left
+ * to right and top to bottom, is the closest thing to that order a grid can express. No
+ * entry is dropped; a Screen that already fills the visible rows simply grows.
+ */
+function packEntries(entries: readonly unknown[]): readonly unknown[] {
+  const placed: OccupiedPlacement[] = [];
+  return entries.map((entry) => {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return entry;
+    const record = entry as Record<string, unknown>;
+    const size = (
+      typeof record.size === "string" && KNOWN_SIZES.has(record.size) ? record.size : "1x1"
+    ) as SuiteWidgetSize;
+    const cell = findFreePlacement(placed, size);
+    placed.push({ ...cell, size });
+    return { ...record, ...cell };
+  });
+}
 
 /**
  * The one migration chain a Screen travels, wherever its bytes came from.
@@ -34,6 +60,19 @@ export const SCREEN_MIGRATIONS: readonly ScreenMigrationStep[] = [
     from: 1,
     to: 2,
     migrate: (screen) => ({ ...screen, version: 2 }),
+  },
+  {
+    /**
+     * Version 3 places every entry on the four-cell grid. The pack keeps document order
+     * and size; nothing is dropped or reshaped.
+     */
+    from: 2,
+    to: 3,
+    migrate: (screen) => ({
+      ...screen,
+      version: 3,
+      widgets: Array.isArray(screen.widgets) ? packEntries(screen.widgets) : screen.widgets,
+    }),
   },
 ];
 

@@ -5,13 +5,16 @@ export declare const suiteWidgetIdSchema: z.ZodString;
 /**
  * The size classes a layout may place a widget at.
  *
- * Three classes, because a host surface is a grid: one cell, two cells, or the whole row.
- * `full` is what the app grid uses by default.
+ * The Screen is a four-cell-wide grid: one or two cells in each direction, or the whole
+ * row. `full` is what the app grid uses by default. A widget declares the subset it can
+ * draw, so adding a class here never forces a widget to support it.
  */
-export declare const SUITE_WIDGET_SIZES: readonly ["1x1", "2x1", "full"];
+export declare const SUITE_WIDGET_SIZES: readonly ["1x1", "1x2", "2x1", "2x2", "full"];
 export declare const suiteWidgetSizeSchema: z.ZodEnum<{
     "1x1": "1x1";
+    "1x2": "1x2";
     "2x1": "2x1";
+    "2x2": "2x2";
     full: "full";
 }>;
 export type SuiteWidgetSize = (typeof SUITE_WIDGET_SIZES)[number];
@@ -151,7 +154,9 @@ export declare const suiteWidgetSchema: z.ZodObject<{
     title: z.ZodString;
     size: z.ZodEnum<{
         "1x1": "1x1";
+        "1x2": "1x2";
         "2x1": "2x1";
+        "2x2": "2x2";
         full: "full";
     }>;
     capabilities: z.ZodArray<z.ZodEnum<{
@@ -191,7 +196,9 @@ export declare const suiteWidgetsSchema: z.ZodArray<z.ZodObject<{
     title: z.ZodString;
     size: z.ZodEnum<{
         "1x1": "1x1";
+        "1x2": "1x2";
         "2x1": "2x1";
+        "2x2": "2x2";
         full: "full";
     }>;
     capabilities: z.ZodArray<z.ZodEnum<{
