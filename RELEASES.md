@@ -4,7 +4,7 @@
      in its changelog. Do not edit the table; edit those files and regenerate. -->
 
 The signed Flatpak remote is the update path. This page is the human mirror of the
-[rolling Suite Desk + Suite Go 2026-11-25 release](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-2026.11.25), which is the repository's
+[rolling Suite Desk + Suite Go 2026-11-27 release](https://github.com/mrrnbhd/suite-apps/releases/tag/suite-2026.11.27), which is the repository's
 "Latest" release on GitHub. Only the two superapps have a release page; a pack carries
 a signed version.
 
@@ -37,15 +37,15 @@ build can still be `alpha`.
 
 | App | Channel | Maturity | Version | Install |
 | --- | --- | --- | --- | --- |
-| [Suite Desk](https://github.com/mrrnbhd/suite-apps/blob/main/hosts/desk/CHANGELOG.md) | stable | alpha | 0.4.0 | `flatpak install --user suite run.suite.desk` |
+| [Suite Desk](https://github.com/mrrnbhd/suite-apps/blob/main/hosts/desk/CHANGELOG.md) | stable | alpha | 0.5.0 | `flatpak install --user suite run.suite.desk` |
 
 ## Mobile
 
 | App | Channel | Maturity | Version | Install |
 | --- | --- | --- | --- | --- |
-| [Suite Go](https://github.com/mrrnbhd/suite-apps/blob/main/hosts/go/CHANGELOG.md) | stable | pre-alpha | 0.2.0 | [suite-go-0.2.0.apk](https://github.com/mrrnbhd/suite-apps/releases/download/suite-2026.11.25/suite-go-0.2.0.apk) |
+| [Suite Go](https://github.com/mrrnbhd/suite-apps/blob/main/hosts/go/CHANGELOG.md) | stable | pre-alpha | 0.3.0 | [suite-go-0.3.0.apk](https://github.com/mrrnbhd/suite-apps/releases/download/suite-2026.11.27/suite-go-0.3.0.apk) |
 
-Suite Go is not a Flatpak. This release carries its release-signed APK, [suite-go-0.2.0.apk](https://github.com/mrrnbhd/suite-apps/releases/download/suite-2026.11.25/suite-go-0.2.0.apk),
+Suite Go is not a Flatpak. This release carries its release-signed APK, [suite-go-0.3.0.apk](https://github.com/mrrnbhd/suite-apps/releases/download/suite-2026.11.27/suite-go-0.3.0.apk),
 with a SHA-256 checksum beside it; sideload it with `adb install -r -t`.
 
 ## Update
