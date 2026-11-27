@@ -1376,6 +1376,7 @@ function requestRemove(registryId, button) {
 function beginDrag(event, tile, widget) {
   if (!editing || event.button !== 0) return;
   const grid = elements.widgets;
+  if (grid.dataset.narrow === "true") return;
   const rect = grid.getBoundingClientRect();
   if (rect.width === 0) return;
   const cellW = rect.width / 4;
@@ -1419,6 +1420,7 @@ function beginDrag(event, tile, widget) {
 function beginResize(event, tile, widget) {
   if (!editing || event.button !== 0) return;
   const grid = elements.widgets;
+  if (grid.dataset.narrow === "true") return;
   const rect = grid.getBoundingClientRect();
   if (rect.width === 0) return;
   const cellW = rect.width / 4;
@@ -1625,6 +1627,7 @@ function rowTile(row, narrow = false) {
 
 function renderWidgets(view) {
   const fragment = document.createDocumentFragment();
+  elements.widgets.dataset.narrow = view.narrow ? "true" : "false";
   view.widgets.forEach((entry, index) => {
     fragment.append(
       entry.kind === "row"
