@@ -277,7 +277,11 @@ const navControlSchema = z.discriminatedUnion("kind", [
 				.max(MENU_SLOTS_MAX_ITEMS),
 			help: helpSchema.optional(),
 		})
-		.strict(),
+		.strict()
+		.refine(
+			(control) => control.options.some((option) => option.id === control.value),
+			"segmented value must match one of the declared options",
+		),
 ]);
 
 /**

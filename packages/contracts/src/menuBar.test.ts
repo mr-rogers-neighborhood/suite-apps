@@ -146,7 +146,9 @@ describe("menu-bar slots", () => {
 					kind: "segmented",
 					id: "planner.group",
 					label: "Group by",
-					value: "Group by day",
+					// A valid slot id that is simply not one of the options: the whitespace
+					// case only proved the id regex, not the cross-field rule.
+					value: "planner.group.missing",
 					options: [{ id: "planner.group.day", label: "Day" }],
 				},
 			],
