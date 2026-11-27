@@ -393,10 +393,21 @@ export class ShellWindow {
       await this.activateTab(open[0]);
       return;
     }
-    await this.#openPackTab(pack, { kind: "document", documentId }, documentId, {
+    const title = await this.#documentTitle(packId, documentId);
+    await this.#openPackTab(pack, { kind: "document", documentId }, title, {
       packId,
       documentId,
     });
+  }
+
+  /** The picker already listed the name; read it again rather than showing a file id. */
+  async #documentTitle(packId: string, documentId: string): Promise<string> {
+    try {
+      const documents = await this.#listDocuments(packId);
+      return documents.find((document) => document.id === documentId)?.name ?? documentId;
+    } catch {
+      return documentId;
+    }
   }
 
   /** Ask a pack to make a document and open it. The tab is named before the pack answers. */
