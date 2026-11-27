@@ -419,6 +419,36 @@ describe("versionCode monotonicity", () => {
     assert.match(verdict.note, /No published release manifest records a versionCode/u);
   });
 
+  it("treats a release with no assets as no manifest, not a failure", () => {
+    // A Desk-only slop page carries no release-manifest.json. gh says "no assets
+    // to download"; that is the same fact as a missing manifest, not an error.
+    const tag = "suite-slop-2026.11.27-abc1234";
+    const gh = (args) => {
+      if (args[0] === "release" && args[1] === "list") {
+        return {
+          status: 0,
+          stdout: JSON.stringify([{ tagName: tag, isDraft: false }]),
+          stderr: "",
+          error: null,
+        };
+      }
+      return {
+        status: 1,
+        stdout: "",
+        stderr: `could not download release-manifest.json from ${tag}:\n  no assets to download`,
+        error: null,
+      };
+    };
+    const verdict = versionCodePreflight({
+      channel: "slop",
+      packageId: "run.suite.slop.go",
+      versionCode: 4,
+      gh,
+    });
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.previous, null);
+  });
+
   it("permits an equal code as a rebuild of the same app version", () => {
     const verdict = versionCodePreflight({
       channel: "nightly",
